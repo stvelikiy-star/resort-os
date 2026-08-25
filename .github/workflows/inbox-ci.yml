@@ -1,0 +1,182 @@
+name: Unified Inbox CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  inbox:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      PREPAYMENT_PERCENT: 30
+      AUTOMATION_SERVICE_KEY: CI-INBOX-SERVICE-KEY-2026
+      AUTOMATION_SERVICE_NAME: ci-channel-adapter
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate and create database schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile API
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply constraints and seed
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start Core API
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/inbox-api.log 2>&1 &
+          echo $! > /tmp/inbox-api.pid
+          sleep 3
+          curl --fail http://127.0.0.1:8000/ready > /tmp/ready.json
+          python -c 'import json; d=json.load(open("/tmp/ready.json")); assert d["room_count"] == 84; assert d["room_type_count"] == 12'
+
+      - name: Reject unauthenticated normalized ingress
+        run: |
+          CODE=$(curl -sS -o /tmp/inbox-no-auth.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/automation/inbox/messages \
+            -H 'Content-Type: application/json' \
+            -d '{"idempotency_key":"ci-inbox-noauth-001","channel_code":"TG_MAIN","channel_kind":"TELEGRAM","channel_display_name":"Telegram","external_conversation_id":"chat-1","direction":"INBOUND","sender_type":"GUEST","text":"Здравствуйте"}')
+          test "$CODE" = "401"
+
+      - name: Ingest one inbound message and prove idempotency
+        run: |
+          cat > /tmp/inbound.json <<'JSON'
+          {"idempotency_key":"ci-inbox-message-001","channel_code":"TG_MAIN","channel_kind":"TELEGRAM","channel_display_name":"Telegram","external_account_id":"bot-test","external_conversation_id":"tg-chat-100","external_contact_id":"tg-user-100","contact_name":"Inbox CI Guest","contact_phone":"+996700000123","contact_username":"ci_guest","direction":"INBOUND","external_message_id":"tg-message-100","sender_type":"GUEST","sender_external_id":"tg-user-100","text":"Нужен номер на двоих","content_type":"TEXT","delivery_status":"RECEIVED"}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/inbox/messages \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/inbound.json > /tmp/inbox-first.json
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/inbox/messages \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/inbound.json > /tmp/inbox-replay.json
+          python - <<'PY'
+          import json
+          first=json.load(open('/tmp/inbox-first.json'))
+          replay=json.load(open('/tmp/inbox-replay.json'))
+          assert first['idempotent_replay'] is False
+          assert first['direction'] == 'INBOUND'
+          assert replay['idempotent_replay'] is True
+          assert replay['id'] == first['id']
+          open('/tmp/conversation-id','w').write(first['conversation_id'])
+          PY
+
+      - name: Login manager and verify needs-reply control
+        run: |
+          curl --fail -sS -c /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/owner-login.json
+          curl --fail -sS -b /tmp/owner-cookies.txt 'http://127.0.0.1:8000/api/v1/admin/inbox/conversations?needs_reply=true' > /tmp/needs-reply.json
+          python - <<'PY'
+          import json
+          cid=open('/tmp/conversation-id').read().strip()
+          d=json.load(open('/tmp/needs-reply.json'))
+          rows=[x for x in d['items'] if x['id']==cid]
+          assert len(rows)==1
+          assert rows[0]['needs_reply'] is True
+          assert rows[0]['contact_name']=='Inbox CI Guest'
+          PY
+
+      - name: Manager claims conversation and adds internal note
+        run: |
+          CID=$(cat /tmp/conversation-id)
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/claim" > /tmp/claim.json
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/notes" \
+            -H 'Content-Type: application/json' -d '{"text":"Уточнить даты и состав гостей"}' > /tmp/note.json
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID" > /tmp/detail-with-note.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/detail-with-note.json'))
+          notes=[m for m in d['messages'] if m['direction']=='INTERNAL']
+          assert len(notes)==1
+          assert 'Уточнить даты' in notes[0]['text']
+          assert d['conversation']['needs_reply'] is True
+          PY
+
+      - name: Ingest provider-evidenced outbound reply and clear needs-reply
+        run: |
+          cat > /tmp/outbound.json <<'JSON'
+          {"idempotency_key":"ci-inbox-message-002","channel_code":"TG_MAIN","channel_kind":"TELEGRAM","channel_display_name":"Telegram","external_account_id":"bot-test","external_conversation_id":"tg-chat-100","external_contact_id":"tg-user-100","contact_name":"Inbox CI Guest","contact_phone":"+996700000123","direction":"OUTBOUND","external_message_id":"tg-message-101","sender_type":"STAFF","sender_external_id":"ci-owner","text":"Здравствуйте. Уточните даты заезда и выезда.","content_type":"TEXT","delivery_status":"SENT"}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/inbox/messages \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/outbound.json > /tmp/outbound-result.json
+          CID=$(cat /tmp/conversation-id)
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID" > /tmp/detail-after-outbound.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/detail-after-outbound.json'))
+          assert d['conversation']['needs_reply'] is False
+          assert d['conversation']['first_response_at'] is not None
+          outbound=[m for m in d['messages'] if m['direction']=='OUTBOUND']
+          assert len(outbound)==1
+          assert outbound[0]['delivery_status']=='SENT'
+          PY
+
+      - name: Verify command center communication metrics and resolve conversation
+        run: |
+          curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/dashboard > /tmp/dashboard.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/dashboard.json'))
+          assert 'communications' in d
+          assert d['communications']['active'] >= 1
+          assert d['communications']['needs_reply'] == 0
+          assert d['communications']['sla_rule'] is None
+          PY
+          CID=$(cat /tmp/conversation-id)
+          curl --fail -sS -b /tmp/owner-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"RESOLVED"}' > /tmp/resolved.json
+          python -c 'import json; assert json.load(open("/tmp/resolved.json"))["status"] == "RESOLVED"'
+
+      - name: Typecheck and build PMS Inbox UI
+        working-directory: apps/admin
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/inbox-api.log || true
