@@ -65,6 +65,8 @@ type ResizeDraft = {
   checkOut: string;
 };
 
+type DailyView = "ALL" | "ARRIVALS" | "DEPARTURES" | "IN_HOUSE" | "FREE_TODAY";
+
 const STATE_LABELS: Record<Room["operational_state"], string> = {
   UNKNOWN: "Не указан",
   CLEAN: "Готов",
@@ -72,6 +74,14 @@ const STATE_LABELS: Record<Room["operational_state"], string> = {
   IN_INSPECTION: "Проверка",
   TECH_BLOCK: "Ремонт",
 };
+
+const VIEW_LABELS: Array<{ key: DailyView; label: string }> = [
+  { key: "ALL", label: "Все номера" },
+  { key: "ARRIVALS", label: "Заезды сегодня" },
+  { key: "DEPARTURES", label: "Выезды сегодня" },
+  { key: "IN_HOUSE", label: "Проживают" },
+  { key: "FREE_TODAY", label: "Свободны сегодня" },
+];
 
 function localDateString(value: Date) {
   const y = value.getFullYear();
@@ -138,6 +148,7 @@ export default function PMSGridV2() {
   const [search, setSearch] = useState("");
   const [roomType, setRoomType] = useState("ALL");
   const [state, setState] = useState("ALL");
+  const [dailyView, setDailyView] = useState<DailyView>("ALL");
   const [refreshToken, setRefreshToken] = useState(0);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [selectedReservation, setSelectedReservation] = useState<ReservationOpen | null>(null);
@@ -218,15 +229,6 @@ export default function PMSGridV2() {
     return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1], "ru"));
   }, [data]);
 
-  const rooms = useMemo(() => {
-    if (!data) return [];
-    const query = search.trim().toLocaleLowerCase("ru");
-    return data.rooms.filter((room) => {
-      const text = [room.code, room.room_type_name, room.building_or_zone || "", room.floor || ""].join(" ").toLocaleLowerCase("ru");
-      return (!query || text.includes(query)) && (roomType === "ALL" || room.room_type_code === roomType) && (state === "ALL" || room.operational_state === state);
-    });
-  }, [data, roomType, search, state]);
-
   const reservationBounds = useMemo(() => {
     const result = new Map<string, ReservationBounds>();
     if (!data) return result;
@@ -245,6 +247,49 @@ export default function PMSGridV2() {
     }
     return result;
   }, [data]);
+
+  function roomMatchesDailyView(room: Room, view: DailyView) {
+    if (view === "ALL") return true;
+    const hasAnyBlockToday = room.blocks.some((block) => block.start <= today && today < block.end);
+    if (view === "FREE_TODAY") return room.operational_state !== "TECH_BLOCK" && !hasAnyBlockToday;
+
+    return room.blocks.some((block) => {
+      if (block.type !== "RESERVATION" || !block.reservation_id) return false;
+      const bounds = reservationBounds.get(block.reservation_id);
+      if (!bounds) return false;
+      if (view === "ARRIVALS") {
+        return block.reservation_status === "GUARANTEED" && bounds.start === today && block.start === bounds.start;
+      }
+      if (view === "DEPARTURES") {
+        return block.reservation_status === "CHECKED_IN" && bounds.end === today && block.end === bounds.end;
+      }
+      if (view === "IN_HOUSE") {
+        return block.reservation_status === "CHECKED_IN" && block.start <= today && today < block.end;
+      }
+      return true;
+    });
+  }
+
+  const rooms = useMemo(() => {
+    if (!data) return [];
+    const query = search.trim().toLocaleLowerCase("ru");
+    return data.rooms.filter((room) => {
+      const text = [room.code, room.room_type_name, room.building_or_zone || "", room.floor || ""].join(" ").toLocaleLowerCase("ru");
+      return (!query || text.includes(query))
+        && (roomType === "ALL" || room.room_type_code === roomType)
+        && (state === "ALL" || room.operational_state === state)
+        && roomMatchesDailyView(room, dailyView);
+    });
+  }, [data, roomType, search, state, dailyView, reservationBounds, today]);
+
+  const dailyCounts = useMemo(() => {
+    const result: Record<DailyView, number> = { ALL: 0, ARRIVALS: 0, DEPARTURES: 0, IN_HOUSE: 0, FREE_TODAY: 0 };
+    if (!data) return result;
+    for (const room of data.rooms) {
+      for (const view of VIEW_LABELS) if (roomMatchesDailyView(room, view.key)) result[view.key] += 1;
+    }
+    return result;
+  }, [data, reservationBounds, today]);
 
   const counts = useMemo(() => {
     const result: Record<Room["operational_state"] | "TOTAL", number> = { TOTAL: rooms.length, UNKNOWN: 0, CLEAN: 0, DIRTY: 0, IN_INSPECTION: 0, TECH_BLOCK: 0 };
@@ -378,6 +423,10 @@ export default function PMSGridV2() {
       <div className="date-actions"><button className="btn" onClick={() => setStart(addDays(start, -7))}>←</button><button className="btn" onClick={() => setStart(parseDateOnly(today))}>Сегодня</button><button className="btn" onClick={() => setStart(addDays(start, 7))}>→</button><button className="btn primary" onClick={() => setRefreshToken((x) => x + 1)}>Обновить</button></div>
     </section>
 
+    <section className="pms-daily-views" aria-label="Быстрые режимы ресепшена">
+      {VIEW_LABELS.map((item) => <button key={item.key} className={dailyView === item.key ? "active" : ""} onClick={() => setDailyView(item.key)}><span>{item.label}</span><strong>{dailyCounts[item.key]}</strong></button>)}
+    </section>
+
     <section className="summary">
       <div className="summary-card"><strong>{counts.TOTAL}</strong><span>Показано</span></div>
       <div className="summary-card"><strong>{counts.CLEAN}</strong><span>Готовы</span></div>
@@ -390,7 +439,7 @@ export default function PMSGridV2() {
     <section className="pms-v2-card">
       <div className="pms-v2-toolbar"><div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div><div className="pms-v2-help"><span>Перетащить = номер + дата</span><span>Потянуть внешний край = даты</span><span>Клик = карточка / переселение / заезд</span></div></div>
       {error && <div className="error-box">{error}</div>}
-      {loading && !data ? <div className="loading">Загрузка шахматки…</div> : rooms.length === 0 ? <div className="empty">Нет номеров по фильтрам.</div> : <div className="pms-v2-scroll">
+      {loading && !data ? <div className="loading">Загрузка шахматки…</div> : rooms.length === 0 ? <div className="empty">Нет номеров по выбранным фильтрам.</div> : <div className="pms-v2-scroll">
         <div className="pms-v2-board" style={{ minWidth: `${308 + windowDays * 72}px` }}>
           <div className="pms-v2-header" style={{ gridTemplateColumns }}>
             <div className="v2-room-head">Номер</div><div className="v2-state-head">Статус</div>
