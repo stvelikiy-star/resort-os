@@ -53,6 +53,13 @@ enum InventoryBlockType {
   MANUAL
 }
 
+enum StaffRole {
+  OWNER
+  MANAGER
+  MAID
+  TECHNICIAN
+}
+
 model Property {
   id           String               @id @default(uuid()) @db.Uuid
   code         String               @unique
@@ -66,6 +73,7 @@ model Property {
   requests     ReservationRequest[]
   reservations Reservation[]
   auditLogs    AuditLog[]
+  staffUsers   StaffUser[]
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
@@ -196,25 +204,25 @@ model ReservationRequest {
 }
 
 model Reservation {
-  id             String            @id @default(uuid()) @db.Uuid
-  propertyId     String            @db.Uuid
-  property       Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  requestId      String?           @unique @db.Uuid
+  id             String              @id @default(uuid()) @db.Uuid
+  propertyId     String              @db.Uuid
+  property       Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requestId      String?             @unique @db.Uuid
   request        ReservationRequest? @relation(fields: [requestId], references: [id])
-  bookingNumber  String            @unique
-  primaryGuestId String?           @db.Uuid
-  primaryGuest   Guest?            @relation(fields: [primaryGuestId], references: [id])
-  status         ReservationStatus @default(GUARANTEED)
-  checkIn        DateTime          @db.Date
-  checkOut       DateTime          @db.Date
+  bookingNumber  String              @unique
+  primaryGuestId String?             @db.Uuid
+  primaryGuest   Guest?              @relation(fields: [primaryGuestId], references: [id])
+  status         ReservationStatus   @default(GUARANTEED)
+  checkIn        DateTime            @db.Date
+  checkOut       DateTime            @db.Date
   adults         Int
-  children       Int               @default(0)
+  children       Int                 @default(0)
   totalKgs       Int
   notes          String?
   blocks         InventoryBlock[]
   payments       Payment[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@index([propertyId, checkIn, checkOut])
   @@map("reservations")
@@ -239,27 +247,60 @@ model InventoryBlock {
 }
 
 model Payment {
-  id            String        @id @default(uuid()) @db.Uuid
-  requestId     String?       @db.Uuid
+  id            String              @id @default(uuid()) @db.Uuid
+  requestId     String?             @db.Uuid
   request       ReservationRequest? @relation(fields: [requestId], references: [id])
-  reservationId String?       @db.Uuid
-  reservation   Reservation?  @relation(fields: [reservationId], references: [id])
+  reservationId String?             @db.Uuid
+  reservation   Reservation?        @relation(fields: [reservationId], references: [id])
   amountKgs     Int
   method        String
-  status        PaymentStatus @default(PENDING)
+  status        PaymentStatus       @default(PENDING)
   externalRef   String?
   paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([requestId])
   @@index([reservationId])
   @@map("payments")
 }
 
+model StaffUser {
+  id           String        @id @default(uuid()) @db.Uuid
+  propertyId   String        @db.Uuid
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  username     String
+  displayName  String
+  passwordHash String
+  role         StaffRole
+  isActive     Boolean       @default(true)
+  sessions     AuthSession[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([propertyId, username])
+  @@index([propertyId, role])
+  @@map("staff_users")
+}
+
+model AuthSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       StaffUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastSeenAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
 model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  propertyId String?  @db.Uuid
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String?   @db.Uuid
   property   Property? @relation(fields: [propertyId], references: [id])
   actorType  String
   actorId    String?
@@ -270,7 +311,7 @@ model AuditLog {
   result     String
   beforeJson Json?
   afterJson  Json?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([propertyId, createdAt])
   @@map("audit_logs")
