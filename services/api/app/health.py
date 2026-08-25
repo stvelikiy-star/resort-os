@@ -6,12 +6,14 @@ PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 router = APIRouter(tags=["health"])
 
 
-@router.get("/live")
+@router.get("/health/live")
+@router.get("/live", include_in_schema=False)
 async def live():
     return {"status": "ok", "service": "three-crowns-core", "probe": "liveness"}
 
 
-@router.get("/ready")
+@router.get("/health/ready")
+@router.get("/ready", include_in_schema=False)
 async def ready(request: Request):
     try:
         async with request.app.state.db.acquire() as conn:
