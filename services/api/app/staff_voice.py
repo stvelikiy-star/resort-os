@@ -3,10 +3,9 @@ import json
 import os
 import re
 import uuid
-from typing import Any
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, HTTPException, Request
 
 router = APIRouter(prefix="/api/v1/channels/telegram/staff", tags=["channel-telegram-staff"])
 
@@ -41,15 +40,28 @@ def _normalize_room_code(value: str) -> str:
 
 
 def _room_matches(transcript: str, room_codes: list[str]) -> list[str]:
-    normalized_text = transcript.upper().replace("Ё", "Е")
+    """Return only conservative, explicit room-code matches.
+
+    Short numeric room codes (1..6 in the current inventory) are accepted only
+    when spoken/written with a room marker such as 'номер', 'комната' or '№'.
+    This prevents phrases like '1 этаж' from blocking room 1. Three-digit and
+    alphanumeric room codes may match as standalone tokens; letters may be
+    separated from digits by whitespace (for example '1 А').
+    """
+    text = transcript.upper().replace("Ё", "Е")
     matches: list[str] = []
     for room_code in room_codes:
         code = _normalize_room_code(room_code)
         if not code:
             continue
-        pattern = rf"(?<![\w]){re.escape(code)}(?![\w])"
-        compact_text = re.sub(r"\s+", "", normalized_text) if any(ch.isalpha() for ch in code) else normalized_text
-        if re.search(pattern, compact_text):
+        if code.isdigit() and len(code) <= 2:
+            pattern = rf"(?:\bНОМЕР(?:Е|А)?\s*|\bКОМНАТ(?:А|Е|У|Ы)\s*|№\s*){re.escape(code)}(?!\d)"
+        elif code.isdigit():
+            pattern = rf"(?<!\d){re.escape(code)}(?!\d)"
+        else:
+            spaced_code = r"\s*".join(re.escape(ch) for ch in code)
+            pattern = rf"(?<![\w]){spaced_code}(?![\w])"
+        if re.search(pattern, text):
             matches.append(room_code)
     return matches
 
