@@ -18,24 +18,6 @@ async def property_context(conn, property_code: str):
     return row
 
 
-async def first_room_for_reservation(conn, reservation_id: uuid.UUID):
-    return await conn.fetchrow(
-        '''
-        SELECT room.id,room.code,room."operationalState"::text AS room_state,
-               ib."startDate",ib."endDate"
-        FROM inventory_blocks ib
-        JOIN rooms room ON room.id=ib."roomId"
-        WHERE ib."reservationId"=$1
-          AND ib."blockType"='RESERVATION'
-          AND ib.active=true
-        ORDER BY ib."startDate" ASC,ib."endDate" ASC
-        LIMIT 1
-        FOR UPDATE OF room,ib
-        ''',
-        reservation_id,
-    )
-
-
 async def room_for_local_date(conn, reservation_id: uuid.UUID, local_date):
     return await conn.fetchrow(
         '''
@@ -60,6 +42,89 @@ async def room_for_local_date(conn, reservation_id: uuid.UUID, local_date):
         reservation_id,
         local_date,
     )
+
+
+async def trim_schedule_for_early_checkout(
+    conn,
+    reservation,
+    local_today,
+):
+    """Release nights after an early checkout without changing commercial total."""
+    if local_today >= reservation["checkOut"]:
+        return False
+    if local_today <= reservation["checkIn"]:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CHECK_OUT_WOULD_CREATE_ZERO_NIGHT_STAY",
+                "planned_check_in": str(reservation["checkIn"]),
+                "actual_local_date": str(local_today),
+            },
+        )
+
+    rows = await conn.fetch(
+        '''
+        SELECT id,"roomId","startDate","endDate"
+        FROM inventory_blocks
+        WHERE "reservationId"=$1
+          AND "blockType"='RESERVATION'
+          AND active=true
+        ORDER BY "startDate","endDate"
+        FOR UPDATE
+        ''',
+        reservation["id"],
+    )
+    if not rows:
+        raise HTTPException(status_code=409, detail="Reservation has no active room schedule")
+
+    retained: list[tuple[Any, Any, Any]] = []
+    for row in rows:
+        if row["endDate"] <= local_today:
+            retained.append((row["roomId"], row["startDate"], row["endDate"]))
+            continue
+        if row["startDate"] < local_today < row["endDate"]:
+            retained.append((row["roomId"], row["startDate"], local_today))
+        break
+
+    if not retained or retained[-1][2] != local_today:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CHECK_OUT_DATE_NOT_IN_SCHEDULE",
+                "actual_local_date": str(local_today),
+            },
+        )
+
+    await conn.execute(
+        '''
+        UPDATE inventory_blocks
+        SET active=false,"updatedAt"=now()
+        WHERE "reservationId"=$1 AND "blockType"='RESERVATION' AND active=true
+        ''',
+        reservation["id"],
+    )
+    for room_id, start_date, end_date in retained:
+        await conn.execute(
+            '''
+            INSERT INTO inventory_blocks (
+              id,"roomId","reservationId","blockType","startDate","endDate",
+              active,reason,"createdAt","updatedAt"
+            ) VALUES ($1,$2,$3,'RESERVATION',$4,$5,true,$6,now(),now())
+            ''',
+            uuid.uuid4(),
+            room_id,
+            reservation["id"],
+            start_date,
+            end_date,
+            reservation["bookingNumber"],
+        )
+
+    await conn.execute(
+        'UPDATE reservations SET "checkOut"=$1,"updatedAt"=now() WHERE id=$2',
+        local_today,
+        reservation["id"],
+    )
+    return True
 
 
 @router.post("/reservations/{reservation_id}/check-in")
@@ -89,13 +154,23 @@ async def check_in(
                 raise HTTPException(status_code=404, detail="Reservation not found")
             if reservation["status"] != "GUARANTEED":
                 raise HTTPException(status_code=409, detail="Only guaranteed reservation can check in")
+            if not (reservation["checkIn"] <= local_today < reservation["checkOut"]):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "CHECK_IN_DATE_OUTSIDE_SCHEDULE",
+                        "planned_check_in": str(reservation["checkIn"]),
+                        "planned_check_out": str(reservation["checkOut"]),
+                        "actual_local_date": str(local_today),
+                        "action": "ADJUST_DATES_IN_CHESSBOARD_FIRST",
+                    },
+                )
 
-            # Check-in always starts in the first active schedule segment. We do not
-            # enforce arrival-date policy here because early/late arrival rules are
-            # not approved; we only enforce physical room readiness.
-            room = await first_room_for_reservation(conn, reservation_id)
-            if not room:
-                raise HTTPException(status_code=409, detail="Reservation has no room assignment for check-in")
+            # The actual check-in room is the schedule segment covering the hotel-local date.
+            # No early/late fee policy is inferred here; only inventory consistency is enforced.
+            room = await room_for_local_date(conn, reservation_id, local_today)
+            if not room or not (room["startDate"] <= local_today < room["endDate"]):
+                raise HTTPException(status_code=409, detail="Reservation has no room assignment for actual check-in date")
             if room["room_state"] != "CLEAN":
                 raise HTTPException(
                     status_code=409,
@@ -157,7 +232,7 @@ async def check_out(
             )
             reservation = await conn.fetchrow(
                 '''
-                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut"
+                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut","totalKgs"
                 FROM reservations
                 WHERE id=$1 AND "propertyId"=$2
                 FOR UPDATE
@@ -169,11 +244,28 @@ async def check_out(
                 raise HTTPException(status_code=404, detail="Reservation not found")
             if reservation["status"] != "CHECKED_IN":
                 raise HTTPException(status_code=409, detail="Only checked-in reservation can check out")
+            if local_today > reservation["checkOut"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "CHECK_OUT_AFTER_SCHEDULE",
+                        "planned_check_out": str(reservation["checkOut"]),
+                        "actual_local_date": str(local_today),
+                        "action": "EXTEND_DATES_IN_CHESSBOARD_FIRST",
+                    },
+                )
 
-            # Multi-room stays are represented as contiguous InventoryBlock segments.
-            # Select the segment occupied today; on the planned checkout date choose
-            # the segment ending today. This avoids cleaning an earlier room after relocation.
+            # Resolve the actually occupied/final segment before an early checkout trims future inventory.
             room = await room_for_local_date(conn, reservation_id, local_today)
+            if not room:
+                raise HTTPException(status_code=409, detail="Reservation has no room assignment for checkout")
+
+            original_check_out = reservation["checkOut"]
+            early_checkout_released_inventory = await trim_schedule_for_early_checkout(
+                conn,
+                reservation,
+                local_today,
+            )
 
             # Historical NFC code remains unchanged/deferred. It is not an active V1 dependency.
             nfc_wallet = await conn.fetchrow(
@@ -212,58 +304,68 @@ async def check_out(
             )
 
             housekeeping_task_id = None
-            if room:
+            await conn.execute(
+                '''UPDATE rooms SET "operationalState"='DIRTY', "updatedAt"=now() WHERE id=$1''',
+                room["id"],
+            )
+            existing_task = await conn.fetchval(
+                '''
+                SELECT id FROM operational_tasks
+                WHERE "roomId"=$1 AND type='HOUSEKEEPING'
+                  AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+                LIMIT 1
+                ''',
+                room["id"],
+            )
+            if existing_task:
+                housekeeping_task_id = existing_task
+            else:
+                housekeeping_task_id = uuid.uuid4()
                 await conn.execute(
-                    '''UPDATE rooms SET "operationalState"='DIRTY', "updatedAt"=now() WHERE id=$1''',
-                    room["id"],
-                )
-                existing_task = await conn.fetchval(
                     '''
-                    SELECT id FROM operational_tasks
-                    WHERE "roomId"=$1 AND type='HOUSEKEEPING'
-                      AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
-                    LIMIT 1
+                    INSERT INTO operational_tasks (
+                      id,"propertyId","roomId",type,status,priority,title,
+                      description,"createdByType","createdById",source,"createdAt","updatedAt"
+                    ) VALUES ($1,$2,$3,'HOUSEKEEPING','OPEN','HIGH',$4,$5,'SYSTEM',$6,'CHECK_OUT',now(),now())
                     ''',
+                    housekeeping_task_id,
+                    pid,
                     room["id"],
+                    f"Уборка после выезда · {room['code']}",
+                    f"Автоматически создано после выезда {reservation['bookingNumber']}",
+                    user["id"],
                 )
-                if existing_task:
-                    housekeeping_task_id = existing_task
-                else:
-                    housekeeping_task_id = uuid.uuid4()
-                    await conn.execute(
-                        '''
-                        INSERT INTO operational_tasks (
-                          id,"propertyId","roomId",type,status,priority,title,
-                          description,"createdByType","createdById",source,"createdAt","updatedAt"
-                        ) VALUES ($1,$2,$3,'HOUSEKEEPING','OPEN','HIGH',$4,$5,'SYSTEM',$6,'CHECK_OUT',now(),now())
-                        ''',
-                        housekeeping_task_id,
-                        pid,
-                        room["id"],
-                        f"Уборка после выезда · {room['code']}",
-                        f"Автоматически создано после выезда {reservation['bookingNumber']}",
-                        user["id"],
-                    )
 
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (
-                  id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
+                  id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"beforeJson","afterJson","createdAt"
                 ) VALUES ($1,$2,'STAFF',$3,'CHECK_OUT','Reservation',$4,'PMS','SUCCESS',
                   jsonb_build_object(
-                    'room_code',$5::text,
-                    'local_date',$6::text,
-                    'housekeeping_task_id',$7::text,
-                    'nfc_frozen',$8::boolean,
-                    'nfc_balance_kgs',$9::int
+                    'status','CHECKED_IN',
+                    'planned_check_out',$5::text,
+                    'stored_total_kgs',$6::int
+                  ),
+                  jsonb_build_object(
+                    'status','CHECKED_OUT',
+                    'room_code',$7::text,
+                    'actual_local_date',$8::text,
+                    'early_checkout_released_inventory',$9::boolean,
+                    'stored_total_kgs',$6::int,
+                    'housekeeping_task_id',$10::text,
+                    'nfc_frozen',$11::boolean,
+                    'nfc_balance_kgs',$12::int
                   ),now())
                 ''',
                 uuid.uuid4(),
                 pid,
                 user["id"],
                 str(reservation_id),
-                room["code"] if room else None,
+                str(original_check_out),
+                reservation["totalKgs"],
+                room["code"],
                 str(local_today),
+                early_checkout_released_inventory,
                 str(housekeeping_task_id) if housekeeping_task_id else None,
                 nfc_frozen,
                 nfc_balance_kgs,
@@ -271,9 +373,13 @@ async def check_out(
     return {
         "reservation_id": str(reservation_id),
         "status": "CHECKED_OUT",
-        "room_code": room["code"] if room else None,
-        "room_state": "DIRTY" if room else None,
+        "room_code": room["code"],
+        "room_state": "DIRTY",
         "housekeeping_task_id": str(housekeeping_task_id) if housekeeping_task_id else None,
+        "actual_check_out": local_today,
+        "planned_check_out_before": original_check_out,
+        "early_checkout_released_inventory": early_checkout_released_inventory,
+        "stored_total_kgs_changed": False,
         "nfc_frozen": nfc_frozen,
         "nfc_balance_kgs": nfc_balance_kgs,
     }
