@@ -17,9 +17,21 @@ type Task = {
   created_at: string;
 };
 type Room = { id: string; code: string; room_type_name: string; operational_state: string };
+type HistoryItem = {
+  id: string;
+  actor_type: string;
+  actor_name?: string | null;
+  actor_role?: string | null;
+  action: string;
+  source?: string | null;
+  result: string;
+  after?: Record<string, unknown> | null;
+  created_at: string;
+};
 
 const typeLabel: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
 const statusLabel: Record<string, string> = { OPEN: "Открыта", IN_PROGRESS: "В работе", IN_INSPECTION: "Проверка", DONE: "Готово", CANCELLED: "Отменена" };
+const actionLabel: Record<string, string> = { CREATE: "Создана", CLAIM: "Взята в работу", STATUS_CHANGE: "Изменён статус", VOICE_MAINTENANCE_INTAKE: "Создана голосом" };
 
 function dateTime(value: string) {
   const date = new Date(value);
@@ -40,6 +52,9 @@ export default function OperationsBoard({ user }: { user: User }) {
   const [roomId, setRoomId] = useState("");
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState("NORMAL");
+  const [historyTaskId, setHistoryTaskId] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,8 +115,31 @@ export default function OperationsBoard({ user }: { user: User }) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || "Не удалось изменить статус");
       await load();
+      if (historyTaskId === task.id) await loadHistory(task.id, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка обновления");
+    }
+  }
+
+  async function loadHistory(taskId: string, force = false) {
+    if (!force && historyTaskId === taskId) {
+      setHistoryTaskId(null);
+      setHistoryItems([]);
+      return;
+    }
+    setHistoryTaskId(taskId);
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/ops/tasks/${taskId}/history`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось загрузить историю задачи");
+      setHistoryItems(body.history || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка истории задачи");
+      setHistoryItems([]);
+    } finally {
+      setHistoryLoading(false);
     }
   }
 
@@ -129,6 +167,7 @@ export default function OperationsBoard({ user }: { user: User }) {
   }
 
   const canCreate = ["OWNER", "MANAGER", "MAID", "TECHNICIAN"].includes(user.role);
+  const canSeeHistory = ["OWNER", "MANAGER"].includes(user.role);
 
   return (
     <main className="work-shell">
@@ -177,7 +216,16 @@ export default function OperationsBoard({ user }: { user: User }) {
             {task.type === "HOUSEKEEPING" && task.status === "IN_INSPECTION" && ["OWNER", "MANAGER"].includes(user.role) && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Принять номер → CLEAN</button>}
             {task.type === "MAINTENANCE" && task.status === "IN_PROGRESS" && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Ремонт завершён</button>}
             {task.type === "GUEST_REQUEST" && task.status === "IN_PROGRESS" && ["OWNER", "MANAGER"].includes(user.role) && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Выполнено</button>}
+            {canSeeHistory && <button className="btn" type="button" onClick={() => loadHistory(task.id)}>{historyTaskId === task.id ? "Скрыть историю" : "История"}</button>}
           </div>
+          {canSeeHistory && historyTaskId === task.id && <div className="task-history">
+            <strong>История действий</strong>
+            {historyLoading ? <span>Загрузка…</span> : historyItems.length === 0 ? <span>Записей пока нет.</span> : historyItems.map((item) => <div className="task-history-row" key={item.id}>
+              <time>{dateTime(item.created_at)}</time>
+              <div><b>{actionLabel[item.action] || item.action}</b><span>{item.actor_name || item.actor_type}{item.actor_role ? ` · ${item.actor_role}` : ""}{item.source ? ` · ${item.source}` : ""}</span></div>
+              {typeof item.after?.status === "string" && <em>{statusLabel[item.after.status] || item.after.status}</em>}
+            </div>)}
+          </div>}
         </article>)}
       </div>}
     </main>
