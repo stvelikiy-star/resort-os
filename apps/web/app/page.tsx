@@ -24,9 +24,30 @@ const amenities = [
   ["Для мероприятий", "Конференц-пространства для групповых и деловых заездов."],
 ];
 
+const hotelJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "LodgingBusiness",
+  name: "Три Короны Resort & SPA",
+  url: "https://3korony.com",
+  email: "3koronykg@mail.ru",
+  telephone: "+996558085002",
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Чолпон-Ата",
+    addressRegion: "Иссык-Кульская область",
+    addressCountry: "KG",
+  },
+  amenityFeature: [
+    { "@type": "LocationFeatureSpecification", name: "Собственный пляж", value: true },
+    { "@type": "LocationFeatureSpecification", name: "SPA", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Открытый бассейн", value: true },
+  ],
+};
+
 export default function HomePage() {
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(hotelJsonLd) }} />
       <header className="site-header">
         <nav className="wrap nav">
           <a className="brand" href="#top" aria-label="Три Короны">
@@ -76,6 +97,14 @@ export default function HomePage() {
 
         <section className="final-cta"><div className="wrap final-row"><div><span className="eyebrow">Бронирование</span><h2 className="display-title light">Выберите даты<br />и проверьте наличие.</h2></div><a className="primary-button gold" href="#booking">Проверить даты</a></div></section>
       </main>
+
+      <footer className="site-footer">
+        <div className="wrap footer-grid">
+          <div><span className="eyebrow">Три Короны</span><h2>Resort & SPA · Чолпон-Ата</h2><p>Иссык-Кульская область, Кыргызстан</p></div>
+          <div><small>Бронирование</small><a href="tel:+996558085002">+996 558 08 50 02</a><small>Менеджеры · WhatsApp / Telegram</small><a href="tel:+996558085008">+996 558 08 50 08</a></div>
+          <div><small>Email</small><a href="mailto:3koronykg@mail.ru">3koronykg@mail.ru</a><small>Сайт</small><a href="https://3korony.com">3korony.com</a></div>
+        </div>
+      </footer>
       <a className="mobile-book" href="#booking">Проверить даты</a>
     </>
   );
