@@ -1,0 +1,169 @@
+name: n8n Resort Core Contract CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  n8n-core-contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      AUTOMATION_SERVICE_KEY: CI-N8N-CORE-CONTRACT-KEY-2026-THREE-CROWNS
+      AUTOMATION_SERVICE_NAME: ci-n8n
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate and create database schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile Core
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply constraints and seed Three Crowns baseline
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/n8n-core-api.log 2>&1 &
+          echo $! > /tmp/n8n-core-api.pid
+          sleep 3
+          curl --fail -sS http://127.0.0.1:8000/ready > /tmp/ready.json
+
+      - name: Reject anonymous automation truth access
+        run: |
+          CODE=$(curl -sS -o /tmp/anonymous.json -w '%{http_code}' http://127.0.0.1:8000/api/v1/automation/read/hotel-facts)
+          test "$CODE" = "401"
+
+      - name: Verify canonical hotel facts
+        run: |
+          curl --fail -sS http://127.0.0.1:8000/api/v1/automation/read/hotel-facts \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" > /tmp/hotel-facts.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/hotel-facts.json'))
+          assert d['property']['code']=='THREE_CROWNS'
+          assert d['inventory']['room_count']==84
+          assert d['inventory']['room_type_count']==12
+          assert d['reservation_rules']['reservation_request_is_reservation'] is False
+          assert d['reservation_rules']['confirmed_prepayment_required_for_valid_reservation'] is True
+          assert d['reservation_rules']['unpaid_request_creates_inventory_hold'] is False
+          assert d['reservation_rules']['old_two_day_unpaid_booking_rule_active'] is False
+          PY
+
+      - name: Verify deterministic availability
+        run: |
+          curl --fail -sS 'http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-27&check_out=2026-08-29&adults=2&children=0' > /tmp/availability.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/availability.json'))
+          assert d['nights']==2
+          assert isinstance(d['results'], list)
+          assert len(d['results'])>0
+          sellable=[x for x in d['results'] if x['pricing']['sellable']]
+          assert sellable
+          first=sellable[0]
+          assert first['pricing']['total_kgs'] and first['pricing']['total_kgs']>0
+          open('/tmp/room-type-code','w').write(first['room_type_code'])
+          PY
+
+      - name: Create ReservationRequest through n8n boundary
+        run: |
+          ROOM_TYPE=$(cat /tmp/room-type-code)
+          cat > /tmp/request.json <<JSON
+          {
+            "idempotency_key":"ci-manychat-event-0001",
+            "channel":"INSTAGRAM_MANYCHAT",
+            "guest_name":"CI Guest",
+            "phone":"+996555000111",
+            "email":null,
+            "check_in":"2026-08-27",
+            "check_out":"2026-08-29",
+            "adults":2,
+            "children":0,
+            "room_type_code":"$ROOM_TYPE",
+            "notes":"CI n8n contract request",
+            "external_message_id":"manychat-event-0001"
+          }
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/reservation-requests \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/request.json > /tmp/request-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/request-result.json'))
+          assert d['status']=='NEW'
+          assert d['is_reservation'] is False
+          open('/tmp/request-id','w').write(d['id'])
+          PY
+
+      - name: Verify request remains non-reservation through read API
+        run: |
+          RID=$(cat /tmp/request-id)
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/automation/read/reservation-requests/$RID" \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" > /tmp/request-status.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/request-status.json'))
+          assert d['request']['status']=='NEW'
+          assert d['request']['is_reservation'] is False
+          assert d['reservation'] is None
+          assert d['payments']['received_kgs']==0
+          PY
+
+      - name: Verify retry idempotency
+        run: |
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/reservation-requests \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" \
+            -H 'Content-Type: application/json' \
+            --data-binary @/tmp/request.json > /tmp/replay.json
+          python - <<'PY'
+          import json
+          original=json.load(open('/tmp/request-result.json'))
+          replay=json.load(open('/tmp/replay.json'))
+          assert replay['idempotent_replay'] is True
+          assert replay['id']==original['id']
+          assert replay['is_reservation'] is False
+          PY
+
+      - name: Show Core logs on failure
+        if: failure()
+        run: cat /tmp/n8n-core-api.log || true
