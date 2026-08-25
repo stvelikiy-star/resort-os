@@ -5,7 +5,7 @@ from pathlib import Path
 import asyncpg
 
 ROOT = Path(__file__).resolve().parents[1]
-SQL_FILE = ROOT / "packages" / "database" / "sql" / "001_core_constraints.sql"
+SQL_DIR = ROOT / "packages" / "database" / "sql"
 
 
 def database_url() -> str:
@@ -14,11 +14,16 @@ def database_url() -> str:
 
 
 async def main() -> None:
-    sql = SQL_FILE.read_text(encoding="utf-8")
+    sql_files = sorted(SQL_DIR.glob("*.sql"))
+    if not sql_files:
+        raise RuntimeError(f"No SQL modules found in {SQL_DIR}")
+
     conn = await asyncpg.connect(database_url())
     try:
-        await conn.execute(sql)
-        print("Core constraints applied")
+        for sql_file in sql_files:
+            await conn.execute(sql_file.read_text(encoding="utf-8"))
+            print(f"Applied {sql_file.name}")
+        print(f"Core SQL applied: {len(sql_files)} module(s)")
     finally:
         await conn.close()
 
