@@ -30,17 +30,18 @@ type ScheduleSegment = {
   area?: string | null;
   start: string;
   end: string;
+  is_working_room: boolean;
 };
 
 type Detail = {
+  local_date: string;
   reservation: { id: string; booking_number: string; status: string; check_in: string; check_out: string; adults: number; children: number; total_kgs: number; notes?: string | null; created_at: string };
   guest: { first_name?: string | null; last_name?: string | null; phone?: string | null; email?: string | null };
   source: { channel?: string | null; request_id?: string | null };
-  room: { code?: string | null; state?: string | null; room_type_name?: string | null; area?: string | null };
+  room: { id: string; code: string; state: string; room_type_code?: string | null; room_type_name?: string | null; area?: string | null; segment_start: string; segment_end: string } | null;
   schedule: ScheduleSegment[];
-  has_room_move: boolean;
   finance: { total_kgs: number; paid_kgs: number; remaining_kgs: number; payments: Array<{ id: string; amount_kgs: number; method: string; status: string; provider?: string | null; external_ref?: string | null; paid_at?: string | null; created_at: string }> };
-  room_tasks: Array<{ id: string; room_code?: string | null; type: string; status: string; priority: string; title: string; assigned_to_name?: string | null; created_at: string }>;
+  room_tasks: Array<{ id: string; room_code: string; type: string; status: string; priority: string; title: string; assigned_to_name?: string | null; created_at: string }>;
   audit: Array<{ id: string; action: string; resource: string; source?: string | null; result: string; created_at: string }>;
 };
 
@@ -49,6 +50,14 @@ type Filter = "ACTIVE" | "ARRIVALS_TODAY" | "DEPARTURES_TODAY" | "GUARANTEED" | 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const statusLabel: Record<string, string> = { GUARANTEED: "Гарантирована", CHECKED_IN: "Проживает", CHECKED_OUT: "Выехал", CANCELLED: "Отменена", NO_SHOW: "Не заехал" };
 const roomStateLabel: Record<string, string> = { CLEAN: "Готов", DIRTY: "Нужна уборка", IN_INSPECTION: "На проверке", TECH_BLOCK: "Ремонт", UNKNOWN: "Не указан" };
+
+function actionError(body: any, fallback: string) {
+  if (typeof body?.detail === "string") return body.detail;
+  if (body?.detail?.code === "CHECK_IN_ROOM_NOT_READY") {
+    return `Номер ${body.detail.room_code || ""} не готов к заселению (${roomStateLabel[body.detail.room_state] || body.detail.room_state || "неизвестный статус"}).`.trim();
+  }
+  return fallback;
+}
 
 export default function ReceptionBoard() {
   const [items, setItems] = useState<Reservation[]>([]);
@@ -99,7 +108,7 @@ export default function ReceptionBoard() {
     try {
       const response = await fetch(`/core/api/v1/admin/stays/reservations/${item.id}/${action}`, { method: "POST" });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось выполнить операцию");
+      if (!response.ok) throw new Error(actionError(body, "Не удалось выполнить операцию"));
       await load();
       if (detail?.reservation.id === item.id) await openDetail(item.id);
     } catch (e) {
@@ -113,7 +122,7 @@ export default function ReceptionBoard() {
     setDetailLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/core/api/v1/admin/reception/reservations/${id}`, { cache: "no-store" });
+      const response = await fetch(`/core/api/v1/admin/booking/reservations/${id}`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || "Не удалось загрузить карточку брони");
       setDetail(body as Detail);
@@ -126,7 +135,7 @@ export default function ReceptionBoard() {
 
   return <main className="work-shell reception-shell">
     <div className="work-head">
-      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже если гостя переселяли между номерами. Текущий номер берётся из графика проживания.</p></div>
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер и история размещения берутся из того же графика, что и шахматка.</p></div>
       <button className="btn" onClick={load}>Обновить</button>
     </div>
 
@@ -150,7 +159,7 @@ export default function ReceptionBoard() {
       {visible.map((item) => <article className="reception-card" key={item.id}>
         <div><span className="status-pill">{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong>{item.has_room_move && <small className="room-move-note">Переселение · {item.schedule_segments} сегм.</small>}</div>
         <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
-        <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small></div>
+        <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small>{item.room_state && <small>{roomStateLabel[item.room_state] || item.room_state}</small>}</div>
         <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
         <div><span className="field-label">Стоимость</span><b>{money(item.totalKgs)}</b></div>
         <div className="reception-actions">
@@ -166,19 +175,19 @@ export default function ReceptionBoard() {
         <header><div><p className="eyebrow">Карточка брони</p><h2>{detail.reservation.booking_number}</h2><span className="status-pill">{statusLabel[detail.reservation.status] || detail.reservation.status}</span></div><button className="btn" onClick={() => setDetail(null)}>Закрыть</button></header>
 
         <div className="detail-summary">
-          <div><span>Гость</span><strong>{[detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Без имени"}</strong><small>{detail.guest.phone || ""}</small><small>{detail.guest.email || ""}</small></div>
-          <div><span>Текущий/рабочий номер</span><strong>{detail.room.code || "—"}</strong><small>{detail.room.room_type_name || ""}{detail.room.area ? ` · ${detail.room.area}` : ""}</small><small>{detail.room.state ? roomStateLabel[detail.room.state] || detail.room.state : ""}</small></div>
+          <div><span>Гость</span><strong>{[detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Без имени"}</strong>{detail.guest.phone && <a href={`tel:${detail.guest.phone}`}>{detail.guest.phone}</a>}{detail.guest.email && <small>{detail.guest.email}</small>}</div>
+          <div><span>Текущий/рабочий номер</span><strong>{detail.room?.code || "—"}</strong><small>{detail.room?.room_type_name || ""}{detail.room?.area ? ` · ${detail.room.area}` : ""}</small><small>{detail.room?.state ? roomStateLabel[detail.room.state] || detail.room.state : "Назначение не найдено"}</small></div>
           <div><span>Проживание</span><strong>{detail.reservation.check_in} → {detail.reservation.check_out}</strong><small>{detail.reservation.adults} взр. · {detail.reservation.children} дет.</small></div>
           <div><span>Источник</span><strong>{detail.source.channel || "—"}</strong><small>{detail.source.request_id ? `Request ${detail.source.request_id.slice(0, 8)}…` : ""}</small></div>
         </div>
 
-        <section className="detail-section"><h3>График проживания</h3><div className="stay-schedule-list">{detail.schedule.map((segment) => <div key={segment.inventory_block_id}><strong>№ {segment.room_code}</strong><span>{segment.start} → {segment.end}</span><small>{segment.room_type_name}{segment.room_state ? ` · ${roomStateLabel[segment.room_state] || segment.room_state}` : ""}</small></div>)}</div></section>
+        <section className="detail-section"><h3>График проживания</h3>{detail.schedule.length === 0 ? <p className="detail-muted">У брони нет активного графика размещения.</p> : <div className="stay-schedule-list">{detail.schedule.map((segment) => <div key={segment.inventory_block_id} className={segment.is_working_room ? "working-room-segment" : ""}><strong>№ {segment.room_code}{segment.is_working_room ? " · сейчас" : ""}</strong><span>{segment.start} → {segment.end}</span><small>{segment.room_type_name}{segment.room_state ? ` · ${roomStateLabel[segment.room_state] || segment.room_state}` : ""}</small></div>)}</div>}</section>
 
         <section className="detail-section"><h3>Внутренние платежи по брони</h3><div className="detail-money"><div><span>Стоимость</span><strong>{money(detail.finance.total_kgs)}</strong></div><div><span>Подтверждено менеджером</span><strong>{money(detail.finance.paid_kgs)}</strong></div><div><span>Остаток</span><strong>{money(detail.finance.remaining_kgs)}</strong></div></div>
           {detail.finance.payments.length > 0 && <div className="detail-rows">{detail.finance.payments.map((payment) => <div key={payment.id}><strong>{money(payment.amount_kgs)}</strong><span>{payment.method} · {payment.provider || "—"}</span><span>{payment.status}</span><small>{payment.paid_at || payment.created_at}</small></div>)}</div>}
         </section>
 
-        <section className="detail-section"><h3>Задачи по номерам проживания</h3>{detail.room_tasks.length === 0 ? <p className="detail-muted">Задач по номерам этой брони нет.</p> : <div className="detail-rows">{detail.room_tasks.map((task) => <div key={task.id}><strong>{task.title}</strong><span>{task.room_code ? `№ ${task.room_code} · ` : ""}{task.type} · {task.priority}</span><span>{task.status}</span><small>{task.assigned_to_name || "Не назначено"}</small></div>)}</div>}</section>
+        <section className="detail-section"><h3>Задачи по номерам проживания</h3>{detail.room_tasks.length === 0 ? <p className="detail-muted">Задач по номерам этой брони нет.</p> : <div className="detail-rows">{detail.room_tasks.map((task) => <div key={task.id}><strong>№ {task.room_code} · {task.title}</strong><span>{task.type} · {task.priority}</span><span>{task.status}</span><small>{task.assigned_to_name || "Не назначено"}</small></div>)}</div>}</section>
 
         <section className="detail-section"><h3>Журнал действий</h3>{detail.audit.length === 0 ? <p className="detail-muted">Записей аудита по брони/заявке нет.</p> : <div className="audit-list">{detail.audit.map((entry) => <div key={entry.id}><strong>{entry.action}</strong><span>{entry.resource} · {entry.source || "—"} · {entry.result}</span><time>{entry.created_at}</time></div>)}</div>}</section>
 
