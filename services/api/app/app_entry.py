@@ -15,6 +15,7 @@ from .operations import router as operations_router
 from .operations_history import router as operations_history_router
 from .realtime import router as realtime_router
 from .reservation_detail import router as reservation_detail_router
+from .room_detail import router as room_detail_router
 from .staff_voice import router as staff_voice_router
 from .stays import router as stays_router
 from .telegram_auth import router as telegram_auth_router
@@ -27,6 +28,7 @@ install_observability(app)
 app.include_router(health_router)
 app.include_router(booking_admin_router)
 app.include_router(reservation_detail_router)
+app.include_router(room_detail_router)
 app.include_router(operations_router)
 app.include_router(operations_history_router)
 app.include_router(stays_router)
@@ -50,4 +52,4 @@ app.include_router(manager_dashboard_router)
 # but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.20.0"
+app.version = "0.21.0"
