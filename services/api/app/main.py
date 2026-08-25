@@ -3,10 +3,11 @@ import uuid
 from datetime import date, timedelta
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 
+from .auth import require_roles, router as auth_router
 from .db import lifespan
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -14,13 +15,13 @@ RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 
 app = FastAPI(
     title="Three Crowns Resort Core API",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
 cors_origins = [
     item.strip()
-    for item in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    for item in os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
     if item.strip()
 ]
 app.add_middleware(
@@ -30,6 +31,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
+app.include_router(auth_router)
 
 
 class ReservationRequestCreate(BaseModel):
@@ -100,11 +102,11 @@ async def price_room_type(conn, room_type_id, check_in: date, check_out: date) -
             nightly.append({"date": night, "price_kgs": None, "status": "MISSING"})
             continue
 
-        status = str(matched["saleStatus"])
+        rate_status = str(matched["saleStatus"])
         price = matched["priceKgs"]
-        if status != "OPEN" or price <= 0:
+        if rate_status != "OPEN" or price <= 0:
             sellable = False
-            reason = "RATE_REQUIRES_CONFIRMATION" if status == "CONFIRM_REQUIRED" else "RATE_CLOSED"
+            reason = "RATE_REQUIRES_CONFIRMATION" if rate_status == "CONFIRM_REQUIRED" else "RATE_CLOSED"
 
         if price > 0:
             total += price
@@ -114,7 +116,7 @@ async def price_room_type(conn, room_type_id, check_in: date, check_out: date) -
                 "date": night,
                 "price_kgs": price,
                 "meal_included": matched["mealIncluded"],
-                "status": status,
+                "status": rate_status,
                 "period": matched["label"],
             }
         )
@@ -291,6 +293,7 @@ async def pms_grid(
     end: date,
     room_type_code: str | None = None,
     operational_state: str | None = None,
+    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER")),
 ):
     if end <= start:
         raise HTTPException(status_code=422, detail="end must be after start")
@@ -336,21 +339,21 @@ async def pms_grid(
         )
 
     blocks_by_room: dict[str, list[dict[str, Any]]] = {}
-    for b in blocks:
-        room_id = str(b["roomId"])
-        guest_name = " ".join(filter(None, [b["firstName"], b["lastName"]])) or None
+    for block in blocks:
+        room_id = str(block["roomId"])
+        guest_name = " ".join(filter(None, [block["firstName"], block["lastName"]])) or None
         blocks_by_room.setdefault(room_id, []).append(
             {
-                "id": str(b["id"]),
-                "type": str(b["blockType"]),
-                "start": b["startDate"],
-                "end": b["endDate"],
-                "reason": b["reason"],
-                "reservation_id": str(b["reservation_id"]) if b["reservation_id"] else None,
-                "booking_number": b["bookingNumber"],
-                "reservation_status": str(b["reservation_status"]) if b["reservation_status"] else None,
+                "id": str(block["id"]),
+                "type": str(block["blockType"]),
+                "start": block["startDate"],
+                "end": block["endDate"],
+                "reason": block["reason"],
+                "reservation_id": str(block["reservation_id"]) if block["reservation_id"] else None,
+                "booking_number": block["bookingNumber"],
+                "reservation_status": str(block["reservation_status"]) if block["reservation_status"] else None,
                 "guest_name": guest_name,
-                "guest_phone": b["phone"],
+                "guest_phone": block["phone"],
             }
         )
 
@@ -360,17 +363,17 @@ async def pms_grid(
         "end": end,
         "rooms": [
             {
-                "id": str(r["id"]),
-                "code": r["code"],
-                "name": r["name"],
-                "room_type_code": r["room_type_code"],
-                "room_type_name": r["room_type_name"],
-                "building_or_zone": r["buildingOrZone"],
-                "floor": r["floorLabel"],
-                "beds_raw": r["bedConfiguration"],
-                "operational_state": str(r["operationalState"]),
-                "blocks": blocks_by_room.get(str(r["id"]), []),
+                "id": str(room["id"]),
+                "code": room["code"],
+                "name": room["name"],
+                "room_type_code": room["room_type_code"],
+                "room_type_name": room["room_type_name"],
+                "building_or_zone": room["buildingOrZone"],
+                "floor": room["floorLabel"],
+                "beds_raw": room["bedConfiguration"],
+                "operational_state": str(room["operationalState"]),
+                "blocks": blocks_by_room.get(str(room["id"]), []),
             }
-            for r in rooms
+            for room in rooms
         ],
     }
