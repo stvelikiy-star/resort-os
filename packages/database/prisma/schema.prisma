@@ -58,6 +58,7 @@ enum StaffRole {
   MANAGER
   MAID
   TECHNICIAN
+  BEACH_PARTNER
 }
 
 enum OperationalTaskType {
@@ -81,24 +82,46 @@ enum OperationalTaskPriority {
   URGENT
 }
 
+enum NfcWalletStatus {
+  ACTIVE
+  BLOCKED
+  CLOSED
+}
+
+enum NfcBraceletStatus {
+  ACTIVE
+  BLOCKED
+  LOST
+  RETURNED
+}
+
+enum NfcTransactionStatus {
+  COMPLETED
+  REVERSED
+}
+
 model Property {
-  id               String                   @id @default(uuid()) @db.Uuid
-  code             String                   @unique
-  name             String
-  timezone         String                   @default("Asia/Bishkek")
-  currency         String                   @default("KGS")
-  roomTypes        RoomType[]
-  rooms            Room[]
-  ratePlans        RatePlan[]
-  guests           Guest[]
-  requests         ReservationRequest[]
-  reservations     Reservation[]
-  auditLogs        AuditLog[]
-  staffUsers       StaffUser[]
-  tasks            OperationalTask[]
-  automationEvents AutomationInboundEvent[]
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  id                  String                   @id @default(uuid()) @db.Uuid
+  code                String                   @unique
+  name                String
+  timezone            String                   @default("Asia/Bishkek")
+  currency            String                   @default("KGS")
+  beachCommissionBps  Int                      @default(500)
+  roomTypes           RoomType[]
+  rooms               Room[]
+  ratePlans           RatePlan[]
+  guests              Guest[]
+  requests            ReservationRequest[]
+  reservations        Reservation[]
+  auditLogs           AuditLog[]
+  staffUsers          StaffUser[]
+  tasks               OperationalTask[]
+  automationEvents    AutomationInboundEvent[]
+  nfcWallets          NfcWallet[]
+  nfcBracelets        NfcBracelet[]
+  nfcTransactions     NfcTransaction[]
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   @@map("properties")
 }
@@ -192,6 +215,7 @@ model Guest {
   phone        String?
   email        String?
   reservations Reservation[]
+  nfcWallets   NfcWallet[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -245,6 +269,7 @@ model Reservation {
   notes          String?
   blocks         InventoryBlock[]
   payments       Payment[]
+  nfcWallet      NfcWallet?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
@@ -294,21 +319,22 @@ model Payment {
 }
 
 model StaffUser {
-  id               String            @id @default(uuid()) @db.Uuid
-  propertyId       String            @db.Uuid
-  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  username         String
-  displayName      String
-  passwordHash     String
-  role             StaffRole
-  isActive         Boolean           @default(true)
-  telegramUserId   String?
-  telegramUsername String?
-  telegramLinkedAt DateTime?
-  sessions         AuthSession[]
-  assignedTasks    OperationalTask[] @relation("TaskAssignee")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String            @id @default(uuid()) @db.Uuid
+  propertyId        String            @db.Uuid
+  property          Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  username          String
+  displayName       String
+  passwordHash      String
+  role              StaffRole
+  isActive          Boolean           @default(true)
+  telegramUserId    String?
+  telegramUsername  String?
+  telegramLinkedAt  DateTime?
+  sessions          AuthSession[]
+  assignedTasks     OperationalTask[] @relation("TaskAssignee")
+  beachTransactions NfcTransaction[]  @relation("BeachPartnerTransactions")
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 
   @@unique([propertyId, username])
   @@unique([propertyId, telegramUserId])
@@ -373,6 +399,91 @@ model AutomationInboundEvent {
   @@unique([propertyId, source, idempotencyKey])
   @@index([propertyId, eventType, createdAt])
   @@map("automation_inbound_events")
+}
+
+model NfcWallet {
+  id            String          @id @default(uuid()) @db.Uuid
+  propertyId    String          @db.Uuid
+  property      Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId String          @unique @db.Uuid
+  reservation   Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  guestId       String          @db.Uuid
+  guest         Guest           @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  balanceKgs    Int             @default(0)
+  status        NfcWalletStatus @default(ACTIVE)
+  bracelets     NfcBracelet[]
+  transactions  NfcTransaction[]
+  ledgerEntries NfcLedgerEntry[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([propertyId, status])
+  @@index([guestId])
+  @@map("nfc_wallets")
+}
+
+model NfcBracelet {
+  id           String            @id @default(uuid()) @db.Uuid
+  propertyId   String            @db.Uuid
+  property     Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  walletId     String            @db.Uuid
+  wallet       NfcWallet         @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  uidHash      String
+  status       NfcBraceletStatus @default(ACTIVE)
+  label        String?
+  issuedAt     DateTime          @default(now())
+  returnedAt   DateTime?
+  transactions NfcTransaction[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([propertyId, uidHash])
+  @@index([walletId, status])
+  @@map("nfc_bracelets")
+}
+
+model NfcTransaction {
+  id                 String               @id @default(uuid()) @db.Uuid
+  propertyId         String               @db.Uuid
+  property           Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  walletId           String               @db.Uuid
+  wallet             NfcWallet            @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  braceletId         String               @db.Uuid
+  bracelet           NfcBracelet          @relation(fields: [braceletId], references: [id], onDelete: Restrict)
+  partnerStaffUserId String               @db.Uuid
+  partnerStaffUser   StaffUser            @relation("BeachPartnerTransactions", fields: [partnerStaffUserId], references: [id], onDelete: Restrict)
+  amountKgs          Int
+  hotelCommissionKgs Int
+  partnerNetKgs      Int
+  commissionBps      Int
+  status             NfcTransactionStatus @default(COMPLETED)
+  idempotencyKey     String
+  description        String?
+  externalRef        String?
+  ledgerEntry        NfcLedgerEntry?
+  createdAt          DateTime             @default(now())
+
+  @@unique([propertyId, idempotencyKey])
+  @@index([walletId, createdAt])
+  @@index([partnerStaffUserId, createdAt])
+  @@map("nfc_transactions")
+}
+
+model NfcLedgerEntry {
+  id               String          @id @default(uuid()) @db.Uuid
+  walletId         String          @db.Uuid
+  wallet           NfcWallet       @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  transactionId    String?         @unique @db.Uuid
+  transaction      NfcTransaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  entryType        String
+  deltaKgs         Int
+  balanceBeforeKgs Int
+  balanceAfterKgs  Int
+  note             String?
+  createdAt        DateTime        @default(now())
+
+  @@index([walletId, createdAt])
+  @@map("nfc_ledger_entries")
 }
 
 model AuditLog {
