@@ -30,6 +30,8 @@ async def _totals(conn, reservation_id: uuid.UUID):
         ''',
         reservation_id,
     )
+    if not row:
+        raise HTTPException(status_code=404, detail="Reservation not found")
     total = int(row["totalKgs"])
     paid = int(row["paid_kgs"])
     return {
@@ -71,13 +73,21 @@ async def record_reservation_payment(
 
             existing = await conn.fetchrow(
                 '''
-                SELECT id,"amountKgs",method,status::text AS status,"externalRef"
+                SELECT id,"reservationId","amountKgs",method,status::text AS status,"externalRef"
                 FROM payments
                 WHERE "idempotencyKey"=$1
                 ''',
                 payload.idempotency_key,
             )
             if existing:
+                if existing["reservationId"] != reservation_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "IDEMPOTENCY_CONFLICT",
+                            "message": "This idempotency key belongs to another reservation.",
+                        },
+                    )
                 totals = await _totals(conn, reservation_id)
                 return {
                     "idempotent_replay": True,
