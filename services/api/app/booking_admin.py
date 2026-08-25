@@ -1,4 +1,3 @@
-import math
 import os
 import secrets
 import uuid
@@ -12,7 +11,6 @@ from .auth import require_roles
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
-PREPAYMENT_PERCENT = int(os.environ.get("PREPAYMENT_PERCENT", "30"))
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-booking"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -102,6 +100,7 @@ async def serialize_request(conn, request_id: uuid.UUID) -> dict[str, Any] | Non
         "room_type_name": row["room_type_name"],
         "quoted_total_kgs": row["quotedTotalKgs"],
         "required_prepayment_kgs": row["requiredPrepaymentKgs"],
+        "prepayment_decided_by_manager": True,
         "notes": row["notes"],
         "created_at": row["createdAt"],
         "updated_at": row["updatedAt"],
@@ -196,17 +195,15 @@ async def quote_request(
                 raise HTTPException(status_code=409, detail="No room available for requested dates")
 
             total = pricing["total_kgs"]
-            prepayment = math.ceil(total * PREPAYMENT_PERCENT / 100)
             await conn.execute(
                 '''
                 UPDATE reservation_requests
-                SET status = 'AWAITING_PREPAYMENT', "desiredRoomTypeId" = $1,
-                    "quotedTotalKgs" = $2, "requiredPrepaymentKgs" = $3, "updatedAt" = now()
-                WHERE id = $4
+                SET status = 'QUOTED', "desiredRoomTypeId" = $1,
+                    "quotedTotalKgs" = $2, "requiredPrepaymentKgs" = NULL, "updatedAt" = now()
+                WHERE id = $3
                 ''',
                 room_type["id"],
                 total,
-                prepayment,
                 request_id,
             )
             await conn.execute(
@@ -214,9 +211,9 @@ async def quote_request(
                 INSERT INTO audit_logs (id, "propertyId", "actorType", "actorId", action, resource,
                   "resourceId", source, result, "afterJson", "createdAt")
                 VALUES ($1,$2,'STAFF',$3,'QUOTE','ReservationRequest',$4,'PMS','SUCCESS',
-                  jsonb_build_object('room_type_code',$5::text,'total_kgs',$6::integer,'prepayment_kgs',$7::integer),now())
+                  jsonb_build_object('room_type_code',$5::text,'total_kgs',$6::integer,'prepayment_rule','MANAGER_DECIDES'),now())
                 ''',
-                uuid.uuid4(), pid, user["id"], str(request_id), payload.room_type_code, total, prepayment,
+                uuid.uuid4(), pid, user["id"], str(request_id), payload.room_type_code, total,
             )
         item = await serialize_request(conn, request_id)
     return item
@@ -275,12 +272,10 @@ async def confirm_payment_and_reserve(
                     "reservation_status": already["status"],
                 }
 
-            if str(rr["status"]) != "AWAITING_PREPAYMENT":
-                raise HTTPException(status_code=409, detail="Request is not awaiting prepayment")
-            if rr["desiredRoomTypeId"] is None or rr["quotedTotalKgs"] is None or rr["requiredPrepaymentKgs"] is None:
+            if str(rr["status"]) not in {"QUOTED", "AWAITING_PREPAYMENT"}:
+                raise HTTPException(status_code=409, detail="Request must be quoted before manager confirms prepayment")
+            if rr["desiredRoomTypeId"] is None or rr["quotedTotalKgs"] is None:
                 raise HTTPException(status_code=409, detail="Request has no complete quote")
-            if payload.amount_kgs < rr["requiredPrepaymentKgs"]:
-                raise HTTPException(status_code=409, detail="Confirmed payment is below required prepayment")
 
             candidates = await conn.fetch(
                 '''
@@ -350,17 +345,23 @@ async def confirm_payment_and_reserve(
                 payload.provider, payload.external_ref, payload.idempotency_key,
             )
             await conn.execute(
-                '''UPDATE reservation_requests SET status='CONVERTED', "updatedAt"=now() WHERE id=$1''',
+                '''
+                UPDATE reservation_requests
+                SET status='CONVERTED',"requiredPrepaymentKgs"=$2,"updatedAt"=now()
+                WHERE id=$1
+                ''',
                 request_id,
+                payload.amount_kgs,
             )
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",
                   source,result,"afterJson","createdAt")
-                VALUES ($1,$2,'STAFF',$3,'CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
-                  jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text),now())
+                VALUES ($1,$2,'STAFF',$3,'MANAGER_CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
+                  jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text,
+                    'manager_confirmed_payment_kgs',$8::integer),now())
                 ''',
-                uuid.uuid4(), pid, user["id"], str(reservation_id), booking_number, chosen["code"], str(payment_id),
+                uuid.uuid4(), pid, user["id"], str(reservation_id), booking_number, chosen["code"], str(payment_id), payload.amount_kgs,
             )
 
     return {
@@ -370,7 +371,8 @@ async def confirm_payment_and_reserve(
         "reservation_status": "GUARANTEED",
         "room_code": chosen["code"],
         "payment_id": str(payment_id),
-        "prepayment_percent": PREPAYMENT_PERCENT,
+        "manager_confirmed_payment_kgs": payload.amount_kgs,
+        "payment_collection": "MANAGER_MANUAL",
     }
 
 
