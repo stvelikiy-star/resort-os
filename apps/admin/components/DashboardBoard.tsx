@@ -29,6 +29,7 @@ type Dashboard = {
   stays: { arrivals_today: number; departures_today: number; in_house: number; guaranteed: number; occupied_rooms: number; occupancy_percent: number };
   requests: { new: number; quoted: number; awaiting_prepayment: number; active: number };
   tasks: { housekeeping_active: number; maintenance_active: number; guest_requests_active: number; urgent_active: number };
+  communications: { active: number; needs_reply: number; oldest_waiting_seconds: number; sla_rule: null };
   finance: { confirmed_payments_today_kgs: number; active_reservations_total_kgs: number; active_reservations_paid_kgs: number; active_reservations_remaining_kgs: number; scope_note: string };
   today: { arrivals: StayItem[]; departures: StayItem[] };
   attention_tasks: AttentionTask[];
@@ -37,6 +38,14 @@ type Dashboard = {
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const taskType: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
 const priority: Record<string, string> = { URGENT: "Срочно", HIGH: "Высокий", NORMAL: "Обычный", LOW: "Низкий" };
+
+function waitingLabel(seconds: number) {
+  if (seconds <= 0) return "—";
+  if (seconds < 60) return `${seconds} сек`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} мин`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} ч ${Math.floor((seconds % 3600) / 60)} мин`;
+  return `${Math.floor(seconds / 86400)} д ${Math.floor((seconds % 86400) / 3600)} ч`;
+}
 
 export default function DashboardBoard() {
   const [data, setData] = useState<Dashboard | null>(null);
@@ -83,13 +92,14 @@ export default function DashboardBoard() {
         <article><span>Заезды сегодня</span><strong>{data.stays.arrivals_today}</strong><small>гарантированные брони</small></article>
         <article><span>Выезды сегодня</span><strong>{data.stays.departures_today}</strong><small>проживающие гости</small></article>
         <article><span>Активные заявки</span><strong>{data.requests.active}</strong><small>{data.requests.awaiting_prepayment} ждут предоплату</small></article>
+        <article><span>Сообщения ждут</span><strong>{data.communications.needs_reply}</strong><small>самое долгое: {waitingLabel(data.communications.oldest_waiting_seconds)}</small></article>
         <article><span>Платежи сегодня</span><strong>{money(data.finance.confirmed_payments_today_kgs)}</strong><small>только подтверждённые в Core</small></article>
-        <article><span>Требуют внимания</span><strong>{roomNeedsWork}</strong><small>уборка / проверка / ремонт</small></article>
+        <article><span>Номера требуют внимания</span><strong>{roomNeedsWork}</strong><small>уборка / проверка / ремонт</small></article>
       </section>
 
       <section className="command-grid">
         <article className="command-panel">
-          <div className="command-panel-head"><div><p className="eyebrow">Номерной фонд</p><h2>84 номера · состояние</h2></div><b>{roomReady} готовы</b></div>
+          <div className="command-panel-head"><div><p className="eyebrow">Номерной фонд</p><h2>{data.rooms.total} номеров · состояние</h2></div><b>{roomReady} готовы</b></div>
           <div className="room-state-grid">
             <div className="state-clean"><strong>{data.rooms.clean}</strong><span>Готовы</span></div>
             <div className="state-dirty"><strong>{data.rooms.dirty}</strong><span>Нужна уборка</span></div>
@@ -108,6 +118,16 @@ export default function DashboardBoard() {
             <div><span>Гарантированные будущие</span><strong>{data.stays.guaranteed}</strong></div>
             <div><span>Сейчас проживают</span><strong>{data.stays.in_house}</strong></div>
           </div>
+        </article>
+
+        <article className="command-panel">
+          <div className="command-panel-head"><div><p className="eyebrow">Коммуникации</p><h2>Контроль ответов</h2></div>{data.communications.needs_reply > 0 && <b>{data.communications.needs_reply} ждут</b>}</div>
+          <div className="command-list compact">
+            <div><span>Активные диалоги</span><strong>{data.communications.active}</strong></div>
+            <div><span>Нужен ответ</span><strong>{data.communications.needs_reply}</strong></div>
+            <div><span>Самое долгое ожидание</span><strong>{waitingLabel(data.communications.oldest_waiting_seconds)}</strong></div>
+          </div>
+          <p className="command-note">Порог SLA пока не задан владельцем, поэтому система показывает фактическое время ожидания без выдуманного статуса «просрочено».</p>
         </article>
 
         <article className="command-panel">
