@@ -52,7 +52,7 @@ export default function RequestsBoard() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const visible = useMemo(() => items.filter((item) => {
     if (filter === "ALL") return true;
@@ -101,14 +101,14 @@ export default function RequestsBoard() {
   }
 
   async function confirmPayment(item: RequestItem) {
-    const amountText = window.prompt("Сумма предоплаты, которую менеджер фактически получил, сом", "");
+    const amountText = window.prompt("Сумма, которую менеджер фактически получил, сом", "");
     if (!amountText) return;
     const amount = Number(amountText.replace(/\s/g, ""));
     if (!Number.isFinite(amount) || amount <= 0) {
       setError("Укажите фактически полученную положительную сумму.");
       return;
     }
-    const externalRef = window.prompt("Номер операции / комментарий", "manual-") || `manual-${Date.now()}`;
+    const externalRef = window.prompt("Номер операции / внутренний комментарий", "manual-") || `manual-${Date.now()}`;
     setBusy(item.id);
     setError(null);
     try {
@@ -120,14 +120,14 @@ export default function RequestsBoard() {
           method: "MANAGER_MANUAL_CONFIRMATION",
           provider: "MANAGER_MANUAL",
           external_ref: externalRef,
-          idempotency_key: `pms-${item.id}-${externalRef}`,
+          idempotency_key: `pms-${item.id}-${Date.now()}`,
         }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось подтвердить оплату");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось зафиксировать оплату и создать бронь");
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка подтверждения оплаты");
+      setError(e instanceof Error ? e.message : "Ошибка фиксации оплаты");
     } finally {
       setBusy(null);
     }
@@ -139,14 +139,14 @@ export default function RequestsBoard() {
         <div>
           <p className="eyebrow">Продажи · бронирование</p>
           <h1>Заявки гостей</h1>
-          <p className="subtitle">n8n/сайт доводят клиента до заявки. Размер и способ предоплаты определяет менеджер вручную.</p>
+          <p className="subtitle">n8n/сайт доводят клиента до заявки. Размер, условия и способ предоплаты определяет менеджер вручную.</p>
         </div>
         <div className="work-actions">
           <select value={filter} onChange={(e) => setFilter(e.target.value)}>
             <option value="ACTIVE">Активные</option>
             <option value="NEW">Новые</option>
             <option value="QUOTED">Рассчитанные</option>
-            <option value="AWAITING_PREPAYMENT">Старые: ждут предоплату</option>
+            <option value="AWAITING_PREPAYMENT">На согласовании оплаты</option>
             <option value="CONVERTED">Забронированы</option>
             <option value="ALL">Все</option>
           </select>
@@ -171,7 +171,7 @@ export default function RequestsBoard() {
               </div>
               {!item.reservation && <div className="request-actions">
                 <button className="btn" disabled={busy === item.id} onClick={() => findOptions(item)}>Проверить варианты</button>
-                {["QUOTED", "AWAITING_PREPAYMENT"].includes(item.status) && <button className="btn primary" disabled={busy === item.id} onClick={() => confirmPayment(item)}>Менеджер получил предоплату → создать бронь</button>}
+                {["QUOTED", "AWAITING_PREPAYMENT"].includes(item.status) && <button className="btn primary" disabled={busy === item.id} onClick={() => confirmPayment(item)}>Оплата получена менеджером → создать бронь</button>}
               </div>}
               {options[item.id] && <div className="option-row">
                 {options[item.id].length === 0 ? <span>Нет продаваемых вариантов.</span> : options[item.id].map((option) => <button key={option.room_type_code} onClick={() => quote(item, option.room_type_code)} disabled={busy === item.id}><b>{option.room_type_name}</b><span>{option.available_count} своб. · {fmt(option.pricing.total_kgs)}</span></button>)}
