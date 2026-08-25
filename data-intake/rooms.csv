@@ -1,1 +1,85 @@
 room_code,room_name,building_or_zone,floor,room_type,capacity_adults,capacity_children,bed_configuration,area_m2,operational_status,notes
+301,301,UNKNOWN,BASEMENT,"Одноместный, цоколь",1,UNKNOWN,,16,UNKNOWN,PHOTO_2026-08-25
+101,101,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп+д,16-24,UNKNOWN,PHOTO_2026-08-25
+102,102,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,,16-24,UNKNOWN,PHOTO_2026-08-25
+103,103,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп+кр,16-24,UNKNOWN,PHOTO_2026-08-25
+104,104,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
+201,201,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,2сп+кр,16-24,UNKNOWN,PHOTO_2026-08-25
+202,202,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,2сп+д+к; доп. кровать,16-24,UNKNOWN,PHOTO_2026-08-25
+302,302,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
+303,303,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
+304,304,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
+305,305,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
+501,501,UNKNOWN,MANSARD,"Одноместный, улучшенный",1,UNKNOWN,1сп+1сп+крк,21,UNKNOWN,"PHOTO_2026-08-25; category inferred from spreadsheet row sequence and 84-room reconciliation; label also contains 'прачка мансарда'; CONFIRM"
+502,502,UNKNOWN,MANSARD,"Одноместный, улучшенный",1,UNKNOWN,1сп+1сп+крк,21,UNKNOWN,"PHOTO_2026-08-25; category inferred from spreadsheet row sequence and 84-room reconciliation; label also contains 'прачка мансарда'; CONFIRM"
+1А,1А,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+1Б,1Б,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+1В,1В,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+1Г,1Г,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+2А,2А,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+2Б,2Б,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+2В,2В,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+2Г,2Г,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+3А,3А,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+3Б,3Б,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+3В,3В,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+3Г,3Г,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+4А,4А,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+4Б,4Б,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+4Г,4Г,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
+112,112,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+113,113,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+124,124,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,2сп,24-32,UNKNOWN,PHOTO_2026-08-25
+126,126,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+134,134,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,2сп,24-32,UNKNOWN,PHOTO_2026-08-25
+136,136,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,2сп,24-32,UNKNOWN,PHOTO_2026-08-25
+211,211,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+213,213,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+221,221,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,2сп,24-32,UNKNOWN,PHOTO_2026-08-25
+225,225,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1+1,24-32,UNKNOWN,PHOTO_2026-08-25
+231,231,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,2сп,24-32,UNKNOWN,PHOTO_2026-08-25
+235,235,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+423,423,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,1сп+1сп,24-32,UNKNOWN,PHOTO_2026-08-25
+422,422,UNKNOWN,UNKNOWN,Двухместный улучшенный,2,UNKNOWN,2сп,24-32,UNKNOWN,PHOTO_2026-08-25
+111,111,UNKNOWN,UNKNOWN,Полулюкс без балкона,2,UNKNOWN,1сп+1сп+д+кр,26,UNKNOWN,PHOTO_2026-08-25
+212,212,UNKNOWN,UNKNOWN,Полулюкс без балкона,2,UNKNOWN,1сп+1сп+д+кр,26,UNKNOWN,PHOTO_2026-08-25
+312,312,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1сп+д,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+313,313,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1сп+д,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+114,114,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,2сп+кр+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+122,122,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+123,123,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+132,132,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+133,133,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+214,214,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,2сп+кр+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+223,223,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,1сп+1 сп.д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+222,222,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,2сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+232,232,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,2сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+233,233,UNKNOWN,UNKNOWN,Люкс двухместный,2,UNKNOWN,2сп+д+кр,36,UNKNOWN,"PHOTO_2026-08-25; bed abbreviations preserved verbatim/near-verbatim; decode key required"
+135,135,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,1сп+1сп+д+кр,36,UNKNOWN,PHOTO_2026-08-25
+125,125,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,1сп+1сп+д+кр,36,UNKNOWN,PHOTO_2026-08-25
+226,226,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,2сп+1сп+д+кр,36,UNKNOWN,PHOTO_2026-08-25
+236,236,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,2сп+1сп+д+кр,36,UNKNOWN,PHOTO_2026-08-25
+311,311,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,2сп+1сп; кухня,36,UNKNOWN,PHOTO_2026-08-25
+314,314,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,2сп+1сп+д; кухня,36,UNKNOWN,PHOTO_2026-08-25
+321,321,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,1сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+324,324,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,2сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+331,331,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,1сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+334,334,UNKNOWN,UNKNOWN,Люкс трехместный,3,UNKNOWN,1сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+121,121,UNKNOWN,UNKNOWN,Двухкомнатный стандарт,4,UNKNOWN,2сп+1сп+1сп,30,UNKNOWN,PHOTO_2026-08-25
+131,131,UNKNOWN,UNKNOWN,Двухкомнатный стандарт,4,UNKNOWN,2сп+1сп+1сп,30,UNKNOWN,PHOTO_2026-08-25
+224,224,UNKNOWN,UNKNOWN,Двухкомнатный стандарт,4,UNKNOWN,2сп+1сп+1сп,30,UNKNOWN,PHOTO_2026-08-25
+234,234,UNKNOWN,UNKNOWN,Двухкомнатный стандарт,4,UNKNOWN,2сп+1сп+1сп,30,UNKNOWN,PHOTO_2026-08-25
+322,322,UNKNOWN,UNKNOWN,Двухкомнатный полулюкс,4,UNKNOWN,1сп+1сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+323,323,UNKNOWN,UNKNOWN,Двухкомнатный полулюкс,4,UNKNOWN,2сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+332,332,UNKNOWN,UNKNOWN,Двухкомнатный полулюкс,4,UNKNOWN,1сп+1сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+333,333,UNKNOWN,UNKNOWN,Двухкомнатный полулюкс,4,UNKNOWN,1сп+1сп+1сп+1сп+д,36,UNKNOWN,PHOTO_2026-08-25
+115,115,UNKNOWN,UNKNOWN,Апартаменты,4,UNKNOWN,2сп+2сп+кр+кр+кр+кр; +1кр,45-50,UNKNOWN,PHOTO_2026-08-25
+215,215,UNKNOWN,UNKNOWN,Апартаменты,4,UNKNOWN,2сп+1сп+1сп+кр+кр,45-50,UNKNOWN,PHOTO_2026-08-25
+421,421,UNKNOWN,UNKNOWN,Апартаменты,4,UNKNOWN,2сп+1сп+1сп+д+кр+кр+кр,45-50,UNKNOWN,PHOTO_2026-08-25; sea view explicitly noted
+424,424,UNKNOWN,UNKNOWN,Апартаменты,4,UNKNOWN,2сп+1сп+1сп+д+кр+кр,45-50,UNKNOWN,PHOTO_2026-08-25
+1,1,NEW_BUILDING,UNKNOWN,Квартиры / апартаменты с кухней,4,UNKNOWN,2сп+1сп+1сп+д+кр,55-65,UNKNOWN,"PHOTO_2026-08-25; spreadsheet heading 'Новый корпус квартиры апартаменты'; website category alias 'Апартаменты с кухней'"
+2,2,NEW_BUILDING,UNKNOWN,Квартиры / апартаменты с кухней,4,UNKNOWN,2сп+1сп+1сп+д+кр,55-65,UNKNOWN,"PHOTO_2026-08-25; spreadsheet heading 'Новый корпус квартиры апартаменты'; website category alias 'Апартаменты с кухней'"
+3,3,NEW_BUILDING,UNKNOWN,Квартиры / апартаменты с кухней,4,UNKNOWN,2сп+1сп+1сп+д+кр,55-65,UNKNOWN,"PHOTO_2026-08-25; spreadsheet heading 'Новый корпус квартиры апартаменты'; website category alias 'Апартаменты с кухней'"
+4,4,NEW_BUILDING,UNKNOWN,Квартиры / апартаменты с кухней,4,UNKNOWN,2сп+1сп+1сп+д+кр,55-65,UNKNOWN,"PHOTO_2026-08-25; spreadsheet heading 'Новый корпус квартиры апартаменты'; website category alias 'Апартаменты с кухней'"
+5,5,NEW_BUILDING,UNKNOWN,Квартиры / апартаменты с кухней,4,UNKNOWN,2сп+1сп+1сп+д+кр,55-65,UNKNOWN,"PHOTO_2026-08-25; spreadsheet heading 'Новый корпус квартиры апартаменты'; website category alias 'Апартаменты с кухней'"
+6,6,NEW_BUILDING,UNKNOWN,Квартиры / апартаменты с кухней,4,UNKNOWN,2сп+1сп+1сп+д+кр,55-65,UNKNOWN,"PHOTO_2026-08-25; spreadsheet heading 'Новый корпус квартиры апартаменты'; website category alias 'Апартаменты с кухней'"
