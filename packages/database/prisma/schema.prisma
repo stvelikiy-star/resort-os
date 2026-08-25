@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoomOperationalState {
+  UNKNOWN
+  CLEAN
+  DIRTY
+  IN_INSPECTION
+  TECH_BLOCK
+}
+
+enum RateSaleStatus {
+  OPEN
+  CLOSED
+  CONFIRM_REQUIRED
+}
+
+enum ReservationRequestStatus {
+  NEW
+  QUOTED
+  AWAITING_PREPAYMENT
+  CONVERTED
+  REJECTED
+  CANCELLED
+  EXPIRED
+}
+
+enum ReservationStatus {
+  GUARANTEED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum InventoryBlockType {
+  RESERVATION
+  MAINTENANCE
+  MANUAL
+}
+
+model Property {
+  id           String               @id @default(uuid()) @db.Uuid
+  code         String               @unique
+  name         String
+  timezone     String               @default("Asia/Bishkek")
+  currency     String               @default("KGS")
+  roomTypes    RoomType[]
+  rooms        Room[]
+  ratePlans    RatePlan[]
+  guests       Guest[]
+  requests     ReservationRequest[]
+  reservations Reservation[]
+  auditLogs    AuditLog[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@map("properties")
+}
+
+model RoomType {
+  id                String               @id @default(uuid()) @db.Uuid
+  propertyId        String               @db.Uuid
+  property          Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  code              String
+  name              String
+  capacityAdults    Int
+  capacityChildren  Int?
+  areaLabel         String?
+  rooms             Room[]
+  ratePeriods       RatePeriod[]
+  desiredByRequests ReservationRequest[] @relation("RequestedRoomType")
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@unique([propertyId, code])
+  @@unique([propertyId, name])
+  @@map("room_types")
+}
+
+model Room {
+  id               String               @id @default(uuid()) @db.Uuid
+  propertyId       String               @db.Uuid
+  property         Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomTypeId       String               @db.Uuid
+  roomType         RoomType             @relation(fields: [roomTypeId], references: [id])
+  code             String
+  name             String
+  buildingOrZone   String?
+  floorLabel       String?
+  bedConfiguration String?
+  areaLabel        String?
+  operationalState RoomOperationalState @default(UNKNOWN)
+  notes            String?
+  inventoryBlocks  InventoryBlock[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@unique([propertyId, code])
+  @@index([propertyId, roomTypeId])
+  @@map("rooms")
+}
+
+model RatePlan {
+  id         String       @id @default(uuid()) @db.Uuid
+  propertyId String       @db.Uuid
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  code       String
+  name       String
+  currency   String       @default("KGS")
+  periods    RatePeriod[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([propertyId, code])
+  @@map("rate_plans")
+}
+
+model RatePeriod {
+  id           String         @id @default(uuid()) @db.Uuid
+  ratePlanId   String         @db.Uuid
+  ratePlan     RatePlan       @relation(fields: [ratePlanId], references: [id], onDelete: Cascade)
+  roomTypeId   String         @db.Uuid
+  roomType     RoomType       @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  label        String
+  validFrom    DateTime       @db.Date
+  validTo      DateTime       @db.Date
+  priceKgs     Int
+  mealIncluded String
+  saleStatus   RateSaleStatus @default(OPEN)
+  notes        String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@unique([ratePlanId, roomTypeId, validFrom, validTo])
+  @@index([roomTypeId, validFrom, validTo])
+  @@map("rate_periods")
+}
+
+model Guest {
+  id           String        @id @default(uuid()) @db.Uuid
+  propertyId   String        @db.Uuid
+  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  firstName    String?
+  lastName     String?
+  phone        String?
+  email        String?
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([propertyId, phone])
+  @@map("guests")
+}
+
+model ReservationRequest {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  propertyId            String                   @db.Uuid
+  property              Property                 @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  status                ReservationRequestStatus @default(NEW)
+  source                String?
+  guestName             String
+  phone                 String
+  email                 String?
+  checkIn               DateTime                 @db.Date
+  checkOut              DateTime                 @db.Date
+  adults                Int
+  children              Int                      @default(0)
+  desiredRoomTypeId     String?                  @db.Uuid
+  desiredRoomType       RoomType?                @relation("RequestedRoomType", fields: [desiredRoomTypeId], references: [id])
+  quotedTotalKgs        Int?
+  requiredPrepaymentKgs Int?
+  notes                 String?
+  reservation           Reservation?
+  payments              Payment[]
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([propertyId, createdAt])
+  @@index([status])
+  @@map("reservation_requests")
+}
+
+model Reservation {
+  id             String            @id @default(uuid()) @db.Uuid
+  propertyId     String            @db.Uuid
+  property       Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requestId      String?           @unique @db.Uuid
+  request        ReservationRequest? @relation(fields: [requestId], references: [id])
+  bookingNumber  String            @unique
+  primaryGuestId String?           @db.Uuid
+  primaryGuest   Guest?            @relation(fields: [primaryGuestId], references: [id])
+  status         ReservationStatus @default(GUARANTEED)
+  checkIn        DateTime          @db.Date
+  checkOut       DateTime          @db.Date
+  adults         Int
+  children       Int               @default(0)
+  totalKgs       Int
+  notes          String?
+  blocks         InventoryBlock[]
+  payments       Payment[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([propertyId, checkIn, checkOut])
+  @@map("reservations")
+}
+
+model InventoryBlock {
+  id            String             @id @default(uuid()) @db.Uuid
+  roomId        String             @db.Uuid
+  room          Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  reservationId String?            @db.Uuid
+  reservation   Reservation?       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  blockType     InventoryBlockType
+  startDate     DateTime           @db.Date
+  endDate       DateTime           @db.Date
+  active        Boolean            @default(true)
+  reason        String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([roomId, startDate, endDate])
+  @@map("inventory_blocks")
+}
+
+model Payment {
+  id            String        @id @default(uuid()) @db.Uuid
+  requestId     String?       @db.Uuid
+  request       ReservationRequest? @relation(fields: [requestId], references: [id])
+  reservationId String?       @db.Uuid
+  reservation   Reservation?  @relation(fields: [reservationId], references: [id])
+  amountKgs     Int
+  method        String
+  status        PaymentStatus @default(PENDING)
+  externalRef   String?
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([requestId])
+  @@index([reservationId])
+  @@map("payments")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String?  @db.Uuid
+  property   Property? @relation(fields: [propertyId], references: [id])
+  actorType  String
+  actorId    String?
+  action     String
+  resource   String
+  resourceId String?
+  source     String?
+  result     String
+  beforeJson Json?
+  afterJson  Json?
+  createdAt  DateTime @default(now())
+
+  @@index([propertyId, createdAt])
+  @@map("audit_logs")
+}
