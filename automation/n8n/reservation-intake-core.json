@@ -1,0 +1,108 @@
+{
+  "name": "Three Crowns - Reservation Intake Core",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "three-crowns/reservation-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262001",
+      "name": "Reservation Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-720, 0],
+      "webhookId": "three-crowns-reservation-intake"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body ?? $json;\nconst required = ['channel','message_id','guest_name','phone','check_in','check_out','adults'];\nfor (const key of required) { if (b[key] === undefined || b[key] === null || String(b[key]).trim() === '') throw new Error(`Missing required field: ${key}`); }\nconst channel = String(b.channel).trim().toUpperCase();\nconst messageId = String(b.message_id).trim();\nreturn [{ json: { channel, message_id: messageId, idempotency_key: `${channel}:${messageId}`, guest_name: String(b.guest_name).trim(), phone: String(b.phone).trim(), email: b.email || null, check_in: String(b.check_in), check_out: String(b.check_out), adults: Number(b.adults), children: Number(b.children || 0), room_type_code: b.room_type_code || null, notes: b.notes || null } }];"
+      },
+      "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262002",
+      "name": "Normalize Intake",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-500, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/booking/check-availability'}}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "check_in", "value": "={{$('Normalize Intake').item.json.check_in}}" },
+            { "name": "check_out", "value": "={{$('Normalize Intake').item.json.check_out}}" },
+            { "name": "adults", "value": "={{$('Normalize Intake').item.json.adults}}" },
+            { "name": "children", "value": "={{$('Normalize Intake').item.json.children}}" },
+            { "name": "room_type_code", "value": "={{$('Normalize Intake').item.json.room_type_code || ''}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262003",
+      "name": "Check Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-260, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/reservation-requests'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ idempotency_key: $('Normalize Intake').item.json.idempotency_key, channel: $('Normalize Intake').item.json.channel, guest_name: $('Normalize Intake').item.json.guest_name, phone: $('Normalize Intake').item.json.phone, email: $('Normalize Intake').item.json.email, check_in: $('Normalize Intake').item.json.check_in, check_out: $('Normalize Intake').item.json.check_out, adults: $('Normalize Intake').item.json.adults, children: $('Normalize Intake').item.json.children, room_type_code: $('Normalize Intake').item.json.room_type_code, notes: $('Normalize Intake').item.json.notes, external_message_id: $('Normalize Intake').item.json.message_id }) }}",
+        "options": {}
+      },
+      "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262004",
+      "name": "Create Reservation Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-20, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const requestResult = $('Create Reservation Request').item.json;\nconst availability = $('Check Availability').item.json;\nif (requestResult.is_reservation !== false) throw new Error('Core contract violation: automation must not create a guaranteed reservation');\nreturn [{ json: { ok: true, reservation_request: requestResult, availability, truth: 'REQUEST_CREATED_NOT_CONFIRMED_RESERVATION' } }];"
+      },
+      "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262005",
+      "name": "Build Safe Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262006",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [460, 0]
+    }
+  ],
+  "connections": {
+    "Reservation Intake Webhook": { "main": [[{ "node": "Normalize Intake", "type": "main", "index": 0 }]] },
+    "Normalize Intake": { "main": [[{ "node": "Check Availability", "type": "main", "index": 0 }]] },
+    "Check Availability": { "main": [[{ "node": "Create Reservation Request", "type": "main", "index": 0 }]] },
+    "Create Reservation Request": { "main": [[{ "node": "Build Safe Result", "type": "main", "index": 0 }]] },
+    "Build Safe Result": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262099",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
