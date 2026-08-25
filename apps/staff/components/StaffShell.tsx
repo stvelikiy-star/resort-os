@@ -63,6 +63,9 @@ export default function StaffShell() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [telegramInitData, setTelegramInitData] = useState("");
+  const [telegramDetected, setTelegramDetected] = useState(false);
+  const [telegramNotice, setTelegramNotice] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +77,48 @@ export default function StaffShell() {
     window.Telegram?.WebApp?.expand();
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
 
-    fetch("/core/api/v1/auth/me", { cache: "no-store" })
-      .then(async (response) => response.ok ? (await response.json()) as User : null)
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setChecking(false));
+    let cancelled = false;
+    async function bootstrapIdentity() {
+      const initData = window.Telegram?.WebApp?.initData || "";
+      if (initData) {
+        setTelegramInitData(initData);
+        setTelegramDetected(true);
+        try {
+          const telegramResponse = await fetch("/core/api/v1/auth/telegram/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: initData }),
+          });
+          if (telegramResponse.ok) {
+            const telegramUser = (await telegramResponse.json()) as User;
+            if (!cancelled) {
+              setUser(telegramUser);
+              setTelegramNotice("Вход выполнен через Telegram");
+              setChecking(false);
+            }
+            return;
+          }
+          if (telegramResponse.status !== 403 && telegramResponse.status !== 503) {
+            if (!cancelled) setTelegramNotice("Telegram-подпись не принята. Доступен обычный вход.");
+          }
+        } catch {
+          if (!cancelled) setTelegramNotice("Telegram-вход временно недоступен. Доступен обычный вход.");
+        }
+      }
+
+      try {
+        const response = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
+        const existingUser = response.ok ? (await response.json()) as User : null;
+        if (!cancelled) setUser(existingUser);
+      } catch {
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setChecking(false);
+      }
+    }
+
+    bootstrapIdentity();
+    return () => { cancelled = true; };
   }, []);
 
   const loadTasks = useCallback(async () => {
@@ -127,8 +167,27 @@ export default function StaffShell() {
         setLoginError("Эта роль не имеет доступа к интерфейсу персонала");
         return;
       }
+
       setUser(payload);
       setPassword("");
+
+      if (telegramInitData) {
+        try {
+          const linkResponse = await fetch("/core/api/v1/auth/telegram/link", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ init_data: telegramInitData }),
+          });
+          const linkBody = await linkResponse.json().catch(() => ({}));
+          if (linkResponse.ok) {
+            setTelegramNotice("Telegram привязан. Следующий вход будет автоматическим.");
+          } else {
+            setTelegramNotice(linkBody.detail || "Вход выполнен, но Telegram не удалось привязать.");
+          }
+        } catch {
+          setTelegramNotice("Вход выполнен, но Telegram не удалось привязать.");
+        }
+      }
     } catch {
       setLoginError("Resort Core недоступен");
     }
@@ -138,6 +197,7 @@ export default function StaffShell() {
     await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
     setUser(null);
     setTasks([]);
+    setTelegramNotice(null);
   }
 
   async function claim(task: Task) {
@@ -175,7 +235,7 @@ export default function StaffShell() {
     }
   }
 
-  if (checking) return <main className="center-screen"><div className="login-panel"><span className="brand-mark">III</span><h1>Подключаю Resort OS…</h1></div></main>;
+  if (checking) return <main className="center-screen"><div className="login-panel"><span className="brand-mark">III</span><h1>Подключаю Resort OS…</h1><p className="muted">Проверяю рабочую сессию и Telegram.</p></div></main>;
 
   if (!user) return (
     <main className="center-screen">
@@ -183,7 +243,8 @@ export default function StaffShell() {
         <span className="brand-mark">III</span>
         <p className="eyebrow">Три Короны · Персонал</p>
         <h1>Моя смена</h1>
-        <p className="muted">Войдите под учётной записью сотрудника. Telegram Mini App позже будет выполнять этот вход автоматически.</p>
+        <p className="muted">{telegramDetected ? "Первый вход в Telegram: введите рабочий логин и пароль один раз. После проверки Telegram будет привязан к вашей учётной записи." : "Войдите под учётной записью сотрудника. В Telegram Mini App вход после привязки выполняется автоматически."}</p>
+        {telegramNotice && <div className="notice">{telegramNotice}</div>}
         <label><span>Логин</span><input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label>
         <label><span>Пароль</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={8} required /></label>
         {loginError && <div className="error">{loginError}</div>}
@@ -197,9 +258,11 @@ export default function StaffShell() {
   return (
     <main className="staff-shell">
       <header className="staff-head">
-        <div><p className="eyebrow">Три Короны · Resort OS</p><h1>{user.display_name}</h1><span>{roleLabel[user.role] || user.role}</span></div>
+        <div><p className="eyebrow">Три Короны · Resort OS</p><h1>{user.display_name}</h1><span>{roleLabel[user.role] || user.role}{telegramDetected ? " · Telegram" : ""}</span></div>
         <button className="ghost" onClick={logout}>Выйти</button>
       </header>
+
+      {telegramNotice && <div className="notice">{telegramNotice}</div>}
 
       <section className="quick-stats">
         <div><strong>{tasks.filter((x) => x.status === "OPEN").length}</strong><span>свободно</span></div>
