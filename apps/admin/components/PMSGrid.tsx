@@ -35,6 +35,12 @@ type GridResponse = {
   rooms: Room[];
 };
 
+type RealtimeMessage = {
+  type: "pms.grid.snapshot" | "heartbeat";
+  version?: string;
+  data?: GridResponse;
+};
+
 const STATE_LABELS: Record<Room["operational_state"], string> = {
   UNKNOWN: "Не указан",
   CLEAN: "Готов",
@@ -56,11 +62,6 @@ function addDays(value: Date, amount: number) {
   return next;
 }
 
-function parseDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
 function dateRange(start: Date, count: number) {
   return Array.from({ length: count }, (_, index) => addDays(start, index));
 }
@@ -76,6 +77,16 @@ function blockTitle(block: Block) {
   return block.reason || (block.type === "MAINTENANCE" ? "Ремонт" : "Блок");
 }
 
+function websocketBase() {
+  const configured = process.env.NEXT_PUBLIC_CORE_WS_URL?.replace(/\/$/, "");
+  if (configured) return configured;
+  if (typeof window === "undefined") return "";
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.hostname;
+  const port = window.location.port === "3001" ? "8000" : window.location.port;
+  return `${protocol}//${host}${port ? `:${port}` : ""}`;
+}
+
 export default function PMSGrid() {
   const [start, setStart] = useState(() => {
     const now = new Date();
@@ -85,6 +96,7 @@ export default function PMSGrid() {
   const [data, setData] = useState<GridResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [realtime, setRealtime] = useState<"connecting" | "live" | "offline">("connecting");
   const [search, setSearch] = useState("");
   const [roomType, setRoomType] = useState("ALL");
   const [state, setState] = useState("ALL");
@@ -117,6 +129,53 @@ export default function PMSGrid() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let socket: WebSocket | null = null;
+    let stopped = false;
+    let reconnectTimer: number | undefined;
+
+    const params = new URLSearchParams({
+      start: localDateString(start),
+      end: localDateString(end),
+    });
+    const base = websocketBase();
+    if (!base) return;
+    const url = `${base}/ws/pms/grid?${params.toString()}`;
+
+    function connect() {
+      if (stopped) return;
+      setRealtime("connecting");
+      socket = new WebSocket(url);
+      socket.onopen = () => setRealtime("live");
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data) as RealtimeMessage;
+          if (message.type === "pms.grid.snapshot" && message.data) {
+            setData(message.data);
+            setError(null);
+            setLoading(false);
+          }
+        } catch {
+          // Ignore malformed realtime frames; the HTTP snapshot remains the fallback source.
+        }
+      };
+      socket.onerror = () => socket?.close();
+      socket.onclose = () => {
+        if (stopped) return;
+        setRealtime("offline");
+        reconnectTimer = window.setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+    return () => {
+      stopped = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      socket?.close();
+    };
+  }, [start, end]);
 
   const roomTypes = useMemo(() => {
     if (!data) return [];
@@ -164,7 +223,7 @@ export default function PMSGrid() {
           <p className="subtitle">84 номера · реальные категории · данные из Resort Core</p>
         </div>
         <div className={`connection ${error ? "error" : "ok"}`}>
-          {error ? "Core недоступен" : loading ? "Обновление…" : "Core подключён"}
+          {error ? "Core недоступен" : realtime === "live" ? "Realtime подключён" : loading ? "Обновление…" : realtime === "connecting" ? "Realtime подключается…" : "HTTP подключён"}
         </div>
       </div>
 
