@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGrid";
+import RequestsBoard from "./RequestsBoard";
 
 type User = {
   id: string;
@@ -11,6 +13,8 @@ type User = {
   property_code: string;
 };
 
+type Tab = "PMS" | "REQUESTS" | "OPS";
+
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
@@ -18,6 +22,7 @@ export default function AdminShell() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [tab, setTab] = useState<Tab>("PMS");
 
   useEffect(() => {
     fetch("/core/api/v1/auth/me", { cache: "no-store" })
@@ -25,7 +30,10 @@ export default function AdminShell() {
         if (!response.ok) return null;
         return (await response.json()) as User;
       })
-      .then(setUser)
+      .then((payload) => {
+        setUser(payload);
+        if (payload && !["OWNER", "MANAGER"].includes(payload.role)) setTab("OPS");
+      })
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
   }, []);
@@ -46,6 +54,7 @@ export default function AdminShell() {
       }
       const payload = (await response.json()) as User;
       setUser(payload);
+      setTab(["OWNER", "MANAGER"].includes(payload.role) ? "PMS" : "OPS");
       setPassword("");
     } catch {
       setError("Сервис входа недоступен. Проверьте Resort Core.");
@@ -83,10 +92,22 @@ export default function AdminShell() {
     );
   }
 
+  const isManager = ["OWNER", "MANAGER"].includes(user.role);
+
   return (
     <>
-      <div className="auth-toolbar"><span><b>{user.display_name}</b> · {user.role}</span><button onClick={logout}>Выйти</button></div>
-      <PMSGrid />
+      <div className="auth-toolbar admin-nav">
+        <div className="admin-identity"><strong>Три Короны · Resort OS</strong><span>{user.display_name} · {user.role}</span></div>
+        <nav className="admin-tabs">
+          {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
+          {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
+          <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
+        </nav>
+        <button className="logout-button" onClick={logout}>Выйти</button>
+      </div>
+      {tab === "PMS" && isManager && <PMSGrid />}
+      {tab === "REQUESTS" && isManager && <RequestsBoard />}
+      {tab === "OPS" && <OperationsBoard user={user} />}
     </>
   );
 }
