@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import DashboardBoard from "./DashboardBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
-import PMSGrid from "./PMSGrid";
+import PMSGrid from "./PMSGridV2";
 import ReceptionBoard from "./ReceptionBoard";
 import RequestsBoard from "./RequestsBoard";
 import StaffBoard from "./StaffBoard";
