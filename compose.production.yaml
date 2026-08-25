@@ -21,23 +21,27 @@ services:
       dockerfile: services/api/Dockerfile
     restart: unless-stopped
     environment:
+      APP_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       PROPERTY_CODE: ${PROPERTY_CODE}
       RATE_PLAN_CODE: ${RATE_PLAN_CODE}
-      PREPAYMENT_PERCENT: ${PREPAYMENT_PERCENT}
       CORS_ORIGINS: ${CORS_ORIGINS}
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS}
       COOKIE_SECURE: ${COOKIE_SECURE}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN}
       AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY}
       AUTOMATION_SERVICE_NAME: ${AUTOMATION_SERVICE_NAME}
+      REQUIRE_AUTOMATION_SERVICE: ${REQUIRE_AUTOMATION_SERVICE}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_INITDATA_MAX_AGE_SECONDS: ${TELEGRAM_INITDATA_MAX_AGE_SECONDS}
+      TELEGRAM_STAFF_WEBHOOK_SECRET: ${TELEGRAM_STAFF_WEBHOOK_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL}
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
       interval: 15s
       timeout: 5s
       retries: 10
