@@ -60,6 +60,13 @@ type OutboundCapabilities = {
   truth: string;
 };
 
+type AiCapabilities = {
+  draft_configured: boolean;
+  auto_send_enabled: boolean;
+  model_configured: boolean;
+  truth: string;
+};
+
 const statusLabels: Record<string, string> = {
   OPEN: "Открыт",
   WAITING_GUEST: "Ждём гостя",
@@ -91,6 +98,13 @@ function dateTime(value?: string | null) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
+function messageAuthor(message: Message) {
+  if (message.direction === "INBOUND") return "Гость";
+  if (message.direction === "OUTBOUND") return "Исходящее";
+  if (message.sender_type === "AI_DRAFT") return "AI-черновик · не отправлен";
+  return "Внутренняя заметка";
+}
+
 export default function InboxBoard() {
   const [items, setItems] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState("NEEDS_REPLY");
@@ -104,8 +118,10 @@ export default function InboxBoard() {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [linkRequestId, setLinkRequestId] = useState("");
   const [capabilities, setCapabilities] = useState<OutboundCapabilities | null>(null);
+  const [aiCapabilities, setAiCapabilities] = useState<AiCapabilities | null>(null);
   const [reply, setReply] = useState("");
   const [sendBusy, setSendBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [sendInfo, setSendInfo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -128,11 +144,14 @@ export default function InboxBoard() {
 
   const loadCapabilities = useCallback(async () => {
     try {
-      const response = await fetch("/core/api/v1/admin/inbox/outbound-capabilities", { cache: "no-store" });
-      if (!response.ok) return;
-      setCapabilities(await response.json());
+      const [outboundResponse, aiResponse] = await Promise.all([
+        fetch("/core/api/v1/admin/inbox/outbound-capabilities", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/inbox/ai-capabilities", { cache: "no-store" }),
+      ]);
+      if (outboundResponse.ok) setCapabilities(await outboundResponse.json());
+      if (aiResponse.ok) setAiCapabilities(await aiResponse.json());
     } catch {
-      // Capability absence keeps send controls safely disabled.
+      // Missing capabilities keep optional actions safely disabled.
     }
   }, []);
 
@@ -158,6 +177,7 @@ export default function InboxBoard() {
     && capabilities?.telegram.outbound_configured
     && detail.conversation.channel_code === capabilities.telegram.channel_code
   );
+  const aiDraftEnabled = Boolean(detail && aiCapabilities?.draft_configured);
 
   async function openConversation(id: string) {
     setDetailBusy(true);
@@ -260,6 +280,26 @@ export default function InboxBoard() {
     }
   }
 
+  async function generateAiDraft() {
+    if (!detail || !aiDraftEnabled) return;
+    setAiBusy(true);
+    setError(null);
+    setSendInfo(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/inbox/conversations/${detail.conversation.id}/ai-draft`, { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось создать AI-черновик");
+      const maxLength = capabilities?.telegram.max_text_length || 4096;
+      setReply(String(body.text || "").slice(0, maxLength));
+      setSendInfo("AI создал черновик. Проверьте и отредактируйте его перед отправкой.");
+      await openConversation(detail.conversation.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка AI-черновика");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
   async function sendReply(event: FormEvent) {
     event.preventDefault();
     if (!detail || !telegramReplyEnabled || !reply.trim()) return;
@@ -270,10 +310,7 @@ export default function InboxBoard() {
     try {
       const response = await fetch(`/core/api/v1/admin/inbox/conversations/${detail.conversation.id}/send-text`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Idempotency-Key": key,
-        },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
         body: JSON.stringify({ text: reply.trim() }),
       });
       const body = await response.json().catch(() => ({}));
@@ -296,19 +333,14 @@ export default function InboxBoard() {
 
   return <main className="work-shell inbox-shell">
     <div className="work-head">
-      <div><p className="eyebrow">Коммуникации</p><h1>Единый Inbox</h1><p className="subtitle">Входящие, фактическое время ожидания и реальные статусы доставки. Канал считается отвеченным только после подтверждения провайдера.</p></div>
+      <div><p className="eyebrow">Коммуникации</p><h1>Единый Inbox</h1><p className="subtitle">Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет.</p></div>
       <button className="btn" onClick={() => { load(); loadCapabilities(); }}>Обновить</button>
     </div>
 
     <div className="inbox-controls">
       <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Имя, телефон, канал, текст…" />
       <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-        <option value="NEEDS_REPLY">Нужен ответ</option>
-        <option value="OPEN">Открытые</option>
-        <option value="WAITING_STAFF">Ждут сотрудника</option>
-        <option value="WAITING_GUEST">Ждём гостя</option>
-        <option value="RESOLVED">Решённые</option>
-        <option value="ALL">Все</option>
+        <option value="NEEDS_REPLY">Нужен ответ</option><option value="OPEN">Открытые</option><option value="WAITING_STAFF">Ждут сотрудника</option><option value="WAITING_GUEST">Ждём гостя</option><option value="RESOLVED">Решённые</option><option value="ALL">Все</option>
       </select>
     </div>
 
@@ -317,7 +349,7 @@ export default function InboxBoard() {
       {visible.length === 0 && <div className="empty">Диалогов по этому фильтру пока нет.</div>}
       {visible.map((item) => <button className={`inbox-row ${item.needs_reply ? "needs-reply" : ""}`} key={item.id} onClick={() => openConversation(item.id)} disabled={detailBusy}>
         <div className="inbox-contact"><strong>{item.contact_name || item.contact_phone || item.contact_username || "Без имени"}</strong><span>{channelLabels[item.channel_kind] || item.channel_name}</span></div>
-        <div className="inbox-preview"><strong>{item.last_message_direction === "INBOUND" ? "Гость" : item.last_message_direction === "INTERNAL" ? "Заметка" : "Ответ"}</strong><span>{item.last_message_text || "Сообщение без текста"}</span></div>
+        <div className="inbox-preview"><strong>{item.last_message_direction === "INBOUND" ? "Гость" : item.last_message_direction === "INTERNAL" ? "Внутреннее" : "Ответ"}</strong><span>{item.last_message_text || "Сообщение без текста"}</span></div>
         <div><span className={`inbox-reply-pill ${item.needs_reply ? "waiting" : ""}`}>{item.needs_reply ? "Нужен ответ" : statusLabels[item.status] || item.status}</span><small>{item.needs_reply ? `ожидает ${waitingLabel(item.waiting_seconds)}` : dateTime(item.last_message_at)}</small></div>
         <div><span className="field-label">Ответственный</span><b>{item.assigned_to_name || "Не назначен"}</b>{item.reservation_request_id && <small>Есть заявка · {item.reservation_request_status || ""}</small>}</div>
       </button>)}
@@ -338,18 +370,22 @@ export default function InboxBoard() {
 
         <div className="message-stream">
           {detail.messages.length === 0 && <div className="empty small">Сообщений нет.</div>}
-          {detail.messages.map((message) => <article className={`message-bubble ${message.direction.toLowerCase()}`} key={message.id}>
-            <div><strong>{message.direction === "INBOUND" ? "Гость" : message.direction === "OUTBOUND" ? "Исходящее" : "Внутренняя заметка"}</strong><time>{dateTime(message.sent_at || message.created_at)}</time></div>
+          {detail.messages.map((message) => <article className={`message-bubble ${message.direction.toLowerCase()} ${message.sender_type === "AI_DRAFT" ? "ai-draft" : ""}`} key={message.id}>
+            <div><strong>{messageAuthor(message)}</strong><time>{dateTime(message.sent_at || message.created_at)}</time></div>
             <p>{message.text || `[${message.content_type}]`}</p>
             {message.direction === "OUTBOUND" && <small>Доставка: {message.delivery_status}</small>}
           </article>)}
         </div>
 
-        {telegramReplyEnabled ? <form className="outbound-reply-form" onSubmit={sendReply}>
-          <label><span>Ответ в Telegram</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={4096} placeholder="Напишите ответ гостю…" /></label>
-          <div><small>Только подтверждённый Telegram статус SENT считается ответом клиенту.</small><button className="btn primary" disabled={sendBusy || !reply.trim()}>{sendBusy ? "Отправляю…" : "Отправить в Telegram"}</button></div>
+        {(aiDraftEnabled || telegramReplyEnabled) ? <form className="outbound-reply-form" onSubmit={sendReply}>
+          <label><span>Черновик ответа менеджера</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={capabilities?.telegram.max_text_length || 4096} placeholder="Напишите ответ или создайте AI-черновик…" /></label>
+          <div className="reply-actions">
+            {aiDraftEnabled && <button type="button" className="btn" onClick={generateAiDraft} disabled={aiBusy || sendBusy}>{aiBusy ? "Готовлю…" : "AI-черновик"}</button>}
+            {telegramReplyEnabled ? <button className="btn primary" disabled={sendBusy || aiBusy || !reply.trim()}>{sendBusy ? "Отправляю…" : "Отправить в Telegram"}</button> : <small>Отправка наружу выключена, пока реальный адаптер канала не настроен.</small>}
+          </div>
           {sendInfo && <p className="send-info">{sendInfo}</p>}
-        </form> : <div className="inbox-send-disabled"><strong>Исходящая отправка для этого канала не активирована</strong><span>{detail.conversation.channel_kind === "TELEGRAM" ? "Telegram adapter подготовлен, но реальный TELEGRAM_SALES_BOT_TOKEN ещё не задан." : "WhatsApp / Instagram будут включены только после подключения их реальных provider-адаптеров."}</span></div>}
+          <p className="reply-truth">AI только предлагает текст. Наличие, цена, оплата и статус брони берутся только из Core и требуют фактических данных.</p>
+        </form> : <div className="inbox-send-disabled"><strong>AI и исходящая отправка не активированы</strong><span>Они включаются только после задания реальных ключей/модели и provider-адаптера. Система не имитирует отправку.</span></div>}
 
         <form className="internal-note-form" onSubmit={addNote}>
           <label><span>Внутренняя заметка — клиент её не получает</span><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={12000} placeholder="Например: уточнить даты у гостя после звонка" /></label>
