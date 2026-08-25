@@ -107,7 +107,7 @@ async def check_out(
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES ($1,$2,'STAFF',$3,'CHECK_OUT','Reservation',$4,'PMS','SUCCESS',
-                     jsonb_build_object('housekeeping_task_id',$5),now())''',
+                     jsonb_build_object('housekeeping_task_id',$5::text),now())''',
                 uuid.uuid4(), pid, user["id"], str(reservation_id), str(housekeeping_task_id) if housekeeping_task_id else None,
             )
     return {
