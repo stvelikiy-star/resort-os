@@ -1,0 +1,19 @@
+.nfc-manage-modal{width:min(680px,100%)}
+.nfc-wallet-panel{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}
+.nfc-wallet-panel>div{display:grid;gap:5px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#f8faf9}
+.nfc-wallet-panel span{color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase}
+.nfc-wallet-panel strong{font-size:16px}
+.nfc-retire-section{margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#fff}
+.nfc-retire-section .field-label{margin:0 0 9px}
+.nfc-retire-section small{display:block;margin-top:9px;color:var(--muted);line-height:1.45}
+.nfc-retire-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.btn.danger-soft{border-color:#e7bcbc;background:#fff3f3;color:#8b3434}
+.btn.danger-soft:hover{background:#fde9e9}
+.nfc-replace-form{margin-top:14px;padding-top:16px;border-top:1px solid var(--line)}
+.nfc-section-title{display:grid;gap:4px}
+.nfc-section-title strong{font-size:18px}
+.nfc-section-title span{color:var(--muted);font-size:12px;line-height:1.45}
+.nfc-issue-form select{width:100%;min-height:44px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:0 11px;color:var(--ink);outline:none}
+.nfc-issue-form select:focus{border-color:#789589;box-shadow:0 0 0 3px #e7eeea}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:620px){.nfc-wallet-panel{grid-template-columns:1fr}.nfc-retire-actions{grid-template-columns:1fr}.nfc-manage-modal{max-height:90svh}}
