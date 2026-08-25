@@ -33,6 +33,8 @@ jobs:
       BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
+      TELEGRAM_BOT_TOKEN: 123456789:CI_TEST_ONLY_TELEGRAM_BOT_TOKEN
+      TELEGRAM_INITDATA_MAX_AGE_SECONDS: 600
 
     steps:
       - uses: actions/checkout@v4
@@ -240,6 +242,30 @@ jobs:
           curl --fail -sS -b /tmp/maid-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
             -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection.json
           python -c 'import json; assert json.load(open("/tmp/inspection.json"))["status"] == "IN_INSPECTION"'
+
+      - name: Verify signed Telegram link and automatic staff login
+        run: |
+          python - <<'PY'
+          import hashlib, hmac, json, os, time, urllib.parse
+          user = json.dumps({"id": 555001, "first_name": "CI", "last_name": "Maid", "username": "ci_maid_tg"}, separators=(",", ":"))
+          pairs = {"auth_date": str(int(time.time())), "query_id": "CI_QUERY_001", "user": user}
+          check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
+          secret = hmac.new(b"WebAppData", os.environ["TELEGRAM_BOT_TOKEN"].encode(), hashlib.sha256).digest()
+          digest = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
+          init_data = urllib.parse.urlencode({**pairs, "hash": digest})
+          json.dump({"init_data": init_data}, open("/tmp/telegram-valid.json", "w"))
+          json.dump({"init_data": init_data + "&tampered=1"}, open("/tmp/telegram-invalid.json", "w"))
+          PY
+          curl --fail -sS -b /tmp/maid-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/telegram/link \
+            -H 'Content-Type: application/json' --data-binary @/tmp/telegram-valid.json > /tmp/telegram-link.json
+          python -c 'import json; assert json.load(open("/tmp/telegram-link.json"))["linked"] is True'
+          curl --fail -sS -c /tmp/telegram-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/telegram/login \
+            -H 'Content-Type: application/json' --data-binary @/tmp/telegram-valid.json > /tmp/telegram-login.json
+          curl --fail -sS -b /tmp/telegram-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/telegram-me.json
+          python -c 'import json; d=json.load(open("/tmp/telegram-me.json")); assert d["username"] == "ci-maid"; assert d["role"] == "MAID"'
+          CODE=$(curl -sS -o /tmp/telegram-invalid-response.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/auth/telegram/login \
+            -H 'Content-Type: application/json' --data-binary @/tmp/telegram-invalid.json)
+          test "$CODE" = "401"
 
       - name: Verify management inspection returns room CLEAN
         run: |
