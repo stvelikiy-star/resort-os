@@ -69,6 +69,7 @@ DECLARE
   v_partner_net integer;
   v_transaction_id uuid;
   v_existing_transaction uuid;
+  v_existing_partner uuid;
   v_existing_wallet uuid;
   v_existing_before integer;
   v_existing_after integer;
@@ -93,24 +94,8 @@ BEGIN
     RAISE EXCEPTION 'NFC_PROPERTY_NOT_FOUND' USING ERRCODE = 'P0001';
   END IF;
 
-  -- Fast replay path. Original before/after balances come from the immutable ledger,
-  -- not the wallet's current balance after later transactions.
-  SELECT t.id, t."walletId", l."balanceBeforeKgs", l."balanceAfterKgs",
-         t."amountKgs", t."hotelCommissionKgs", t."partnerNetKgs", t."commissionBps"
-    INTO v_existing_transaction, v_existing_wallet, v_existing_before, v_existing_after,
-         v_existing_amount, v_existing_commission, v_existing_net, v_existing_bps
-  FROM "nfc_transactions" t
-  LEFT JOIN "nfc_ledger_entries" l ON l."transactionId" = t.id
-  WHERE t."propertyId" = v_property_id
-    AND t."idempotencyKey" = p_idempotency_key;
-
-  IF FOUND THEN
-    RETURN QUERY SELECT
-      v_existing_transaction, v_existing_wallet, v_existing_before, v_existing_after,
-      v_existing_amount, v_existing_commission, v_existing_net, v_existing_bps, true;
-    RETURN;
-  END IF;
-
+  -- Authorization happens before any replay lookup so one partner cannot use a
+  -- guessed idempotency key to read another partner's transaction result.
   PERFORM 1
   FROM "staff_users" u
   WHERE u.id = p_partner_staff_user
@@ -120,6 +105,27 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'NFC_PARTNER_NOT_AUTHORIZED' USING ERRCODE = 'P0001';
+  END IF;
+
+  -- Fast replay path. Original before/after balances come from the immutable ledger,
+  -- not the wallet's current balance after later transactions.
+  SELECT t.id, t."partnerStaffUserId", t."walletId", l."balanceBeforeKgs", l."balanceAfterKgs",
+         t."amountKgs", t."hotelCommissionKgs", t."partnerNetKgs", t."commissionBps"
+    INTO v_existing_transaction, v_existing_partner, v_existing_wallet, v_existing_before, v_existing_after,
+         v_existing_amount, v_existing_commission, v_existing_net, v_existing_bps
+  FROM "nfc_transactions" t
+  LEFT JOIN "nfc_ledger_entries" l ON l."transactionId" = t.id
+  WHERE t."propertyId" = v_property_id
+    AND t."idempotencyKey" = p_idempotency_key;
+
+  IF FOUND THEN
+    IF v_existing_partner <> p_partner_staff_user THEN
+      RAISE EXCEPTION 'NFC_IDEMPOTENCY_CONFLICT' USING ERRCODE = 'P0001';
+    END IF;
+    RETURN QUERY SELECT
+      v_existing_transaction, v_existing_wallet, v_existing_before, v_existing_after,
+      v_existing_amount, v_existing_commission, v_existing_net, v_existing_bps, true;
+    RETURN;
   END IF;
 
   -- Serialize every operation for this bracelet/wallet. Different API workers and
@@ -143,9 +149,9 @@ BEGIN
   END IF;
 
   -- A concurrent identical retry may have completed while we waited for the wallet lock.
-  SELECT t.id, t."walletId", l."balanceBeforeKgs", l."balanceAfterKgs",
+  SELECT t.id, t."partnerStaffUserId", t."walletId", l."balanceBeforeKgs", l."balanceAfterKgs",
          t."amountKgs", t."hotelCommissionKgs", t."partnerNetKgs", t."commissionBps"
-    INTO v_existing_transaction, v_existing_wallet, v_existing_before, v_existing_after,
+    INTO v_existing_transaction, v_existing_partner, v_existing_wallet, v_existing_before, v_existing_after,
          v_existing_amount, v_existing_commission, v_existing_net, v_existing_bps
   FROM "nfc_transactions" t
   LEFT JOIN "nfc_ledger_entries" l ON l."transactionId" = t.id
@@ -153,6 +159,9 @@ BEGIN
     AND t."idempotencyKey" = p_idempotency_key;
 
   IF FOUND THEN
+    IF v_existing_partner <> p_partner_staff_user THEN
+      RAISE EXCEPTION 'NFC_IDEMPOTENCY_CONFLICT' USING ERRCODE = 'P0001';
+    END IF;
     RETURN QUERY SELECT
       v_existing_transaction, v_existing_wallet, v_existing_before, v_existing_after,
       v_existing_amount, v_existing_commission, v_existing_net, v_existing_bps, true;
