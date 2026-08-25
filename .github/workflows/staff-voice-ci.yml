@@ -1,0 +1,203 @@
+name: Staff Voice CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  staff-voice:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      PREPAYMENT_PERCENT: 30
+      COOKIE_SECURE: false
+      TELEGRAM_BOT_TOKEN: CI-STAFF-BOT
+      TELEGRAM_STAFF_WEBHOOK_SECRET: CI_STAFF_VOICE_SECRET
+      TELEGRAM_BOT_API_BASE_URL: http://127.0.0.1:18082
+      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: 2
+      STAFF_VOICE_MAX_BYTES: 20000000
+      OPENAI_API_KEY: CI-TRANSCRIBE-KEY
+      OPENAI_TRANSCRIBE_MODEL: ci-transcribe-model
+      OPENAI_API_BASE_URL: http://127.0.0.1:18082/v1
+      OPENAI_TRANSCRIBE_TIMEOUT_SECONDS: 2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate and create database schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile Core and mocks
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply constraints seed and technician fixture
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python - <<'PY'
+          import asyncio, os, uuid, asyncpg
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              pid=await conn.fetchval("SELECT id FROM properties WHERE code='THREE_CROWNS'")
+              await conn.execute("UPDATE rooms SET \"operationalState\"='CLEAN' WHERE \"propertyId\"=$1 AND code IN ('214','1')", pid)
+              await conn.execute('''
+                  INSERT INTO staff_users (id,"propertyId",username,"displayName","passwordHash",role,"isActive","telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt")
+                  VALUES ($1,$2,'ci-tech','CI Technician','not-used','TECHNICIAN',true,'777001','ci_tech',now(),now(),now())
+                  ON CONFLICT ("propertyId",username) DO UPDATE SET "telegramUserId"='777001',"isActive"=true,"updatedAt"=now()
+              ''', uuid.UUID('00000000-0000-4000-8000-000000007701'), pid)
+              await conn.close()
+          asyncio.run(main())
+          PY
+
+      - name: Start isolated provider mocks
+        run: |
+          python scripts/mock_staff_voice_providers.py > /tmp/staff-voice-mock.log 2>&1 &
+          echo $! > /tmp/staff-voice-mock.pid
+          sleep 1
+
+      - name: Start Core API
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/staff-voice-api.log 2>&1 &
+          echo $! > /tmp/staff-voice-api.pid
+          sleep 3
+          curl --fail http://127.0.0.1:8000/ready > /tmp/ready.json
+
+      - name: Reject missing webhook secret
+        run: |
+          CODE=$(curl -sS -o /tmp/no-secret.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/channels/telegram/staff/webhook \
+            -H 'Content-Type: application/json' \
+            -d '{"update_id":8000,"message":{"message_id":80,"chat":{"id":777001,"type":"private"},"from":{"id":777001,"is_bot":false},"voice":{"file_id":"voice-214","file_size":8}}}')
+          test "$CODE" = "401"
+
+      - name: Reject unlinked Telegram staff account before provider calls
+        run: |
+          CODE=$(curl -sS -o /tmp/unlinked.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/channels/telegram/staff/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_STAFF_VOICE_SECRET' \
+            -d '{"update_id":8000,"message":{"message_id":80,"chat":{"id":999999,"type":"private"},"from":{"id":999999,"is_bot":false},"voice":{"file_id":"voice-214","file_size":8}}}')
+          test "$CODE" = "403"
+          test "$(cat /tmp/mock-staff-telegram-count)" = "0"
+          test "$(cat /tmp/mock-staff-transcribe-count)" = "0"
+
+      - name: Exact room 214 voice creates maintenance task and TECH_BLOCK
+        run: |
+          cat > /tmp/voice-214.json <<'JSON'
+          {"update_id":8001,"message":{"message_id":81,"chat":{"id":777001,"type":"private"},"from":{"id":777001,"is_bot":false,"first_name":"Tech"},"voice":{"file_id":"voice-214","file_unique_id":"uniq-214","file_size":8,"duration":4}}}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/staff/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_STAFF_VOICE_SECRET' \
+            --data-binary @/tmp/voice-214.json > /tmp/voice-214-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/voice-214-result.json'))
+          assert d['type']=='MAINTENANCE'
+          assert d['priority']=='NORMAL'
+          assert d['room_code']=='214'
+          assert d['room_match_count']==1
+          assert d['needs_room_review'] is False
+          assert d['room_state']=='TECH_BLOCK'
+          assert '214' in d['transcript']
+          PY
+          python - <<'PY'
+          import asyncio, os, asyncpg
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              state=await conn.fetchval("SELECT \"operationalState\"::text FROM rooms WHERE code='214'")
+              task=await conn.fetchrow("SELECT type::text AS type,priority::text AS priority,description,\"roomId\" FROM operational_tasks WHERE source='TELEGRAM_STAFF_VOICE' ORDER BY \"createdAt\" DESC LIMIT 1")
+              assert state=='TECH_BLOCK'
+              assert task['type']=='MAINTENANCE' and task['priority']=='NORMAL' and task['roomId'] is not None
+              assert '214' in task['description']
+              await conn.close()
+          asyncio.run(main())
+          PY
+
+      - name: Duplicate Telegram update does not redownload or retranscribe
+        run: |
+          TG_COUNT=$(cat /tmp/mock-staff-telegram-count)
+          TX_COUNT=$(cat /tmp/mock-staff-transcribe-count)
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/staff/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_STAFF_VOICE_SECRET' \
+            --data-binary @/tmp/voice-214.json > /tmp/voice-214-replay.json
+          test "$(cat /tmp/mock-staff-telegram-count)" = "$TG_COUNT"
+          test "$(cat /tmp/mock-staff-transcribe-count)" = "$TX_COUNT"
+          python -c 'import json; assert json.load(open("/tmp/voice-214-replay.json"))["idempotent_replay"] is True'
+
+      - name: Phrase about first floor must not block room 1
+        run: |
+          cat > /tmp/voice-floor1.json <<'JSON'
+          {"update_id":8002,"message":{"message_id":82,"chat":{"id":777001,"type":"private"},"from":{"id":777001,"is_bot":false,"first_name":"Tech"},"voice":{"file_id":"voice-floor1","file_unique_id":"uniq-floor1","file_size":8,"duration":4}}}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/staff/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_STAFF_VOICE_SECRET' \
+            --data-binary @/tmp/voice-floor1.json > /tmp/voice-floor1-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/voice-floor1-result.json'))
+          assert d['room_code'] is None
+          assert d['room_match_count']==0
+          assert d['needs_room_review'] is True
+          assert d['room_state'] is None
+          PY
+          python - <<'PY'
+          import asyncio, os, asyncpg
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              state=await conn.fetchval("SELECT \"operationalState\"::text FROM rooms WHERE code='1'")
+              task=await conn.fetchrow("SELECT title,\"roomId\",priority::text AS priority FROM operational_tasks WHERE source='TELEGRAM_STAFF_VOICE' ORDER BY \"createdAt\" DESC LIMIT 1")
+              assert state=='CLEAN'
+              assert task['roomId'] is None
+              assert 'уточнения' in task['title']
+              assert task['priority']=='NORMAL'
+              await conn.close()
+          asyncio.run(main())
+          PY
+
+      - name: Verify voice capabilities disclose conservative policy
+        run: |
+          curl --fail -sS http://127.0.0.1:8000/api/v1/channels/telegram/staff/voice-capabilities > /tmp/voice-capabilities.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/voice-capabilities.json'))
+          assert d['configured'] is True
+          assert 'TECHNICIAN' in d['allowed_roles']
+          assert d['priority_policy']=='NORMAL_ONLY_UNTIL_EXPLICIT_SEVERITY_RULES_ARE_APPROVED'
+          assert d['room_policy']=='EXACT_SINGLE_MATCH_ELSE_REVIEW_WITHOUT_ROOM_BLOCK'
+          PY
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          cat /tmp/staff-voice-api.log || true
+          cat /tmp/staff-voice-mock.log || true
