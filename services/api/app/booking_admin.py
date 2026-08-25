@@ -229,13 +229,22 @@ async def confirm_payment_and_reserve(
     async with request.app.state.db.acquire() as conn:
         existing = await conn.fetchrow(
             '''
-            SELECT p.id, p."reservationId", r."bookingNumber", r.status::text AS reservation_status
-            FROM payments p LEFT JOIN reservations r ON r.id = p."reservationId"
-            WHERE p."idempotencyKey" = $1
+            SELECT p.id,p."requestId",p."reservationId",r."bookingNumber",r.status::text AS reservation_status
+            FROM payments p
+            LEFT JOIN reservations r ON r.id=p."reservationId"
+            WHERE p."idempotencyKey"=$1
             ''',
             payload.idempotency_key,
         )
         if existing:
+            if existing["requestId"] != request_id:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "IDEMPOTENCY_CONFLICT",
+                        "message": "This idempotency key belongs to another reservation request.",
+                    },
+                )
             return {
                 "idempotent_replay": True,
                 "payment_id": str(existing["id"]),
@@ -248,10 +257,10 @@ async def confirm_payment_and_reserve(
             pid = await property_id(conn)
             rr = await conn.fetchrow(
                 '''
-                SELECT rr.*, rt.code AS room_type_code
+                SELECT rr.*,rt.code AS room_type_code
                 FROM reservation_requests rr
-                LEFT JOIN room_types rt ON rt.id = rr."desiredRoomTypeId"
-                WHERE rr.id = $1 AND rr."propertyId" = $2
+                LEFT JOIN room_types rt ON rt.id=rr."desiredRoomTypeId"
+                WHERE rr.id=$1 AND rr."propertyId"=$2
                 FOR UPDATE OF rr
                 ''',
                 request_id,
@@ -261,7 +270,7 @@ async def confirm_payment_and_reserve(
                 raise HTTPException(status_code=404, detail="Request not found")
 
             already = await conn.fetchrow(
-                '''SELECT id, "bookingNumber", status::text AS status FROM reservations WHERE "requestId" = $1''',
+                '''SELECT id,"bookingNumber",status::text AS status FROM reservations WHERE "requestId"=$1''',
                 request_id,
             )
             if already:
@@ -279,8 +288,8 @@ async def confirm_payment_and_reserve(
 
             candidates = await conn.fetch(
                 '''
-                SELECT id, code FROM rooms
-                WHERE "propertyId" = $1 AND "roomTypeId" = $2 AND "operationalState" <> 'TECH_BLOCK'
+                SELECT id,code FROM rooms
+                WHERE "propertyId"=$1 AND "roomTypeId"=$2 AND "operationalState"<>'TECH_BLOCK'
                 ORDER BY code
                 FOR UPDATE
                 ''',
@@ -293,12 +302,11 @@ async def confirm_payment_and_reserve(
                     '''
                     SELECT EXISTS(
                       SELECT 1 FROM inventory_blocks ib
-                      WHERE ib."roomId" = $1 AND ib.active = true
-                        AND daterange(ib."startDate", ib."endDate", '[)')
-                          && daterange($2::date, $3::date, '[)')
+                      WHERE ib."roomId"=$1 AND ib.active=true
+                        AND daterange(ib."startDate",ib."endDate",'[)') && daterange($2::date,$3::date,'[)')
                     )
                     ''',
-                    room["id"], rr["checkIn"], rr["checkOut"],
+                    room["id"],rr["checkIn"],rr["checkOut"],
                 )
                 if not blocked:
                     chosen = room
@@ -306,17 +314,15 @@ async def confirm_payment_and_reserve(
             if not chosen:
                 raise HTTPException(status_code=409, detail="Availability changed; no room remains")
 
-            guest_id = uuid.uuid4()
-            reservation_id = uuid.uuid4()
-            payment_id = uuid.uuid4()
-            booking_number = f"TC-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
+            guest_id=uuid.uuid4()
+            reservation_id=uuid.uuid4()
+            payment_id=uuid.uuid4()
+            booking_number=f"TC-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
 
             await conn.execute(
-                '''
-                INSERT INTO guests (id,"propertyId","firstName",phone,email,"createdAt","updatedAt")
-                VALUES ($1,$2,$3,$4,$5,now(),now())
-                ''',
-                guest_id, pid, rr["guestName"], rr["phone"], rr["email"],
+                '''INSERT INTO guests (id,"propertyId","firstName",phone,email,"createdAt","updatedAt")
+                   VALUES ($1,$2,$3,$4,$5,now(),now())''',
+                guest_id,pid,rr["guestName"],rr["phone"],rr["email"],
             )
             await conn.execute(
                 '''
@@ -324,16 +330,15 @@ async def confirm_payment_and_reserve(
                   status,"checkIn","checkOut",adults,children,"totalKgs",notes,"createdAt","updatedAt")
                 VALUES ($1,$2,$3,$4,$5,'GUARANTEED',$6,$7,$8,$9,$10,$11,now(),now())
                 ''',
-                reservation_id, pid, request_id, booking_number, guest_id,
-                rr["checkIn"], rr["checkOut"], rr["adults"], rr["children"], rr["quotedTotalKgs"], rr["notes"],
+                reservation_id,pid,request_id,booking_number,guest_id,
+                rr["checkIn"],rr["checkOut"],rr["adults"],rr["children"],rr["quotedTotalKgs"],rr["notes"],
             )
             await conn.execute(
                 '''
-                INSERT INTO inventory_blocks (id,"roomId","reservationId","blockType","startDate","endDate",
-                  active,reason,"createdAt","updatedAt")
+                INSERT INTO inventory_blocks (id,"roomId","reservationId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt")
                 VALUES ($1,$2,$3,'RESERVATION',$4,$5,true,$6,now(),now())
                 ''',
-                uuid.uuid4(), chosen["id"], reservation_id, rr["checkIn"], rr["checkOut"], booking_number,
+                uuid.uuid4(),chosen["id"],reservation_id,rr["checkIn"],rr["checkOut"],booking_number,
             )
             await conn.execute(
                 '''
@@ -341,27 +346,21 @@ async def confirm_payment_and_reserve(
                   "externalRef","idempotencyKey","paidAt","createdAt","updatedAt")
                 VALUES ($1,$2,$3,$4,$5,'RECEIVED',$6,$7,$8,now(),now(),now())
                 ''',
-                payment_id, request_id, reservation_id, payload.amount_kgs, payload.method,
-                payload.provider, payload.external_ref, payload.idempotency_key,
+                payment_id,request_id,reservation_id,payload.amount_kgs,payload.method,
+                payload.provider,payload.external_ref,payload.idempotency_key,
+            )
+            await conn.execute(
+                '''UPDATE reservation_requests SET status='CONVERTED',"requiredPrepaymentKgs"=$2,"updatedAt"=now() WHERE id=$1''',
+                request_id,payload.amount_kgs,
             )
             await conn.execute(
                 '''
-                UPDATE reservation_requests
-                SET status='CONVERTED',"requiredPrepaymentKgs"=$2,"updatedAt"=now()
-                WHERE id=$1
-                ''',
-                request_id,
-                payload.amount_kgs,
-            )
-            await conn.execute(
-                '''
-                INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",
-                  source,result,"afterJson","createdAt")
+                INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                 VALUES ($1,$2,'STAFF',$3,'MANAGER_CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
                   jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text,
                     'manager_confirmed_payment_kgs',$8::integer),now())
                 ''',
-                uuid.uuid4(), pid, user["id"], str(reservation_id), booking_number, chosen["code"], str(payment_id), payload.amount_kgs,
+                uuid.uuid4(),pid,user["id"],str(reservation_id),booking_number,chosen["code"],str(payment_id),payload.amount_kgs,
             )
 
     return {
@@ -386,18 +385,18 @@ async def list_reservations(
         pid = await property_id(conn)
         rows = await conn.fetch(
             '''
-            SELECT r.id, r."bookingNumber", r.status::text AS status, r."checkIn", r."checkOut",
-                   r.adults, r.children, r."totalKgs", g."firstName", g.phone,
-                   room.code AS room_code, rt.name AS room_type_name
+            SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
+                   r.adults,r.children,r."totalKgs",g."firstName",g.phone,
+                   room.code AS room_code,rt.name AS room_type_name
             FROM reservations r
-            LEFT JOIN guests g ON g.id = r."primaryGuestId"
-            LEFT JOIN inventory_blocks ib ON ib."reservationId" = r.id AND ib."blockType"='RESERVATION' AND ib.active=true
-            LEFT JOIN rooms room ON room.id = ib."roomId"
-            LEFT JOIN room_types rt ON rt.id = room."roomTypeId"
-            WHERE r."propertyId" = $1
+            LEFT JOIN guests g ON g.id=r."primaryGuestId"
+            LEFT JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib."blockType"='RESERVATION' AND ib.active=true
+            LEFT JOIN rooms room ON room.id=ib."roomId"
+            LEFT JOIN room_types rt ON rt.id=room."roomTypeId"
+            WHERE r."propertyId"=$1
             ORDER BY r."createdAt" DESC
             LIMIT $2
             ''',
-            pid, limit,
+            pid,limit,
         )
-    return {"items": [dict(row) | {"id": str(row["id"])} for row in rows]}
+    return {"items":[dict(row)|{"id":str(row["id"])} for row in rows]}
