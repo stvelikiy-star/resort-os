@@ -2,6 +2,7 @@
 import asyncio
 import os
 import sys
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
 import asyncpg
@@ -23,6 +24,14 @@ def database_dsn() -> str:
     if not value:
         raise RuntimeError("DATABASE_URL is required")
     return value.split("?", 1)[0]
+
+
+def parse_utc_timestamp(value: str) -> datetime:
+    normalized = value.strip().replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def static_checks() -> tuple[list[str], list[str]]:
@@ -53,12 +62,17 @@ def static_checks() -> tuple[list[str], list[str]]:
         except ValueError:
             errors.append("DATABASE_URL is invalid")
 
-    service_key = os.environ.get("AUTOMATION_SERVICE_KEY", "")
-    if service_key and len(service_key) < 32:
+    service_key = os.environ.get("AUTOMATION_SERVICE_KEY", "").strip()
+    if truthy("REQUIRE_AUTOMATION_SERVICE", default=True) and not service_key:
+        errors.append("AUTOMATION_SERVICE_KEY is required for the n8n/Core production boundary")
+    elif service_key and len(service_key) < 32:
         errors.append("AUTOMATION_SERVICE_KEY must be at least 32 characters when configured")
 
+    # Direct Telegram Sales is optional/reference under the n8n-first client architecture.
+    # If someone configures it, require the matching webhook secret.
     if os.environ.get("TELEGRAM_SALES_BOT_TOKEN") and not os.environ.get("TELEGRAM_SALES_WEBHOOK_SECRET"):
         errors.append("Telegram Sales token is set but TELEGRAM_SALES_WEBHOOK_SECRET is missing")
+
     if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("OPENAI_TRANSCRIBE_MODEL") and not os.environ.get("TELEGRAM_STAFF_WEBHOOK_SECRET"):
         errors.append("Staff voice transcription is configured but TELEGRAM_STAFF_WEBHOOK_SECRET is missing")
 
@@ -107,21 +121,30 @@ async def database_checks() -> tuple[list[str], list[str], dict]:
             except ValueError:
                 errors.append("EXPECTED_ROOM_COUNT must be an integer")
 
+        expected_room_types = os.environ.get("EXPECTED_ROOM_TYPE_COUNT", "").strip()
+        if expected_room_types:
+            try:
+                expected = int(expected_room_types)
+                if facts["room_types"] != expected:
+                    errors.append(f"Room type count mismatch: expected {expected}, found {facts['room_types']}")
+            except ValueError:
+                errors.append("EXPECTED_ROOM_TYPE_COUNT must be an integer")
+
         required_constraints = {
             "no_overlapping_active_room_blocks",
             "reservation_valid_dates",
             "reservation_request_valid_dates",
             "payment_positive_amount",
         }
-        found = set(await conn.fetch(
+        found_rows = await conn.fetch(
             '''SELECT conname FROM pg_constraint WHERE conname = ANY($1::text[])''',
             list(required_constraints),
-        ))
-        # asyncpg Records are not hashable by desired field; normalize explicitly.
-        found_names = {row["conname"] for row in found}
+        )
+        found_names = {row["conname"] for row in found_rows}
         missing = sorted(required_constraints - found_names)
         if missing:
             errors.append("Missing critical PostgreSQL constraints: " + ", ".join(missing))
+        facts["critical_constraints"] = sorted(found_names)
 
         migration_table = await conn.fetchval("SELECT to_regclass('public._prisma_migrations')")
         facts["migration_history_present"] = migration_table is not None
@@ -142,7 +165,23 @@ async def database_checks() -> tuple[list[str], list[str], dict]:
             if not backup_marker:
                 errors.append("LAST_VERIFIED_BACKUP_AT is required after a successful backup/restore verification")
             else:
-                facts["last_verified_backup_at"] = backup_marker
+                try:
+                    backup_at = parse_utc_timestamp(backup_marker)
+                    facts["last_verified_backup_at"] = backup_at.isoformat()
+                    if backup_at > datetime.now(timezone.utc):
+                        errors.append("LAST_VERIFIED_BACKUP_AT cannot be in the future")
+                    max_age_raw = os.environ.get("MAX_BACKUP_AGE_HOURS", "").strip()
+                    if max_age_raw:
+                        max_age = float(max_age_raw)
+                        if max_age <= 0:
+                            errors.append("MAX_BACKUP_AGE_HOURS must be positive")
+                        else:
+                            age_hours = (datetime.now(timezone.utc) - backup_at).total_seconds() / 3600
+                            facts["verified_backup_age_hours"] = round(age_hours, 2)
+                            if age_hours > max_age:
+                                errors.append(f"Verified backup is too old: {age_hours:.1f}h > {max_age:.1f}h")
+                except (ValueError, OverflowError):
+                    errors.append("LAST_VERIFIED_BACKUP_AT must be a valid ISO-8601 timestamp")
     finally:
         await conn.close()
     return errors, warnings, facts
