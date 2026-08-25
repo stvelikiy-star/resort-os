@@ -1,0 +1,211 @@
+import asyncio
+import csv
+import os
+import uuid
+from datetime import date
+from pathlib import Path
+
+import asyncpg
+
+ROOT = Path(__file__).resolve().parents[1]
+ROOMS_CSV = ROOT / "data-intake" / "rooms.csv"
+RATES_CSV = ROOT / "data-intake" / "rates.csv"
+
+PROPERTY_CODE = "THREE_CROWNS"
+PROPERTY_NAME = "Три Короны"
+RATE_PLAN_CODE = "DIRECT_2026_27"
+RATE_PLAN_NAME = "Direct official tariff 2026/27"
+
+ROOM_TYPE_CODES = {
+    "Одноместный, цоколь": "SINGLE_BASEMENT",
+    "Двухместный стандарт, цоколь": "DOUBLE_STANDARD_BASEMENT",
+    "Одноместный, улучшенный": "SINGLE_IMPROVED",
+    "Двухместный стандарт в коттеджном доме": "DOUBLE_COTTAGE",
+    "Двухместный улучшенный": "DOUBLE_IMPROVED",
+    "Полулюкс без балкона": "JUNIOR_SUITE_NO_BALCONY",
+    "Люкс двухместный": "SUITE_DOUBLE",
+    "Люкс трехместный": "SUITE_TRIPLE",
+    "Двухкомнатный стандарт": "TWO_ROOM_STANDARD",
+    "Двухкомнатный полулюкс": "TWO_ROOM_JUNIOR_SUITE",
+    "Апартаменты": "APARTMENT",
+    "Квартиры / апартаменты с кухней": "APARTMENT_KITCHEN",
+}
+
+
+def database_url() -> str:
+    value = os.environ.get("DATABASE_URL", "postgresql://resort:resort@localhost:5432/resort_os")
+    return value.replace("?schema=public", "")
+
+
+def nullable_int(value: str | None) -> int | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value or value.upper() == "UNKNOWN":
+        return None
+    return int(value)
+
+
+def clean(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value or value.upper() == "UNKNOWN":
+        return None
+    return value
+
+
+def load_rooms() -> list[dict]:
+    with ROOMS_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    codes = [r["room_code"].strip() for r in rows]
+    if len(rows) != 84:
+        raise RuntimeError(f"Expected 84 room rows, got {len(rows)}")
+    if len(codes) != len(set(codes)):
+        raise RuntimeError("Duplicate room_code detected")
+    unknown_types = sorted({r["room_type"].strip() for r in rows} - set(ROOM_TYPE_CODES))
+    if unknown_types:
+        raise RuntimeError(f"Unmapped room types: {unknown_types}")
+    return rows
+
+
+def load_rates() -> list[dict]:
+    with RATES_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    unknown_types = sorted({r["room_type"].strip() for r in rows} - set(ROOM_TYPE_CODES))
+    if unknown_types:
+        raise RuntimeError(f"Unmapped rate room types: {unknown_types}")
+    return rows
+
+
+async def upsert_property(conn) -> uuid.UUID:
+    return await conn.fetchval(
+        '''
+        INSERT INTO properties (id, code, name, timezone, currency, "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, 'Asia/Bishkek', 'KGS', now(), now())
+        ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, "updatedAt" = now()
+        RETURNING id
+        ''',
+        uuid.uuid4(), PROPERTY_CODE, PROPERTY_NAME,
+    )
+
+
+async def upsert_room_types(conn, property_id: uuid.UUID, room_rows: list[dict]) -> dict[str, uuid.UUID]:
+    grouped: dict[str, dict] = {}
+    for row in room_rows:
+        name = row["room_type"].strip()
+        grouped.setdefault(name, row)
+
+    ids: dict[str, uuid.UUID] = {}
+    for name, sample in grouped.items():
+        code = ROOM_TYPE_CODES[name]
+        room_type_id = await conn.fetchval(
+            '''
+            INSERT INTO room_types (
+                id, "propertyId", code, name, "capacityAdults", "capacityChildren", "areaLabel", "createdAt", "updatedAt"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, now(), now())
+            ON CONFLICT ("propertyId", code) DO UPDATE SET
+                name = EXCLUDED.name,
+                "capacityAdults" = EXCLUDED."capacityAdults",
+                "capacityChildren" = EXCLUDED."capacityChildren",
+                "areaLabel" = EXCLUDED."areaLabel",
+                "updatedAt" = now()
+            RETURNING id
+            ''',
+            uuid.uuid4(), property_id, code, name,
+            int(sample["capacity_adults"]),
+            nullable_int(sample.get("capacity_children")),
+            clean(sample.get("area_m2")),
+        )
+        ids[name] = room_type_id
+    return ids
+
+
+async def upsert_rooms(conn, property_id: uuid.UUID, type_ids: dict[str, uuid.UUID], rows: list[dict]) -> None:
+    for row in rows:
+        room_type = row["room_type"].strip()
+        await conn.execute(
+            '''
+            INSERT INTO rooms (
+                id, "propertyId", "roomTypeId", code, name, "buildingOrZone", "floorLabel",
+                "bedConfiguration", "areaLabel", "operationalState", notes, "createdAt", "updatedAt"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'UNKNOWN', $10, now(), now())
+            ON CONFLICT ("propertyId", code) DO UPDATE SET
+                "roomTypeId" = EXCLUDED."roomTypeId",
+                name = EXCLUDED.name,
+                "buildingOrZone" = EXCLUDED."buildingOrZone",
+                "floorLabel" = EXCLUDED."floorLabel",
+                "bedConfiguration" = EXCLUDED."bedConfiguration",
+                "areaLabel" = EXCLUDED."areaLabel",
+                notes = EXCLUDED.notes,
+                "updatedAt" = now()
+            ''',
+            uuid.uuid4(), property_id, type_ids[room_type], row["room_code"].strip(),
+            row["room_name"].strip(), clean(row.get("building_or_zone")), clean(row.get("floor")),
+            clean(row.get("bed_configuration")), clean(row.get("area_m2")), clean(row.get("notes")),
+        )
+
+
+async def upsert_rates(conn, property_id: uuid.UUID, type_ids: dict[str, uuid.UUID], rows: list[dict]) -> None:
+    plan_id = await conn.fetchval(
+        '''
+        INSERT INTO rate_plans (id, "propertyId", code, name, currency, "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, $4, 'KGS', now(), now())
+        ON CONFLICT ("propertyId", code) DO UPDATE SET name = EXCLUDED.name, "updatedAt" = now()
+        RETURNING id
+        ''',
+        uuid.uuid4(), property_id, RATE_PLAN_CODE, RATE_PLAN_NAME,
+    )
+
+    for row in rows:
+        room_type_name = row["room_type"].strip()
+        price = int(row["price_kgs"])
+        notes = clean(row.get("notes"))
+        # A zero in the legacy/off-season source is never treated as a free sale price.
+        sale_status = "CONFIRM_REQUIRED" if price <= 0 else "OPEN"
+        valid_from = date.fromisoformat(row["valid_from"])
+        valid_to = date.fromisoformat(row["valid_to"])
+        await conn.execute(
+            '''
+            INSERT INTO rate_periods (
+                id, "ratePlanId", "roomTypeId", label, "validFrom", "validTo", "priceKgs",
+                "mealIncluded", "saleStatus", notes, "createdAt", "updatedAt"
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+            ON CONFLICT ("ratePlanId", "roomTypeId", "validFrom", "validTo") DO UPDATE SET
+                label = EXCLUDED.label,
+                "priceKgs" = EXCLUDED."priceKgs",
+                "mealIncluded" = EXCLUDED."mealIncluded",
+                "saleStatus" = EXCLUDED."saleStatus",
+                notes = EXCLUDED.notes,
+                "updatedAt" = now()
+            ''',
+            uuid.uuid4(), plan_id, type_ids[room_type_name], row["rate_name"].strip(),
+            valid_from, valid_to, price, row["meal_included"].strip(), sale_status, notes,
+        )
+
+
+async def main() -> None:
+    room_rows = load_rooms()
+    rate_rows = load_rates()
+    conn = await asyncpg.connect(database_url())
+    try:
+        async with conn.transaction():
+            property_id = await upsert_property(conn)
+            type_ids = await upsert_room_types(conn, property_id, room_rows)
+            await upsert_rooms(conn, property_id, type_ids, room_rows)
+            await upsert_rates(conn, property_id, type_ids, rate_rows)
+
+            room_count = await conn.fetchval('SELECT count(*) FROM rooms WHERE "propertyId" = $1', property_id)
+            type_count = await conn.fetchval('SELECT count(*) FROM room_types WHERE "propertyId" = $1', property_id)
+            if room_count != 84:
+                raise RuntimeError(f"Seed verification failed: database has {room_count} rooms")
+            if type_count != 12:
+                raise RuntimeError(f"Seed verification failed: database has {type_count} room types")
+
+        print(f"Seed OK: property={PROPERTY_CODE}, rooms={room_count}, room_types={type_count}, rates={len(rate_rows)}")
+    finally:
+        await conn.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
