@@ -31,6 +31,7 @@ jobs:
       BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
+      CORE_API_URL: http://127.0.0.1:8000
 
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +46,13 @@ jobs:
           npm install
           npx prisma validate
           npx prisma db push
+
+      - name: Typecheck and build PMS admin V2
+        working-directory: apps/admin
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
 
       - uses: actions/setup-python@v5
         with:
@@ -128,7 +136,6 @@ jobs:
           assert d['pricing']['stored_total_will_change_on_commit'] is False
           open('/tmp/version0','w').write(d['reservation']['version'])
           PY
-          VERSION=$(cat /tmp/version0)
           python - <<'PY'
           import json
           d=json.load(open('/tmp/move.json'))
@@ -180,7 +187,77 @@ jobs:
           open('/tmp/version2','w').write(d['version'])
           PY
 
-      - name: Conflict rolls back and preserves prior schedule
+      - name: Check-in requires first room to be CLEAN
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          ROOM1=$(cat /tmp/target1)
+          python - <<'PY'
+          import os,asyncio,asyncpg,uuid
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'DIRTY\' WHERE id=$1',uuid.UUID(open('/tmp/target1').read().strip()))
+              finally: await conn.close()
+          asyncio.run(main())
+          PY
+          CODE=$(curl -sS -o /tmp/checkin-blocked.json -w '%{http_code}' -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-in")
+          test "$CODE" = "409"
+          python -c 'import json; d=json.load(open("/tmp/checkin-blocked.json")); assert d["detail"]["code"]=="CHECK_IN_ROOM_NOT_READY"'
+          python - <<'PY'
+          import os,asyncio,asyncpg,uuid
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\' WHERE id=$1',uuid.UUID(open('/tmp/target1').read().strip()))
+              finally: await conn.close()
+          asyncio.run(main())
+          PY
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-in" > /tmp/checkin.json
+          python -c 'import json; d=json.load(open("/tmp/checkin.json")); assert d["status"]=="CHECKED_IN"; assert d["room_state"]=="CLEAN"'
+
+      - name: Immediate relocation preserves history and dirties vacated room
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          ROOM2=$(cat /tmp/target2)
+          cat > /tmp/relocate.json <<JSON
+          {"segments":[{"room_id":"$ROOM2","start":"2026-08-26","end":"2026-08-31"}]}
+          JSON
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/relocate.json > /tmp/relocate-preview.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/relocate-preview.json'))
+          assert d['can_commit'] is True
+          assert d['immediate_relocation']
+          assert d['immediate_relocation']['vacated_room_will_become_dirty'] is True
+          x=json.load(open('/tmp/relocate.json'))
+          x['expected_version']=open('/tmp/version2').read().strip()
+          json.dump(x,open('/tmp/relocate-commit.json','w'))
+          PY
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/relocate-commit.json > /tmp/relocate-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/relocate-result.json'))
+          assert d['immediate_relocation']
+          assert d['relocation_housekeeping_task_id']
+          open('/tmp/version3','w').write(d['version'])
+          PY
+          python - <<'PY'
+          import os,asyncio,asyncpg,uuid
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  room=uuid.UUID(open('/tmp/target1').read().strip())
+                  state=await conn.fetchval('SELECT "operationalState"::text FROM rooms WHERE id=$1',room)
+                  assert state=='DIRTY', state
+                  tasks=await conn.fetchval("SELECT count(*) FROM operational_tasks WHERE \"roomId\"=$1 AND type='HOUSEKEEPING' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')",room)
+                  assert tasks>=1, tasks
+              finally: await conn.close()
+          asyncio.run(main())
+          PY
+
+      - name: Conflict rolls back and preserves relocated schedule
         run: |
           RID=$(cat /tmp/reservation_id)
           ROOM1=$(cat /tmp/target1)
@@ -203,7 +280,7 @@ jobs:
           python - <<'PY'
           import json
           x=json.load(open('/tmp/conflict.json'))
-          x['expected_version']=open('/tmp/version2').read().strip()
+          x['expected_version']=open('/tmp/version3').read().strip()
           json.dump(x,open('/tmp/conflict-commit.json','w'))
           PY
           CODE=$(curl -sS -o /tmp/conflict-result.json -w '%{http_code}' -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
@@ -213,10 +290,36 @@ jobs:
           python - <<'PY'
           import json
           d=json.load(open('/tmp/schedule-final.json'))
+          target2=open('/tmp/target2').read().strip()
           assert d['reservation']['check_out']=='2026-08-31'
-          assert len(d['schedule'])==2
-          assert d['schedule'][0]['end']=='2026-08-28'
-          assert d['schedule'][1]['start']=='2026-08-28'
+          assert len(d['schedule'])==1
+          assert d['schedule'][0]['room_id']==target2
+          assert d['schedule'][0]['start']=='2026-08-26'
+          assert d['schedule'][0]['end']=='2026-08-31'
+          PY
+
+      - name: Check-out cleans correct current-room identity and creates housekeeping
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          TARGET2=$(cat /tmp/target2)
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-out" > /tmp/checkout.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/checkout.json'))
+          assert d['status']=='CHECKED_OUT'
+          assert d['room_state']=='DIRTY'
+          assert d['housekeeping_task_id']
+          PY
+          python - <<'PY'
+          import os,asyncio,asyncpg,uuid
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  room=uuid.UUID(open('/tmp/target2').read().strip())
+                  state=await conn.fetchval('SELECT "operationalState"::text FROM rooms WHERE id=$1',room)
+                  assert state=='DIRTY', state
+              finally: await conn.close()
+          asyncio.run(main())
           PY
 
       - name: Verify audit evidence exists
@@ -227,8 +330,12 @@ jobs:
               conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               try:
                   rid=open('/tmp/reservation_id').read().strip()
-                  count=await conn.fetchval('SELECT count(*) FROM audit_logs WHERE resource=\'Reservation\' AND "resourceId"=$1 AND action=\'PMS_SCHEDULE_MUTATION\' AND result=\'SUCCESS\'',rid)
-                  assert count==2, count
+                  mutations=await conn.fetchval('SELECT count(*) FROM audit_logs WHERE resource=\'Reservation\' AND "resourceId"=$1 AND action=\'PMS_SCHEDULE_MUTATION\' AND result=\'SUCCESS\'',rid)
+                  checkins=await conn.fetchval('SELECT count(*) FROM audit_logs WHERE resource=\'Reservation\' AND "resourceId"=$1 AND action=\'CHECK_IN\' AND result=\'SUCCESS\'',rid)
+                  checkouts=await conn.fetchval('SELECT count(*) FROM audit_logs WHERE resource=\'Reservation\' AND "resourceId"=$1 AND action=\'CHECK_OUT\' AND result=\'SUCCESS\'',rid)
+                  assert mutations==3, mutations
+                  assert checkins==1, checkins
+                  assert checkouts==1, checkouts
               finally: await conn.close()
           asyncio.run(main())
           PY
