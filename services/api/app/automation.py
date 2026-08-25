@@ -1,4 +1,6 @@
+import os
 import uuid
+from datetime import date
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -6,7 +8,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .service_auth import require_automation_service
 
-PROPERTY_CODE = "THREE_CROWNS"
+PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 router = APIRouter(prefix="/api/v1/automation", tags=["automation"])
 service_access = require_automation_service
 
@@ -17,13 +19,21 @@ class AutomationReservationIntake(BaseModel):
     guest_name: str = Field(min_length=2, max_length=160)
     phone: str = Field(min_length=5, max_length=40)
     email: str | None = Field(default=None, max_length=200)
-    check_in: str = Field(min_length=10, max_length=10)
-    check_out: str = Field(min_length=10, max_length=10)
+    check_in: date
+    check_out: date
     adults: int = Field(ge=1, le=20)
     children: int = Field(default=0, ge=0, le=20)
     room_type_code: str | None = Field(default=None, max_length=80)
     notes: str | None = Field(default=None, max_length=4000)
     external_message_id: str | None = Field(default=None, max_length=180)
+
+    @model_validator(mode="after")
+    def validate_stay_dates(self):
+        if self.check_out <= self.check_in:
+            raise ValueError("check_out must be after check_in")
+        if (self.check_out - self.check_in).days > 60:
+            raise ValueError("maximum requested stay is 60 nights")
+        return self
 
 
 class AutomationStaffIntake(BaseModel):
@@ -131,19 +141,16 @@ async def automation_reservation_request(
                     raise HTTPException(status_code=422, detail="Unknown room_type_code")
 
             request_id = uuid.uuid4()
-            try:
-                await conn.execute(
-                    '''
-                    INSERT INTO reservation_requests (
-                      id,"propertyId",status,source,"guestName",phone,email,"checkIn","checkOut",adults,children,
-                      "desiredRoomTypeId",notes,"createdAt","updatedAt"
-                    ) VALUES ($1,$2,'NEW',$3,$4,$5,$6,$7::date,$8::date,$9,$10,$11,$12,now(),now())
-                    ''',
-                    request_id, pid, source, payload.guest_name, payload.phone, payload.email,
-                    payload.check_in, payload.check_out, payload.adults, payload.children, room_type_id, payload.notes,
-                )
-            except Exception as exc:
-                raise HTTPException(status_code=422, detail=f"Invalid reservation intake: {type(exc).__name__}") from exc
+            await conn.execute(
+                '''
+                INSERT INTO reservation_requests (
+                  id,"propertyId",status,source,"guestName",phone,email,"checkIn","checkOut",adults,children,
+                  "desiredRoomTypeId",notes,"createdAt","updatedAt"
+                ) VALUES ($1,$2,'NEW',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),now())
+                ''',
+                request_id, pid, source, payload.guest_name, payload.phone, payload.email,
+                payload.check_in, payload.check_out, payload.adults, payload.children, room_type_id, payload.notes,
+            )
 
             await conn.execute(
                 '''UPDATE automation_inbound_events
