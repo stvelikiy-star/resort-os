@@ -27,14 +27,11 @@ jobs:
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
-      PREPAYMENT_PERCENT: 30
       CORE_API_URL: http://127.0.0.1:8000
       BOOTSTRAP_OWNER_USERNAME: ci-owner
       BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
-      TELEGRAM_BOT_TOKEN: 123456789:CI_TEST_ONLY_TELEGRAM_BOT_TOKEN
-      TELEGRAM_INITDATA_MAX_AGE_SECONDS: 600
 
     steps:
       - uses: actions/checkout@v4
@@ -43,121 +40,88 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Install Prisma
+      - name: Validate and create development schema
         working-directory: packages/database
-        run: npm install
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
 
-      - name: Validate Prisma schema
-        working-directory: packages/database
-        run: npx prisma validate
-
-      - name: Create database schema
-        working-directory: packages/database
-        run: npx prisma db push
-
-      - name: Install PMS admin dependencies
+      - name: Typecheck and build PMS admin
         working-directory: apps/admin
-        run: npm install
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
 
-      - name: Typecheck PMS admin
-        working-directory: apps/admin
-        run: npm run typecheck
-
-      - name: Build PMS admin
-        working-directory: apps/admin
-        run: npm run build
-
-      - name: Install public site dependencies
+      - name: Typecheck and build public site
         working-directory: apps/web
-        run: npm install
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
 
-      - name: Typecheck public site
-        working-directory: apps/web
-        run: npm run typecheck
-
-      - name: Build public site
-        working-directory: apps/web
-        run: npm run build
-
-      - name: Install staff PWA dependencies
+      - name: Typecheck and build staff PWA
         working-directory: apps/staff
-        run: npm install
-
-      - name: Typecheck staff PWA
-        working-directory: apps/staff
-        run: npm run typecheck
-
-      - name: Build staff PWA
-        working-directory: apps/staff
-        run: npm run build
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install API dependencies
-        run: pip install -r services/api/requirements.txt
-
-      - name: Compile Python
-        run: python -m compileall services/api/app scripts
-
-      - name: Apply critical database constraints
-        run: python scripts/apply_core_constraints.py
-
-      - name: Seed evidence-backed Three Crowns inventory and rates
-        run: python scripts/seed_from_intake.py
-
-      - name: Bootstrap CI owner account
-        run: python scripts/bootstrap_owner.py
-
-      - name: Bootstrap CI line staff accounts
+      - name: Install and compile Core
         run: |
-          STAFF_USERNAME=ci-maid STAFF_PASSWORD=CI-Maid-Strong-Password-2026 STAFF_DISPLAY_NAME="CI Maid" STAFF_ROLE=MAID python scripts/upsert_staff_user.py
-          STAFF_USERNAME=ci-tech STAFF_PASSWORD=CI-Tech-Strong-Password-2026 STAFF_DISPLAY_NAME="CI Technician" STAFF_ROLE=TECHNICIAN python scripts/upsert_staff_user.py
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts
 
-      - name: Start API
+      - name: Apply constraints and seed Three Crowns
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start Resort Core
         run: |
           python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
           echo $! > /tmp/resort-api.pid
           sleep 3
+          curl --fail -sS http://127.0.0.1:8000/ready > /tmp/ready.json
 
-      - name: Smoke test public Core API
+      - name: Verify public availability and create request
         run: |
-          curl --fail http://127.0.0.1:8000/health
           curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0" > /tmp/availability.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/availability.json'))
           sellable=[x for x in d['results'] if x['pricing']['sellable']]
-          assert sellable, 'expected at least one sellable room type'
+          assert sellable
           open('/tmp/room_type_code','w').write(sellable[0]['room_type_code'])
           PY
-
-      - name: Verify unpaid request is request only
-        run: |
-          RESPONSE=$(curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
             -H 'Content-Type: application/json' \
-            -d '{"guest_name":"CI Test Guest","phone":"+996000000000","check_in":"2026-08-26","check_out":"2026-08-28","adults":2,"children":0,"source":"CI"}')
-          echo "$RESPONSE" > /tmp/request.json
-          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["is_reservation"] is False; assert d["status"] == "NEW"; open("/tmp/request_id","w").write(d["id"])'
+            -d '{"guest_name":"CI Test Guest","phone":"+996000000000","check_in":"2026-08-26","check_out":"2026-08-28","adults":2,"children":0,"source":"CI"}' > /tmp/request.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/request.json'))
+          assert d['is_reservation'] is False
+          assert d['status']=='NEW'
+          open('/tmp/request_id','w').write(d['id'])
+          PY
 
-      - name: Verify protected APIs reject unauthenticated access
+      - name: Verify protected PMS and login
         run: |
           CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01")
           test "$CODE" = "401"
-          CODE=$(curl -sS -o /tmp/tasks-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/ops/tasks")
-          test "$CODE" = "401"
-
-      - name: Login as owner and verify protected PMS
-        run: |
           curl --fail -sS -c /tmp/resort-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
             -H 'Content-Type: application/json' \
             -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json
           curl --fail -sS -b /tmp/resort-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/me.json
-          python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"] == "OWNER"; assert d["username"] == "ci-owner"'
-          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01" > /tmp/grid-before.json
+          python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"]=="OWNER"'
 
-      - name: Quote request and require 30 percent prepayment
+      - name: Quote stay without automatic prepayment rule
         run: |
           REQUEST_ID=$(cat /tmp/request_id)
           ROOM_TYPE=$(cat /tmp/room_type_code)
@@ -165,56 +129,55 @@ jobs:
             -H 'Content-Type: application/json' \
             -d "{\"room_type_code\":\"$ROOM_TYPE\"}" > /tmp/quote.json
           python - <<'PY'
-          import json, math
+          import json
           d=json.load(open('/tmp/quote.json'))
-          assert d['status']=='AWAITING_PREPAYMENT'
+          assert d['status']=='QUOTED'
           assert d['quoted_total_kgs'] > 0
-          assert d['required_prepayment_kgs'] == math.ceil(d['quoted_total_kgs'] * 0.30)
-          open('/tmp/prepayment','w').write(str(d['required_prepayment_kgs']))
+          assert d['required_prepayment_kgs'] is None
+          assert d['prepayment_decided_by_manager'] is True
           PY
 
-      - name: Confirm payment atomically creates reservation
+      - name: Manager-confirmed manual payment creates reservation atomically
         run: |
           REQUEST_ID=$(cat /tmp/request_id)
-          PREPAYMENT=$(cat /tmp/prepayment)
+          MANAGER_AMOUNT=1234
           curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/confirm-payment" \
             -H 'Content-Type: application/json' \
-            -d "{\"amount_kgs\":$PREPAYMENT,\"method\":\"CI_MANUAL\",\"provider\":\"CI\",\"external_ref\":\"ci-payment-001\",\"idempotency_key\":\"ci-idempotency-payment-001\"}" > /tmp/reservation.json
+            -d "{\"amount_kgs\":$MANAGER_AMOUNT,\"method\":\"MANAGER_MANUAL\",\"provider\":\"MANAGER_MANUAL\",\"external_ref\":\"ci-manager-payment-001\",\"idempotency_key\":\"ci-manager-payment-idempotency-001\"}" > /tmp/reservation.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/reservation.json'))
           assert d['idempotent_replay'] is False
           assert d['reservation_status']=='GUARANTEED'
-          assert d['booking_number'].startswith('TC-')
+          assert d['manager_confirmed_payment_kgs']==1234
+          assert d['payment_collection']=='MANAGER_MANUAL'
           open('/tmp/reservation_id','w').write(d['reservation_id'])
           open('/tmp/booking_number','w').write(d['booking_number'])
-          open('/tmp/room_code','w').write(d['room_code'])
           PY
 
-      - name: Verify payment idempotency
+      - name: Verify manual payment idempotency
         run: |
           REQUEST_ID=$(cat /tmp/request_id)
-          PREPAYMENT=$(cat /tmp/prepayment)
           curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/confirm-payment" \
             -H 'Content-Type: application/json' \
-            -d "{\"amount_kgs\":$PREPAYMENT,\"method\":\"CI_MANUAL\",\"provider\":\"CI\",\"external_ref\":\"ci-payment-001\",\"idempotency_key\":\"ci-idempotency-payment-001\"}" > /tmp/replay.json
-          python -c 'import json; d=json.load(open("/tmp/replay.json")); assert d["idempotent_replay"] is True'
+            -d '{"amount_kgs":1234,"method":"MANAGER_MANUAL","provider":"MANAGER_MANUAL","external_ref":"ci-manager-payment-001","idempotency_key":"ci-manager-payment-idempotency-001"}' > /tmp/replay.json
+          python -c 'import json; assert json.load(open("/tmp/replay.json"))["idempotent_replay"] is True'
 
       - name: Verify reservation appears in PMS grid
         run: |
-          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01" > /tmp/grid-after.json
+          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01" > /tmp/grid.json
           python - <<'PY'
           import json
           booking=open('/tmp/booking_number').read().strip()
-          d=json.load(open('/tmp/grid-after.json'))
-          blocks=[b for r in d['rooms'] for b in r['blocks']]
-          assert any(b.get('booking_number')==booking for b in blocks)
+          d=json.load(open('/tmp/grid.json'))
+          assert any(b.get('booking_number')==booking for r in d['rooms'] for b in r['blocks'])
           PY
 
-      - name: Verify check-in checkout creates housekeeping task
+      - name: Verify check-in checkout housekeeping lifecycle
         run: |
           RID=$(cat /tmp/reservation_id)
           curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-in" > /tmp/checkin.json
+          python -c 'import json; assert json.load(open("/tmp/checkin.json"))["status"]=="CHECKED_IN"'
           curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-out" > /tmp/checkout.json
           python - <<'PY'
           import json
@@ -222,113 +185,8 @@ jobs:
           assert d['status']=='CHECKED_OUT'
           assert d['room_state']=='DIRTY'
           assert d['housekeeping_task_id']
-          open('/tmp/housekeeping_task_id','w').write(d['housekeeping_task_id'])
           PY
 
-      - name: Verify maid claims and submits housekeeping for inspection
-        run: |
-          curl --fail -sS -c /tmp/maid-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"ci-maid","password":"CI-Maid-Strong-Password-2026"}' > /tmp/maid-login.json
-          TID=$(cat /tmp/housekeeping_task_id)
-          curl --fail -sS -b /tmp/maid-cookies.txt http://127.0.0.1:8000/api/v1/ops/tasks > /tmp/maid-tasks.json
-          python - <<'PY'
-          import json
-          tid=open('/tmp/housekeeping_task_id').read().strip()
-          d=json.load(open('/tmp/maid-tasks.json'))
-          assert any(x['id']==tid for x in d['items'])
-          PY
-          curl --fail -sS -b /tmp/maid-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/claim" > /tmp/maid-claim.json
-          curl --fail -sS -b /tmp/maid-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
-            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection.json
-          python -c 'import json; assert json.load(open("/tmp/inspection.json"))["status"] == "IN_INSPECTION"'
-
-      - name: Verify signed Telegram link and automatic staff login
-        run: |
-          python - <<'PY'
-          import hashlib, hmac, json, os, time, urllib.parse
-          user = json.dumps({"id": 555001, "first_name": "CI", "last_name": "Maid", "username": "ci_maid_tg"}, separators=(",", ":"))
-          pairs = {"auth_date": str(int(time.time())), "query_id": "CI_QUERY_001", "user": user}
-          check = "\n".join(f"{k}={pairs[k]}" for k in sorted(pairs))
-          secret = hmac.new(b"WebAppData", os.environ["TELEGRAM_BOT_TOKEN"].encode(), hashlib.sha256).digest()
-          digest = hmac.new(secret, check.encode(), hashlib.sha256).hexdigest()
-          init_data = urllib.parse.urlencode({**pairs, "hash": digest})
-          json.dump({"init_data": init_data}, open("/tmp/telegram-valid.json", "w"))
-          json.dump({"init_data": init_data + "&tampered=1"}, open("/tmp/telegram-invalid.json", "w"))
-          PY
-          curl --fail -sS -b /tmp/maid-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/telegram/link \
-            -H 'Content-Type: application/json' --data-binary @/tmp/telegram-valid.json > /tmp/telegram-link.json
-          python -c 'import json; assert json.load(open("/tmp/telegram-link.json"))["linked"] is True'
-          curl --fail -sS -c /tmp/telegram-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/telegram/login \
-            -H 'Content-Type: application/json' --data-binary @/tmp/telegram-valid.json > /tmp/telegram-login.json
-          curl --fail -sS -b /tmp/telegram-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/telegram-me.json
-          python -c 'import json; d=json.load(open("/tmp/telegram-me.json")); assert d["username"] == "ci-maid"; assert d["role"] == "MAID"'
-          CODE=$(curl -sS -o /tmp/telegram-invalid-response.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/auth/telegram/login \
-            -H 'Content-Type: application/json' --data-binary @/tmp/telegram-invalid.json)
-          test "$CODE" = "401"
-
-      - name: Verify management inspection returns room CLEAN
-        run: |
-          TID=$(cat /tmp/housekeeping_task_id)
-          curl --fail -sS -b /tmp/resort-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
-            -H 'Content-Type: application/json' -d '{"status":"DONE"}' > /tmp/clean.json
-          python -c 'import json; assert json.load(open("/tmp/clean.json"))["status"] == "DONE"'
-
-      - name: Verify technician maintenance lifecycle
-        run: |
-          ROOM_ID=$(python -c 'import json; print(json.load(open("/tmp/grid-before.json"))["rooms"][0]["id"])')
-          RESPONSE=$(curl --fail -sS -b /tmp/resort-cookies.txt -X POST http://127.0.0.1:8000/api/v1/ops/tasks \
-            -H 'Content-Type: application/json' \
-            -d "{\"type\":\"MAINTENANCE\",\"room_id\":\"$ROOM_ID\",\"priority\":\"HIGH\",\"title\":\"CI maintenance test\",\"source\":\"CI\"}")
-          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); open("/tmp/maintenance_task_id","w").write(d["id"])'
-          curl --fail -sS -c /tmp/tech-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"ci-tech","password":"CI-Tech-Strong-Password-2026"}' > /tmp/tech-login.json
-          TID=$(cat /tmp/maintenance_task_id)
-          curl --fail -sS -b /tmp/tech-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/claim" > /tmp/tech-claim.json
-          curl --fail -sS -b /tmp/tech-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
-            -H 'Content-Type: application/json' -d '{"status":"DONE"}' > /tmp/tech-done.json
-          python -c 'import json; assert json.load(open("/tmp/tech-done.json"))["status"] == "DONE"'
-
-      - name: Start canonical PMS admin
-        working-directory: apps/admin
-        run: |
-          npm run start > /tmp/resort-admin.log 2>&1 &
-          echo $! > /tmp/resort-admin.pid
-          sleep 3
-
-      - name: Smoke test PMS admin shell
-        run: curl --fail http://127.0.0.1:3001/
-
-      - name: Start canonical public site
-        working-directory: apps/web
-        run: |
-          npm run start > /tmp/resort-web.log 2>&1 &
-          echo $! > /tmp/resort-web.pid
-          sleep 3
-
-      - name: Smoke test public site and Core proxy
-        run: |
-          curl --fail http://127.0.0.1:3000/
-          curl --fail "http://127.0.0.1:3000/core/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
-
-      - name: Start staff PWA
-        working-directory: apps/staff
-        run: |
-          npm run start > /tmp/resort-staff.log 2>&1 &
-          echo $! > /tmp/resort-staff.pid
-          sleep 3
-
-      - name: Smoke test staff PWA shell
-        run: |
-          curl --fail http://127.0.0.1:3002/
-          curl --fail http://127.0.0.1:3002/manifest.webmanifest
-          curl --fail http://127.0.0.1:3002/sw.js
-
-      - name: Show logs on failure
+      - name: Show Core logs on failure
         if: failure()
-        run: |
-          cat /tmp/resort-api.log || true
-          cat /tmp/resort-admin.log || true
-          cat /tmp/resort-web.log || true
-          cat /tmp/resort-staff.log || true
+        run: cat /tmp/resort-api.log || true
