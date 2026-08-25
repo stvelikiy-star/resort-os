@@ -1,0 +1,119 @@
+name: Realtime PMS CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  realtime:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
+      PMS_WS_POLL_SECONDS: 0.25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Create database schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Prepare property and owner
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start Core API
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/realtime-api.log 2>&1 &
+          echo $! > /tmp/realtime-api.pid
+          sleep 3
+          curl --fail http://127.0.0.1:8000/health
+
+      - name: Login owner and capture session cookie
+        run: |
+          curl --fail -sS -c /tmp/realtime-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/realtime-login.json
+          SESSION=$(awk '$6 == "resort_session" {print $7}' /tmp/realtime-cookies.txt | tail -1)
+          test -n "$SESSION"
+          echo "$SESSION" > /tmp/realtime-session
+
+      - name: Verify snapshot and live database change over websocket
+        run: |
+          python - <<'PY'
+          import asyncio
+          import json
+          import os
+          import asyncpg
+          import websockets
+
+          async def main():
+              token=open('/tmp/realtime-session').read().strip()
+              uri='ws://127.0.0.1:8000/ws/pms/grid?start=2026-08-25&end=2026-09-01'
+              async with websockets.connect(uri, additional_headers={"Cookie": f"resort_session={token}"}) as ws:
+                  first=json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                  assert first['type']=='pms.grid.snapshot'
+                  assert len(first['data']['rooms'])==84
+                  first_version=first['version']
+                  target=first['data']['rooms'][0]
+
+                  db=os.environ['DATABASE_URL'].replace('?schema=public','')
+                  conn=await asyncpg.connect(db)
+                  try:
+                      await conn.execute('UPDATE rooms SET "operationalState"=\'TECH_BLOCK\',"updatedAt"=now() WHERE id=$1', target['id'])
+                  finally:
+                      await conn.close()
+
+                  while True:
+                      message=json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                      if message.get('type')!='pms.grid.snapshot':
+                          continue
+                      assert message['version'] != first_version
+                      changed=next(room for room in message['data']['rooms'] if room['id']==target['id'])
+                      assert changed['operational_state']=='TECH_BLOCK'
+                      break
+
+          asyncio.run(main())
+          PY
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/realtime-api.log || true
