@@ -1,12 +1,12 @@
 # RESORT OS — CURRENT STATE
 
-Version: 0.3
+Version: 0.4
 Date: 2026-08-25
-Status: CORE BASELINE VERIFIED IN CI
+Status: CORE + PMS + CANONICAL SITE BASELINE VERIFIED IN CI
 Canonical: YES
 Document Type: Evidence-Based Current System State
 
-Critical rule: TARGET ≠ CURRENT. Production readiness is not implied by development CI verification.
+Critical rule: TARGET ≠ CURRENT. Development verification does not equal production readiness.
 
 ---
 
@@ -17,27 +17,32 @@ STATUS: VERIFIED FACT
 Repository:
 `stvelikiy-star/resort-os`
 
-Current repository contains canonical knowledge, recovery artifacts, real Three Crowns intake data and the first working Resort Core implementation.
+Canonical implementation now contains:
+- PostgreSQL/Prisma Resort Core schema;
+- FastAPI Core;
+- real Three Crowns room/rate seed;
+- Next.js PMS admin application;
+- Next.js canonical public site application;
+- CI verification;
+- recovery evidence and canonical knowledge.
 
 ---
 
-# 2. THREE CROWNS PROPERTY DATA
+# 2. PROPERTY DATA
 
 STATUS: VERIFIED AS SEEDABLE DEVELOPMENT BASELINE
+
+Current CI successfully reconciles and loads:
+- 84 rooms;
+- 12 room categories;
+- current 2026/27 rate input.
 
 Evidence:
 - `data-intake/rooms.csv`
 - `data-intake/rates.csv`
-- `data-intake/reservation_rules.md`
 - `docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md`
-- `docs/CORE_IMPLEMENTATION_EVIDENCE_2026-08-25.md`
 
-CI successfully seeded:
-- 84 room rows;
-- 12 room categories;
-- current 2026/27 rate input.
-
-Known source caveats remain explicitly documented and are not silently converted to facts.
+Known source caveats remain explicitly qualified rather than guessed.
 
 ---
 
@@ -45,18 +50,7 @@ Known source caveats remain explicitly documented and are not silently converted
 
 STATUS: VERIFIED IN DEVELOPMENT CI
 
-Evidence:
-- `packages/database/prisma/schema.prisma`
-- `packages/database/sql/001_core_constraints.sql`
-- CI run `32834872750`, conclusion `success`.
-
-Verified in PostgreSQL 16 CI:
-- Prisma schema validation;
-- schema creation;
-- custom constraint application;
-- evidence-backed seed execution.
-
-Implemented core entities:
+Implemented and successfully created on PostgreSQL 16:
 - Property;
 - RoomType;
 - Room;
@@ -69,88 +63,125 @@ Implemented core entities:
 - Payment;
 - AuditLog.
 
-Verified design boundary:
-`ReservationRequest ≠ Reservation`.
+Critical implemented boundary:
+`ReservationRequest != Reservation`.
 
-Current business rule encoded in implementation intent:
-An unpaid request is not an active reservation.
+Critical database constraint successfully applies:
+active inventory blocks for the same room cannot overlap by date range.
 
-Critical database definition exists and applies successfully:
-active inventory blocks for one room cannot overlap by date range.
+Zero-price legacy/off-season rate input is not exposed as free sale; it becomes `CONFIRM_REQUIRED`.
 
 NOT YET VERIFIED:
-parallel concurrency stress/race behavior beyond successful constraint installation.
+parallel concurrency stress behavior under simultaneous reservation writes.
 
 ---
 
 # 4. CORE API
 
-STATUS: VERIFIED DEVELOPMENT SMOKE BASELINE
+STATUS: VERIFIED DEVELOPMENT BASELINE
 
-Evidence:
-- `services/api/app/main.py`
-- `services/api/app/db.py`
-- CI run `32834872750`.
-
-Verified runtime routes:
+Implemented routes:
 - `GET /health`
 - `GET /api/v1/booking/check-availability`
-- `POST /api/v1/booking/requests` exists in source and compiles; dedicated POST behavioral assertion is still TODO.
+- `POST /api/v1/booking/requests`
 - `GET /api/v1/pms/grid`
 
-CI successfully started FastAPI against the seeded PostgreSQL database and received successful HTTP responses from health, availability and PMS grid endpoints.
+Verified runtime behavior includes:
+- availability returns successfully against seeded PostgreSQL;
+- PMS grid returns successfully against seeded PostgreSQL;
+- an unpaid POST creates a request with status `NEW` and explicitly returns `is_reservation = false`.
 
-The API is NOT approved for open production exposure because authentication/RBAC is not implemented yet.
+Current business truth implemented:
+WITHOUT CONFIRMED PREPAYMENT THERE IS NO ACTIVE RESERVATION.
 
----
-
-# 5. PRICING
-
-STATUS: PARTIAL / DEVELOPMENT BASELINE VERIFIED
-
-Seasonal rate data loads successfully and availability can read pricing from the database.
-
-Safety behavior in seed:
-legacy/off-season rate rows with `0 KGS` become `CONFIRM_REQUIRED`; they are not interpreted as free-sale prices.
-
-NOT YET VERIFIED:
-- exhaustive price assertions at every seasonal boundary;
-- manual discounts;
-- extra-person price engine;
-- final production prepayment amount.
+The stale legacy website rule about holding an unpaid preliminary booking for two days is not implemented.
 
 ---
 
-# 6. PUBLIC WEBSITE
+# 5. PMS ADMIN
 
-STATUS: PARTIAL / VISUAL PROTOTYPE
+STATUS: IMPLEMENTED / VERIFIED BUILD BASELINE
 
-A V5 public-site skeleton exists on Vercel from prior project work.
+Canonical source:
+`apps/admin/`
 
-Known limitation from audit:
-its previous booking UI did not use the now-verified Resort Core API.
+The admin is no longer based on deterministic mock data.
 
-The public-site source is not yet established as a canonical application tree inside this repository.
+Implemented current UI:
+- live fetch from `/api/v1/pms/grid`;
+- real room/category roster from Resort Core;
+- 7 / 14 / 31 day windows;
+- previous / today / next navigation;
+- room/category search;
+- room-type filter;
+- operational-state filter;
+- sticky room and state columns;
+- horizontal date scroll;
+- physical room state badges;
+- reservation / maintenance / manual inventory block rendering;
+- current room-state summary.
 
-Next required implementation:
-connect the existing visual booking flow to Core availability and ReservationRequest APIs after the site source is canonicalized.
+CI evidence:
+- TypeScript check: SUCCESS;
+- Next.js production build: SUCCESS.
+
+Authentication/RBAC is still missing, therefore this admin is NOT approved for public production exposure.
 
 ---
 
-# 7. PMS UI
+# 6. CANONICAL PUBLIC SITE
 
-STATUS: PARTIAL
+STATUS: IMPLEMENTED / VERIFIED DEVELOPMENT INTEGRATION BASELINE
 
-Recovered evidence:
-`recovery-artifacts/pms-grid/PMSGrid.tsx`
+Canonical source:
+`apps/web/`
 
-That component is a UI prototype using mock data and is not production PMS.
+Recovered V5 remains reference evidence only:
+`docs/PUBLIC_SITE_V5_RECOVERY.md`.
 
-The backend endpoint it conceptually required now exists and has passed smoke verification:
-`GET /api/v1/pms/grid`.
+The canonical rebuild retains the V5 premium green/gold visual direction but removes the old fake booking behavior.
 
-Next required implementation:
-create canonical admin application and replace mock generation with live API data.
+Implemented current booking experience:
+- guest chooses check-in/check-out;
+- guest chooses adults/children;
+- site calls real `GET /api/v1/booking/check-availability`;
+- site shows real room categories returned by Core;
+- exact period price is read from Core when sellable;
+- guest selects a room category;
+- guest enters name / phone / optional email;
+- site POSTs to `POST /api/v1/booking/requests`;
+- UI explicitly states that the request is not a reservation until confirmed prepayment.
+
+CI evidence:
+- public-site TypeScript check: SUCCESS;
+- public-site production build: SUCCESS;
+- public-site production-mode startup: SUCCESS;
+- homepage HTTP smoke: SUCCESS;
+- public-site `/core` proxy to availability: SUCCESS.
+
+Current media limitation:
+several images are temporary hotlinks inherited from the V5 visual skeleton. They must be replaced with owned media before final production cutover.
+
+The existing V5 Vercel deployment is NOT the canonical source application and no DNS cutover has been performed.
+
+---
+
+# 7. TEST EVIDENCE
+
+Initial Core verification:
+- Run `32834872750`
+- Job `97761394147`
+- conclusion: SUCCESS
+
+PMS + site integration verification:
+- Run `32835695344`
+- Job `97763917713`
+- commit `7f86165aaebaf38bcf68af415c0f9a3a8311678a`
+- conclusion: SUCCESS
+
+Full evidence:
+- `docs/CORE_IMPLEMENTATION_EVIDENCE_2026-08-25.md`
+- `docs/PMS_SITE_INTEGRATION_EVIDENCE_2026-08-25.md`
 
 ---
 
@@ -158,92 +189,98 @@ create canonical admin application and replace mock generation with live API dat
 
 STATUS: NOT IMPLEMENTED
 
-No verified server-side login/RBAC exists yet.
+This is now the immediate P0/P1 engineering blocker before admin deployment.
 
-This is a blocker for any public/admin production deployment.
+No server-side login, staff session or permission enforcement is yet verified.
 
 ---
 
-# 9. HOUSEKEEPING / MAINTENANCE
+# 9. PAYMENT / RESERVATION CONVERSION
 
-STATUS: BUSINESS REQUIREMENTS ESTABLISHED / IMPLEMENTATION TODO
+STATUS: PARTIAL DOMAIN MODEL / TRANSACTION TODO
 
-Room operational-state enum exists:
+Payment entity exists.
+
+Not yet implemented:
+- payment provider/acquiring;
+- final prepayment amount rule;
+- payment verification;
+- atomic `paid request -> guaranteed Reservation -> inventory block` transaction;
+- refund/cancellation/no-show rules.
+
+No production payment activation has occurred.
+
+---
+
+# 10. HOUSEKEEPING / MAINTENANCE
+
+STATUS: REQUIREMENTS ESTABLISHED / IMPLEMENTATION TODO
+
+Room physical states exist in schema:
 - UNKNOWN;
 - CLEAN;
 - DIRTY;
 - IN_INSPECTION;
 - TECH_BLOCK.
 
-This does not yet constitute a staff task workflow.
+Task workflows, assignments, SLA, photos and staff mobile UI are not yet implemented.
 
 ---
 
-# 10. COMMUNICATIONS / AI / AUTOMATION
+# 11. COMMUNICATIONS / AI / AUTOMATION
 
-STATUS: NOT IMPLEMENTED IN CURRENT CORE
+STATUS: NOT IMPLEMENTED
 
-No production evidence yet for:
+No verified working production integration yet for:
 - Instagram;
 - WhatsApp;
-- Telegram sales integration;
+- Telegram sales;
 - unified inbox;
-- n8n workflows;
-- AI Sales & Concierge tool calling;
-- Whisper staff workflow.
+- response control;
+- AI Sales & Concierge tools;
+- n8n production orchestration;
+- Whisper staff flow.
 
-These remain downstream modules over the Core API.
+These remain downstream of secure Core permissions.
 
 ---
 
-# 11. DINING / STORE / QR / ACCESS / BILLIARDS / LED
+# 12. DINING / STORE / QR / ACCESS / BILLIARDS / LED
 
 STATUS: REQUIREMENTS ESTABLISHED / IMPLEMENTATION TODO
 
-Beach bar and beach cafe payments remain outside the hotel financial ledger in current scope.
+These remain confirmed Three Crowns scope modules.
+
+Beach bar and beach cafe customer payments remain outside the hotel financial ledger.
 
 ---
 
-# 12. NFC
+# 13. NFC
 
 STATUS: DEFERRED
 
-NFC finance is not a dependency for current V1.
-
----
-
-# 13. TEST EVIDENCE
-
-Latest verified baseline:
-
-Workflow: `Resort Core CI`
-Run: `32834872750`
-Job: `97761394147`
-Commit verified: `1bc6531a55c5522ad65d60e6a5254988ece9a1cb`
-Conclusion: `success`
-
-Successful steps include PostgreSQL boot, Prisma validation/schema creation, Python compilation, critical DB constraints, 84-room seed, API start, health smoke, availability smoke and PMS grid smoke.
-
-Full detail:
-`docs/CORE_IMPLEMENTATION_EVIDENCE_2026-08-25.md`.
+NFC financial ecosystem is explicitly not a V1 foundation dependency.
 
 ---
 
 # 14. CURRENT ENGINEERING ORDER
 
-1. Canonical live PMS admin UI over `/api/v1/pms/grid`.
-2. Add authentication/RBAC before external/admin production exposure.
-3. Canonicalize existing V5 site source.
-4. Connect site booking UI to availability + ReservationRequest.
-5. Implement paid-request -> guaranteed Reservation transaction after final prepayment rules/provider are confirmed.
-6. Add housekeeping and maintenance task engine.
-7. Add communications/unified inbox and AI tools.
-8. Add dining/store/QR/access/billiards/LED modules.
+Verified now:
 
-Current verified foundation:
+`REAL PROPERTY DATA -> POSTGRESQL -> CORE API -> PMS ADMIN BUILD`
 
-`REAL DATA -> POSTGRESQL -> AVAILABILITY -> PMS GRID API`
+and:
 
-Next target:
+`PUBLIC SITE -> REAL AVAILABILITY -> RESERVATION REQUEST`
 
-`LIVE PMS UI -> AUTH -> SITE INTEGRATION`.
+Next engineering sequence:
+
+1. internal authentication / RBAC with no external identity service dependency;
+2. protect PMS/admin Core routes;
+3. implement manager booking workspace and request queue;
+4. finalize current prepayment rule/provider and implement atomic paid-request conversion;
+5. add real reservation bars/actions into PMS;
+6. housekeeping + maintenance task engine;
+7. communications/unified inbox + response-control;
+8. AI tools over authorized Core;
+9. dining/store/QR/access/billiards/LED.
