@@ -1,0 +1,177 @@
+name: Hotel Operations CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  hotel-operations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      COOKIE_SECURE: false
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Owner-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Create database schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile Core
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply constraints and seed hotel
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Create maid and technician users
+        run: |
+          STAFF_USERNAME=ci-maid STAFF_PASSWORD='CI-Maid-Strong-Password-2026' STAFF_DISPLAY_NAME='CI Maid' STAFF_ROLE=MAID python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-tech STAFF_PASSWORD='CI-Tech-Strong-Password-2026' STAFF_DISPLAY_NAME='CI Technician' STAFF_ROLE=TECHNICIAN python scripts/upsert_staff_user.py
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/hotel-ops-api.log 2>&1 &
+          echo $! > /tmp/hotel-ops-api.pid
+          sleep 3
+          curl --fail -sS http://127.0.0.1:8000/ready > /tmp/ready.json
+
+      - name: Login owner and load staff overview
+        run: |
+          curl --fail -sS -c /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Owner-Strong-Password-2026"}' > /tmp/login.json
+          curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/staff/overview > /tmp/staff.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/staff.json'))
+          staff={x['username']:x for x in d['staff']}
+          assert 'ci-maid' in staff
+          assert 'ci-tech' in staff
+          assert staff['ci-maid']['role']=='MAID'
+          assert staff['ci-tech']['role']=='TECHNICIAN'
+          open('/tmp/maid-id','w').write(staff['ci-maid']['id'])
+          open('/tmp/tech-id','w').write(staff['ci-tech']['id'])
+          PY
+
+      - name: Resolve real room 101 from PMS grid
+        run: |
+          curl --fail -sS -b /tmp/owner-cookies.txt 'http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-27&end=2026-08-28' > /tmp/grid.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/grid.json'))
+          room=next(x for x in d['rooms'] if x['code']=='101')
+          open('/tmp/room-id','w').write(room['id'])
+          PY
+
+      - name: Create housekeeping task
+        run: |
+          ROOM_ID=$(cat /tmp/room-id)
+          cat > /tmp/create-task.json <<JSON
+          {"type":"HOUSEKEEPING","room_id":"$ROOM_ID","priority":"NORMAL","title":"CI уборка 101","source":"CI"}
+          JSON
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/ops/tasks \
+            -H 'Content-Type: application/json' --data-binary @/tmp/create-task.json > /tmp/task.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/task.json'))
+          assert d['status']=='OPEN'
+          open('/tmp/task-id','w').write(d['id'])
+          PY
+
+      - name: Reject wrong-role assignment and assign maid
+        run: |
+          TASK_ID=$(cat /tmp/task-id)
+          TECH_ID=$(cat /tmp/tech-id)
+          MAID_ID=$(cat /tmp/maid-id)
+          CODE=$(curl -sS -o /tmp/wrong-role.json -w '%{http_code}' -b /tmp/owner-cookies.txt \
+            -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/assignee" \
+            -H 'Content-Type: application/json' -d "{\"assigned_to_id\":\"$TECH_ID\"}")
+          test "$CODE" = "422"
+          curl --fail -sS -b /tmp/owner-cookies.txt \
+            -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/assignee" \
+            -H 'Content-Type: application/json' -d "{\"assigned_to_id\":\"$MAID_ID\"}" > /tmp/assigned.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/assigned.json'))
+          assert d['assigned_to_name']=='CI Maid'
+          assert d['idempotent'] is False
+          PY
+
+      - name: Verify assignment in task history and room detail
+        run: |
+          TASK_ID=$(cat /tmp/task-id)
+          ROOM_ID=$(cat /tmp/room-id)
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/history" > /tmp/history.json
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/rooms/$ROOM_ID" > /tmp/room-detail.json
+          python - <<'PY'
+          import json
+          h=json.load(open('/tmp/history.json'))
+          assert any(x['action']=='ASSIGN' and x['actor_name']=='CI Owner' for x in h['history'])
+          r=json.load(open('/tmp/room-detail.json'))
+          assert r['room']['code']=='101'
+          task=next(x for x in r['tasks'] if x['id']==open('/tmp/task-id').read().strip())
+          assert task['assigned_to']=='CI Maid'
+          assert task['type']=='HOUSEKEEPING'
+          PY
+
+      - name: Verify staff workload counts are not multiplied by sessions
+        run: |
+          curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/staff/overview > /tmp/staff-after.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/staff-after.json'))
+          maid=next(x for x in d['staff'] if x['username']=='ci-maid')
+          assert maid['active_tasks']==1
+          assert maid['housekeeping_active']==1
+          assert maid['maintenance_active']==0
+          PY
+
+      - name: Typecheck and build PMS
+        working-directory: apps/admin
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
+
+      - name: Show Core logs on failure
+        if: failure()
+        run: cat /tmp/hotel-ops-api.log || true
