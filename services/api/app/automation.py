@@ -93,23 +93,36 @@ async def claim_automation_event(conn, pid: uuid.UUID, source: str, key: str, ev
 @router.get("/capabilities")
 async def automation_capabilities(_service: dict[str, Any] = Depends(service_access)):
     return {
+        "orchestrator": "n8n",
+        "client_channel_architecture": {
+            "instagram": "ManyChat -> n8n -> Resort Core",
+            "whatsapp": "API Green -> n8n -> Resort Core",
+            "telegram": "n8n where appropriate; direct Core adapter is optional/reference",
+            "website": "Website -> Resort Core directly",
+        },
         "allowed": [
             "GET /api/v1/booking/check-availability",
+            "GET /api/v1/automation/read/hotel-facts",
+            "GET /api/v1/automation/read/reservation-requests/{request_id}",
+            "GET /api/v1/automation/read/reservations/{booking_number}",
             "POST /api/v1/automation/reservation-requests",
             "POST /api/v1/automation/staff-intake",
-            "POST /api/v1/automation/inbox/messages",
+            "POST /api/v1/automation/inbox/messages (optional audit/control)",
         ],
         "forbidden_for_ai": [
+            "direct PostgreSQL writes",
             "confirm-payment",
             "create-guaranteed-reservation",
             "check-in",
             "check-out",
             "refund",
+            "money mutation",
             "nfc-charge",
         ],
         "truth_rule": "Tool failure or unknown result must never be described as success.",
-        "reservation_rule": "Automation creates ReservationRequest only; guaranteed reservation requires controlled payment/management flow.",
-        "inbox_rule": "Provider adapters may ingest normalized facts only; external delivery must never be claimed without provider evidence.",
+        "reservation_rule": "Automation creates ReservationRequest only; a valid reservation requires the controlled Resort Core payment/management flow.",
+        "channel_rule": "ManyChat/API Green/n8n own provider delivery evidence. Resort Core must not claim an external message was delivered without provider evidence.",
+        "database_rule": "n8n must never connect directly to Resort OS PostgreSQL.",
     }
 
 
