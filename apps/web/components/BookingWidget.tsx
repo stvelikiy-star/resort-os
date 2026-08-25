@@ -7,6 +7,13 @@ type AvailableRoom = {
   code: string;
 };
 
+type PricingNight = {
+  date: string;
+  price_kgs: number | null;
+  meal_included?: string;
+  status: string;
+};
+
 type AvailabilityResult = {
   room_type_id: string;
   room_type_code: string;
@@ -21,12 +28,7 @@ type AvailabilityResult = {
     sellable: boolean;
     total_kgs: number | null;
     reason: string | null;
-    nights: Array<{
-      date: string;
-      price_kgs: number | null;
-      meal_included?: string;
-      status: string;
-    }>;
+    nights: PricingNight[];
   };
 };
 
@@ -59,6 +61,14 @@ const addDays = (iso: string, days: number) => {
 };
 
 const money = (value: number) => new Intl.NumberFormat("ru-RU").format(value);
+
+function mealLabel(nights: PricingNight[]) {
+  const values = Array.from(new Set(nights.map((night) => night.meal_included).filter(Boolean)));
+  if (values.length !== 1) return values.length > 1 ? "Условия питания меняются по датам" : null;
+  if (values[0] === "BREAKFAST") return "Завтрак включён";
+  if (values[0] === "NONE") return "Без питания";
+  return null;
+}
 
 export default function BookingWidget() {
   const initial = today();
@@ -164,19 +174,20 @@ export default function BookingWidget() {
             <div className="no-results">На выбранные даты подходящих свободных номеров не найдено. Измените даты или количество гостей.</div>
           ) : (
             <div className="availability-grid">
-              {results.results.map((item) => (
-                <article className="availability-card" key={item.room_type_id}>
+              {results.results.map((item) => {
+                const meal = mealLabel(item.pricing.nights);
+                return <article className="availability-card" key={item.room_type_id}>
                   <div>
                     <span className="availability-count">Свободно: {item.available_count}</span>
                     <h3>{item.room_type_name}</h3>
                     <p>{item.capacity_adults} осн. мест{item.area ? ` · ${item.area} м²` : ""}</p>
                   </div>
                   <div className="availability-price">
-                    {item.pricing.sellable && item.pricing.total_kgs !== null ? <><strong>{money(item.pricing.total_kgs)} сом</strong><small>за весь период</small></> : <><strong>По запросу</strong><small>тариф требует подтверждения</small></>}
+                    {item.pricing.sellable && item.pricing.total_kgs !== null ? <><strong>{money(item.pricing.total_kgs)} сом</strong><small>за весь период{meal ? ` · ${meal}` : ""}</small></> : <><strong>По запросу</strong><small>тариф требует подтверждения</small></>}
                   </div>
                   <button className="outline-button" onClick={() => setSelected(item)} type="button">Оставить заявку</button>
-                </article>
-              ))}
+                </article>;
+              })}
             </div>
           )}
 
