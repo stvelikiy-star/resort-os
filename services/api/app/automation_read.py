@@ -1,5 +1,8 @@
+import json
 import os
 import uuid
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,9 +11,21 @@ from .service_auth import require_automation_service
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
+GUEST_FACTS_PATH = Path(__file__).resolve().parent.parent / "data" / "three_crowns_guest_facts.json"
 
 router = APIRouter(prefix="/api/v1/automation/read", tags=["automation-read"])
 service_access = require_automation_service
+
+
+@lru_cache(maxsize=1)
+def _guest_facts() -> dict[str, Any]:
+    try:
+        payload = json.loads(GUEST_FACTS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail="Guest facts source is unavailable") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=503, detail="Guest facts source is invalid")
+    return payload
 
 
 async def _property(conn):
@@ -77,11 +92,14 @@ async def hotel_facts(request: Request, _service: dict[str, Any] = Depends(servi
             "old_two_day_unpaid_booking_rule_active": False,
             "prepayment_amount_rule": "Read required_prepayment_kgs from the current request; client automation must not assume a global percentage.",
         },
+        "guest_facts": _guest_facts(),
         "truth_rules": [
             "Availability and price must come from Resort Core.",
             "A ReservationRequest is not a guaranteed reservation.",
             "Do not claim payment is received without a RECEIVED payment fact.",
             "Do not claim a room is booked without a Reservation fact.",
+            "Use only CONFIRMED guest facts as certain; PARTIAL/UNKNOWN facts require clarification.",
+            "STALE_DO_NOT_USE facts must never drive client replies.",
             "Unknown policy remains unknown rather than being invented.",
         ],
     }
