@@ -40,6 +40,18 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Resolve hotel-local test dates
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+          today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              for i in range(6):
+                  f.write(f'D{i}={(today + timedelta(days=i)).isoformat()}\n')
+          PY
+
       - name: Create development database
         working-directory: packages/database
         run: |
@@ -76,7 +88,7 @@ jobs:
 
       - name: Create manager-confirmed guaranteed reservation
         run: |
-          curl --fail -sS 'http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-30&adults=2&children=0' > /tmp/availability.json
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=$D0&check_out=$D4&adults=2&children=0" > /tmp/availability.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/availability.json'))
@@ -89,7 +101,7 @@ jobs:
           TYPE=$(cat /tmp/type)
           curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
             -H 'Content-Type: application/json' \
-            -d "{\"guest_name\":\"Chessboard Guest\",\"phone\":\"+996555111222\",\"check_in\":\"2026-08-26\",\"check_out\":\"2026-08-30\",\"adults\":2,\"children\":0,\"room_type_code\":\"$TYPE\",\"source\":\"CI_CHESSBOARD\"}" > /tmp/request.json
+            -d "{\"guest_name\":\"Chessboard Guest\",\"phone\":\"+996555111222\",\"check_in\":\"$D0\",\"check_out\":\"$D4\",\"adults\":2,\"children\":0,\"room_type_code\":\"$TYPE\",\"source\":\"CI_CHESSBOARD\"}" > /tmp/request.json
           RID=$(python -c 'import json; print(json.load(open("/tmp/request.json"))["id"])')
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$RID/quote" \
             -H 'Content-Type: application/json' -d "{\"room_type_code\":\"$TYPE\"}" > /tmp/quote.json
@@ -124,7 +136,7 @@ jobs:
           RID=$(cat /tmp/reservation_id)
           TARGET=$(cat /tmp/target1)
           cat > /tmp/move.json <<JSON
-          {"segments":[{"room_id":"$TARGET","start":"2026-08-26","end":"2026-08-30"}]}
+          {"segments":[{"room_id":"$TARGET","start":"$D0","end":"$D4"}]}
           JSON
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
             -H 'Content-Type: application/json' --data-binary @/tmp/move.json > /tmp/move-preview.json
@@ -161,17 +173,17 @@ jobs:
           ROOM2=$(cat /tmp/target2)
           cat > /tmp/split.json <<JSON
           {"segments":[
-            {"room_id":"$ROOM1","start":"2026-08-26","end":"2026-08-28"},
-            {"room_id":"$ROOM2","start":"2026-08-28","end":"2026-08-31"}
+            {"room_id":"$ROOM1","start":"$D0","end":"$D2"},
+            {"room_id":"$ROOM2","start":"$D2","end":"$D5"}
           ]}
           JSON
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
             -H 'Content-Type: application/json' --data-binary @/tmp/split.json > /tmp/split-preview.json
           python - <<'PY'
-          import json
+          import json, os
           d=json.load(open('/tmp/split-preview.json'))
           assert d['can_commit'] is True
-          assert d['proposed_check_out']=='2026-08-31'
+          assert d['proposed_check_out']==os.environ['D5']
           assert len(d['proposed_schedule'])==2
           x=json.load(open('/tmp/split.json'))
           x['expected_version']=open('/tmp/version1').read().strip()
@@ -180,9 +192,9 @@ jobs:
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
             -H 'Content-Type: application/json' --data-binary @/tmp/split-commit.json > /tmp/split-result.json
           python - <<'PY'
-          import json
+          import json, os
           d=json.load(open('/tmp/split-result.json'))
-          assert d['check_out']=='2026-08-31'
+          assert d['check_out']==os.environ['D5']
           assert len(d['schedule'])==2
           open('/tmp/version2','w').write(d['version'])
           PY
@@ -190,7 +202,6 @@ jobs:
       - name: Check-in requires first room to be CLEAN
         run: |
           RID=$(cat /tmp/reservation_id)
-          ROOM1=$(cat /tmp/target1)
           python - <<'PY'
           import os,asyncio,asyncpg,uuid
           async def main():
@@ -215,13 +226,28 @@ jobs:
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-in" > /tmp/checkin.json
           python -c 'import json; d=json.load(open("/tmp/checkin.json")); assert d["status"]=="CHECKED_IN"; assert d["room_state"]=="CLEAN"'
 
-      - name: Immediate relocation preserves history and dirties vacated room
+      - name: Immediate relocation preserves lived history and dirties vacated room
         run: |
           RID=$(cat /tmp/reservation_id)
-          ROOM2=$(cat /tmp/target2)
-          cat > /tmp/relocate.json <<JSON
-          {"segments":[{"room_id":"$ROOM2","start":"2026-08-26","end":"2026-08-31"}]}
-          JSON
+          curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/pre-relocate-schedule.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/pre-relocate-schedule.json'))
+          effective=d['local_today']
+          checkout=d['reservation']['check_out']
+          target=open('/tmp/target2').read().strip()
+          kept=[]
+          for item in d['schedule']:
+              if item['end'] <= effective:
+                  kept.append({'room_id':item['room_id'],'start':item['start'],'end':item['end']})
+                  continue
+              if item['start'] < effective < item['end']:
+                  kept.append({'room_id':item['room_id'],'start':item['start'],'end':effective})
+              break
+          assert effective < checkout, (effective, checkout)
+          kept.append({'room_id':target,'start':effective,'end':checkout})
+          json.dump({'segments':kept},open('/tmp/relocate.json','w'))
+          PY
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
             -H 'Content-Type: application/json' --data-binary @/tmp/relocate.json > /tmp/relocate-preview.json
           python - <<'PY'
@@ -243,8 +269,9 @@ jobs:
           assert d['relocation_housekeeping_task_id']
           open('/tmp/version3','w').write(d['version'])
           PY
+          curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/relocated-schedule.json
           python - <<'PY'
-          import os,asyncio,asyncpg,uuid
+          import os,asyncio,asyncpg,uuid,json
           async def main():
               conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               try:
@@ -255,25 +282,40 @@ jobs:
                   assert tasks>=1, tasks
               finally: await conn.close()
           asyncio.run(main())
+          relocated=json.load(open('/tmp/relocated-schedule.json'))
+          target2=open('/tmp/target2').read().strip()
+          assert relocated['schedule'][-1]['room_id']==target2
           PY
 
       - name: Conflict rolls back and preserves relocated schedule
         run: |
           RID=$(cat /tmp/reservation_id)
-          ROOM1=$(cat /tmp/target1)
           python - <<'PY'
           import os,uuid,asyncio,asyncpg
           async def main():
               conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               try:
                   room=uuid.UUID(open('/tmp/target1').read().strip())
-                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,'2026-08-28','2026-08-31')
+                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,os.environ['D2'],os.environ['D5'])
               finally: await conn.close()
           asyncio.run(main())
           PY
-          cat > /tmp/conflict.json <<JSON
-          {"segments":[{"room_id":"$ROOM1","start":"2026-08-26","end":"2026-08-31"}]}
-          JSON
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/relocated-schedule.json'))
+          effective=d['local_today']
+          target1=open('/tmp/target1').read().strip()
+          proposed=[]
+          for item in d['schedule']:
+              if item['end'] <= effective:
+                  proposed.append({'room_id':item['room_id'],'start':item['start'],'end':item['end']})
+                  continue
+              if item['start'] < effective:
+                  proposed.append({'room_id':item['room_id'],'start':item['start'],'end':effective})
+              break
+          proposed.append({'room_id':target1,'start':effective,'end':d['reservation']['check_out']})
+          json.dump({'segments':proposed},open('/tmp/conflict.json','w'))
+          PY
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
             -H 'Content-Type: application/json' --data-binary @/tmp/conflict.json > /tmp/conflict-preview.json
           python -c 'import json; d=json.load(open("/tmp/conflict-preview.json")); assert d["can_commit"] is False; assert d["conflicts"]'
@@ -289,19 +331,16 @@ jobs:
           curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/schedule-final.json
           python - <<'PY'
           import json
-          d=json.load(open('/tmp/schedule-final.json'))
-          target2=open('/tmp/target2').read().strip()
-          assert d['reservation']['check_out']=='2026-08-31'
-          assert len(d['schedule'])==1
-          assert d['schedule'][0]['room_id']==target2
-          assert d['schedule'][0]['start']=='2026-08-26'
-          assert d['schedule'][0]['end']=='2026-08-31'
+          before=json.load(open('/tmp/relocated-schedule.json'))
+          after=json.load(open('/tmp/schedule-final.json'))
+          before_shape=[(x['room_id'],x['start'],x['end']) for x in before['schedule']]
+          after_shape=[(x['room_id'],x['start'],x['end']) for x in after['schedule']]
+          assert after_shape==before_shape,(before_shape,after_shape)
           PY
 
-      - name: Check-out cleans correct current-room identity and creates housekeeping
+      - name: Check-out uses actual current room and creates housekeeping
         run: |
           RID=$(cat /tmp/reservation_id)
-          TARGET2=$(cat /tmp/target2)
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-out" > /tmp/checkout.json
           python - <<'PY'
           import json
