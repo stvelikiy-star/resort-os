@@ -18,6 +18,24 @@ async def property_context(conn, property_code: str):
     return row
 
 
+async def first_room_for_reservation(conn, reservation_id: uuid.UUID):
+    return await conn.fetchrow(
+        '''
+        SELECT room.id,room.code,room."operationalState"::text AS room_state,
+               ib."startDate",ib."endDate"
+        FROM inventory_blocks ib
+        JOIN rooms room ON room.id=ib."roomId"
+        WHERE ib."reservationId"=$1
+          AND ib."blockType"='RESERVATION'
+          AND ib.active=true
+        ORDER BY ib."startDate" ASC,ib."endDate" ASC
+        LIMIT 1
+        FOR UPDATE OF room,ib
+        ''',
+        reservation_id,
+    )
+
+
 async def room_for_local_date(conn, reservation_id: uuid.UUID, local_date):
     return await conn.fetchrow(
         '''
@@ -37,6 +55,7 @@ async def room_for_local_date(conn, reservation_id: uuid.UUID, local_date):
           ib."endDate" DESC,
           ib."startDate" DESC
         LIMIT 1
+        FOR UPDATE OF room,ib
         ''',
         reservation_id,
         local_date,
@@ -71,13 +90,20 @@ async def check_in(
             if reservation["status"] != "GUARANTEED":
                 raise HTTPException(status_code=409, detail="Only guaranteed reservation can check in")
 
-            room = await room_for_local_date(conn, reservation_id, local_today)
+            # Check-in always starts in the first active schedule segment. We do not
+            # enforce arrival-date policy here because early/late arrival rules are
+            # not approved; we only enforce physical room readiness.
+            room = await first_room_for_reservation(conn, reservation_id)
             if not room:
                 raise HTTPException(status_code=409, detail="Reservation has no room assignment for check-in")
-            if room["room_state"] == "TECH_BLOCK":
+            if room["room_state"] != "CLEAN":
                 raise HTTPException(
                     status_code=409,
-                    detail={"code": "CHECK_IN_ROOM_TECH_BLOCK", "room_code": room["code"]},
+                    detail={
+                        "code": "CHECK_IN_ROOM_NOT_READY",
+                        "room_code": room["code"],
+                        "room_state": room["room_state"],
+                    },
                 )
 
             await conn.execute(
@@ -90,19 +116,29 @@ async def check_in(
                   id,"propertyId","actorType","actorId",action,resource,"resourceId",
                   source,result,"afterJson","createdAt"
                 ) VALUES ($1,$2,'STAFF',$3,'CHECK_IN','Reservation',$4,'PMS','SUCCESS',
-                  jsonb_build_object('room_code',$5::text,'local_date',$6::text),now())
+                  jsonb_build_object(
+                    'room_code',$5::text,
+                    'room_state',$6::text,
+                    'planned_check_in',$7::text,
+                    'actual_local_date',$8::text
+                  ),now())
                 ''',
                 uuid.uuid4(),
                 pid,
                 user["id"],
                 str(reservation_id),
                 room["code"],
+                room["room_state"],
+                str(reservation["checkIn"]),
                 str(local_today),
             )
     return {
         "reservation_id": str(reservation_id),
         "status": "CHECKED_IN",
         "room_code": room["code"],
+        "room_state": room["room_state"],
+        "planned_check_in": reservation["checkIn"],
+        "actual_local_date": local_today,
     }
 
 
