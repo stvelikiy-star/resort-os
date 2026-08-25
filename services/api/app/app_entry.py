@@ -12,6 +12,7 @@ from .nfc import router as nfc_router
 from .nfc_reporting import router as nfc_reporting_router
 from .observability import install_observability
 from .operations import router as operations_router
+from .operations_assignment import router as operations_assignment_router
 from .operations_history import router as operations_history_router
 from .realtime import router as realtime_router
 from .reservation_detail import router as reservation_detail_router
@@ -32,6 +33,7 @@ app.include_router(reservation_detail_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(operations_router)
+app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
 app.include_router(stays_router)
 app.include_router(telegram_auth_router)
@@ -54,4 +56,4 @@ app.include_router(manager_dashboard_router)
 # but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.22.0"
+app.version = "0.23.0"
