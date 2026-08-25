@@ -69,6 +69,56 @@ def map_nfc_database_error(exc: RaiseError) -> HTTPException:
     return HTTPException(status_code=409, detail="NFC payment could not be processed")
 
 
+@router.get("/api/v1/admin/nfc/wallets")
+async def list_nfc_wallets(
+    request: Request,
+    _user: dict[str, Any] = Depends(management_access),
+):
+    async with request.app.state.db.acquire() as conn:
+        pid = await property_id(conn)
+        rows = await conn.fetch(
+            '''
+            SELECT w.id AS wallet_id,w."reservationId" AS reservation_id,w."guestId" AS guest_id,
+                   w."balanceKgs" AS balance_kgs,w.status::text AS wallet_status,
+                   r."bookingNumber" AS booking_number,r.status::text AS reservation_status,
+                   g."firstName" AS guest_name,
+                   b.id AS bracelet_id,b.status::text AS bracelet_status,b.label AS bracelet_label,b."issuedAt" AS issued_at
+            FROM nfc_wallets w
+            JOIN reservations r ON r.id=w."reservationId"
+            LEFT JOIN guests g ON g.id=w."guestId"
+            LEFT JOIN LATERAL (
+              SELECT nb.id,nb.status,nb.label,nb."issuedAt"
+              FROM nfc_bracelets nb
+              WHERE nb."walletId"=w.id
+              ORDER BY (nb.status='ACTIVE') DESC, nb."issuedAt" DESC NULLS LAST, nb."createdAt" DESC
+              LIMIT 1
+            ) b ON true
+            WHERE w."propertyId"=$1
+            ORDER BY w."createdAt" DESC
+            ''',
+            pid,
+        )
+    return {
+        "items": [
+            {
+                "wallet_id": str(row["wallet_id"]),
+                "reservation_id": str(row["reservation_id"]),
+                "guest_id": str(row["guest_id"]),
+                "booking_number": row["booking_number"],
+                "reservation_status": row["reservation_status"],
+                "guest_name": row["guest_name"],
+                "balance_kgs": row["balance_kgs"],
+                "wallet_status": row["wallet_status"],
+                "bracelet_id": str(row["bracelet_id"]) if row["bracelet_id"] else None,
+                "bracelet_status": row["bracelet_status"],
+                "bracelet_label": row["bracelet_label"],
+                "issued_at": row["issued_at"],
+            }
+            for row in rows
+        ]
+    }
+
+
 @router.post("/api/v1/admin/nfc/wallets", status_code=status.HTTP_201_CREATED)
 async def issue_nfc_wallet(
     payload: NfcWalletIssue,
