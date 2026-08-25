@@ -1,0 +1,176 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+type Reservation = {
+  id: string;
+  bookingNumber: string;
+  status: string;
+  checkIn: string;
+  checkOut: string;
+  adults: number;
+  children: number;
+  totalKgs: number;
+  firstName?: string | null;
+  phone?: string | null;
+  room_code?: string | null;
+  room_type_name?: string | null;
+};
+
+type Detail = {
+  reservation: { id: string; booking_number: string; status: string; check_in: string; check_out: string; adults: number; children: number; total_kgs: number; notes?: string | null; created_at: string };
+  guest: { first_name?: string | null; last_name?: string | null; phone?: string | null; email?: string | null };
+  source: { channel?: string | null; request_id?: string | null };
+  room: { code?: string | null; state?: string | null; room_type_name?: string | null; area?: string | null };
+  finance: { total_kgs: number; paid_kgs: number; remaining_kgs: number; payments: Array<{ id: string; amount_kgs: number; method: string; status: string; provider?: string | null; external_ref?: string | null; paid_at?: string | null; created_at: string }> };
+  room_tasks: Array<{ id: string; type: string; status: string; priority: string; title: string; assigned_to_name?: string | null; created_at: string }>;
+  audit: Array<{ id: string; action: string; resource: string; source?: string | null; result: string; created_at: string }>;
+};
+
+type Filter = "ACTIVE" | "ARRIVALS_TODAY" | "DEPARTURES_TODAY" | "GUARANTEED" | "CHECKED_IN" | "CHECKED_OUT" | "ALL";
+
+const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
+const statusLabel: Record<string, string> = { GUARANTEED: "Гарантирована", CHECKED_IN: "Проживает", CHECKED_OUT: "Выехал", CANCELLED: "Отменена", NO_SHOW: "Не заехал" };
+const roomStateLabel: Record<string, string> = { CLEAN: "Готов", DIRTY: "Нужна уборка", IN_INSPECTION: "На проверке", TECH_BLOCK: "Ремонт", UNKNOWN: "Не указан" };
+
+export default function ReceptionBoard() {
+  const [items, setItems] = useState<Reservation[]>([]);
+  const [localDate, setLocalDate] = useState<string>("");
+  const [filter, setFilter] = useState<Filter>("ACTIVE");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [reservationsResponse, dashboardResponse] = await Promise.all([
+        fetch("/core/api/v1/admin/booking/reservations?limit=250", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/dashboard", { cache: "no-store" }),
+      ]);
+      const reservationsBody = await reservationsResponse.json().catch(() => ({}));
+      if (!reservationsResponse.ok) throw new Error(reservationsBody.detail || "Не удалось загрузить брони");
+      setItems(reservationsBody.items || []);
+      if (dashboardResponse.ok) {
+        const dashboardBody = await dashboardResponse.json();
+        setLocalDate(dashboardBody.property?.local_date || "");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return items.filter((item) => {
+      let statusMatch = true;
+      if (filter === "ACTIVE") statusMatch = ["GUARANTEED", "CHECKED_IN"].includes(item.status);
+      else if (filter === "ARRIVALS_TODAY") statusMatch = item.status === "GUARANTEED" && Boolean(localDate) && item.checkIn === localDate;
+      else if (filter === "DEPARTURES_TODAY") statusMatch = item.status === "CHECKED_IN" && Boolean(localDate) && item.checkOut === localDate;
+      else if (filter !== "ALL") statusMatch = item.status === filter;
+      if (!statusMatch) return false;
+      if (!q) return true;
+      return [item.bookingNumber, item.firstName, item.phone, item.room_code, item.room_type_name].some((value) => value?.toLowerCase().includes(q));
+    });
+  }, [items, filter, query, localDate]);
+
+  async function transition(item: Reservation, action: "check-in" | "check-out") {
+    setBusy(item.id);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/stays/reservations/${item.id}/${action}`, { method: "POST" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось выполнить операцию");
+      await load();
+      if (detail?.reservation.id === item.id) await openDetail(item.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка операции");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function openDetail(id: string) {
+    setDetailLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/booking/reservations/${id}`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось загрузить карточку брони");
+      setDetail(body as Detail);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка карточки брони");
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  return <main className="work-shell reception-shell">
+    <div className="work-head">
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Гость, номер, даты, гостиничные платежи, заезд/выезд и история действий.</p></div>
+      <button className="btn" onClick={load}>Обновить</button>
+    </div>
+
+    <div className="reception-controls">
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Гость, телефон, номер, бронь…" />
+      <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
+        <option value="ACTIVE">Активные</option>
+        <option value="ARRIVALS_TODAY">Заезды сегодня</option>
+        <option value="DEPARTURES_TODAY">Выезды сегодня</option>
+        <option value="GUARANTEED">Ожидают заезд</option>
+        <option value="CHECKED_IN">Проживают</option>
+        <option value="CHECKED_OUT">Выехали</option>
+        <option value="ALL">Все</option>
+      </select>
+      <span>{localDate ? `Дата отеля: ${localDate}` : ""}</span>
+    </div>
+
+    {error && <div className="error-box">{error}</div>}
+    {loading ? <div className="loading">Загрузка броней…</div> : <div className="reception-list">
+      {visible.length === 0 && <div className="empty">По выбранному фильтру броней нет.</div>}
+      {visible.map((item) => <article className="reception-card" key={item.id}>
+        <div><span className="status-pill">{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong></div>
+        <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
+        <div><span className="field-label">Номер</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small></div>
+        <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
+        <div><span className="field-label">Стоимость</span><b>{money(item.totalKgs)}</b></div>
+        <div className="reception-actions">
+          <button className="btn" onClick={() => openDetail(item.id)} disabled={detailLoading}>Карточка</button>
+          {item.status === "GUARANTEED" && <button className="btn primary" onClick={() => transition(item, "check-in")} disabled={busy === item.id}>Заезд</button>}
+          {item.status === "CHECKED_IN" && <button className="btn primary" onClick={() => transition(item, "check-out")} disabled={busy === item.id}>Выезд</button>}
+        </div>
+      </article>)}
+    </div>}
+
+    {detail && <div className="detail-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setDetail(null); }}>
+      <section className="reservation-detail" role="dialog" aria-modal="true">
+        <header><div><p className="eyebrow">Карточка брони</p><h2>{detail.reservation.booking_number}</h2><span className="status-pill">{statusLabel[detail.reservation.status] || detail.reservation.status}</span></div><button className="btn" onClick={() => setDetail(null)}>Закрыть</button></header>
+
+        <div className="detail-summary">
+          <div><span>Гость</span><strong>{[detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Без имени"}</strong><small>{detail.guest.phone || ""}</small><small>{detail.guest.email || ""}</small></div>
+          <div><span>Номер</span><strong>{detail.room.code || "—"}</strong><small>{detail.room.room_type_name || ""}{detail.room.area ? ` · ${detail.room.area}` : ""}</small><small>{detail.room.state ? roomStateLabel[detail.room.state] || detail.room.state : ""}</small></div>
+          <div><span>Проживание</span><strong>{detail.reservation.check_in} → {detail.reservation.check_out}</strong><small>{detail.reservation.adults} взр. · {detail.reservation.children} дет.</small></div>
+          <div><span>Источник</span><strong>{detail.source.channel || "—"}</strong><small>{detail.source.request_id ? `Request ${detail.source.request_id.slice(0, 8)}…` : ""}</small></div>
+        </div>
+
+        <section className="detail-section"><h3>Оплата брони</h3><div className="detail-money"><div><span>Стоимость</span><strong>{money(detail.finance.total_kgs)}</strong></div><div><span>Подтверждено</span><strong>{money(detail.finance.paid_kgs)}</strong></div><div><span>Остаток</span><strong>{money(detail.finance.remaining_kgs)}</strong></div></div>
+          {detail.finance.payments.length > 0 && <div className="detail-rows">{detail.finance.payments.map((payment) => <div key={payment.id}><strong>{money(payment.amount_kgs)}</strong><span>{payment.method} · {payment.provider || "—"}</span><span>{payment.status}</span><small>{payment.paid_at || payment.created_at}</small></div>)}</div>}
+        </section>
+
+        <section className="detail-section"><h3>Задачи по номеру</h3>{detail.room_tasks.length === 0 ? <p className="detail-muted">История задач по текущему номеру отсутствует.</p> : <div className="detail-rows">{detail.room_tasks.map((task) => <div key={task.id}><strong>{task.title}</strong><span>{task.type} · {task.priority}</span><span>{task.status}</span><small>{task.assigned_to_name || "Не назначено"}</small></div>)}</div>}</section>
+
+        <section className="detail-section"><h3>Журнал действий</h3>{detail.audit.length === 0 ? <p className="detail-muted">Записей аудита по брони/заявке нет.</p> : <div className="audit-list">{detail.audit.map((entry) => <div key={entry.id}><strong>{entry.action}</strong><span>{entry.resource} · {entry.source || "—"} · {entry.result}</span><time>{entry.created_at}</time></div>)}</div>}</section>
+
+        {detail.reservation.notes && <section className="detail-section"><h3>Заметка</h3><p className="detail-muted">{detail.reservation.notes}</p></section>}
+      </section>
+    </div>}
+  </main>;
+}
