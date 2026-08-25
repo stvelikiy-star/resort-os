@@ -1,0 +1,80 @@
+name: Resort Core CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Prisma
+        working-directory: packages/database
+        run: npm install
+
+      - name: Validate Prisma schema
+        working-directory: packages/database
+        run: npx prisma validate
+
+      - name: Create database schema
+        working-directory: packages/database
+        run: npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile Python
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply critical database constraints
+        run: python scripts/apply_core_constraints.py
+
+      - name: Seed evidence-backed Three Crowns inventory and rates
+        run: python scripts/seed_from_intake.py
+
+      - name: Start API
+        run: |
+          python -m uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
+          echo $! > /tmp/resort-api.pid
+          sleep 3
+
+      - name: Smoke test API
+        run: |
+          curl --fail http://127.0.0.1:8000/health
+          curl --fail "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
+          curl --fail "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01"
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/resort-api.log || true
