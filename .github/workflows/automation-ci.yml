@@ -1,0 +1,158 @@
+name: Automation Contract CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  automation:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      AUTOMATION_SERVICE_KEY: CI-AUTOMATION-SERVICE-KEY-2026
+      AUTOMATION_SERVICE_NAME: ci-n8n
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install and validate Prisma schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile API
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply constraints and seed property
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+
+      - name: Start Core API
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/automation-api.log 2>&1 &
+          echo $! > /tmp/automation-api.pid
+          sleep 3
+          curl --fail http://127.0.0.1:8000/health
+
+      - name: Verify automation service boundary
+        run: |
+          CODE=$(curl -sS -o /tmp/capabilities-anon.json -w '%{http_code}' http://127.0.0.1:8000/api/v1/automation/capabilities)
+          test "$CODE" = "401"
+          CODE=$(curl -sS -o /tmp/capabilities-bad.json -w '%{http_code}' http://127.0.0.1:8000/api/v1/automation/capabilities -H 'X-Resort-Service-Key: wrong-key')
+          test "$CODE" = "401"
+          curl --fail -sS http://127.0.0.1:8000/api/v1/automation/capabilities \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" > /tmp/capabilities.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/capabilities.json'))
+          assert 'confirm-payment' in d['forbidden_for_ai']
+          assert 'POST /api/v1/automation/reservation-requests' in d['allowed']
+          PY
+
+      - name: Verify AI reservation intake is request only and idempotent
+        run: |
+          cat > /tmp/ai-request.json <<'JSON'
+          {"idempotency_key":"ci-ai-request-001","channel":"TELEGRAM","guest_name":"AI CI Guest","phone":"+996700000001","check_in":"2026-08-27","check_out":"2026-08-29","adults":2,"children":0,"notes":"Created by automation contract test","external_message_id":"tg-001"}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/reservation-requests \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/ai-request.json > /tmp/ai-request-first.json
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/reservation-requests \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/ai-request.json > /tmp/ai-request-replay.json
+          python - <<'PY'
+          import json
+          first=json.load(open('/tmp/ai-request-first.json'))
+          replay=json.load(open('/tmp/ai-request-replay.json'))
+          assert first['is_reservation'] is False
+          assert first['status'] == 'NEW'
+          assert first['idempotent_replay'] is False
+          assert replay['idempotent_replay'] is True
+          assert replay['id'] == first['id']
+          PY
+
+      - name: Reject invalid AI reservation dates
+        run: |
+          CODE=$(curl -sS -o /tmp/invalid-dates.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/automation/reservation-requests \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            -d '{"idempotency_key":"ci-ai-request-bad-dates","channel":"TELEGRAM","guest_name":"Bad Dates","phone":"+996700000002","check_in":"2026-08-29","check_out":"2026-08-27","adults":2}')
+          test "$CODE" = "422"
+
+      - name: Select a room for voice maintenance intake
+        run: |
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-27&check_out=2026-08-29&adults=1&children=0" > /tmp/availability-before-automation.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/availability-before-automation.json'))
+          rooms=[room for group in d['results'] for room in group['available_rooms']]
+          assert rooms
+          open('/tmp/automation-room-code','w').write(rooms[-1]['code'])
+          PY
+
+      - name: Verify voice maintenance intake is idempotent and blocks room
+        run: |
+          ROOM_CODE=$(cat /tmp/automation-room-code)
+          cat > /tmp/staff-intake.json <<JSON
+          {"idempotency_key":"ci-voice-maintenance-001","channel":"TELEGRAM_STAFF","intent":"MAINTENANCE","room_code":"$ROOM_CODE","transcript":"В номере течет кран, нужна проверка сантехника","summary":"Проверить протечку крана","priority":"HIGH","external_message_id":"voice-001","sender_external_id":"tg-tech-001"}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/staff-intake \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/staff-intake.json > /tmp/staff-intake-first.json
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/automation/staff-intake \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" -H 'Content-Type: application/json' \
+            --data-binary @/tmp/staff-intake.json > /tmp/staff-intake-replay.json
+          python - <<'PY'
+          import json
+          first=json.load(open('/tmp/staff-intake-first.json'))
+          replay=json.load(open('/tmp/staff-intake-replay.json'))
+          assert first['type'] == 'MAINTENANCE'
+          assert first['room_state'] == 'TECH_BLOCK'
+          assert first['idempotent_replay'] is False
+          assert replay['idempotent_replay'] is True
+          assert replay['id'] == first['id']
+          PY
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-27&check_out=2026-08-29&adults=1&children=0" > /tmp/availability-after-automation.json
+          python - <<'PY'
+          import json
+          room_code=open('/tmp/automation-room-code').read().strip()
+          d=json.load(open('/tmp/availability-after-automation.json'))
+          available={room['code'] for group in d['results'] for room in group['available_rooms']}
+          assert room_code not in available
+          PY
+
+      - name: Show API log on failure
+        if: failure()
+        run: cat /tmp/automation-api.log || true
