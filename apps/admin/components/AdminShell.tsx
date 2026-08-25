@@ -4,8 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import DashboardBoard from "./DashboardBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGrid";
+import ReceptionBoard from "./ReceptionBoard";
 import RequestsBoard from "./RequestsBoard";
-import ReservationsBoard from "./ReservationsBoard";
 
 type User = {
   id: string;
@@ -112,7 +112,7 @@ export default function AdminShell() {
       {tab === "DASHBOARD" && isManager && <DashboardBoard />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "RESERVATIONS" && isManager && <ReservationsBoard />}
+      {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
     </>
   );
