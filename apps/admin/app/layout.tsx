@@ -9,6 +9,7 @@ import "./inbox.css";
 import "./staff.css";
 import "./room-detail.css";
 import "./chessboard.css";
+import "./chessboard-v2.css";
 
 export const metadata: Metadata = {
   title: "Три Короны — PMS",
