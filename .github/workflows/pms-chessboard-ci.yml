@@ -1,0 +1,238 @@
+name: PMS Chessboard Mutation CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  chessboard:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Create development database
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Core and seed
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start Core and login
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/chessboard-api.log 2>&1 &
+          sleep 3
+          curl --fail -sS -c /tmp/cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json
+
+      - name: Create manager-confirmed guaranteed reservation
+        run: |
+          curl --fail -sS 'http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-30&adults=2&children=0' > /tmp/availability.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/availability.json'))
+          sellable=[x for x in d['results'] if x['pricing']['sellable'] and len(x['available_rooms']) >= 3]
+          assert sellable, 'need a room type with at least three rooms for chessboard test'
+          x=sellable[0]
+          open('/tmp/type','w').write(x['room_type_code'])
+          json.dump(x['available_rooms'][:3],open('/tmp/rooms.json','w'))
+          PY
+          TYPE=$(cat /tmp/type)
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
+            -H 'Content-Type: application/json' \
+            -d "{\"guest_name\":\"Chessboard Guest\",\"phone\":\"+996555111222\",\"check_in\":\"2026-08-26\",\"check_out\":\"2026-08-30\",\"adults\":2,\"children\":0,\"room_type_code\":\"$TYPE\",\"source\":\"CI_CHESSBOARD\"}" > /tmp/request.json
+          RID=$(python -c 'import json; print(json.load(open("/tmp/request.json"))["id"])')
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$RID/quote" \
+            -H 'Content-Type: application/json' -d "{\"room_type_code\":\"$TYPE\"}" > /tmp/quote.json
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$RID/confirm-payment" \
+            -H 'Content-Type: application/json' \
+            -d '{"amount_kgs":777,"method":"MANAGER_MANUAL","provider":"MANAGER_MANUAL","external_ref":"chessboard-ci-pay","idempotency_key":"chessboard-ci-payment-0001"}' > /tmp/reservation.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/reservation.json'))
+          open('/tmp/reservation_id','w').write(d['reservation_id'])
+          PY
+
+      - name: Read canonical schedule and choose free targets
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/schedule0.json
+          python - <<'PY'
+          import json
+          schedule=json.load(open('/tmp/schedule0.json'))
+          rooms=json.load(open('/tmp/rooms.json'))
+          current=schedule['schedule'][0]['room_id']
+          targets=[r for r in rooms if r['id'] != current]
+          assert len(targets)>=2
+          open('/tmp/target1','w').write(targets[0]['id'])
+          open('/tmp/target2','w').write(targets[1]['id'])
+          assert schedule['reservation']['status']=='GUARANTEED'
+          assert schedule['reservation']['stored_total_kgs'] > 0
+          PY
+
+      - name: Preview and atomically move entire booking
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          TARGET=$(cat /tmp/target1)
+          cat > /tmp/move.json <<JSON
+          {"segments":[{"room_id":"$TARGET","start":"2026-08-26","end":"2026-08-30"}]}
+          JSON
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/move.json > /tmp/move-preview.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/move-preview.json'))
+          assert d['can_commit'] is True
+          assert d['conflicts']==[]
+          assert d['pricing']['stored_total_will_change_on_commit'] is False
+          open('/tmp/version0','w').write(d['reservation']['version'])
+          PY
+          VERSION=$(cat /tmp/version0)
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/move.json'))
+          d['expected_version']=open('/tmp/version0').read().strip()
+          json.dump(d,open('/tmp/move-commit.json','w'))
+          PY
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/move-commit.json > /tmp/moved.json
+          python -c 'import json; d=json.load(open("/tmp/moved.json")); assert d["ok"] is True; open("/tmp/version1","w").write(d["version"])'
+
+      - name: Reject stale manager snapshot without changing schedule
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          CODE=$(curl -sS -o /tmp/stale.json -w '%{http_code}' -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/move-commit.json)
+          test "$CODE" = "409"
+          python -c 'import json; assert json.load(open("/tmp/stale.json"))["detail"]["code"]=="STALE_RESERVATION"'
+
+      - name: Resize and split reservation across two rooms
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          ROOM1=$(cat /tmp/target1)
+          ROOM2=$(cat /tmp/target2)
+          cat > /tmp/split.json <<JSON
+          {"segments":[
+            {"room_id":"$ROOM1","start":"2026-08-26","end":"2026-08-28"},
+            {"room_id":"$ROOM2","start":"2026-08-28","end":"2026-08-31"}
+          ]}
+          JSON
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/split.json > /tmp/split-preview.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/split-preview.json'))
+          assert d['can_commit'] is True
+          assert d['proposed_check_out']=='2026-08-31'
+          assert len(d['proposed_schedule'])==2
+          x=json.load(open('/tmp/split.json'))
+          x['expected_version']=open('/tmp/version1').read().strip()
+          json.dump(x,open('/tmp/split-commit.json','w'))
+          PY
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/split-commit.json > /tmp/split-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/split-result.json'))
+          assert d['check_out']=='2026-08-31'
+          assert len(d['schedule'])==2
+          open('/tmp/version2','w').write(d['version'])
+          PY
+
+      - name: Conflict rolls back and preserves prior schedule
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          ROOM1=$(cat /tmp/target1)
+          python - <<'PY'
+          import os,uuid,asyncio,asyncpg
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  room=uuid.UUID(open('/tmp/target1').read().strip())
+                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,'2026-08-28','2026-08-31')
+              finally: await conn.close()
+          asyncio.run(main())
+          PY
+          cat > /tmp/conflict.json <<JSON
+          {"segments":[{"room_id":"$ROOM1","start":"2026-08-26","end":"2026-08-31"}]}
+          JSON
+          curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/preview" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/conflict.json > /tmp/conflict-preview.json
+          python -c 'import json; d=json.load(open("/tmp/conflict-preview.json")); assert d["can_commit"] is False; assert d["conflicts"]'
+          python - <<'PY'
+          import json
+          x=json.load(open('/tmp/conflict.json'))
+          x['expected_version']=open('/tmp/version2').read().strip()
+          json.dump(x,open('/tmp/conflict-commit.json','w'))
+          PY
+          CODE=$(curl -sS -o /tmp/conflict-result.json -w '%{http_code}' -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
+            -H 'Content-Type: application/json' --data-binary @/tmp/conflict-commit.json)
+          test "$CODE" = "409"
+          curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/schedule-final.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/schedule-final.json'))
+          assert d['reservation']['check_out']=='2026-08-31'
+          assert len(d['schedule'])==2
+          assert d['schedule'][0]['end']=='2026-08-28'
+          assert d['schedule'][1]['start']=='2026-08-28'
+          PY
+
+      - name: Verify audit evidence exists
+        run: |
+          python - <<'PY'
+          import os,asyncio,asyncpg
+          async def main():
+              conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  rid=open('/tmp/reservation_id').read().strip()
+                  count=await conn.fetchval('SELECT count(*) FROM audit_logs WHERE resource=\'Reservation\' AND "resourceId"=$1 AND action=\'PMS_SCHEDULE_MUTATION\' AND result=\'SUCCESS\'',rid)
+                  assert count==2, count
+              finally: await conn.close()
+          asyncio.run(main())
+          PY
+
+      - name: Show Core logs on failure
+        if: failure()
+        run: cat /tmp/chessboard-api.log || true
