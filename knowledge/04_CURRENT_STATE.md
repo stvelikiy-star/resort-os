@@ -1,1153 +1,274 @@
 # RESORT OS — CURRENT STATE
 
-Version: 0.1
-Status: BLOCKED
-Qualifier: CURRENT STATE NOT ESTABLISHED
+Version: 0.2
+Date: 2026-08-25
+Status: IMPLEMENTATION STARTED
 Canonical: YES
 Document Type: Evidence-Based Current System State
 
-Depends On:
-- 00_PRODUCT_BIBLE.md
-- 01_DOMAIN_BUSINESS_RULES.md
-- 02_SYSTEM_ARCHITECTURE.md
-- 03_AI_ADMIN.md
-
-Workflow Reference:
-- 05_DECISIONS_AND_BACKLOG.md
+Critical rule: TARGET ≠ CURRENT. This file records implementation evidence only.
 
 ---
 
-# 1. DOCUMENT PURPOSE
+# 1. REPOSITORY
 
-Этот документ является единственным каноническим источником информации о том, ЧТО ФАКТИЧЕСКИ СУЩЕСТВУЕТ в реализации Resort OS.
+STATUS: VERIFIED FACT
 
-Он должен содержать только evidence-backed facts о реальной системе.
+Canonical repository:
+`stvelikiy-star/resort-os`
 
-Этот документ отвечает на вопросы:
-
-WHAT ACTUALLY EXISTS?
-
-WHAT IS IMPLEMENTED?
-
-WHAT IS VERIFIED?
-
-WHAT IS PARTIAL?
-
-WHAT IS BROKEN?
-
-WHAT IS UNKNOWN?
-
-WHAT IS BLOCKED FROM VERIFICATION?
-
-Этот документ НЕ описывает:
-
-- product vision;
-- желаемую функциональность;
-- target architecture;
-- planned functionality;
-- proposed features;
-- предположения;
-- industry standards;
-- будущий backlog.
+Repository now contains:
+- canonical knowledge;
+- recovery artifacts;
+- evidence-backed Three Crowns room/rate intake;
+- first PostgreSQL/Prisma Core schema;
+- first FastAPI Core implementation;
+- seed/bootstrap scripts;
+- CI definition.
 
 ---
 
-# 2. CURRENT STATUS
+# 2. THREE CROWNS DATA BASELINE
 
-Status:
+STATUS: PARTIAL / EVIDENCE-BACKED INPUT
 
-BLOCKED
+Evidence:
+- `data-intake/rooms.csv`
+- `data-intake/rates.csv`
+- `data-intake/reservation_rules.md`
+- `docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md`
 
-Reason:
+Established input baseline:
+- 84 room rows;
+- 12 room categories;
+- 2026/27 seasonal tariff rows;
+- direct-source food and extra-person tariffs;
+- unpaid request is NOT an active reservation;
+- legacy website rule allowing an unpaid preliminary booking for two days is stale and MUST NOT be implemented.
 
-На момент создания этого baseline реальный проект Resort OS не предоставлен для технического аудита.
-
-Следовательно, фактическое состояние реализации не установлено.
-
-Неизвестно:
-
-- source code;
-- repository structure;
-- technology stack;
-- database;
-- schema;
-- migrations;
-- API;
-- authentication;
-- authorization;
-- RBAC;
-- tenant model;
-- property model;
-- implemented modules;
-- tests;
-- deployment;
-- integrations;
-- AI implementation;
-- production environment;
-- operational evidence.
-
-Все перечисленные области должны оставаться UNKNOWN / BLOCKED до получения evidence.
+Known data caveats remain documented in the reconciliation file, including 501/502 category confirmation, building/floor mapping and raw bed abbreviations.
 
 ---
 
-# 3. CRITICAL CURRENT-STATE RULE
+# 3. PUBLIC WEBSITE
 
-TARGET ≠ CURRENT
+STATUS: PARTIAL
 
-Наличие capability в:
+Evidence from prior Vercel audit:
+- production-target V5 prototype exists on Vercel;
+- visual public-site skeleton exists;
+- its booking interaction is prototype behavior and is not evidence of real availability/reservation functionality;
+- V5 source tree has not yet been established inside this canonical repository.
 
-00_PRODUCT_BIBLE.md
-
-не означает её реализацию.
-
-Наличие Business Rule в:
-
-01_DOMAIN_BUSINESS_RULES.md
-
-не означает её реализацию.
-
-Наличие architecture в:
-
-02_SYSTEM_ARCHITECTURE.md
-
-не означает её реализацию.
-
-Наличие AI capability в:
-
-03_AI_ADMIN.md
-
-не означает её реализацию.
-
-Наличие задачи в:
-
-05_DECISIONS_AND_BACKLOG.md
-
-не означает её реализацию.
-
-Только evidence реальной системы может изменить Current State.
+Production DNS cutover to V5 is NOT approved by this status.
 
 ---
 
-# 4. CURRENT-STATE STATUS MODEL
+# 4. PMS GRID
 
-Для описания фактической реализации использовать:
+STATUS: PARTIAL / RECOVERED UI PROTOTYPE
 
-VERIFIED FACT
-= факт о реальной системе подтверждён evidence.
+Evidence:
+`recovery-artifacts/pms-grid/PMSGrid.tsx`
 
-IMPLEMENTED
-= capability/code существует, но ещё не доказано соответствие требуемому поведению.
+The recovered component:
+- is an interactive grid UI prototype;
+- contains deterministic mock data;
+- is NOT current production PMS;
+- can be adapted to the new live Core endpoint once the backend is verified.
 
-VERIFIED
-= capability реализована, прошла необходимые проверки и имеет evidence.
+New implementation endpoint now exists in source:
+`GET /api/v1/pms/grid`
 
-PARTIAL
-= capability существует частично.
-
-BROKEN
-= capability существует, но не выполняет требуемое поведение.
-
-UNKNOWN
-= недостаточно информации.
-
-BLOCKED
-= проверка невозможна из-за отсутствия доступа, данных, environment, credentials, files или другого required evidence.
-
-Не использовать:
-
-APPROVED
-
-PROPOSED
-
-PLANNED
-
-как доказательство Current State.
+Runtime status of that endpoint:
+NOT YET VERIFIED at the time of this update.
 
 ---
 
-# 5. EVIDENCE STANDARD
-
-Допустимый evidence может включать:
-
-- source files;
-- repository structure;
-- dependency manifests;
-- configuration;
-- database schema;
-- migrations;
-- ORM models;
-- API definitions;
-- route definitions;
-- service/domain code;
-- authentication configuration;
-- authorization code;
-- tests;
-- test execution results;
-- build results;
-- runtime behavior;
-- logs;
-- deployment configuration;
-- infrastructure configuration;
-- verified external integration configuration;
-- screenshots/runtime evidence where technically relevant.
-
-Каждый значимый Current State claim должен быть traceable к evidence.
-
----
-
-# 6. EVIDENCE RECORD FORMAT
-
-Для significant claim использовать:
-
-AREA:
-
-CLAIM:
-
-STATUS:
-
-EVIDENCE:
-
-LOCATION:
-
-VERIFICATION METHOD:
-
-RESULT:
-
-LIMITATIONS:
-
-LAST VERIFIED:
-
-Если evidence отсутствует:
-
-STATUS:
-UNKNOWN / BLOCKED
-
-Не заполнять отсутствующие данные предположениями.
-
----
-
-# 7. PROJECT ACCESS
-
-Status:
-
-BLOCKED
-
-Repository:
-UNKNOWN
-
-Source Code:
-UNKNOWN
-
-Project Archive:
-UNKNOWN
-
-Runtime Environment:
-UNKNOWN
-
-Database Access:
-UNKNOWN
-
-Deployment Access:
-UNKNOWN
-
-Logs:
-UNKNOWN
-
-External Integration Credentials:
-UNKNOWN
-
-Production Access:
-UNKNOWN
-
-Reason:
-
-Real project evidence has not yet been supplied for audit.
-
----
-
-# 8. TECHNOLOGY STACK
-
-Status:
-
-UNKNOWN
-
-Frontend:
-UNKNOWN
-
-Backend:
-UNKNOWN
-
-Programming Languages:
-UNKNOWN
-
-Frameworks:
-UNKNOWN
-
-Database:
-UNKNOWN
-
-ORM:
-UNKNOWN
-
-Cache:
-UNKNOWN
-
-Queue:
-UNKNOWN
-
-Authentication:
-UNKNOWN
-
-Authorization:
-UNKNOWN
-
-API Style:
-UNKNOWN
-
-Hosting:
-UNKNOWN
-
-Containers:
-UNKNOWN
-
-CI/CD:
-UNKNOWN
-
-Monitoring:
-UNKNOWN
-
-AI Provider:
-UNKNOWN
-
-Не определять technology stack из Target Architecture.
-
----
-
-# 9. PROJECT STRUCTURE
-
-Status:
-
-UNKNOWN
-
-Repository model:
-UNKNOWN
-
-Applications:
-UNKNOWN
-
-Packages:
-UNKNOWN
-
-Modules:
-UNKNOWN
-
-Shared Libraries:
-UNKNOWN
-
-Domain Boundaries:
-UNKNOWN
-
-Infrastructure:
-UNKNOWN
-
-Tests:
-UNKNOWN
-
-Documentation:
-UNKNOWN
-
----
-
-# 10. PROPERTY / TENANCY
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- tenant model;
-- property isolation;
-- organization hierarchy;
-- multi-property support;
-- property configuration;
-- feature configuration.
-
-Security conclusions запрещены без evidence.
-
----
-
-# 11. AUTHENTICATION
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- login mechanism;
-- session management;
-- token model;
-- password handling;
-- MFA;
-- identity provider;
-- guest authentication.
-
----
-
-# 12. AUTHORIZATION / RBAC
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- roles;
-- permissions;
-- server-side authorization;
-- resource-level authorization;
-- tenant isolation enforcement;
-- property isolation enforcement.
-
-UI visibility не считается evidence authorization.
-
----
-
-# 13. PMS / RESERVATIONS
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- Reservation Request;
+# 5. DATABASE / INVENTORY / PRICING
+
+STATUS: IMPLEMENTED IN SOURCE / NOT YET VERIFIED
+
+Evidence:
+- `packages/database/prisma/schema.prisma`
+- `packages/database/sql/001_core_constraints.sql`
+- `scripts/seed_from_intake.py`
+
+Implemented source model includes:
+- Property;
+- RoomType;
+- Room;
+- RatePlan;
+- RatePeriod;
+- Guest;
+- ReservationRequest;
 - Reservation;
-- booking lifecycle;
-- Human Confirmation;
-- modification;
-- cancellation;
-- no-show;
-- walk-in;
-- group booking;
-- Smart Booking Board.
+- InventoryBlock;
+- Payment;
+- AuditLog.
+
+Important implementation boundary:
+- ReservationRequest and Reservation are separate entities;
+- an unpaid request does not create a Reservation;
+- rate rows with price 0 are imported as `CONFIRM_REQUIRED`, not as free sale inventory.
+
+Data-integrity implementation includes a PostgreSQL exclusion constraint designed to prevent overlapping active inventory blocks for the same room.
+
+Database migration/constraint execution and concurrency behavior remain NOT VERIFIED until CI/runtime evidence succeeds.
 
 ---
 
-# 14. GUEST / STAY
+# 6. CORE API
 
-Status:
+STATUS: IMPLEMENTED IN SOURCE / NOT YET VERIFIED
 
-UNKNOWN
+Evidence:
+- `services/api/app/main.py`
+- `services/api/app/db.py`
+- `services/api/requirements.txt`
 
-Не подтверждено:
+Implemented source routes:
+- `GET /health`
+- `GET /api/v1/booking/check-availability`
+- `POST /api/v1/booking/requests`
+- `GET /api/v1/pms/grid`
 
-- Guest profile;
-- Stay;
-- Guest ≠ Stay separation;
-- check-in;
-- check-out;
-- room assignment;
-- Room Move;
-- Split Stay;
-- stay history.
+Current booking rule enforced by source intent:
+`REQUEST -> availability/price -> payment/confirmation flow -> RESERVATION`
 
----
+The current request endpoint explicitly returns that the created object is not a reservation.
 
-# 15. INVENTORY / AVAILABILITY
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- inventory model;
-- availability calculation;
-- room inventory;
-- room-type inventory;
-- concurrency protection;
-- booking conflict prevention;
-- maintenance blocking;
-- external synchronization.
+Authentication/RBAC is NOT implemented yet and the API MUST NOT be treated as production-public until authorization boundaries exist.
 
 ---
 
-# 16. PRICING
+# 7. CI / TESTING
 
-Status:
+STATUS: IMPLEMENTED DEFINITION / EXECUTION NOT YET VERIFIED
 
-UNKNOWN
+Evidence:
+`.github/workflows/core-ci.yml`
 
-Не подтверждено:
+The workflow is designed to verify:
+- Prisma schema validity;
+- PostgreSQL schema creation;
+- Python compilation;
+- critical DB constraints;
+- real 84-room/12-category seed;
+- API health;
+- availability endpoint smoke test;
+- PMS grid smoke test.
 
-- pricing engine;
-- rates;
-- seasonality;
-- occupancy pricing;
-- discounts;
-- taxes;
-- packages;
-- deterministic calculations;
-- repricing.
-
----
-
-# 17. FOLIO / FINANCE
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- Folio;
-- Charges;
-- balance;
-- corrections;
-- deposits;
-- refunds;
-- financial audit;
-- currencies.
+No successful workflow run is claimed until GitHub Actions returns execution evidence.
 
 ---
 
-# 18. PAYMENTS
+# 8. AUTHENTICATION / RBAC
 
-Status:
+STATUS: UNKNOWN / TODO P0-P1
 
-UNKNOWN
+No working server-side authentication or RBAC implementation is currently established.
 
-Не подтверждено:
-
-- payment provider;
-- acquiring;
-- payment API;
-- webhook handling;
-- idempotency;
-- refunds;
-- reconciliation;
-- supported currencies;
-- supported regions.
-
-Наличие payment requirement в Product Bible не означает working payment integration.
+Target property roles previously specified include OWNER/MANAGER/MAID/TECHNICIAN and other operational roles, but target role documentation is not implementation evidence.
 
 ---
 
-# 19. HOUSEKEEPING
+# 9. HOUSEKEEPING / MAINTENANCE
 
-Status:
+STATUS: PLANNED / NOT IMPLEMENTED
 
-UNKNOWN
+Business workflows are defined at target level, but working task/housekeeping/maintenance modules are not yet established in source.
 
-Не подтверждено:
+The current Room operational-state schema includes:
+- UNKNOWN;
+- CLEAN;
+- DIRTY;
+- IN_INSPECTION;
+- TECH_BLOCK.
 
-- housekeeping workflow;
-- room cleaning states;
-- assignments;
-- staff workflow;
-- room readiness.
-
----
-
-# 20. MAINTENANCE
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- maintenance tickets;
-- lifecycle;
-- assignment;
-- priority;
-- room/inventory blocking;
-- history.
+This enum alone does not mean the staff workflow is implemented.
 
 ---
 
-# 21. TASK ENGINE
+# 10. COMMUNICATIONS / AI / AUTOMATION
 
-Status:
+STATUS: NOT IMPLEMENTED IN CURRENT CORE
 
-UNKNOWN
+No working evidence yet for production:
+- Instagram integration;
+- WhatsApp integration;
+- Telegram sales integration;
+- unified inbox;
+- AI Sales & Concierge tool calling;
+- n8n production workflows;
+- Whisper staff flow.
 
-Не подтверждено:
-
-- tasks;
-- assignment;
-- priorities;
-- statuses;
-- escalation;
-- completion;
-- audit.
-
----
-
-# 22. SERVICES / RESOURCES
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- service catalog;
-- resources;
-- scheduling;
-- capacity;
-- availability;
-- service booking;
-- SPA;
-- activities;
-- transfers.
+These remain future modules over the controlled Core API.
 
 ---
 
-# 23. PARTNER / AGENT
+# 11. DINING / STORE / QR / ACCESS / BILLIARDS / LED
 
-Status:
+STATUS: REQUIREMENTS ESTABLISHED / IMPLEMENTATION NOT YET ESTABLISHED
 
-UNKNOWN
+These modules are in the Three Crowns Master Specification but no working implementation is claimed yet.
 
-Не подтверждено:
-
-- Partner records;
-- Agent records;
-- reservation attribution;
-- revenue attribution;
-- commissions;
-- settlement history.
+Beach bar and beach cafe payments are outside the hotel financial ledger in current scope.
 
 ---
 
-# 24. GUEST PORTAL / QR
+# 12. NFC
 
-Status:
+STATUS: DEFERRED
 
-UNKNOWN
-
-Не подтверждено:
-
-- Guest Portal;
-- QR access;
-- secure guest context;
-- Stay binding;
-- token expiration;
-- revocation;
-- authorization;
-- guest requests.
+NFC/wristband finance is not a foundation dependency and is intentionally not part of the current Core implementation milestone.
 
 ---
 
-# 25. F&B / ROOM SERVICE / KDS
+# 13. CURRENT P0
 
-Status:
+Current engineering objective:
 
-UNKNOWN
+`REAL ROOM/RATE DATA -> VERIFIED DATABASE -> VERIFIED AVAILABILITY -> VERIFIED RESERVATION REQUEST -> LIVE PMS GRID -> SITE INTEGRATION`
 
-Не подтверждено:
-
-- restaurant;
-- menu;
-- cart;
-- orders;
-- room service;
-- kitchen;
-- KDS;
-- tables;
-- waiters;
-- dining hall;
-- order/payment/delivery state separation.
+Immediate blockers before public production use:
+- successful CI/runtime verification;
+- authentication/RBAC;
+- final payment/prepayment amount rule;
+- production payment flow;
+- cancellation/refund/no-show rules;
+- final site-to-Core integration;
+- production deployment/security/backup/observability evidence.
 
 ---
 
-# 26. COMMAND CENTER
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- operational dashboard;
-- occupancy overview;
-- arrivals/departures;
-- alerts;
-- room readiness;
-- guest requests;
-- task aggregation;
-- management indicators.
-
----
-
-# 27. AI ADMINISTRATOR
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- AI Administrator;
-- LLM integration;
-- AI Operations Administrator;
-- AI Sales & Concierge;
-- tool calling;
-- permission enforcement;
-- Human Confirmation;
-- AI audit;
-- retrieval;
-- conversation context;
-- omnichannel AI.
-
-Наличие `03_AI_ADMIN.md` является Target Knowledge, а не implementation evidence.
-
----
-
-# 28. OMNICHANNEL
-
-Status:
-
-UNKNOWN
-
-Не подтверждены working integrations:
-
-Web:
-UNKNOWN
-
-Telegram:
-UNKNOWN
-
-WhatsApp:
-UNKNOWN
-
-Instagram:
-UNKNOWN
-
-Любая integration требует evidence.
-
----
-
-# 29. INTEGRATIONS
-
-Status:
-
-UNKNOWN
-
-Не подтверждены:
-
-- OTA;
-- Channel Manager;
-- payments;
-- email;
-- messaging;
-- telephony;
-- accounting;
-- fiscal;
-- locks;
-- IoT;
-- POS/KDS;
-- automation.
-
-PLANNED INTEGRATION ≠ WORKING INTEGRATION.
-
----
-
-# 30. API
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- API existence;
-- API style;
-- endpoints;
-- authentication;
-- authorization;
-- validation;
-- versioning;
-- idempotency;
-- rate limiting;
-- documentation.
-
----
-
-# 31. DATA INTEGRITY
-
-Status:
-
-UNKNOWN
-
-Не подтверждена защита от:
-
-- double booking;
-- lost updates;
-- concurrent reservation conflicts;
-- duplicate webhook processing;
-- duplicate AI actions;
-- duplicate payments;
-- duplicate orders;
-- inconsistent inventory;
-- broken historical data.
-
----
-
-# 32. AUDIT
-
-Status:
-
-UNKNOWN
-
-Не подтверждено наличие audit trail для:
-
-WHO
-
-WHEN
-
-TENANT
-
-PROPERTY
-
-ACTION
-
-RESOURCE
-
-BEFORE
-
-AFTER
-
-SOURCE
-
-RESULT
-
----
-
-# 33. SECURITY
-
-Status:
-
-UNKNOWN
-
-Не подтверждены:
-
-- tenant isolation;
-- property isolation;
-- RBAC;
-- resource authorization;
-- least privilege;
-- input validation;
-- secret management;
-- rate limiting;
-- session security;
-- webhook verification;
-- privacy controls;
-- backup/recovery.
-
-Нельзя объявлять систему secure без проверки.
-
----
-
-# 34. TESTING
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- unit tests;
-- integration tests;
-- end-to-end tests;
-- permission tests;
-- tenant isolation tests;
-- data integrity tests;
-- security tests;
-- AI tool tests;
-- build success;
-- test execution success.
-
-TEST FILE EXISTS ≠ TEST PASSED.
-
----
-
-# 35. DEPLOYMENT / OPERATIONS
-
-Status:
-
-UNKNOWN
-
-Не подтверждено:
-
-- deployment architecture;
-- environments;
-- CI/CD;
-- backups;
-- monitoring;
-- logging;
-- health checks;
-- error tracking;
-- rollback;
-- disaster recovery.
-
----
-
-# 36. VERIFIED CAPABILITIES
-
-Current count:
-
-0
-
-Reason:
-
-No real project evidence has yet been audited.
-
-Это НЕ означает, что capabilities не существуют.
-
-Это означает только:
-
-THEY HAVE NOT BEEN VERIFIED.
-
----
-
-# 37. IMPLEMENTED BUT NOT VERIFIED
-
-Current entries:
-
-NONE ESTABLISHED
-
-Не добавлять сюда capability без evidence существования implementation.
-
----
-
-# 38. PARTIAL CAPABILITIES
-
-Current entries:
-
-NONE ESTABLISHED
-
----
-
-# 39. BROKEN CAPABILITIES
-
-Current entries:
-
-NONE ESTABLISHED
-
-Не считать capability BROKEN без evidence существования и failed verification.
-
----
-
-# 40. KNOWN GAPS
-
-Status: UNKNOWN
-Qualifier: NOT YET ESTABLISHED
-
-Reason:
-
-GAP требует сравнения:
-
-TARGET
-−
-VERIFIED CURRENT STATE.
-
-Поскольку Current State ещё не установлен, полный Gap Analysis преждевременен.
-
----
-
-# 41. CURRENT BLOCKERS
-
-## BLOCKER CS-001
-
-TITLE:
-REAL PROJECT EVIDENCE NOT AVAILABLE
-
-STATUS:
-BLOCKED
-
-IMPACT:
-
-Current State Audit cannot establish implementation truth.
-
-REQUIRED:
-
-Real Resort OS project evidence.
-
----
-
-# 42. AUDIT PROCEDURE WHEN PROJECT BECOMES AVAILABLE
-
-После получения проекта:
-
-1. Establish available access.
-2. Inventory files/repositories.
-3. Identify technology stack.
-4. Identify runtime/deployment evidence.
-5. Inspect database/schema/migrations.
-6. Map actual domain modules.
-7. Inspect authentication.
-8. Inspect authorization/RBAC.
-9. Inspect tenant/property isolation.
-10. Inspect Reservations.
-11. Inspect Guest/Stay.
-12. Inspect Inventory/Availability.
-13. Inspect Pricing.
-14. Inspect Finance/Payments.
-15. Inspect Operations.
-16. Inspect Guest Portal.
-17. Inspect F&B if present.
-18. Inspect Integrations.
-19. Inspect AI capabilities.
-20. Inspect tests.
-21. Execute permitted verification.
-22. Record evidence.
-23. Classify capabilities.
-24. Update this document.
-25. Only then perform Gap Analysis.
-
----
-
-# 43. CURRENT STATE UPDATE RULE
-
-Every Current State update must be based on new evidence.
-
-Allowed transition examples:
-
-UNKNOWN
-→ IMPLEMENTED
-
-UNKNOWN
-→ VERIFIED
-
-UNKNOWN
-→ PARTIAL
-
-UNKNOWN
-→ BROKEN
-
-BLOCKED
-→ VERIFIED FACT
-
-IMPLEMENTED
-→ VERIFIED
-
-IMPLEMENTED
-→ BROKEN
-
-PARTIAL
-→ IMPLEMENTED
-→ VERIFIED
-
-Status changes require evidence.
-
----
-
-# 44. NO ASSUMPTION RULE
-
-Never infer Current State from:
-
-Product Bible;
-
-Business Rules;
-
-Target Architecture;
-
-AI Architecture;
-
-Backlog;
-
-marketing copy;
-
-future plans;
-
-screenshots without sufficient technical context;
-
-file names alone;
-
-comments alone;
-
-test names alone.
-
-Current State requires direct evidence appropriate to the claim.
-
----
-
-# 45. RELATION TO GAP ANALYSIS
-
-After Current State is established:
-
-00_PRODUCT_BIBLE.md
-+
-01_DOMAIN_BUSINESS_RULES.md
-+
-02_SYSTEM_ARCHITECTURE.md
-+
-03_AI_ADMIN.md
-=
-TARGET
-
-04_CURRENT_STATE.md
-=
-REALITY
-
-TARGET
-−
-REALITY
-=
-GAP
-
-05_DECISIONS_AND_BACKLOG.md
-=
-DECISIONS + PRIORITIES + NEXT ACTIONS
-
----
-
-# 46. VERSIONING
-
-Current Version:
-
-0.1
-
-Qualifier: EMPTY EVIDENCE BASELINE
-
-The document exists structurally, but real implementation facts have not yet been established.
-
-After the first complete evidence-based audit, increment the version and replace UNKNOWN/BLOCKED sections with verified findings where possible.
-
-Do not remove unresolved UNKNOWN areas merely to make the document look complete.
-
----
-
-# FINAL CURRENT STATE PRINCIPLE
-
-CURRENT STATE IS EVIDENCE, NOT INTENTION.
-
-DO NOT INVENT IMPLEMENTATION.
-
-DO NOT COPY TARGET INTO CURRENT.
-
-DO NOT ASSUME CODE EXISTS.
-
-DO NOT ASSUME TESTS PASS.
-
-DO NOT ASSUME INTEGRATIONS WORK.
-
-DO NOT ASSUME SECURITY EXISTS.
-
-DO NOT ASSUME AI EXISTS.
-
-UNKNOWN IS A VALID ANSWER.
-
-BLOCKED IS A VALID ANSWER.
-
-IMPLEMENTED REQUIRES EVIDENCE.
-
-VERIFIED REQUIRES TESTING / VERIFICATION EVIDENCE.
-
-The purpose of this document is not to make Resort OS look complete.
-
-Its purpose is to tell the truth about what actually exists.
+# 14. TRUTH SUMMARY
+
+IMPLEMENTED IN SOURCE:
+- Core data model;
+- rate/inventory seed path;
+- double-booking DB constraint definition;
+- availability API source;
+- reservation-request API source;
+- PMS grid API source;
+- CI definition.
+
+PARTIAL:
+- public site V5;
+- PMS UI prototype;
+- property data baseline.
+
+NOT YET VERIFIED:
+- database boot;
+- seed execution;
+- API runtime;
+- endpoint behavior;
+- double-booking constraint under runtime concurrency.
+
+NOT YET IMPLEMENTED / UNKNOWN:
+- auth/RBAC;
+- confirmed payment workflow;
+- staff apps;
+- communications integrations;
+- AI automation;
+- dining/store/QR/access/billiards/LED operational modules.
