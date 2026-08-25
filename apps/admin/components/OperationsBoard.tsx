@@ -13,10 +13,12 @@ type Task = {
   room_id?: string | null;
   room_code?: string | null;
   room_state?: string | null;
+  assigned_to_id?: string | null;
   assigned_to_name?: string | null;
   created_at: string;
 };
 type Room = { id: string; code: string; room_type_name: string; operational_state: string };
+type StaffAssignee = { id: string; display_name: string; role: string; active: boolean };
 type HistoryItem = {
   id: string;
   actor_type: string;
@@ -31,7 +33,7 @@ type HistoryItem = {
 
 const typeLabel: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
 const statusLabel: Record<string, string> = { OPEN: "Открыта", IN_PROGRESS: "В работе", IN_INSPECTION: "Проверка", DONE: "Готово", CANCELLED: "Отменена" };
-const actionLabel: Record<string, string> = { CREATE: "Создана", CLAIM: "Взята в работу", STATUS_CHANGE: "Изменён статус", VOICE_MAINTENANCE_INTAKE: "Создана голосом" };
+const actionLabel: Record<string, string> = { CREATE: "Создана", CLAIM: "Взята в работу", ASSIGN: "Назначен сотрудник", UNASSIGN: "Снято назначение", STATUS_CHANGE: "Изменён статус", VOICE_MAINTENANCE_INTAKE: "Создана голосом" };
 
 function dateTime(value: string) {
   const date = new Date(value);
@@ -42,12 +44,14 @@ function dateTime(value: string) {
 export default function OperationsBoard({ user }: { user: User }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [staff, setStaff] = useState<StaffAssignee[]>([]);
   const [filter, setFilter] = useState("ACTIVE");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
   const [taskType, setTaskType] = useState(user.role === "TECHNICIAN" ? "MAINTENANCE" : "HOUSEKEEPING");
   const [roomId, setRoomId] = useState("");
   const [title, setTitle] = useState("");
@@ -55,6 +59,8 @@ export default function OperationsBoard({ user }: { user: User }) {
   const [historyTaskId, setHistoryTaskId] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  const isManager = ["OWNER", "MANAGER"].includes(user.role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,14 +71,21 @@ export default function OperationsBoard({ user }: { user: User }) {
       const taskData = await taskResponse.json();
       setTasks(taskData.items || []);
 
-      if (["OWNER", "MANAGER"].includes(user.role)) {
+      if (isManager) {
         const today = new Date();
         const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
         const iso = (d: Date) => d.toISOString().slice(0, 10);
-        const gridResponse = await fetch(`/core/api/v1/pms/grid?start=${iso(today)}&end=${iso(tomorrow)}`, { cache: "no-store" });
+        const [gridResponse, staffResponse] = await Promise.all([
+          fetch(`/core/api/v1/pms/grid?start=${iso(today)}&end=${iso(tomorrow)}`, { cache: "no-store" }),
+          fetch("/core/api/v1/admin/staff/overview", { cache: "no-store" }),
+        ]);
         if (gridResponse.ok) {
           const grid = await gridResponse.json();
           setRooms((grid.rooms || []).map((r: any) => ({ id: r.id, code: r.code, room_type_name: r.room_type_name, operational_state: r.operational_state })));
+        }
+        if (staffResponse.ok) {
+          const staffData = await staffResponse.json();
+          setStaff((staffData.staff || []).filter((item: StaffAssignee) => item.active));
         }
       }
     } catch (e) {
@@ -80,7 +93,7 @@ export default function OperationsBoard({ user }: { user: User }) {
     } finally {
       setLoading(false);
     }
-  }, [user.role]);
+  }, [isManager]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -104,6 +117,11 @@ export default function OperationsBoard({ user }: { user: User }) {
     });
   }, [tasks, filter, typeFilter, query]);
 
+  function eligibleStaff(task: Task) {
+    const expected = task.type === "HOUSEKEEPING" ? "MAID" : task.type === "MAINTENANCE" ? "TECHNICIAN" : null;
+    return expected ? staff.filter((item) => item.role === expected) : [];
+  }
+
   async function updateStatus(task: Task, status: string) {
     setError(null);
     try {
@@ -118,6 +136,27 @@ export default function OperationsBoard({ user }: { user: User }) {
       if (historyTaskId === task.id) await loadHistory(task.id, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка обновления");
+    }
+  }
+
+  async function assignTask(task: Task, assignedToId: string) {
+    if (!isManager || !["HOUSEKEEPING", "MAINTENANCE"].includes(task.type)) return;
+    setAssigningTaskId(task.id);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/ops/tasks/${task.id}/assignee`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assigned_to_id: assignedToId || null }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось назначить сотрудника");
+      await load();
+      if (historyTaskId === task.id) await loadHistory(task.id, true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка назначения");
+    } finally {
+      setAssigningTaskId(null);
     }
   }
 
@@ -167,7 +206,7 @@ export default function OperationsBoard({ user }: { user: User }) {
   }
 
   const canCreate = ["OWNER", "MANAGER", "MAID", "TECHNICIAN"].includes(user.role);
-  const canSeeHistory = ["OWNER", "MANAGER"].includes(user.role);
+  const canSeeHistory = isManager;
 
   return (
     <main className="work-shell">
@@ -195,9 +234,9 @@ export default function OperationsBoard({ user }: { user: User }) {
         <select value={taskType} onChange={(e) => setTaskType(e.target.value)} disabled={user.role === "MAID" || user.role === "TECHNICIAN"}>
           {user.role !== "TECHNICIAN" && <option value="HOUSEKEEPING">Уборка</option>}
           {user.role !== "MAID" && <option value="MAINTENANCE">Ремонт</option>}
-          {["OWNER", "MANAGER"].includes(user.role) && <option value="GUEST_REQUEST">Запрос гостя</option>}
+          {isManager && <option value="GUEST_REQUEST">Запрос гостя</option>}
         </select>
-        {["OWNER", "MANAGER"].includes(user.role) ? <select value={roomId} onChange={(e) => setRoomId(e.target.value)}><option value="">Без номера</option>{rooms.map((room) => <option key={room.id} value={room.id}>{room.code} · {room.room_type_name} · {room.operational_state}</option>)}</select> : <input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="ID номера (из Telegram/PWA)" />}
+        {isManager ? <select value={roomId} onChange={(e) => setRoomId(e.target.value)}><option value="">Без номера</option>{rooms.map((room) => <option key={room.id} value={room.id}>{room.code} · {room.room_type_name} · {room.operational_state}</option>)}</select> : <input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="ID номера (из Telegram/PWA)" />}
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Что нужно сделать" required minLength={2} />
         <select value={priority} onChange={(e) => setPriority(e.target.value)}><option value="NORMAL">Обычный</option><option value="HIGH">Высокий</option><option value="URGENT">Срочно</option><option value="LOW">Низкий</option></select>
         <button className="btn primary" disabled={creating}>{creating ? "Создаю…" : "Создать задачу"}</button>
@@ -210,12 +249,21 @@ export default function OperationsBoard({ user }: { user: User }) {
           <p>{task.room_code ? `Номер ${task.room_code}` : "Без привязки к номеру"}{task.room_state ? ` · ${task.room_state}` : ""}</p>
           <p>{task.assigned_to_name ? `Ответственный: ${task.assigned_to_name}` : "Ответственный не назначен"} · создана {dateTime(task.created_at)}</p>
           {task.description && <p>{task.description}</p>}
+
+          {isManager && ["HOUSEKEEPING", "MAINTENANCE"].includes(task.type) && !["DONE", "CANCELLED"].includes(task.status) && <label className="task-assignee-control">
+            <span>Ответственный</span>
+            <select value={task.assigned_to_id || ""} disabled={assigningTaskId === task.id} onChange={(e) => assignTask(task, e.target.value)}>
+              <option value="">Не назначен</option>
+              {eligibleStaff(task).map((employee) => <option value={employee.id} key={employee.id}>{employee.display_name}</option>)}
+            </select>
+          </label>}
+
           <div className="task-actions">
             {task.status === "OPEN" && <button className="btn" onClick={() => updateStatus(task, "IN_PROGRESS")}>Взять в работу</button>}
             {task.type === "HOUSEKEEPING" && task.status === "IN_PROGRESS" && <button className="btn primary" onClick={() => updateStatus(task, "IN_INSPECTION")}>Уборка закончена → проверка</button>}
-            {task.type === "HOUSEKEEPING" && task.status === "IN_INSPECTION" && ["OWNER", "MANAGER"].includes(user.role) && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Принять номер → CLEAN</button>}
+            {task.type === "HOUSEKEEPING" && task.status === "IN_INSPECTION" && isManager && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Принять номер → CLEAN</button>}
             {task.type === "MAINTENANCE" && task.status === "IN_PROGRESS" && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Ремонт завершён</button>}
-            {task.type === "GUEST_REQUEST" && task.status === "IN_PROGRESS" && ["OWNER", "MANAGER"].includes(user.role) && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Выполнено</button>}
+            {task.type === "GUEST_REQUEST" && task.status === "IN_PROGRESS" && isManager && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Выполнено</button>}
             {canSeeHistory && <button className="btn" type="button" onClick={() => loadHistory(task.id)}>{historyTaskId === task.id ? "Скрыть историю" : "История"}</button>}
           </div>
           {canSeeHistory && historyTaskId === task.id && <div className="task-history">
