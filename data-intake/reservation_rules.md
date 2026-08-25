@@ -1,34 +1,45 @@
 # THREE CROWNS — RESERVATION RULES INPUT
 
 Updated: 2026-08-25
-Status: EVIDENCE-BACKED INTAKE / NOT YET FULLY OWNER-CONFIRMED
+Status: OWNER-CORRECTED EVIDENCE INTAKE / NOT YET COMPLETE
 
-Этот файл содержит только правила, для которых найдено evidence. Неизвестное остаётся `UNKNOWN`.
+Этот файл содержит только правила, для которых найдено evidence или получено прямое подтверждение владельца/проекта. Неизвестное остаётся `UNKNOWN`.
 
-Source priority used for this update:
+Source priority:
 
-1. owner-provided / project-provided 2026 materials;
-2. official `3korony.com` and official 2026 PDF;
-3. multiple current booking/listing sources for cross-check;
-4. third-party reviews only as operational signals, never as business-rule authority.
+1. direct owner / project confirmation;
+2. owner-provided / project-provided 2026 materials;
+3. official `3korony.com` and official 2026 PDF, unless explicitly identified as stale;
+4. current booking/listing sources for cross-check only;
+5. third-party reviews only as operational signals, never as business-rule authority.
 
 ---
 
-## 1. Human Confirmation
+## 1. Reservation validity / Human Confirmation
 
-Кто имеет право окончательно подтвердить бронь:
+Canonical product rule:
 
-`MANAGER / RESERVATION ADMINISTRATOR` — official website states that a room is considered booked when the guest has booking confirmation from the hotel manager.
+`RESERVATION REQUEST != CONFIRMED RESERVATION`.
 
-Что обязательно проверяет сотрудник перед подтверждением:
+Final reservation requires Human Confirmation.
 
-`UNKNOWN` — exact checklist not published.
+Direct owner/project correction on 2026-08-25:
 
-Evidence-backed lifecycle interpretation for design:
+`WITHOUT PREPAYMENT THE BOOKING IS NOT VALID.`
 
-`RESERVATION REQUEST -> AVAILABILITY / PRICE CHECK -> MANAGER APPROVAL -> AWAITING PREPAYMENT -> GUARANTEED RESERVATION`
+Therefore an unpaid request / intent MUST NOT be represented to the guest or staff as a valid confirmed booking.
 
-The distinction between manager-confirmed but non-guaranteed and guaranteed reservation should be preserved in the data model.
+Working lifecycle for design:
+
+`RESERVATION REQUEST -> AVAILABILITY / PRICE CHECK -> MANAGER APPROVAL -> PAYMENT REQUIRED -> PREPAYMENT CONFIRMED -> VALID / GUARANTEED RESERVATION`
+
+Exact ordering details may be refined after all owner answers are received, but the invariant is already confirmed:
+
+`NO PREPAYMENT -> NO VALID BOOKING`.
+
+Whether an unpaid request temporarily blocks inventory before payment:
+
+`UNKNOWN / OWNER ANSWER REQUIRED`.
 
 ---
 
@@ -36,35 +47,59 @@ The distinction between manager-confirmed but non-guaranteed and guaranteed rese
 
 Требуется ли предоплата:
 
-`YES` for guaranteed booking.
+`YES` — OWNER/PROJECT CONFIRMED 2026-08-25.
 
-Размер:
+Critical rule:
 
-`FIRST NIGHT / FIRST DAY OF STAY` according to the current official website.
+`WITHOUT PREPAYMENT THE BOOKING IS NOT VALID.`
+
+Размер / формула предоплаты:
+
+`UNKNOWN / OWNER ANSWER REQUIRED`.
+
+Do NOT currently hard-code:
+
+- `30%` from an earlier project concept;
+- `first night` from stale official website text.
+
+The current official website contains outdated reservation information and MUST NOT be used as authority for the unpaid-booking timer or prepayment formula until revalidated.
 
 Срок оплаты:
 
-Official wording: if prepayment is absent, preliminary booking is removed after `2 days`.
+`UNKNOWN / OWNER ANSWER REQUIRED`.
 
-Exact timestamp from which the 2-day period starts:
+Что происходит до оплаты:
 
-`CONFIRM` — likely preliminary booking creation/manager approval, but not explicitly defined.
+The request may exist as a lead / reservation request, but it is NOT a valid confirmed booking.
 
-Что происходит, если срок истёк:
+Whether inventory is held during that period:
 
-`PRELIMINARY BOOKING IS REMOVED` according to the official website.
-
-### CRITICAL CONFLICT
-
-Earlier project concept used `30% prepayment`.
-
-Current official business information states `prepayment for the first night`.
-
-For implementation, **30% MUST NOT be hard-coded** until the owner explicitly changes the current hotel rule.
+`UNKNOWN / OWNER ANSWER REQUIRED`.
 
 ---
 
-## 3. Cancellation
+## 3. STALE WEBSITE RULE — REJECTED FOR IMPLEMENTATION
+
+Old website wording:
+
+- preliminary booking is removed after 2 days without prepayment;
+- guaranteed booking requires prepayment for the first night.
+
+Owner/project correction on 2026-08-25:
+
+`THE WEBSITE INFORMATION IS OLD.`
+
+Implementation status:
+
+- `2 unpaid days` rule: **DO NOT IMPLEMENT**;
+- timer start question: **REMOVED FROM ACTIVE REQUIREMENTS**;
+- `first night` prepayment formula: **DO NOT IMPLEMENT UNTIL OWNER CONFIRMS CURRENT FORMULA**.
+
+Historical website wording may be retained only as stale-source evidence, not as a business rule.
+
+---
+
+## 4. Cancellation
 
 Правило отмены:
 
@@ -76,7 +111,7 @@ For implementation, **30% MUST NOT be hard-coded** until the owner explicitly ch
 
 ---
 
-## 4. No-show
+## 5. No-show
 
 Как обрабатывается незаезд:
 
@@ -84,27 +119,27 @@ For implementation, **30% MUST NOT be hard-coded** until the owner explicitly ch
 
 ---
 
-## 5. Check-in / Check-out
+## 6. Check-in / Check-out
 
 Check-in: `14:00` — supported by earlier project rule and multiple current booking sources.
 
 Check-out: `12:00` — supported by earlier project rule and multiple current booking sources.
 
-Conflict: Google Hotels currently displays `11:00` checkout, while Skyscanner / Alean / Putevka and project baseline show `12:00`.
+Conflict: Google Hotels currently displays `11:00` checkout, while other project/current sources show `12:00`.
 
 Implementation status: `USE 14:00 / 12:00 AS PROVISIONAL HOTEL RULE; OWNER CONFIRM BEFORE GO-LIVE`.
 
 Early check-in:
 
-`UNKNOWN / BY REQUEST` appears on third-party sources, but exact charging rule is not established.
+`UNKNOWN`.
 
 Late check-out:
 
-`UNKNOWN / BY REQUEST` appears on third-party sources, but exact charging rule is not established.
+`UNKNOWN`.
 
 ---
 
-## 6. Children / Extra Guests
+## 7. Children / Extra Guests
 
 Owner-provided 2026 price sheet states:
 
@@ -113,23 +148,21 @@ Owner-provided 2026 price sheet states:
 - charge wording: child from `4 years`, adult from `13 years` according to tariffs;
 - additional linen/service is included in that extra-person tariff.
 
-Therefore the working age interpretation is:
+Working age interpretation:
 
 - child tariff: age `4-12`;
 - adult tariff: age `13+`.
 
-Status: `HIGH-CONFIDENCE FROM DIRECT 2026 MATERIAL, BUT CONFIRM EXACT AGE BOUNDARY / UNDER-4 RULE`.
-
-A third-party source uses a different child age wording (`до 11 лет`), so the direct 2026 price sheet must take priority until owner clarification.
+Status: `HIGH-CONFIDENCE FROM DIRECT 2026 MATERIAL, BUT CONFIRM UNDER-4 RULE`.
 
 ---
 
-## 7. Meals
+## 8. Meals
 
 Room-price meal inclusion:
 
-- `1 Jun - 15 Sep`: breakfast included;
-- `16 Sep - 31 May`: official website/PDF states prices are without breakfast.
+- `1 Jun - 15 Sep`: breakfast included according to 2026 price materials;
+- off-season meal inclusion requires final owner confirmation before production if website information is stale.
 
 Additional meal tariffs from 2026 materials:
 
@@ -151,7 +184,7 @@ Exact dining entitlement/check-in mechanism:
 
 ---
 
-## 8. Payment Methods
+## 9. Payment Methods
 
 Owner-provided 2026 price sheet states hotel accepts:
 
@@ -161,11 +194,7 @@ Owner-provided 2026 price sheet states hotel accepts:
 - cash;
 - bank transfer.
 
-Official website also mentions an older `Elsom` wallet flow.
-
-Current implementation rule:
-
-`USE OWNER-PROVIDED 2026 PAYMENT LIST AS PRIMARY BUSINESS INPUT; ELSOM STATUS = CONFIRM / POSSIBLY STALE WEBSITE CONTENT`.
+Older website payment information must be treated as potentially stale until revalidated.
 
 Exact acquiring providers / QR provider / bank requisites / fiscal flow:
 
@@ -173,7 +202,7 @@ Exact acquiring providers / QR provider / bank requisites / fiscal flow:
 
 ---
 
-## 9. Booking Sources
+## 10. Booking Sources
 
 Observed public contact/booking surfaces:
 
@@ -181,11 +210,7 @@ Observed public contact/booking surfaces:
 - reservation phone;
 - WhatsApp;
 - Telegram;
-- third-party hotel/travel listings including Booking, Yandex Travel, Google Hotels and tour operators.
-
-Important current observation:
-
-Booking.com listing exists, but a recent crawl states the property cannot currently be booked there.
+- third-party hotel/travel listings and tour operators.
 
 Which channels are actually managed as active sales sources today:
 
@@ -197,12 +222,7 @@ Instagram account / exact active handle:
 
 ---
 
-## 10. Discounts / Manual Price Changes
-
-Official website states discounts may be provided:
-
-- to travel agencies depending on number of rooms and duration, with prepayment;
-- to collective / group / corporate arrivals depending on room quantity and stay duration.
+## 11. Discounts / Manual Price Changes
 
 Exact percentage / approval authority / minimum volume:
 
@@ -218,7 +238,7 @@ Required audit reason for manual discount:
 
 ---
 
-## 11. Room Assignment
+## 12. Room Assignment
 
 Бронируется конкретный номер или только категория до заселения:
 
@@ -232,25 +252,29 @@ The current spreadsheet evidence operates at specific-room level, but this does 
 
 ---
 
-## 12. Overbooking
+## 13. Overbooking
 
 Допускается ли overbooking:
 
 `UNKNOWN`.
 
-Default safety rule remains:
+Default safety rule:
 
 `DO NOT ALLOW OVERBOOKING unless explicitly approved by the owner`.
 
 ---
 
-## 13. Immediate Owner Confirmations Still Required
+## 14. Immediate Owner Answers Still Needed
 
-Only the following reservation questions remain critical before production booking logic:
+The former question about `2 unpaid days` is CLOSED and removed because the website rule is stale.
 
-1. Is the guaranteed-booking prepayment definitely **first night**, replacing the old 30% concept?
-2. Is check-out definitely **12:00**?
-3. Are ages `4-12 child / 13+ adult` correct, and what is the rule for children under 4?
-4. Are 2 unpaid days counted from request creation or from manager approval?
-5. What are cancellation/refund/no-show rules?
-6. Is booking held by category first or by a specific room number?
+Remaining booking facts to resolve from the owner's answers include:
+
+1. Current prepayment amount / formula.
+2. Whether an unpaid request blocks inventory at all, and if yes, for how long / under whose action.
+3. Final check-out time.
+4. Cancellation / refund / no-show rules.
+5. Category-first vs specific-room booking policy.
+6. Children under 4 rule.
+
+Do not reintroduce the stale 2-day timer unless the owner explicitly establishes a new current rule.
