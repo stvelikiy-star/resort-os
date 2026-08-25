@@ -48,6 +48,18 @@ type RequestItem = {
   reservation?: { booking_number: string; status: string } | null;
 };
 
+type OutboundCapabilities = {
+  telegram: {
+    channel_code: string;
+    inbound_configured: boolean;
+    outbound_configured: boolean;
+    max_text_length: number;
+  };
+  whatsapp: { configured: boolean };
+  instagram: { configured: boolean };
+  truth: string;
+};
+
 const statusLabels: Record<string, string> = {
   OPEN: "Открыт",
   WAITING_GUEST: "Ждём гостя",
@@ -91,6 +103,10 @@ export default function InboxBoard() {
   const [noteBusy, setNoteBusy] = useState(false);
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [linkRequestId, setLinkRequestId] = useState("");
+  const [capabilities, setCapabilities] = useState<OutboundCapabilities | null>(null);
+  const [reply, setReply] = useState("");
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendInfo, setSendInfo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,7 +126,18 @@ export default function InboxBoard() {
     }
   }, [filter]);
 
+  const loadCapabilities = useCallback(async () => {
+    try {
+      const response = await fetch("/core/api/v1/admin/inbox/outbound-capabilities", { cache: "no-store" });
+      if (!response.ok) return;
+      setCapabilities(await response.json());
+    } catch {
+      // Capability absence keeps send controls safely disabled.
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadCapabilities(); }, [loadCapabilities]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -125,9 +152,17 @@ export default function InboxBoard() {
     ].some((value) => value?.toLowerCase().includes(q)));
   }, [items, query]);
 
+  const telegramReplyEnabled = Boolean(
+    detail
+    && detail.conversation.channel_kind === "TELEGRAM"
+    && capabilities?.telegram.outbound_configured
+    && detail.conversation.channel_code === capabilities.telegram.channel_code
+  );
+
   async function openConversation(id: string) {
     setDetailBusy(true);
     setError(null);
+    setSendInfo(null);
     try {
       const [detailResponse, requestResponse] = await Promise.all([
         fetch(`/core/api/v1/admin/inbox/conversations/${id}`, { cache: "no-store" }),
@@ -225,10 +260,44 @@ export default function InboxBoard() {
     }
   }
 
+  async function sendReply(event: FormEvent) {
+    event.preventDefault();
+    if (!detail || !telegramReplyEnabled || !reply.trim()) return;
+    setSendBusy(true);
+    setError(null);
+    setSendInfo(null);
+    const key = `pms-${crypto.randomUUID()}`;
+    try {
+      const response = await fetch(`/core/api/v1/admin/inbox/conversations/${detail.conversation.id}/send-text`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": key,
+        },
+        body: JSON.stringify({ text: reply.trim() }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const statusText = body.delivery_status ? `Статус доставки: ${body.delivery_status}. ` : "";
+        throw new Error(`${statusText}${body.provider_description || body.detail || "Telegram не подтвердил отправку"}`);
+      }
+      setReply("");
+      setSendInfo(body.delivery_status === "SENT" ? "Telegram подтвердил отправку." : `Статус: ${body.delivery_status}`);
+      await openConversation(detail.conversation.id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка отправки");
+      await openConversation(detail.conversation.id);
+      await load();
+    } finally {
+      setSendBusy(false);
+    }
+  }
+
   return <main className="work-shell inbox-shell">
     <div className="work-head">
-      <div><p className="eyebrow">Коммуникации</p><h1>Единый Inbox</h1><p className="subtitle">Контроль входящих диалогов и времени ожидания. Внешняя отправка появится только после подключения реальных каналов.</p></div>
-      <button className="btn" onClick={load}>Обновить</button>
+      <div><p className="eyebrow">Коммуникации</p><h1>Единый Inbox</h1><p className="subtitle">Входящие, фактическое время ожидания и реальные статусы доставки. Канал считается отвеченным только после подтверждения провайдера.</p></div>
+      <button className="btn" onClick={() => { load(); loadCapabilities(); }}>Обновить</button>
     </div>
 
     <div className="inbox-controls">
@@ -276,12 +345,16 @@ export default function InboxBoard() {
           </article>)}
         </div>
 
+        {telegramReplyEnabled ? <form className="outbound-reply-form" onSubmit={sendReply}>
+          <label><span>Ответ в Telegram</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={4096} placeholder="Напишите ответ гостю…" /></label>
+          <div><small>Только подтверждённый Telegram статус SENT считается ответом клиенту.</small><button className="btn primary" disabled={sendBusy || !reply.trim()}>{sendBusy ? "Отправляю…" : "Отправить в Telegram"}</button></div>
+          {sendInfo && <p className="send-info">{sendInfo}</p>}
+        </form> : <div className="inbox-send-disabled"><strong>Исходящая отправка для этого канала не активирована</strong><span>{detail.conversation.channel_kind === "TELEGRAM" ? "Telegram adapter подготовлен, но реальный TELEGRAM_SALES_BOT_TOKEN ещё не задан." : "WhatsApp / Instagram будут включены только после подключения их реальных provider-адаптеров."}</span></div>}
+
         <form className="internal-note-form" onSubmit={addNote}>
           <label><span>Внутренняя заметка — клиент её не получает</span><textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} maxLength={12000} placeholder="Например: уточнить даты у гостя после звонка" /></label>
           <button className="btn" disabled={noteBusy || !note.trim()}>{noteBusy ? "Сохраняю…" : "Добавить заметку"}</button>
         </form>
-
-        <div className="inbox-send-disabled"><strong>Исходящая отправка не активирована</strong><span>Ответ клиенту будет доступен только после реального подключения и проверки Telegram / WhatsApp / Instagram адаптера. Сейчас система не имитирует доставку.</span></div>
       </section>
     </div>}
   </main>;
