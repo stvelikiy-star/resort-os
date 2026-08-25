@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import DashboardBoard from "./DashboardBoard";
+import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGrid";
 import ReceptionBoard from "./ReceptionBoard";
@@ -15,7 +16,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "OPS";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "INBOX" | "OPS";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -84,7 +85,7 @@ export default function AdminShell() {
         <form className="login-card" onSubmit={login}>
           <p className="eyebrow">Три Короны · Resort OS</p>
           <h1>Вход в управление</h1>
-          <p className="login-copy">Шахматка, бронирования и операционные данные доступны только сотрудникам.</p>
+          <p className="login-copy">Шахматка, бронирования, сообщения и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
           <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></label>
           {error && <div className="login-error">{error}</div>}
@@ -105,6 +106,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
+          {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
@@ -113,6 +115,7 @@ export default function AdminShell() {
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
+      {tab === "INBOX" && isManager && <InboxBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
     </>
   );
