@@ -9,6 +9,28 @@ router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-deta
 manager_access = require_roles("OWNER", "MANAGER")
 
 
+def _select_working_room(status: str, schedule, local_today):
+    if not schedule:
+        return None
+    if status == "CHECKED_IN":
+        active = next(
+            (row for row in schedule if row["startDate"] <= local_today < row["endDate"]),
+            None,
+        )
+        if active:
+            return active
+        checkout_boundary = next(
+            (row for row in reversed(schedule) if row["endDate"] == local_today),
+            None,
+        )
+        if checkout_boundary:
+            return checkout_boundary
+        return schedule[-1]
+    if status == "CHECKED_OUT":
+        return schedule[-1]
+    return schedule[0]
+
+
 @router.get("/reservations/{reservation_id}")
 async def reservation_detail(
     reservation_id: uuid.UUID,
@@ -16,33 +38,51 @@ async def reservation_detail(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", user["property_code"])
-        if not pid:
+        prop = await conn.fetchrow(
+            "SELECT id,timezone FROM properties WHERE code=$1",
+            user["property_code"],
+        )
+        if not prop:
             raise HTTPException(status_code=503, detail="Property not loaded")
+        pid = prop["id"]
+        local_today = await conn.fetchval(
+            "SELECT (now() AT TIME ZONE $1)::date",
+            prop["timezone"],
+        )
 
         row = await conn.fetchrow(
             '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
                    r.adults,r.children,r."totalKgs",r.notes,r."createdAt",r."updatedAt",
                    g.id AS guest_id,g."firstName",g."lastName",g.phone,g.email,
-                   rr.id AS request_id,rr.source AS request_source,rr."guestName" AS request_guest_name,
-                   room.id AS room_id,room.code AS room_code,room."operationalState"::text AS room_state,
-                   rt.code AS room_type_code,rt.name AS room_type_name,rt."areaLabel" AS room_type_area
+                   rr.id AS request_id,rr.source AS request_source,rr."guestName" AS request_guest_name
             FROM reservations r
             LEFT JOIN guests g ON g.id=r."primaryGuestId"
             LEFT JOIN reservation_requests rr ON rr.id=r."requestId"
-            LEFT JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib.active=true AND ib."blockType"='RESERVATION'
-            LEFT JOIN rooms room ON room.id=ib."roomId"
-            LEFT JOIN room_types rt ON rt.id=room."roomTypeId"
             WHERE r.id=$1 AND r."propertyId"=$2
-            ORDER BY ib."createdAt" ASC
-            LIMIT 1
             ''',
             reservation_id,
             pid,
         )
         if not row:
             raise HTTPException(status_code=404, detail="Reservation not found")
+
+        schedule = await conn.fetch(
+            '''
+            SELECT ib.id,ib."roomId",ib."startDate",ib."endDate",
+                   room.code AS room_code,room."operationalState"::text AS room_state,
+                   rt.code AS room_type_code,rt.name AS room_type_name,rt."areaLabel" AS room_type_area
+            FROM inventory_blocks ib
+            JOIN rooms room ON room.id=ib."roomId"
+            JOIN room_types rt ON rt.id=room."roomTypeId"
+            WHERE ib."reservationId"=$1
+              AND ib.active=true
+              AND ib."blockType"='RESERVATION'
+            ORDER BY ib."startDate",ib."endDate",room.code
+            ''',
+            reservation_id,
+        )
+        working_room = _select_working_room(row["status"], schedule, local_today)
 
         payments = await conn.fetch(
             '''
@@ -63,34 +103,39 @@ async def reservation_detail(
 
         audit = await conn.fetch(
             '''
-            SELECT id,"actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
+            SELECT id,"actorType","actorId",action,resource,"resourceId",source,result,
+                   "beforeJson","afterJson","createdAt"
             FROM audit_logs
             WHERE "propertyId"=$1 AND "resourceId"=ANY($2::text[])
             ORDER BY "createdAt" DESC
-            LIMIT 80
+            LIMIT 100
             ''',
             pid,
             audit_ids,
         )
 
+        room_ids = sorted({item["roomId"] for item in schedule}, key=str)
         room_tasks = []
-        if row["room_id"]:
+        if room_ids:
             room_tasks = await conn.fetch(
                 '''
-                SELECT t.id,t.type::text AS type,t.status::text AS status,t.priority::text AS priority,
+                SELECT t.id,t."roomId",room.code AS room_code,
+                       t.type::text AS type,t.status::text AS status,t.priority::text AS priority,
                        t.title,t.description,t."createdAt",t."updatedAt",t."completedAt",
                        u."displayName" AS assigned_to_name
                 FROM operational_tasks t
+                JOIN rooms room ON room.id=t."roomId"
                 LEFT JOIN staff_users u ON u.id=t."assignedToId"
-                WHERE t."propertyId"=$1 AND t."roomId"=$2
+                WHERE t."propertyId"=$1 AND t."roomId"=ANY($2::uuid[])
                 ORDER BY t."createdAt" DESC
-                LIMIT 30
+                LIMIT 80
                 ''',
                 pid,
-                row["room_id"],
+                room_ids,
             )
 
     return {
+        "local_date": local_today,
         "reservation": {
             "id": str(row["id"]),
             "booking_number": row["bookingNumber"],
@@ -116,14 +161,31 @@ async def reservation_detail(
             "channel": row["request_source"],
             "original_guest_name": row["request_guest_name"],
         },
-        "room": {
-            "id": str(row["room_id"]) if row["room_id"] else None,
-            "code": row["room_code"],
-            "state": row["room_state"],
-            "room_type_code": row["room_type_code"],
-            "room_type_name": row["room_type_name"],
-            "area": row["room_type_area"],
+        "room": None if not working_room else {
+            "id": str(working_room["roomId"]),
+            "code": working_room["room_code"],
+            "state": working_room["room_state"],
+            "room_type_code": working_room["room_type_code"],
+            "room_type_name": working_room["room_type_name"],
+            "area": working_room["room_type_area"],
+            "segment_start": working_room["startDate"],
+            "segment_end": working_room["endDate"],
         },
+        "schedule": [
+            {
+                "inventory_block_id": str(item["id"]),
+                "room_id": str(item["roomId"]),
+                "room_code": item["room_code"],
+                "room_state": item["room_state"],
+                "room_type_code": item["room_type_code"],
+                "room_type_name": item["room_type_name"],
+                "area": item["room_type_area"],
+                "start": item["startDate"],
+                "end": item["endDate"],
+                "is_working_room": bool(working_room and item["id"] == working_room["id"]),
+            }
+            for item in schedule
+        ],
         "finance": {
             "total_kgs": int(row["totalKgs"]),
             "paid_kgs": total_paid,
@@ -145,6 +207,8 @@ async def reservation_detail(
         "room_tasks": [
             {
                 "id": str(t["id"]),
+                "room_id": str(t["roomId"]),
+                "room_code": t["room_code"],
                 "type": t["type"],
                 "status": t["status"],
                 "priority": t["priority"],
@@ -167,6 +231,7 @@ async def reservation_detail(
                 "resource_id": a["resourceId"],
                 "source": a["source"],
                 "result": a["result"],
+                "before": a["beforeJson"],
                 "after": a["afterJson"],
                 "created_at": a["createdAt"],
             }
