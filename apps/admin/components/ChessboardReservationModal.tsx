@@ -83,6 +83,8 @@ export default function ChessboardReservationModal({
   onUpdated,
   initialMode,
   initialTargetRoomId,
+  initialCheckIn,
+  initialCheckOut,
 }: {
   reservationId: string;
   rooms: RoomOption[];
@@ -90,6 +92,8 @@ export default function ChessboardReservationModal({
   onUpdated: () => void;
   initialMode?: ChessboardMode;
   initialTargetRoomId?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
 }) {
   const [data, setData] = useState<ScheduleResponse | null>(null);
   const [mode, setMode] = useState<ChessboardMode>(initialMode || "MOVE");
@@ -103,6 +107,10 @@ export default function ChessboardReservationModal({
   const [error, setError] = useState<string | null>(null);
   const autoPreviewDone = useRef(false);
 
+  useEffect(() => {
+    autoPreviewDone.current = false;
+  }, [reservationId, initialMode, initialTargetRoomId, initialCheckIn, initialCheckOut]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -111,11 +119,12 @@ export default function ChessboardReservationModal({
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(normalizeError(body, "Не удалось загрузить бронь"));
       const payload = body as ScheduleResponse;
-      const resolvedMode: ChessboardMode = payload.reservation.status === "CHECKED_IN" && (initialMode || "MOVE") === "MOVE" ? "RELOCATE" : (initialMode || "MOVE");
+      const requestedMode = initialMode || "MOVE";
+      const resolvedMode: ChessboardMode = payload.reservation.status === "CHECKED_IN" && requestedMode === "MOVE" ? "RELOCATE" : requestedMode;
       setData(payload);
       setMode(resolvedMode);
-      setNewCheckIn(payload.reservation.check_in);
-      setNewCheckOut(payload.reservation.check_out);
+      setNewCheckIn(initialCheckIn || payload.reservation.check_in);
+      setNewCheckOut(initialCheckOut || payload.reservation.check_out);
       setEffectiveDate(payload.local_today > payload.reservation.check_in ? payload.local_today : payload.reservation.check_in);
       setTargetRoomId(initialTargetRoomId || payload.schedule[0]?.room_id || "");
       setPreview(null);
@@ -124,7 +133,7 @@ export default function ChessboardReservationModal({
     } finally {
       setLoading(false);
     }
-  }, [reservationId, initialMode, initialTargetRoomId]);
+  }, [reservationId, initialMode, initialTargetRoomId, initialCheckIn, initialCheckOut]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -199,14 +208,23 @@ export default function ChessboardReservationModal({
   }
 
   useEffect(() => {
-    if (!data || !initialTargetRoomId || autoPreviewDone.current) return;
-    if (data.reservation.status !== "GUARANTEED") return;
-    autoPreviewDone.current = true;
-    const segments = proposedSchedule("MOVE", initialTargetRoomId).map(({ room_id, start, end }) => ({ room_id, start, end }));
-    if (segments.length) void requestPreview(segments);
-    // The initial drag target intentionally triggers one preview only.
+    if (!data || autoPreviewDone.current) return;
+
+    if (initialTargetRoomId && data.reservation.status === "GUARANTEED") {
+      autoPreviewDone.current = true;
+      const segments = proposedSchedule("MOVE", initialTargetRoomId).map(({ room_id, start, end }) => ({ room_id, start, end }));
+      if (segments.length) void requestPreview(segments);
+      return;
+    }
+
+    if ((initialCheckIn || initialCheckOut) && mode === "DATES") {
+      autoPreviewDone.current = true;
+      const segments = proposedSchedule("DATES").map(({ room_id, start, end }) => ({ room_id, start, end }));
+      if (segments.length) void requestPreview(segments);
+    }
+    // Initial drag/drop and edge-resize gestures intentionally trigger one server preview only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, initialTargetRoomId]);
+  }, [data, initialTargetRoomId, initialCheckIn, initialCheckOut, mode, newCheckIn, newCheckOut]);
 
   async function commit() {
     if (!preview) return;
