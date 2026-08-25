@@ -3,12 +3,14 @@ import "./globals.css";
 import "./auth.css";
 import "./nfc.css";
 import "./finance.css";
+import "./hotel-finance.css";
 import "./dashboard.css";
 import "./reception.css";
 import "./inbox.css";
 import "./staff.css";
 import "./room-detail.css";
 import "./chessboard.css";
+import "./chessboard-payment.css";
 import "./chessboard-v2.css";
 
 export const metadata: Metadata = {
