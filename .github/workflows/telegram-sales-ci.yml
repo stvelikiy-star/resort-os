@@ -1,0 +1,197 @@
+name: Telegram Sales CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  telegram-sales:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      PREPAYMENT_PERCENT: 30
+      AUTOMATION_SERVICE_KEY: CI-TELEGRAM-AUTOMATION-KEY
+      AUTOMATION_SERVICE_NAME: ci-automation
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
+      TELEGRAM_SALES_BOT_TOKEN: CI-BOT-TOKEN
+      TELEGRAM_SALES_WEBHOOK_SECRET: CI_TELEGRAM_SECRET_2026
+      TELEGRAM_SALES_CHANNEL_CODE: TELEGRAM_SALES
+      TELEGRAM_SALES_DISPLAY_NAME: Telegram Sales
+      TELEGRAM_SALES_ACCOUNT_ID: ci-sales-bot
+      TELEGRAM_BOT_API_BASE_URL: http://127.0.0.1:18080
+      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: 0.2
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate and create database schema
+        working-directory: packages/database
+        run: |
+          npm install
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile API and test helpers
+        run: python -m compileall services/api/app scripts
+
+      - name: Apply constraints and seed
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start isolated Telegram mock
+        run: |
+          python scripts/mock_telegram_bot_api.py > /tmp/mock-telegram.log 2>&1 &
+          echo $! > /tmp/mock-telegram.pid
+          sleep 1
+
+      - name: Start Core API
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/telegram-api.log 2>&1 &
+          echo $! > /tmp/telegram-api.pid
+          sleep 3
+          curl --fail http://127.0.0.1:8000/ready > /tmp/ready.json
+
+      - name: Reject webhook without Telegram secret
+        run: |
+          CODE=$(curl -sS -o /tmp/tg-no-secret.json -w '%{http_code}' -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
+            -H 'Content-Type: application/json' \
+            -d '{"update_id":5000,"message":{"message_id":100,"date":1787600000,"chat":{"id":700100,"type":"private"},"from":{"id":700100,"is_bot":false,"first_name":"Guest"},"text":"Здравствуйте"}}')
+          test "$CODE" = "401"
+
+      - name: Ingest private Telegram message and prove webhook idempotency
+        run: |
+          cat > /tmp/tg-inbound.json <<'JSON'
+          {"update_id":5001,"message":{"message_id":101,"date":1787600000,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest","username":"tg_ci_guest"},"text":"Нужен номер на двоих"}}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_TELEGRAM_SECRET_2026' \
+            --data-binary @/tmp/tg-inbound.json > /tmp/tg-first.json
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_TELEGRAM_SECRET_2026' \
+            --data-binary @/tmp/tg-inbound.json > /tmp/tg-replay.json
+          python - <<'PY'
+          import json
+          first=json.load(open('/tmp/tg-first.json'))
+          replay=json.load(open('/tmp/tg-replay.json'))
+          assert first['accepted'] is True and first['ignored'] is False
+          assert first['channel_code']=='TELEGRAM_SALES'
+          assert replay['idempotent_replay'] is True
+          open('/tmp/tg-conversation-id','w').write(first['conversation_id'])
+          PY
+
+      - name: Ignore non-private Telegram traffic
+        run: |
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_TELEGRAM_SECRET_2026' \
+            -d '{"update_id":5009,"message":{"message_id":109,"date":1787600000,"chat":{"id":-10099,"type":"supergroup"},"from":{"id":700199,"is_bot":false,"first_name":"Group"},"text":"group chatter"}}' > /tmp/tg-group.json
+          python -c 'import json; d=json.load(open("/tmp/tg-group.json")); assert d["ignored"] is True and d["reason"] == "non_private_chat"'
+
+      - name: Login manager and verify channel capabilities
+        run: |
+          curl --fail -sS -c /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/owner-login.json
+          curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/inbox/outbound-capabilities > /tmp/tg-capabilities.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/tg-capabilities.json'))
+          assert d['telegram']['inbound_configured'] is True
+          assert d['telegram']['outbound_configured'] is True
+          assert d['whatsapp']['configured'] is False
+          assert d['instagram']['configured'] is False
+          PY
+
+      - name: Send Telegram reply and prove local dispatch idempotency
+        run: |
+          CID=$(cat /tmp/tg-conversation-id)
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/send-text" \
+            -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-tg-outbound-success-001' \
+            -d '{"text":"Здравствуйте. Уточните даты заезда и выезда."}' > /tmp/tg-send-success.json
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/send-text" \
+            -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-tg-outbound-success-001' \
+            -d '{"text":"Здравствуйте. Уточните даты заезда и выезда."}' > /tmp/tg-send-replay.json
+          python - <<'PY'
+          import json
+          first=json.load(open('/tmp/tg-send-success.json'))
+          replay=json.load(open('/tmp/tg-send-replay.json'))
+          assert first['delivery_status']=='SENT' and first['counts_as_response'] is True
+          assert replay['idempotent_replay'] is True and replay['delivery_status']=='SENT'
+          assert open('/tmp/mock-telegram-send-count').read().strip()=='1'
+          PY
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID" > /tmp/tg-after-send.json
+          python -c 'import json; d=json.load(open("/tmp/tg-after-send.json")); assert d["conversation"]["needs_reply"] is False; assert any(m["delivery_status"]=="SENT" for m in d["messages"] if m["direction"]=="OUTBOUND")'
+
+      - name: Prove provider FAILED does not clear needs-reply
+        run: |
+          cat > /tmp/tg-second-inbound.json <<'JSON'
+          {"update_id":5002,"message":{"message_id":102,"date":1787600100,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest"},"text":"Еще вопрос"}}
+          JSON
+          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
+            -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_TELEGRAM_SECRET_2026' --data-binary @/tmp/tg-second-inbound.json > /tmp/tg-second.json
+          CID=$(cat /tmp/tg-conversation-id)
+          CODE=$(curl -sS -o /tmp/tg-failed.json -w '%{http_code}' -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/send-text" \
+            -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-tg-outbound-failed-001' -d '{"text":"[FAIL] provider rejection"}')
+          test "$CODE" = "502"
+          python -c 'import json; assert json.load(open("/tmp/tg-failed.json"))["delivery_status"] == "FAILED"'
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID" > /tmp/tg-after-fail.json
+          python -c 'import json; d=json.load(open("/tmp/tg-after-fail.json")); assert d["conversation"]["needs_reply"] is True; assert any(m["delivery_status"]=="FAILED" for m in d["messages"] if m["direction"]=="OUTBOUND")'
+
+      - name: Prove transport UNKNOWN is not automatically resent
+        run: |
+          CID=$(cat /tmp/tg-conversation-id)
+          CODE=$(curl -sS -o /tmp/tg-unknown.json -w '%{http_code}' -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/send-text" \
+            -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-tg-outbound-unknown-001' -d '{"text":"[SLOW] uncertain transport"}')
+          test "$CODE" = "502"
+          python -c 'import json; assert json.load(open("/tmp/tg-unknown.json"))["delivery_status"] == "UNKNOWN"'
+          COUNT=$(cat /tmp/mock-telegram-send-count)
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/inbox/conversations/$CID/send-text" \
+            -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-tg-outbound-unknown-001' -d '{"text":"[SLOW] uncertain transport"}' > /tmp/tg-unknown-replay.json
+          test "$(cat /tmp/mock-telegram-send-count)" = "$COUNT"
+          python -c 'import json; d=json.load(open("/tmp/tg-unknown-replay.json")); assert d["idempotent_replay"] is True and d["delivery_status"] == "UNKNOWN"'
+
+      - name: Typecheck and build PMS Inbox
+        working-directory: apps/admin
+        run: |
+          npm install
+          npm run typecheck
+          npm run build
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          cat /tmp/telegram-api.log || true
+          cat /tmp/mock-telegram.log || true
