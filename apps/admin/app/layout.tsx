@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./auth.css";
+import "./admin-nav-polish.css";
 import "./nfc.css";
 import "./finance.css";
 import "./hotel-finance.css";
