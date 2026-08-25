@@ -96,7 +96,9 @@ async def _reservation(conn, reservation_id: uuid.UUID, property_id: uuid.UUID, 
 
 
 async def _current_blocks(conn, reservation_id: uuid.UUID, lock: bool = False):
-    suffix = " FOR UPDATE" if lock else ""
+    # Lock only inventory rows here. Room rows are locked separately in one
+    # deterministic ORDER BY room.code,room.id to reduce cross-reservation deadlocks.
+    suffix = " FOR UPDATE OF ib" if lock else ""
     return await conn.fetch(
         f'''
         SELECT ib.id,ib."roomId",ib."startDate",ib."endDate",room.code,
