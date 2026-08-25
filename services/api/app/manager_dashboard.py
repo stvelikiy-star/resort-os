@@ -79,6 +79,25 @@ async def manager_dashboard(
             pid,
         )
 
+        communication_counts = await conn.fetchrow(
+            '''
+            SELECT
+              count(*) FILTER (WHERE status NOT IN ('RESOLVED','ARCHIVED'))::int AS active,
+              count(*) FILTER (
+                WHERE "lastInboundAt" IS NOT NULL
+                  AND ("lastOutboundAt" IS NULL OR "lastInboundAt">"lastOutboundAt")
+                  AND status NOT IN ('RESOLVED','ARCHIVED')
+              )::int AS needs_reply,
+              COALESCE(EXTRACT(EPOCH FROM (now()-MIN("lastInboundAt") FILTER (
+                WHERE "lastInboundAt" IS NOT NULL
+                  AND ("lastOutboundAt" IS NULL OR "lastInboundAt">"lastOutboundAt")
+                  AND status NOT IN ('RESOLVED','ARCHIVED')
+              ))),0)::bigint AS oldest_waiting_seconds
+            FROM conversations WHERE "propertyId"=$1
+            ''',
+            pid,
+        )
+
         payment_today = await conn.fetchval(
             '''
             SELECT COALESCE(sum(p."amountKgs"),0)::bigint
@@ -202,6 +221,12 @@ async def manager_dashboard(
         },
         "requests": dict(request_counts),
         "tasks": dict(task_counts),
+        "communications": {
+            "active": int(communication_counts["active"] or 0),
+            "needs_reply": int(communication_counts["needs_reply"] or 0),
+            "oldest_waiting_seconds": int(communication_counts["oldest_waiting_seconds"] or 0),
+            "sla_rule": None,
+        },
         "finance": {
             "confirmed_payments_today_kgs": int(payment_today or 0),
             "active_reservations_total_kgs": int(active_balance["booked_total_kgs"] or 0),
