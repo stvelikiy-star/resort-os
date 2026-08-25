@@ -77,10 +77,23 @@ type ReservationDetail = {
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const TASK_ACTIVE = new Set(["OPEN", "IN_PROGRESS", "IN_INSPECTION"]);
 
+function makeIdempotencyKey(reservationId: string) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `pms-reservation-payment-${reservationId}-${random}`;
+}
+
 export default function ReservationQuickFacts({ reservationId, refreshKey }: { reservationId: string; refreshKey?: string }) {
   const [detail, setDetail] = useState<ReservationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentRef, setPaymentRef] = useState("");
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,17 +109,59 @@ export default function ReservationQuickFacts({ reservationId, refreshKey }: { r
       .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "Ошибка карточки брони"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [reservationId, refreshKey]);
+  }, [reservationId, refreshKey, reloadToken]);
 
   const activeTasks = useMemo(() => (detail?.room_tasks || []).filter((task) => TASK_ACTIVE.has(task.status)), [detail]);
   const latestAudit = useMemo(() => (detail?.audit || []).slice(0, 8), [detail]);
   const latestPayments = useMemo(() => [...(detail?.finance.payments || [])].reverse().slice(0, 4), [detail]);
+
+  async function recordPayment() {
+    const amount = Number(paymentAmount.replace(/\s/g, ""));
+    const method = paymentMethod.trim();
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPaymentError("Введите фактически полученную положительную сумму.");
+      return;
+    }
+    if (method.length < 2) {
+      setPaymentError("Укажите способ, которым менеджер фактически получил оплату.");
+      return;
+    }
+
+    setPaymentBusy(true);
+    setPaymentError(null);
+    setPaymentSuccess(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/booking/reservations/${reservationId}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount_kgs: Math.trunc(amount),
+          method,
+          external_ref: paymentRef.trim() || null,
+          idempotency_key: makeIdempotencyKey(reservationId),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось записать оплату");
+      setPaymentSuccess(`Записано ${money(Math.trunc(amount))}`);
+      setPaymentAmount("");
+      setPaymentMethod("");
+      setPaymentRef("");
+      setShowPaymentForm(false);
+      setReloadToken((value) => value + 1);
+    } catch (cause) {
+      setPaymentError(cause instanceof Error ? cause.message : "Ошибка записи оплаты");
+    } finally {
+      setPaymentBusy(false);
+    }
+  }
 
   if (loading && !detail) return <section className="chess-quick-facts"><div className="detail-muted">Загружаю гостя, платежи и задачи…</div></section>;
   if (error && !detail) return <section className="chess-quick-facts"><div className="detail-muted">{error}</div></section>;
   if (!detail) return null;
 
   const guestName = [detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Гость";
+  const overpaid = Math.max(detail.finance.paid_kgs - detail.finance.total_kgs, 0);
 
   return <section className="chess-quick-facts">
     <div className="chess-quick-contact">
@@ -114,15 +169,29 @@ export default function ReservationQuickFacts({ reservationId, refreshKey }: { r
       <div className="chess-contact-actions">
         {detail.guest.phone && <a className="btn" href={`tel:${detail.guest.phone}`}>Позвонить · {detail.guest.phone}</a>}
         {detail.guest.email && <a className="btn" href={`mailto:${detail.guest.email}`}>Email</a>}
+        <button className="btn" onClick={() => { setShowPaymentForm((value) => !value); setPaymentError(null); setPaymentSuccess(null); }}>Записать оплату</button>
       </div>
     </div>
 
     <div className="chess-finance-strip">
       <div><span>Стоимость</span><strong>{money(detail.finance.total_kgs)}</strong></div>
       <div><span>Подтверждено</span><strong>{money(detail.finance.paid_kgs)}</strong></div>
-      <div><span>Остаток</span><strong>{money(detail.finance.remaining_kgs)}</strong></div>
+      <div><span>{overpaid > 0 ? "Переплата" : "Остаток"}</span><strong>{money(overpaid > 0 ? overpaid : detail.finance.remaining_kgs)}</strong></div>
       <div><span>Активные задачи</span><strong>{activeTasks.length}</strong></div>
     </div>
+
+    {showPaymentForm && <div className="chess-payment-form">
+      <div className="chess-payment-form-head"><div><strong>Фиксация внутренней оплаты</strong><span>Только факт денег, уже принятых менеджером. Resort OS не выбирает сумму и условия.</span></div><button className="btn" onClick={() => setShowPaymentForm(false)}>Закрыть</button></div>
+      <div className="chess-payment-fields">
+        <label><span>Получено, сом</span><input inputMode="numeric" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="Например 5000" /></label>
+        <label><span>Способ</span><input value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} placeholder="Фактический способ оплаты" /></label>
+        <label><span>Номер операции / комментарий</span><input value={paymentRef} onChange={(event) => setPaymentRef(event.target.value)} placeholder="Необязательно" /></label>
+        <button className="btn primary" disabled={paymentBusy} onClick={recordPayment}>{paymentBusy ? "Записываю…" : "Записать факт оплаты"}</button>
+      </div>
+      {paymentError && <div className="error-box compact">{paymentError}</div>}
+    </div>}
+
+    {paymentSuccess && <div className="chess-payment-success">{paymentSuccess}</div>}
 
     <div className="chess-facts-columns">
       <details open={activeTasks.length > 0}>
