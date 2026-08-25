@@ -74,6 +74,37 @@ async def check_out(
                 ''',
                 reservation_id,
             )
+
+            nfc_wallet = await conn.fetchrow(
+                '''SELECT id,"balanceKgs",status::text AS status FROM nfc_wallets
+                   WHERE "reservationId"=$1 AND "propertyId"=$2 FOR UPDATE''',
+                reservation_id, pid,
+            )
+            nfc_frozen = False
+            nfc_balance_kgs = None
+            if nfc_wallet:
+                nfc_balance_kgs = nfc_wallet["balanceKgs"]
+                if nfc_wallet["status"] == "ACTIVE":
+                    await conn.execute(
+                        '''UPDATE nfc_wallets SET status='BLOCKED',"updatedAt"=now() WHERE id=$1''',
+                        nfc_wallet["id"],
+                    )
+                    await conn.execute(
+                        '''UPDATE nfc_bracelets SET status='BLOCKED',"updatedAt"=now()
+                           WHERE "walletId"=$1 AND status='ACTIVE'::"NfcBraceletStatus"''',
+                        nfc_wallet["id"],
+                    )
+                    nfc_frozen = True
+                    await conn.execute(
+                        '''
+                        INSERT INTO audit_logs (
+                          id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
+                        ) VALUES ($1,$2,'STAFF',$3,'FREEZE_NFC_ON_CHECK_OUT','NfcWallet',$4,'PMS','SUCCESS',
+                          jsonb_build_object('status','BLOCKED','balance_kgs',$5::int,'reason','CHECK_OUT'),now())
+                        ''',
+                        uuid.uuid4(), pid, user["id"], str(nfc_wallet["id"]), nfc_balance_kgs,
+                    )
+
             await conn.execute(
                 '''UPDATE reservations SET status='CHECKED_OUT', "updatedAt"=now() WHERE id=$1''',
                 reservation_id,
@@ -107,8 +138,9 @@ async def check_out(
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES ($1,$2,'STAFF',$3,'CHECK_OUT','Reservation',$4,'PMS','SUCCESS',
-                     jsonb_build_object('housekeeping_task_id',$5::text),now())''',
+                     jsonb_build_object('housekeeping_task_id',$5::text,'nfc_frozen',$6::boolean,'nfc_balance_kgs',$7::int),now())''',
                 uuid.uuid4(), pid, user["id"], str(reservation_id), str(housekeeping_task_id) if housekeeping_task_id else None,
+                nfc_frozen, nfc_balance_kgs,
             )
     return {
         "reservation_id": str(reservation_id),
@@ -116,4 +148,6 @@ async def check_out(
         "room_code": room["code"] if room else None,
         "room_state": "DIRTY" if room else None,
         "housekeeping_task_id": str(housekeeping_task_id) if housekeeping_task_id else None,
+        "nfc_frozen": nfc_frozen,
+        "nfc_balance_kgs": nfc_balance_kgs,
     }
