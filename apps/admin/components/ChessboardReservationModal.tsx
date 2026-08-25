@@ -72,6 +72,8 @@ function normalizeError(body: any, fallback: string) {
   if (["ROOM_CONFLICT", "ROOM_CONFLICT_RACE"].includes(body?.detail?.code)) return "Выбранный номер уже занят в части этого периода. Исходная бронь не изменена.";
   if (body?.detail?.code === "PAST_ROOM_HISTORY_IMMUTABLE") return "Нельзя переписать уже прожитые ночи. Используйте переселение с текущей даты.";
   if (body?.detail?.code === "TARGET_ROOM_TECH_BLOCK") return "Целевой номер находится в техническом блоке.";
+  if (body?.detail?.code === "TARGET_ROOM_NOT_READY") return `Номер ${body.detail.room_code || ""} ещё не готов к переселению.`.trim();
+  if (body?.detail?.code === "CHECK_IN_ROOM_NOT_READY") return `Номер ${body.detail.room_code || ""} не готов к заселению (${body.detail.room_state || "статус неизвестен"}).`.trim();
   if (body?.detail?.code === "CURRENT_SCHEDULE_NOT_CONTIGUOUS" || body?.detail?.code === "CURRENT_SCHEDULE_RANGE_MISMATCH") return "У этой брони нарушен текущий график размещения. Сначала требуется проверка менеджером.";
   return fallback;
 }
@@ -138,6 +140,7 @@ export default function ChessboardReservationModal({
   useEffect(() => { void load(); }, [load]);
 
   const currentRoomIds = useMemo(() => new Set((data?.schedule || []).map((x) => x.room_id)), [data]);
+  const hasInitialPlacementDates = Boolean(initialCheckIn || initialCheckOut);
 
   function proposedSchedule(currentMode = mode, roomId = targetRoomId): ScheduleSegment[] {
     if (!data || data.schedule.length === 0) return [];
@@ -145,6 +148,9 @@ export default function ChessboardReservationModal({
 
     if (currentMode === "MOVE") {
       if (!roomId) return [];
+      if (source.length === 1 && newCheckIn && newCheckOut && newCheckOut > newCheckIn) {
+        return [{ ...source[0], room_id: roomId, start: newCheckIn, end: newCheckOut }];
+      }
       return source.map((item) => ({ ...item, room_id: roomId }));
     }
 
@@ -303,9 +309,12 @@ export default function ChessboardReservationModal({
             </nav>
 
             <div className="chess-mutation-form">
-              {mode === "MOVE" && <label><span>Новый номер</span><select value={targetRoomId} onChange={(e) => { setTargetRoomId(e.target.value); setPreview(null); }}>
-                {rooms.map((room) => <option key={room.id} value={room.id} disabled={room.operational_state === "TECH_BLOCK"}>{room.code} · {room.room_type_name}{room.operational_state === "TECH_BLOCK" ? " · ремонт" : currentRoomIds.has(room.id) ? " · сейчас" : ""}</option>)}
-              </select></label>}
+              {mode === "MOVE" && <div className="chess-move-fields">
+                <label><span>Новый номер</span><select value={targetRoomId} onChange={(e) => { setTargetRoomId(e.target.value); setPreview(null); }}>
+                  {rooms.map((room) => <option key={room.id} value={room.id} disabled={room.operational_state === "TECH_BLOCK"}>{room.code} · {room.room_type_name}{room.operational_state === "TECH_BLOCK" ? " · ремонт" : currentRoomIds.has(room.id) ? " · сейчас" : ""}</option>)}
+                </select></label>
+                {hasInitialPlacementDates && <div className="chess-placement-note"><span>Новая позиция</span><strong>{newCheckIn} → {newCheckOut}</strong><small>Длительность сохранена при перетаскивании.</small></div>}
+              </div>}
 
               {mode === "DATES" && <div className="chess-date-grid">
                 <label><span>Заезд</span><input type="date" value={newCheckIn} disabled={data.reservation.status === "CHECKED_IN"} onChange={(e) => { setNewCheckIn(e.target.value); setPreview(null); }} /></label>
