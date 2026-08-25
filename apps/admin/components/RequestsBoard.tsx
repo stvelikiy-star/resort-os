@@ -101,12 +101,14 @@ export default function RequestsBoard() {
   }
 
   async function confirmPayment(item: RequestItem) {
-    if (!item.required_prepayment_kgs) return;
-    const amountText = window.prompt("Подтверждённая сумма оплаты, сом", String(item.required_prepayment_kgs));
+    const amountText = window.prompt("Сумма предоплаты, которую менеджер фактически получил, сом", "");
     if (!amountText) return;
     const amount = Number(amountText.replace(/\s/g, ""));
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    const externalRef = window.prompt("Номер операции / комментарий банка", "manual-") || `manual-${Date.now()}`;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Укажите фактически полученную положительную сумму.");
+      return;
+    }
+    const externalRef = window.prompt("Номер операции / комментарий", "manual-") || `manual-${Date.now()}`;
     setBusy(item.id);
     setError(null);
     try {
@@ -115,14 +117,14 @@ export default function RequestsBoard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount_kgs: amount,
-          method: "MANUAL_BANK_CONFIRMATION",
-          provider: "MANUAL",
+          method: "MANAGER_MANUAL_CONFIRMATION",
+          provider: "MANAGER_MANUAL",
           external_ref: externalRef,
           idempotency_key: `pms-${item.id}-${externalRef}`,
         }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось подтвердить оплату");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось подтвердить оплату");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка подтверждения оплаты");
@@ -134,8 +136,22 @@ export default function RequestsBoard() {
   return (
     <main className="work-shell">
       <div className="work-head">
-        <div><p className="eyebrow">Продажи · бронирование</p><h1>Заявки гостей</h1><p className="subtitle">Заявка становится бронью только после подтверждённой предоплаты.</p></div>
-        <div className="work-actions"><select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="ACTIVE">Активные</option><option value="NEW">Новые</option><option value="AWAITING_PREPAYMENT">Ждут предоплату</option><option value="CONVERTED">Забронированы</option><option value="ALL">Все</option></select><button className="btn" onClick={load}>Обновить</button></div>
+        <div>
+          <p className="eyebrow">Продажи · бронирование</p>
+          <h1>Заявки гостей</h1>
+          <p className="subtitle">n8n/сайт доводят клиента до заявки. Размер и способ предоплаты определяет менеджер вручную.</p>
+        </div>
+        <div className="work-actions">
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="ACTIVE">Активные</option>
+            <option value="NEW">Новые</option>
+            <option value="QUOTED">Рассчитанные</option>
+            <option value="AWAITING_PREPAYMENT">Старые: ждут предоплату</option>
+            <option value="CONVERTED">Забронированы</option>
+            <option value="ALL">Все</option>
+          </select>
+          <button className="btn" onClick={load}>Обновить</button>
+        </div>
       </div>
       {error && <div className="error-box">{error}</div>}
       {loading ? <div className="loading">Загрузка заявок…</div> : (
@@ -143,10 +159,23 @@ export default function RequestsBoard() {
           {visible.length === 0 && <div className="empty">Заявок в этом фильтре нет.</div>}
           {visible.map((item) => (
             <article className="request-card" key={item.id}>
-              <div className="request-main"><div><span className={`status-pill s-${item.status}`}>{item.status}</span><h3>{item.guest_name}</h3><a href={`tel:${item.phone}`}>{item.phone}</a></div><div className="request-dates"><b>{item.check_in} → {item.check_out}</b><span>{item.adults} взр. · {item.children} дет.</span></div></div>
-              <div className="request-money"><div><span>Категория</span><b>{item.room_type_name || "не выбрана"}</b></div><div><span>Итого</span><b>{fmt(item.quoted_total_kgs)}</b></div><div><span>Предоплата 30%</span><b>{fmt(item.required_prepayment_kgs)}</b></div>{item.reservation && <div><span>Бронь</span><b>{item.reservation.booking_number}</b></div>}</div>
-              {!item.reservation && <div className="request-actions"><button className="btn" disabled={busy === item.id} onClick={() => findOptions(item)}>Проверить варианты</button>{item.status === "AWAITING_PREPAYMENT" && <button className="btn primary" disabled={busy === item.id} onClick={() => confirmPayment(item)}>Подтвердить оплату → бронь</button>}</div>}
-              {options[item.id] && <div className="option-row">{options[item.id].length === 0 ? <span>Нет продаваемых вариантов.</span> : options[item.id].map((option) => <button key={option.room_type_code} onClick={() => quote(item, option.room_type_code)} disabled={busy === item.id}><b>{option.room_type_name}</b><span>{option.available_count} своб. · {fmt(option.pricing.total_kgs)}</span></button>)}</div>}
+              <div className="request-main">
+                <div><span className={`status-pill s-${item.status}`}>{item.status}</span><h3>{item.guest_name}</h3><a href={`tel:${item.phone}`}>{item.phone}</a></div>
+                <div className="request-dates"><b>{item.check_in} → {item.check_out}</b><span>{item.adults} взр. · {item.children} дет.</span></div>
+              </div>
+              <div className="request-money">
+                <div><span>Категория</span><b>{item.room_type_name || "не выбрана"}</b></div>
+                <div><span>Стоимость проживания</span><b>{fmt(item.quoted_total_kgs)}</b></div>
+                <div><span>Предоплата</span><b>{item.required_prepayment_kgs ? fmt(item.required_prepayment_kgs) : "решает менеджер"}</b></div>
+                {item.reservation && <div><span>Бронь</span><b>{item.reservation.booking_number}</b></div>}
+              </div>
+              {!item.reservation && <div className="request-actions">
+                <button className="btn" disabled={busy === item.id} onClick={() => findOptions(item)}>Проверить варианты</button>
+                {["QUOTED", "AWAITING_PREPAYMENT"].includes(item.status) && <button className="btn primary" disabled={busy === item.id} onClick={() => confirmPayment(item)}>Менеджер получил предоплату → создать бронь</button>}
+              </div>}
+              {options[item.id] && <div className="option-row">
+                {options[item.id].length === 0 ? <span>Нет продаваемых вариантов.</span> : options[item.id].map((option) => <button key={option.room_type_code} onClick={() => quote(item, option.room_type_code)} disabled={busy === item.id}><b>{option.room_type_name}</b><span>{option.available_count} своб. · {fmt(option.pricing.total_kgs)}</span></button>)}
+              </div>}
             </article>
           ))}
         </div>
