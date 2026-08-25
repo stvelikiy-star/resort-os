@@ -1,56 +1,109 @@
-# Resort OS
+# Resort OS — Three Crowns
 
-Universal Hospitality / Resort Operating System.
+Hospitality operating system for «Три Короны», Cholpon-Ata, Issyk-Kul.
 
-## Repository status
+## Current engineering state
 
-BOOTSTRAP BASELINE.
+Implementation has started. Do not confuse source existence with production readiness.
 
-This repository was created after source-discovery failed to locate a
-complete prior Guest House / Resort OS implementation.
+Current first milestone:
 
-The repository MUST NOT claim that a production PMS already exists.
+`84 real rooms -> seasonal rates -> availability -> reservation request -> paid reservation -> PMS grid`
 
-## Canonical Knowledge
+Canonical implementation truth is maintained in:
+`knowledge/04_CURRENT_STATE.md`.
 
-The `knowledge/` directory contains the six canonical Resort OS documents:
+Three Crowns property specification:
+`knowledge/06_THREE_CROWNS_MASTER_SPEC.md`.
 
-- 00_PRODUCT_BIBLE.md
-- 01_DOMAIN_BUSINESS_RULES.md
-- 02_SYSTEM_ARCHITECTURE.md
-- 03_AI_ADMIN.md
-- 04_CURRENT_STATE.md
-- 05_DECISIONS_AND_BACKLOG.md
+Evidence reconciliation:
+`docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md`.
 
-`04_CURRENT_STATE.md` is the only canonical owner of factual implementation
-reality.
+## Repository layout
 
-UNKNOWN / VALIDATE states must not be promoted without evidence.
+- `services/api/` — FastAPI Resort Core.
+- `packages/database/prisma/` — canonical PostgreSQL schema owner.
+- `packages/database/sql/` — critical PostgreSQL constraints not expressible in Prisma.
+- `scripts/` — database bootstrap / evidence-backed seed.
+- `data-intake/` — verified/qualified Three Crowns source inputs.
+- `recovery-artifacts/` — recovered prototypes/reference only.
+- `knowledge/` — canonical product/domain/current-state documents.
 
-## Recovery artifacts
+## Local Core startup
 
-`recovery-artifacts/` contains historical UI/code fragments recovered from
-local archives.
+Requirements:
+- Docker;
+- Node.js 22+;
+- Python 3.12+.
 
-Recovery artifacts are evidence/reference only.
+1. Start PostgreSQL:
 
-They are NOT automatically considered:
-- production code;
-- implemented functionality;
-- verified functionality;
-- approved architecture.
+```bash
+docker compose up -d postgres
+```
+
+2. Create a local env file:
+
+```bash
+cp .env.example .env
+set -a && source .env && set +a
+```
+
+3. Build the initial PostgreSQL schema with Prisma:
+
+```bash
+cd packages/database
+npm install
+npx prisma validate
+npx prisma db push
+cd ../..
+```
+
+4. Install API dependencies and apply critical DB constraints:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r services/api/requirements.txt
+python scripts/apply_core_constraints.py
+```
+
+5. Load the evidence-backed Three Crowns inventory/rates:
+
+```bash
+python scripts/seed_from_intake.py
+```
+
+The seed stops if the intake no longer reconciles to exactly 84 rooms and 12 room categories.
+
+6. Start Core API:
+
+```bash
+python -m uvicorn app.main:app --app-dir services/api --reload --port 8000
+```
+
+Useful endpoints:
+
+- `GET /health`
+- `GET /api/v1/booking/check-availability`
+- `POST /api/v1/booking/requests`
+- `GET /api/v1/pms/grid`
+- `/docs` — FastAPI OpenAPI UI in development.
+
+## Critical booking rule
+
+An unpaid customer request is **not an active reservation**.
+
+The legacy public-site rule that allowed a preliminary unpaid booking for two days is stale and must not be implemented.
+
+The exact required prepayment amount/provider is still a business decision and is intentionally not hard-coded in Core.
+
+## Site
+
+A V5 public-site visual skeleton exists separately as a recovered/deployed prototype. It is not yet considered the canonical source-backed public application in this repository. The next site step is to connect its booking UI to verified Core availability and reservation-request endpoints rather than preserve its previous demo-only booking behavior.
 
 ## Development rule
 
-KNOWLEDGE
-→ CURRENT STATE
-→ GAP
-→ PRIORITY
-→ IMPLEMENT
-→ TEST
-→ EVIDENCE
-→ VERIFIED / NOT VERIFIED
-→ CURRENT STATE UPDATE
+`KNOWLEDGE -> CURRENT STATE -> GAP -> PRIORITY -> IMPLEMENT -> TEST -> EVIDENCE -> VERIFIED / NOT VERIFIED -> CURRENT STATE UPDATE`
 
-No production deploy, payment activation, destructive DB operation, or
-irreversible production action without an explicit owner gate.
+No production payment activation, DNS cutover, destructive production DB action, or irreversible production change without an explicit owner gate.
