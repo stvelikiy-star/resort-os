@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 0.5
+Version: 0.6
 Date: 2026-08-25
-Status: ACTIVE DEVELOPMENT / LAST FULLY CONFIRMED CI BASELINE RECORDED
+Status: ACTIVE DEVELOPMENT / CURRENT MAIN PARTIALLY NOT CI-VERIFIED
 Canonical: YES
 Document Type: Evidence-Based Current System State
 
@@ -14,263 +14,233 @@ Critical rule: **TARGET ≠ CURRENT. IMPLEMENTED ≠ VERIFIED. DEVELOPMENT VERIF
 
 STATUS: VERIFIED FACT
 
-Repository:
-`stvelikiy-star/resort-os`
+Repository: `stvelikiy-star/resort-os`
 
-Canonical implementation contains:
+Canonical implementation currently contains:
 - PostgreSQL + Prisma domain schema;
-- critical PostgreSQL SQL invariants/functions;
 - FastAPI Resort Core;
-- real Three Crowns room/rate seed baseline;
+- Three Crowns room/rate seed baseline;
 - Next.js PMS/admin;
 - Next.js public booking site;
 - Next.js staff/Telegram-oriented PWA;
-- auth/RBAC;
+- authentication/RBAC;
 - reservation/payment management flow;
 - stays/check-in/check-out;
-- housekeeping/maintenance operational tasks;
+- housekeeping/maintenance tasks;
 - realtime PMS WebSocket;
 - guarded automation service API;
-- NFC wallet/beach payment subsystem;
-- recovery evidence and canonical knowledge.
+- provider-neutral Unified Inbox core;
+- owner/manager Command Center;
+- container/deployment scaffolding;
+- dormant NFC implementation retained as deferred code only.
 
-No DNS cutover, production payment activation or irreversible production migration is recorded here.
+No production DNS cutover, production payment activation or irreversible production migration is recorded.
 
 ---
 
-# 2. PROPERTY DATA
+# 2. ACTIVE EXECUTION PLAN
+
+STATUS: ACTIVE / CANONICAL
+
+Canonical plan: `knowledge/07_EXECUTION_PLAN_THREE_CROWNS.md`.
+
+NFC / wristband / internal-wallet work is **DEFERRED** and excluded from the active engineering queue until the owner explicitly reactivates it.
+
+Current active order:
+1. PMS daily management and reception visibility;
+2. housekeeping/maintenance operational control;
+3. Unified Inbox and response control;
+4. channel adapters;
+5. AI Sales & Concierge over controlled Core tools;
+6. Whisper/audio staff intake;
+7. real hotel payment provider after provider selection;
+8. public-site production completion;
+9. dining/store/QR/access/billiards/LED only after exact rules/equipment are known;
+10. production hardening/cutover.
+
+Unknown business rules must remain UNKNOWN / DECISION REQUIRED rather than being invented.
+
+---
+
+# 3. PROPERTY DATA
 
 STATUS: VERIFIED AS SEEDABLE DEVELOPMENT BASELINE
 
-Current development baseline reconciles:
+Development baseline reconciles:
 - 84 rooms;
 - 12 room categories;
 - 2026/27 rate input.
 
 Evidence:
-- `data-intake/rooms.csv`
-- `data-intake/rates.csv`
-- `docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md`
+- `data-intake/rooms.csv`;
+- `data-intake/rates.csv`;
+- `docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md`.
 
 Known source caveats remain qualified rather than guessed.
 
 ---
 
-# 3. DATABASE CORE
+# 4. DATABASE / CORE
 
-STATUS: IMPLEMENTED; MAJOR BASELINE VERIFIED IN CI
+STATUS: IMPLEMENTED; MAJOR BASELINE VERIFIED BEFORE CURRENT ACTIONS BLOCKER
 
-Current Prisma/domain schema includes:
-- Property;
-- RoomType / Room;
-- RatePlan / RatePeriod;
-- Guest;
-- ReservationRequest;
-- Reservation;
-- InventoryBlock;
-- Payment;
-- StaffUser / AuthSession;
-- OperationalTask;
-- AutomationInboundEvent;
-- NfcWallet / NfcBracelet / NfcTransaction / NfcLedgerEntry;
-- AuditLog.
+Core domain includes property, room/rate, guest, ReservationRequest, Reservation, InventoryBlock, Payment, staff/auth, operational tasks, communication/inbox entities, automation inbound events and AuditLog.
 
-Critical implemented invariants include:
+Critical implemented hotel invariants include:
 - `ReservationRequest != Reservation`;
-- valid stay/rate date ranges;
+- valid date ranges;
 - nonnegative reservation totals;
 - positive payment amounts;
-- active inventory blocks for the same room cannot overlap;
-- NFC wallet balance cannot be negative;
-- NFC transaction split must equal amount;
-- NFC ledger balance arithmetic must reconcile;
-- beach commission is bounded to 0..10000 bps.
+- active inventory blocks for the same room cannot overlap.
 
-Added after the last fully confirmed CI baseline:
-- `packages/database/sql/003_nfc_lifecycle.sql`;
-- partial unique index enforcing no more than one `ACTIVE` bracelet per NFC wallet.
-
-This latest lifecycle SQL is IMPLEMENTED but currently NOT CI-VERIFIED because GitHub Actions jobs are not starting workflow steps (see section 16).
+Dormant NFC tables/functions remain in the repository as deferred implementation evidence but are not part of the active engineering plan.
 
 ---
 
-# 4. CORE API
+# 5. CORE API
 
-STATUS: IMPLEMENTED; CORE BASELINE VERIFIED IN CI
+STATUS: IMPLEMENTED
 
-Public/core routes include:
-- `GET /health`;
-- `GET /api/v1/booking/check-availability`;
-- `POST /api/v1/booking/requests`;
-- `GET /api/v1/pms/grid`.
-
-Domain modules composed by `services/api/app/app_entry.py` include:
-- booking admin;
+Key routes/modules include:
+- health/readiness;
+- booking availability and reservation requests;
+- PMS grid;
+- booking administration;
+- reservation detail;
+- stays/check-in/check-out;
 - operations;
-- stays;
-- Telegram authentication;
-- automation;
-- realtime;
-- NFC;
-- NFC reporting.
+- Telegram staff authentication;
+- guarded automation;
+- provider-neutral communication ingest;
+- manager Unified Inbox;
+- realtime PMS;
+- owner/manager Command Center.
 
 Current business truth:
-**WITHOUT THE CONTROLLED PAYMENT/MANAGEMENT CONVERSION FLOW THERE IS NO GUARANTEED RESERVATION.**
+**A REQUEST IS NOT A GUARANTEED RESERVATION.**
 
-AI/n8n does not receive a route that can directly confirm payment or create a guaranteed reservation.
+AI/n8n does not have a route that can directly confirm payment, create a guaranteed reservation, check a guest in/out or mutate money.
 
 ---
 
-# 5. AUTHENTICATION / RBAC
+# 6. AUTHENTICATION / RBAC
 
-STATUS: IMPLEMENTED / VERIFIED IN THE LAST CONFIRMED BASELINE
+STATUS: IMPLEMENTED / VERIFIED IN LAST CONFIRMED BASELINE
 
 Implemented:
-- server-side username/password authentication;
-- Argon2 password verification;
-- hashed session tokens stored in PostgreSQL;
-- session expiry/revocation model;
-- secure-cookie configuration including optional shared cookie domain;
+- username/password authentication;
+- Argon2 verification;
+- hashed PostgreSQL sessions;
+- expiry/revocation;
+- secure cookie configuration;
 - server-side role checks;
-- roles: `OWNER`, `MANAGER`, `MAID`, `TECHNICIAN`, `BEACH_PARTNER`;
-- Telegram Mini App `initData` signature validation;
-- Telegram account linking to an existing staff user;
-- automatic Telegram login after linking.
+- Telegram Mini App signature validation and staff linking.
 
-Production credentials/tokens are not committed.
+Production secrets are not committed.
 
 ---
 
-# 6. RESERVATION REQUEST -> PAYMENT -> GUARANTEED RESERVATION
+# 7. BOOKING / PAYMENT-CONVERSION FLOW
 
 STATUS: IMPLEMENTED CONTROLLED MANAGEMENT FLOW / EXTERNAL ACQUIRING NOT ACTIVATED
 
 Implemented:
 - manager request queue;
-- deterministic quote against Core room/rate data;
-- configurable prepayment percentage (`PREPAYMENT_PERCENT`, current project default 30);
+- deterministic quote from Core rates/availability;
+- configurable prepayment percentage in development configuration;
 - controlled payment confirmation endpoint;
-- atomic creation of Guest + GUARANTEED Reservation + reservation inventory block + received Payment;
-- request conversion to `CONVERTED`;
-- idempotency/audit boundaries used by the management flow;
-- no AI permission to execute this conversion.
+- atomic Guest + GUARANTEED Reservation + inventory block + Payment creation;
+- conversion of the request to `CONVERTED`;
+- audit/idempotency boundaries;
+- no AI permission for final conversion.
 
-Not yet production-integrated:
-- MBank / Optima / PayBox acquiring/webhook credentials;
+Not production-integrated:
+- real MBank / Optima / PayBox adapter;
 - provider signature verification;
-- automated provider reconciliation/refund flows.
+- provider reconciliation/refunds.
 
-No production merchant keys are recorded in the repository.
+Business note: the exact live prepayment rule must follow the owner’s current policy when production payment integration is selected; old website text is not authoritative.
 
 ---
 
-# 7. PMS ADMIN
+# 8. PMS / RECEPTION
 
-STATUS: IMPLEMENTED DEVELOPMENT CONTROL CENTER
+STATUS: IMPLEMENTED DEVELOPMENT CONTROL CENTER / RECENT EXTENSIONS NOT CI-VERIFIED
 
-Canonical source:
-`apps/admin/`
+Canonical source: `apps/admin/`.
 
-Current major areas:
-- **Шахматка** — real Core data, date windows/navigation, search and filters, sticky room/state columns, reservation/maintenance/manual blocks;
+Current active areas include:
+- **Главная / Command Center** — real Core-derived KPIs for room state, arrivals/departures, requests, tasks, payment visibility and communication response control;
+- **Шахматка** — real Core data, date navigation, search/filters, sticky room/state columns, reservation/maintenance/manual blocks;
 - **Заявки** — ReservationRequest workspace and controlled conversion flow;
-- **Брони** — guaranteed reservations, check-in/check-out, NFC issuance/management;
+- **Брони** — reception workspace with search, arrivals today, departures today, currently staying guests, reservation/guest/room detail, confirmed payments, outstanding balance, room tasks and audit history;
 - **Операции** — housekeeping/maintenance/guest-request tasks;
-- **Финансы NFC** — added after last fully confirmed baseline; read-only transaction/partner reporting.
+- **Сообщения** — Unified Inbox response-control workspace.
 
 PMS is no longer a deterministic mock.
 
-Advanced filter requirements beyond currently recovered/implemented filters must remain an explicit backlog item; do not invent unrecovered historical filter specifications.
+Advanced historical filter requirements that were not recovered remain backlog items and must not be invented.
 
 ---
 
-# 8. STAYS / HOUSEKEEPING / MAINTENANCE
+# 9. STAYS / HOUSEKEEPING / MAINTENANCE
 
 STATUS: IMPLEMENTED BASELINE
 
 Implemented:
-- controlled `GUARANTEED -> CHECKED_IN`;
-- controlled `CHECKED_IN -> CHECKED_OUT`;
-- checkout changes physical room state to `DIRTY`;
+- `GUARANTEED -> CHECKED_IN`;
+- `CHECKED_IN -> CHECKED_OUT`;
+- checkout moves room to `DIRTY`;
 - checkout creates/reuses housekeeping task;
-- housekeeping task lifecycle including `IN_INSPECTION`;
-- manager acceptance flow;
-- maintenance tasks;
-- maintenance intake can move a room to `TECH_BLOCK`;
-- staff assignment/claiming and task status transitions;
-- staff PWA for operational workers.
+- housekeeping lifecycle through `IN_INSPECTION` and manager acceptance;
+- maintenance tasks and `TECH_BLOCK`;
+- staff task claiming/assignment/status transitions;
+- staff PWA.
 
-Room physical states remain:
-- `UNKNOWN`;
-- `CLEAN`;
-- `DIRTY`;
-- `IN_INSPECTION`;
-- `TECH_BLOCK`.
+Physical room states remain separate from reservation/stay state.
 
-Photo-proof workflow is not recorded as fully implemented/verified yet.
+Photo-proof/checklist completion is not recorded as fully implemented/verified yet.
 
 ---
 
-# 9. STAFF / TELEGRAM PWA
+# 10. UNIFIED INBOX
 
-STATUS: IMPLEMENTED DEVELOPMENT BASELINE
+STATUS: IMPLEMENTED PROVIDER-NEUTRAL CORE / NOT YET CONNECTED TO LIVE CHANNELS / NOT CI-VERIFIED ON CURRENT MAIN
 
-Canonical source:
-`apps/staff/`
+Implemented domain:
+- CommunicationChannel;
+- Conversation;
+- ConversationMessage;
+- manager assignment;
+- link from conversation to ReservationRequest;
+- normalized provider-neutral inbound/outbound message ingestion;
+- idempotency through automation inbound events;
+- manager conversation read/control API;
+- response-control state based on actual inbound/outbound timestamps;
+- internal notes;
+- manager Inbox UI;
+- Command Center metrics for conversations needing a response and longest actual waiting time.
 
-Implemented roles/interfaces:
-- MAID task interface;
-- TECHNICIAN task interface;
-- BEACH_PARTNER NFC terminal;
-- Telegram Mini App bootstrapping and automatic identity attempt;
-- first-login Telegram linking fallback;
-- manual login fallback.
+Important truth:
+- no fake external-send button is exposed;
+- live Telegram/WhatsApp/Instagram outbound delivery is not yet connected;
+- no invented SLA threshold is applied.
 
-BEACH_PARTNER terminal supports:
-- bracelet UID scan/input;
-- balance lookup;
-- charge amount;
-- commission preview/result;
-- idempotent retry behavior through Core;
-- Web NFC when supported by the client environment;
-- manual UID fallback when Web NFC is unavailable.
-
-Browser/WebView NFC hardware compatibility still requires real-device testing.
-
----
-
-# 10. REALTIME PMS
-
-STATUS: IMPLEMENTED / VERIFIED IN LAST CONFIRMED BASELINE
-
-Implemented WebSocket contract:
-`/ws/pms/grid`
-
-Verified baseline behavior before the current Actions infrastructure blocker:
-- authenticated manager connection;
-- initial PMS snapshot;
-- PostgreSQL state change;
-- same WebSocket receives an updated snapshot without manual refresh.
-
-Current implementation observes PostgreSQL state and can later be optimized to `LISTEN/NOTIFY` without changing the external WebSocket contract.
+A dedicated Unified Inbox CI workflow has been added but current GitHub Actions execution remains unavailable for verification.
 
 ---
 
-# 11. AI / AUTOMATION SERVICE BOUNDARY
+# 11. AI / AUTOMATION BOUNDARY
 
-STATUS: CORE TOOL BOUNDARY IMPLEMENTED / VERIFIED IN LAST CONFIRMED BASELINE
+STATUS: CORE TOOL BOUNDARY IMPLEMENTED / MAJOR BASELINE VERIFIED
 
-Implemented protected service routes:
-- `GET /api/v1/automation/capabilities`;
-- `POST /api/v1/automation/reservation-requests`;
-- `POST /api/v1/automation/staff-intake`.
+Protected automation capabilities include reservation-request creation, structured staff intake and normalized Inbox ingestion.
 
-Authentication:
-`X-Resort-Service-Key` validated with constant-time comparison.
+Authentication uses `X-Resort-Service-Key` with constant-time comparison.
 
-Automation inbound events have database idempotency tracking.
+Automation inbound events use database idempotency tracking.
 
-Explicit AI/n8n forbidden operations include:
+Explicitly forbidden to AI/n8n:
 - payment confirmation;
 - guaranteed reservation creation;
 - check-in;
@@ -278,120 +248,126 @@ Explicit AI/n8n forbidden operations include:
 - refund;
 - NFC charge.
 
-Truth rule:
-**tool failure or unknown result must never be described as success.**
+Truth rule: **tool failure or unknown result must never be described as success.**
 
 ---
 
 # 12. n8n / CHANNEL AUTOMATION
 
-STATUS: CORE BRIDGE TEMPLATES IMPLEMENTED / NOT DEPLOYED
+STATUS: CORE BRIDGE TEMPLATES IMPLEMENTED / LIVE CHANNELS NOT DEPLOYED
 
-Added after the last fully confirmed CI baseline:
-- `automation/n8n/README.md`;
-- `automation/n8n/reservation-intake-core.json`;
-- `automation/n8n/staff-intake-core.json`.
+Inactive importable normalized-input templates exist under `automation/n8n/`.
 
-These are inactive, importable orchestration templates for **normalized structured input** only.
+They do not contain production credentials and do not connect directly to PostgreSQL.
 
-They do not contain provider credentials and do not connect directly to PostgreSQL.
-
-NOT YET IMPLEMENTED/DEPLOYED:
-- production n8n instance configuration;
-- Instagram adapter;
+Still required:
+- Telegram Sales adapter;
 - WhatsApp adapter;
-- Telegram sales adapter;
-- unified inbox/response-control dashboard;
-- OpenAI extraction/reply layer;
-- Whisper audio transcription adapter;
-- outbound provider reply delivery and retry/DLQ logic.
+- Instagram adapter;
+- provider outbound delivery/retry handling;
+- OpenAI extraction/reply orchestration;
+- Whisper audio transcription adapter.
+
+Provider-specific behavior must be implemented only from actual provider contracts/credentials.
 
 ---
 
-# 13. NFC CASHLESS SYSTEM
+# 13. REALTIME PMS
 
-STATUS: CORE PAYMENT BASELINE VERIFIED; LIFECYCLE/FINANCE EXTENSIONS IMPLEMENTED BUT CURRENTLY NOT CI-VERIFIED
+STATUS: IMPLEMENTED / VERIFIED IN LAST CONFIRMED BASELINE
 
-Verified before current Actions blocker:
-- NFC wallet issuance only after `CHECKED_IN`;
-- raw bracelet UID is not stored; Core stores a peppered SHA-256 hash;
-- `BEACH_PARTNER` RBAC;
-- PostgreSQL `process_nfc_payment`;
-- wallet locking using `FOR UPDATE`;
-- idempotency;
-- idempotency replay bound to the same partner;
-- immutable transaction + ledger write;
-- property commission config, Three Crowns current default 500 bps (5%);
-- insufficient-funds rejection;
-- concurrency test proving simultaneous charges cannot overdraw wallet.
+WebSocket: `/ws/pms/grid`.
 
-Implemented after last fully confirmed baseline:
-- reception NFC issue modal;
-- wallet summary in reservation workspace;
-- bracelet states using schema-confirmed values `ACTIVE/BLOCKED/LOST/RETURNED`;
-- controlled bracelet retirement;
-- atomic bracelet replacement preserving wallet balance;
-- database invariant: max one ACTIVE bracelet per wallet;
-- checkout freezes ACTIVE NFC wallet/bracelet to `BLOCKED` while preserving remaining balance;
-- manager NFC transaction report;
-- partner commission summary;
-- admin `Финансы NFC` tab;
-- beach-partner own transaction reporting API.
-
-IMPORTANT UNKNOWN / BUSINESS DECISION REQUIRED:
-what happens to a nonzero remaining NFC balance after checkout (refund, transfer, other settlement policy). Current safe behavior freezes access and preserves the balance; it does not silently zero or refund money.
+Verified baseline behavior:
+- authenticated manager connection;
+- initial PMS snapshot;
+- PostgreSQL state change;
+- updated snapshot on the same WebSocket without manual refresh.
 
 ---
 
-# 14. CANONICAL PUBLIC SITE
+# 14. PUBLIC SITE
 
 STATUS: IMPLEMENTED / VERIFIED DEVELOPMENT BASELINE
 
-Canonical source:
-`apps/web/`
+Canonical source: `apps/web/`.
 
 Implemented:
 - real availability query;
-- real Core price data;
+- Core price data;
 - room-category selection;
 - guest contact capture;
-- `POST /api/v1/booking/requests`;
-- explicit message that a request is not yet a guaranteed reservation.
+- ReservationRequest creation;
+- explicit communication that a request is not yet a guaranteed reservation.
 
-Recovered V5 remains reference evidence only.
+Production blockers:
+- temporary/hotlinked media must be replaced with owned Three Crowns media;
+- final room content must be completed;
+- full acceptance/rollback gate must precede DNS cutover.
 
-Current media limitation:
-temporary/hotlinked images remain a production-cutover blocker until owned resort media replaces them.
-
-No `3korony.com` DNS cutover to the canonical rebuild is recorded.
+No `3korony.com` cutover to the canonical rebuild is recorded.
 
 ---
 
-# 15. DINING / STORE / QR / ACCESS / BILLIARDS / LED / UNIFIED INBOX
+# 15. DEPLOYMENT / OPERATIONS PACK
 
-STATUS: CONFIRMED PROJECT SCOPE / IMPLEMENTATION TODO UNLESS SEPARATELY EVIDENCED
+STATUS: IMPLEMENTED SCAFFOLD / NOT PRODUCTION DEPLOYED / NOT CI-VERIFIED ON CURRENT MAIN
 
-Confirmed required modules include:
+Implemented after the last confirmed green baseline:
+- liveness/readiness probes;
+- Docker images for Core, public web, PMS and staff PWA;
+- production-oriented compose topology;
+- production environment contract/template;
+- explicit Core URL build arguments for Next.js images;
+- staged deployment and rollback runbook;
+- reduced container build context.
+
+Production gate:
+- establish a real migration baseline rather than relying on `prisma db push` as the permanent production strategy;
+- prove backup/restore;
+- run current-main verification;
+- perform staging acceptance before cutover.
+
+---
+
+# 16. DEFERRED NFC
+
+STATUS: DEFERRED / DORMANT
+
+The repository retains previously implemented NFC code as evidence and optional future capability.
+
+Per the active owner direction:
+- no further NFC engineering;
+- no NFC UX expansion;
+- no NFC production activation;
+- no NFC payment-provider work;
+- no NFC business-rule decisions are part of the active queue.
+
+Do not use NFC as a dependency for current Three Crowns V1.
+
+---
+
+# 17. CONFIRMED SCOPE / RULES STILL REQUIRED
+
+Confirmed future modules include:
 - dining/cafeteria management;
-- shop/payment control;
-- beach bar;
-- beach cafe;
+- store management;
 - entrance/access;
-- QR toilet scenario;
-- billiards;
-- LED screen management;
-- unified control of incoming messages/replies across platforms.
+- QR service points/toilet scenario;
+- billiards/resource booking;
+- LED screen management.
 
-Detailed historical business rules for several of these modules were not recovered. Do not invent them. They require explicit domain contracts before financial/access-control implementation.
+Do not invent exact accounting, pricing, hardware or workflow rules that were not recovered/confirmed.
+
+Beach bar/cafe payment remains outside the hotel’s central payment contour under the current project direction.
 
 ---
 
-# 16. CI / VERIFICATION STATE
+# 18. CI / VERIFICATION STATE
 
 ## Last explicitly confirmed full green baseline
 
-Commit:
-`7038818db41756b94e8d5235410404b9b6172c1e`
+Commit: `7038818db41756b94e8d5235410404b9b6172c1e`
 
 Confirmed successful workflows on that commit:
 - Resort Core CI — SUCCESS;
@@ -399,42 +375,34 @@ Confirmed successful workflows on that commit:
 - Realtime PMS CI — SUCCESS;
 - NFC Beach Payment CI — SUCCESS.
 
-The verified NFC CI at that baseline covered 5% commission, idempotent retry, insufficient funds, raw UID hashing and concurrent-charge no-overdraft behavior.
+The NFC result above is historical verification only; NFC is now deferred.
 
-## Current GitHub Actions blocker
+## Current Actions blocker
 
-Starting later on 2026-08-25, multiple independent workflows began failing approximately 4–5 seconds after scheduling, before any workflow step executed.
+Later on 2026-08-25, multiple workflows began terminating before workflow steps executed. Earlier failed jobs showed empty/null steps and no usable step logs.
 
-Observed evidence on failed jobs:
-- job conclusion `failure`;
-- `steps = null` / empty step list;
-- no decoded job log available.
+For current recent commits, available GitHub checks/runs do not provide new successful verification evidence.
 
-Therefore the exact infrastructure cause is **UNKNOWN**.
+Therefore commits after the last confirmed green baseline remain **IMPLEMENTED / NOT CI-VERIFIED** unless another explicit evidence source verifies them.
 
-Do NOT classify these runs as code/test failures without a workflow step/log proving such a failure.
-
-All commits after the last fully confirmed baseline must be classified as one of:
-- IMPLEMENTED / NOT CI-VERIFIED, or
-- VERIFIED by another explicit evidence source.
+Do not classify an infrastructure-level Actions failure as a code/test failure without step/log evidence.
 
 ---
 
-# 17. CURRENT ENGINEERING ORDER
+# 19. CURRENT ENGINEERING ORDER
 
-Completed/established foundation:
+Completed/established active foundation:
 
-`PROPERTY DATA -> POSTGRESQL -> CORE -> AUTH/RBAC -> BOOKING REQUEST -> CONTROLLED PAYMENT CONVERSION -> PMS -> STAYS -> STAFF OPS -> REALTIME -> GUARDED AUTOMATION TOOLS -> NFC CORE`
+`PROPERTY DATA -> POSTGRESQL -> CORE -> AUTH/RBAC -> BOOKING REQUEST -> CONTROLLED CONVERSION -> PMS -> STAYS -> STAFF OPS -> REALTIME -> GUARDED AUTOMATION -> COMMAND CENTER -> RECEPTION DETAIL -> UNIFIED INBOX CORE -> DEPLOYMENT SCAFFOLD`
 
 Immediate next sequence:
-
-1. restore/diagnose GitHub Actions runner execution and re-verify current `main`;
-2. add provider/channel adapters around the guarded n8n Core bridge;
-3. implement Whisper/audio intake adapter for technicians/staff;
-4. implement unified inbox + response-control state model;
-5. integrate a real payment provider only after provider credentials/contracts are explicitly selected;
-6. define NFC checkout balance settlement policy before any refund/close automation;
-7. specify and implement dining/store/beach cafe/bar accounting domain;
-8. specify entrance/QR toilet/billiards access/resource domain;
-9. specify LED screen device/content protocol;
-10. replace public-site temporary media with owned assets and perform production cutover only after full acceptance/rollback planning.
+1. keep current-state evidence synchronized and restore/diagnose CI verification;
+2. implement Telegram Sales adapter into the normalized Inbox contract;
+3. add real outbound-channel adapter boundary with explicit delivery result/retry state;
+4. implement AI Sales/Concierge orchestration over allowed Core tools only;
+5. implement Whisper/audio staff intake;
+6. add WhatsApp and Instagram adapters only from their actual integration contracts;
+7. integrate real hotel payment provider after provider selection/credentials;
+8. finish public site owned media/content and staging acceptance;
+9. specify remaining dining/store/access/QR/billiards/LED rules before implementation;
+10. production hardening, backup/restore, monitoring, staging, rollback and cutover.
