@@ -214,7 +214,7 @@ async def quote_request(
                 INSERT INTO audit_logs (id, "propertyId", "actorType", "actorId", action, resource,
                   "resourceId", source, result, "afterJson", "createdAt")
                 VALUES ($1,$2,'STAFF',$3,'QUOTE','ReservationRequest',$4,'PMS','SUCCESS',
-                  jsonb_build_object('room_type_code',$5,'total_kgs',$6,'prepayment_kgs',$7),now())
+                  jsonb_build_object('room_type_code',$5::text,'total_kgs',$6::integer,'prepayment_kgs',$7::integer),now())
                 ''',
                 uuid.uuid4(), pid, user["id"], str(request_id), payload.room_type_code, total, prepayment,
             )
@@ -358,7 +358,7 @@ async def confirm_payment_and_reserve(
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",
                   source,result,"afterJson","createdAt")
                 VALUES ($1,$2,'STAFF',$3,'CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
-                  jsonb_build_object('booking_number',$5,'room_code',$6,'payment_id',$7),now())
+                  jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text),now())
                 ''',
                 uuid.uuid4(), pid, user["id"], str(reservation_id), booking_number, chosen["code"], str(payment_id),
             )
