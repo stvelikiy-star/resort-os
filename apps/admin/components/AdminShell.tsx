@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import NfcFinanceBoard from "./NfcFinanceBoard";
+import DashboardBoard from "./DashboardBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGrid";
 import RequestsBoard from "./RequestsBoard";
@@ -15,7 +15,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "PMS" | "REQUESTS" | "RESERVATIONS" | "NFC_FINANCE" | "OPS";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "OPS";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -24,7 +24,7 @@ export default function AdminShell() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [tab, setTab] = useState<Tab>("PMS");
+  const [tab, setTab] = useState<Tab>("DASHBOARD");
 
   useEffect(() => {
     fetch("/core/api/v1/auth/me", { cache: "no-store" })
@@ -34,7 +34,7 @@ export default function AdminShell() {
       })
       .then((payload) => {
         setUser(payload);
-        if (payload && !["OWNER", "MANAGER"].includes(payload.role)) setTab("OPS");
+        setTab(payload && ["OWNER", "MANAGER"].includes(payload.role) ? "DASHBOARD" : "OPS");
       })
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
@@ -56,7 +56,7 @@ export default function AdminShell() {
       }
       const payload = (await response.json()) as User;
       setUser(payload);
-      setTab(["OWNER", "MANAGER"].includes(payload.role) ? "PMS" : "OPS");
+      setTab(["OWNER", "MANAGER"].includes(payload.role) ? "DASHBOARD" : "OPS");
       setPassword("");
     } catch {
       setError("Сервис входа недоступен. Проверьте Resort Core.");
@@ -101,18 +101,18 @@ export default function AdminShell() {
       <div className="auth-toolbar admin-nav">
         <div className="admin-identity"><strong>Три Короны · Resort OS</strong><span>{user.display_name} · {user.role}</span></div>
         <nav className="admin-tabs">
+          {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
-          {isManager && <button className={tab === "NFC_FINANCE" ? "active" : ""} onClick={() => setTab("NFC_FINANCE")}>Финансы NFC</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
+      {tab === "DASHBOARD" && isManager && <DashboardBoard />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReservationsBoard />}
-      {tab === "NFC_FINANCE" && isManager && <NfcFinanceBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
     </>
   );
