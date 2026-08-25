@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import NfcFinanceBoard from "./NfcFinanceBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGrid";
 import RequestsBoard from "./RequestsBoard";
@@ -14,7 +15,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "PMS" | "REQUESTS" | "RESERVATIONS" | "OPS";
+type Tab = "PMS" | "REQUESTS" | "RESERVATIONS" | "NFC_FINANCE" | "OPS";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -103,6 +104,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
+          {isManager && <button className={tab === "NFC_FINANCE" ? "active" : ""} onClick={() => setTab("NFC_FINANCE")}>Финансы NFC</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
@@ -110,6 +112,7 @@ export default function AdminShell() {
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReservationsBoard />}
+      {tab === "NFC_FINANCE" && isManager && <NfcFinanceBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
     </>
   );
