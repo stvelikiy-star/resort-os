@@ -1,55 +1,100 @@
-# Resort OS — Three Crowns
+# Resort OS — «Три Короны»
 
-Hospitality operating system for «Три Короны», Cholpon-Ata, Issyk-Kul.
+Единая гостиничная система для Resort & SPA «Три Короны», Чолпон-Ата, Иссык-Куль.
 
-## Current engineering state
+## Что входит в текущий V1
 
-Implementation has started. Do not confuse source existence with production readiness.
+Канонический контур:
 
-Current first milestone:
+`PUBLIC SITE / PMS / STAFF / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
-`84 real rooms -> seasonal rates -> availability -> reservation request -> paid reservation -> PMS grid`
+Resort Core является единственным источником гостиничной правды для:
+- 84 комнатных позиций и 12 категорий;
+- тарифов и детерминированной доступности;
+- ReservationRequest и Reservation;
+- размещения гостя по комнатам/датам;
+- PMS-шахматки и realtime;
+- check-in / check-out;
+- уборки и ремонта;
+- сотрудников/RBAC;
+- внутренних менеджерских фактов оплат;
+- управленческих отчётов;
+- контролируемых API для n8n.
 
-Canonical implementation truth is maintained in:
-`knowledge/04_CURRENT_STATE.md`.
+Клиентские каналы V1 оркестрируются через n8n:
+- Instagram -> ManyChat -> n8n;
+- WhatsApp -> API Green -> n8n;
+- сайт -> Resort Core напрямую.
 
-Three Crowns property specification:
-`knowledge/06_THREE_CROWNS_MASTER_SPEC.md`.
+Задача автоматизации — довести клиента до горячей квалифицированной заявки. Предоплату и условия менеджер определяет и принимает самостоятельно.
 
-Evidence reconciliation:
-`docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md`.
+NFC-контур сохранён в репозитории как отложенный исторический код, но **не является активной частью V1**.
 
-## Repository layout
+## Ключевой операционный экран
+
+PMS Chessboard V2 — основной ежедневный экран ресепшена.
+
+Поддерживается серверно-авторитетный workflow:
+- перенос будущей брони на другой номер;
+- перенос брони на другую дату с сохранением длительности;
+- изменение/сокращение/продление дат;
+- split stay / последовательные сегменты проживания в разных комнатах;
+- переселение уже заселённого гостя без переписывания прожитой истории;
+- check-in/check-out;
+- карточка гостя, внутренние оплаты, задачи и аудит;
+- PostgreSQL-защита от пересекающихся активных блоков номера;
+- preview -> explicit confirm -> atomic transaction;
+- stale-version и race-conflict rollback.
+
+## Канонические документы
+
+- `knowledge/04_CURRENT_STATE.md` — фактическое состояние реализации.
+- `knowledge/07_EXECUTION_PLAN_THREE_CROWNS.md` — активный порядок разработки.
+- `knowledge/06_THREE_CROWNS_MASTER_SPEC.md` — спецификация объекта.
+- `docs/PMS_CHESSBOARD_MUTATION_CONTRACT.md` — контракт безопасных изменений шахматки.
+- `docs/THREE_CROWNS_SOURCE_RECONCILIATION_2026-08-25.md` — сверка исходных данных.
+- `automation/n8n/README.md` — граница n8n / Resort Core.
+
+Критическое правило проекта:
+
+`TARGET != CURRENT. IMPLEMENTED != VERIFIED. DEVELOPMENT VERIFIED != PRODUCTION READY.`
+
+## Структура репозитория
 
 - `services/api/` — FastAPI Resort Core.
-- `packages/database/prisma/` — canonical PostgreSQL schema owner.
-- `packages/database/sql/` — critical PostgreSQL constraints not expressible in Prisma.
-- `scripts/` — database bootstrap / evidence-backed seed.
-- `data-intake/` — verified/qualified Three Crowns source inputs.
-- `recovery-artifacts/` — recovered prototypes/reference only.
-- `knowledge/` — canonical product/domain/current-state documents.
+- `packages/database/prisma/` — каноническая Prisma/PostgreSQL схема.
+- `packages/database/sql/` — PostgreSQL-инварианты, которые не выражаются Prisma schema.
+- `apps/admin/` — PMS / ресепшен / шахматка / управление.
+- `apps/web/` — публичный продающий сайт и booking widget.
+- `apps/staff/` — PWA/Mini App для персонала.
+- `automation/n8n/` — provider-neutral workflow templates.
+- `scripts/` — bootstrap, seed, backup/restore, preflight.
+- `data-intake/` — подтверждённые/квалифицированные входные данные отеля.
+- `knowledge/` — канонические product/domain/current-state документы.
 
-## Local Core startup
+## Локальный запуск Core
 
-Requirements:
+Требования:
 - Docker;
 - Node.js 22+;
 - Python 3.12+.
 
-1. Start PostgreSQL:
+### 1. PostgreSQL
 
 ```bash
 docker compose up -d postgres
 ```
 
-2. Create a local env file:
+### 2. Environment
 
 ```bash
 cp .env.example .env
 set -a && source .env && set +a
 ```
 
-3. Build the initial PostgreSQL schema with Prisma:
+### 3. Development schema
+
+Для локальной development-среды:
 
 ```bash
 cd packages/database
@@ -59,51 +104,128 @@ npx prisma db push
 cd ../..
 ```
 
-4. Install API dependencies and apply critical DB constraints:
+`prisma db push` не является постоянной production migration strategy. Production требует migration baseline и preflight gate.
+
+### 4. Python + DB constraints + seed
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r services/api/requirements.txt
 python scripts/apply_core_constraints.py
-```
-
-5. Load the evidence-backed Three Crowns inventory/rates:
-
-```bash
 python scripts/seed_from_intake.py
 ```
 
-The seed stops if the intake no longer reconciles to exactly 84 rooms and 12 room categories.
+Seed останавливается, если intake больше не сходится ровно в 84 номера / 12 категорий.
 
-6. Start Core API:
+### 5. Создать/обновить владельца
+
+Задайте безопасные локальные значения `BOOTSTRAP_OWNER_*` в `.env`, затем:
 
 ```bash
-python -m uvicorn app.main:app --app-dir services/api --reload --port 8000
+python scripts/bootstrap_owner.py
 ```
 
-Useful endpoints:
+### 6. Запустить Resort Core
 
+```bash
+python -m uvicorn app.app_entry:app --app-dir services/api --reload --port 8000
+```
+
+Основные endpoint'ы:
 - `GET /health`
+- `GET /health/live`
+- `GET /health/ready`
 - `GET /api/v1/booking/check-availability`
 - `POST /api/v1/booking/requests`
 - `GET /api/v1/pms/grid`
-- `/docs` — FastAPI OpenAPI UI in development.
+- `GET/POST /api/v1/admin/pms/reservations/{id}/schedule...`
+- `GET /api/v1/automation/read/hotel-facts`
+- `/docs` — OpenAPI UI в development.
 
-## Critical booking rule
+## Запуск приложений
 
-An unpaid customer request is **not an active reservation**.
+В отдельных терминалах:
 
-The legacy public-site rule that allowed a preliminary unpaid booking for two days is stale and must not be implemented.
+```bash
+cd apps/admin && npm install && npm run dev
+```
 
-The exact required prepayment amount/provider is still a business decision and is intentionally not hard-coded in Core.
+```bash
+cd apps/web && npm install && npm run dev
+```
 
-## Site
+```bash
+cd apps/staff && npm install && npm run dev
+```
 
-A V5 public-site visual skeleton exists separately as a recovered/deployed prototype. It is not yet considered the canonical source-backed public application in this repository. The next site step is to connect its booking UI to verified Core availability and reservation-request endpoints rather than preserve its previous demo-only booking behavior.
+Ожидаемые development ports:
+- public site: `3000`;
+- PMS/admin: `3001`;
+- staff PWA: `3002`;
+- Resort Core: `8000`.
+
+## Бронирование и предоплата
+
+Правила V1:
+- `ReservationRequest != Reservation`;
+- заявка без менеджерского подтверждения не занимает inventory;
+- старое правило публичного сайта про «держим неоплаченную бронь 2 дня» не используется;
+- Core рассчитывает стоимость проживания;
+- менеджер самостоятельно определяет и принимает предоплату;
+- Resort OS может зафиксировать фактически принятую менеджером сумму;
+- n8n/AI не выбирает сумму/способ предоплаты и не подтверждает бронь самостоятельно;
+- создание Reservation + InventoryBlock + manager-recorded Payment происходит контролируемо и атомарно.
+
+## Публичный сайт
+
+`apps/web` — текущий канонический сайт, а не старый V5-макет.
+
+Уже используется:
+- реальная availability из Resort Core;
+- стоимость на выбранные даты;
+- тарифные meal facts;
+- 12 категорий;
+- отправка реального ReservationRequest;
+- mobile booking flow;
+- SEO metadata / OpenGraph / JSON-LD / sitemap / robots.
+
+Перед финальным production cutover нужно заменить временные media sources на собственные фотографии «Трёх Корон» и пройти staging acceptance.
+
+## n8n
+
+n8n не пишет PostgreSQL напрямую.
+
+Он использует `X-Resort-Service-Key` и разрешённые Resort Core contracts для:
+- hotel facts;
+- availability/pricing;
+- create/read ReservationRequest;
+- request/reservation status;
+- structured staff intake where applicable.
+
+Запрещено для n8n/AI:
+- создавать гарантированную бронь напрямую;
+- подтверждать деньги;
+- check-in/check-out;
+- refund;
+- прямой SQL;
+- выдумывать availability/price/policy.
+
+## Production gates
+
+До production:
+- migration baseline;
+- backup -> clean restore verification;
+- production preflight;
+- secure secrets/cookies;
+- current-main build/E2E evidence;
+- staging acceptance;
+- monitoring;
+- rollback rehearsal;
+- только затем DNS/cutover.
+
+Никаких необратимых production DB/DNS действий без отдельного owner gate.
 
 ## Development rule
 
 `KNOWLEDGE -> CURRENT STATE -> GAP -> PRIORITY -> IMPLEMENT -> TEST -> EVIDENCE -> VERIFIED / NOT VERIFIED -> CURRENT STATE UPDATE`
-
-No production payment activation, DNS cutover, destructive production DB action, or irreversible production change without an explicit owner gate.
