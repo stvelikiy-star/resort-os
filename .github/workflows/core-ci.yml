@@ -28,6 +28,10 @@ jobs:
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
       CORE_API_URL: http://127.0.0.1:8000
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
 
     steps:
       - uses: actions/checkout@v4
@@ -88,17 +92,19 @@ jobs:
       - name: Seed evidence-backed Three Crowns inventory and rates
         run: python scripts/seed_from_intake.py
 
+      - name: Bootstrap CI owner account
+        run: python scripts/bootstrap_owner.py
+
       - name: Start API
         run: |
           python -m uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
           echo $! > /tmp/resort-api.pid
           sleep 3
 
-      - name: Smoke test Core API
+      - name: Smoke test public Core API
         run: |
           curl --fail http://127.0.0.1:8000/health
           curl --fail "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
-          curl --fail "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01"
 
       - name: Verify unpaid request is request only
         run: |
@@ -107,6 +113,30 @@ jobs:
             -d '{"guest_name":"CI Test Guest","phone":"+996000000000","check_in":"2026-08-26","check_out":"2026-08-28","adults":2,"children":0,"source":"CI"}')
           echo "$RESPONSE"
           echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["is_reservation"] is False; assert d["status"] == "NEW"'
+
+      - name: Verify PMS rejects unauthenticated access
+        run: |
+          CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01")
+          test "$CODE" = "401"
+
+      - name: Login as owner and verify protected PMS
+        run: |
+          curl --fail -sS -c /tmp/resort-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json
+          curl --fail -sS -b /tmp/resort-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/me.json
+          python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"] == "OWNER"; assert d["username"] == "ci-owner"'
+          curl --fail -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01"
+
+      - name: Start canonical PMS admin
+        working-directory: apps/admin
+        run: |
+          npm run start > /tmp/resort-admin.log 2>&1 &
+          echo $! > /tmp/resort-admin.pid
+          sleep 3
+
+      - name: Smoke test PMS admin shell
+        run: curl --fail http://127.0.0.1:3001/
 
       - name: Start canonical public site
         working-directory: apps/web
@@ -124,4 +154,5 @@ jobs:
         if: failure()
         run: |
           cat /tmp/resort-api.log || true
+          cat /tmp/resort-admin.log || true
           cat /tmp/resort-web.log || true
