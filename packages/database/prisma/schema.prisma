@@ -100,28 +100,61 @@ enum NfcTransactionStatus {
   REVERSED
 }
 
+enum CommunicationChannelKind {
+  WEBSITE
+  TELEGRAM
+  WHATSAPP
+  INSTAGRAM
+  OTHER
+}
+
+enum ConversationStatus {
+  OPEN
+  WAITING_GUEST
+  WAITING_STAFF
+  RESOLVED
+  ARCHIVED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum MessageDeliveryStatus {
+  RECEIVED
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  UNKNOWN
+}
+
 model Property {
-  id                  String                   @id @default(uuid()) @db.Uuid
-  code                String                   @unique
-  name                String
-  timezone            String                   @default("Asia/Bishkek")
-  currency            String                   @default("KGS")
-  beachCommissionBps  Int                      @default(500)
-  roomTypes           RoomType[]
-  rooms               Room[]
-  ratePlans           RatePlan[]
-  guests              Guest[]
-  requests            ReservationRequest[]
-  reservations        Reservation[]
-  auditLogs           AuditLog[]
-  staffUsers          StaffUser[]
-  tasks               OperationalTask[]
-  automationEvents    AutomationInboundEvent[]
-  nfcWallets          NfcWallet[]
-  nfcBracelets        NfcBracelet[]
-  nfcTransactions     NfcTransaction[]
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  id                    String                   @id @default(uuid()) @db.Uuid
+  code                  String                   @unique
+  name                  String
+  timezone              String                   @default("Asia/Bishkek")
+  currency              String                   @default("KGS")
+  beachCommissionBps    Int                      @default(500)
+  roomTypes             RoomType[]
+  rooms                 Room[]
+  ratePlans             RatePlan[]
+  guests                Guest[]
+  requests              ReservationRequest[]
+  reservations          Reservation[]
+  auditLogs             AuditLog[]
+  staffUsers            StaffUser[]
+  tasks                 OperationalTask[]
+  automationEvents      AutomationInboundEvent[]
+  communicationChannels CommunicationChannel[]
+  conversations         Conversation[]
+  nfcWallets            NfcWallet[]
+  nfcBracelets          NfcBracelet[]
+  nfcTransactions       NfcTransaction[]
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
   @@map("properties")
 }
@@ -243,6 +276,7 @@ model ReservationRequest {
   notes                 String?
   reservation           Reservation?
   payments              Payment[]
+  conversations         Conversation[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
@@ -319,22 +353,23 @@ model Payment {
 }
 
 model StaffUser {
-  id                String            @id @default(uuid()) @db.Uuid
-  propertyId        String            @db.Uuid
-  property          Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  username          String
-  displayName       String
-  passwordHash      String
-  role              StaffRole
-  isActive          Boolean           @default(true)
-  telegramUserId    String?
-  telegramUsername  String?
-  telegramLinkedAt  DateTime?
-  sessions          AuthSession[]
-  assignedTasks     OperationalTask[] @relation("TaskAssignee")
-  beachTransactions NfcTransaction[]  @relation("BeachPartnerTransactions")
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                    String            @id @default(uuid()) @db.Uuid
+  propertyId            String            @db.Uuid
+  property              Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  username              String
+  displayName           String
+  passwordHash          String
+  role                   StaffRole
+  isActive              Boolean           @default(true)
+  telegramUserId        String?
+  telegramUsername      String?
+  telegramLinkedAt      DateTime?
+  sessions              AuthSession[]
+  assignedTasks         OperationalTask[] @relation("TaskAssignee")
+  assignedConversations Conversation[]    @relation("ConversationAssignee")
+  beachTransactions     NfcTransaction[]  @relation("BeachPartnerTransactions")
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 
   @@unique([propertyId, username])
   @@unique([propertyId, telegramUserId])
@@ -399,6 +434,76 @@ model AutomationInboundEvent {
   @@unique([propertyId, source, idempotencyKey])
   @@index([propertyId, eventType, createdAt])
   @@map("automation_inbound_events")
+}
+
+model CommunicationChannel {
+  id                String                   @id @default(uuid()) @db.Uuid
+  propertyId        String                   @db.Uuid
+  property          Property                 @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  code              String
+  kind              CommunicationChannelKind
+  displayName       String
+  externalAccountId String?
+  isActive          Boolean                  @default(true)
+  metadata          Json?
+  conversations     Conversation[]
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@unique([propertyId, code])
+  @@index([propertyId, kind, isActive])
+  @@map("communication_channels")
+}
+
+model Conversation {
+  id                     String             @id @default(uuid()) @db.Uuid
+  propertyId             String             @db.Uuid
+  property               Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  channelId              String             @db.Uuid
+  channel                CommunicationChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  externalConversationId String?
+  externalContactId      String?
+  contactName            String?
+  contactPhone           String?
+  contactUsername        String?
+  status                 ConversationStatus @default(OPEN)
+  assignedToId           String?            @db.Uuid
+  assignedTo             StaffUser?         @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  reservationRequestId   String?            @db.Uuid
+  reservationRequest     ReservationRequest? @relation(fields: [reservationRequestId], references: [id], onDelete: SetNull)
+  lastInboundAt          DateTime?
+  lastOutboundAt         DateTime?
+  firstResponseAt        DateTime?
+  resolvedAt             DateTime?
+  messages               ConversationMessage[]
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  @@unique([channelId, externalConversationId])
+  @@index([propertyId, status, updatedAt])
+  @@index([assignedToId, status])
+  @@index([reservationRequestId])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id                String                @id @default(uuid()) @db.Uuid
+  conversationId    String                @db.Uuid
+  conversation      Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  direction         MessageDirection
+  externalMessageId String?
+  senderType        String
+  senderExternalId  String?
+  text              String?
+  contentType       String                @default("TEXT")
+  deliveryStatus    MessageDeliveryStatus @default(UNKNOWN)
+  rawPayload        Json?
+  sentAt            DateTime?
+  createdAt         DateTime              @default(now())
+
+  @@unique([conversationId, externalMessageId])
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
 }
 
 model NfcWallet {
