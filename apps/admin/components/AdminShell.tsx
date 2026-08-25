@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGrid";
 import RequestsBoard from "./RequestsBoard";
+import ReservationsBoard from "./ReservationsBoard";
 
 type User = {
   id: string;
@@ -13,7 +14,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "PMS" | "REQUESTS" | "OPS";
+type Tab = "PMS" | "REQUESTS" | "RESERVATIONS" | "OPS";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -101,12 +102,14 @@ export default function AdminShell() {
         <nav className="admin-tabs">
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
+          {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
+      {tab === "RESERVATIONS" && isManager && <ReservationsBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
     </>
   );
