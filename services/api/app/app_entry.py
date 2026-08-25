@@ -1,6 +1,8 @@
 from .automation import router as automation_router
 from .booking_admin import router as booking_admin_router
+from .communication_ingest import router as communication_ingest_router
 from .health import router as health_router
+from .inbox import router as inbox_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
 from .nfc import router as nfc_router
@@ -20,6 +22,8 @@ app.include_router(operations_router)
 app.include_router(stays_router)
 app.include_router(telegram_auth_router)
 app.include_router(automation_router)
+app.include_router(communication_ingest_router)
+app.include_router(inbox_router)
 app.include_router(realtime_router)
 app.include_router(manager_dashboard_router)
 
@@ -27,4 +31,4 @@ app.include_router(manager_dashboard_router)
 # but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.12.0"
+app.version = "0.13.0"
