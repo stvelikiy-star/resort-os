@@ -1,6 +1,7 @@
 from .automation import router as automation_router
 from .booking_admin import router as booking_admin_router
 from .main import app
+from .nfc import router as nfc_router
 from .operations import router as operations_router
 from .realtime import router as realtime_router
 from .stays import router as stays_router
@@ -14,4 +15,5 @@ app.include_router(stays_router)
 app.include_router(telegram_auth_router)
 app.include_router(automation_router)
 app.include_router(realtime_router)
-app.version = "0.7.0"
+app.include_router(nfc_router)
+app.version = "0.8.0"
