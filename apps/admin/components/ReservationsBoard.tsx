@@ -43,6 +43,8 @@ type NfcIssueResult = {
   label?: string | null;
 };
 
+type RetiredBraceletStatus = "BLOCKED" | "LOST" | "RETURNED";
+
 type NdefReader = {
   scan: () => Promise<void>;
   addEventListener: (
@@ -62,6 +64,12 @@ const statusLabels: Record<string, string> = {
   CANCELLED: "Отменена",
   NO_SHOW: "Не заехал",
 };
+const braceletStatusLabels: Record<string, string> = {
+  ACTIVE: "Активен",
+  BLOCKED: "Заблокирован",
+  LOST: "Потерян",
+  RETURNED: "Возвращён",
+};
 
 export default function ReservationsBoard() {
   const [items, setItems] = useState<Reservation[]>([]);
@@ -70,6 +78,7 @@ export default function ReservationsBoard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+
   const [issueTarget, setIssueTarget] = useState<Reservation | null>(null);
   const [braceletUid, setBraceletUid] = useState("");
   const [initialBalance, setInitialBalance] = useState("0");
@@ -77,6 +86,13 @@ export default function ReservationsBoard() {
   const [issueError, setIssueError] = useState<string | null>(null);
   const [scanNotice, setScanNotice] = useState<string | null>(null);
   const [issueResult, setIssueResult] = useState<NfcIssueResult | null>(null);
+
+  const [manageTarget, setManageTarget] = useState<{ reservation: Reservation; wallet: NfcWalletSummary } | null>(null);
+  const [manageBusy, setManageBusy] = useState(false);
+  const [manageError, setManageError] = useState<string | null>(null);
+  const [manageNotice, setManageNotice] = useState<string | null>(null);
+  const [replacementUid, setReplacementUid] = useState("");
+  const [retirePreviousAs, setRetirePreviousAs] = useState<RetiredBraceletStatus>("LOST");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,30 +159,56 @@ export default function ReservationsBoard() {
     setScanNotice(null);
   }
 
-  async function scanNfc() {
-    setIssueError(null);
-    setScanNotice(null);
+  function openNfcManage(item: Reservation, wallet: NfcWalletSummary) {
+    setManageTarget({ reservation: item, wallet });
+    setManageError(null);
+    setManageNotice(null);
+    setReplacementUid("");
+    setRetirePreviousAs(wallet.bracelet_status === "ACTIVE" ? "LOST" : "BLOCKED");
+  }
+
+  function closeNfcManage() {
+    if (manageBusy) return;
+    setManageTarget(null);
+    setManageError(null);
+    setManageNotice(null);
+    setReplacementUid("");
+  }
+
+  async function readNfcUid(setValue: (value: string) => void, setNotice: (value: string) => void) {
     const NDEFReaderCtor = (window as unknown as { NDEFReader?: NdefReaderConstructor }).NDEFReader;
     if (!NDEFReaderCtor) {
-      setScanNotice("Web NFC на этом устройстве недоступен. Введите UID вручную или используйте считыватель как клавиатуру.");
+      setNotice("Web NFC на этом устройстве недоступен. Введите UID вручную или используйте считыватель как клавиатуру.");
       return;
     }
     try {
       const reader = new NDEFReaderCtor();
       await reader.scan();
-      setScanNotice("Поднесите браслет к телефону…");
+      setNotice("Поднесите браслет к телефону…");
       reader.addEventListener("reading", (event) => {
         const serial = (event.serialNumber || "").trim();
         if (!serial) {
-          setScanNotice("Браслет считан, но устройство не передало UID. Используйте ручной ввод.");
+          setNotice("Браслет считан, но устройство не передало UID. Используйте ручной ввод.");
           return;
         }
-        setBraceletUid(serial);
-        setScanNotice("Браслет считан. Проверьте UID и подтвердите выдачу.");
+        setValue(serial);
+        setNotice("Браслет считан. Проверьте UID перед подтверждением.");
       }, { once: true });
     } catch (e) {
-      setScanNotice(e instanceof Error ? `NFC недоступен: ${e.message}` : "Не удалось запустить NFC-считывание");
+      setNotice(e instanceof Error ? `NFC недоступен: ${e.message}` : "Не удалось запустить NFC-считывание");
     }
+  }
+
+  async function scanNfc() {
+    setIssueError(null);
+    setScanNotice(null);
+    await readNfcUid(setBraceletUid, setScanNotice);
+  }
+
+  async function scanReplacementNfc() {
+    setManageError(null);
+    setManageNotice(null);
+    await readNfcUid(setReplacementUid, setManageNotice);
   }
 
   async function issueBracelet(event: FormEvent) {
@@ -210,6 +252,75 @@ export default function ReservationsBoard() {
     }
   }
 
+  async function retireBracelet(nextStatus: RetiredBraceletStatus) {
+    if (!manageTarget?.wallet.bracelet_id) return;
+    setManageBusy(true);
+    setManageError(null);
+    setManageNotice(null);
+    try {
+      const { wallet } = manageTarget;
+      const response = await fetch(`/core/api/v1/admin/nfc/wallets/${wallet.wallet_id}/bracelets/${wallet.bracelet_id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось изменить статус браслета");
+      setManageTarget((current) => current ? {
+        ...current,
+        wallet: { ...current.wallet, bracelet_status: body.bracelet_status },
+      } : current);
+      setManageNotice(`Статус браслета: ${braceletStatusLabels[body.bracelet_status] || body.bracelet_status}. Баланс ${fmt(body.balance_kgs)} сохранён без изменений.`);
+      await load();
+    } catch (e) {
+      setManageError(e instanceof Error ? e.message : "Ошибка NFC-операции");
+    } finally {
+      setManageBusy(false);
+    }
+  }
+
+  async function replaceBracelet(event: FormEvent) {
+    event.preventDefault();
+    if (!manageTarget?.wallet.bracelet_id) return;
+    const normalizedUid = replacementUid.trim();
+    if (normalizedUid.length < 4) {
+      setManageError("UID нового браслета должен содержать минимум 4 символа");
+      return;
+    }
+
+    setManageBusy(true);
+    setManageError(null);
+    setManageNotice(null);
+    try {
+      const { reservation, wallet } = manageTarget;
+      const label = `${reservation.room_code ? `№${reservation.room_code}` : reservation.bookingNumber} · ${reservation.firstName || "Гость"}`.slice(0, 80);
+      const response = await fetch(`/core/api/v1/admin/nfc/wallets/${wallet.wallet_id}/bracelets/${wallet.bracelet_id}/replace`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bracelet_uid: normalizedUid, label, retire_previous_as: retirePreviousAs }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось заменить NFC-браслет");
+      setReplacementUid("");
+      setManageTarget((current) => current ? {
+        ...current,
+        wallet: {
+          ...current.wallet,
+          bracelet_id: body.new_bracelet_id,
+          bracelet_status: "ACTIVE",
+          bracelet_label: body.label || current.wallet.bracelet_label,
+          balance_kgs: body.balance_kgs,
+        },
+      } : current);
+      setManageNotice(body.idempotent_replay ? "Новый браслет уже активен. Повторная замена не выполнена." : `Браслет заменён. Баланс ${fmt(body.balance_kgs)} перенесён без денежной операции.`);
+      await load();
+    } catch (e) {
+      setManageError(e instanceof Error ? e.message : "Ошибка замены NFC-браслета");
+    } finally {
+      setManageBusy(false);
+    }
+  }
+
   return (
     <main className="work-shell">
       <div className="work-head">
@@ -229,11 +340,12 @@ export default function ReservationsBoard() {
             <div><span className="field-label">Стоимость</span><b>{fmt(item.totalKgs)}</b></div>
             <div className="reservation-nfc">
               <span className="field-label">NFC</span>
-              {wallet ? <><b className={`nfc-status ${wallet.wallet_status === "ACTIVE" ? "active" : ""}`}>{wallet.wallet_status === "ACTIVE" ? "Кошелёк активен" : wallet.wallet_status}</b><small>{fmt(wallet.balance_kgs)}{wallet.bracelet_label ? ` · ${wallet.bracelet_label}` : ""}</small></> : <><b className="nfc-status">Не выдан</b>{item.status === "CHECKED_IN" && <small>Можно выдать после оформленного заезда</small>}</>}
+              {wallet ? <><b className={`nfc-status ${wallet.wallet_status === "ACTIVE" && wallet.bracelet_status === "ACTIVE" ? "active" : ""}`}>{wallet.bracelet_status ? braceletStatusLabels[wallet.bracelet_status] || wallet.bracelet_status : wallet.wallet_status}</b><small>{fmt(wallet.balance_kgs)}{wallet.bracelet_label ? ` · ${wallet.bracelet_label}` : ""}</small></> : <><b className="nfc-status">Не выдан</b>{item.status === "CHECKED_IN" && <small>Можно выдать после оформленного заезда</small>}</>}
             </div>
             <div className="reservation-actions">
               {item.status === "GUARANTEED" && <button className="btn primary" disabled={busy === item.id} onClick={() => transition(item, "check-in")}>Оформить заезд</button>}
               {item.status === "CHECKED_IN" && !wallet && <button className="btn nfc" disabled={busy === item.id} onClick={() => openNfcIssue(item)}>Выдать NFC-браслет</button>}
+              {wallet && <button className="btn nfc" disabled={busy === item.id} onClick={() => openNfcManage(item, wallet)}>Управление NFC</button>}
               {item.status === "CHECKED_IN" && <button className="btn primary" disabled={busy === item.id} onClick={() => transition(item, "check-out")}>Оформить выезд</button>}
             </div>
           </article>;
@@ -260,6 +372,41 @@ export default function ReservationsBoard() {
             {issueError && <div className="error-box compact">{issueError}</div>}
             <button className="btn primary nfc-submit" disabled={issueBusy}>{issueBusy ? "Выдаю…" : "Выдать браслет"}</button>
           </form>}
+        </section>
+      </div>}
+
+      {manageTarget && <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeNfcManage(); }}>
+        <section className="nfc-modal nfc-manage-modal" role="dialog" aria-modal="true" aria-labelledby="nfc-manage-title">
+          <div className="nfc-modal-head">
+            <div><p className="eyebrow">Ресепшен · NFC</p><h2 id="nfc-manage-title">Управление браслетом</h2><p>{manageTarget.reservation.bookingNumber} · {manageTarget.reservation.firstName || "Гость"} · номер {manageTarget.reservation.room_code || "—"}</p></div>
+            <button className="btn" type="button" disabled={manageBusy} onClick={closeNfcManage}>Закрыть</button>
+          </div>
+
+          <div className="nfc-wallet-panel">
+            <div><span>Баланс</span><strong>{fmt(manageTarget.wallet.balance_kgs)}</strong></div>
+            <div><span>Кошелёк</span><strong>{manageTarget.wallet.wallet_status}</strong></div>
+            <div><span>Браслет</span><strong>{braceletStatusLabels[manageTarget.wallet.bracelet_status || ""] || manageTarget.wallet.bracelet_status || "—"}</strong></div>
+          </div>
+
+          {manageTarget.wallet.bracelet_status === "ACTIVE" && <div className="nfc-retire-section">
+            <p className="field-label">Если браслет больше нельзя использовать</p>
+            <div className="nfc-retire-actions">
+              <button className="btn danger-soft" type="button" disabled={manageBusy} onClick={() => retireBracelet("LOST")}>Потерян</button>
+              <button className="btn danger-soft" type="button" disabled={manageBusy} onClick={() => retireBracelet("BLOCKED")}>Заблокировать</button>
+              <button className="btn" type="button" disabled={manageBusy} onClick={() => retireBracelet("RETURNED")}>Возвращён</button>
+            </div>
+            <small>Статус меняется только у браслета. Деньги гостя остаются в кошельке.</small>
+          </div>}
+
+          <form className="nfc-issue-form nfc-replace-form" onSubmit={replaceBracelet}>
+            <div className="nfc-section-title"><strong>Заменить браслет</strong><span>Новый браслет получает тот же кошелёк и текущий баланс.</span></div>
+            {manageTarget.wallet.bracelet_status === "ACTIVE" && <label><span>Старый браслет считать</span><select value={retirePreviousAs} onChange={(e) => setRetirePreviousAs(e.target.value as RetiredBraceletStatus)}><option value="LOST">Потерянным</option><option value="BLOCKED">Заблокированным</option><option value="RETURNED">Возвращённым</option></select></label>}
+            <label><span>UID нового браслета</span><div className="nfc-input-row"><input value={replacementUid} onChange={(e) => setReplacementUid(e.target.value)} placeholder="Новый UID" required minLength={4} maxLength={160} /><button className="btn" type="button" disabled={manageBusy} onClick={scanReplacementNfc}>Считать NFC</button></div></label>
+            <div className="nfc-warning"><strong>Баланс не переносится вручную</strong><span>Замена не создаёт денежную операцию: новый браслет просто получает доступ к существующему кошельку.</span></div>
+            {manageNotice && <div className="notice-box">{manageNotice}</div>}
+            {manageError && <div className="error-box compact">{manageError}</div>}
+            <button className="btn primary nfc-submit" disabled={manageBusy || manageTarget.wallet.wallet_status !== "ACTIVE"}>{manageBusy ? "Выполняю…" : "Заменить браслет"}</button>
+          </form>
         </section>
       </div>}
     </main>
