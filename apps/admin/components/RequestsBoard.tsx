@@ -108,7 +108,9 @@ export default function RequestsBoard() {
       setError("Укажите фактически полученную положительную сумму.");
       return;
     }
-    const externalRef = window.prompt("Номер операции / внутренний комментарий", "manual-") || `manual-${Date.now()}`;
+    const externalRefText = window.prompt("Номер операции / внутренний комментарий (можно оставить пустым)", "");
+    if (externalRefText === null) return;
+    const externalRef = externalRefText.trim() || null;
     setBusy(item.id);
     setError(null);
     try {
