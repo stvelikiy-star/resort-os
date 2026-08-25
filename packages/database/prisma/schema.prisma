@@ -60,6 +60,27 @@ enum StaffRole {
   TECHNICIAN
 }
 
+enum OperationalTaskType {
+  HOUSEKEEPING
+  MAINTENANCE
+  GUEST_REQUEST
+}
+
+enum OperationalTaskStatus {
+  OPEN
+  IN_PROGRESS
+  IN_INSPECTION
+  DONE
+  CANCELLED
+}
+
+enum OperationalTaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 model Property {
   id           String               @id @default(uuid()) @db.Uuid
   code         String               @unique
@@ -74,6 +95,7 @@ model Property {
   reservations Reservation[]
   auditLogs    AuditLog[]
   staffUsers   StaffUser[]
+  tasks        OperationalTask[]
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
@@ -115,6 +137,7 @@ model Room {
   operationalState RoomOperationalState @default(UNKNOWN)
   notes            String?
   inventoryBlocks  InventoryBlock[]
+  tasks            OperationalTask[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
 
@@ -247,36 +270,41 @@ model InventoryBlock {
 }
 
 model Payment {
-  id            String              @id @default(uuid()) @db.Uuid
-  requestId     String?             @db.Uuid
-  request       ReservationRequest? @relation(fields: [requestId], references: [id])
-  reservationId String?             @db.Uuid
-  reservation   Reservation?        @relation(fields: [reservationId], references: [id])
-  amountKgs     Int
-  method        String
-  status        PaymentStatus       @default(PENDING)
-  externalRef   String?
-  paidAt        DateTime?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id             String              @id @default(uuid()) @db.Uuid
+  requestId      String?             @db.Uuid
+  request        ReservationRequest? @relation(fields: [requestId], references: [id])
+  reservationId  String?             @db.Uuid
+  reservation    Reservation?        @relation(fields: [reservationId], references: [id])
+  amountKgs      Int
+  method         String
+  status         PaymentStatus       @default(PENDING)
+  provider       String?
+  externalRef    String?
+  idempotencyKey String?             @unique
+  metadata       Json?
+  paidAt         DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@index([requestId])
   @@index([reservationId])
+  @@unique([provider, externalRef])
   @@map("payments")
 }
 
 model StaffUser {
-  id           String        @id @default(uuid()) @db.Uuid
-  propertyId   String        @db.Uuid
-  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  username     String
-  displayName  String
-  passwordHash String
-  role         StaffRole
-  isActive     Boolean       @default(true)
-  sessions     AuthSession[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id            String            @id @default(uuid()) @db.Uuid
+  propertyId    String            @db.Uuid
+  property      Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  username      String
+  displayName   String
+  passwordHash  String
+  role          StaffRole
+  isActive      Boolean           @default(true)
+  sessions      AuthSession[]
+  assignedTasks OperationalTask[] @relation("TaskAssignee")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@unique([propertyId, username])
   @@index([propertyId, role])
@@ -296,6 +324,32 @@ model AuthSession {
   @@index([userId, expiresAt])
   @@index([expiresAt])
   @@map("auth_sessions")
+}
+
+model OperationalTask {
+  id            String                  @id @default(uuid()) @db.Uuid
+  propertyId    String                  @db.Uuid
+  property      Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomId        String?                 @db.Uuid
+  room          Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  type          OperationalTaskType
+  status        OperationalTaskStatus   @default(OPEN)
+  priority      OperationalTaskPriority @default(NORMAL)
+  title         String
+  description   String?
+  assignedToId  String?                 @db.Uuid
+  assignedTo    StaffUser?              @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdByType String
+  createdById   String?
+  source        String?
+  completedAt   DateTime?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  @@index([propertyId, status, type])
+  @@index([roomId, status])
+  @@index([assignedToId, status])
+  @@map("operational_tasks")
 }
 
 model AuditLog {
