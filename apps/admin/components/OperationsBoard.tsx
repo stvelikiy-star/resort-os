@@ -21,10 +21,18 @@ type Room = { id: string; code: string; room_type_name: string; operational_stat
 const typeLabel: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
 const statusLabel: Record<string, string> = { OPEN: "Открыта", IN_PROGRESS: "В работе", IN_INSPECTION: "Проверка", DONE: "Готово", CANCELLED: "Отменена" };
 
+function dateTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
 export default function OperationsBoard({ user }: { user: User }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filter, setFilter] = useState("ACTIVE");
+  const [typeFilter, setTypeFilter] = useState("ALL");
+  const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -61,7 +69,25 @@ export default function OperationsBoard({ user }: { user: User }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const visible = useMemo(() => tasks.filter((task) => filter === "ALL" ? true : filter === "ACTIVE" ? !["DONE", "CANCELLED"].includes(task.status) : task.status === filter), [tasks, filter]);
+  const activeTasks = useMemo(() => tasks.filter((task) => !["DONE", "CANCELLED"].includes(task.status)), [tasks]);
+  const metrics = useMemo(() => ({
+    active: activeTasks.length,
+    unassigned: activeTasks.filter((task) => !task.assigned_to_name).length,
+    housekeeping: activeTasks.filter((task) => task.type === "HOUSEKEEPING").length,
+    maintenance: activeTasks.filter((task) => task.type === "MAINTENANCE").length,
+    inspection: activeTasks.filter((task) => task.status === "IN_INSPECTION").length,
+  }), [activeTasks]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return tasks.filter((task) => {
+      const statusMatches = filter === "ALL" ? true : filter === "ACTIVE" ? !["DONE", "CANCELLED"].includes(task.status) : task.status === filter;
+      const typeMatches = typeFilter === "ALL" || task.type === typeFilter;
+      const queryMatches = !q || [task.title, task.description, task.room_code, task.assigned_to_name, typeLabel[task.type], statusLabel[task.status]]
+        .some((value) => value?.toLowerCase().includes(q));
+      return statusMatches && typeMatches && queryMatches;
+    });
+  }, [tasks, filter, typeFilter, query]);
 
   async function updateStatus(task: Task, status: string) {
     setError(null);
@@ -108,8 +134,23 @@ export default function OperationsBoard({ user }: { user: User }) {
     <main className="work-shell">
       <div className="work-head">
         <div><p className="eyebrow">Операции · персонал</p><h1>Задачи пансионата</h1><p className="subtitle">Уборка, ремонт и запросы гостей с синхронизацией статуса номера.</p></div>
-        <div className="work-actions"><select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="ACTIVE">Активные</option><option value="OPEN">Открытые</option><option value="IN_PROGRESS">В работе</option><option value="IN_INSPECTION">На проверке</option><option value="DONE">Готовые</option><option value="ALL">Все</option></select><button className="btn" onClick={load}>Обновить</button></div>
+        <button className="btn" onClick={load}>Обновить</button>
       </div>
+
+      <div className="summary">
+        <div className="summary-card"><strong>{metrics.active}</strong><span>активных задач</span></div>
+        <div className="summary-card"><strong>{metrics.unassigned}</strong><span>без ответственного</span></div>
+        <div className="summary-card"><strong>{metrics.housekeeping}</strong><span>уборка</span></div>
+        <div className="summary-card"><strong>{metrics.maintenance}</strong><span>ремонт</span></div>
+        <div className="summary-card"><strong>{metrics.inspection}</strong><span>на проверке</span></div>
+      </div>
+
+      <div className="controls">
+        <div className="control"><label>Поиск</label><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Номер, задача, сотрудник…" /></div>
+        <div className="control"><label>Статус</label><select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="ACTIVE">Активные</option><option value="OPEN">Открытые</option><option value="IN_PROGRESS">В работе</option><option value="IN_INSPECTION">На проверке</option><option value="DONE">Готовые</option><option value="CANCELLED">Отменённые</option><option value="ALL">Все</option></select></div>
+        <div className="control"><label>Тип</label><select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}><option value="ALL">Все типы</option><option value="HOUSEKEEPING">Уборка</option><option value="MAINTENANCE">Ремонт</option><option value="GUEST_REQUEST">Запрос гостя</option></select></div>
+      </div>
+
       {error && <div className="error-box">{error}</div>}
       {canCreate && <form className="task-create" onSubmit={createTask}>
         <select value={taskType} onChange={(e) => setTaskType(e.target.value)} disabled={user.role === "MAID" || user.role === "TECHNICIAN"}>
@@ -123,11 +164,12 @@ export default function OperationsBoard({ user }: { user: User }) {
         <button className="btn primary" disabled={creating}>{creating ? "Создаю…" : "Создать задачу"}</button>
       </form>}
       {loading ? <div className="loading">Загрузка задач…</div> : <div className="task-grid">
-        {visible.length === 0 && <div className="empty">Активных задач нет.</div>}
+        {visible.length === 0 && <div className="empty">Задач по выбранным условиям нет.</div>}
         {visible.map((task) => <article className={`task-card p-${task.priority}`} key={task.id}>
           <div className="task-meta"><span>{typeLabel[task.type] || task.type}</span><b>{statusLabel[task.status] || task.status}</b></div>
           <h3>{task.title}</h3>
           <p>{task.room_code ? `Номер ${task.room_code}` : "Без привязки к номеру"}{task.room_state ? ` · ${task.room_state}` : ""}</p>
+          <p>{task.assigned_to_name ? `Ответственный: ${task.assigned_to_name}` : "Ответственный не назначен"} · создана {dateTime(task.created_at)}</p>
           {task.description && <p>{task.description}</p>}
           <div className="task-actions">
             {task.status === "OPEN" && <button className="btn" onClick={() => updateStatus(task, "IN_PROGRESS")}>Взять в работу</button>}
