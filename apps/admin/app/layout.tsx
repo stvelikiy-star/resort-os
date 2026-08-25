@@ -5,6 +5,7 @@ import "./nfc.css";
 import "./finance.css";
 import "./dashboard.css";
 import "./reception.css";
+import "./inbox.css";
 
 export const metadata: Metadata = {
   title: "Три Короны — PMS",
