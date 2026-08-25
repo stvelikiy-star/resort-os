@@ -293,20 +293,24 @@ model Payment {
 }
 
 model StaffUser {
-  id            String            @id @default(uuid()) @db.Uuid
-  propertyId    String            @db.Uuid
-  property      Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  username      String
-  displayName   String
-  passwordHash  String
-  role          StaffRole
-  isActive      Boolean           @default(true)
-  sessions      AuthSession[]
-  assignedTasks OperationalTask[] @relation("TaskAssignee")
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id               String            @id @default(uuid()) @db.Uuid
+  propertyId       String            @db.Uuid
+  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  username         String
+  displayName      String
+  passwordHash     String
+  role             StaffRole
+  isActive         Boolean           @default(true)
+  telegramUserId   String?
+  telegramUsername String?
+  telegramLinkedAt DateTime?
+  sessions         AuthSession[]
+  assignedTasks    OperationalTask[] @relation("TaskAssignee")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@unique([propertyId, username])
+  @@unique([propertyId, telegramUserId])
   @@index([propertyId, role])
   @@map("staff_users")
 }
