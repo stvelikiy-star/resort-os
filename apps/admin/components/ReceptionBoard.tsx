@@ -15,6 +15,21 @@ type Reservation = {
   phone?: string | null;
   room_code?: string | null;
   room_type_name?: string | null;
+  room_state?: string | null;
+  schedule_segments: number;
+  has_room_move: boolean;
+};
+
+type ScheduleSegment = {
+  inventory_block_id: string;
+  room_id: string;
+  room_code: string;
+  room_state: string;
+  room_type_code: string;
+  room_type_name: string;
+  area?: string | null;
+  start: string;
+  end: string;
 };
 
 type Detail = {
@@ -22,8 +37,10 @@ type Detail = {
   guest: { first_name?: string | null; last_name?: string | null; phone?: string | null; email?: string | null };
   source: { channel?: string | null; request_id?: string | null };
   room: { code?: string | null; state?: string | null; room_type_name?: string | null; area?: string | null };
+  schedule: ScheduleSegment[];
+  has_room_move: boolean;
   finance: { total_kgs: number; paid_kgs: number; remaining_kgs: number; payments: Array<{ id: string; amount_kgs: number; method: string; status: string; provider?: string | null; external_ref?: string | null; paid_at?: string | null; created_at: string }> };
-  room_tasks: Array<{ id: string; type: string; status: string; priority: string; title: string; assigned_to_name?: string | null; created_at: string }>;
+  room_tasks: Array<{ id: string; room_code?: string | null; type: string; status: string; priority: string; title: string; assigned_to_name?: string | null; created_at: string }>;
   audit: Array<{ id: string; action: string; resource: string; source?: string | null; result: string; created_at: string }>;
 };
 
@@ -48,17 +65,11 @@ export default function ReceptionBoard() {
     setLoading(true);
     setError(null);
     try {
-      const [reservationsResponse, dashboardResponse] = await Promise.all([
-        fetch("/core/api/v1/admin/booking/reservations?limit=250", { cache: "no-store" }),
-        fetch("/core/api/v1/admin/dashboard", { cache: "no-store" }),
-      ]);
-      const reservationsBody = await reservationsResponse.json().catch(() => ({}));
-      if (!reservationsResponse.ok) throw new Error(reservationsBody.detail || "Не удалось загрузить брони");
-      setItems(reservationsBody.items || []);
-      if (dashboardResponse.ok) {
-        const dashboardBody = await dashboardResponse.json();
-        setLocalDate(dashboardBody.property?.local_date || "");
-      }
+      const response = await fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось загрузить брони");
+      setItems(body.items || []);
+      setLocalDate(body.local_date || "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
@@ -66,7 +77,7 @@ export default function ReceptionBoard() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -88,7 +99,7 @@ export default function ReceptionBoard() {
     try {
       const response = await fetch(`/core/api/v1/admin/stays/reservations/${item.id}/${action}`, { method: "POST" });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось выполнить операцию");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось выполнить операцию");
       await load();
       if (detail?.reservation.id === item.id) await openDetail(item.id);
     } catch (e) {
@@ -102,7 +113,7 @@ export default function ReceptionBoard() {
     setDetailLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/core/api/v1/admin/booking/reservations/${id}`, { cache: "no-store" });
+      const response = await fetch(`/core/api/v1/admin/reception/reservations/${id}`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || "Не удалось загрузить карточку брони");
       setDetail(body as Detail);
@@ -115,7 +126,7 @@ export default function ReceptionBoard() {
 
   return <main className="work-shell reception-shell">
     <div className="work-head">
-      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Гость, номер, даты, гостиничные платежи, заезд/выезд и история действий.</p></div>
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже если гостя переселяли между номерами. Текущий номер берётся из графика проживания.</p></div>
       <button className="btn" onClick={load}>Обновить</button>
     </div>
 
@@ -137,9 +148,9 @@ export default function ReceptionBoard() {
     {loading ? <div className="loading">Загрузка броней…</div> : <div className="reception-list">
       {visible.length === 0 && <div className="empty">По выбранному фильтру броней нет.</div>}
       {visible.map((item) => <article className="reception-card" key={item.id}>
-        <div><span className="status-pill">{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong></div>
+        <div><span className="status-pill">{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong>{item.has_room_move && <small className="room-move-note">Переселение · {item.schedule_segments} сегм.</small>}</div>
         <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
-        <div><span className="field-label">Номер</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small></div>
+        <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small></div>
         <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
         <div><span className="field-label">Стоимость</span><b>{money(item.totalKgs)}</b></div>
         <div className="reception-actions">
@@ -156,16 +167,18 @@ export default function ReceptionBoard() {
 
         <div className="detail-summary">
           <div><span>Гость</span><strong>{[detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Без имени"}</strong><small>{detail.guest.phone || ""}</small><small>{detail.guest.email || ""}</small></div>
-          <div><span>Номер</span><strong>{detail.room.code || "—"}</strong><small>{detail.room.room_type_name || ""}{detail.room.area ? ` · ${detail.room.area}` : ""}</small><small>{detail.room.state ? roomStateLabel[detail.room.state] || detail.room.state : ""}</small></div>
+          <div><span>Текущий/рабочий номер</span><strong>{detail.room.code || "—"}</strong><small>{detail.room.room_type_name || ""}{detail.room.area ? ` · ${detail.room.area}` : ""}</small><small>{detail.room.state ? roomStateLabel[detail.room.state] || detail.room.state : ""}</small></div>
           <div><span>Проживание</span><strong>{detail.reservation.check_in} → {detail.reservation.check_out}</strong><small>{detail.reservation.adults} взр. · {detail.reservation.children} дет.</small></div>
           <div><span>Источник</span><strong>{detail.source.channel || "—"}</strong><small>{detail.source.request_id ? `Request ${detail.source.request_id.slice(0, 8)}…` : ""}</small></div>
         </div>
 
-        <section className="detail-section"><h3>Оплата брони</h3><div className="detail-money"><div><span>Стоимость</span><strong>{money(detail.finance.total_kgs)}</strong></div><div><span>Подтверждено</span><strong>{money(detail.finance.paid_kgs)}</strong></div><div><span>Остаток</span><strong>{money(detail.finance.remaining_kgs)}</strong></div></div>
+        <section className="detail-section"><h3>График проживания</h3><div className="stay-schedule-list">{detail.schedule.map((segment) => <div key={segment.inventory_block_id}><strong>№ {segment.room_code}</strong><span>{segment.start} → {segment.end}</span><small>{segment.room_type_name}{segment.room_state ? ` · ${roomStateLabel[segment.room_state] || segment.room_state}` : ""}</small></div>)}</div></section>
+
+        <section className="detail-section"><h3>Внутренние платежи по брони</h3><div className="detail-money"><div><span>Стоимость</span><strong>{money(detail.finance.total_kgs)}</strong></div><div><span>Подтверждено менеджером</span><strong>{money(detail.finance.paid_kgs)}</strong></div><div><span>Остаток</span><strong>{money(detail.finance.remaining_kgs)}</strong></div></div>
           {detail.finance.payments.length > 0 && <div className="detail-rows">{detail.finance.payments.map((payment) => <div key={payment.id}><strong>{money(payment.amount_kgs)}</strong><span>{payment.method} · {payment.provider || "—"}</span><span>{payment.status}</span><small>{payment.paid_at || payment.created_at}</small></div>)}</div>}
         </section>
 
-        <section className="detail-section"><h3>Задачи по номеру</h3>{detail.room_tasks.length === 0 ? <p className="detail-muted">История задач по текущему номеру отсутствует.</p> : <div className="detail-rows">{detail.room_tasks.map((task) => <div key={task.id}><strong>{task.title}</strong><span>{task.type} · {task.priority}</span><span>{task.status}</span><small>{task.assigned_to_name || "Не назначено"}</small></div>)}</div>}</section>
+        <section className="detail-section"><h3>Задачи по номерам проживания</h3>{detail.room_tasks.length === 0 ? <p className="detail-muted">Задач по номерам этой брони нет.</p> : <div className="detail-rows">{detail.room_tasks.map((task) => <div key={task.id}><strong>{task.title}</strong><span>{task.room_code ? `№ ${task.room_code} · ` : ""}{task.type} · {task.priority}</span><span>{task.status}</span><small>{task.assigned_to_name || "Не назначено"}</small></div>)}</div>}</section>
 
         <section className="detail-section"><h3>Журнал действий</h3>{detail.audit.length === 0 ? <p className="detail-muted">Записей аудита по брони/заявке нет.</p> : <div className="audit-list">{detail.audit.map((entry) => <div key={entry.id}><strong>{entry.action}</strong><span>{entry.resource} · {entry.source || "—"} · {entry.result}</span><time>{entry.created_at}</time></div>)}</div>}</section>
 
