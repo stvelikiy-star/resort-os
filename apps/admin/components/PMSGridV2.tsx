@@ -54,6 +54,7 @@ type ReservationOpen = {
 type ReservationBounds = {
   start: string;
   end: string;
+  segments: number;
 };
 
 type ResizeDraft = {
@@ -142,6 +143,7 @@ export default function PMSGridV2() {
   const [selectedReservation, setSelectedReservation] = useState<ReservationOpen | null>(null);
   const [draggingReservationId, setDraggingReservationId] = useState<string | null>(null);
   const [dropRoomId, setDropRoomId] = useState<string | null>(null);
+  const [dropDate, setDropDate] = useState<string | null>(null);
   const [resizeDraft, setResizeDraft] = useState<ResizeDraft | null>(null);
 
   const days = useMemo(() => dateRange(start, windowDays), [start, windowDays]);
@@ -233,11 +235,12 @@ export default function PMSGridV2() {
         if (block.type !== "RESERVATION" || !block.reservation_id) continue;
         const current = result.get(block.reservation_id);
         if (!current) {
-          result.set(block.reservation_id, { start: block.start, end: block.end });
+          result.set(block.reservation_id, { start: block.start, end: block.end, segments: 1 });
           continue;
         }
         if (block.start < current.start) current.start = block.start;
         if (block.end > current.end) current.end = block.end;
+        current.segments += 1;
       }
     }
     return result;
@@ -258,13 +261,39 @@ export default function PMSGridV2() {
     return { from, to, column: `${3 + from} / ${3 + to}` };
   }
 
-  function onDrop(room: Room, event: React.DragEvent) {
+  function dateFromDragEvent(event: React.DragEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (target.closest(".v2-room-cell,.v2-state-cell")) return null;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const relativeX = event.clientX - rect.left - 308;
+    const index = Math.floor(relativeX / 72);
+    if (index < 0 || index >= windowDays) return null;
+    return shiftDate(startIso, index);
+  }
+
+  function onDrop(room: Room, event: React.DragEvent<HTMLDivElement>) {
     event.preventDefault();
     const reservationId = event.dataTransfer.getData("application/x-resort-reservation") || draggingReservationId;
+    const targetDate = dateFromDragEvent(event);
     setDropRoomId(null);
+    setDropDate(null);
     setDraggingReservationId(null);
     if (!reservationId || room.operational_state === "TECH_BLOCK") return;
-    setSelectedReservation({ id: reservationId, initialMode: "MOVE", targetRoomId: room.id });
+
+    const bounds = reservationBounds.get(reservationId);
+    if (!bounds || bounds.segments !== 1 || !targetDate) {
+      setSelectedReservation({ id: reservationId, initialMode: "MOVE", targetRoomId: room.id });
+      return;
+    }
+
+    const nights = daysBetween(bounds.start, bounds.end);
+    setSelectedReservation({
+      id: reservationId,
+      initialMode: "MOVE",
+      targetRoomId: room.id,
+      initialCheckIn: targetDate,
+      initialCheckOut: shiftDate(targetDate, nights),
+    });
   }
 
   function beginResize(event: React.PointerEvent<HTMLButtonElement>, block: Block, edge: "LEFT" | "RIGHT") {
@@ -336,7 +365,7 @@ export default function PMSGridV2() {
       <div>
         <p className="eyebrow">Resort OS · Three Crowns</p>
         <h1>Шахматка</h1>
-        <p className="subtitle">Переносите будущую бронь между номерами и тяните внешние края полосы для изменения дат. Любое изменение сначала проверяет Resort Core и только потом подтверждается.</p>
+        <p className="subtitle">Перетащите будущую бронь на другой номер или дату; потяните внешний край для сокращения/продления. Resort Core всегда проверяет изменение до сохранения.</p>
       </div>
       <div className={`connection ${error ? "error" : "ok"}`}>{error ? "Core недоступен" : realtime === "live" ? "Realtime" : realtime === "connecting" ? "Подключение…" : "HTTP режим"}</div>
     </div>
@@ -359,7 +388,7 @@ export default function PMSGridV2() {
     </section>
 
     <section className="pms-v2-card">
-      <div className="pms-v2-toolbar"><div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div><div className="pms-v2-help"><span>Перетащить полосу = перенос номера</span><span>Потянуть внешний край = изменить дату</span><span>Клик = карточка / переселение / заезд</span></div></div>
+      <div className="pms-v2-toolbar"><div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div><div className="pms-v2-help"><span>Перетащить = номер + дата</span><span>Потянуть внешний край = даты</span><span>Клик = карточка / переселение / заезд</span></div></div>
       {error && <div className="error-box">{error}</div>}
       {loading && !data ? <div className="loading">Загрузка шахматки…</div> : rooms.length === 0 ? <div className="empty">Нет номеров по фильтрам.</div> : <div className="pms-v2-scroll">
         <div className="pms-v2-board" style={{ minWidth: `${308 + windowDays * 72}px` }}>
@@ -368,10 +397,21 @@ export default function PMSGridV2() {
             {days.map((day) => { const key = localDateString(day); const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day); return <div key={key} className={`v2-date-head ${key === today ? "today" : ""}`}><strong>{day.getDate()}</strong><span>{weekday}</span></div>; })}
           </div>
 
-          {rooms.map((room) => <div key={room.id} className={`pms-v2-row ${dropRoomId === room.id ? "drop-target" : ""} ${room.operational_state === "TECH_BLOCK" ? "tech-row" : ""}`} style={{ gridTemplateColumns }} onDragOver={(event) => { if (draggingReservationId && room.operational_state !== "TECH_BLOCK") { event.preventDefault(); setDropRoomId(room.id); } }} onDragLeave={() => { if (dropRoomId === room.id) setDropRoomId(null); }} onDrop={(event) => onDrop(room, event)}>
+          {rooms.map((room) => <div key={room.id} className={`pms-v2-row ${dropRoomId === room.id ? "drop-target" : ""} ${room.operational_state === "TECH_BLOCK" ? "tech-row" : ""}`} style={{ gridTemplateColumns }} onDragOver={(event) => {
+            if (!draggingReservationId || room.operational_state === "TECH_BLOCK") return;
+            event.preventDefault();
+            setDropRoomId(room.id);
+            setDropDate(dateFromDragEvent(event));
+          }} onDragLeave={(event) => {
+            if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+            if (dropRoomId === room.id) {
+              setDropRoomId(null);
+              setDropDate(null);
+            }
+          }} onDrop={(event) => onDrop(room, event)}>
             <button className="v2-room-cell" onClick={() => setSelectedRoomId(room.id)}><strong>{room.code}</strong><span>{room.room_type_name}</span></button>
             <div className="v2-state-cell"><span className={`badge ${room.operational_state}`}>{STATE_LABELS[room.operational_state]}</span></div>
-            {days.map((day, index) => { const key = localDateString(day); const weekend = day.getDay() === 0 || day.getDay() === 6; return <div key={key} className={`v2-day-bg ${weekend ? "weekend" : ""} ${key === today ? "today" : ""}`} style={{ gridColumn: `${3 + index} / ${4 + index}` }} />; })}
+            {days.map((day, index) => { const key = localDateString(day); const weekend = day.getDay() === 0 || day.getDay() === 6; const targeted = dropRoomId === room.id && dropDate === key; return <div key={key} className={`v2-day-bg ${weekend ? "weekend" : ""} ${key === today ? "today" : ""} ${targeted ? "drop-date-target" : ""}`} style={{ gridColumn: `${3 + index} / ${4 + index}` }} />; })}
             {room.blocks.map((block) => {
               const interactive = block.type === "RESERVATION" && Boolean(block.reservation_id);
               const bounds = block.reservation_id ? reservationBounds.get(block.reservation_id) : undefined;
@@ -384,16 +424,16 @@ export default function PMSGridV2() {
               } : block;
               const place = blockPlacement(visualBlock);
               if (!place) return null;
-              const draggable = interactive && block.reservation_status === "GUARANTEED" && !resizing;
+              const draggable = interactive && block.reservation_status === "GUARANTEED" && bounds?.segments === 1 && !resizing;
 
               return <div key={block.id} className={`v2-booking-bar ${block.type} ${interactive ? "interactive" : ""} ${draggable ? "draggable" : ""} ${resizing ? "resizing" : ""}`} style={{ gridColumn: place.column }} draggable={draggable} onDragStart={(event) => {
                 if (!draggable || !block.reservation_id) return;
                 setDraggingReservationId(block.reservation_id);
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("application/x-resort-reservation", block.reservation_id);
-              }} onDragEnd={() => { setDraggingReservationId(null); setDropRoomId(null); }}>
+              }} onDragEnd={() => { setDraggingReservationId(null); setDropRoomId(null); setDropDate(null); }}>
                 {canResizeLeft && block.reservation_id ? <button className="v2-resize-handle left" title="Потянуть дату заезда" aria-label="Изменить дату заезда" onPointerDown={(event) => beginResize(event, block, "LEFT")} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); } }}>‹</button> : <span className="v2-resize-spacer" />}
-                <button className="v2-bar-main" disabled={!interactive} onClick={() => interactive && block.reservation_id && setSelectedReservation({ id: block.reservation_id })} title={`${blockTitle(block)} · ${block.start} → ${block.end}${draggable ? " · можно перетащить" : ""}`}>
+                <button className="v2-bar-main" disabled={!interactive} onClick={() => interactive && block.reservation_id && setSelectedReservation({ id: block.reservation_id })} title={`${blockTitle(block)} · ${block.start} → ${block.end}${draggable ? " · можно перетащить по номеру и дате" : bounds && bounds.segments > 1 ? " · составное размещение: перенос через карточку" : ""}`}>
                   <strong>{blockTitle(block)}</strong><span>{block.booking_number || block.reason || ""}</span>
                 </button>
                 {canResizeRight && block.reservation_id ? <button className="v2-resize-handle right" title="Потянуть дату выезда" aria-label="Изменить дату выезда" onPointerDown={(event) => beginResize(event, block, "RIGHT")} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); } }}>›</button> : <span className="v2-resize-spacer" />}
