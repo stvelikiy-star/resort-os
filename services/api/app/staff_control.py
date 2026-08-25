@@ -25,25 +25,40 @@ async def staff_overview(
 
         staff = await conn.fetch(
             '''
+            WITH task_stats AS (
+              SELECT "assignedToId" AS user_id,
+                     count(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS active_tasks,
+                     count(*) FILTER (
+                       WHERE "completedAt" IS NOT NULL
+                         AND ("completedAt" AT TIME ZONE $2)::date=$3
+                     )::int AS completed_today,
+                     count(*) FILTER (
+                       WHERE type='HOUSEKEEPING' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+                     )::int AS housekeeping_active,
+                     count(*) FILTER (
+                       WHERE type='MAINTENANCE' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+                     )::int AS maintenance_active
+              FROM operational_tasks
+              WHERE "propertyId"=$1 AND "assignedToId" IS NOT NULL
+              GROUP BY "assignedToId"
+            ),
+            session_stats AS (
+              SELECT "userId" AS user_id,MAX("lastSeenAt") AS last_session_seen_at
+              FROM auth_sessions
+              WHERE "revokedAt" IS NULL
+              GROUP BY "userId"
+            )
             SELECT u.id,u.username,u."displayName",u.role::text AS role,u."isActive",
                    u."telegramUserId",u."telegramUsername",u."telegramLinkedAt",u."createdAt",u."updatedAt",
-                   COALESCE(count(t.id) FILTER (WHERE t.status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')),0)::int AS active_tasks,
-                   COALESCE(count(t.id) FILTER (
-                     WHERE t."completedAt" IS NOT NULL
-                       AND (t."completedAt" AT TIME ZONE $2)::date=$3
-                   ),0)::int AS completed_today,
-                   COALESCE(count(t.id) FILTER (
-                     WHERE t.type='HOUSEKEEPING' AND t.status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
-                   ),0)::int AS housekeeping_active,
-                   COALESCE(count(t.id) FILTER (
-                     WHERE t.type='MAINTENANCE' AND t.status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
-                   ),0)::int AS maintenance_active,
-                   MAX(s."lastSeenAt") AS last_session_seen_at
+                   COALESCE(ts.active_tasks,0)::int AS active_tasks,
+                   COALESCE(ts.completed_today,0)::int AS completed_today,
+                   COALESCE(ts.housekeeping_active,0)::int AS housekeeping_active,
+                   COALESCE(ts.maintenance_active,0)::int AS maintenance_active,
+                   ss.last_session_seen_at
             FROM staff_users u
-            LEFT JOIN operational_tasks t ON t."assignedToId"=u.id
-            LEFT JOIN auth_sessions s ON s."userId"=u.id AND s."revokedAt" IS NULL
+            LEFT JOIN task_stats ts ON ts.user_id=u.id
+            LEFT JOIN session_stats ss ON ss.user_id=u.id
             WHERE u."propertyId"=$1
-            GROUP BY u.id
             ORDER BY
               CASE u.role::text WHEN 'OWNER' THEN 0 WHEN 'MANAGER' THEN 1 WHEN 'MAID' THEN 2 WHEN 'TECHNICIAN' THEN 3 ELSE 4 END,
               u."displayName"
