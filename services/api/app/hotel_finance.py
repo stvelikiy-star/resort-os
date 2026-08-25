@@ -155,6 +155,13 @@ async def finance_summary(
         return name or row["request_guest"] or None
 
     return {
+        "scope": {
+            "internal_only": True,
+            "payment_collection": "MANAGER_MANUAL",
+            "manager_decides_prepayment": True,
+            "automated_acquiring_required": False,
+            "accounting_report": False,
+        },
         "range": {"from": from_date, "to": to_date, "timezone": prop["timezone"], "currency": prop["currency"]},
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],
@@ -180,9 +187,10 @@ async def finance_summary(
             for row in recent
         ],
         "truth": {
-            "received": "Period received totals include Payment.status=RECEIVED using paidAt.",
-            "pending": "Pending total is a payment-record snapshot for records created in the selected range; it is not recognized revenue.",
-            "active_reservations": "Active reservation totals are a current snapshot of GUARANTEED/CHECKED_IN reservation values and received payment facts; they are not an accounting revenue-recognition report.",
+            "received": "Period received totals include only manager-recorded Payment.status=RECEIVED facts using paidAt.",
+            "pending": "Pending total is an internal payment-record snapshot; it is not recognized revenue and does not mean automation is collecting payment.",
+            "active_reservations": "Active reservation totals are a current internal snapshot of GUARANTEED/CHECKED_IN reservation values and manager-confirmed payment facts; they are not an accounting revenue-recognition report.",
             "refunds": "Current Payment model has REFUNDED status but no normalized refund timestamp, so refunded amount is shown only as an all-time snapshot, not attributed to the selected period.",
+            "collection": "Prepayment collection and terms are manager-owned in V1; Resort OS only reports stored internal facts.",
         },
     }
