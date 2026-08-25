@@ -203,7 +203,8 @@ async def change_task_status(
             )
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
-                   VALUES ($1,$2,'STAFF',$3,'STATUS_CHANGE','OperationalTask',$4,'OPS','SUCCESS',jsonb_build_object('status',$5),now())''',
+                   VALUES ($1,$2,'STAFF',$3,'STATUS_CHANGE','OperationalTask',$4,'OPS','SUCCESS',
+                     jsonb_build_object('status',$5::text),now())''',
                 uuid.uuid4(), pid, user["id"], str(task_id), payload.status,
             )
     return {"id": str(task_id), "status": payload.status}
