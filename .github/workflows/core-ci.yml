@@ -77,6 +77,18 @@ jobs:
         working-directory: apps/web
         run: npm run build
 
+      - name: Install staff PWA dependencies
+        working-directory: apps/staff
+        run: npm install
+
+      - name: Typecheck staff PWA
+        working-directory: apps/staff
+        run: npm run typecheck
+
+      - name: Build staff PWA
+        working-directory: apps/staff
+        run: npm run build
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -95,6 +107,11 @@ jobs:
 
       - name: Bootstrap CI owner account
         run: python scripts/bootstrap_owner.py
+
+      - name: Bootstrap CI line staff accounts
+        run: |
+          STAFF_USERNAME=ci-maid STAFF_PASSWORD=CI-Maid-Strong-Password-2026 STAFF_DISPLAY_NAME="CI Maid" STAFF_ROLE=MAID python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-tech STAFF_PASSWORD=CI-Tech-Strong-Password-2026 STAFF_DISPLAY_NAME="CI Technician" STAFF_ROLE=TECHNICIAN python scripts/upsert_staff_user.py
 
       - name: Start API
         run: |
@@ -122,7 +139,7 @@ jobs:
           echo "$RESPONSE" > /tmp/request.json
           echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["is_reservation"] is False; assert d["status"] == "NEW"; open("/tmp/request_id","w").write(d["id"])'
 
-      - name: Verify PMS rejects unauthenticated access
+      - name: Verify protected APIs reject unauthenticated access
         run: |
           CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01")
           test "$CODE" = "401"
@@ -206,15 +223,46 @@ jobs:
           open('/tmp/housekeeping_task_id','w').write(d['housekeeping_task_id'])
           PY
 
-      - name: Verify housekeeping inspection lifecycle
+      - name: Verify maid claims and submits housekeeping for inspection
+        run: |
+          curl --fail -sS -c /tmp/maid-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-maid","password":"CI-Maid-Strong-Password-2026"}' > /tmp/maid-login.json
+          TID=$(cat /tmp/housekeeping_task_id)
+          curl --fail -sS -b /tmp/maid-cookies.txt http://127.0.0.1:8000/api/v1/ops/tasks > /tmp/maid-tasks.json
+          python - <<'PY'
+          import json
+          tid=open('/tmp/housekeeping_task_id').read().strip()
+          d=json.load(open('/tmp/maid-tasks.json'))
+          assert any(x['id']==tid for x in d['items'])
+          PY
+          curl --fail -sS -b /tmp/maid-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/claim" > /tmp/maid-claim.json
+          curl --fail -sS -b /tmp/maid-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection.json
+          python -c 'import json; assert json.load(open("/tmp/inspection.json"))["status"] == "IN_INSPECTION"'
+
+      - name: Verify management inspection returns room CLEAN
         run: |
           TID=$(cat /tmp/housekeeping_task_id)
           curl --fail -sS -b /tmp/resort-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
-            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection.json
-          curl --fail -sS -b /tmp/resort-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
             -H 'Content-Type: application/json' -d '{"status":"DONE"}' > /tmp/clean.json
           python -c 'import json; assert json.load(open("/tmp/clean.json"))["status"] == "DONE"'
-          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/ops/tasks?type=HOUSEKEEPING" > /tmp/tasks.json
+
+      - name: Verify technician maintenance lifecycle
+        run: |
+          ROOM_ID=$(python -c 'import json; print(json.load(open("/tmp/grid-before.json"))["rooms"][0]["id"])')
+          RESPONSE=$(curl --fail -sS -b /tmp/resort-cookies.txt -X POST http://127.0.0.1:8000/api/v1/ops/tasks \
+            -H 'Content-Type: application/json' \
+            -d "{\"type\":\"MAINTENANCE\",\"room_id\":\"$ROOM_ID\",\"priority\":\"HIGH\",\"title\":\"CI maintenance test\",\"source\":\"CI\"}")
+          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); open("/tmp/maintenance_task_id","w").write(d["id"])'
+          curl --fail -sS -c /tmp/tech-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-tech","password":"CI-Tech-Strong-Password-2026"}' > /tmp/tech-login.json
+          TID=$(cat /tmp/maintenance_task_id)
+          curl --fail -sS -b /tmp/tech-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/claim" > /tmp/tech-claim.json
+          curl --fail -sS -b /tmp/tech-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"DONE"}' > /tmp/tech-done.json
+          python -c 'import json; assert json.load(open("/tmp/tech-done.json"))["status"] == "DONE"'
 
       - name: Start canonical PMS admin
         working-directory: apps/admin
@@ -238,9 +286,23 @@ jobs:
           curl --fail http://127.0.0.1:3000/
           curl --fail "http://127.0.0.1:3000/core/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
 
+      - name: Start staff PWA
+        working-directory: apps/staff
+        run: |
+          npm run start > /tmp/resort-staff.log 2>&1 &
+          echo $! > /tmp/resort-staff.pid
+          sleep 3
+
+      - name: Smoke test staff PWA shell
+        run: |
+          curl --fail http://127.0.0.1:3002/
+          curl --fail http://127.0.0.1:3002/manifest.webmanifest
+          curl --fail http://127.0.0.1:3002/sw.js
+
       - name: Show logs on failure
         if: failure()
         run: |
           cat /tmp/resort-api.log || true
           cat /tmp/resort-admin.log || true
           cat /tmp/resort-web.log || true
+          cat /tmp/resort-staff.log || true
