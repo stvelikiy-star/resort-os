@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import parse_qsl
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from .auth import COOKIE_SECURE, SESSION_COOKIE, SESSION_TTL_HOURS, current_user, hash_session_token
@@ -71,7 +71,8 @@ def validate_init_data(init_data: str) -> dict[str, Any]:
 
 async def set_staff_session(response: Response, conn, user_row) -> dict[str, Any]:
     raw_token = secrets.token_urlsafe(48)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=SESSION_TTL_HOURS)
+    # PostgreSQL schema stores timestamp without timezone, matching the canonical web auth flow.
+    expires_at = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
     session_id = uuid.uuid4()
     await conn.execute(
         '''
@@ -87,7 +88,6 @@ async def set_staff_session(response: Response, conn, user_row) -> dict[str, Any
         SESSION_COOKIE,
         raw_token,
         max_age=SESSION_TTL_HOURS * 3600,
-        expires=expires_at,
         httponly=True,
         secure=COOKIE_SECURE,
         samesite="lax",
