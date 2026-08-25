@@ -3,16 +3,27 @@ import os
 from datetime import datetime, timezone
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from .communication_ingest import NormalizedChannelMessage, ingest_normalized_channel_message
 
 router = APIRouter(prefix="/api/v1/channels/telegram", tags=["channel-telegram"])
 
+TELEGRAM_SALES_BOT_TOKEN = os.environ.get("TELEGRAM_SALES_BOT_TOKEN")
 TELEGRAM_SALES_WEBHOOK_SECRET = os.environ.get("TELEGRAM_SALES_WEBHOOK_SECRET")
 TELEGRAM_SALES_CHANNEL_CODE = os.environ.get("TELEGRAM_SALES_CHANNEL_CODE", "TELEGRAM_SALES")
 TELEGRAM_SALES_DISPLAY_NAME = os.environ.get("TELEGRAM_SALES_DISPLAY_NAME", "Telegram Sales")
 TELEGRAM_SALES_ACCOUNT_ID = os.environ.get("TELEGRAM_SALES_ACCOUNT_ID")
+TELEGRAM_PROVIDER_TIMEOUT_SECONDS = float(os.environ.get("TELEGRAM_PROVIDER_TIMEOUT_SECONDS", "10"))
+
+
+def telegram_sales_inbound_configured() -> bool:
+    return bool(TELEGRAM_SALES_WEBHOOK_SECRET)
+
+
+def telegram_sales_outbound_configured() -> bool:
+    return bool(TELEGRAM_SALES_BOT_TOKEN)
 
 
 def _require_webhook_secret(value: str | None) -> None:
@@ -64,6 +75,80 @@ def _telegram_message(update: dict[str, Any]) -> dict[str, Any] | None:
     # contract is approved for them.
     message = update.get("message")
     return message if isinstance(message, dict) else None
+
+
+async def send_telegram_text(chat_id: str, text: str) -> dict[str, Any]:
+    """Call Telegram Bot API sendMessage and report evidence, not assumptions.
+
+    SENT means Telegram returned HTTP success with `ok=true` and a Message.
+    FAILED means Telegram returned a definite provider rejection.
+    UNKNOWN means the network/timeout failed and Core cannot know whether the
+    provider received the request. UNKNOWN must never be retried automatically
+    with the same business intent because Bot API sendMessage has no client
+    idempotency key.
+    """
+    if not TELEGRAM_SALES_BOT_TOKEN:
+        return {
+            "state": "FAILED",
+            "description": "Telegram Sales outbound is not configured",
+            "provider_status_code": None,
+            "provider_payload": None,
+            "message_id": None,
+            "sent_at": None,
+        }
+
+    url = f"https://api.telegram.org/bot{TELEGRAM_SALES_BOT_TOKEN}/sendMessage"
+    try:
+        async with httpx.AsyncClient(timeout=TELEGRAM_PROVIDER_TIMEOUT_SECONDS) as client:
+            response = await client.post(url, json={"chat_id": chat_id, "text": text})
+    except httpx.RequestError as exc:
+        return {
+            "state": "UNKNOWN",
+            "description": f"Telegram request transport error: {exc.__class__.__name__}",
+            "provider_status_code": None,
+            "provider_payload": None,
+            "message_id": None,
+            "sent_at": None,
+        }
+
+    try:
+        data = response.json()
+    except ValueError:
+        data = {"ok": False, "description": "Telegram returned non-JSON response"}
+
+    if not isinstance(data, dict):
+        data = {"ok": False, "description": "Telegram returned invalid response payload"}
+
+    result = data.get("result") if isinstance(data.get("result"), dict) else None
+    message_id = result.get("message_id") if result else None
+
+    if response.is_success and data.get("ok") is True and isinstance(message_id, int):
+        unix_date = result.get("date")
+        sent_at = (
+            datetime.fromtimestamp(unix_date, tz=timezone.utc)
+            if isinstance(unix_date, int) and unix_date >= 0
+            else datetime.now(timezone.utc)
+        )
+        return {
+            "state": "SENT",
+            "description": None,
+            "provider_status_code": response.status_code,
+            "provider_payload": data,
+            "message_id": message_id,
+            "sent_at": sent_at,
+        }
+
+    description = data.get("description")
+    if not isinstance(description, str):
+        description = f"Telegram rejected sendMessage with HTTP {response.status_code}"
+    return {
+        "state": "FAILED",
+        "description": description[:1000],
+        "provider_status_code": response.status_code,
+        "provider_payload": data,
+        "message_id": None,
+        "sent_at": None,
+    }
 
 
 @router.post("/webhook")
