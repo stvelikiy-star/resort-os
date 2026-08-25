@@ -112,7 +112,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="section gallery-section" id="gallery"><div className="wrap"><span className="eyebrow dark">Три Короны</span><h2 className="display-title">Озеро, территория и отдых</h2><p className="section-copy">Финальный медиапакет будет использовать фотографии самого курорта; структура галереи уже подготовлена для широкоформатных кадров и удобного просмотра.</p><div className="gallery-grid"><div className="g1" /><div className="g2" /><div className="g3" /><div className="g4" /></div></div></section>
+        <section className="section gallery-section" id="gallery"><div className="wrap"><span className="eyebrow dark">Три Короны</span><h2 className="display-title">Озеро, территория и отдых</h2><p className="section-copy">Берег Иссык-Куля, пляж, пирс и курортная территория создают пространство для спокойного отдыха в Чолпон-Ате.</p><div className="gallery-grid"><div className="g1" /><div className="g2" /><div className="g3" /><div className="g4" /></div></div></section>
 
         <section className="contact-band"><div className="wrap contact-band-grid"><div><span className="eyebrow dark">Нужна помощь с выбором?</span><h2>Свяжитесь с менеджером</h2><p>Если даты или категория требуют уточнения, менеджер поможет подобрать вариант.</p></div><div className="contact-actions"><a className="primary-button" href="tel:+996558085002">+996 558 08 50 02</a><a className="outline-button" href="mailto:3koronykg@mail.ru">3koronykg@mail.ru</a></div></div></section>
 
