@@ -2,11 +2,11 @@ import hashlib
 import os
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Callable
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError
+from argon2.exceptions import VerificationError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
@@ -36,17 +36,13 @@ def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-async def _property_id(conn) -> uuid.UUID | None:
-    return await conn.fetchval("SELECT id FROM properties WHERE code = $1", PROPERTY_CODE)
-
-
 async def current_user(request: Request) -> dict[str, Any]:
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     token_hash = hash_session_token(token)
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     async with request.app.state.db.acquire() as conn:
         row = await conn.fetchrow(
@@ -115,7 +111,7 @@ async def login(payload: LoginPayload, request: Request, response: Response):
 
         try:
             password_hasher.verify(row["passwordHash"], payload.password)
-        except VerifyMismatchError:
+        except VerificationError:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
         if password_hasher.check_needs_rehash(row["passwordHash"]):
@@ -127,7 +123,7 @@ async def login(payload: LoginPayload, request: Request, response: Response):
 
         raw_token = secrets.token_urlsafe(48)
         token_hash = hash_session_token(raw_token)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=SESSION_TTL_HOURS)
+        expires_at = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
         session_id = uuid.uuid4()
 
         await conn.execute(
@@ -156,7 +152,6 @@ async def login(payload: LoginPayload, request: Request, response: Response):
         SESSION_COOKIE,
         raw_token,
         max_age=SESSION_TTL_HOURS * 3600,
-        expires=expires_at,
         httponly=True,
         secure=COOKIE_SECURE,
         samesite="lax",
