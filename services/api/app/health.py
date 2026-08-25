@@ -1,5 +1,8 @@
+import os
+
 from fastapi import APIRouter, HTTPException, Request
 
+PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 router = APIRouter(tags=["health"])
 
 
@@ -21,10 +24,10 @@ async def ready(request: Request):
                 FROM properties p
                 WHERE p.code=$1
                 ''',
-                "THREE_CROWNS",
+                PROPERTY_CODE,
             )
             if not prop:
-                raise HTTPException(status_code=503, detail="Three Crowns property is not loaded")
+                raise HTTPException(status_code=503, detail="Configured property is not loaded")
     except HTTPException:
         raise
     except Exception as exc:
