@@ -97,6 +97,7 @@ async def automation_capabilities(_service: dict[str, Any] = Depends(service_acc
             "GET /api/v1/booking/check-availability",
             "POST /api/v1/automation/reservation-requests",
             "POST /api/v1/automation/staff-intake",
+            "POST /api/v1/automation/inbox/messages",
         ],
         "forbidden_for_ai": [
             "confirm-payment",
@@ -108,6 +109,7 @@ async def automation_capabilities(_service: dict[str, Any] = Depends(service_acc
         ],
         "truth_rule": "Tool failure or unknown result must never be described as success.",
         "reservation_rule": "Automation creates ReservationRequest only; guaranteed reservation requires controlled payment/management flow.",
+        "inbox_rule": "Provider adapters may ingest normalized facts only; external delivery must never be claimed without provider evidence.",
     }
 
 
