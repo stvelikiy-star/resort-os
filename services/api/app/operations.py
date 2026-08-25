@@ -83,6 +83,7 @@ async def list_tasks(
     if task_status and task_status not in TASK_STATUSES:
         raise HTTPException(status_code=422, detail="Unknown task status")
 
+    line_staff_id = uuid.UUID(user["id"]) if user["role"] in {"MAID", "TECHNICIAN"} else None
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user["property_code"])
         rows = await conn.fetch(
@@ -98,12 +99,13 @@ async def list_tasks(
               AND t.type::text = ANY($2::text[])
               AND ($3::text IS NULL OR t.status::text=$3)
               AND ($4::text IS NULL OR t.type::text=$4)
+              AND ($6::uuid IS NULL OR t."assignedToId" IS NULL OR t."assignedToId"=$6)
             ORDER BY
               CASE t.priority::text WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,
               t."createdAt" DESC
             LIMIT $5
             ''',
-            pid, list(allowed), task_status, task_type, limit,
+            pid, list(allowed), task_status, task_type, limit, line_staff_id,
         )
     return {"items": [task_to_dict(row) for row in rows]}
 
@@ -162,6 +164,43 @@ async def create_task(
     return {"id": str(task_id), "status": "OPEN"}
 
 
+@router.post("/tasks/{task_id}/claim")
+async def claim_task(
+    task_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(current_user),
+):
+    if user["role"] not in {"MAID", "TECHNICIAN"}:
+        raise HTTPException(status_code=403, detail="Only line staff claims tasks through this endpoint")
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn, user["property_code"])
+            task = await conn.fetchrow(
+                '''SELECT id,type::text AS type,status::text AS status,"assignedToId" FROM operational_tasks
+                   WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                task_id, pid,
+            )
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if task["type"] not in allowed_types_for_role(user["role"]):
+                raise HTTPException(status_code=403, detail="Task type not allowed for role")
+            current_user_id = uuid.UUID(user["id"])
+            if task["assignedToId"] and task["assignedToId"] != current_user_id:
+                raise HTTPException(status_code=409, detail="Task is already assigned to another employee")
+            if task["status"] not in {"OPEN", "IN_PROGRESS"}:
+                raise HTTPException(status_code=409, detail="Task cannot be claimed in current state")
+            await conn.execute(
+                '''UPDATE operational_tasks SET "assignedToId"=$1,status='IN_PROGRESS',"updatedAt"=now() WHERE id=$2''',
+                current_user_id, task_id,
+            )
+            await conn.execute(
+                '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'CLAIM','OperationalTask',$4,'STAFF_PWA','SUCCESS',now())''',
+                uuid.uuid4(), pid, user["id"], str(task_id),
+            )
+    return {"id": str(task_id), "status": "IN_PROGRESS", "assigned_to_id": user["id"]}
+
+
 @router.patch("/tasks/{task_id}/status")
 async def change_task_status(
     task_id: uuid.UUID,
@@ -176,7 +215,7 @@ async def change_task_status(
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             task = await conn.fetchrow(
-                '''SELECT id,type::text AS type,status::text AS status,"roomId" FROM operational_tasks
+                '''SELECT id,type::text AS type,status::text AS status,"roomId","assignedToId" FROM operational_tasks
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 task_id, pid,
             )
@@ -184,6 +223,8 @@ async def change_task_status(
                 raise HTTPException(status_code=404, detail="Task not found")
             if task["type"] not in allowed_types_for_role(user["role"]):
                 raise HTTPException(status_code=403, detail="Task type not allowed for role")
+            if user["role"] in {"MAID", "TECHNICIAN"} and task["assignedToId"] != uuid.UUID(user["id"]):
+                raise HTTPException(status_code=403, detail="Claim the task before changing its status")
 
             if user["role"] == "MAID" and payload.status == "DONE":
                 raise HTTPException(status_code=403, detail="Housekeeping completion requires inspection")
