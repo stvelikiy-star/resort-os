@@ -1,0 +1,102 @@
+{
+  "name": "Three Crowns - Guest Sales Context Core",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "three-crowns/guest-sales-context",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "54c8ff74-b6dd-43e2-9d91-a29151001001",
+      "name": "Sales Context Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-700, 0],
+      "webhookId": "three-crowns-guest-sales-context"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body ?? $json;\nfor (const key of ['check_in','check_out','adults']) { if (b[key] === undefined || b[key] === null || String(b[key]).trim() === '') throw new Error(`Missing required field: ${key}`); }\nconst adults = Number(b.adults); const children = Number(b.children || 0);\nif (!Number.isInteger(adults) || adults < 1) throw new Error('adults must be a positive integer');\nif (!Number.isInteger(children) || children < 0) throw new Error('children must be a nonnegative integer');\nreturn [{ json: { check_in: String(b.check_in), check_out: String(b.check_out), adults, children, room_type_code: b.room_type_code ? String(b.room_type_code) : null } }];"
+      },
+      "id": "54c8ff74-b6dd-43e2-9d91-a29151001002",
+      "name": "Normalize Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/read/hotel-facts'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54c8ff74-b6dd-43e2-9d91-a29151001003",
+      "name": "Get Hotel Facts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-220, -100]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/booking/check-availability'}}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "check_in", "value": "={{$('Normalize Search').item.json.check_in}}" },
+            { "name": "check_out", "value": "={{$('Normalize Search').item.json.check_out}}" },
+            { "name": "adults", "value": "={{$('Normalize Search').item.json.adults}}" },
+            { "name": "children", "value": "={{$('Normalize Search').item.json.children}}" },
+            { "name": "room_type_code", "value": "={{$('Normalize Search').item.json.room_type_code || ''}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "54c8ff74-b6dd-43e2-9d91-a29151001004",
+      "name": "Check Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [20, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const facts = $('Get Hotel Facts').item.json;\nconst availability = $('Check Availability').item.json;\nconst sellable = (availability.results || []).filter(x => x.pricing?.sellable === true && Number.isFinite(x.pricing?.total_kgs));\nreturn [{ json: { ok: true, hotel_facts: facts, search: { check_in: availability.check_in, check_out: availability.check_out, nights: availability.nights, adults: availability.adults, children: availability.children }, sellable_options: sellable, truth_rules: ['Use only sellable_options for date-specific offers.', 'ReservationRequest is not a reservation.', 'Do not invent policy fields marked PARTIAL, UNKNOWN or STALE_DO_NOT_USE.', 'Provider/channel delivery is handled outside Resort Core.'] } }];"
+      },
+      "id": "54c8ff74-b6dd-43e2-9d91-a29151001005",
+      "name": "Build Truth Bundle",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "54c8ff74-b6dd-43e2-9d91-a29151001006",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [500, 0]
+    }
+  ],
+  "connections": {
+    "Sales Context Webhook": { "main": [[{ "node": "Normalize Search", "type": "main", "index": 0 }]] },
+    "Normalize Search": { "main": [[{ "node": "Get Hotel Facts", "type": "main", "index": 0 }]] },
+    "Get Hotel Facts": { "main": [[{ "node": "Check Availability", "type": "main", "index": 0 }]] },
+    "Check Availability": { "main": [[{ "node": "Build Truth Bundle", "type": "main", "index": 0 }]] },
+    "Build Truth Bundle": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "54c8ff74-b6dd-43e2-9d91-a29151001999",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
