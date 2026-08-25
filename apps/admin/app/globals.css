@@ -84,6 +84,32 @@ h1 { margin: 0; font-size: clamp(25px, 3vw, 38px); letter-spacing: -.035em; }
 .block .muted { display: block; margin-top: 2px; opacity: .72; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .loading { padding: 40px; text-align: center; color: var(--muted); }
 
+.reservation-nfc { min-width: 155px; }
+.nfc-status { display: inline-flex; align-items: center; width: fit-content; min-height: 25px; padding: 3px 8px; border-radius: 999px; background: #eef1ef; color: #68736e; font-size: 11px; }
+.nfc-status.active { background: #e0f2e5; color: #237242; }
+.btn.nfc { border-color: #cfac55; background: #fff8e7; color: #745819; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 18px; background: rgba(16, 29, 23, .56); backdrop-filter: blur(4px); }
+.nfc-modal { width: min(620px, 100%); max-height: min(760px, calc(100vh - 36px)); overflow: auto; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); box-shadow: 0 28px 90px rgba(16, 29, 23, .28); padding: 20px; }
+.nfc-modal-head { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+.nfc-modal-head h2 { margin: 0; font-size: 27px; letter-spacing: -.035em; }
+.nfc-modal-head p:not(.eyebrow) { margin: 7px 0 0; color: var(--muted); }
+.nfc-issue-form { display: grid; gap: 14px; margin-top: 18px; }
+.nfc-issue-form label { display: grid; gap: 6px; }
+.nfc-issue-form label > span { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.nfc-issue-form input { width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 0 11px; outline: none; }
+.nfc-issue-form input:focus { border-color: #789589; box-shadow: 0 0 0 3px #e7eeea; }
+.nfc-input-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.nfc-warning { display: grid; gap: 4px; padding: 12px; border: 1px solid #ead7a5; border-radius: 12px; background: #fff9e9; color: #694f17; }
+.nfc-warning span { font-size: 12px; line-height: 1.45; }
+.notice-box { padding: 12px; border: 1px solid #cfe0d6; border-radius: 12px; background: #eef6f1; color: #285640; font-size: 13px; }
+.error-box.compact { margin: 0; }
+.nfc-submit { width: 100%; }
+.nfc-success { display: grid; gap: 10px; margin-top: 18px; padding: 18px; border: 1px solid #c9dfd0; border-radius: 16px; background: #eef7f1; }
+.nfc-success strong { font-size: 22px; color: #22693f; }
+.nfc-success span { font-size: 17px; font-weight: 800; }
+.nfc-success small { color: var(--muted); line-height: 1.45; }
+.nfc-success .btn { margin-top: 4px; }
+
 @media (max-width: 980px) {
   .shell { padding: 12px; }
   .topbar { flex-direction: column; }
@@ -99,4 +125,9 @@ h1 { margin: 0; font-size: clamp(25px, 3vw, 38px); letter-spacing: -.035em; }
   .room-head, .room-cell { width: 140px; min-width: 140px; max-width: 140px; }
   .state-head, .state-cell { left: 140px; width: 96px; min-width: 96px; max-width: 96px; }
   .badge { min-width: 75px; font-size: 9px; }
+  .modal-backdrop { align-items: end; padding: 0; }
+  .nfc-modal { width: 100%; max-height: 88svh; border-radius: 20px 20px 0 0; padding: 18px 14px calc(18px + env(safe-area-inset-bottom)); }
+  .nfc-modal-head { gap: 8px; }
+  .nfc-modal-head h2 { font-size: 24px; }
+  .nfc-input-row { grid-template-columns: 1fr; }
 }
