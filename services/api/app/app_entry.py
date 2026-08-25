@@ -5,6 +5,7 @@ from .booking_admin import router as booking_admin_router
 from .channel_outbound import router as channel_outbound_router
 from .communication_ingest import router as communication_ingest_router
 from .health import router as health_router
+from .hotel_finance import router as hotel_finance_router
 from .inbox import router as inbox_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
@@ -32,6 +33,7 @@ app.include_router(booking_admin_router)
 app.include_router(reservation_detail_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
+app.include_router(hotel_finance_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
@@ -56,4 +58,4 @@ app.include_router(manager_dashboard_router)
 # but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.23.0"
+app.version = "0.24.0"
