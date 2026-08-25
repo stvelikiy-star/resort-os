@@ -1,15 +1,16 @@
 import json
+import os
 import uuid
 from datetime import date, timedelta
 from typing import Any
 
-import asyncpg
+from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
 from .auth import require_roles
 
-RATE_PLAN_CODE = "DIRECT_2026_27"
+RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-chessboard"])
 manager_access = require_roles("OWNER", "MANAGER")
 
@@ -44,7 +45,10 @@ def _normalize_segments(items: list[ScheduleSegment]) -> list[ScheduleSegment]:
             merged.append(item)
     for index, item in enumerate(merged):
         if index and merged[index - 1].end != item.start:
-            raise HTTPException(status_code=422, detail="Schedule segments must be contiguous without gaps or overlaps")
+            raise HTTPException(
+                status_code=422,
+                detail="Schedule segments must be contiguous without gaps or overlaps",
+            )
     return merged
 
 
@@ -52,11 +56,11 @@ def _schedule_json(items: list[ScheduleSegment], rooms: dict[uuid.UUID, Any]) ->
     return [
         {
             "room_id": str(item.room_id),
-            "room_code": rooms[item.room_id]["code"] if item.room_id in rooms else None,
-            "room_type_code": rooms[item.room_id]["room_type_code"] if item.room_id in rooms else None,
-            "room_type_name": rooms[item.room_id]["room_type_name"] if item.room_id in rooms else None,
-            "start": item.start.isoformat(),
-            "end": item.end.isoformat(),
+            "room_code": rooms[item.room_id]["code"],
+            "room_type_code": rooms[item.room_id]["room_type_code"],
+            "room_type_name": rooms[item.room_id]["room_type_name"],
+            "start": item.start,
+            "end": item.end,
         }
         for item in items
     ]
@@ -98,7 +102,7 @@ async def _reservation(conn, reservation_id: uuid.UUID, property_id: uuid.UUID, 
 
 async def _current_blocks(conn, reservation_id: uuid.UUID, lock: bool = False):
     suffix = " FOR UPDATE" if lock else ""
-    rows = await conn.fetch(
+    return await conn.fetch(
         f'''
         SELECT ib.id,ib."roomId",ib."startDate",ib."endDate",room.code,
                rt.code AS room_type_code,rt.name AS room_type_name
@@ -110,7 +114,6 @@ async def _current_blocks(conn, reservation_id: uuid.UUID, lock: bool = False):
         ''',
         reservation_id,
     )
-    return rows
 
 
 async def _load_rooms(conn, property_id: uuid.UUID, room_ids: list[uuid.UUID], lock: bool = False):
@@ -216,19 +219,49 @@ def _rows_to_schedule(rows) -> list[ScheduleSegment]:
     ]
 
 
-def _validate_status_and_history(reservation, current: list[ScheduleSegment], proposed: list[ScheduleSegment], local_today: date):
+def _assert_current_schedule_consistent(reservation, current: list[ScheduleSegment]):
+    if not current:
+        raise HTTPException(status_code=409, detail="Reservation has no active room schedule")
+    if current[0].start != reservation["checkIn"] or current[-1].end != reservation["checkOut"]:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "CURRENT_SCHEDULE_RANGE_MISMATCH", "message": "Repair reservation schedule before moving it."},
+        )
+    for index in range(1, len(current)):
+        if current[index - 1].end != current[index].start:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "CURRENT_SCHEDULE_NOT_CONTIGUOUS", "message": "Repair reservation schedule before moving it."},
+            )
+
+
+def _validate_status_and_history(
+    reservation,
+    current: list[ScheduleSegment],
+    proposed: list[ScheduleSegment],
+    local_today: date,
+):
     status = reservation["status"]
     if status not in {"GUARANTEED", "CHECKED_IN"}:
-        raise HTTPException(status_code=409, detail=f"Reservation status {status} is read-only for chessboard mutation")
+        raise HTTPException(
+            status_code=409,
+            detail=f"Reservation status {status} is read-only for chessboard mutation",
+        )
 
     proposed_check_in = proposed[0].start
     proposed_check_out = proposed[-1].end
 
     if status == "CHECKED_IN":
         if proposed_check_in != reservation["checkIn"]:
-            raise HTTPException(status_code=409, detail="CHECKED_IN reservation check-in history cannot be rewritten")
+            raise HTTPException(
+                status_code=409,
+                detail="CHECKED_IN reservation check-in history cannot be rewritten",
+            )
         if proposed_check_out <= local_today:
-            raise HTTPException(status_code=409, detail="CHECKED_IN reservation must retain a future checkout date")
+            raise HTTPException(
+                status_code=409,
+                detail="CHECKED_IN reservation must retain a future checkout date",
+            )
         history_end = min(local_today, reservation["checkOut"])
         for night in _nights(reservation["checkIn"], history_end):
             if _night_room(current, night) != _night_room(proposed, night):
@@ -238,27 +271,36 @@ def _validate_status_and_history(reservation, current: list[ScheduleSegment], pr
                 )
 
 
-async def _build_preview(conn, reservation, current_rows, proposed: list[ScheduleSegment], rooms, local_today: date):
+async def _build_preview(
+    conn,
+    reservation,
+    current_rows,
+    proposed: list[ScheduleSegment],
+    rooms: dict[uuid.UUID, Any],
+    local_today: date,
+):
     current = _rows_to_schedule(current_rows)
+    _assert_current_schedule_consistent(reservation, current)
     _validate_status_and_history(reservation, current, proposed, local_today)
-
-    if proposed[0].start >= proposed[-1].end:
-        raise HTTPException(status_code=422, detail="Invalid proposed stay range")
 
     missing = [str(item.room_id) for item in proposed if item.room_id not in rooms]
     if missing:
-        raise HTTPException(status_code=422, detail={"code": "ROOM_NOT_FOUND", "room_ids": missing})
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "ROOM_NOT_FOUND", "room_ids": missing},
+        )
 
-    blocked = [rooms[item.room_id]["code"] for item in proposed if rooms[item.room_id]["operational_state"] == "TECH_BLOCK"]
+    blocked = sorted(
+        {rooms[item.room_id]["code"] for item in proposed if rooms[item.room_id]["operational_state"] == "TECH_BLOCK"}
+    )
     if blocked:
-        raise HTTPException(status_code=409, detail={"code": "TARGET_ROOM_TECH_BLOCK", "rooms": sorted(set(blocked))})
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "TARGET_ROOM_TECH_BLOCK", "rooms": blocked},
+        )
 
     conflicts = await _conflicts(conn, reservation["id"], proposed)
     pricing = await _pricing_preview(conn, proposed, rooms)
-
-    current_room_ids = list({item.room_id for item in current})
-    current_rooms = await _load_rooms(conn, reservation["propertyId"] if "propertyId" in reservation else rooms[next(iter(rooms))]["propertyId"] if rooms else uuid.UUID(int=0), current_room_ids) if False else None
-
     current_type_codes = sorted({row["room_type_code"] for row in current_rows})
     proposed_type_codes = sorted({rooms[item.room_id]["room_type_code"] for item in proposed})
     suggested = pricing["suggested_total_kgs"]
@@ -314,12 +356,14 @@ async def preview_schedule(
         if not reservation:
             raise HTTPException(status_code=404, detail="Reservation not found")
         current_rows = await _current_blocks(conn, reservation_id)
-        if not current_rows:
-            raise HTTPException(status_code=409, detail="Reservation has no active room schedule")
         room_ids = sorted({item.room_id for item in proposed}, key=str)
         rooms = await _load_rooms(conn, prop["id"], room_ids)
-        local_today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
-        return await _build_preview(conn, reservation, current_rows, proposed, rooms, local_today)
+        local_today = await conn.fetchval(
+            "SELECT (now() AT TIME ZONE $1)::date", prop["timezone"]
+        )
+        return await _build_preview(
+            conn, reservation, current_rows, proposed, rooms, local_today
+        )
 
 
 @router.post("/reservations/{reservation_id}/schedule/commit")
@@ -340,31 +384,47 @@ async def commit_schedule(
                 if reservation["version"] != payload.expected_version:
                     raise HTTPException(
                         status_code=409,
-                        detail={"code": "STALE_RESERVATION", "current_version": reservation["version"]},
+                        detail={
+                            "code": "STALE_RESERVATION",
+                            "current_version": reservation["version"],
+                        },
                     )
 
                 current_rows = await _current_blocks(conn, reservation_id, lock=True)
-                if not current_rows:
-                    raise HTTPException(status_code=409, detail="Reservation has no active room schedule")
-
                 all_room_ids = sorted(
-                    {row["roomId"] for row in current_rows} | {item.room_id for item in proposed},
+                    {row["roomId"] for row in current_rows}
+                    | {item.room_id for item in proposed},
                     key=str,
                 )
                 rooms = await _load_rooms(conn, prop["id"], all_room_ids, lock=True)
                 if len(rooms) != len(all_room_ids):
-                    raise HTTPException(status_code=422, detail="One or more rooms do not belong to this property")
+                    raise HTTPException(
+                        status_code=422,
+                        detail="One or more rooms do not belong to this property",
+                    )
 
-                local_today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
-                preview = await _build_preview(conn, reservation, current_rows, proposed, rooms, local_today)
+                local_today = await conn.fetchval(
+                    "SELECT (now() AT TIME ZONE $1)::date", prop["timezone"]
+                )
+                preview = await _build_preview(
+                    conn, reservation, current_rows, proposed, rooms, local_today
+                )
                 if not preview["can_commit"]:
-                    raise HTTPException(status_code=409, detail={"code": "ROOM_CONFLICT", "conflicts": preview["conflicts"]})
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "ROOM_CONFLICT",
+                            "conflicts": preview["conflicts"],
+                        },
+                    )
 
                 before_schedule = preview["current_schedule"]
                 await conn.execute(
-                    '''UPDATE inventory_blocks
-                       SET active=false,"updatedAt"=now()
-                       WHERE "reservationId"=$1 AND active=true AND "blockType"='RESERVATION' ''',
+                    '''
+                    UPDATE inventory_blocks
+                    SET active=false,"updatedAt"=now()
+                    WHERE "reservationId"=$1 AND active=true AND "blockType"='RESERVATION'
+                    ''',
                     reservation_id,
                 )
 
@@ -372,21 +432,35 @@ async def commit_schedule(
                     await conn.execute(
                         '''
                         INSERT INTO inventory_blocks (
-                          id,"roomId","reservationId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt"
+                          id,"roomId","reservationId","blockType","startDate","endDate",
+                          active,reason,"createdAt","updatedAt"
                         ) VALUES ($1,$2,$3,'RESERVATION',$4,$5,true,$6,now(),now())
                         ''',
-                        uuid.uuid4(), item.room_id, reservation_id, item.start, item.end, reservation["bookingNumber"],
+                        uuid.uuid4(),
+                        item.room_id,
+                        reservation_id,
+                        item.start,
+                        item.end,
+                        reservation["bookingNumber"],
                     )
 
                 await conn.execute(
-                    '''UPDATE reservations
-                       SET "checkIn"=$1,"checkOut"=$2,"updatedAt"=now()
-                       WHERE id=$3''',
+                    '''
+                    UPDATE reservations
+                    SET "checkIn"=$1,"checkOut"=$2,"updatedAt"=now()
+                    WHERE id=$3
+                    ''',
                     proposed[0].start,
                     proposed[-1].end,
                     reservation_id,
                 )
 
+                before_payload = {
+                    "schedule": before_schedule,
+                    "check_in": reservation["checkIn"].isoformat(),
+                    "check_out": reservation["checkOut"].isoformat(),
+                    "stored_total_kgs": reservation["totalKgs"],
+                }
                 after_payload = {
                     "schedule": preview["proposed_schedule"],
                     "check_in": proposed[0].start.isoformat(),
@@ -396,26 +470,27 @@ async def commit_schedule(
                     "price_delta_kgs": preview["pricing"]["delta_kgs"],
                     "category_changed": preview["category_changed"],
                 }
-                before_payload = {
-                    "schedule": before_schedule,
-                    "check_in": reservation["checkIn"].isoformat(),
-                    "check_out": reservation["checkOut"].isoformat(),
-                    "stored_total_kgs": reservation["totalKgs"],
-                }
                 await conn.execute(
                     '''
                     INSERT INTO audit_logs (
-                      id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,
-                      "beforeJson","afterJson","createdAt"
-                    ) VALUES ($1,$2,'STAFF',$3,'PMS_SCHEDULE_MUTATION','Reservation',$4,'PMS_CHESSBOARD','SUCCESS',
-                      $5::jsonb,$6::jsonb,now())
+                      id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                      source,result,"beforeJson","afterJson","createdAt"
+                    ) VALUES ($1,$2,'STAFF',$3,'PMS_SCHEDULE_MUTATION','Reservation',$4,
+                      'PMS_CHESSBOARD','SUCCESS',$5::jsonb,$6::jsonb,now())
                     ''',
-                    uuid.uuid4(), prop["id"], user["id"], str(reservation_id),
-                    json.dumps(before_payload, default=str), json.dumps(after_payload, default=str),
+                    uuid.uuid4(),
+                    prop["id"],
+                    user["id"],
+                    str(reservation_id),
+                    json.dumps(before_payload, default=str),
+                    json.dumps(after_payload, default=str),
                 )
 
                 new_version = await conn.fetchval(
-                    '''SELECT to_char("updatedAt", 'YYYY-MM-DD"T"HH24:MI:SS.US') FROM reservations WHERE id=$1''',
+                    '''
+                    SELECT to_char("updatedAt", 'YYYY-MM-DD"T"HH24:MI:SS.US')
+                    FROM reservations WHERE id=$1
+                    ''',
                     reservation_id,
                 )
                 return {
@@ -430,8 +505,11 @@ async def commit_schedule(
                     "pricing_preview": preview["pricing"],
                     "message": "Schedule updated atomically; stored reservation total was not changed automatically.",
                 }
-    except asyncpg.ExclusionViolationError as exc:
+    except ExclusionViolationError as exc:
         raise HTTPException(
             status_code=409,
-            detail={"code": "ROOM_CONFLICT_RACE", "message": "Inventory changed before commit; original schedule was preserved."},
+            detail={
+                "code": "ROOM_CONFLICT_RACE",
+                "message": "Inventory changed before commit; original schedule was preserved.",
+            },
         ) from exc
