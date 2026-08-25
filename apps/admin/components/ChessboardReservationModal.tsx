@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReservationQuickFacts from "./ReservationQuickFacts";
 
 type RoomOption = {
   id: string;
@@ -295,6 +296,8 @@ export default function ChessboardReservationModal({
             <strong>Текущее размещение</strong>
             {data.schedule.map((item) => <div key={item.inventory_block_id || `${item.room_id}-${item.start}`}><b>№ {item.room_code}</b><span>{item.start} → {item.end}</span><small>{item.room_type_name}</small></div>)}
           </div>
+
+          <ReservationQuickFacts reservationId={reservationId} refreshKey={data.reservation.version} />
 
           <div className="chess-lifecycle-actions">
             {data.reservation.status === "GUARANTEED" && <button className="btn primary" disabled={busy} onClick={() => stayAction("check-in")}>Заселить гостя</button>}
