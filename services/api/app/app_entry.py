@@ -20,6 +20,7 @@ from .pms_chessboard_read import router as pms_chessboard_read_router
 from .realtime import router as realtime_router
 from .reception_reservations import router as reception_reservations_router
 from .reservation_detail import router as reservation_detail_router
+from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
 from .staff_control import router as staff_control_router
 from .staff_voice import router as staff_voice_router
@@ -35,6 +36,7 @@ app.include_router(health_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reservation_detail_router)
+app.include_router(reservation_payments_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(hotel_finance_router)
@@ -64,4 +66,4 @@ app.include_router(manager_dashboard_router)
 # but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.27.0"
+app.version = "0.28.0"
