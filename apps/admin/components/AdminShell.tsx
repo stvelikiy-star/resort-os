@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import DashboardBoard from "./DashboardBoard";
+import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV2";
@@ -17,7 +18,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "INBOX" | "OPS" | "STAFF";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -107,6 +108,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
+          {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
           {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
           {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Аудит сообщений</button>}
@@ -117,6 +119,7 @@ export default function AdminShell() {
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
+      {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard />}
       {tab === "INBOX" && isManager && <InboxBoard />}
