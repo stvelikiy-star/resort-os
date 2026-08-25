@@ -1,5 +1,5 @@
-import PMSGrid from "../components/PMSGrid";
+import AdminShell from "../components/AdminShell";
 
 export default function AdminHomePage() {
-  return <PMSGrid />;
+  return <AdminShell />;
 }
