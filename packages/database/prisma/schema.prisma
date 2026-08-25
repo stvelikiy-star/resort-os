@@ -82,22 +82,23 @@ enum OperationalTaskPriority {
 }
 
 model Property {
-  id           String               @id @default(uuid()) @db.Uuid
-  code         String               @unique
-  name         String
-  timezone     String               @default("Asia/Bishkek")
-  currency     String               @default("KGS")
-  roomTypes    RoomType[]
-  rooms        Room[]
-  ratePlans    RatePlan[]
-  guests       Guest[]
-  requests     ReservationRequest[]
-  reservations Reservation[]
-  auditLogs    AuditLog[]
-  staffUsers   StaffUser[]
-  tasks        OperationalTask[]
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id               String                   @id @default(uuid()) @db.Uuid
+  code             String                   @unique
+  name             String
+  timezone         String                   @default("Asia/Bishkek")
+  currency         String                   @default("KGS")
+  roomTypes        RoomType[]
+  rooms            Room[]
+  ratePlans        RatePlan[]
+  guests           Guest[]
+  requests         ReservationRequest[]
+  reservations     Reservation[]
+  auditLogs        AuditLog[]
+  staffUsers       StaffUser[]
+  tasks            OperationalTask[]
+  automationEvents AutomationInboundEvent[]
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
   @@map("properties")
 }
@@ -354,6 +355,24 @@ model OperationalTask {
   @@index([roomId, status])
   @@index([assignedToId, status])
   @@map("operational_tasks")
+}
+
+model AutomationInboundEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  propertyId       String    @db.Uuid
+  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  source           String
+  idempotencyKey   String
+  eventType        String
+  payloadJson      Json
+  resultResource   String?
+  resultResourceId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([propertyId, source, idempotencyKey])
+  @@index([propertyId, eventType, createdAt])
+  @@map("automation_inbound_events")
 }
 
 model AuditLog {
