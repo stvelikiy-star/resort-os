@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ChessboardReservationModal from "./ChessboardReservationModal";
 import RoomDetailModal from "./RoomDetailModal";
 
 type Block = {
@@ -103,6 +104,7 @@ export default function PMSGrid() {
   const [state, setState] = useState("ALL");
   const [refreshToken, setRefreshToken] = useState(0);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
 
   const days = useMemo(() => dateRange(start, windowDays), [start, windowDays]);
   const end = useMemo(() => addDays(start, windowDays), [start, windowDays]);
@@ -116,9 +118,7 @@ export default function PMSGrid() {
         end: localDateString(end),
       });
       const response = await fetch(`/core/api/v1/pms/grid?${params}`, { cache: "no-store" });
-      if (!response.ok) {
-        throw new Error(`Core API: HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Core API: HTTP ${response.status}`);
       const payload = (await response.json()) as GridResponse;
       setData(payload);
     } catch (cause) {
@@ -128,9 +128,7 @@ export default function PMSGrid() {
     }
   }, [start, end, refreshToken]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -138,10 +136,7 @@ export default function PMSGrid() {
     let stopped = false;
     let reconnectTimer: number | undefined;
 
-    const params = new URLSearchParams({
-      start: localDateString(start),
-      end: localDateString(end),
-    });
+    const params = new URLSearchParams({ start: localDateString(start), end: localDateString(end) });
     const base = websocketBase();
     if (!base) return;
     const url = `${base}/ws/pms/grid?${params.toString()}`;
@@ -160,7 +155,7 @@ export default function PMSGrid() {
             setLoading(false);
           }
         } catch {
-          // Ignore malformed realtime frames; the HTTP snapshot remains the fallback source.
+          // HTTP snapshot remains the fallback truth source.
         }
       };
       socket.onerror = () => socket?.close();
@@ -190,11 +185,7 @@ export default function PMSGrid() {
     if (!data) return [];
     const query = search.trim().toLocaleLowerCase("ru");
     return data.rooms.filter((room) => {
-      const matchesSearch =
-        !query ||
-        room.code.toLocaleLowerCase("ru").includes(query) ||
-        room.room_type_name.toLocaleLowerCase("ru").includes(query) ||
-        (room.building_or_zone || "").toLocaleLowerCase("ru").includes(query);
+      const matchesSearch = !query || room.code.toLocaleLowerCase("ru").includes(query) || room.room_type_name.toLocaleLowerCase("ru").includes(query) || (room.building_or_zone || "").toLocaleLowerCase("ru").includes(query);
       const matchesType = roomType === "ALL" || room.room_type_code === roomType;
       const matchesState = state === "ALL" || room.operational_state === state;
       return matchesSearch && matchesType && matchesState;
@@ -202,19 +193,13 @@ export default function PMSGrid() {
   }, [data, roomType, search, state]);
 
   const counts = useMemo(() => {
-    const result: Record<Room["operational_state"] | "TOTAL", number> = {
-      TOTAL: rooms.length,
-      UNKNOWN: 0,
-      CLEAN: 0,
-      DIRTY: 0,
-      IN_INSPECTION: 0,
-      TECH_BLOCK: 0,
-    };
+    const result: Record<Room["operational_state"] | "TOTAL", number> = { TOTAL: rooms.length, UNKNOWN: 0, CLEAN: 0, DIRTY: 0, IN_INSPECTION: 0, TECH_BLOCK: 0 };
     rooms.forEach((room) => result[room.operational_state]++);
     return result;
   }, [rooms]);
 
   const today = localDateString(new Date());
+  const allRooms = data?.rooms || [];
 
   return (
     <main className="shell">
@@ -222,50 +207,19 @@ export default function PMSGrid() {
         <div>
           <p className="eyebrow">Resort OS · Three Crowns</p>
           <h1>Шахматка номеров</h1>
-          <p className="subtitle">84 номера · реальные категории · данные из Resort Core · нажмите на номер для карточки</p>
+          <p className="subtitle">Нажмите на бронь: перенос, даты, переселение, заезд и выезд проходят через безопасную проверку Core.</p>
         </div>
-        <div className={`connection ${error ? "error" : "ok"}`}>
-          {error ? "Core недоступен" : realtime === "live" ? "Realtime подключён" : loading ? "Обновление…" : realtime === "connecting" ? "Realtime подключается…" : "HTTP подключён"}
-        </div>
+        <div className={`connection ${error ? "error" : "ok"}`}>{error ? "Core недоступен" : realtime === "live" ? "Realtime подключён" : loading ? "Обновление…" : realtime === "connecting" ? "Realtime подключается…" : "HTTP подключён"}</div>
       </div>
 
       <section className="controls" aria-label="Фильтры шахматки">
-        <div className="control">
-          <label htmlFor="search">Номер / категория</label>
-          <input id="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Например 312 или Люкс" />
-        </div>
-
-        <div className="control">
-          <label htmlFor="roomType">Категория</label>
-          <select id="roomType" value={roomType} onChange={(event) => setRoomType(event.target.value)}>
-            <option value="ALL">Все категории</option>
-            {roomTypes.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-          </select>
-        </div>
-
-        <div className="control">
-          <label htmlFor="state">Состояние</label>
-          <select id="state" value={state} onChange={(event) => setState(event.target.value)}>
-            <option value="ALL">Все состояния</option>
-            {Object.entries(STATE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
-          </select>
-        </div>
-
-        <div className="control">
-          <label htmlFor="period">Период</label>
-          <select id="period" value={windowDays} onChange={(event) => setWindowDays(Number(event.target.value))}>
-            <option value={7}>7 дней</option>
-            <option value={14}>14 дней</option>
-            <option value={31}>31 день</option>
-          </select>
-        </div>
-
+        <div className="control"><label htmlFor="search">Номер / категория</label><input id="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Например 312 или Люкс" /></div>
+        <div className="control"><label htmlFor="roomType">Категория</label><select id="roomType" value={roomType} onChange={(event) => setRoomType(event.target.value)}><option value="ALL">Все категории</option>{roomTypes.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></div>
+        <div className="control"><label htmlFor="state">Состояние</label><select id="state" value={state} onChange={(event) => setState(event.target.value)}><option value="ALL">Все состояния</option>{Object.entries(STATE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></div>
+        <div className="control"><label htmlFor="period">Период</label><select id="period" value={windowDays} onChange={(event) => setWindowDays(Number(event.target.value))}><option value={7}>7 дней</option><option value={14}>14 дней</option><option value={31}>31 день</option></select></div>
         <div className="date-actions">
           <button className="btn" onClick={() => setStart(addDays(start, -7))} aria-label="Назад 7 дней">←</button>
-          <button className="btn" onClick={() => {
-            const now = new Date();
-            setStart(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-          }}>Сегодня</button>
+          <button className="btn" onClick={() => { const now = new Date(); setStart(new Date(now.getFullYear(), now.getMonth(), now.getDate())); }}>Сегодня</button>
           <button className="btn" onClick={() => setStart(addDays(start, 7))} aria-label="Вперёд 7 дней">→</button>
           <button className="btn primary" onClick={() => setRefreshToken((value) => value + 1)}>Обновить</button>
         </div>
@@ -283,57 +237,38 @@ export default function PMSGrid() {
       <section className="grid-card">
         <div className="grid-toolbar">
           <div><strong>{localDateString(start)}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div>
-          <div className="legend" aria-label="Легенда блоков">
-            <span className="legend-item" style={{ "--legend": "var(--reservation)" } as React.CSSProperties}>Бронь</span>
-            <span className="legend-item" style={{ "--legend": "var(--maintenance)" } as React.CSSProperties}>Ремонт</span>
-            <span className="legend-item" style={{ "--legend": "var(--manual)" } as React.CSSProperties}>Ручной блок</span>
-          </div>
+          <div className="legend" aria-label="Легенда блоков"><span className="legend-item" style={{ "--legend": "var(--reservation)" } as React.CSSProperties}>Бронь</span><span className="legend-item" style={{ "--legend": "var(--maintenance)" } as React.CSSProperties}>Ремонт</span><span className="legend-item" style={{ "--legend": "var(--manual)" } as React.CSSProperties}>Ручной блок</span></div>
         </div>
 
         {error && <div className="error-box">{error}. Проверьте Resort Core и повторите.</div>}
         {loading && !data ? <div className="loading">Загружаю номера…</div> : rooms.length === 0 ? <div className="empty">По выбранным фильтрам номеров нет.</div> : (
           <div className="grid-scroll">
             <table className="pms-table">
-              <thead>
-                <tr>
-                  <th className="room-head">Номер</th>
-                  <th className="state-head">Состояние</th>
-                  {days.map((day) => {
-                    const key = localDateString(day);
-                    const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day);
-                    return <th key={key} className={`date-head ${key === today ? "today" : ""}`}><strong>{day.getDate()}</strong>{weekday}</th>;
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {rooms.map((room) => <tr key={room.id}>
-                  <td className="room-cell" title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
-                    <button className="room-open-button" onClick={() => setSelectedRoomId(room.id)} aria-label={`Открыть карточку номера ${room.code}`}>
-                      <div className="room-code">{room.code}</div>
-                      <div className="room-type">{room.room_type_name}</div>
-                    </button>
-                  </td>
-                  <td className="state-cell"><span className={`badge ${room.operational_state}`}>{STATE_LABELS[room.operational_state]}</span></td>
-                  {days.map((day, index) => {
-                    const key = localDateString(day);
-                    const block = blockAt(room, key);
-                    const weekend = day.getDay() === 0 || day.getDay() === 6;
-                    const showBlockLabel = block && (block.start === key || index === 0);
-                    return <td key={key} className={`day-cell ${weekend ? "weekend" : ""} ${key === today ? "today" : ""}`}>
-                      {block && <div className={`block ${block.type}`} title={`${blockTitle(block)} · ${block.start} — ${block.end}`}>
-                        {showBlockLabel ? blockTitle(block) : ""}
-                        {showBlockLabel && block.booking_number && <span className="muted">{block.booking_number}</span>}
-                      </div>}
-                    </td>;
-                  })}
-                </tr>)}
-              </tbody>
+              <thead><tr><th className="room-head">Номер</th><th className="state-head">Состояние</th>{days.map((day) => { const key = localDateString(day); const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day); return <th key={key} className={`date-head ${key === today ? "today" : ""}`}><strong>{day.getDate()}</strong>{weekday}</th>; })}</tr></thead>
+              <tbody>{rooms.map((room) => <tr key={room.id}>
+                <td className="room-cell" title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}><button className="room-open-button" onClick={() => setSelectedRoomId(room.id)} aria-label={`Открыть карточку номера ${room.code}`}><div className="room-code">{room.code}</div><div className="room-type">{room.room_type_name}</div></button></td>
+                <td className="state-cell"><span className={`badge ${room.operational_state}`}>{STATE_LABELS[room.operational_state]}</span></td>
+                {days.map((day, index) => {
+                  const key = localDateString(day);
+                  const block = blockAt(room, key);
+                  const weekend = day.getDay() === 0 || day.getDay() === 6;
+                  const showBlockLabel = block && (block.start === key || index === 0);
+                  const reservationInteractive = block?.type === "RESERVATION" && block.reservation_id;
+                  return <td key={key} className={`day-cell ${weekend ? "weekend" : ""} ${key === today ? "today" : ""}`}>
+                    {block && <button type="button" className={`block ${block.type} ${reservationInteractive ? "interactive" : ""}`} title={`${blockTitle(block)} · ${block.start} — ${block.end}${reservationInteractive ? " · нажмите для управления" : ""}`} onClick={() => reservationInteractive && setSelectedReservationId(block.reservation_id)} disabled={!reservationInteractive}>
+                      {showBlockLabel ? blockTitle(block) : ""}
+                      {showBlockLabel && block.booking_number && <span className="muted">{block.booking_number}</span>}
+                    </button>}
+                  </td>;
+                })}
+              </tr>)}</tbody>
             </table>
           </div>
         )}
       </section>
 
       {selectedRoomId && <RoomDetailModal roomId={selectedRoomId} onClose={() => setSelectedRoomId(null)} />}
+      {selectedReservationId && <ChessboardReservationModal reservationId={selectedReservationId} rooms={allRooms} onClose={() => setSelectedReservationId(null)} onUpdated={() => setRefreshToken((value) => value + 1)} />}
     </main>
   );
 }
