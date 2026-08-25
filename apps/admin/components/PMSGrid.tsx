@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import RoomDetailModal from "./RoomDetailModal";
 
 type Block = {
   id: string;
@@ -101,6 +102,7 @@ export default function PMSGrid() {
   const [roomType, setRoomType] = useState("ALL");
   const [state, setState] = useState("ALL");
   const [refreshToken, setRefreshToken] = useState(0);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
   const days = useMemo(() => dateRange(start, windowDays), [start, windowDays]);
   const end = useMemo(() => addDays(start, windowDays), [start, windowDays]);
@@ -220,7 +222,7 @@ export default function PMSGrid() {
         <div>
           <p className="eyebrow">Resort OS · Three Crowns</p>
           <h1>Шахматка номеров</h1>
-          <p className="subtitle">84 номера · реальные категории · данные из Resort Core</p>
+          <p className="subtitle">84 номера · реальные категории · данные из Resort Core · нажмите на номер для карточки</p>
         </div>
         <div className={`connection ${error ? "error" : "ok"}`}>
           {error ? "Core недоступен" : realtime === "live" ? "Realtime подключён" : loading ? "Обновление…" : realtime === "connecting" ? "Realtime подключается…" : "HTTP подключён"}
@@ -230,21 +232,14 @@ export default function PMSGrid() {
       <section className="controls" aria-label="Фильтры шахматки">
         <div className="control">
           <label htmlFor="search">Номер / категория</label>
-          <input
-            id="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Например 312 или Люкс"
-          />
+          <input id="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Например 312 или Люкс" />
         </div>
 
         <div className="control">
           <label htmlFor="roomType">Категория</label>
           <select id="roomType" value={roomType} onChange={(event) => setRoomType(event.target.value)}>
             <option value="ALL">Все категории</option>
-            {roomTypes.map(([code, name]) => (
-              <option key={code} value={code}>{name}</option>
-            ))}
+            {roomTypes.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
           </select>
         </div>
 
@@ -252,9 +247,7 @@ export default function PMSGrid() {
           <label htmlFor="state">Состояние</label>
           <select id="state" value={state} onChange={(event) => setState(event.target.value)}>
             <option value="ALL">Все состояния</option>
-            {Object.entries(STATE_LABELS).map(([code, label]) => (
-              <option key={code} value={code}>{label}</option>
-            ))}
+            {Object.entries(STATE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
 
@@ -289,9 +282,7 @@ export default function PMSGrid() {
 
       <section className="grid-card">
         <div className="grid-toolbar">
-          <div>
-            <strong>{localDateString(start)}</strong> — <strong>{localDateString(addDays(end, -1))}</strong>
-          </div>
+          <div><strong>{localDateString(start)}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div>
           <div className="legend" aria-label="Легенда блоков">
             <span className="legend-item" style={{ "--legend": "var(--reservation)" } as React.CSSProperties}>Бронь</span>
             <span className="legend-item" style={{ "--legend": "var(--maintenance)" } as React.CSSProperties}>Ремонт</span>
@@ -300,11 +291,7 @@ export default function PMSGrid() {
         </div>
 
         {error && <div className="error-box">{error}. Проверьте Resort Core и повторите.</div>}
-        {loading && !data ? (
-          <div className="loading">Загружаю номера…</div>
-        ) : rooms.length === 0 ? (
-          <div className="empty">По выбранным фильтрам номеров нет.</div>
-        ) : (
+        {loading && !data ? <div className="loading">Загружаю номера…</div> : rooms.length === 0 ? <div className="empty">По выбранным фильтрам номеров нет.</div> : (
           <div className="grid-scroll">
             <table className="pms-table">
               <thead>
@@ -314,53 +301,39 @@ export default function PMSGrid() {
                   {days.map((day) => {
                     const key = localDateString(day);
                     const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(day);
-                    return (
-                      <th key={key} className={`date-head ${key === today ? "today" : ""}`}>
-                        <strong>{day.getDate()}</strong>
-                        {weekday}
-                      </th>
-                    );
+                    return <th key={key} className={`date-head ${key === today ? "today" : ""}`}><strong>{day.getDate()}</strong>{weekday}</th>;
                   })}
                 </tr>
               </thead>
               <tbody>
-                {rooms.map((room) => (
-                  <tr key={room.id}>
-                    <td className="room-cell" title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
+                {rooms.map((room) => <tr key={room.id}>
+                  <td className="room-cell" title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
+                    <button className="room-open-button" onClick={() => setSelectedRoomId(room.id)} aria-label={`Открыть карточку номера ${room.code}`}>
                       <div className="room-code">{room.code}</div>
                       <div className="room-type">{room.room_type_name}</div>
-                    </td>
-                    <td className="state-cell">
-                      <span className={`badge ${room.operational_state}`}>{STATE_LABELS[room.operational_state]}</span>
-                    </td>
-                    {days.map((day, index) => {
-                      const key = localDateString(day);
-                      const block = blockAt(room, key);
-                      const weekend = day.getDay() === 0 || day.getDay() === 6;
-                      const showBlockLabel = block && (block.start === key || index === 0);
-                      return (
-                        <td key={key} className={`day-cell ${weekend ? "weekend" : ""} ${key === today ? "today" : ""}`}>
-                          {block && (
-                            <div
-                              className={`block ${block.type}`}
-                              title={`${blockTitle(block)} · ${block.start} — ${block.end}`}
-                            >
-                              {showBlockLabel ? blockTitle(block) : ""}
-                              {showBlockLabel && block.booking_number && (
-                                <span className="muted">{block.booking_number}</span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                    </button>
+                  </td>
+                  <td className="state-cell"><span className={`badge ${room.operational_state}`}>{STATE_LABELS[room.operational_state]}</span></td>
+                  {days.map((day, index) => {
+                    const key = localDateString(day);
+                    const block = blockAt(room, key);
+                    const weekend = day.getDay() === 0 || day.getDay() === 6;
+                    const showBlockLabel = block && (block.start === key || index === 0);
+                    return <td key={key} className={`day-cell ${weekend ? "weekend" : ""} ${key === today ? "today" : ""}`}>
+                      {block && <div className={`block ${block.type}`} title={`${blockTitle(block)} · ${block.start} — ${block.end}`}>
+                        {showBlockLabel ? blockTitle(block) : ""}
+                        {showBlockLabel && block.booking_number && <span className="muted">{block.booking_number}</span>}
+                      </div>}
+                    </td>;
+                  })}
+                </tr>)}
               </tbody>
             </table>
           </div>
         )}
       </section>
+
+      {selectedRoomId && <RoomDetailModal roomId={selectedRoomId} onClose={() => setSelectedRoomId(null)} />}
     </main>
   );
 }
