@@ -57,12 +57,17 @@ def normalized_message_time(value: datetime | None) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
-@router.post("/messages", status_code=status.HTTP_201_CREATED)
-async def ingest_message(
+async def ingest_normalized_channel_message(
     payload: NormalizedChannelMessage,
     request: Request,
-    service: dict[str, Any] = Depends(service_access),
-):
+    service: dict[str, Any],
+) -> dict[str, Any]:
+    """Persist one provider-normalized communication event.
+
+    Provider adapters (Telegram/WhatsApp/Instagram/etc.) must normalize into this
+    contract instead of writing communication tables directly. This preserves
+    one idempotency, audit and response-control path for every channel.
+    """
     code = normalized_channel_code(payload.channel_code)
     source = f"INBOX_{code}"[:60]
     message_time = normalized_message_time(payload.sent_at)
@@ -214,3 +219,12 @@ async def ingest_message(
         "channel_code": code,
         "direction": payload.direction,
     }
+
+
+@router.post("/messages", status_code=status.HTTP_201_CREATED)
+async def ingest_message(
+    payload: NormalizedChannelMessage,
+    request: Request,
+    service: dict[str, Any] = Depends(service_access),
+):
+    return await ingest_normalized_channel_message(payload, request, service)
