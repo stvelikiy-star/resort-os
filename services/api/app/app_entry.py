@@ -1,6 +1,7 @@
 from .automation import router as automation_router
 from .booking_admin import router as booking_admin_router
 from .main import app
+from .manager_dashboard import router as manager_dashboard_router
 from .nfc import router as nfc_router
 from .nfc_reporting import router as nfc_reporting_router
 from .operations import router as operations_router
@@ -16,6 +17,10 @@ app.include_router(stays_router)
 app.include_router(telegram_auth_router)
 app.include_router(automation_router)
 app.include_router(realtime_router)
+app.include_router(manager_dashboard_router)
+
+# NFC remains composed for backward compatibility with existing implementation,
+# but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.9.0"
+app.version = "0.10.0"
