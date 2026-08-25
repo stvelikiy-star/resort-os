@@ -64,13 +64,18 @@ async def ingest_normalized_channel_message(
 ) -> dict[str, Any]:
     """Persist one provider-normalized communication event.
 
-    Provider adapters (Telegram/WhatsApp/Instagram/etc.) must normalize into this
-    contract instead of writing communication tables directly. This preserves
-    one idempotency, audit and response-control path for every channel.
+    Provider adapters must normalize into this contract instead of writing
+    communication tables directly. Only provider-confirmed SENT/DELIVERED
+    outbound messages count as an actual response to the guest.
     """
     code = normalized_channel_code(payload.channel_code)
     source = f"INBOX_{code}"[:60]
     message_time = normalized_message_time(payload.sent_at)
+    is_inbound = payload.direction == "INBOUND"
+    is_confirmed_outbound = (
+        payload.direction == "OUTBOUND"
+        and payload.delivery_status in {"SENT", "DELIVERED"}
+    )
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -138,8 +143,8 @@ async def ingest_normalized_channel_message(
                   "firstResponseAt","createdAt","updatedAt"
                 ) VALUES (
                   $1,$2,$3,$4,$5,$6,$7,$8,'OPEN',
-                  CASE WHEN $9='INBOUND' THEN $10 ELSE NULL END,
-                  CASE WHEN $9='OUTBOUND' THEN $10 ELSE NULL END,
+                  CASE WHEN $9 THEN $11 ELSE NULL END,
+                  CASE WHEN $10 THEN $11 ELSE NULL END,
                   NULL,now(),now()
                 )
                 ON CONFLICT ("channelId","externalConversationId") DO UPDATE SET
@@ -147,23 +152,23 @@ async def ingest_normalized_channel_message(
                   "contactName"=COALESCE(EXCLUDED."contactName",conversations."contactName"),
                   "contactPhone"=COALESCE(EXCLUDED."contactPhone",conversations."contactPhone"),
                   "contactUsername"=COALESCE(EXCLUDED."contactUsername",conversations."contactUsername"),
-                  status=CASE WHEN $9='INBOUND' AND conversations.status IN ('RESOLVED','ARCHIVED') THEN 'OPEN'::"ConversationStatus" ELSE conversations.status END,
+                  status=CASE WHEN $9 AND conversations.status IN ('RESOLVED','ARCHIVED') THEN 'OPEN'::"ConversationStatus" ELSE conversations.status END,
                   "lastInboundAt"=CASE
-                    WHEN $9='INBOUND' AND (conversations."lastInboundAt" IS NULL OR conversations."lastInboundAt" < $10)
-                    THEN $10 ELSE conversations."lastInboundAt" END,
+                    WHEN $9 AND (conversations."lastInboundAt" IS NULL OR conversations."lastInboundAt" < $11)
+                    THEN $11 ELSE conversations."lastInboundAt" END,
                   "lastOutboundAt"=CASE
-                    WHEN $9='OUTBOUND' AND (conversations."lastOutboundAt" IS NULL OR conversations."lastOutboundAt" < $10)
-                    THEN $10 ELSE conversations."lastOutboundAt" END,
+                    WHEN $10 AND (conversations."lastOutboundAt" IS NULL OR conversations."lastOutboundAt" < $11)
+                    THEN $11 ELSE conversations."lastOutboundAt" END,
                   "firstResponseAt"=CASE
-                    WHEN $9='OUTBOUND' AND conversations."firstResponseAt" IS NULL AND conversations."lastInboundAt" IS NOT NULL
-                    THEN $10 ELSE conversations."firstResponseAt" END,
-                  "resolvedAt"=CASE WHEN $9='INBOUND' THEN NULL ELSE conversations."resolvedAt" END,
+                    WHEN $10 AND conversations."firstResponseAt" IS NULL AND conversations."lastInboundAt" IS NOT NULL
+                    THEN $11 ELSE conversations."firstResponseAt" END,
+                  "resolvedAt"=CASE WHEN $9 THEN NULL ELSE conversations."resolvedAt" END,
                   "updatedAt"=now()
                 RETURNING id
                 ''',
                 uuid.uuid4(), pid, channel["id"], payload.external_conversation_id,
                 payload.external_contact_id, payload.contact_name, payload.contact_phone,
-                payload.contact_username, payload.direction, message_time,
+                payload.contact_username, is_inbound, is_confirmed_outbound, message_time,
             )
 
             if payload.external_message_id:
@@ -205,10 +210,10 @@ async def ingest_normalized_channel_message(
                 '''
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                 VALUES ($1,$2,'SERVICE',$3,'INGEST_MESSAGE','ConversationMessage',$4,$5,'SUCCESS',
-                  jsonb_build_object('channel_code',$6::text,'direction',$7::text,'conversation_id',$8::text),now())
+                  jsonb_build_object('channel_code',$6::text,'direction',$7::text,'delivery_status',$8::text,'conversation_id',$9::text),now())
                 ''',
                 uuid.uuid4(), pid, service["actor_id"], str(message_id), source, code,
-                payload.direction, str(conversation["id"]),
+                payload.direction, payload.delivery_status, str(conversation["id"]),
             )
 
     return {
@@ -218,6 +223,8 @@ async def ingest_normalized_channel_message(
         "conversation_id": str(conversation["id"]),
         "channel_code": code,
         "direction": payload.direction,
+        "delivery_status": payload.delivery_status,
+        "counts_as_response": is_confirmed_outbound,
     }
 
 
