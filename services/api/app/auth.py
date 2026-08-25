@@ -14,6 +14,7 @@ SESSION_COOKIE = "resort_session"
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "12"))
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN") or None
 
 password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -156,6 +157,7 @@ async def login(payload: LoginPayload, request: Request, response: Response):
         secure=COOKIE_SECURE,
         samesite="lax",
         path="/",
+        domain=COOKIE_DOMAIN,
     )
     return AuthUser(
         id=str(row["id"]),
@@ -175,7 +177,7 @@ async def logout(request: Request, response: Response):
                 'UPDATE auth_sessions SET "revokedAt" = now() WHERE "tokenHash" = $1 AND "revokedAt" IS NULL',
                 hash_session_token(token),
             )
-    response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(SESSION_COOKIE, path="/", domain=COOKIE_DOMAIN)
 
 
 @router.get("/me", response_model=AuthUser)
