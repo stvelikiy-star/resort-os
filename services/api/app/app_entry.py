@@ -12,6 +12,7 @@ from .realtime import router as realtime_router
 from .reservation_detail import router as reservation_detail_router
 from .stays import router as stays_router
 from .telegram_auth import router as telegram_auth_router
+from .telegram_sales import router as telegram_sales_router
 
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
@@ -21,6 +22,7 @@ app.include_router(reservation_detail_router)
 app.include_router(operations_router)
 app.include_router(stays_router)
 app.include_router(telegram_auth_router)
+app.include_router(telegram_sales_router)
 app.include_router(automation_router)
 app.include_router(communication_ingest_router)
 app.include_router(inbox_router)
@@ -31,4 +33,4 @@ app.include_router(manager_dashboard_router)
 # but it is explicitly deferred from the active Three Crowns engineering plan.
 app.include_router(nfc_router)
 app.include_router(nfc_reporting_router)
-app.version = "0.13.0"
+app.version = "0.14.0"
