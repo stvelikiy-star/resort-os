@@ -1,0 +1,192 @@
+{
+  "version": "2026-08-25",
+  "usage": "Customer-facing automation may use CONFIRMED facts. PARTIAL/UNKNOWN facts must not be stated as certain. STALE facts must not be used.",
+  "property": {
+    "name": "Три Короны Resort & SPA",
+    "city": "Чолпон-Ата",
+    "region": "Иссык-Кульская область",
+    "country": "Кыргызстан",
+    "status": "CONFIRMED"
+  },
+  "public_contacts": {
+    "reservation_phone": {
+      "value": "+996 558 08 50 02",
+      "status": "CONFIRMED"
+    },
+    "manager_phone": {
+      "value": "+996 558 08 50 08",
+      "channels": ["WhatsApp", "Telegram"],
+      "status": "CONFIRMED"
+    },
+    "email": {
+      "value": "3koronykg@mail.ru",
+      "status": "CONFIRMED"
+    },
+    "website": {
+      "value": "https://3korony.com",
+      "status": "CONFIRMED"
+    },
+    "instagram_handle": {
+      "value": null,
+      "status": "UNKNOWN",
+      "rule": "Do not invent or guess an Instagram handle."
+    }
+  },
+  "scale": {
+    "rooms": {
+      "value": 84,
+      "status": "CONFIRMED"
+    },
+    "places": {
+      "value": 220,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "room_categories": {
+      "value": 12,
+      "status": "CONFIRMED_DEVELOPMENT_BASELINE"
+    }
+  },
+  "room_standard_amenities": {
+    "items": [
+      "satellite TV",
+      "refrigerator",
+      "shower",
+      "safe",
+      "internal phone",
+      "internet"
+    ],
+    "status": "CONFIRMED_PUBLIC_SOURCE",
+    "balcony_note": {
+      "value": "Most rooms have balconies/views; basement categories are without balcony.",
+      "status": "PARTIAL",
+      "rule": "Do not promise a balcony for a specific room unless that room/category fact is confirmed."
+    }
+  },
+  "facilities": {
+    "own_beach": {
+      "value": true,
+      "status": "CONFIRMED"
+    },
+    "pier_meters": {
+      "value": 150,
+      "status": "CONFIRMED"
+    },
+    "outdoor_pool": {
+      "value": "15x8 m",
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "spa": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "massage": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "sauna": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "billiards": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "laundry": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "parking": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE"
+    },
+    "conference_halls": {
+      "value": true,
+      "status": "CONFIRMED_PUBLIC_SOURCE",
+      "capacity": {
+        "value": null,
+        "status": "UNKNOWN_CONFLICTING_PUBLIC_SOURCES",
+        "rule": "Do not quote conference capacity until normalized."
+      }
+    }
+  },
+  "booking_truth": {
+    "reservation_request_is_reservation": {
+      "value": false,
+      "status": "CONFIRMED_OWNER_RULE"
+    },
+    "confirmed_prepayment_required_for_valid_reservation": {
+      "value": true,
+      "status": "CONFIRMED_OWNER_RULE"
+    },
+    "unpaid_request_holds_room": {
+      "value": false,
+      "status": "CONFIRMED_SYSTEM_RULE"
+    },
+    "old_two_day_unpaid_rule": {
+      "value": "Old site text said an unpaid preliminary booking could be removed after two days.",
+      "status": "STALE_DO_NOT_USE"
+    },
+    "prepayment_amount": {
+      "value": null,
+      "status": "READ_FROM_CURRENT_REQUEST",
+      "rule": "Use required_prepayment_kgs returned by Resort Core. Do not independently assume a global percentage in client messaging."
+    }
+  },
+  "payment_methods_2026": {
+    "items": ["Visa", "MasterCard", "QR", "cash", "bank transfer"],
+    "status": "CONFIRMED_2026_PRICE_LIST",
+    "online_provider": {
+      "value": null,
+      "status": "NOT_CONFIGURED",
+      "rule": "Do not promise a specific online payment provider until it is connected."
+    }
+  },
+  "meals_2026": {
+    "summer_room_rate": {
+      "value": "breakfast included",
+      "status": "CONFIRMED_2026_PRICE_LIST"
+    },
+    "adult": {
+      "breakfast_kgs": 500,
+      "lunch_kgs": 750,
+      "dinner_kgs": 650,
+      "three_meals_without_bed_kgs": 1900,
+      "status": "CONFIRMED_2026_PRICE_LIST"
+    },
+    "child": {
+      "breakfast_kgs": 400,
+      "lunch_kgs": 550,
+      "dinner_kgs": 450,
+      "three_meals_without_bed_kgs": 1400,
+      "status": "CONFIRMED_2026_PRICE_LIST"
+    },
+    "rule": "Date-specific room meal inclusion should come from Resort Core pricing, not from this static summary."
+  },
+  "extra_guest_2026": {
+    "adult_13_plus_kgs_per_day": {
+      "value": 1500,
+      "status": "CONFIRMED_2026_PRICE_LIST"
+    },
+    "child_4_to_12_kgs_per_day": {
+      "value": 850,
+      "status": "CONFIRMED_2026_PRICE_LIST"
+    },
+    "under_4_rule": {
+      "value": null,
+      "status": "UNKNOWN",
+      "rule": "Do not state that children under 4 are free unless the owner confirms it."
+    }
+  },
+  "operational_times": {
+    "check_in": {
+      "value": "14:00",
+      "status": "PARTIAL_SOURCE_SUPPORTED",
+      "rule": "May be shown only after current owner rule is normalized for production."
+    },
+    "check_out": {
+      "value": null,
+      "status": "UNKNOWN_CONFLICTING_PUBLIC_SOURCES",
+      "rule": "Public sources conflict between 11:00 and 12:00; do not state a definitive checkout time from automation yet."
+    }
+  }
+}
