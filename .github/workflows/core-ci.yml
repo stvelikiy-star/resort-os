@@ -27,6 +27,7 @@ jobs:
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
+      PREPAYMENT_PERCENT: 30
       CORE_API_URL: http://127.0.0.1:8000
       BOOTSTRAP_OWNER_USERNAME: ci-owner
       BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
@@ -97,26 +98,35 @@ jobs:
 
       - name: Start API
         run: |
-          python -m uvicorn app.main:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
           echo $! > /tmp/resort-api.pid
           sleep 3
 
       - name: Smoke test public Core API
         run: |
           curl --fail http://127.0.0.1:8000/health
-          curl --fail "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0" > /tmp/availability.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/availability.json'))
+          sellable=[x for x in d['results'] if x['pricing']['sellable']]
+          assert sellable, 'expected at least one sellable room type'
+          open('/tmp/room_type_code','w').write(sellable[0]['room_type_code'])
+          PY
 
       - name: Verify unpaid request is request only
         run: |
           RESPONSE=$(curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
             -H 'Content-Type: application/json' \
             -d '{"guest_name":"CI Test Guest","phone":"+996000000000","check_in":"2026-08-26","check_out":"2026-08-28","adults":2,"children":0,"source":"CI"}')
-          echo "$RESPONSE"
-          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["is_reservation"] is False; assert d["status"] == "NEW"'
+          echo "$RESPONSE" > /tmp/request.json
+          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["is_reservation"] is False; assert d["status"] == "NEW"; open("/tmp/request_id","w").write(d["id"])'
 
       - name: Verify PMS rejects unauthenticated access
         run: |
           CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01")
+          test "$CODE" = "401"
+          CODE=$(curl -sS -o /tmp/tasks-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/ops/tasks")
           test "$CODE" = "401"
 
       - name: Login as owner and verify protected PMS
@@ -126,7 +136,85 @@ jobs:
             -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json
           curl --fail -sS -b /tmp/resort-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/me.json
           python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"] == "OWNER"; assert d["username"] == "ci-owner"'
-          curl --fail -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01"
+          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01" > /tmp/grid-before.json
+
+      - name: Quote request and require 30 percent prepayment
+        run: |
+          REQUEST_ID=$(cat /tmp/request_id)
+          ROOM_TYPE=$(cat /tmp/room_type_code)
+          curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/quote" \
+            -H 'Content-Type: application/json' \
+            -d "{\"room_type_code\":\"$ROOM_TYPE\"}" > /tmp/quote.json
+          python - <<'PY'
+          import json, math
+          d=json.load(open('/tmp/quote.json'))
+          assert d['status']=='AWAITING_PREPAYMENT'
+          assert d['quoted_total_kgs'] > 0
+          assert d['required_prepayment_kgs'] == math.ceil(d['quoted_total_kgs'] * 0.30)
+          open('/tmp/prepayment','w').write(str(d['required_prepayment_kgs']))
+          PY
+
+      - name: Confirm payment atomically creates reservation
+        run: |
+          REQUEST_ID=$(cat /tmp/request_id)
+          PREPAYMENT=$(cat /tmp/prepayment)
+          curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/confirm-payment" \
+            -H 'Content-Type: application/json' \
+            -d "{\"amount_kgs\":$PREPAYMENT,\"method\":\"CI_MANUAL\",\"provider\":\"CI\",\"external_ref\":\"ci-payment-001\",\"idempotency_key\":\"ci-idempotency-payment-001\"}" > /tmp/reservation.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/reservation.json'))
+          assert d['idempotent_replay'] is False
+          assert d['reservation_status']=='GUARANTEED'
+          assert d['booking_number'].startswith('TC-')
+          open('/tmp/reservation_id','w').write(d['reservation_id'])
+          open('/tmp/booking_number','w').write(d['booking_number'])
+          open('/tmp/room_code','w').write(d['room_code'])
+          PY
+
+      - name: Verify payment idempotency
+        run: |
+          REQUEST_ID=$(cat /tmp/request_id)
+          PREPAYMENT=$(cat /tmp/prepayment)
+          curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/confirm-payment" \
+            -H 'Content-Type: application/json' \
+            -d "{\"amount_kgs\":$PREPAYMENT,\"method\":\"CI_MANUAL\",\"provider\":\"CI\",\"external_ref\":\"ci-payment-001\",\"idempotency_key\":\"ci-idempotency-payment-001\"}" > /tmp/replay.json
+          python -c 'import json; d=json.load(open("/tmp/replay.json")); assert d["idempotent_replay"] is True'
+
+      - name: Verify reservation appears in PMS grid
+        run: |
+          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01" > /tmp/grid-after.json
+          python - <<'PY'
+          import json
+          booking=open('/tmp/booking_number').read().strip()
+          d=json.load(open('/tmp/grid-after.json'))
+          blocks=[b for r in d['rooms'] for b in r['blocks']]
+          assert any(b.get('booking_number')==booking for b in blocks)
+          PY
+
+      - name: Verify check-in checkout creates housekeeping task
+        run: |
+          RID=$(cat /tmp/reservation_id)
+          curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-in" > /tmp/checkin.json
+          curl --fail -sS -b /tmp/resort-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-out" > /tmp/checkout.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/checkout.json'))
+          assert d['status']=='CHECKED_OUT'
+          assert d['room_state']=='DIRTY'
+          assert d['housekeeping_task_id']
+          open('/tmp/housekeeping_task_id','w').write(d['housekeeping_task_id'])
+          PY
+
+      - name: Verify housekeeping inspection lifecycle
+        run: |
+          TID=$(cat /tmp/housekeeping_task_id)
+          curl --fail -sS -b /tmp/resort-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection.json
+          curl --fail -sS -b /tmp/resort-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"DONE"}' > /tmp/clean.json
+          python -c 'import json; assert json.load(open("/tmp/clean.json"))["status"] == "DONE"'
+          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/ops/tasks?type=HOUSEKEEPING" > /tmp/tasks.json
 
       - name: Start canonical PMS admin
         working-directory: apps/admin
