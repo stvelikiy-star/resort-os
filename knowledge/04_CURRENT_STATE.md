@@ -1,7 +1,7 @@
 # RESORT OS — CURRENT STATE
 
-Version: 0.9
-Date: 2026-08-25
+Version: 1.0
+Date: 2026-08-26
 Status: ACTIVE DEVELOPMENT / CURRENT MAIN PARTIALLY NOT CI-VERIFIED
 Canonical: YES
 Document Type: Evidence-Based Current System State
@@ -121,7 +121,7 @@ Manager boundary:
 - n8n does not generate payment links/QR, collect money or decide whether prepayment is sufficient;
 - without manager-confirmed reservation fact, automation must not tell the guest that a room is booked.
 
-Current booking-admin correction:
+Current booking-admin behavior:
 - quote calculates stay value only;
 - no fixed 30% rule is applied by Core;
 - quote stores `requiredPrepaymentKgs = NULL` until management acts;
@@ -134,7 +134,7 @@ Automated acquiring/payment-provider integration is not required for current V1.
 
 # 6. PMS CHESSBOARD V2 — PRIMARY P0
 
-STATUS: TRANSACTIONAL BACKEND + FIRST V2 INTERACTION UI IMPLEMENTED / NOT CI-VERIFIED
+STATUS: TRANSACTIONAL BACKEND + DIRECT INTERACTION UI IMPLEMENTED / NOT CI-VERIFIED
 
 Detailed contract: `docs/PMS_CHESSBOARD_MUTATION_CONTRACT.md`.
 
@@ -149,7 +149,9 @@ One Reservation may own multiple contiguous active Reservation InventoryBlock se
 
 Implemented mutation capabilities:
 - move a future reservation to another room for the same dates;
+- drag a future single-segment reservation to another room **and another start date** while preserving stay length;
 - change/cut/extend future reservation dates;
+- direct pointer-drag of the outer left/right reservation edges for date resize;
 - split a stay into contiguous room segments;
 - relocate a CHECKED_IN guest from an effective date;
 - preserve already-lived room assignment history;
@@ -160,6 +162,7 @@ Implemented mutation capabilities:
 - AuditLog before/after evidence.
 
 Safety behavior:
+- browser gestures never write booking truth directly; every gesture becomes Core preview -> explicit manager commit;
 - Reservation is locked before commit;
 - active reservation blocks are locked;
 - current/proposed rooms are locked;
@@ -168,58 +171,107 @@ Safety behavior:
 - stale manager screen returns `409 STALE_RESERVATION`;
 - TECH_BLOCK target is rejected;
 - CHECKED_IN past room nights cannot be rewritten;
+- internal boundary between room-relocation segments is not directly drag-resized;
 - if checked-in guest is relocated **today**, target room must be CLEAN;
 - successful immediate relocation marks the vacated room DIRTY and creates/reuses a housekeeping task inside the same transaction;
 - failure leaves original schedule unchanged.
 
 ## Chessboard V2 UI
 
-Active admin chessboard now uses `PMSGridV2`.
+Active admin chessboard uses `PMSGridV2`.
 
-Implemented UI direction:
-- one reservation segment is rendered as one spanning bar across its date range rather than duplicated cell-by-cell;
+Implemented UI:
+- one reservation segment is one spanning bar across its date range rather than duplicated cell-by-cell;
 - split/relocated stay renders as multiple room/date bars;
 - click room -> room detail;
-- click reservation -> stay-management modal;
-- future GUARANTEED reservation can be dragged onto another room row;
-- drop opens server-backed move preview rather than committing silently;
-- left/right edge controls open date-cut/resize workflow;
-- explicit modes: `Перенести бронь`, `Изменить даты`, `Переселить с даты`;
+- click reservation -> stay-management workspace;
+- future single-segment GUARANTEED reservation can be dragged by room and date;
+- exact target date cell is highlighted during drag;
+- drag/drop opens server-backed preview rather than committing silently;
+- direct pointer resize on outer reservation edges shows live proposed dates then opens Core preview;
+- explicit modes remain available for touch/tablet: `Перенести бронь`, `Изменить даты`, `Переселить с даты`;
+- multi-segment reservation quick-drag is intentionally disabled to avoid collapsing a relocation schedule accidentally;
 - preview shows target schedule, conflicts, stored total, suggested Core tariff and delta;
 - explicit confirmation is required before commit;
-- GUARANTEED -> check-in and CHECKED_IN -> check-out actions are available from the reservation workspace;
-- touch/tablet remains usable through explicit controls without requiring precision drag gestures.
+- GUARANTEED -> check-in and CHECKED_IN -> check-out actions are available from the same workspace;
+- realtime snapshot updates remain available through `/ws/pms/grid`.
 
-True direct pointer-drag resizing of the bar edge is still a follow-up UX enhancement; the safe date-resize workflow already exists through edge controls/modal.
+## Daily reception views inside chessboard
+
+Implemented factual quick modes:
+- all rooms;
+- arrivals today;
+- departures today;
+- checked-in/currently occupied rooms;
+- rooms without an active block today and not in TECH_BLOCK.
+
+Arrival/departure logic uses the complete Reservation schedule bounds, not an intermediate room-segment boundary. A room relocation therefore does not create a false hotel departure.
 
 ---
 
-# 7. RECEPTION / RESERVATION DETAIL
+# 7. RESERVATION WORKSPACE / RECEPTION
 
 STATUS: SCHEDULE-AWARE EXTENSION IMPLEMENTED / NOT CI-VERIFIED
 
-A new reception list returns exactly one row per Reservation even when the stay has several room segments.
+A reception list returns exactly one row per Reservation even when the stay has several room segments.
 
 Displayed room is selected by reservation state and hotel-local date:
-- GUARANTEED -> first/check-in room;
+- GUARANTEED -> check-in/first relevant room;
 - CHECKED_IN -> current room segment;
-- CHECKED_OUT -> final room segment.
+- CHECKED_OUT -> final retained schedule room where representable.
 
-Reception card/detail now supports:
+Canonical reservation detail was corrected to be schedule-aware. It now exposes:
 - guest/contact;
-- dates and status;
 - current/working room;
-- complete room-move schedule;
+- complete active room schedule;
 - manager-recorded internal payment facts and balance;
 - tasks across all rooms used by the stay;
-- audit history;
-- check-in/check-out.
+- audit before/after history;
+- source request facts.
 
-Stay lifecycle was made room-schedule aware so check-out selects the actually occupied/final room segment rather than blindly using the first block after a relocation.
+The chessboard reservation workspace now embeds compact quick facts:
+- guest contact with call/email actions;
+- current room;
+- stored stay value;
+- manager-confirmed paid amount;
+- remaining balance;
+- active tasks;
+- expandable recent tasks, payment records and audit actions;
+- booking notes.
+
+Reception detail was corrected to use the canonical `/api/v1/admin/booking/reservations/{id}` endpoint and safely handles a missing room assignment instead of assuming a room always exists.
 
 ---
 
-# 8. OTHER PMS / ADMIN AREAS
+# 8. STAY LIFECYCLE / INVENTORY CONSISTENCY
+
+STATUS: IMPLEMENTED SAFETY HARDENING / NOT CI-VERIFIED
+
+Check-in/check-out now follow the same room schedule as the chessboard.
+
+Check-in:
+- requires GUARANTEED status;
+- hotel-local date must fall inside the stored reservation schedule;
+- actual check-in room is the segment covering the hotel-local date;
+- room must be CLEAN;
+- commercial early/late fees are not inferred;
+- if dates do not match reality, manager must first adjust the schedule in chessboard.
+
+Check-out:
+- requires CHECKED_IN status;
+- actual room is selected from the room schedule, not the first historical block;
+- early checkout releases future InventoryBlock nights inside the same transaction;
+- early checkout does **not** silently change stored reservation value;
+- late checkout after the schedule end is rejected until manager extends dates in chessboard, preventing silent occupancy outside inventory;
+- vacated room becomes DIRTY;
+- housekeeping task is created/reused;
+- AuditLog records planned vs actual checkout and whether future inventory was released.
+
+A zero-night/day-use stay is not modeled by the current date-only Reservation/InventoryBlock model and is therefore not silently invented as a supported workflow.
+
+---
+
+# 9. OTHER PMS / ADMIN AREAS
 
 STATUS: IMPLEMENTED DEVELOPMENT CONTROL CENTER / RECENT EXTENSIONS NOT CI-VERIFIED
 
@@ -237,7 +289,7 @@ PMS is not a mock.
 
 ---
 
-# 9. STAFF / HOUSEKEEPING / MAINTENANCE
+# 10. STAFF / HOUSEKEEPING / MAINTENANCE
 
 STATUS: IMPLEMENTED BASELINE / RECENT CONTROL EXTENSIONS NOT CI-VERIFIED
 
@@ -258,7 +310,7 @@ Photo/checklist evidence remains a future enhancement; exact checklists must not
 
 ---
 
-# 10. N8N / AUTOMATION CONTRACT
+# 11. N8N / AUTOMATION CONTRACT
 
 STATUS: ACTIVE ARCHITECTURE / CORE BOUNDARY IMPLEMENTED / RECENT READ LAYER NOT CI-VERIFIED
 
@@ -277,7 +329,7 @@ Canonical n8n boundary: `automation/n8n/README.md`.
 
 ---
 
-# 11. PUBLIC SALES SITE
+# 12. PUBLIC SALES SITE
 
 STATUS: IMPLEMENTED DEVELOPMENT BASELINE / VISUAL PRODUCTION WORK REMAINS
 
@@ -310,7 +362,7 @@ Main remaining site work:
 
 ---
 
-# 12. INTERNAL HOTEL FINANCE
+# 13. INTERNAL HOTEL FINANCE
 
 STATUS: INTERNAL REPORTING API IMPLEMENTED / NOT ACCOUNTING
 
@@ -331,7 +383,7 @@ Not in V1 scope:
 
 ---
 
-# 13. DEPLOYMENT / PRODUCTION HARDENING
+# 14. DEPLOYMENT / PRODUCTION HARDENING
 
 STATUS: IMPLEMENTED SCAFFOLD / ACTIVE WORK / NOT PRODUCTION DEPLOYED
 
@@ -357,7 +409,7 @@ Remaining gates:
 
 ---
 
-# 14. DEFERRED / UNKNOWN MODULES
+# 15. DEFERRED / UNKNOWN MODULES
 
 NFC: DEFERRED / DORMANT. No active engineering.
 
@@ -373,7 +425,7 @@ Do not invent accounting, pricing, hardware or workflow rules for these modules.
 
 ---
 
-# 15. CI / VERIFICATION STATE
+# 16. CI / VERIFICATION STATE
 
 ## Last explicitly confirmed full green baseline
 
@@ -389,33 +441,34 @@ Confirmed successful workflows on that historical baseline:
 
 Recent/current commits still return no usable new CI status/step evidence through the available GitHub Actions view.
 
-Dedicated current workflows now include:
+Dedicated current workflows include:
 - updated Resort Core CI using manager-decided manual prepayment;
-- PMS Chessboard Mutation CI for move/split/resize/stale/conflict rollback/audit;
+- PMS Chessboard Mutation CI with admin typecheck/build and move/split/resize/stale/conflict/room-readiness/relocation tests;
 - n8n Core contract CI;
 - hotel operations CI;
 - backup/restore CI scaffolding.
+
+`pms-chessboard-ci.yml` now derives test dates from hotel timezone rather than fixed calendar dates so the test does not become stale merely because the runner is restored later.
 
 Until actual workflow execution evidence exists, latest chessboard/reception changes remain **IMPLEMENTED / NOT CI-VERIFIED**.
 
 ---
 
-# 16. CURRENT ENGINEERING ORDER
+# 17. CURRENT ENGINEERING ORDER
 
 Immediate sequence:
 
-1. **Finish/verify PMS Chessboard V2 transaction safety and interaction UX.**
-2. Add true pointer resize handles and faster move/split gestures over the same preview/commit API.
-3. Finish reservation/guest side workspace directly from chessboard.
-4. Harden schedule-aware check-in/check-out and room-relocation operational side effects.
-5. Strengthen daily reception navigation and Command Center drill-downs.
-6. Continue staff/housekeeping/maintenance convenience and evidence capture without inventing checklists.
-7. Keep n8n/Core hot-lead contract stable.
-8. Finish premium public site using the same Core truth; replace media when owned photography arrives.
-9. Finish internal-finance UI from manager-recorded facts.
-10. Establish migration baseline, backup/restore proof, CI, staging and rollback.
-11. Production cutover only after acceptance.
-12. Implement dining/store/access/QR/billiards/LED only after exact rules are supplied.
+1. **Verify and polish PMS Chessboard V2 on the current transaction engine.**
+2. Add clear status visual language and finish tablet/mobile precision behavior for drag/resize.
+3. Extend chessboard/reception E2E assertions for schedule-aware reservation detail and lifecycle edge cases.
+4. Strengthen daily reception shortcuts and Command Center drill-downs into the chessboard.
+5. Continue staff/housekeeping/maintenance convenience and evidence capture without inventing checklists.
+6. Keep n8n/Core hot-lead contract stable.
+7. Resume premium public-site completion using the same Core truth; replace media when owned photography arrives.
+8. Finish internal-finance UI from manager-recorded facts.
+9. Establish migration baseline, backup/restore proof, current-main CI, staging and rollback.
+10. Production cutover only after acceptance.
+11. Implement dining/store/access/QR/billiards/LED only after exact rules are supplied.
 
 Development rule:
 
