@@ -1,0 +1,86 @@
+{
+  "name": "Three Crowns - Staff Intake Core",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "three-crowns/staff-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "65718b40-d014-4abe-a3dc-809ba3191001",
+      "name": "Staff Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-600, 0],
+      "webhookId": "three-crowns-staff-intake"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body ?? $json;\nconst allowed = new Set(['MAINTENANCE','HOUSEKEEPING','GUEST_REQUEST']);\nconst channel = String(b.channel || '').trim().toUpperCase();\nconst messageId = String(b.message_id || '').trim();\nconst intent = String(b.intent || '').trim().toUpperCase();\nif (!channel) throw new Error('Missing required field: channel');\nif (!messageId) throw new Error('Missing required field: message_id');\nif (!allowed.has(intent)) throw new Error('Invalid intent');\nif (!String(b.transcript || '').trim()) throw new Error('Missing transcript');\nif ((intent === 'MAINTENANCE' || intent === 'HOUSEKEEPING') && !String(b.room_code || '').trim()) throw new Error('room_code is required for room work');\nreturn [{ json: { idempotency_key: `${channel}:${messageId}`, channel, message_id: messageId, sender_id: b.sender_id ? String(b.sender_id) : null, intent, room_code: b.room_code ? String(b.room_code).trim() : null, transcript: String(b.transcript).trim(), summary: b.summary ? String(b.summary).trim() : null, priority: String(b.priority || 'NORMAL').toUpperCase() } }];"
+      },
+      "id": "65718b40-d014-4abe-a3dc-809ba3191002",
+      "name": "Normalize Staff Intake",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-360, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/staff-intake'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ idempotency_key: $('Normalize Staff Intake').item.json.idempotency_key, channel: $('Normalize Staff Intake').item.json.channel, intent: $('Normalize Staff Intake').item.json.intent, room_code: $('Normalize Staff Intake').item.json.room_code, transcript: $('Normalize Staff Intake').item.json.transcript, summary: $('Normalize Staff Intake').item.json.summary, priority: $('Normalize Staff Intake').item.json.priority, external_message_id: $('Normalize Staff Intake').item.json.message_id, sender_external_id: $('Normalize Staff Intake').item.json.sender_id }) }}",
+        "options": {}
+      },
+      "id": "65718b40-d014-4abe-a3dc-809ba3191003",
+      "name": "Create Operational Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-100, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $('Create Operational Task').item.json;\nif (!result.id) throw new Error('Core did not return task id');\nreturn [{ json: { ok: true, task: result, truth: 'CORE_TASK_CREATED' } }];"
+      },
+      "id": "65718b40-d014-4abe-a3dc-809ba3191004",
+      "name": "Build Safe Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [140, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {}
+      },
+      "id": "65718b40-d014-4abe-a3dc-809ba3191005",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [380, 0]
+    }
+  ],
+  "connections": {
+    "Staff Intake Webhook": { "main": [[{ "node": "Normalize Staff Intake", "type": "main", "index": 0 }]] },
+    "Normalize Staff Intake": { "main": [[{ "node": "Create Operational Task", "type": "main", "index": 0 }]] },
+    "Create Operational Task": { "main": [[{ "node": "Build Safe Result", "type": "main", "index": 0 }]] },
+    "Build Safe Result": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "65718b40-d014-4abe-a3dc-809ba3191099",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}
