@@ -27,6 +27,7 @@ jobs:
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
+      CORE_API_URL: http://127.0.0.1:8000
 
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +47,18 @@ jobs:
       - name: Create database schema
         working-directory: packages/database
         run: npx prisma db push
+
+      - name: Install PMS admin dependencies
+        working-directory: apps/admin
+        run: npm install
+
+      - name: Typecheck PMS admin
+        working-directory: apps/admin
+        run: npm run typecheck
+
+      - name: Build PMS admin
+        working-directory: apps/admin
+        run: npm run build
 
       - uses: actions/setup-python@v5
         with:
