@@ -1,6 +1,7 @@
 import json
+import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -8,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .service_auth import require_automation_service
 
+PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 router = APIRouter(prefix="/api/v1/automation/inbox", tags=["automation-inbox"])
 service_access = require_automation_service
 
@@ -47,6 +49,14 @@ def normalized_channel_code(value: str) -> str:
     return code[:80]
 
 
+def normalized_message_time(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.utcnow()
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 @router.post("/messages", status_code=status.HTTP_201_CREATED)
 async def ingest_message(
     payload: NormalizedChannelMessage,
@@ -55,9 +65,11 @@ async def ingest_message(
 ):
     code = normalized_channel_code(payload.channel_code)
     source = f"INBOX_{code}"[:60]
+    message_time = normalized_message_time(payload.sent_at)
+
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", "THREE_CROWNS")
+            pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY_CODE)
             if not pid:
                 raise HTTPException(status_code=503, detail="Property is not loaded")
 
@@ -121,8 +133,8 @@ async def ingest_message(
                   "firstResponseAt","createdAt","updatedAt"
                 ) VALUES (
                   $1,$2,$3,$4,$5,$6,$7,$8,'OPEN',
-                  CASE WHEN $9='INBOUND' THEN COALESCE($10,now()) ELSE NULL END,
-                  CASE WHEN $9='OUTBOUND' THEN COALESCE($10,now()) ELSE NULL END,
+                  CASE WHEN $9='INBOUND' THEN $10 ELSE NULL END,
+                  CASE WHEN $9='OUTBOUND' THEN $10 ELSE NULL END,
                   NULL,now(),now()
                 )
                 ON CONFLICT ("channelId","externalConversationId") DO UPDATE SET
@@ -131,15 +143,22 @@ async def ingest_message(
                   "contactPhone"=COALESCE(EXCLUDED."contactPhone",conversations."contactPhone"),
                   "contactUsername"=COALESCE(EXCLUDED."contactUsername",conversations."contactUsername"),
                   status=CASE WHEN $9='INBOUND' AND conversations.status IN ('RESOLVED','ARCHIVED') THEN 'OPEN'::"ConversationStatus" ELSE conversations.status END,
-                  "lastInboundAt"=CASE WHEN $9='INBOUND' THEN GREATEST(COALESCE(conversations."lastInboundAt",'-infinity'::timestamptz),COALESCE($10,now())) ELSE conversations."lastInboundAt" END,
-                  "lastOutboundAt"=CASE WHEN $9='OUTBOUND' THEN GREATEST(COALESCE(conversations."lastOutboundAt",'-infinity'::timestamptz),COALESCE($10,now())) ELSE conversations."lastOutboundAt" END,
-                  "firstResponseAt"=CASE WHEN $9='OUTBOUND' AND conversations."firstResponseAt" IS NULL AND conversations."lastInboundAt" IS NOT NULL THEN COALESCE($10,now()) ELSE conversations."firstResponseAt" END,
+                  "lastInboundAt"=CASE
+                    WHEN $9='INBOUND' AND (conversations."lastInboundAt" IS NULL OR conversations."lastInboundAt" < $10)
+                    THEN $10 ELSE conversations."lastInboundAt" END,
+                  "lastOutboundAt"=CASE
+                    WHEN $9='OUTBOUND' AND (conversations."lastOutboundAt" IS NULL OR conversations."lastOutboundAt" < $10)
+                    THEN $10 ELSE conversations."lastOutboundAt" END,
+                  "firstResponseAt"=CASE
+                    WHEN $9='OUTBOUND' AND conversations."firstResponseAt" IS NULL AND conversations."lastInboundAt" IS NOT NULL
+                    THEN $10 ELSE conversations."firstResponseAt" END,
+                  "resolvedAt"=CASE WHEN $9='INBOUND' THEN NULL ELSE conversations."resolvedAt" END,
                   "updatedAt"=now()
                 RETURNING id
                 ''',
                 uuid.uuid4(), pid, channel["id"], payload.external_conversation_id,
                 payload.external_contact_id, payload.contact_name, payload.contact_phone,
-                payload.contact_username, payload.direction, payload.sent_at,
+                payload.contact_username, payload.direction, message_time,
             )
 
             if payload.external_message_id:
@@ -152,7 +171,12 @@ async def ingest_message(
                         '''UPDATE automation_inbound_events SET "resultResource"='ConversationMessage',"resultResourceId"=$1,"updatedAt"=now() WHERE id=$2''',
                         str(duplicate), event_id,
                     )
-                    return {"idempotent_replay": True, "resource": "ConversationMessage", "id": str(duplicate)}
+                    return {
+                        "idempotent_replay": True,
+                        "resource": "ConversationMessage",
+                        "id": str(duplicate),
+                        "conversation_id": str(conversation["id"]),
+                    }
 
             message_id = uuid.uuid4()
             await conn.execute(
@@ -165,7 +189,7 @@ async def ingest_message(
                 message_id, conversation["id"], payload.direction, payload.external_message_id,
                 payload.sender_type, payload.sender_external_id, payload.text, payload.content_type,
                 payload.delivery_status, json.dumps(payload.raw_payload) if payload.raw_payload is not None else None,
-                payload.sent_at,
+                message_time,
             )
 
             await conn.execute(
