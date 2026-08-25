@@ -1,7 +1,7 @@
 import hashlib
 import os
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from asyncpg.exceptions import RaiseError, UniqueViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -17,6 +17,8 @@ management_access = require_roles("OWNER", "MANAGER")
 beach_access = require_roles("BEACH_PARTNER")
 balance_access = require_roles("OWNER", "MANAGER", "BEACH_PARTNER")
 
+RetiredBraceletStatus = Literal["BLOCKED", "LOST", "RETURNED"]
+
 
 class NfcWalletIssue(BaseModel):
     reservation_id: uuid.UUID
@@ -27,6 +29,16 @@ class NfcWalletIssue(BaseModel):
 
 class NfcBraceletLookup(BaseModel):
     bracelet_uid: str = Field(min_length=4, max_length=160)
+
+
+class NfcBraceletStatusChange(BaseModel):
+    status: RetiredBraceletStatus
+
+
+class NfcBraceletReplacement(BaseModel):
+    bracelet_uid: str = Field(min_length=4, max_length=160)
+    label: str | None = Field(default=None, max_length=80)
+    retire_previous_as: RetiredBraceletStatus
 
 
 class NfcCharge(BaseModel):
@@ -64,6 +76,8 @@ def map_nfc_database_error(exc: RaiseError) -> HTTPException:
         return HTTPException(status_code=409, detail="NFC bracelet is not active")
     if "NFC_WALLET_NOT_ACTIVE" in message:
         return HTTPException(status_code=409, detail="NFC wallet is not active")
+    if "NFC_IDEMPOTENCY_CONFLICT" in message:
+        return HTTPException(status_code=409, detail="NFC idempotency key belongs to another partner")
     if "NFC_INVALID_AMOUNT" in message or "NFC_INVALID_IDEMPOTENCY_KEY" in message:
         return HTTPException(status_code=422, detail="Invalid NFC charge request")
     return HTTPException(status_code=409, detail="NFC payment could not be processed")
@@ -216,6 +230,191 @@ async def issue_nfc_wallet(
         "balance_kgs": payload.initial_balance_kgs,
         "wallet_status": "ACTIVE",
         "bracelet_status": "ACTIVE",
+        "label": payload.label,
+    }
+
+
+@router.patch("/api/v1/admin/nfc/wallets/{wallet_id}/bracelets/{bracelet_id}/status")
+async def retire_nfc_bracelet(
+    wallet_id: uuid.UUID,
+    bracelet_id: uuid.UUID,
+    payload: NfcBraceletStatusChange,
+    request: Request,
+    user: dict[str, Any] = Depends(management_access),
+):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn)
+            wallet = await conn.fetchrow(
+                '''SELECT id,"balanceKgs",status::text AS status FROM nfc_wallets
+                   WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                wallet_id, pid,
+            )
+            if not wallet:
+                raise HTTPException(status_code=404, detail="NFC wallet not found")
+            bracelet = await conn.fetchrow(
+                '''SELECT id,status::text AS status,label,"returnedAt" FROM nfc_bracelets
+                   WHERE id=$1 AND "walletId"=$2 AND "propertyId"=$3 FOR UPDATE''',
+                bracelet_id, wallet_id, pid,
+            )
+            if not bracelet:
+                raise HTTPException(status_code=404, detail="NFC bracelet not found")
+            if bracelet["status"] == payload.status:
+                return {
+                    "idempotent_replay": True,
+                    "wallet_id": str(wallet_id),
+                    "bracelet_id": str(bracelet_id),
+                    "bracelet_status": bracelet["status"],
+                    "wallet_status": wallet["status"],
+                    "balance_kgs": wallet["balanceKgs"],
+                }
+            if bracelet["status"] != "ACTIVE":
+                raise HTTPException(status_code=409, detail="Only an ACTIVE bracelet can be retired by this operation")
+
+            await conn.execute(
+                '''
+                UPDATE nfc_bracelets
+                SET status=$1::"NfcBraceletStatus",
+                    "returnedAt"=CASE WHEN $1='RETURNED' THEN now() ELSE NULL END,
+                    "updatedAt"=now()
+                WHERE id=$2
+                ''',
+                payload.status, bracelet_id,
+            )
+            await conn.execute(
+                '''
+                INSERT INTO audit_logs (
+                  id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"beforeJson","afterJson","createdAt"
+                ) VALUES ($1,$2,'STAFF',$3,'RETIRE_NFC_BRACELET','NfcBracelet',$4,'PMS','SUCCESS',
+                  jsonb_build_object('status',$5::text),
+                  jsonb_build_object('status',$6::text,'wallet_id',$7::text,'balance_kgs',$8::int),now())
+                ''',
+                uuid.uuid4(), pid, user["id"], str(bracelet_id), bracelet["status"], payload.status,
+                str(wallet_id), wallet["balanceKgs"],
+            )
+
+    return {
+        "idempotent_replay": False,
+        "wallet_id": str(wallet_id),
+        "bracelet_id": str(bracelet_id),
+        "bracelet_status": payload.status,
+        "wallet_status": wallet["status"],
+        "balance_kgs": wallet["balanceKgs"],
+    }
+
+
+@router.post("/api/v1/admin/nfc/wallets/{wallet_id}/bracelets/{bracelet_id}/replace", status_code=status.HTTP_201_CREATED)
+async def replace_nfc_bracelet(
+    wallet_id: uuid.UUID,
+    bracelet_id: uuid.UUID,
+    payload: NfcBraceletReplacement,
+    request: Request,
+    user: dict[str, Any] = Depends(management_access),
+):
+    replacement_hash = uid_hash(payload.bracelet_uid)
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn)
+            wallet = await conn.fetchrow(
+                '''
+                SELECT w.id,w."balanceKgs",w.status::text AS status,r."bookingNumber"
+                FROM nfc_wallets w
+                JOIN reservations r ON r.id=w."reservationId"
+                WHERE w.id=$1 AND w."propertyId"=$2
+                FOR UPDATE OF w
+                ''',
+                wallet_id, pid,
+            )
+            if not wallet:
+                raise HTTPException(status_code=404, detail="NFC wallet not found")
+            if wallet["status"] != "ACTIVE":
+                raise HTTPException(status_code=409, detail="Bracelet can be replaced only for an ACTIVE wallet")
+
+            source = await conn.fetchrow(
+                '''SELECT id,status::text AS status,label FROM nfc_bracelets
+                   WHERE id=$1 AND "walletId"=$2 AND "propertyId"=$3 FOR UPDATE''',
+                bracelet_id, wallet_id, pid,
+            )
+            if not source:
+                raise HTTPException(status_code=404, detail="Source NFC bracelet not found")
+
+            active = await conn.fetchrow(
+                '''SELECT id,"uidHash",status::text AS status,label FROM nfc_bracelets
+                   WHERE "walletId"=$1 AND status='ACTIVE'::"NfcBraceletStatus"
+                   FOR UPDATE''',
+                wallet_id,
+            )
+
+            existing_uid = await conn.fetchrow(
+                '''SELECT id,"walletId",status::text AS status,label FROM nfc_bracelets
+                   WHERE "propertyId"=$1 AND "uidHash"=$2''',
+                pid, replacement_hash,
+            )
+            if existing_uid:
+                if existing_uid["walletId"] == wallet_id and existing_uid["status"] == "ACTIVE":
+                    return {
+                        "idempotent_replay": True,
+                        "wallet_id": str(wallet_id),
+                        "old_bracelet_id": str(bracelet_id),
+                        "new_bracelet_id": str(existing_uid["id"]),
+                        "bracelet_status": "ACTIVE",
+                        "wallet_status": wallet["status"],
+                        "balance_kgs": wallet["balanceKgs"],
+                        "label": existing_uid["label"],
+                    }
+                raise HTTPException(status_code=409, detail="Replacement NFC bracelet UID is already assigned")
+
+            if source["status"] == "ACTIVE":
+                if not active or active["id"] != bracelet_id:
+                    raise HTTPException(status_code=409, detail="Active bracelet changed; refresh NFC state before replacement")
+                await conn.execute(
+                    '''
+                    UPDATE nfc_bracelets
+                    SET status=$1::"NfcBraceletStatus",
+                        "returnedAt"=CASE WHEN $1='RETURNED' THEN now() ELSE NULL END,
+                        "updatedAt"=now()
+                    WHERE id=$2
+                    ''',
+                    payload.retire_previous_as, bracelet_id,
+                )
+            elif active:
+                raise HTTPException(status_code=409, detail="Wallet already has another ACTIVE bracelet; refresh NFC state")
+
+            new_bracelet_id = uuid.uuid4()
+            try:
+                await conn.execute(
+                    '''
+                    INSERT INTO nfc_bracelets (
+                      id,"propertyId","walletId","uidHash",status,label,"issuedAt","createdAt","updatedAt"
+                    ) VALUES ($1,$2,$3,$4,'ACTIVE',$5,now(),now(),now())
+                    ''',
+                    new_bracelet_id, pid, wallet_id, replacement_hash, payload.label,
+                )
+            except UniqueViolationError as exc:
+                raise HTTPException(status_code=409, detail="NFC replacement conflicted with another active or assigned bracelet") from exc
+
+            await conn.execute(
+                '''
+                INSERT INTO audit_logs (
+                  id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"beforeJson","afterJson","createdAt"
+                ) VALUES ($1,$2,'STAFF',$3,'REPLACE_NFC_BRACELET','NfcWallet',$4,'PMS','SUCCESS',
+                  jsonb_build_object('old_bracelet_id',$5::text,'old_status',$6::text),
+                  jsonb_build_object('new_bracelet_id',$7::text,'old_retired_as',$8::text,
+                    'balance_kgs',$9::int,'booking_number',$10::text),now())
+                ''',
+                uuid.uuid4(), pid, user["id"], str(wallet_id), str(bracelet_id), source["status"],
+                str(new_bracelet_id), payload.retire_previous_as, wallet["balanceKgs"], wallet["bookingNumber"],
+            )
+
+    return {
+        "idempotent_replay": False,
+        "wallet_id": str(wallet_id),
+        "old_bracelet_id": str(bracelet_id),
+        "old_bracelet_status": payload.retire_previous_as if source["status"] == "ACTIVE" else source["status"],
+        "new_bracelet_id": str(new_bracelet_id),
+        "bracelet_status": "ACTIVE",
+        "wallet_status": wallet["status"],
+        "balance_kgs": wallet["balanceKgs"],
         "label": payload.label,
     }
 
