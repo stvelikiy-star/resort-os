@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type RoomOption = {
   id: string;
@@ -56,15 +56,23 @@ type PreviewResponse = {
   };
 };
 
-type Mode = "MOVE" | "DATES" | "RELOCATE";
+export type ChessboardMode = "MOVE" | "DATES" | "RELOCATE";
 
 const money = (value?: number | null) => value == null ? "—" : `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
+
+function shiftDate(value: string, days: number) {
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().slice(0, 10);
+}
 
 function normalizeError(body: any, fallback: string) {
   if (typeof body?.detail === "string") return body.detail;
   if (body?.detail?.code === "STALE_RESERVATION") return "Бронь уже изменена в другом окне. Обновите данные и повторите.";
-  if (body?.detail?.code === "ROOM_CONFLICT") return "Выбранный номер уже занят в части этого периода.";
+  if (["ROOM_CONFLICT", "ROOM_CONFLICT_RACE"].includes(body?.detail?.code)) return "Выбранный номер уже занят в части этого периода. Исходная бронь не изменена.";
   if (body?.detail?.code === "PAST_ROOM_HISTORY_IMMUTABLE") return "Нельзя переписать уже прожитые ночи. Используйте переселение с текущей даты.";
+  if (body?.detail?.code === "TARGET_ROOM_TECH_BLOCK") return "Целевой номер находится в техническом блоке.";
+  if (body?.detail?.code === "CURRENT_SCHEDULE_NOT_CONTIGUOUS" || body?.detail?.code === "CURRENT_SCHEDULE_RANGE_MISMATCH") return "У этой брони нарушен текущий график размещения. Сначала требуется проверка менеджером.";
   return fallback;
 }
 
@@ -73,15 +81,19 @@ export default function ChessboardReservationModal({
   rooms,
   onClose,
   onUpdated,
+  initialMode,
+  initialTargetRoomId,
 }: {
   reservationId: string;
   rooms: RoomOption[];
   onClose: () => void;
   onUpdated: () => void;
+  initialMode?: ChessboardMode;
+  initialTargetRoomId?: string;
 }) {
   const [data, setData] = useState<ScheduleResponse | null>(null);
-  const [mode, setMode] = useState<Mode>("MOVE");
-  const [targetRoomId, setTargetRoomId] = useState("");
+  const [mode, setMode] = useState<ChessboardMode>(initialMode || "MOVE");
+  const [targetRoomId, setTargetRoomId] = useState(initialTargetRoomId || "");
   const [newCheckIn, setNewCheckIn] = useState("");
   const [newCheckOut, setNewCheckOut] = useState("");
   const [effectiveDate, setEffectiveDate] = useState("");
@@ -89,6 +101,7 @@ export default function ChessboardReservationModal({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoPreviewDone = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -98,41 +111,49 @@ export default function ChessboardReservationModal({
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(normalizeError(body, "Не удалось загрузить бронь"));
       const payload = body as ScheduleResponse;
+      const resolvedMode: ChessboardMode = payload.reservation.status === "CHECKED_IN" && (initialMode || "MOVE") === "MOVE" ? "RELOCATE" : (initialMode || "MOVE");
       setData(payload);
+      setMode(resolvedMode);
       setNewCheckIn(payload.reservation.check_in);
       setNewCheckOut(payload.reservation.check_out);
       setEffectiveDate(payload.local_today > payload.reservation.check_in ? payload.local_today : payload.reservation.check_in);
-      setTargetRoomId(payload.schedule[0]?.room_id || "");
+      setTargetRoomId(initialTargetRoomId || payload.schedule[0]?.room_id || "");
       setPreview(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки брони");
     } finally {
       setLoading(false);
     }
-  }, [reservationId]);
+  }, [reservationId, initialMode, initialTargetRoomId]);
 
   useEffect(() => { void load(); }, [load]);
 
   const currentRoomIds = useMemo(() => new Set((data?.schedule || []).map((x) => x.room_id)), [data]);
 
-  function proposedSchedule(): ScheduleSegment[] {
+  function proposedSchedule(currentMode = mode, roomId = targetRoomId): ScheduleSegment[] {
     if (!data || data.schedule.length === 0) return [];
     const source = data.schedule.map((x) => ({ ...x }));
 
-    if (mode === "MOVE") {
-      if (!targetRoomId) return [];
-      return source.map((item) => ({ ...item, room_id: targetRoomId }));
+    if (currentMode === "MOVE") {
+      if (!roomId) return [];
+      return source.map((item) => ({ ...item, room_id: roomId }));
     }
 
-    if (mode === "DATES") {
-      const first = source[0];
-      const last = source[source.length - 1];
-      first.start = newCheckIn;
-      last.end = newCheckOut;
-      return source;
+    if (currentMode === "DATES") {
+      if (!newCheckIn || !newCheckOut || newCheckOut <= newCheckIn) return [];
+      const resized = source
+        .filter((item) => item.end > newCheckIn && item.start < newCheckOut)
+        .map((item) => ({ ...item }));
+      if (resized.length === 0) {
+        const base = source[0];
+        return [{ ...base, start: newCheckIn, end: newCheckOut }];
+      }
+      resized[0].start = newCheckIn;
+      resized[resized.length - 1].end = newCheckOut;
+      return resized;
     }
 
-    if (!targetRoomId || !effectiveDate) return [];
+    if (!roomId || !effectiveDate || effectiveDate >= data.reservation.check_out) return [];
     const kept: ScheduleSegment[] = [];
     for (const item of source) {
       if (item.end <= effectiveDate) {
@@ -144,14 +165,11 @@ export default function ChessboardReservationModal({
       }
       break;
     }
-    kept.push({ room_id: targetRoomId, start: effectiveDate, end: data.reservation.check_out });
+    kept.push({ room_id: roomId, start: effectiveDate, end: data.reservation.check_out });
     return kept;
   }
 
-  async function runPreview() {
-    if (!data) return;
-    const segments = proposedSchedule().map(({ room_id, start, end }) => ({ room_id, start, end }));
-    if (!segments.length) return;
+  async function requestPreview(segments: Array<{ room_id: string; start: string; end: string }>) {
     setBusy(true);
     setError(null);
     setPreview(null);
@@ -170,6 +188,25 @@ export default function ChessboardReservationModal({
       setBusy(false);
     }
   }
+
+  async function runPreview() {
+    const segments = proposedSchedule().map(({ room_id, start, end }) => ({ room_id, start, end }));
+    if (!segments.length) {
+      setError("Проверьте выбранные даты и номер.");
+      return;
+    }
+    await requestPreview(segments);
+  }
+
+  useEffect(() => {
+    if (!data || !initialTargetRoomId || autoPreviewDone.current) return;
+    if (data.reservation.status !== "GUARANTEED") return;
+    autoPreviewDone.current = true;
+    const segments = proposedSchedule("MOVE", initialTargetRoomId).map(({ room_id, start, end }) => ({ room_id, start, end }));
+    if (segments.length) void requestPreview(segments);
+    // The initial drag target intentionally triggers one preview only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, initialTargetRoomId]);
 
   async function commit() {
     if (!preview) return;
@@ -232,9 +269,7 @@ export default function ChessboardReservationModal({
 
           <div className="chess-current-schedule">
             <strong>Текущее размещение</strong>
-            {data.schedule.map((item) => <div key={item.inventory_block_id || `${item.room_id}-${item.start}`}>
-              <b>№ {item.room_code}</b><span>{item.start} → {item.end}</span><small>{item.room_type_name}</small>
-            </div>)}
+            {data.schedule.map((item) => <div key={item.inventory_block_id || `${item.room_id}-${item.start}`}><b>№ {item.room_code}</b><span>{item.start} → {item.end}</span><small>{item.room_type_name}</small></div>)}
           </div>
 
           <div className="chess-lifecycle-actions">
@@ -244,9 +279,9 @@ export default function ChessboardReservationModal({
 
           {["GUARANTEED", "CHECKED_IN"].includes(data.reservation.status) && <>
             <nav className="chess-mode-tabs">
-              <button className={mode === "MOVE" ? "active" : ""} disabled={data.reservation.status === "CHECKED_IN"} onClick={() => { setMode("MOVE"); setPreview(null); }}>Перенести бронь</button>
-              <button className={mode === "DATES" ? "active" : ""} onClick={() => { setMode("DATES"); setPreview(null); }}>Изменить даты</button>
-              <button className={mode === "RELOCATE" ? "active" : ""} onClick={() => { setMode("RELOCATE"); setPreview(null); }}>Переселить с даты</button>
+              <button className={mode === "MOVE" ? "active" : ""} disabled={data.reservation.status === "CHECKED_IN"} onClick={() => { setMode("MOVE"); setPreview(null); setError(null); }}>Перенести бронь</button>
+              <button className={mode === "DATES" ? "active" : ""} onClick={() => { setMode("DATES"); setPreview(null); setError(null); }}>Изменить даты</button>
+              <button className={mode === "RELOCATE" ? "active" : ""} onClick={() => { setMode("RELOCATE"); setPreview(null); setError(null); }}>Переселить с даты</button>
             </nav>
 
             <div className="chess-mutation-form">
@@ -256,11 +291,11 @@ export default function ChessboardReservationModal({
 
               {mode === "DATES" && <div className="chess-date-grid">
                 <label><span>Заезд</span><input type="date" value={newCheckIn} disabled={data.reservation.status === "CHECKED_IN"} onChange={(e) => { setNewCheckIn(e.target.value); setPreview(null); }} /></label>
-                <label><span>Выезд</span><input type="date" value={newCheckOut} min={data.local_today} onChange={(e) => { setNewCheckOut(e.target.value); setPreview(null); }} /></label>
+                <label><span>Выезд</span><input type="date" value={newCheckOut} min={data.reservation.status === "CHECKED_IN" ? shiftDate(data.local_today, 1) : shiftDate(newCheckIn || data.reservation.check_in, 1)} onChange={(e) => { setNewCheckOut(e.target.value); setPreview(null); }} /></label>
               </div>}
 
               {mode === "RELOCATE" && <div className="chess-date-grid">
-                <label><span>Переселить с</span><input type="date" value={effectiveDate} min={data.reservation.status === "CHECKED_IN" ? data.local_today : data.reservation.check_in} max={data.reservation.check_out} onChange={(e) => { setEffectiveDate(e.target.value); setPreview(null); }} /></label>
+                <label><span>Переселить с</span><input type="date" value={effectiveDate} min={data.reservation.status === "CHECKED_IN" ? data.local_today : data.reservation.check_in} max={shiftDate(data.reservation.check_out, -1)} onChange={(e) => { setEffectiveDate(e.target.value); setPreview(null); }} /></label>
                 <label><span>В новый номер</span><select value={targetRoomId} onChange={(e) => { setTargetRoomId(e.target.value); setPreview(null); }}>
                   {rooms.map((room) => <option key={room.id} value={room.id} disabled={room.operational_state === "TECH_BLOCK"}>{room.code} · {room.room_type_name}{room.operational_state === "TECH_BLOCK" ? " · ремонт" : ""}</option>)}
                 </select></label>
@@ -281,8 +316,8 @@ export default function ChessboardReservationModal({
               <div><span>Тариф Core для новых дат/номеров</span><b>{preview.pricing.sellable ? money(preview.pricing.suggested_total_kgs) : "требует проверки"}</b></div>
               <div><span>Разница</span><b>{preview.pricing.delta_kgs == null ? "—" : money(preview.pricing.delta_kgs)}</b></div>
             </div>
-            <p className="chess-price-note">Перенос не меняет стоимость брони автоматически. Если категория/даты изменились, менеджер отдельно решает коммерческую корректировку.</p>
-            {preview.can_commit && <button className="btn primary chess-confirm" disabled={busy} onClick={commit}>{busy ? "Сохраняю…" : "Подтвердить перенос"}</button>}
+            <p className="chess-price-note">Перенос не меняет стоимость брони автоматически. Если категория или даты изменились, менеджер отдельно решает коммерческую корректировку.</p>
+            {preview.can_commit && <button className="btn primary chess-confirm" disabled={busy} onClick={commit}>{busy ? "Сохраняю…" : "Подтвердить изменение"}</button>}
           </div>}
         </>}
       </section>
