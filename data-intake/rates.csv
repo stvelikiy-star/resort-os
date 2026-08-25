@@ -1,1 +1,49 @@
 rate_name,valid_from,valid_to,room_type,occupancy_rule,price_kgs,meal_included,notes
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,"Одноместный, цоколь",base 1 guest(s),3000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,"Одноместный, цоколь",base 1 guest(s),4000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,"Одноместный, цоколь",base 1 guest(s),3000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,"Одноместный, цоколь",base 1 guest(s),0,NONE,"Source: official 3korony.com/prices_ru.pdf; official source displays 0 KGS for off-season basement category; DO NOT interpret as free; sale status requires confirmation"
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,"Одноместный, улучшенный",base 1 guest(s),4800,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,"Одноместный, улучшенный",base 1 guest(s),6000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,"Одноместный, улучшенный",base 1 guest(s),4800,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,"Одноместный, улучшенный",base 1 guest(s),3500,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,"Двухместный стандарт, цоколь",base 2 guest(s),4500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,"Двухместный стандарт, цоколь",base 2 guest(s),6000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,"Двухместный стандарт, цоколь",base 2 guest(s),4500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,"Двухместный стандарт, цоколь",base 2 guest(s),0,NONE,"Source: official 3korony.com/prices_ru.pdf; official source displays 0 KGS for off-season basement category; DO NOT interpret as free; sale status requires confirmation"
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Двухместный улучшенный,base 2 guest(s),5500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Двухместный улучшенный,base 2 guest(s),7500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Двухместный улучшенный,base 2 guest(s),5500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Двухместный улучшенный,base 2 guest(s),4500,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Двухместный стандарт в коттеджном доме,base 2 guest(s),6000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Двухместный стандарт в коттеджном доме,base 2 guest(s),8000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Двухместный стандарт в коттеджном доме,base 2 guest(s),6000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Двухместный стандарт в коттеджном доме,base 2 guest(s),5000,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Полулюкс без балкона,base 2 guest(s),5500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Полулюкс без балкона,base 2 guest(s),7500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Полулюкс без балкона,base 2 guest(s),5500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Полулюкс без балкона,base 2 guest(s),4500,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Люкс двухместный,base 2 guest(s),7000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Люкс двухместный,base 2 guest(s),8500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Люкс двухместный,base 2 guest(s),7000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Люкс двухместный,base 2 guest(s),5500,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Люкс трехместный,base 3 guest(s),9000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Люкс трехместный,base 3 guest(s),11500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Люкс трехместный,base 3 guest(s),9000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Люкс трехместный,base 3 guest(s),7500,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Двухкомнатный полулюкс,base 4 guest(s),11000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Двухкомнатный полулюкс,base 4 guest(s),14000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Двухкомнатный полулюкс,base 4 guest(s),11000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Двухкомнатный полулюкс,base 4 guest(s),9000,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Двухкомнатный стандарт,base 4 guest(s),9500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Двухкомнатный стандарт,base 4 guest(s),12000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Двухкомнатный стандарт,base 4 guest(s),9500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Двухкомнатный стандарт,base 4 guest(s),7500,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Апартаменты,base 4 guest(s),12500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_PEAK,2026-07-07,2026-08-25,Апартаменты,base 4 guest(s),15000,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Апартаменты,base 4 guest(s),12500,BREAKFAST,Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Апартаменты,base 4 guest(s),10000,NONE,Source: official 3korony.com/prices_ru.pdf
+2026_EARLY_SUMMER,2026-06-01,2026-07-06,Квартиры / апартаменты с кухней,base 4 guest(s),13000,BREAKFAST,"Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf; photo label='Квартиры'; official website label='Апартаменты с кухней'"
+2026_PEAK,2026-07-07,2026-08-25,Квартиры / апартаменты с кухней,base 4 guest(s),15500,BREAKFAST,"Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf; photo label='Квартиры'; official website label='Апартаменты с кухней'"
+2026_LATE_SUMMER,2026-08-26,2026-09-15,Квартиры / апартаменты с кухней,base 4 guest(s),13000,BREAKFAST,"Source: photographed 2026 price list + official 3korony.com/prices_ru.pdf; photo label='Квартиры'; official website label='Апартаменты с кухней'"
+2026_27_OFFSEASON,2026-09-16,2027-05-31,Квартиры / апартаменты с кухней,base 4 guest(s),10500,NONE,"Source: official 3korony.com/prices_ru.pdf; photo label='Квартиры'; official website label='Апартаменты с кухней'"
