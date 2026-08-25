@@ -47,6 +47,21 @@ type ReservationOpen = {
   id: string;
   initialMode?: ChessboardMode;
   targetRoomId?: string;
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+};
+
+type ReservationBounds = {
+  start: string;
+  end: string;
+};
+
+type ResizeDraft = {
+  blockId: string;
+  reservationId: string;
+  edge: "LEFT" | "RIGHT";
+  checkIn: string;
+  checkOut: string;
 };
 
 const STATE_LABELS: Record<Room["operational_state"], string> = {
@@ -73,6 +88,12 @@ function addDays(value: Date, amount: number) {
   const next = new Date(value.getFullYear(), value.getMonth(), value.getDate());
   next.setDate(next.getDate() + amount);
   return next;
+}
+
+function shiftDate(value: string, amount: number) {
+  const [y, m, d] = value.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + amount));
+  return next.toISOString().slice(0, 10);
 }
 
 function dateRange(start: Date, count: number) {
@@ -121,6 +142,7 @@ export default function PMSGridV2() {
   const [selectedReservation, setSelectedReservation] = useState<ReservationOpen | null>(null);
   const [draggingReservationId, setDraggingReservationId] = useState<string | null>(null);
   const [dropRoomId, setDropRoomId] = useState<string | null>(null);
+  const [resizeDraft, setResizeDraft] = useState<ResizeDraft | null>(null);
 
   const days = useMemo(() => dateRange(start, windowDays), [start, windowDays]);
   const end = useMemo(() => addDays(start, windowDays), [start, windowDays]);
@@ -203,6 +225,24 @@ export default function PMSGridV2() {
     });
   }, [data, roomType, search, state]);
 
+  const reservationBounds = useMemo(() => {
+    const result = new Map<string, ReservationBounds>();
+    if (!data) return result;
+    for (const room of data.rooms) {
+      for (const block of room.blocks) {
+        if (block.type !== "RESERVATION" || !block.reservation_id) continue;
+        const current = result.get(block.reservation_id);
+        if (!current) {
+          result.set(block.reservation_id, { start: block.start, end: block.end });
+          continue;
+        }
+        if (block.start < current.start) current.start = block.start;
+        if (block.end > current.end) current.end = block.end;
+      }
+    }
+    return result;
+  }, [data]);
+
   const counts = useMemo(() => {
     const result: Record<Room["operational_state"] | "TOTAL", number> = { TOTAL: rooms.length, UNKNOWN: 0, CLEAN: 0, DIRTY: 0, IN_INSPECTION: 0, TECH_BLOCK: 0 };
     rooms.forEach((room) => result[room.operational_state]++);
@@ -211,7 +251,7 @@ export default function PMSGridV2() {
 
   const gridTemplateColumns = `190px 118px repeat(${windowDays}, 72px)`;
 
-  function blockPlacement(block: Block) {
+  function blockPlacement(block: Pick<Block, "start" | "end">) {
     const from = Math.max(0, daysBetween(startIso, block.start));
     const to = Math.min(windowDays, daysBetween(startIso, block.end));
     if (to <= 0 || from >= windowDays || to <= from) return null;
@@ -227,12 +267,76 @@ export default function PMSGridV2() {
     setSelectedReservation({ id: reservationId, initialMode: "MOVE", targetRoomId: room.id });
   }
 
+  function beginResize(event: React.PointerEvent<HTMLButtonElement>, block: Block, edge: "LEFT" | "RIGHT") {
+    if (!block.reservation_id) return;
+    const bounds = reservationBounds.get(block.reservation_id);
+    if (!bounds) return;
+    if (edge === "LEFT" && block.reservation_status !== "GUARANTEED") return;
+    if (edge === "RIGHT" && !["GUARANTEED", "CHECKED_IN"].includes(block.reservation_status || "")) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const reservationId = block.reservation_id;
+    const originalCheckIn = bounds.start;
+    const originalCheckOut = bounds.end;
+    const startClientX = event.clientX;
+    let nextCheckIn = originalCheckIn;
+    let nextCheckOut = originalCheckOut;
+    let moved = false;
+
+    setResizeDraft({ blockId: block.id, reservationId, edge, checkIn: nextCheckIn, checkOut: nextCheckOut });
+    document.body.classList.add("pms-resizing");
+
+    const onPointerMove = (pointerEvent: PointerEvent) => {
+      const deltaPixels = pointerEvent.clientX - startClientX;
+      if (Math.abs(deltaPixels) >= 4) moved = true;
+      const deltaDays = Math.round(deltaPixels / 72);
+
+      if (edge === "LEFT") {
+        let candidate = shiftDate(originalCheckIn, deltaDays);
+        if (candidate >= originalCheckOut) candidate = shiftDate(originalCheckOut, -1);
+        nextCheckIn = candidate;
+      } else {
+        let candidate = shiftDate(originalCheckOut, deltaDays);
+        if (candidate <= originalCheckIn) candidate = shiftDate(originalCheckIn, 1);
+        nextCheckOut = candidate;
+      }
+
+      setResizeDraft({ blockId: block.id, reservationId, edge, checkIn: nextCheckIn, checkOut: nextCheckOut });
+    };
+
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerCancel);
+      document.body.classList.remove("pms-resizing");
+      setResizeDraft(null);
+    };
+
+    const onPointerUp = () => {
+      cleanup();
+      setSelectedReservation({
+        id: reservationId,
+        initialMode: "DATES",
+        initialCheckIn: moved ? nextCheckIn : undefined,
+        initialCheckOut: moved ? nextCheckOut : undefined,
+      });
+    };
+
+    const onPointerCancel = () => cleanup();
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp, { once: true });
+    window.addEventListener("pointercancel", onPointerCancel, { once: true });
+  }
+
   return <main className="shell pms-v2-shell">
     <div className="topbar">
       <div>
         <p className="eyebrow">Resort OS · Three Crowns</p>
         <h1>Шахматка</h1>
-        <p className="subtitle">Бронь — единая полоса по датам. Будущую бронь можно перетащить на другой номер; Core сначала покажет preview и только потом позволит подтвердить.</p>
+        <p className="subtitle">Переносите будущую бронь между номерами и тяните внешние края полосы для изменения дат. Любое изменение сначала проверяет Resort Core и только потом подтверждается.</p>
       </div>
       <div className={`connection ${error ? "error" : "ok"}`}>{error ? "Core недоступен" : realtime === "live" ? "Realtime" : realtime === "connecting" ? "Подключение…" : "HTTP режим"}</div>
     </div>
@@ -255,7 +359,7 @@ export default function PMSGridV2() {
     </section>
 
     <section className="pms-v2-card">
-      <div className="pms-v2-toolbar"><div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div><div className="pms-v2-help"><span>Перетащить = перенос</span><span>Край полосы = изменить даты</span><span>Клик = карточка / переселение / заезд</span></div></div>
+      <div className="pms-v2-toolbar"><div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div><div className="pms-v2-help"><span>Перетащить полосу = перенос номера</span><span>Потянуть внешний край = изменить дату</span><span>Клик = карточка / переселение / заезд</span></div></div>
       {error && <div className="error-box">{error}</div>}
       {loading && !data ? <div className="loading">Загрузка шахматки…</div> : rooms.length === 0 ? <div className="empty">Нет номеров по фильтрам.</div> : <div className="pms-v2-scroll">
         <div className="pms-v2-board" style={{ minWidth: `${308 + windowDays * 72}px` }}>
@@ -269,21 +373,31 @@ export default function PMSGridV2() {
             <div className="v2-state-cell"><span className={`badge ${room.operational_state}`}>{STATE_LABELS[room.operational_state]}</span></div>
             {days.map((day, index) => { const key = localDateString(day); const weekend = day.getDay() === 0 || day.getDay() === 6; return <div key={key} className={`v2-day-bg ${weekend ? "weekend" : ""} ${key === today ? "today" : ""}`} style={{ gridColumn: `${3 + index} / ${4 + index}` }} />; })}
             {room.blocks.map((block) => {
-              const place = blockPlacement(block);
-              if (!place) return null;
               const interactive = block.type === "RESERVATION" && Boolean(block.reservation_id);
-              const draggable = interactive && block.reservation_status === "GUARANTEED";
-              return <div key={block.id} className={`v2-booking-bar ${block.type} ${interactive ? "interactive" : ""} ${draggable ? "draggable" : ""}`} style={{ gridColumn: place.column }} draggable={draggable} onDragStart={(event) => {
+              const bounds = block.reservation_id ? reservationBounds.get(block.reservation_id) : undefined;
+              const canResizeLeft = interactive && block.reservation_status === "GUARANTEED" && bounds?.start === block.start;
+              const canResizeRight = interactive && ["GUARANTEED", "CHECKED_IN"].includes(block.reservation_status || "") && bounds?.end === block.end;
+              const resizing = resizeDraft?.blockId === block.id;
+              const visualBlock = resizing ? {
+                start: resizeDraft.edge === "LEFT" ? resizeDraft.checkIn : block.start,
+                end: resizeDraft.edge === "RIGHT" ? resizeDraft.checkOut : block.end,
+              } : block;
+              const place = blockPlacement(visualBlock);
+              if (!place) return null;
+              const draggable = interactive && block.reservation_status === "GUARANTEED" && !resizing;
+
+              return <div key={block.id} className={`v2-booking-bar ${block.type} ${interactive ? "interactive" : ""} ${draggable ? "draggable" : ""} ${resizing ? "resizing" : ""}`} style={{ gridColumn: place.column }} draggable={draggable} onDragStart={(event) => {
                 if (!draggable || !block.reservation_id) return;
                 setDraggingReservationId(block.reservation_id);
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("application/x-resort-reservation", block.reservation_id);
               }} onDragEnd={() => { setDraggingReservationId(null); setDropRoomId(null); }}>
-                {interactive && block.reservation_id && <button className="v2-resize-handle left" title="Изменить даты" onClick={(event) => { event.stopPropagation(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); }}>‹</button>}
+                {canResizeLeft && block.reservation_id ? <button className="v2-resize-handle left" title="Потянуть дату заезда" aria-label="Изменить дату заезда" onPointerDown={(event) => beginResize(event, block, "LEFT")} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); } }}>‹</button> : <span className="v2-resize-spacer" />}
                 <button className="v2-bar-main" disabled={!interactive} onClick={() => interactive && block.reservation_id && setSelectedReservation({ id: block.reservation_id })} title={`${blockTitle(block)} · ${block.start} → ${block.end}${draggable ? " · можно перетащить" : ""}`}>
                   <strong>{blockTitle(block)}</strong><span>{block.booking_number || block.reason || ""}</span>
                 </button>
-                {interactive && block.reservation_id && <button className="v2-resize-handle right" title="Изменить даты" onClick={(event) => { event.stopPropagation(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); }}>›</button>}
+                {canResizeRight && block.reservation_id ? <button className="v2-resize-handle right" title="Потянуть дату выезда" aria-label="Изменить дату выезда" onPointerDown={(event) => beginResize(event, block, "RIGHT")} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); } }}>›</button> : <span className="v2-resize-spacer" />}
+                {resizing && <span className="v2-resize-live">{resizeDraft.checkIn} → {resizeDraft.checkOut}</span>}
               </div>;
             })}
           </div>)}
@@ -292,6 +406,6 @@ export default function PMSGridV2() {
     </section>
 
     {selectedRoomId && <RoomDetailModal roomId={selectedRoomId} onClose={() => setSelectedRoomId(null)} />}
-    {selectedReservation && <ChessboardReservationModal reservationId={selectedReservation.id} rooms={data?.rooms || []} initialMode={selectedReservation.initialMode} initialTargetRoomId={selectedReservation.targetRoomId} onClose={() => setSelectedReservation(null)} onUpdated={() => setRefreshToken((x) => x + 1)} />}
+    {selectedReservation && <ChessboardReservationModal reservationId={selectedReservation.id} rooms={data?.rooms || []} initialMode={selectedReservation.initialMode} initialTargetRoomId={selectedReservation.targetRoomId} initialCheckIn={selectedReservation.initialCheckIn} initialCheckOut={selectedReservation.initialCheckOut} onClose={() => setSelectedReservation(null)} onUpdated={() => setRefreshToken((x) => x + 1)} />}
   </main>;
 }
