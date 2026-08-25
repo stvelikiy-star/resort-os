@@ -115,7 +115,7 @@ export default function AdminShell() {
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
-      {tab === "DASHBOARD" && isManager && <DashboardBoard />}
+      {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
