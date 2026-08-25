@@ -60,6 +60,18 @@ jobs:
         working-directory: apps/admin
         run: npm run build
 
+      - name: Install public site dependencies
+        working-directory: apps/web
+        run: npm install
+
+      - name: Typecheck public site
+        working-directory: apps/web
+        run: npm run typecheck
+
+      - name: Build public site
+        working-directory: apps/web
+        run: npm run build
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -82,12 +94,34 @@ jobs:
           echo $! > /tmp/resort-api.pid
           sleep 3
 
-      - name: Smoke test API
+      - name: Smoke test Core API
         run: |
           curl --fail http://127.0.0.1:8000/health
           curl --fail "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
           curl --fail "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01"
 
-      - name: Show API log on failure
+      - name: Verify unpaid request is request only
+        run: |
+          RESPONSE=$(curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
+            -H 'Content-Type: application/json' \
+            -d '{"guest_name":"CI Test Guest","phone":"+996000000000","check_in":"2026-08-26","check_out":"2026-08-28","adults":2,"children":0,"source":"CI"}')
+          echo "$RESPONSE"
+          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); assert d["is_reservation"] is False; assert d["status"] == "NEW"'
+
+      - name: Start canonical public site
+        working-directory: apps/web
+        run: |
+          npm run start > /tmp/resort-web.log 2>&1 &
+          echo $! > /tmp/resort-web.pid
+          sleep 3
+
+      - name: Smoke test public site and Core proxy
+        run: |
+          curl --fail http://127.0.0.1:3000/
+          curl --fail "http://127.0.0.1:3000/core/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0"
+
+      - name: Show logs on failure
         if: failure()
-        run: cat /tmp/resort-api.log || true
+        run: |
+          cat /tmp/resort-api.log || true
+          cat /tmp/resort-web.log || true
