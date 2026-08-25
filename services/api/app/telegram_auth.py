@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from .auth import COOKIE_SECURE, SESSION_COOKIE, SESSION_TTL_HOURS, current_user, hash_session_token
+from .auth import COOKIE_DOMAIN, COOKIE_SECURE, SESSION_COOKIE, SESSION_TTL_HOURS, current_user, hash_session_token
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -71,7 +71,6 @@ def validate_init_data(init_data: str) -> dict[str, Any]:
 
 async def set_staff_session(response: Response, conn, user_row) -> dict[str, Any]:
     raw_token = secrets.token_urlsafe(48)
-    # PostgreSQL schema stores timestamp without timezone, matching the canonical web auth flow.
     expires_at = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
     session_id = uuid.uuid4()
     await conn.execute(
@@ -92,6 +91,7 @@ async def set_staff_session(response: Response, conn, user_row) -> dict[str, Any
         secure=COOKIE_SECURE,
         samesite="lax",
         path="/",
+        domain=COOKIE_DOMAIN,
     )
     return {
         "id": str(user_row["id"]),
