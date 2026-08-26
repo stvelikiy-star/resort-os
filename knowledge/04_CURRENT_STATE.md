@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.3
+Version: 1.4
 Date: 2026-08-26
 Status: DELIVERY RELEASE CANDIDATE / CURRENT EXECUTABLE BASELINE CI-VERIFIED / NOT PRODUCTION READY
 Canonical: YES
@@ -19,9 +19,14 @@ Repository: `stvelikiy-star/resort-os`.
 
 Current executable code baseline verified in GitHub Actions:
 
-`9420d48209c8e869a055b2e552e2491c1f19bd63`
+`97f69cb5c091b49650bfa4b80beb095def75886b`
 
-That merge contains the CI-recovery baseline plus payment-idempotency hardening. The subsequent docs-only Knowledge synchronization does not change executable code and therefore does not supersede this code-verification anchor.
+This current baseline contains the recovered executable stack, payment-idempotency hardening, public-site recovery, Control Center monorepo verification hardening, and the security maintenance upgrade of Admin/Public Web/Staff from Next.js 14.2.35 to patched Next.js 15.5.24 with React/React DOM 19.2.8.
+
+The repository-owned AI PROF verification contract remains fail-closed: root `npm test` validates the exact trusted Git blob identities of all three app manifests before running their typechecks/builds and Core/scripts Python compilation. The trusted manifest blobs at this baseline are:
+- `apps/admin/package.json` -> `e29254cc30c879d2e581db42002367a30d850bf7`;
+- `apps/web/package.json` -> `abe10c8520756ae0863702f2389bda821a956384`;
+- `apps/staff/package.json` -> `85e54aabc4afefc58d1d20b2a92031c4c364a1fa`.
 
 Current owner-approved V1 architecture:
 
@@ -421,6 +426,12 @@ Payment-integrity evidence:
 - `failure=0`, `cancelled=0` for that exact post-merge SHA;
 - `Payment Idempotency CI` passed schema, normalization, real API/PostgreSQL contract tests and concurrent collision tests.
 
+Security-maintenance evidence:
+- PR #9 exact head `a7b6bf9db44bf4990bd3d91313b7da40750e0701` upgraded Admin/Public Web/Staff to Next.js 15.5.24 and React/React DOM 19.2.8 while updating the trusted manifest fingerprints rather than weakening verification;
+- squash-merged canonical `main` is `97f69cb5c091b49650bfa4b80beb095def75886b`;
+- GitHub Actions reports exactly 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found;
+- the post-merge tree remains the exact security-maintenance tree `978df6e5b4cb4b4e0ce4e521a2f4e45402914b2e`.
+
 Active matrix on the verified executable baseline includes:
 1. Resort Core CI;
 2. Hotel Operations CI;
@@ -437,9 +448,11 @@ Active matrix on the verified executable baseline includes:
 13. NFC Deferred Scope CI;
 14. Data Intake Integrity CI.
 
+The security-maintenance commit changes dependency manifests/locks and trusted verifier fingerprints only; it does not promote staging or production gates.
+
 Interpretation boundary:
 
-**14/14 development CI success proves the exercised development contracts on that exact code baseline. It does not prove staging acceptance, production secrets, production migration execution, monitoring, rollback or DNS cutover.**
+**Development CI success proves the exercised development contracts on the exact cited code baselines. It does not prove staging acceptance, production secrets, production migration execution, monitoring, rollback or DNS cutover.**
 
 ---
 
