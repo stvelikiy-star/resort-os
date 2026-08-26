@@ -188,7 +188,7 @@ jobs:
 
       - name: Prove provider FAILED does not clear needs-reply
         run: |
-          TG_TIME=$(date +%s)
+          TG_TIME=$(($(date +%s) + 60))
           cat > /tmp/tg-second-inbound.json <<JSON
           {"update_id":5002,"message":{"message_id":102,"date":$TG_TIME,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest"},"text":"Еще вопрос"}}
           JSON
