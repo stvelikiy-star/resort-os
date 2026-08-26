@@ -65,7 +65,13 @@ def main() -> int:
 
     active_env_files = [ROOT / ".env.example", ROOT / ".env.production.example", ROOT / "compose.production.yaml"]
     for path in active_env_files:
-        if path.exists() and "PREPAYMENT_PERCENT" in path.read_text(encoding="utf-8"):
+        if not path.exists():
+            continue
+        active_lines = [
+            line for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        if any(line.split("=", 1)[0].strip() == "PREPAYMENT_PERCENT" for line in active_lines):
             errors.append(f"{path.relative_to(ROOT)} still exposes PREPAYMENT_PERCENT")
 
     print("Three Crowns active release scope guard")
