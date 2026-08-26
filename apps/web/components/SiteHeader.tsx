@@ -22,6 +22,7 @@ export default function SiteHeader() {
   }, [open]);
 
   const closeMenu = () => setOpen(false);
+  const links = [["#rooms","Номера"],["#rates","Цены"],["#resort","Курорт"],["#experience","Отдых"],["#gallery","Галерея"],["#contacts","Контакты"]];
 
   return (
     <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
@@ -30,11 +31,11 @@ export default function SiteHeader() {
           <img src="/brand/three-crowns-mark.svg" alt="" width="118" height="33" />
           <span className="brand-copy"><strong>ТРИ КОРОНЫ</strong><small>Resort & SPA · Issyk-Kul</small></span>
         </a>
-        <nav className="desktop-nav" aria-label="Основная навигация"><a href="#rooms">Номера</a><a href="#resort">Курорт</a><a href="#spa">SPA</a><a href="#gallery">Галерея</a><a href="#contacts">Контакты</a></nav>
+        <nav className="desktop-nav" aria-label="Основная навигация">{links.map(([href,label]) => <a key={href} href={href}>{label}</a>)}</nav>
         <a className="header-book desktop-only" href="#booking">Проверить даты</a>
         <button className="menu-toggle" type="button" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? "Закрыть меню" : "Открыть меню"} onClick={() => setOpen((value) => !value)}><span /><span /></button>
       </div>
-      <div className={`mobile-menu ${open ? "is-open" : ""}`} id="mobile-menu" aria-hidden={!open}><nav className="wrap" aria-label="Мобильная навигация"><a href="#rooms" onClick={closeMenu}>Номера</a><a href="#resort" onClick={closeMenu}>Курорт</a><a href="#spa" onClick={closeMenu}>SPA</a><a href="#gallery" onClick={closeMenu}>Галерея</a><a href="#contacts" onClick={closeMenu}>Контакты</a><a className="button button-accent" href="#booking" onClick={closeMenu}>Проверить даты</a></nav></div>
+      <div className={`mobile-menu ${open ? "is-open" : ""}`} id="mobile-menu" aria-hidden={!open}><nav className="wrap" aria-label="Мобильная навигация">{links.map(([href,label]) => <a key={href} href={href} onClick={closeMenu}>{label}</a>)}<a className="button button-accent" href="#booking" onClick={closeMenu}>Проверить даты</a></nav></div>
     </header>
   );
 }
