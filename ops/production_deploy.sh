@@ -18,12 +18,22 @@ need curl
 [ -f "$ENV_FILE" ] || fail "Missing $ENV_FILE"
 [ -f "$MIGRATION" ] || fail "Missing immutable migration baseline: $MIGRATION"
 
+# Load host-visible values for validation only. Secrets stay in the host-local file.
+set -a
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+set +a
+
+: "${POSTGRES_DB:?POSTGRES_DB is required}"
+: "${POSTGRES_USER:?POSTGRES_USER is required}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+: "${BOOTSTRAP_OWNER_USERNAME:?BOOTSTRAP_OWNER_USERNAME is required for first deployment}"
+: "${BOOTSTRAP_OWNER_PASSWORD:?BOOTSTRAP_OWNER_PASSWORD is required for first deployment}"
+
 mkdir -p "$BACKUP_DIR"
 
-# Validate config before touching running services.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" config >/dev/null
 
-# Snapshot current DB when it exists. Failure is fatal on an existing production volume.
 if docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" ps --status running postgres | grep -q postgres; then
   echo "Creating pre-deploy database backup..."
   docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
@@ -32,12 +42,9 @@ if docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" ps --status running pos
   test -s "$BACKUP_DIR/predeploy-$TIMESTAMP.dump"
 fi
 
-# Build first; a failed image build never replaces the running release.
-echo "Building production images..."
+echo "Building production images before replacing services..."
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" build --pull api web admin staff
 
-# Database starts first; immutable SQL is idempotent only for a fresh baseline.
-# For an already initialized production database, future changes must use additive migrations.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" up -d postgres
 for i in {1..60}; do
   if docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
@@ -46,10 +53,12 @@ for i in {1..60}; do
   fi
   sleep 2
 done
+docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
+  'PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
 
-# Apply baseline only when Prisma migrations table and application tables are absent.
 TABLES=$(docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
-  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema=\u0027public\u0027 AND table_name IN (\u0027properties\u0027,\u0027rooms\u0027,\u0027reservations\u0027);"')
+  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='"'"'public'"'"' AND table_name IN ('"'"'properties'"'"','"'"'rooms'"'"','"'"'reservations'"'"');"')
+
 if [ "$TABLES" = "0" ]; then
   echo "Applying initial immutable database baseline..."
   cat "$MIGRATION" | docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
@@ -58,23 +67,23 @@ else
   echo "Existing application schema detected; initial baseline will not be replayed."
 fi
 
-# Bring up backend before user-facing surfaces.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" up -d api
 for i in {1..60}; do
-  if curl --fail --silent http://127.0.0.1:8000/health/ready >/dev/null; then break; fi
+  if curl --fail --silent http://127.0.0.1:8000/health/ready >/dev/null 2>&1; then break; fi
   sleep 2
 done
-curl --fail --silent http://127.0.0.1:8000/health/ready
+curl --fail --show-error --silent http://127.0.0.1:8000/health/ready >/dev/null
 
-# Seed is reconciliation-based and keeps the canonical 84-room/12-category baseline.
+# Both scripts are intentionally baked into the API image and are idempotent/reconciling.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T api python /app/scripts/seed_from_intake.py
-
-# Owner bootstrap is idempotent; remove bootstrap password from host env after first launch.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T api python /app/scripts/bootstrap_owner.py
 
-docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" up -d web admin staff edge
+# Start all user-facing services, TLS edge, and daily backup loop.
+docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" up -d backup web admin staff edge
 
 bash ops/production_smoke.sh "$ENV_FILE"
 
 echo "Production deployment passed smoke checks."
-echo "Backup retained at: $BACKUP_DIR/predeploy-$TIMESTAMP.dump (if an existing DB was present)."
+if [ -f "$BACKUP_DIR/predeploy-$TIMESTAMP.dump" ]; then
+  echo "Pre-deploy backup: $BACKUP_DIR/predeploy-$TIMESTAMP.dump"
+fi
