@@ -427,12 +427,28 @@ Payment-integrity evidence:
 - `Payment Idempotency CI` passed schema, normalization, real API/PostgreSQL contract tests and concurrent collision tests.
 
 Security-maintenance evidence:
-- PR #9 exact head `a7b6bf9...` upgraded Admin/Public Web/Staff to Next.js 15.5.24 and React/React DOM 19.2.8 while updating the trusted manifest fingerprints rather than weakening verification;
+- PR #9 exact head `a7b6bf9db44bf4990bd3d91313b7da40750e0701` upgraded Admin/Public Web/Staff to Next.js 15.5.24 and React/React DOM 19.2.8 while updating the trusted manifest fingerprints rather than weakening verification;
 - squash-merged canonical `main` is `97f69cb5c091b49650bfa4b80beb095def75886b`;
 - GitHub Actions reports exactly 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found;
 - the post-merge tree remains the exact security-maintenance tree `978df6e5b4cb4b4e0ce4e521a2f4e45402914b2e`.
 
-Active matrix on the verified executable baseline includes the complete Core/product safety suite. The security-maintenance commit only touches the three app dependency manifests/locks and trusted verifier fingerprints; it does not promote staging or production gates.
+Active matrix on the verified executable baseline includes:
+1. Resort Core CI;
+2. Hotel Operations CI;
+3. PMS Chessboard Mutation CI;
+4. Payment Idempotency CI;
+5. Automation Contract CI;
+6. n8n Resort Core Contract CI;
+7. Unified Inbox CI;
+8. AI Sales Draft CI;
+9. Telegram Sales CI;
+10. Staff Voice CI;
+11. Realtime PMS CI;
+12. PostgreSQL Backup Restore CI;
+13. NFC Deferred Scope CI;
+14. Data Intake Integrity CI.
+
+The security-maintenance commit changes dependency manifests/locks and trusted verifier fingerprints only; it does not promote staging or production gates.
 
 Interpretation boundary:
 
