@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.4
+Version: 1.5
 Date: 2026-08-26
 Status: DELIVERY RELEASE CANDIDATE / CURRENT EXECUTABLE BASELINE CI-VERIFIED / NOT PRODUCTION READY
 Canonical: YES
@@ -19,11 +19,11 @@ Repository: `stvelikiy-star/resort-os`.
 
 Current executable code baseline verified in GitHub Actions:
 
-`97f69cb5c091b49650bfa4b80beb095def75886b`
+`3023226c025a2f57cc801298e22b892c0862d8c6`
 
-This current baseline contains the recovered executable stack, payment-idempotency hardening, public-site recovery, Control Center monorepo verification hardening, and the security maintenance upgrade of Admin/Public Web/Staff from Next.js 14.2.35 to patched Next.js 15.5.24 with React/React DOM 19.2.8.
+This current baseline contains the recovered executable stack, payment-idempotency hardening, Control Center monorepo verification hardening, the security maintenance upgrade of Admin/Public Web/Staff to Next.js 15.5.24 with React/React DOM 19.2.8, the current Three Crowns public-site/catalog implementation, read-only CRM mirror contract, inactive n8n Google Sheets mirror workflow, and the fail-closed public-site truth guard.
 
-The repository-owned AI PROF verification contract remains fail-closed: root `npm test` validates the exact trusted Git blob identities of all three app manifests before running their typechecks/builds and Core/scripts Python compilation. The trusted manifest blobs at this baseline are:
+The repository-owned AI PROF verification contract remains fail-closed: root `npm test` validates the exact trusted Git blob identities of all three app manifests before running their typechecks/builds and Core/scripts Python compilation. The trusted manifest blobs at this baseline remain:
 - `apps/admin/package.json` -> `e29254cc30c879d2e581db42002367a30d850bf7`;
 - `apps/web/package.json` -> `abe10c8520756ae0863702f2389bda821a956384`;
 - `apps/staff/package.json` -> `85e54aabc4afefc58d1d20b2a92031c4c364a1fa`.
@@ -33,7 +33,7 @@ Current owner-approved V1 architecture:
 `PUBLIC SITE / PMS / STAFF / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
 Canonical runtime entrypoint: `app.app_entry:app`.
-Current composed app version: `0.29.0`.
+Current FastAPI application version declared in `services/api/app/main.py`: `0.2.0`.
 
 Resort Core owns hotel truth:
 - 84 room positions / 12 room categories development baseline;
@@ -45,6 +45,7 @@ Resort Core owns hotel truth:
 - staff/RBAC;
 - manager-recorded internal payment facts;
 - controlled n8n API;
+- read-only CRM mirror feed;
 - AuditLog.
 
 Client channels are orchestrated outside Resort Core:
@@ -297,9 +298,9 @@ Direct client-provider adapters retained in Core remain optional/reference code 
 
 ---
 
-## 10. n8n automation boundary
+## 10. n8n automation and CRM mirror boundary
 
-STATUS: **VERIFIED DEVELOPMENT CORE CONTRACT**.
+STATUS: **VERIFIED DEVELOPMENT CORE CONTRACT / CRM MIRROR IMPLEMENTED / LIVE GOOGLE SHEETS SYNC NOT VERIFIED**.
 
 Protected by `X-Resort-Service-Key`.
 
@@ -308,44 +309,62 @@ Current allowed contract includes:
 - deterministic availability/pricing;
 - create/read ReservationRequest;
 - request/reservation/payment status facts that exist in Core;
-- structured staff intake where applicable.
+- structured staff intake where applicable;
+- protected read-only `GET /api/v1/automation/read/crm-feed` for ReservationRequest, Reservation and Payment mirror data.
+
+CRM mirror authority rules:
+- Resort Core remains source of truth;
+- the CRM feed is read-only and exposes no Google Sheets -> PostgreSQL write-back route;
+- stable Core IDs are used for mirror upserts;
+- admin Requests includes a CRM-compatible CSV fallback export;
+- committed n8n workflow `automation/n8n/crm-google-sheets-sync.json` is inactive and contains no OAuth/service secrets;
+- intended workflow behavior is periodic Core -> Google Sheets upsert for Leads, Bookings and Payments while preserving manager-only CRM fields;
+- live Google Sheets OAuth selection, workflow publication, execution against the target sheet and ongoing runtime synchronization are **NOT VERIFIED** by repository evidence alone.
 
 n8n/AI cannot bypass Core authority to create guaranteed reservations, confirm manager payments, check-in/out, refund or mutate hotel money.
 
-Implementation/runbook detail: `automation/n8n/README.md`.
+Implementation/runbook detail: `automation/n8n/README.md` and `automation/n8n/CRM_GOOGLE_SHEETS_SYNC.md`.
 
-That README and `knowledge/08_CLIENT_AUTOMATION_N8N_BOUNDARY.md` are supporting implementation/decision documents; neither replaces canonical Product/Domain/AI/Current-State authority.
+Those runbooks and `knowledge/08_CLIENT_AUTOMATION_N8N_BOUNDARY.md` are supporting implementation/decision documents; none replaces canonical Product/Domain/AI/Current-State authority.
 
 ---
 
 ## 11. Public sales site
 
-STATUS: **IMPLEMENTED DELIVERY BASELINE; BUILD VERIFIED; OWNED MEDIA STILL REQUIRED FOR PRODUCTION VISUAL ACCEPTANCE**.
+STATUS: **IMPLEMENTED DELIVERY BASELINE; BUILD + PUBLIC-TRUTH GUARD VERIFIED; FINAL MEDIA COMPLETENESS / VISUAL ACCEPTANCE STILL OPEN**.
 
 Current `apps/web` includes:
-- premium guest-facing hero/sections;
-- 12 category structure;
+- rebuilt premium canonical homepage;
+- centralized 12-category `roomCatalog`;
+- `/rooms` catalog plus 12 statically generated `/rooms/[slug]` category pages;
+- verified room-area and baseline-capacity presentation from current project intake;
+- official summer 2026 category price matrix as a reference layer;
 - confirmed resort facts: own beach, 150 m pier, SPA/massage, outdoor pool 15×8, Cholpon-Ata;
 - confirmed contacts;
 - live Core availability/pricing;
-- tariff-derived meal information;
-- sellable-first/price-sorted results;
 - mobile-friendly date/guest search;
 - selected-room request flow;
 - real ReservationRequest creation;
-- explicit request-not-yet-booking wording;
+- explicit request-not-yet-booking / no automatic room-block wording;
 - manager confirmation/prepayment boundary;
 - metadata/OpenGraph/JSON-LD/sitemap/robots;
-- sticky mobile booking CTA.
+- cross-route navigation and mobile browsing.
 
-Unconfirmed public claims were removed during copy audit.
+Current media truth:
+- rendered primary public media use repository-local Three Crowns assets;
+- current homepage explicitly treats the materialized local photo subset as incomplete for category-specific photography;
+- presence of a candidate/source asset does not establish a CURRENT operational service claim;
+- `conference.webp`, billiards, laundry and sauna are not allowed to become public CURRENT claims without separate canonical verification.
 
-Remaining visual blocker:
-- replace temporary/hotlinked media with owned Three Crowns photography before production cutover.
+Fail-closed public truth enforcement:
+- `scripts/public_site_truth_guard.py` protects homepage, metadata, room catalog/pages, BookingWidget and roomCatalog;
+- it rejects stale fixed-prepayment rules, the old two-day unpaid hold, fixed first-night prepayment, uncanonicalized conference/billiards/laundry/sauna claims, conference media promotion and remote/hotlinked media;
+- it requires the live Core availability/request endpoints, explicit request-not-confirmed-booking wording and exactly 12 public categories;
+- dedicated `Public Site Truth CI` is active and passed on exact current main `3023226c025a2f57cc801298e22b892c0862d8c6`.
 
 Website and PMS read the same InventoryBlock truth; no separate availability synchronization job is required.
 
-Existing Vercel project `three-crowns-resort-preview` is a legacy static mock with fake availability text and must not be presented as the canonical Resort OS runtime.
+A Vercel deployment existing under a Three Crowns project name does not by itself prove correspondence to this exact canonical GitHub main. Production deployment correspondence remains a separate runtime/deployment gate until exact source linkage is verified.
 
 ---
 
@@ -395,17 +414,19 @@ Dormant NFC schema artifacts must not drive active V1 feature scope.
 
 ## 14. Production gates still open
 
-**Development CI verification is now satisfied for the current executable baseline. Production readiness is not.**
+**Development CI verification is satisfied for the current executable baseline. Production readiness is not.**
 
 Do not claim production-ready until the remaining gates are completed:
 1. generated/reviewed/applied Prisma migration baseline/history rather than permanent `db push`;
 2. production-like current-schema backup -> clean restore proof for the intended deployment procedure;
-3. owned public-site photography and visual acceptance;
+3. complete/final approved public media pack, category-photo mapping and visual acceptance;
 4. staging acceptance;
 5. production secrets/HTTPS/hostnames;
 6. monitoring/alerts;
 7. rollback rehearsal;
-8. explicit DNS/cutover owner gate.
+8. explicit DNS/cutover owner gate;
+9. exact production deployment/source correspondence to the intended canonical main;
+10. if Google Sheets CRM is part of go-live scope: OAuth credential binding, workflow publication and live sync acceptance.
 
 Automated payment-provider integration is **not** a Three Crowns V1 gate under the current manager-manual prepayment workflow.
 
@@ -428,11 +449,26 @@ Payment-integrity evidence:
 
 Security-maintenance evidence:
 - PR #9 exact head `a7b6bf9db44bf4990bd3d91313b7da40750e0701` upgraded Admin/Public Web/Staff to Next.js 15.5.24 and React/React DOM 19.2.8 while updating the trusted manifest fingerprints rather than weakening verification;
-- squash-merged canonical `main` is `97f69cb5c091b49650bfa4b80beb095def75886b`;
-- GitHub Actions reports exactly 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found;
-- the post-merge tree remains the exact security-maintenance tree `978df6e5b4cb4b4e0ce4e521a2f4e45402914b2e`.
+- canonical security baseline commit is `97f69cb5c091b49650bfa4b80beb095def75886b`;
+- GitHub Actions reported 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found.
 
-Active matrix on the verified executable baseline includes:
+Public/CRM baseline lineage after that security baseline includes:
+- `e165c9fdeba76f71cef75880ee51f840966ea2c1` — verified Three Crowns 2026 brand/rate/local-media integration;
+- `ff688bcdfb46aeb6e659d3c4ad28392c32b01d5c` — rendered primary backgrounds forced to local media; post-merge Resort Core CI #413 and Contract CI #22 succeeded;
+- `33c384964e2936533ecdaa3380130dd085ef3abd` — full 2026 public price presentation baseline;
+- `fd2946cc1fd3e46331e9c5a56a5a674ddb673e09` — protected read-only Resort Core CRM mirror feed and admin CSV fallback;
+- `fe1278fba5ea129b96bc8974d8613c76946b4bce` — inactive importable n8n Google Sheets CRM sync workflow plus JSON/safety CI;
+- `7c5cb5e166bac98841467b22515d04c34ac9b570` — canonical public 12-category room catalog and category pages;
+- `7f193e9476ba6aa8f13e4e35b8d58a7916543b43` — canonical public homepage rebuilt with unverified CURRENT service claims removed;
+- current main `3023226c025a2f57cc801298e22b892c0862d8c6` — fail-closed public-site truth guard and dedicated CI.
+
+Exact current-main Actions evidence:
+- query for `head_sha=3023226c025a2f57cc801298e22b892c0862d8c6` returned 14 push-triggered runs;
+- no `failure` conclusion was found;
+- no `cancelled` conclusion was found;
+- `Public Site Truth CI` run #2 completed with `success` on that exact SHA.
+
+Active baseline matrix retained from the core implementation includes:
 1. Resort Core CI;
 2. Hotel Operations CI;
 3. PMS Chessboard Mutation CI;
@@ -448,11 +484,13 @@ Active matrix on the verified executable baseline includes:
 13. NFC Deferred Scope CI;
 14. Data Intake Integrity CI.
 
-The security-maintenance commit changes dependency manifests/locks and trusted verifier fingerprints only; it does not promote staging or production gates.
+Additional focused guards now include:
+- Public Site Truth CI;
+- n8n Workflow JSON/safety CI for committed workflow artifacts.
 
 Interpretation boundary:
 
-**Development CI success proves the exercised development contracts on the exact cited code baselines. It does not prove staging acceptance, production secrets, production migration execution, monitoring, rollback or DNS cutover.**
+**Development CI success proves the exercised development contracts on the exact cited code baselines. It does not prove staging acceptance, production secrets, production migration execution, live Google Sheets synchronization, monitoring, rollback, exact Vercel source correspondence or DNS cutover.**
 
 ---
 
@@ -463,12 +501,14 @@ Remaining work should now proceed from verified current state, not from historic
 1. production migration baseline generation/review -> clean staging apply/verification;
 2. production-like backup/restore rehearsal using the intended migration/deploy procedure;
 3. staging acceptance of public site + PMS + Staff + Core + n8n handoff contracts;
-4. replace public-site temporary/hotlinked media with owned photography;
-5. production secrets/HTTPS/hostnames and operational monitoring;
-6. rollback rehearsal;
-7. explicit owner DNS/cutover gate.
+4. complete/finalize category-specific public media pack and visual acceptance;
+5. verify intended production deployment is built from the intended canonical GitHub baseline;
+6. if CRM Sheets is required for launch, bind Google OAuth, publish the inactive workflow and prove live mirror sync without write-back authority;
+7. production secrets/HTTPS/hostnames and operational monitoring;
+8. rollback rehearsal;
+9. explicit owner DNS/cutover gate.
 
-Do not spend active delivery time on deferred NFC, automated acquiring, direct provider-specific CRM logic, or unspecified dining/store/access/QR/billiards/LED business rules unless canonical decision authority changes their scope.
+Do not spend active delivery time on deferred NFC, automated acquiring, direct provider-specific CRM write-back logic, or unspecified dining/store/access/QR/billiards/LED business rules unless canonical decision authority changes their scope.
 
 Development rule:
 
