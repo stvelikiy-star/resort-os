@@ -48,7 +48,6 @@ jobs:
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
-      PREPAYMENT_PERCENT: 30
       BOOTSTRAP_OWNER_USERNAME: ci-owner
       BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
@@ -125,10 +124,11 @@ jobs:
           REQUEST_ID=$(cat /tmp/nfc-request-id)
           curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/quote" \
             -H 'Content-Type: application/json' -d "{\"room_type_code\":\"$ROOM_TYPE\"}" > /tmp/nfc-quote.json
-          PREPAYMENT=$(python -c 'import json; print(json.load(open("/tmp/nfc-quote.json"))["required_prepayment_kgs"])')
+          python -c 'import json; d=json.load(open("/tmp/nfc-quote.json")); assert d["required_prepayment_kgs"] is None; assert d["prepayment_decided_by_manager"] is True'
+          MANAGER_AMOUNT=1234
           curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/confirm-payment" \
             -H 'Content-Type: application/json' \
-            -d "{\"amount_kgs\":$PREPAYMENT,\"method\":\"CI_MANUAL\",\"provider\":\"NFC_CI\",\"external_ref\":\"nfc-prepay-001\",\"idempotency_key\":\"nfc-prepayment-idempotency-001\"}" > /tmp/nfc-reservation.json
+            -d "{\"amount_kgs\":$MANAGER_AMOUNT,\"method\":\"CI_MANUAL\",\"provider\":\"NFC_CI\",\"external_ref\":\"nfc-prepay-001\",\"idempotency_key\":\"nfc-prepayment-idempotency-001\"}" > /tmp/nfc-reservation.json
           python -c 'import json; d=json.load(open("/tmp/nfc-reservation.json")); open("/tmp/nfc-reservation-id","w").write(d["reservation_id"])'
           RESERVATION_ID=$(cat /tmp/nfc-reservation-id)
           curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RESERVATION_ID/check-in" > /tmp/nfc-checkin.json
