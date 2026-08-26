@@ -73,7 +73,7 @@ export default function HomePage() {
                 <Link className="button button-quiet" href="/rooms">Смотреть 12 категорий</Link>
               </div>
             </div>
-            <a className="action-hero-orbit" href="#story" aria-label="Прокрутить к истории курорта"><span>Scroll<br />to explore ↓</span></a>
+            <a className="action-hero-orbit" href="#story" aria-label="Прокрутить к истории курорта"><span>Листайте<br />вниз ↓</span></a>
           </div>
           <div className="action-hero-index" aria-hidden="true">CHOLPON-ATA · ISSYK-KUL</div>
         </div>
@@ -125,7 +125,7 @@ export default function HomePage() {
           <div className="action-room-rail" role="list" aria-label="Категории номеров">
             {roomCategories.map((room) => (
               <article className="action-room-card" data-index={room.index} key={room.slug} role="listitem">
-                <div className="action-room-card-top"><span>{room.index}</span><span>{formatKgs(room.rates.peak)} сом · high season</span></div>
+                <div className="action-room-card-top"><span>{room.index}</span><span>{formatKgs(room.rates.peak)} сом · высокий сезон</span></div>
                 <div>
                   <h3>{room.name}</h3>
                   <div className="action-room-card-meta"><span>{room.capacity}</span><span>{room.area}</span></div>
