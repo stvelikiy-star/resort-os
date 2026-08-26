@@ -19,6 +19,11 @@ reject_placeholder() {
   [ -n "$value" ] || fail "$name is required"
   case "$value" in CHANGE_ME*) fail "$name still contains a CHANGE_ME placeholder" ;; esac
 }
+query_postgres() {
+  local sql="$1"
+  printf '%s\n' "$sql" | docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
+    'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At'
+}
 
 need docker
 need curl
@@ -72,15 +77,11 @@ done
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
 
-APP_TABLE_COUNT="$(docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
-  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema=\u0027public\u0027 AND table_name IN (\u0027properties\u0027,\u0027rooms\u0027,\u0027reservations\u0027);"')"
-
+APP_TABLE_COUNT="$(query_postgres "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('properties','rooms','reservations');")"
+STAFF_TABLE="$(query_postgres "SELECT CASE WHEN to_regclass('public.staff_users') IS NULL THEN 0 ELSE 1 END;")"
 OWNER_COUNT=0
-STAFF_TABLE="$(docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
-  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT CASE WHEN to_regclass(\u0027public.staff_users\u0027) IS NULL THEN 0 ELSE 1 END;"')"
 if [ "$STAFF_TABLE" = "1" ]; then
-  OWNER_COUNT="$(docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
-    'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM staff_users WHERE role::text=\u0027OWNER\u0027 AND \u0022isActive\u0022=true;"')"
+  OWNER_COUNT="$(query_postgres "SELECT count(*) FROM staff_users WHERE role::text='OWNER' AND \"isActive\"=true;")"
 fi
 
 if [ "$OWNER_COUNT" -gt 0 ] && [ -n "${BOOTSTRAP_OWNER_PASSWORD:-}" ]; then
@@ -102,8 +103,7 @@ docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm migrator npx pris
 echo "Reconciling canonical Three Crowns intake..."
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm api python /app/scripts/seed_from_intake.py
 
-OWNER_COUNT="$(docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
-  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM staff_users WHERE role::text=\u0027OWNER\u0027 AND \u0022isActive\u0022=true;"')"
+OWNER_COUNT="$(query_postgres "SELECT count(*) FROM staff_users WHERE role::text='OWNER' AND \"isActive\"=true;")"
 if [ "$OWNER_COUNT" = "0" ]; then
   reject_placeholder BOOTSTRAP_OWNER_USERNAME "${BOOTSTRAP_OWNER_USERNAME:-}"
   reject_placeholder BOOTSTRAP_OWNER_PASSWORD "${BOOTSTRAP_OWNER_PASSWORD:-}"
