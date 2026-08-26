@@ -33,3 +33,15 @@ ALTER TABLE "inventory_blocks"
 ALTER TABLE "payments"
   ADD CONSTRAINT payment_positive_amount CHECK ("amountKgs" > 0),
   ADD CONSTRAINT payment_has_context CHECK ("requestId" IS NOT NULL OR "reservationId" IS NOT NULL);
+
+-- Operational task creation can be initiated from several manager/automation
+-- surfaces. The database is the final concurrency boundary: for a room there
+-- may be at most one active HOUSEKEEPING task and one active MAINTENANCE task.
+-- Completed/cancelled history remains unlimited, and GUEST_REQUEST is not
+-- constrained because multiple independent guest requests may legitimately
+-- be active for the same room.
+CREATE UNIQUE INDEX active_room_operational_task_type_unique
+  ON operational_tasks ("roomId", type)
+  WHERE "roomId" IS NOT NULL
+    AND type IN ('HOUSEKEEPING', 'MAINTENANCE')
+    AND status IN ('OPEN', 'IN_PROGRESS', 'IN_INSPECTION');
