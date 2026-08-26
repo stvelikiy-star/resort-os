@@ -1,0 +1,9 @@
+{
+  "name": "@resort-os/root-verification",
+  "private": true,
+  "scripts": {
+    "typecheck": "npm --prefix apps/admin run typecheck && npm --prefix apps/web run typecheck && npm --prefix apps/staff run typecheck",
+    "build": "npm --prefix apps/admin run build && npm --prefix apps/web run build && npm --prefix apps/staff run build",
+    "test": "npm run typecheck && npm run build && python3 -m compileall -q services/api/app scripts"
+  }
+}
