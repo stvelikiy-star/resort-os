@@ -11,6 +11,7 @@ from .auth import require_roles
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
+MANUAL_PAYMENT_PROVIDER = "MANAGER_MANUAL"
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-booking"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -23,7 +24,6 @@ class QuotePayload(BaseModel):
 class ConfirmPaymentPayload(BaseModel):
     amount_kgs: int = Field(gt=0)
     method: str = Field(min_length=2, max_length=60)
-    provider: str = Field(default="MANUAL", min_length=2, max_length=60)
     external_ref: str | None = Field(default=None, max_length=160)
     idempotency_key: str = Field(min_length=8, max_length=180)
 
@@ -253,6 +253,32 @@ async def confirm_payment_and_reserve(
                 "reservation_status": existing["reservation_status"],
             }
 
+        external_ref = payload.external_ref.strip() if payload.external_ref else None
+        if external_ref:
+            reference_payment = await conn.fetchrow(
+                '''
+                SELECT id,"requestId","reservationId","amountKgs",method,status::text AS status
+                FROM payments
+                WHERE provider=$1 AND "externalRef"=$2
+                ''',
+                MANUAL_PAYMENT_PROVIDER,
+                external_ref,
+            )
+            if reference_payment:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "PAYMENT_EXTERNAL_REF_CONFLICT",
+                        "message": "This manager payment reference is already recorded.",
+                        "payment_id": str(reference_payment["id"]),
+                        "request_id": str(reference_payment["requestId"]) if reference_payment["requestId"] else None,
+                        "reservation_id": str(reference_payment["reservationId"]) if reference_payment["reservationId"] else None,
+                        "amount_kgs": int(reference_payment["amountKgs"]),
+                        "method": reference_payment["method"],
+                        "status": reference_payment["status"],
+                    },
+                )
+
         async with conn.transaction():
             pid = await property_id(conn)
             rr = await conn.fetchrow(
@@ -314,10 +340,10 @@ async def confirm_payment_and_reserve(
             if not chosen:
                 raise HTTPException(status_code=409, detail="Availability changed; no room remains")
 
-            guest_id=uuid.uuid4()
-            reservation_id=uuid.uuid4()
-            payment_id=uuid.uuid4()
-            booking_number=f"TC-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
+            guest_id = uuid.uuid4()
+            reservation_id = uuid.uuid4()
+            payment_id = uuid.uuid4()
+            booking_number = f"TC-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
 
             await conn.execute(
                 '''INSERT INTO guests (id,"propertyId","firstName",phone,email,"createdAt","updatedAt")
@@ -346,8 +372,8 @@ async def confirm_payment_and_reserve(
                   "externalRef","idempotencyKey","paidAt","createdAt","updatedAt")
                 VALUES ($1,$2,$3,$4,$5,'RECEIVED',$6,$7,$8,now(),now(),now())
                 ''',
-                payment_id,request_id,reservation_id,payload.amount_kgs,payload.method,
-                payload.provider,payload.external_ref,payload.idempotency_key,
+                payment_id,request_id,reservation_id,payload.amount_kgs,payload.method.strip(),
+                MANUAL_PAYMENT_PROVIDER,external_ref,payload.idempotency_key,
             )
             await conn.execute(
                 '''UPDATE reservation_requests SET status='CONVERTED',"requiredPrepaymentKgs"=$2,"updatedAt"=now() WHERE id=$1''',
@@ -358,9 +384,9 @@ async def confirm_payment_and_reserve(
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                 VALUES ($1,$2,'STAFF',$3,'MANAGER_CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
                   jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text,
-                    'manager_confirmed_payment_kgs',$8::integer),now())
+                    'manager_confirmed_payment_kgs',$8::integer,'payment_provider',$9::text),now())
                 ''',
-                uuid.uuid4(),pid,user["id"],str(reservation_id),booking_number,chosen["code"],str(payment_id),payload.amount_kgs,
+                uuid.uuid4(),pid,user["id"],str(reservation_id),booking_number,chosen["code"],str(payment_id),payload.amount_kgs,MANUAL_PAYMENT_PROVIDER,
             )
 
     return {
