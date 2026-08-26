@@ -34,7 +34,8 @@ async def list_reception_reservations(
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
                    r.adults,r.children,r."totalKgs",g."firstName",g.phone,
                    selected.room_code,selected.room_type_name,selected.room_state,
-                   COALESCE(seg.segment_count,0)::int AS schedule_segments
+                   COALESCE(seg.segment_count,0)::int AS schedule_segments,
+                   COALESCE(pay.paid_kgs,0)::bigint AS paid_kgs
             FROM reservations r
             LEFT JOIN guests g ON g.id=r."primaryGuestId"
             LEFT JOIN LATERAL (
@@ -67,6 +68,11 @@ async def list_reception_reservations(
                 AND ib2.active=true
                 AND ib2."blockType"='RESERVATION'
             ) seg ON true
+            LEFT JOIN LATERAL (
+              SELECT COALESCE(SUM(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS paid_kgs
+              FROM payments p
+              WHERE p."reservationId"=r.id
+            ) pay ON true
             WHERE r."propertyId"=$1
             ORDER BY
               CASE r.status::text WHEN 'CHECKED_IN' THEN 0 WHEN 'GUARANTEED' THEN 1 ELSE 2 END,
@@ -89,7 +95,9 @@ async def list_reception_reservations(
                 "checkOut": row["checkOut"],
                 "adults": row["adults"],
                 "children": row["children"],
-                "totalKgs": row["totalKgs"],
+                "totalKgs": int(row["totalKgs"]),
+                "paidKgs": int(row["paid_kgs"]),
+                "remainingKgs": max(int(row["totalKgs"]) - int(row["paid_kgs"]), 0),
                 "firstName": row["firstName"],
                 "phone": row["phone"],
                 "room_code": row["room_code"],
@@ -100,7 +108,7 @@ async def list_reception_reservations(
             }
             for row in rows
         ],
-        "truth": "One row per Reservation. Display room is selected from the active room schedule according to stay status and hotel-local date.",
+        "truth": "One row per Reservation. Display room is selected from the active room schedule according to stay status and hotel-local date. Payment fields include only manager-recorded RECEIVED facts in Resort Core.",
     }
 
 
