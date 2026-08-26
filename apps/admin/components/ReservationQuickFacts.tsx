@@ -82,6 +82,16 @@ function makeIdempotencyKey(reservationId: string) {
   return `pms-reservation-payment-${reservationId}-${random}`;
 }
 
+function paymentErrorMessage(body: any) {
+  if (typeof body?.detail === "string") return body.detail;
+  if (body?.detail?.code === "PAYMENT_EXTERNAL_REF_CONFLICT") {
+    const amount = typeof body.detail.amount_kgs === "number" ? ` · ${money(body.detail.amount_kgs)}` : "";
+    return `Этот номер операции уже записан${amount}. Проверьте платёж, чтобы не учитывать его повторно.`;
+  }
+  if (body?.detail?.code === "IDEMPOTENCY_CONFLICT") return "Запрос оплаты уже использован для другой брони. Обновите карточку и повторите.";
+  return "Не удалось записать оплату";
+}
+
 export default function ReservationQuickFacts({ reservationId, refreshKey }: { reservationId: string; refreshKey?: string }) {
   const [detail, setDetail] = useState<ReservationDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,7 +112,7 @@ export default function ReservationQuickFacts({ reservationId, refreshKey }: { r
     fetch(`/core/api/v1/admin/booking/reservations/${reservationId}`, { cache: "no-store" })
       .then(async (response) => {
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.detail || "Не удалось загрузить данные брони");
+        if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось загрузить данные брони");
         return body as ReservationDetail;
       })
       .then((body) => { if (!cancelled) setDetail(body); })
@@ -142,7 +152,7 @@ export default function ReservationQuickFacts({ reservationId, refreshKey }: { r
         }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось записать оплату");
+      if (!response.ok) throw new Error(paymentErrorMessage(body));
       setPaymentSuccess(`Записано ${money(Math.trunc(amount))}`);
       setPaymentAmount("");
       setPaymentMethod("");
@@ -185,7 +195,7 @@ export default function ReservationQuickFacts({ reservationId, refreshKey }: { r
       <div className="chess-payment-fields">
         <label><span>Получено, сом</span><input inputMode="numeric" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="Например 5000" /></label>
         <label><span>Способ</span><input value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} placeholder="Фактический способ оплаты" /></label>
-        <label><span>Номер операции / комментарий</span><input value={paymentRef} onChange={(event) => setPaymentRef(event.target.value)} placeholder="Необязательно" /></label>
+        <label><span>Номер операции / комментарий</span><input value={paymentRef} onChange={(event) => setPaymentRef(event.target.value)} placeholder="Необязательно · повторный номер будет отклонён" /></label>
         <button className="btn primary" disabled={paymentBusy} onClick={recordPayment}>{paymentBusy ? "Записываю…" : "Записать факт оплаты"}</button>
       </div>
       {paymentError && <div className="error-box compact">{paymentError}</div>}
