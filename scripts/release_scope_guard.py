@@ -7,6 +7,7 @@ current owner-approved V1 scope.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -41,6 +42,43 @@ FORBIDDEN_PATH_FRAGMENTS = (
     "/beach/charge",
 )
 
+_PREPAYMENT_KEY = re.compile(
+    r"^\s*(?:(?:\"PREPAYMENT_PERCENT\")|(?:'PREPAYMENT_PERCENT')|PREPAYMENT_PERCENT)\s*(?:=|:)"
+)
+
+
+def exposes_active_prepayment_percent(text: str) -> bool:
+    """Detect an uncommented PREPAYMENT_PERCENT key in dotenv or YAML syntax."""
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if _PREPAYMENT_KEY.match(line):
+            return True
+    return False
+
+
+def run_self_test() -> int:
+    cases = {
+        "PREPAYMENT_PERCENT=30\n": True,
+        "  PREPAYMENT_PERCENT = 30\n": True,
+        "      PREPAYMENT_PERCENT: ${PREPAYMENT_PERCENT}\n": True,
+        "      \"PREPAYMENT_PERCENT\": 30\n": True,
+        "      'PREPAYMENT_PERCENT': 30\n": True,
+        "# PREPAYMENT_PERCENT=30\n": False,
+        "   # PREPAYMENT_PERCENT: 30\n": False,
+        "OTHER_PREPAYMENT_PERCENT=30\n": False,
+        "NOTE: PREPAYMENT_PERCENT\n": False,
+        "\n": False,
+    }
+    for text, expected in cases.items():
+        actual = exposes_active_prepayment_percent(text)
+        if actual != expected:
+            print(f"FAIL: PREPAYMENT_PERCENT parser mismatch for {text!r}: {actual} != {expected}")
+            return 1
+    print("PASS: PREPAYMENT_PERCENT guard handles dotenv, YAML, quoted keys, comments and false positives")
+    return 0
+
 
 def main() -> int:
     paths = {route.path for route in app.routes if getattr(route, "path", None)}
@@ -65,7 +103,7 @@ def main() -> int:
 
     active_env_files = [ROOT / ".env.example", ROOT / ".env.production.example", ROOT / "compose.production.yaml"]
     for path in active_env_files:
-        if path.exists() and "PREPAYMENT_PERCENT" in path.read_text(encoding="utf-8"):
+        if path.exists() and exposes_active_prepayment_percent(path.read_text(encoding="utf-8")):
             errors.append(f"{path.relative_to(ROOT)} still exposes PREPAYMENT_PERCENT")
 
     print("Three Crowns active release scope guard")
@@ -83,4 +121,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv[1:]:
+        raise SystemExit(run_self_test())
     raise SystemExit(main())

@@ -1,235 +1,54 @@
-name: NFC Beach Payment CI
+name: NFC Deferred Scope CI
 
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/api/app/**'
+      - 'services/api/requirements.txt'
+      - 'scripts/release_scope_guard.py'
+      - '.env.example'
+      - '.env.production.example'
+      - 'compose.production.yaml'
+      - '.github/workflows/nfc-ci.yml'
   pull_request:
+    paths:
+      - 'services/api/app/**'
+      - 'services/api/requirements.txt'
+      - 'scripts/release_scope_guard.py'
+      - '.env.example'
+      - '.env.production.example'
+      - 'compose.production.yaml'
+      - '.github/workflows/nfc-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  nfc:
+  nfc-release-boundary:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: resort_os
-          POSTGRES_USER: resort
-          POSTGRES_PASSWORD: resort
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U resort -d resort_os"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
-      PROPERTY_CODE: THREE_CROWNS
-      RATE_PLAN_CODE: DIRECT_2026_27
-      PREPAYMENT_PERCENT: 30
-      BOOTSTRAP_OWNER_USERNAME: ci-owner
-      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
-      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
-      COOKIE_SECURE: false
-      NFC_UID_PEPPER: CI-only-NFC-pepper-never-use-in-production-2026
-
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Create database schema
-        working-directory: packages/database
-        run: |
-          npm install
-          npx prisma validate
-          npx prisma db push
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
 
-      - name: Install API dependencies
-        run: pip install -r services/api/requirements.txt
-
-      - name: Compile API and scripts
-        run: python -m compileall services/api/app scripts
-
-      - name: Apply SQL constraints and NFC function
-        run: python scripts/apply_core_constraints.py
-
-      - name: Seed property and staff
+      - name: Install and compile API
         run: |
-          python scripts/seed_from_intake.py
-          python scripts/bootstrap_owner.py
-          STAFF_USERNAME=ci-beach STAFF_PASSWORD=CI-Beach-Strong-Password-2026 STAFF_DISPLAY_NAME="CI Beach Partner" STAFF_ROLE=BEACH_PARTNER python scripts/upsert_staff_user.py
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts/release_scope_guard.py
 
-      - name: Start Core API
-        run: |
-          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/nfc-api.log 2>&1 &
-          echo $! > /tmp/nfc-api.pid
-          sleep 3
-          curl --fail http://127.0.0.1:8000/health
+      - name: Self-test release scope parser
+        run: python scripts/release_scope_guard.py --self-test
 
-      - name: Create a guaranteed reservation and check in
-        run: |
-          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-27&check_out=2026-08-29&adults=2&children=0" > /tmp/nfc-availability.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/nfc-availability.json'))
-          sellable=[x for x in d['results'] if x['pricing']['sellable']]
-          assert sellable
-          open('/tmp/nfc-room-type','w').write(sellable[0]['room_type_code'])
-          PY
-          ROOM_TYPE=$(cat /tmp/nfc-room-type)
-          RESPONSE=$(curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
-            -H 'Content-Type: application/json' \
-            -d "{\"guest_name\":\"NFC CI Guest\",\"phone\":\"+996700000099\",\"check_in\":\"2026-08-27\",\"check_out\":\"2026-08-29\",\"adults\":2,\"children\":0,\"room_type_code\":\"$ROOM_TYPE\",\"source\":\"NFC_CI\"}")
-          echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); open("/tmp/nfc-request-id","w").write(d["id"])'
-          curl --fail -sS -c /tmp/nfc-owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
-            -H 'Content-Type: application/json' -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/nfc-owner-login.json
-          REQUEST_ID=$(cat /tmp/nfc-request-id)
-          curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/quote" \
-            -H 'Content-Type: application/json' -d "{\"room_type_code\":\"$ROOM_TYPE\"}" > /tmp/nfc-quote.json
-          PREPAYMENT=$(python -c 'import json; print(json.load(open("/tmp/nfc-quote.json"))["required_prepayment_kgs"])')
-          curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/confirm-payment" \
-            -H 'Content-Type: application/json' \
-            -d "{\"amount_kgs\":$PREPAYMENT,\"method\":\"CI_MANUAL\",\"provider\":\"NFC_CI\",\"external_ref\":\"nfc-prepay-001\",\"idempotency_key\":\"nfc-prepayment-idempotency-001\"}" > /tmp/nfc-reservation.json
-          python -c 'import json; d=json.load(open("/tmp/nfc-reservation.json")); open("/tmp/nfc-reservation-id","w").write(d["reservation_id"])'
-          RESERVATION_ID=$(cat /tmp/nfc-reservation-id)
-          curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RESERVATION_ID/check-in" > /tmp/nfc-checkin.json
-          python -c 'import json; assert json.load(open("/tmp/nfc-checkin.json"))["status"] == "CHECKED_IN"'
-
-      - name: Issue bracelet wallet at check-in
-        run: |
-          RESERVATION_ID=$(cat /tmp/nfc-reservation-id)
-          curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/nfc/wallets \
-            -H 'Content-Type: application/json' \
-            -d "{\"reservation_id\":\"$RESERVATION_ID\",\"bracelet_uid\":\"CI-BRACELET-001\",\"initial_balance_kgs\":10000,\"label\":\"CI blue\"}" > /tmp/nfc-wallet.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/nfc-wallet.json'))
-          assert d['balance_kgs']==10000
-          assert d['wallet_status']=='ACTIVE'
-          assert d['bracelet_status']=='ACTIVE'
-          assert d['idempotent_replay'] is False
-          open('/tmp/nfc-wallet-id','w').write(d['wallet_id'])
-          PY
-          curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/nfc/wallets \
-            -H 'Content-Type: application/json' \
-            -d "{\"reservation_id\":\"$RESERVATION_ID\",\"bracelet_uid\":\"CI-BRACELET-001\",\"initial_balance_kgs\":10000,\"label\":\"CI blue\"}" > /tmp/nfc-wallet-replay.json
-          python -c 'import json; assert json.load(open("/tmp/nfc-wallet-replay.json"))["idempotent_replay"] is True'
-
-      - name: Login beach partner and verify starting balance
-        run: |
-          curl --fail -sS -c /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
-            -H 'Content-Type: application/json' -d '{"username":"ci-beach","password":"CI-Beach-Strong-Password-2026"}' > /tmp/nfc-beach-login.json
-          python -c 'import json; assert json.load(open("/tmp/nfc-beach-login.json"))["role"] == "BEACH_PARTNER"'
-          curl --fail -sS -b /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/beach/balance \
-            -H 'Content-Type: application/json' -d '{"bracelet_uid":"CI-BRACELET-001"}' > /tmp/nfc-balance-start.json
-          python -c 'import json; assert json.load(open("/tmp/nfc-balance-start.json"))["balance_kgs"] == 10000'
-
-      - name: Charge 1000 KGS and calculate hotel 5 percent commission
-        run: |
-          curl --fail -sS -b /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/beach/charge \
-            -H 'Content-Type: application/json' \
-            -d '{"bracelet_uid":"CI-BRACELET-001","amount_kgs":1000,"idempotency_key":"nfc-charge-ci-001","description":"CI jetski test"}' > /tmp/nfc-charge.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/nfc-charge.json'))
-          assert d['balance_before_kgs']==10000
-          assert d['balance_after_kgs']==9000
-          assert d['amount_kgs']==1000
-          assert d['commission_bps']==500
-          assert d['hotel_commission_kgs']==50
-          assert d['partner_net_kgs']==950
-          assert d['idempotent_replay'] is False
-          open('/tmp/nfc-transaction-id','w').write(d['transaction_id'])
-          PY
-
-      - name: Verify retry does not double charge
-        run: |
-          curl --fail -sS -b /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/beach/charge \
-            -H 'Content-Type: application/json' \
-            -d '{"bracelet_uid":"CI-BRACELET-001","amount_kgs":1000,"idempotency_key":"nfc-charge-ci-001","description":"CI jetski retry"}' > /tmp/nfc-charge-replay.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/nfc-charge-replay.json'))
-          assert d['idempotent_replay'] is True
-          assert d['balance_after_kgs']==9000
-          assert d['transaction_id']==open('/tmp/nfc-transaction-id').read().strip()
-          PY
-          curl --fail -sS -b /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/beach/balance \
-            -H 'Content-Type: application/json' -d '{"bracelet_uid":"CI-BRACELET-001"}' > /tmp/nfc-balance-after-replay.json
-          python -c 'import json; assert json.load(open("/tmp/nfc-balance-after-replay.json"))["balance_kgs"] == 9000'
-
-      - name: Reject insufficient funds without changing balance
-        run: |
-          CODE=$(curl -sS -o /tmp/nfc-insufficient.json -w '%{http_code}' -b /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/beach/charge \
-            -H 'Content-Type: application/json' \
-            -d '{"bracelet_uid":"CI-BRACELET-001","amount_kgs":10000,"idempotency_key":"nfc-charge-too-large-001"}')
-          test "$CODE" = "409"
-          curl --fail -sS -b /tmp/nfc-beach-cookies.txt -X POST http://127.0.0.1:8000/api/v1/beach/balance \
-            -H 'Content-Type: application/json' -d '{"bracelet_uid":"CI-BRACELET-001"}' > /tmp/nfc-balance-after-failure.json
-          python -c 'import json; assert json.load(open("/tmp/nfc-balance-after-failure.json"))["balance_kgs"] == 9000'
-
-      - name: Prove concurrent charges cannot overdraw wallet
-        run: |
-          python - <<'PY'
-          import asyncio
-          import hashlib
-          import os
-          import asyncpg
-
-          DB=os.environ['DATABASE_URL'].replace('?schema=public','')
-          UID='CI-BRACELET-001'
-          HASH=hashlib.sha256(f"{os.environ['NFC_UID_PEPPER']}\0{UID}".encode()).hexdigest()
-
-          async def charge(key):
-              conn=await asyncpg.connect(DB)
-              try:
-                  partner=await conn.fetchval("SELECT id FROM staff_users WHERE username='ci-beach'")
-                  row=await conn.fetchrow(
-                      'SELECT * FROM process_nfc_payment($1,$2,$3,$4,$5,$6)',
-                      'THREE_CROWNS', HASH, partner, 6000, key, 'CI concurrent charge'
-                  )
-                  return ('success', dict(row))
-              except asyncpg.exceptions.RaiseError as exc:
-                  return ('error', str(exc))
-              finally:
-                  await conn.close()
-
-          async def main():
-              results=await asyncio.gather(charge('nfc-concurrent-a-001'), charge('nfc-concurrent-b-001'))
-              successes=[x for x in results if x[0]=='success']
-              errors=[x for x in results if x[0]=='error']
-              assert len(successes)==1, results
-              assert len(errors)==1, results
-              assert 'NFC_INSUFFICIENT_FUNDS' in errors[0][1], results
-              assert successes[0][1]['balance_before_kgs']==9000
-              assert successes[0][1]['balance_after_kgs']==3000
-
-              conn=await asyncpg.connect(DB)
-              try:
-                  wallet_id=open('/tmp/nfc-wallet-id').read().strip()
-                  balance=await conn.fetchval('SELECT "balanceKgs" FROM nfc_wallets WHERE id=$1', wallet_id)
-                  tx_count=await conn.fetchval('SELECT count(*) FROM nfc_transactions WHERE "walletId"=$1', wallet_id)
-                  ledger_count=await conn.fetchval('SELECT count(*) FROM nfc_ledger_entries WHERE "walletId"=$1', wallet_id)
-                  stored_hash=await conn.fetchval('SELECT "uidHash" FROM nfc_bracelets WHERE "walletId"=$1', wallet_id)
-                  assert balance==3000
-                  assert tx_count==2
-                  assert ledger_count==3
-                  assert stored_hash != UID
-                  assert len(stored_hash)==64
-              finally:
-                  await conn.close()
-
-          asyncio.run(main())
-          PY
-
-      - name: Show API log on failure
-        if: failure()
-        run: cat /tmp/nfc-api.log || true
+      - name: Verify active V1 release boundary
+        run: python scripts/release_scope_guard.py

@@ -3,11 +3,32 @@ name: PMS Chessboard Mutation CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/admin/**'
+      - '.github/workflows/pms-chessboard-ci.yml'
   pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/admin/**'
+      - '.github/workflows/pms-chessboard-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   chessboard:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -40,6 +61,14 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
       - name: Resolve hotel-local test dates
         run: |
           python - <<'PY'
@@ -55,20 +84,22 @@ jobs:
       - name: Create development database
         working-directory: packages/database
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npx prisma validate
           npx prisma db push
 
       - name: Typecheck and build PMS admin V2
         working-directory: apps/admin
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
 
       - name: Install Core and seed
         run: |
@@ -229,6 +260,17 @@ jobs:
       - name: Immediate relocation preserves lived history and dirties vacated room
         run: |
           RID=$(cat /tmp/reservation_id)
+          python - <<'PY'
+          import os, asyncio, asyncpg, uuid
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  target = uuid.UUID(open('/tmp/target2').read().strip())
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\',"updatedAt"=now() WHERE id=$1', target)
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
           curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/pre-relocate-schedule.json
           python - <<'PY'
           import json
@@ -257,7 +299,7 @@ jobs:
           assert d['immediate_relocation']
           assert d['immediate_relocation']['vacated_room_will_become_dirty'] is True
           x=json.load(open('/tmp/relocate.json'))
-          x['expected_version']=open('/tmp/version2').read().strip()
+          x['expected_version']=d['reservation']['version']
           json.dump(x,open('/tmp/relocate-commit.json','w'))
           PY
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
@@ -292,11 +334,13 @@ jobs:
           RID=$(cat /tmp/reservation_id)
           python - <<'PY'
           import os,uuid,asyncio,asyncpg
+          from datetime import date
           async def main():
               conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               try:
                   room=uuid.UUID(open('/tmp/target1').read().strip())
-                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,os.environ['D2'],os.environ['D5'])
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\',"updatedAt"=now() WHERE id=$1', room)
+                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,date.fromisoformat(os.environ['D2']),date.fromisoformat(os.environ['D5']))
               finally: await conn.close()
           asyncio.run(main())
           PY
@@ -341,6 +385,26 @@ jobs:
       - name: Check-out uses actual current room and creates housekeeping
         run: |
           RID=$(cat /tmp/reservation_id)
+          python - <<'PY'
+          import os, asyncio, asyncpg, uuid
+          from datetime import date, timedelta
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  reservation_id = uuid.UUID(open('/tmp/reservation_id').read().strip())
+                  lived_from = date.fromisoformat(os.environ['D0']) - timedelta(days=1)
+                  await conn.execute('UPDATE reservations SET "checkIn"=$1,"updatedAt"=now() WHERE id=$2', lived_from, reservation_id)
+                  await conn.execute(
+                      '''UPDATE inventory_blocks SET "startDate"=$1,"updatedAt"=now()
+                         WHERE id=(SELECT id FROM inventory_blocks
+                                   WHERE "reservationId"=$2 AND active=true AND "blockType"='RESERVATION'
+                                   ORDER BY "startDate" LIMIT 1)''',
+                      lived_from, reservation_id,
+                  )
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-out" > /tmp/checkout.json
           python - <<'PY'
           import json

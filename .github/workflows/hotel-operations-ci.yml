@@ -3,11 +3,34 @@ name: Hotel Operations CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/admin/**'
+      - 'apps/staff/**'
+      - '.github/workflows/hotel-operations-ci.yml'
   pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/admin/**'
+      - 'apps/staff/**'
+      - '.github/workflows/hotel-operations-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   hotel-operations:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -39,16 +62,26 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
       - name: Create database schema
         working-directory: packages/database
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npx prisma validate
           npx prisma db push
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
 
       - name: Install API dependencies
         run: pip install -r services/api/requirements.txt
@@ -279,11 +312,11 @@ jobs:
       - name: Typecheck and build PMS and Staff PWA
         run: |
           cd apps/admin
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
           cd ../staff
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
 
