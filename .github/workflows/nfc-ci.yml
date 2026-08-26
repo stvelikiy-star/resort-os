@@ -45,5 +45,8 @@ jobs:
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/release_scope_guard.py
 
+      - name: Self-test release scope parser
+        run: python scripts/release_scope_guard.py --self-test
+
       - name: Verify deferred NFC routes are not composed
         run: python scripts/release_scope_guard.py
