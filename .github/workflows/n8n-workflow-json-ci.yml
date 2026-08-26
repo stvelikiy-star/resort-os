@@ -1,0 +1,84 @@
+name: n8n Workflow JSON CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'automation/n8n/**'
+      - '.github/workflows/n8n-workflow-json-ci.yml'
+  pull_request:
+    paths:
+      - 'automation/n8n/**'
+      - '.github/workflows/n8n-workflow-json-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-n8n-workflows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Parse all committed n8n workflow JSON
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const path = require('path');
+          const dir = path.join(process.cwd(), 'automation', 'n8n');
+          const files = fs.readdirSync(dir).filter((name) => name.endsWith('.json')).sort();
+          if (!files.length) throw new Error('No n8n workflow JSON files found');
+          for (const name of files) {
+            const payload = JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
+            if (!payload || typeof payload !== 'object') throw new Error(`${name}: workflow must be an object`);
+            if (!Array.isArray(payload.nodes)) throw new Error(`${name}: nodes must be an array`);
+            if (!payload.connections || typeof payload.connections !== 'object') throw new Error(`${name}: connections must be an object`);
+            const nodeNames = new Set();
+            for (const node of payload.nodes) {
+              if (!node.name || !node.type) throw new Error(`${name}: every node needs name and type`);
+              if (nodeNames.has(node.name)) throw new Error(`${name}: duplicate node name ${node.name}`);
+              nodeNames.add(node.name);
+              if (node.credentials && Object.keys(node.credentials).length) {
+                throw new Error(`${name}: committed workflow must not contain bound credential identifiers`);
+              }
+            }
+            console.log(`validated ${name}: ${payload.nodes.length} nodes`);
+          }
+          JS
+
+      - name: Verify Three Crowns CRM mirror safety contract
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const file = 'automation/n8n/crm-google-sheets-sync.json';
+          const workflow = JSON.parse(fs.readFileSync(file, 'utf8'));
+          if (workflow.active !== false) throw new Error('CRM sync must be committed inactive');
+          if (workflow.settings?.timezone !== 'Asia/Bishkek') throw new Error('CRM sync timezone must be Asia/Bishkek');
+          const sheets = workflow.nodes.filter((node) => node.type === 'n8n-nodes-base.googleSheets');
+          if (sheets.length !== 3) throw new Error(`expected 3 Google Sheets nodes, found ${sheets.length}`);
+          const expected = new Map([
+            ['Upsert Leads', ['Lead ID', '1258982052']],
+            ['Upsert Bookings', ['Booking ID', '215292756']],
+            ['Upsert Payments', ['Payment ID', '1151975814']],
+          ]);
+          for (const node of sheets) {
+            if (node.parameters?.operation !== 'appendOrUpdate') throw new Error(`${node.name}: must appendOrUpdate`);
+            const rule = expected.get(node.name);
+            if (!rule) throw new Error(`unexpected Sheets node: ${node.name}`);
+            const [key, sheetId] = rule;
+            if (!node.parameters?.columns?.matchingColumns?.includes(key)) throw new Error(`${node.name}: missing match key ${key}`);
+            if (String(node.parameters?.sheetName?.value) !== sheetId) throw new Error(`${node.name}: wrong sheet id`);
+            if (node.parameters?.documentId?.value !== '1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A') throw new Error(`${node.name}: wrong CRM spreadsheet`);
+          }
+          const serialized = JSON.stringify(workflow);
+          if (serialized.includes('CI-AUTOMATION-SERVICE-KEY') || serialized.includes('AIza') || serialized.includes('ya29.')) {
+            throw new Error('workflow appears to contain a literal secret/token');
+          }
+          console.log('CRM mirror workflow safety contract verified');
+          JS
