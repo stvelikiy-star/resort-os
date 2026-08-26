@@ -91,13 +91,31 @@ jobs:
             -v "$PWD/infra/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile
 
-      - name: Assert PMS realtime and same-origin Core routing
+      - name: Assert public Core allowlist and internal routing
         run: |
+          grep -Fq '@publicAvailability' infra/Caddyfile
+          grep -Fq 'path /core/api/v1/booking/check-availability' infra/Caddyfile
+          grep -Fq 'method GET' infra/Caddyfile
+          grep -Fq '@publicReservationRequest' infra/Caddyfile
+          grep -Fq 'path /core/api/v1/booking/requests' infra/Caddyfile
+          grep -Fq 'method POST' infra/Caddyfile
+          grep -Fq '@blockedPublicCore path /core/*' infra/Caddyfile
+          grep -Fq 'respond "Not Found" 404' infra/Caddyfile
           grep -Fq '@pmsws path /ws/*' infra/Caddyfile
-          test "$(grep -Fc 'handle_path /core/*' infra/Caddyfile)" -ge 3
-          grep -Fq 'COOKIE_DOMAIN=.3korony.com' ops/production.env.example
-          grep -Fq 'COOKIE_SECURE=true' ops/production.env.example
-          grep -Fq 'REQUIRE_COOKIE_DOMAIN=true' ops/production.env.example
+          test "$(grep -Fc 'handle_path /core/*' infra/Caddyfile)" -eq 2
+
+      - name: Assert host-isolated secure sessions
+        run: |
+          grep -Fxq 'COOKIE_SECURE=true' ops/production.env.example
+          grep -Fxq 'COOKIE_DOMAIN=' ops/production.env.example
+          grep -Fxq 'REQUIRE_COOKIE_DOMAIN=false' ops/production.env.example
+          grep -Fq 'REQUIRE_COOKIE_DOMAIN must be false for host-isolated production sessions' ops/production_deploy.sh
+          grep -Fq 'COOKIE_DOMAIN must be empty so production sessions remain host-only' ops/production_deploy.sh
+          grep -Fq 'REQUIRE_COOKIE_DOMAIN=false' ops/production_deploy.sh
+          if grep -Fq 'COOKIE_DOMAIN=.3korony.com' ops/production.env.example; then
+            echo 'ERROR: shared parent-domain session cookie is forbidden' >&2
+            exit 1
+          fi
 
       - name: Assert production cutover gates
         run: |
