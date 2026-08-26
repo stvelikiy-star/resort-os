@@ -166,8 +166,6 @@ async def check_in(
                     },
                 )
 
-            # The actual check-in room is the schedule segment covering the hotel-local date.
-            # No early/late fee policy is inferred here; only inventory consistency is enforced.
             room = await room_for_local_date(conn, reservation_id, local_today)
             if not room or not (room["startDate"] <= local_today < room["endDate"]):
                 raise HTTPException(status_code=409, detail="Reservation has no room assignment for actual check-in date")
@@ -255,7 +253,6 @@ async def check_out(
                     },
                 )
 
-            # Resolve the actually occupied/final segment before an early checkout trims future inventory.
             room = await room_for_local_date(conn, reservation_id, local_today)
             if not room:
                 raise HTTPException(status_code=409, detail="Reservation has no room assignment for checkout")
@@ -267,43 +264,11 @@ async def check_out(
                 local_today,
             )
 
-            # Historical NFC code remains unchanged/deferred. It is not an active V1 dependency.
-            nfc_wallet = await conn.fetchrow(
-                '''SELECT id,"balanceKgs",status::text AS status FROM nfc_wallets
-                   WHERE "reservationId"=$1 AND "propertyId"=$2 FOR UPDATE''',
-                reservation_id, pid,
-            )
-            nfc_frozen = False
-            nfc_balance_kgs = None
-            if nfc_wallet:
-                nfc_balance_kgs = nfc_wallet["balanceKgs"]
-                if nfc_wallet["status"] == "ACTIVE":
-                    await conn.execute(
-                        '''UPDATE nfc_wallets SET status='BLOCKED',"updatedAt"=now() WHERE id=$1''',
-                        nfc_wallet["id"],
-                    )
-                    await conn.execute(
-                        '''UPDATE nfc_bracelets SET status='BLOCKED',"updatedAt"=now()
-                           WHERE "walletId"=$1 AND status='ACTIVE'::"NfcBraceletStatus"''',
-                        nfc_wallet["id"],
-                    )
-                    nfc_frozen = True
-                    await conn.execute(
-                        '''
-                        INSERT INTO audit_logs (
-                          id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
-                        ) VALUES ($1,$2,'STAFF',$3,'FREEZE_NFC_ON_CHECK_OUT','NfcWallet',$4,'PMS','SUCCESS',
-                          jsonb_build_object('status','BLOCKED','balance_kgs',$5::int,'reason','CHECK_OUT'),now())
-                        ''',
-                        uuid.uuid4(), pid, user["id"], str(nfc_wallet["id"]), nfc_balance_kgs,
-                    )
-
             await conn.execute(
                 '''UPDATE reservations SET status='CHECKED_OUT', "updatedAt"=now() WHERE id=$1''',
                 reservation_id,
             )
 
-            housekeeping_task_id = None
             await conn.execute(
                 '''UPDATE rooms SET "operationalState"='DIRTY', "updatedAt"=now() WHERE id=$1''',
                 room["id"],
@@ -352,9 +317,7 @@ async def check_out(
                     'actual_local_date',$8::text,
                     'early_checkout_released_inventory',$9::boolean,
                     'stored_total_kgs',$6::int,
-                    'housekeeping_task_id',$10::text,
-                    'nfc_frozen',$11::boolean,
-                    'nfc_balance_kgs',$12::int
+                    'housekeeping_task_id',$10::text
                   ),now())
                 ''',
                 uuid.uuid4(),
@@ -367,8 +330,6 @@ async def check_out(
                 str(local_today),
                 early_checkout_released_inventory,
                 str(housekeeping_task_id) if housekeeping_task_id else None,
-                nfc_frozen,
-                nfc_balance_kgs,
             )
     return {
         "reservation_id": str(reservation_id),
@@ -380,6 +341,4 @@ async def check_out(
         "planned_check_out_before": original_check_out,
         "early_checkout_released_inventory": early_checkout_released_inventory,
         "stored_total_kgs_changed": False,
-        "nfc_frozen": nfc_frozen,
-        "nfc_balance_kgs": nfc_balance_kgs,
     }
