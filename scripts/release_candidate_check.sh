@@ -32,6 +32,8 @@ export COOKIE_SECURE="${COOKIE_SECURE:-false}"
 export BOOTSTRAP_OWNER_USERNAME="${BOOTSTRAP_OWNER_USERNAME:-rc-owner}"
 export BOOTSTRAP_OWNER_PASSWORD="${BOOTSTRAP_OWNER_PASSWORD:-RC-Local-Only-Password-2026}"
 export BOOTSTRAP_OWNER_DISPLAY_NAME="${BOOTSTRAP_OWNER_DISPLAY_NAME:-Release Check Owner}"
+export RC_MAID_USERNAME="${RC_MAID_USERNAME:-rc-maid}"
+export RC_MAID_PASSWORD="${RC_MAID_PASSWORD:-RC-Maid-Local-Only-Password-2026}"
 export CORE_API_URL="${CORE_API_URL:-http://127.0.0.1:8000}"
 
 LOG_DIR="${RC_LOG_DIR:-/tmp/three-crowns-rc}"
@@ -51,7 +53,7 @@ echo "== Three Crowns Release Candidate Check =="
 echo "Repository: $ROOT"
 echo "Logs: $LOG_DIR"
 
-echo "[1/12] PostgreSQL"
+echo "[1/13] PostgreSQL"
 docker compose up -d postgres
 for attempt in {1..30}; do
   if docker compose exec -T postgres pg_isready -U resort -d resort_os >/dev/null 2>&1; then
@@ -64,7 +66,7 @@ for attempt in {1..30}; do
   sleep 1
 done
 
-echo "[2/12] Prisma validate + development schema"
+echo "[2/13] Prisma validate + development schema"
 (
   cd packages/database
   npm install
@@ -72,20 +74,26 @@ echo "[2/12] Prisma validate + development schema"
   npx prisma db push
 )
 
-echo "[3/12] Python environment"
+echo "[3/13] Python compile + active release scope guard"
 if [[ ! -x .venv/bin/python ]]; then
   python3 -m venv .venv
 fi
 PY="$ROOT/.venv/bin/python"
 "$PY" -m pip install --disable-pip-version-check -r services/api/requirements.txt
 "$PY" -m compileall services/api/app scripts
+"$PY" scripts/release_scope_guard.py | tee "$LOG_DIR/release-scope.txt"
 
-echo "[4/12] PostgreSQL constraints + evidence-backed seed"
+echo "[4/13] PostgreSQL constraints + evidence-backed seed + synthetic RC staff"
 "$PY" scripts/apply_core_constraints.py
 "$PY" scripts/seed_from_intake.py
 "$PY" scripts/bootstrap_owner.py
+STAFF_USERNAME="$RC_MAID_USERNAME" \
+STAFF_PASSWORD="$RC_MAID_PASSWORD" \
+STAFF_DISPLAY_NAME="RC Synthetic Maid" \
+STAFF_ROLE=MAID \
+"$PY" scripts/upsert_staff_user.py
 
-echo "[5/12] Admin typecheck/build"
+echo "[5/13] Admin typecheck/build"
 (
   cd apps/admin
   npm install
@@ -93,7 +101,7 @@ echo "[5/12] Admin typecheck/build"
   CORE_API_URL="$CORE_API_URL" npm run build
 )
 
-echo "[6/12] Public web typecheck/build"
+echo "[6/13] Public web typecheck/build"
 (
   cd apps/web
   npm install
@@ -101,7 +109,7 @@ echo "[6/12] Public web typecheck/build"
   CORE_API_URL="$CORE_API_URL" npm run build
 )
 
-echo "[7/12] Staff PWA typecheck/build"
+echo "[7/13] Staff PWA typecheck/build"
 (
   cd apps/staff
   npm install
@@ -109,7 +117,7 @@ echo "[7/12] Staff PWA typecheck/build"
   CORE_API_URL="$CORE_API_URL" npm run build
 )
 
-echo "[8/12] Start Resort Core + health probes"
+echo "[8/13] Start Resort Core + health probes"
 "$PY" -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 >"$LOG_DIR/core.log" 2>&1 &
 API_PID=$!
 for attempt in {1..30}; do
@@ -155,7 +163,7 @@ print((date.today()+timedelta(days=4)).isoformat())
 PY
 )
 
-echo "[9/12] Auth + PMS 84-room invariant"
+echo "[9/13] Auth + PMS 84-room invariant"
 UNAUTH_CODE=$(curl --silent --output "$LOG_DIR/unauth-pms.json" --write-out '%{http_code}' \
   "http://127.0.0.1:8000/api/v1/pms/grid?start=$START_DATE&end=$END_DATE")
 if [[ "$UNAUTH_CODE" != "401" ]]; then
@@ -182,7 +190,7 @@ assert len({room['id'] for room in rooms})==84, 'room ids are not unique'
 print('PMS grid invariant: 84 unique rooms')
 PY
 
-echo "[10/12] Availability + public ReservationRequest truth"
+echo "[10/13] Availability + public ReservationRequest truth"
 curl --fail --silent --show-error \
   "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=$SEARCH_START&check_out=$SEARCH_END&adults=2&children=0" \
   >"$LOG_DIR/availability.json"
@@ -216,7 +224,7 @@ PY
 
 REQUEST_ID=$(cat "$LOG_DIR/request-id.txt")
 
-echo "[11/12] Manager quote/payment -> reservation -> chessboard schedule"
+echo "[11/13] Manager quote/payment -> reservation -> chessboard schedule"
 curl --fail --silent --show-error -b "$LOG_DIR/cookies.txt" \
   -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST_ID/quote" \
   -H 'Content-Type: application/json' \
@@ -264,7 +272,7 @@ assert data['schedule'][0]['end']==data['reservation']['check_out']
 print('Chessboard schedule invariant: one contiguous active reservation segment')
 PY
 
-echo "[12/12] Existing-reservation internal payment idempotency"
+echo "[12/13] Existing-reservation internal payment idempotency"
 EXTRA_KEY="rc-extra-$RESERVATION_ID"
 cat >"$LOG_DIR/extra-payment-payload.json" <<JSON
 {"amount_kgs":321,"method":"RC_MANUAL","external_ref":"RC-EXTRA-$RESERVATION_ID","idempotency_key":"$EXTRA_KEY"}
@@ -289,6 +297,14 @@ assert first['finance']['paid_kgs']==1098, first['finance']
 assert second['finance']['paid_kgs']==1098, second['finance']
 print('Internal payment idempotency: replay safe, total not double-counted')
 PY
+
+echo "[13/13] Housekeeping inspection/rework lifecycle"
+RC_OWNER_USERNAME="$BOOTSTRAP_OWNER_USERNAME" \
+RC_OWNER_PASSWORD="$BOOTSTRAP_OWNER_PASSWORD" \
+RC_MAID_USERNAME="$RC_MAID_USERNAME" \
+RC_MAID_PASSWORD="$RC_MAID_PASSWORD" \
+CORE_BASE_URL="http://127.0.0.1:8000" \
+"$PY" scripts/release_operations_smoke.py | tee "$LOG_DIR/operations-smoke.txt"
 
 if [[ "${RC_SEED_DEMO:-0}" == "1" ]]; then
   echo "RC_SEED_DEMO=1 -> preparing synthetic showcase bookings"
