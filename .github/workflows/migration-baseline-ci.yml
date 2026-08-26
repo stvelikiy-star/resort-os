@@ -70,14 +70,17 @@ jobs:
       - name: Generate reviewed-input baseline candidate
         run: bash scripts/generate_migration_baseline.sh
 
-      - name: Verify generated candidate and checksum
+      - name: Verify generated candidate and portable checksum
         run: |
-          test -s packages/database/prisma/migrations/0_init/migration.sql
-          test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
-          grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
-          grep -q 'payment_positive_amount' packages/database/prisma/migrations/0_init/migration.sql
-          grep -q 'payment_has_context' packages/database/prisma/migrations/0_init/migration.sql
-          sha256sum packages/database/prisma/migrations/0_init/migration.sql
+          set -euo pipefail
+          MIGRATION_DIR=packages/database/prisma/migrations/0_init
+          test -s "$MIGRATION_DIR/migration.sql"
+          test -s "$MIGRATION_DIR/migration.sql.sha256"
+          grep -q 'no_overlapping_active_room_blocks' "$MIGRATION_DIR/migration.sql"
+          grep -q 'payment_positive_amount' "$MIGRATION_DIR/migration.sql"
+          grep -q 'payment_has_context' "$MIGRATION_DIR/migration.sql"
+          test "$(awk 'NR==1 {print $2}' "$MIGRATION_DIR/migration.sql.sha256")" = 'migration.sql'
+          (cd "$MIGRATION_DIR" && sha256sum -c migration.sql.sha256)
 
       - name: Apply baseline to clean PostgreSQL with Prisma migration history
         working-directory: packages/database
