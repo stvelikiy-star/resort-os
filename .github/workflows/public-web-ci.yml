@@ -1,15 +1,25 @@
 name: Public Web CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [feat/public-site-action-pass]
+    branches: [main, feat/public-site-action-pass]
     paths:
       - 'apps/web/**'
+      - 'scripts/public_site_truth_guard.py'
       - '.github/workflows/public-web-ci.yml'
   pull_request:
     paths:
       - 'apps/web/**'
+      - 'scripts/public_site_truth_guard.py'
       - '.github/workflows/public-web-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   web:
@@ -31,8 +41,15 @@ jobs:
       - name: Build
         working-directory: apps/web
         run: npm run build
+      - name: Enforce canonical public truth
+        run: python3 scripts/public_site_truth_guard.py
       - name: Assert action homepage contract
         run: |
           grep -q 'ActionRuntime' apps/web/app/page.tsx
           grep -q 'action-room-rail' apps/web/app/page.tsx
           grep -q 'prefers-reduced-motion' apps/web/app/action-v3.css
+          grep -Fq 'Пирс длиной 150 метров' apps/web/app/page.tsx
+          grep -Fq 'Открытый бассейн 15×8 м' apps/web/app/page.tsx
+          grep -Fq 'Номер автоматически не блокируется' apps/web/app/page.tsx
+          grep -Fq '/core/api/v1/booking/check-availability' apps/web/components/BookingWidget.tsx
+          grep -Fq '/core/api/v1/booking/requests' apps/web/components/BookingWidget.tsx
