@@ -48,7 +48,6 @@ jobs:
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
-      PREPAYMENT_PERCENT: 30
       AUTOMATION_SERVICE_KEY: CI-TELEGRAM-AUTOMATION-KEY
       AUTOMATION_SERVICE_NAME: ci-automation
       BOOTSTRAP_OWNER_USERNAME: ci-owner
@@ -125,8 +124,9 @@ jobs:
 
       - name: Ingest private Telegram message and prove webhook idempotency
         run: |
-          cat > /tmp/tg-inbound.json <<'JSON'
-          {"update_id":5001,"message":{"message_id":101,"date":1787600000,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest","username":"tg_ci_guest"},"text":"Нужен номер на двоих"}}
+          TG_TIME=$(date +%s)
+          cat > /tmp/tg-inbound.json <<JSON
+          {"update_id":5001,"message":{"message_id":101,"date":$TG_TIME,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest","username":"tg_ci_guest"},"text":"Нужен номер на двоих"}}
           JSON
           curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
             -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_TELEGRAM_SECRET_2026' \
@@ -188,8 +188,9 @@ jobs:
 
       - name: Prove provider FAILED does not clear needs-reply
         run: |
-          cat > /tmp/tg-second-inbound.json <<'JSON'
-          {"update_id":5002,"message":{"message_id":102,"date":1787600100,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest"},"text":"Еще вопрос"}}
+          TG_TIME=$(date +%s)
+          cat > /tmp/tg-second-inbound.json <<JSON
+          {"update_id":5002,"message":{"message_id":102,"date":$TG_TIME,"chat":{"id":700101,"type":"private"},"from":{"id":700101,"is_bot":false,"first_name":"Telegram","last_name":"Guest"},"text":"Еще вопрос"}}
           JSON
           curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/channels/telegram/webhook \
             -H 'Content-Type: application/json' -H 'X-Telegram-Bot-Api-Secret-Token: CI_TELEGRAM_SECRET_2026' --data-binary @/tmp/tg-second-inbound.json > /tmp/tg-second.json
