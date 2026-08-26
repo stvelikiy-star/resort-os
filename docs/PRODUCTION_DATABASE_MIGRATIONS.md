@@ -38,7 +38,7 @@ Generated output is still only `GENERATED / NOT VERIFIED` until the clean-databa
 
 ## Equivalent manual baseline command
 
-From `packages/database/`:
+From `packages/database/` with the repository's current Prisma 6.x CLI:
 
 ```bash
 npm install
@@ -47,7 +47,7 @@ npx prisma validate
 mkdir -p prisma/migrations/0_init
 npx prisma migrate diff \
   --from-empty \
-  --to-schema prisma/schema.prisma \
+  --to-schema-datamodel prisma/schema.prisma \
   --script \
   > prisma/migrations/0_init/migration.sql
 ```
@@ -152,6 +152,6 @@ Only a successful restore verification may supply `LAST_VERIFIED_BACKUP_AT` to t
 
 ## Current blocker
 
-The baseline SQL itself is **not yet committed/executed/verified** because this environment has not run the repository command against a clean PostgreSQL target.
+The baseline SQL itself is **not yet committed/executed/verified** because the repository still needs a successful clean-PostgreSQL generation/apply/preflight proof and explicit SQL review.
 
-Until generation, human review and clean-database verification are captured as evidence, migration status remains `NOT READY FOR PRODUCTION`.
+Until generation, review and clean-database verification are captured as evidence, migration status remains `NOT READY FOR PRODUCTION`.

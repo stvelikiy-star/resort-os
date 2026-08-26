@@ -40,7 +40,7 @@ trap 'rm -f "$TMP_FILE"' EXIT
 
 npx prisma migrate diff \
   --from-empty \
-  --to-schema prisma/schema.prisma \
+  --to-schema-datamodel prisma/schema.prisma \
   --script > "$TMP_FILE"
 
 if [[ ! -s "$TMP_FILE" ]]; then

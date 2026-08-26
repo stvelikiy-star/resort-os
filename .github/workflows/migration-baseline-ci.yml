@@ -1,0 +1,133 @@
+name: Production Migration Baseline CI
+
+on:
+  pull_request:
+    paths:
+      - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/sql/**'
+      - 'scripts/generate_migration_baseline.sh'
+      - 'scripts/seed_from_intake.py'
+      - 'scripts/production_preflight.py'
+      - '.github/workflows/migration-baseline-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/sql/**'
+      - 'packages/database/prisma/migrations/**'
+      - 'scripts/generate_migration_baseline.sh'
+      - 'scripts/seed_from_intake.py'
+      - 'scripts/production_preflight.py'
+      - '.github/workflows/migration-baseline-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os_migration_test
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os_migration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os_migration_test?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prove baseline generator refuses production mode
+        run: |
+          if APP_ENV=production bash scripts/generate_migration_baseline.sh >/tmp/generator-prod.out 2>/tmp/generator-prod.err; then
+            echo 'ERROR: baseline generator unexpectedly ran in production mode' >&2
+            exit 1
+          fi
+          grep -q 'baseline generation is disabled' /tmp/generator-prod.err
+
+      - name: Generate reviewed-input baseline candidate
+        run: bash scripts/generate_migration_baseline.sh
+
+      - name: Verify generated candidate and checksum
+        run: |
+          test -s packages/database/prisma/migrations/0_init/migration.sql
+          test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
+          grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
+          grep -q 'payment_positive_amount' packages/database/prisma/migrations/0_init/migration.sql
+          grep -q 'payment_has_context' packages/database/prisma/migrations/0_init/migration.sql
+          sha256sum packages/database/prisma/migrations/0_init/migration.sql
+
+      - name: Apply baseline to clean PostgreSQL with Prisma migration history
+        working-directory: packages/database
+        run: |
+          npx prisma migrate deploy
+          npx prisma migrate status
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Seed canonical Three Crowns development intake
+        run: python scripts/seed_from_intake.py
+
+      - name: Verify migration history and production database invariants
+        env:
+          APP_ENV: production
+          COOKIE_SECURE: 'true'
+          REQUIRE_RECENT_BACKUP: 'false'
+          AUTOMATION_SERVICE_KEY: ci-only-three-crowns-automation-key-00000001
+          EXPECTED_ROOM_COUNT: '84'
+          EXPECTED_ROOM_TYPE_COUNT: '12'
+        run: |
+          python scripts/production_preflight.py | tee /tmp/production-preflight.txt
+          grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
+          grep -q '^FACT: applied_migrations=1$' /tmp/production-preflight.txt
+          grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
+          grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
+          grep -q '^RESULT: READY FOR NEXT DEPLOYMENT GATE$' /tmp/production-preflight.txt
+
+      - name: Verify database migration ledger directly
+        env:
+          PGPASSWORD: resort
+        run: |
+          migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          overlap_guard_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = 'no_overlapping_active_room_blocks'")"
+          test "$migration_count" = '1'
+          test "$overlap_guard_count" = '1'
+
+      - name: Upload baseline candidate for explicit review
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-migration-baseline-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            packages/database/prisma/migrations/0_init/migration.sql
+            packages/database/prisma/migrations/0_init/migration.sql.sha256
+          if-no-files-found: error
+          retention-days: 7
