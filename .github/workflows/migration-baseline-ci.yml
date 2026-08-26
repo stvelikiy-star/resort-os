@@ -117,8 +117,10 @@ jobs:
         env:
           PGPASSWORD: resort
         run: |
-          test "$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = '1'
-          test "$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc \"select count(*) from pg_constraint where conname='no_overlapping_active_room_blocks'\")" = '1'
+          migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          overlap_guard_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = 'no_overlapping_active_room_blocks'")"
+          test "$migration_count" = '1'
+          test "$overlap_guard_count" = '1'
 
       - name: Upload baseline candidate for explicit review
         uses: actions/upload-artifact@v4
