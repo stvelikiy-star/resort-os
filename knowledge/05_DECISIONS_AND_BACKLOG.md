@@ -10,509 +10,1877 @@ Depends On:
 - 01_DOMAIN_BUSINESS_RULES.md
 - 02_SYSTEM_ARCHITECTURE.md
 - 03_AI_ADMIN.md
-- 04_CURRENT_STATE.md for factual implementation evidence only
+- 04_CURRENT_STATE.md for factual implementation evidence
 
 ---
 
-# 1. DOCUMENT PURPOSE AND AUTHORITY
+# 1. DOCUMENT PURPOSE
 
-This document is the canonical register of:
-- approved and rejected decisions;
-- open decisions;
-- validation questions;
-- backlog priorities;
-- dependencies and blockers.
+Этот документ является рабочим реестром:
 
-It is NOT Product Bible, Domain Rules, System Architecture, AI specification or Current State.
+- принятых решений;
+- открытых решений;
+- вопросов, требующих validation;
+- архитектурных решений;
+- product decisions;
+- domain decisions;
+- AI decisions;
+- технических исследований;
+- будущего backlog;
+- приоритетов;
+- зависимостей;
+- блокеров.
 
-Canonical responsibility:
-- `00_PRODUCT_BIBLE.md` = WHAT PRODUCT WE WANT;
-- `01_DOMAIN_BUSINESS_RULES.md` = HOW THE BUSINESS MUST BEHAVE;
-- `02_SYSTEM_ARCHITECTURE.md` = HOW THE TARGET SYSTEM SHOULD BE STRUCTURED;
-- `03_AI_ADMIN.md` = HOW AI OPERATES INSIDE RESORT OS;
-- `04_CURRENT_STATE.md` = WHAT ACTUALLY EXISTS, supported by evidence;
-- `05_DECISIONS_AND_BACKLOG.md` = WHAT HAS BEEN DECIDED / WHAT REMAINS OPEN / WHAT SHOULD BE DONE NEXT.
+Этот документ НЕ является:
 
-Property-specific documents `06`, `07` and `08` are subordinate/supporting documents. They may elaborate approved decisions, requirements and execution order but cannot independently redefine canonical Product, Domain, Architecture, AI or Current State truth.
+Product Bible;
+Domain Business Rules;
+System Architecture;
+AI specification;
+Current State.
 
----
+Он отвечает на вопросы:
 
-# 2. STATUS MODEL
+WHAT HAS BEEN DECIDED?
 
-Use explicit statuses only:
+WHAT IS NOT DECIDED?
 
-- APPROVED — decision accepted.
-- APPROVED CONCEPT — direction accepted; exact details may remain open.
-- PROPOSED — proposed, not accepted.
-- VALIDATE — research/evidence required.
-- UNKNOWN — insufficient information.
-- DECISION REQUIRED — explicit owner/product decision required.
-- PLANNED — accepted into plan, not implemented.
-- IMPLEMENTED — implementation exists, verification may still be absent.
-- VERIFIED — required checks/evidence exist.
-- BLOCKED — cannot continue without missing input/access/decision/dependency.
-- RESOLVED — historical blocker/question has been resolved; retain for traceability.
-- REJECTED — consciously rejected.
-- PARTIAL — partial implementation/compliance.
-- BROKEN — existing capability does not meet required behavior.
-- DEFERRED — consciously outside the active implementation queue.
+WHAT MUST BE VALIDATED?
 
-Product truth invariants:
-
-`APPROVED != IMPLEMENTED`
-
-`IMPLEMENTED != VERIFIED`
-
-`TARGET != CURRENT`
-
-`DOCUMENTED != IMPLEMENTED`
-
-`TEST EXISTS != TEST PASSED`
-
-`PLANNED INTEGRATION != WORKING INTEGRATION`
-
-`MARKETING CLAIM <= VERIFIED PRODUCT CAPABILITY`
-
-Documentation changes cannot close an implementation GAP.
+WHAT SHOULD BE DONE NEXT?
 
 ---
 
-# 3. PRIORITY MODEL
+# 2. DOCUMENT RESPONSIBILITY
 
-- P0 — blocker, security/data-integrity/fundamental correctness.
-- P1 — high-value V1/core workflow/dependency.
-- P2 — important but not immediate blocker.
-- P3 — improvement/future optimization.
-- VALIDATE — priority cannot be set safely before research.
-- DEFER — consciously postponed.
+Разделение ответственности Knowledge:
 
-Next-task selection must consider product correctness, security, data integrity, critical business rules, dependencies, V1/operational/commercial value, implementation risk and verification feasibility. Prefer one bounded P0/P1 task at a time unless tasks are inseparable.
+00_PRODUCT_BIBLE.md
+= WHAT PRODUCT WE WANT
+
+01_DOMAIN_BUSINESS_RULES.md
+= HOW THE BUSINESS MUST BEHAVE
+
+02_SYSTEM_ARCHITECTURE.md
+= HOW THE TARGET SYSTEM SHOULD BE STRUCTURED
+
+03_AI_ADMIN.md
+= HOW AI OPERATES INSIDE RESORT OS
+
+04_CURRENT_STATE.md
+= WHAT ACTUALLY EXISTS
+
+05_DECISIONS_AND_BACKLOG.md
+= WHAT MUST BE DECIDED / VALIDATED / DONE NEXT
+
+Supporting property documents `06`, `07` and `08` are subordinate to canonical `00`–`05`. They may elaborate implementation requirements, execution order or decision extracts, but they must not independently redefine Product, Domain, Architecture, AI or factual Current State truth.
 
 ---
 
-# 4. APPROVED PRODUCT DECISIONS
+# 3. STATUS MODEL
 
-## D-001 — ONE PLATFORM / ONE CORE
-Status: APPROVED
-Area: Product Architecture
+Использовать только явные статусы.
 
-Resort OS develops as one platform with a shared Core and modular architecture. Do not create independent Guest House / Hotel / Resort / Resort & SPA products without separate evidence-backed justification.
+APPROVED
+= решение принято.
 
-## D-002 — SHARED CANONICAL DOMAIN MODEL
-Status: APPROVED
-Area: Domain Architecture
+APPROVED CONCEPT
+= направление принято, детали ещё могут измениться.
 
-Use a shared canonical domain model for consistent domain concepts. This does not require one physical database or one physical service.
+PROPOSED
+= предложение ожидает решения.
 
-## D-003 — UNIVERSAL INSIDE → SIMPLE OUTSIDE
-Status: APPROVED
-Area: Product / UX
+VALIDATE
+= требуется исследование или проверка.
 
-Internal platform universality must not create one overloaded interface for everyone. Capability exposure depends on configuration, enabled modules, role, permissions and context.
+UNKNOWN
+= информации недостаточно.
 
-## D-004 — RESERVATION REQUEST != CONFIRMED RESERVATION
-Status: APPROVED
-Area: Reservations
+DECISION REQUIRED
+= требуется явное решение владельца продукта.
 
-ReservationRequest is distinct from Confirmed Reservation.
+PLANNED
+= принято в план, но не реализовано.
 
-## D-005 — HUMAN CONFIRMATION FOR FINAL RESERVATION
-Status: APPROVED
-Area: Reservations / AI Safety
+IMPLEMENTED
+= реализовано, но ещё не обязательно проверено.
+
+VERIFIED
+= реализация прошла необходимые проверки и имеет evidence.
+
+BLOCKED
+= работа не может продолжаться без недостающих данных, доступа, решения или зависимости.
+
+RESOLVED
+= исторический blocker/question закрыт подтверждённым evidence/decision и хранится для traceability.
+
+REJECTED
+= решение сознательно отклонено.
+
+PARTIAL
+= частичная реализация/соответствие.
+
+BROKEN
+= существующая capability не выполняет требуемое поведение.
+
+---
+
+# 4. PRODUCT TRUTH
+
+Критические правила:
+
+APPROVED ≠ IMPLEMENTED
+
+APPROVED CONCEPT ≠ IMPLEMENTED
+
+PLANNED ≠ IMPLEMENTED
+
+IMPLEMENTED ≠ VERIFIED
+
+PROPOSED ≠ APPROVED
+
+TARGET ARCHITECTURE ≠ CURRENT ARCHITECTURE
+
+DOCUMENTED ≠ IMPLEMENTED
+
+TEST FILE EXISTS ≠ TEST PASSED
+
+PLANNED INTEGRATION ≠ WORKING INTEGRATION
+
+MARKETING CLAIM <= VERIFIED PRODUCT CAPABILITY
+
+Нельзя закрывать GAP изменением документации.
+
+---
+
+# 5. PRIORITY MODEL
+
+P0
+= критический blocker, безопасность, data integrity, fundamental product correctness или невозможность продолжать работу.
+
+P1
+= высокая ценность для V1, core workflow или критическая dependency.
+
+P2
+= важная capability, но не обязательный immediate blocker.
+
+P3
+= improvement / optimization / future enhancement.
+
+VALIDATE
+= приоритет нельзя корректно определить до исследования.
+
+DEFER
+= сознательно отложено.
+
+---
+
+# 6. DECISION RECORD FORMAT
+
+Каждое значимое решение должно по возможности фиксироваться в формате:
+
+ID:
+
+TITLE:
+
+DATE:
+
+STATUS:
+
+AREA:
+
+CONTEXT:
+
+PROBLEM:
+
+OPTIONS:
+
+DECISION:
+
+RATIONALE:
+
+CONSEQUENCES:
+
+DEPENDENCIES:
+
+AFFECTED DOCUMENTS:
+
+EVIDENCE:
+
+OWNER:
+
+NEXT ACTION:
+
+Не все поля обязаны быть заполнены немедленно.
+
+Неизвестные данные должны оставаться UNKNOWN.
+
+---
+
+# 7. APPROVED PRODUCT DECISIONS
+
+## DECISION D-001
+
+TITLE:
+ONE PLATFORM / ONE CORE
+
+STATUS:
+APPROVED
+
+AREA:
+Product Architecture
+
+DECISION:
+
+Resort OS развивается как единая платформа с общим Core и модульной архитектурой.
+
+Не создавать независимые продукты для:
+
+Guest House;
+Hotel;
+Resort;
+Resort & SPA
+
+без отдельного доказанного основания.
+
+---
+
+## DECISION D-002
+
+TITLE:
+SHARED CANONICAL DOMAIN MODEL
+
+STATUS:
+APPROVED
+
+AREA:
+Domain Architecture
+
+DECISION:
+
+Resort OS использует Shared Canonical Domain Model для согласованного понимания основных domain concepts.
+
+Это не требует одной database или одного physical service.
+
+---
+
+## DECISION D-003
+
+TITLE:
+UNIVERSAL INSIDE → SIMPLE OUTSIDE
+
+STATUS:
+APPROVED
+
+AREA:
+Product / UX
+
+DECISION:
+
+Внутренняя универсальность платформы не должна приводить к перегруженному одинаковому интерфейсу для всех типов объектов.
+
+Функциональность должна зависеть от:
+
+configuration;
+enabled modules;
+role;
+permissions;
+context.
+
+---
+
+## DECISION D-004
+
+TITLE:
+RESERVATION REQUEST ≠ CONFIRMED RESERVATION
+
+STATUS:
+APPROVED
+
+AREA:
+Reservations
+
+DECISION:
+
+Reservation Request является отдельным состоянием от Confirmed Reservation.
+
+---
+
+## DECISION D-005
+
+TITLE:
+HUMAN CONFIRMATION FOR FINAL RESERVATION
+
+STATUS:
+APPROVED
+
+AREA:
+Reservations / AI Safety
+
+DECISION:
+
+Final Reservation Confirmation требует Human Confirmation.
 
 Approved lifecycle:
 
-`RESERVATION REQUEST -> CHECK / CALCULATION -> HUMAN CONFIRMATION -> CONFIRMED RESERVATION`
+RESERVATION REQUEST
+→ CHECK / CALCULATION
+→ HUMAN CONFIRMATION
+→ CONFIRMED RESERVATION
 
-AI cannot bypass Human Confirmation.
-
-## D-006 — GUEST != STAY
-Status: APPROVED
-Area: Domain Model
-
-Guest and Stay are different domain concepts.
-
-## D-007 — SPLIT STAY / PARTIAL ROOM MOVE
-Status: APPROVED
-Area: PMS / Stay
-
-Split Stay / Partial Room Move is a required capability. Generic product implementation detail remains architecture/domain dependent even if a property implementation already exists.
-
-## D-008 — AI ADMINISTRATOR AS CENTRAL PRODUCT LAYER
-Status: APPROVED
-Area: AI / Product
-
-AI Administrator is a central product layer and strategic differentiator of Resort OS.
-
-## D-009 — TWO AI CONTOURS
-Status: APPROVED
-Area: AI
-
-1. AI Operations Administrator.
-2. AI Sales & Concierge.
-
-## D-010 — AI PERMISSION BOUNDARY
-Status: APPROVED
-Area: AI / Security
-
-`AI_PERMISSION <= CURRENT_USER_PERMISSION`.
-
-## D-011 — RESORT OS AS OPERATIONAL SOURCE OF TRUTH
-Status: APPROVED
-Area: AI / Architecture
-
-AI is not the operational source of truth. Operational data must come from Resort OS or another explicitly designated authoritative source.
-
-## D-012 — CONTROLLED AI TOOLS
-Status: APPROVED
-Area: AI Architecture
-
-AI performs operational actions only through controlled tools/functions and Resort OS application/domain boundaries. Unrestricted production database access is not a generic AI interface.
-
-## D-013 — DETERMINISTIC CRITICAL BUSINESS LOGIC
-Status: APPROVED
-Area: Architecture / AI
-
-Critical calculations, permissions, validations and state transitions must not depend on LLM improvisation.
-
-## D-014 — PARTNER / AGENT CAPABILITY
-Status: APPROVED CONCEPT
-Area: Product
-
-Resort OS should support Partner / Agent traceability across source attribution, reservations, guests/stays where applicable, revenue, commission history and settlement history. Exact commission/settlement rules remain unapproved.
-
-## D-015 — PAYMENT BUSINESS REQUIREMENT
-Status: APPROVED
-Area: Payments
-
-Resort OS must account for practical lawful payment scenarios of target customers/guests, including scenarios related to payments originating from Russia. This does NOT approve a provider, acquiring route or cross-border mechanism.
-
-Generic implementation status: VALIDATE.
-
-## D-016 — BUILD / INTEGRATE / HYBRID
-Status: APPROVED
-Area: Architecture / Product
-
-For significant capabilities, valid strategies are BUILD / INTEGRATE / HYBRID / DEFER. Exact choice requires analysis.
-
-## D-017 — CORE MUST NOT REQUIRE AI TO FUNCTION
-Status: APPROVED
-Area: Architecture
-
-Core operational capabilities must function without mandatory AI dependency where applicable. AI failure must not imply total PMS failure.
-
-## D-018 — IMPLEMENTED != VERIFIED
-Status: APPROVED
-Area: Product Truth / QA
-
-Implementation becomes VERIFIED only with required evidence.
+AI не может самостоятельно обходить этот переход.
 
 ---
 
-# 5. APPROVED THREE CROWNS PROPERTY DECISIONS
+## DECISION D-006
 
-These decisions are property/V1 decisions for Three Crowns. They do not automatically resolve generic Resort OS product questions for every future property.
+TITLE:
+GUEST ≠ STAY
 
-## D-019 — THREE CROWNS CLIENT AUTOMATION BOUNDARY
-Status: APPROVED
-Area: Three Crowns / Client Automation
+STATUS:
+APPROVED
 
-Approved active channel architecture:
-- Instagram -> ManyChat -> n8n;
-- WhatsApp -> API Green -> n8n;
-- other client channels may be orchestrated through n8n where appropriate;
-- public booking website calls Resort Core directly for deterministic hotel operations.
+AREA:
+Domain Model
 
-n8n/AI objective is a hot qualified lead and controlled handoff. It may use Core facts and create/read ReservationRequest but must not write PostgreSQL directly, invent availability/price, confirm payment, create guaranteed Reservation outside controlled human conversion, check-in/out, refund or mutate hotel money.
+DECISION:
 
-Current factual implementation belongs only in `04_CURRENT_STATE.md`.
-
-## D-020 — THREE CROWNS MANAGER-MANUAL PREPAYMENT BOUNDARY
-Status: APPROVED
-Area: Three Crowns / Payments / V1
-
-For active Three Crowns V1:
-- manager decides prepayment amount, terms and method;
-- manager collects payment manually;
-- Resort OS records manager-confirmed internal payment facts;
-- automation does not choose amount/method, generate a payment link, collect money or decide sufficiency;
-- automated acquiring/provider integration is not a V1 launch gate.
-
-This property decision does NOT resolve generic provider/acquiring/cross-border validation under D-015 and the generic Payment Validation Queue.
-
-## D-021 — THREE CROWNS NFC DEFERRED
-Status: APPROVED / DEFERRED
-Area: Three Crowns / NFC
-
-NFC/wristband/internal-wallet work is excluded from the active Three Crowns V1 queue. Dormant source/schema evidence may remain. Reactivation requires a new explicit owner decision.
-
-## D-022 — THREE CROWNS PMS CHESSBOARD PRIMARY DAILY SURFACE
-Status: APPROVED
-Area: Three Crowns / PMS / UX
-
-The PMS chessboard is the primary daily operating surface for Three Crowns. It must remain connected to the same Resort Core truth as reception, operations, finance and public availability. Exact factual implementation status is owned only by `04_CURRENT_STATE.md`.
+Guest и Stay являются разными domain concepts.
 
 ---
 
-# 6. CURRENT PROJECT REALITY
+## DECISION D-007
 
-Canonical implementation reality is maintained only in:
+TITLE:
+SPLIT STAY / PARTIAL ROOM MOVE
 
-`04_CURRENT_STATE.md`
+STATUS:
+APPROVED
 
-This document may cite that reality for decisions/prioritization but must not reproduce a competing Current State snapshot.
+AREA:
+PMS / Stay
 
----
+DECISION:
 
-# 7. HISTORICAL BASELINE BLOCKER
+Split Stay / Partial Room Move является требуемой capability Resort OS.
 
-## B-001 — CURRENT STATE BASELINE ESTABLISHED
-Status: RESOLVED
-Area: Project Baseline
-
-Historical problem: at Knowledge-bootstrap time there was insufficient real-project evidence to establish Current State.
-
-Resolution:
-- the real `stvelikiy-star/resort-os` repository exists and is readable;
-- implementation evidence, schema, tests/workflows and deployment artifacts are available;
-- `04_CURRENT_STATE.md` is populated and is the only canonical factual implementation owner;
-- exact verified executable baselines and verification evidence are recorded there.
-
-B-001 must never again be used as an active blocker unless the actual repository/evidence becomes unavailable and `04_CURRENT_STATE.md` explicitly records that condition.
+Конкретная implementation model ещё не утверждена.
 
 ---
 
-# 8. CONTINUOUS CURRENT STATE AUDIT
+## DECISION D-008
+
+TITLE:
+AI ADMINISTRATOR AS CENTRAL PRODUCT LAYER
+
+STATUS:
+APPROVED
+
+AREA:
+AI / Product
+
+DECISION:
+
+AI Administrator является central product layer and strategic differentiator Resort OS.
+
+---
+
+## DECISION D-009
+
+TITLE:
+TWO AI CONTOURS
+
+STATUS:
+APPROVED
+
+AREA:
+AI
+
+DECISION:
+
+AI Administrator имеет два основных product contours:
+
+1. AI Operations Administrator
+2. AI Sales & Concierge
+
+---
+
+## DECISION D-010
+
+TITLE:
+AI PERMISSION BOUNDARY
+
+STATUS:
+APPROVED
+
+AREA:
+AI / Security
+
+DECISION:
+
+AI_PERMISSION <= CURRENT_USER_PERMISSION
+
+AI не получает больше полномочий, чем текущий пользователь/context.
+
+---
+
+## DECISION D-011
+
+TITLE:
+RESORT OS AS OPERATIONAL SOURCE OF TRUTH
+
+STATUS:
+APPROVED
+
+AREA:
+AI / Architecture
+
+DECISION:
+
+AI не является operational source of truth.
+
+Operational data должна поступать из Resort OS или другого явно определённого authoritative source.
+
+---
+
+## DECISION D-012
+
+TITLE:
+CONTROLLED AI TOOLS
+
+STATUS:
+APPROVED
+
+AREA:
+AI Architecture
+
+DECISION:
+
+AI должен выполнять operational actions через controlled tools/functions и Resort OS domain/application layer.
+
+Unrestricted production database access не является generic AI business interface.
+
+---
+
+## DECISION D-013
+
+TITLE:
+DETERMINISTIC CRITICAL BUSINESS LOGIC
+
+STATUS:
+APPROVED
+
+AREA:
+Architecture / AI
+
+DECISION:
+
+Critical Business Rules не должны зависеть от LLM improvisation.
+
+Deterministic logic должна использоваться для критических calculations, permissions, validations и state transitions.
+
+---
+
+## DECISION D-014
+
+TITLE:
+PARTNER / AGENT CAPABILITY
+
+STATUS:
+APPROVED CONCEPT
+
+AREA:
+Product
+
+DECISION:
+
+Resort OS должен учитывать Partner / Agent management с traceability по:
+
+source attribution;
+reservations;
+guests/stays where applicable;
+revenue;
+commission history;
+settlement history.
+
+Детальные commission/settlement rules ещё не утверждены.
+
+---
+
+## DECISION D-015
+
+TITLE:
+PAYMENT BUSINESS REQUIREMENT
+
+STATUS:
+APPROVED
+
+AREA:
+Payments
+
+DECISION:
+
+Resort OS должен учитывать practical lawful payment scenarios целевых клиентов и гостей, включая сценарии, связанные с платежами, происходящими из России.
+
+Это НЕ является утверждением конкретного provider, acquiring route или cross-border mechanism.
+
+Implementation:
+
+VALIDATE.
+
+---
+
+## DECISION D-016
+
+TITLE:
+BUILD / INTEGRATE / HYBRID
+
+STATUS:
+APPROVED
+
+AREA:
+Architecture / Product
+
+DECISION:
+
+Для значимых capabilities допускаются стратегии:
+
+BUILD;
+INTEGRATE;
+HYBRID;
+DEFER.
+
+Конкретный выбор принимается после анализа.
+
+---
+
+## DECISION D-017
+
+TITLE:
+CORE MUST NOT REQUIRE AI TO FUNCTION
+
+STATUS:
+APPROVED
+
+AREA:
+Architecture
+
+DECISION:
+
+Core operational Resort OS capabilities должны работать без обязательной зависимости от AI там, где это технически и продуктово применимо.
+
+AI failure не должен автоматически означать total PMS failure.
+
+---
+
+## DECISION D-018
+
+TITLE:
+IMPLEMENTED ≠ VERIFIED
+
+STATUS:
+APPROVED
+
+AREA:
+Product Truth / QA
+
+DECISION:
+
+Наличие реализации не означает VERIFIED.
+
+VERIFIED требует соответствующих проверок и evidence.
+
+---
+
+## DECISION D-019
+
+TITLE:
+THREE CROWNS CLIENT AUTOMATION BOUNDARY
+
+STATUS:
+APPROVED
+
+AREA:
+Three Crowns / Client Automation
+
+DECISION:
+
+Для активного Three Crowns V1 утверждён следующий client orchestration boundary:
+
+Instagram -> ManyChat -> n8n;
+
+WhatsApp -> API Green -> n8n;
+
+other client channels may use n8n where appropriate;
+
+public booking website -> Resort Core directly.
+
+n8n / AI может использовать authoritative Core facts и создавать/read ReservationRequest, но не может напрямую писать PostgreSQL, придумывать availability/price/policy, подтверждать payment, создавать guaranteed Reservation вне controlled human conversion, check-in/out/refund или мутировать hotel money.
+
+Фактическая реализация и verification принадлежат только 04_CURRENT_STATE.md.
+
+---
+
+## DECISION D-020
+
+TITLE:
+THREE CROWNS MANAGER-MANUAL PREPAYMENT BOUNDARY
+
+STATUS:
+APPROVED
+
+AREA:
+Three Crowns / Payments / V1
+
+DECISION:
+
+Для активного Three Crowns V1:
+
+manager decides prepayment amount, terms and method;
+
+manager collects payment manually;
+
+Resort OS records manager-confirmed internal payment facts;
+
+automation does not choose amount/method, generate payment links, collect money or decide sufficiency;
+
+automated acquiring/payment-provider integration is not a V1 launch gate.
+
+Это property-specific решение не закрывает generic Resort OS provider/acquiring/cross-border VALIDATE queue по D-015.
+
+---
+
+## DECISION D-021
+
+TITLE:
+THREE CROWNS NFC DEFERRED
+
+STATUS:
+APPROVED / DEFER
+
+AREA:
+Three Crowns / NFC
+
+DECISION:
+
+NFC / wristband / internal-wallet work исключён из активного Three Crowns V1 queue. Dormant source/schema evidence может оставаться. Reactivation требует нового explicit owner decision.
+
+---
+
+## DECISION D-022
+
+TITLE:
+THREE CROWNS PMS CHESSBOARD PRIMARY DAILY SURFACE
+
+STATUS:
+APPROVED
+
+AREA:
+Three Crowns / PMS / UX
+
+DECISION:
+
+PMS chessboard является primary daily operating surface Three Crowns и должен использовать ту же Resort Core truth, что reception, operations, finance и public availability.
+
+Фактическая реализация и verification принадлежат только 04_CURRENT_STATE.md.
+
+---
+
+# 8. CURRENT PROJECT REALITY
+
+Canonical implementation reality is maintained in:
+
+04_CURRENT_STATE.md
+
+This document may reference Current State when prioritizing decisions and backlog, but it must not redefine Current State.
+
+# 9. CURRENT BLOCKER
+
+## BLOCKER B-001
+
+TITLE:
+CURRENT STATE BASELINE ESTABLISHED
+
+STATUS:
+RESOLVED
+
+AREA:
+Project Baseline
+
+HISTORICAL PROBLEM:
+
+На bootstrap-этапе Knowledge Pack отсутствовало достаточное evidence реального проекта для корректного GAP между Target Product и Existing Implementation.
+
+RESOLUTION:
+
+Реальный repository `stvelikiy-star/resort-os`, schema, code, workflows/tests и deployment artifacts доступны и проаудированы.
+
+Canonical factual implementation reality теперь поддерживается в:
+
+04_CURRENT_STATE.md
+
+B-001 является historical traceability record и не должен использоваться как текущий blocker, пока 04_CURRENT_STATE.md не зафиксирует новую фактическую потерю project evidence.
+
+---
+
+# 10. CONTINUOUS CURRENT STATE AUDIT
 
 Status: ACTIVE
 Execution: EVIDENCE-DRIVEN
 
-Current State is established, not a future bootstrap task.
+Current State уже установлен и больше не является future bootstrap task.
 
-After every meaningful implementation change:
+После каждого meaningful implementation change выполнять:
 
-`IMPLEMENT -> TEST -> EVIDENCE -> VERIFIED / NOT VERIFIED -> UPDATE 04_CURRENT_STATE.md`
+REAL CODE / SYSTEM
+→ TEST / AUDIT
+→ EVIDENCE
+→ VERIFIED / NOT VERIFIED
+→ 04_CURRENT_STATE.md
+→ TARGET VS CURRENT
+→ GAP
 
-Periodic audit should continue to cover technology stack, project structure, domain/data model, reservations/stays/inventory/pricing/finance/operations/security/RBAC/API/integrations/tests/deployment and AI implementation where present.
+Периодический audit должен устанавливать/перепроверять как минимум:
 
----
+technology stack;
 
-# 9. GAP ANALYSIS RULE
+project structure;
 
-`APPROVED TARGET - VERIFIED CURRENT STATE = GAP`
+domain implementation;
 
-A GAP is not automatically an immediate backlog item. Classify it as V1 REQUIRED / VALIDATE / DEFER / POST-V1 / DECISION REQUIRED / NOT PRODUCT SCOPE.
+database/data model;
 
----
+reservation capabilities;
 
-# 10. GENERIC DOMAIN DECISION QUEUES
+guest/stay capabilities;
 
-Three Crowns-specific approved decisions do not silently resolve these generic Resort OS queues.
+inventory;
 
-## Reservations — DECISION REQUIRED
-Validate/decide generic lifecycle, request expiration, cancellation, modification, no-show, walk-in, groups, waitlist, holds, overbooking, confirmation timeout and deposit/guarantee relationship.
+pricing;
 
-## Stay — DECISION REQUIRED
-Validate/decide generic Stay creation/closure, check-in/out, early/late behavior, no-show relationship, room moves, Split Stay segmentation and history.
+finance;
 
-## Inventory — DECISION REQUIRED
-Validate/decide generic inventory unit/model, availability, holds, maintenance/out-of-order blocks, concurrency/conflict behavior, external synchronization and overbooking.
+operations;
 
-## Pricing — DECISION REQUIRED
-Validate/decide generic rate model, seasonality, weekday/weekend, occupancy/adult/child/extra-bed/meal/package pricing, discounts/promos/partners, taxes/fees/currencies/rounding, price locking/repricing and Split Stay pricing.
+security;
 
-## Finance — DECISION REQUIRED
-Validate/decide generic folio model, charges, payment relationships, deposits, refunds, corrections/voids, split folio/transfers, currencies, balances, closing/reopening and audit.
+RBAC;
 
-## Partners — DECISION REQUIRED
-Validate/decide commission formula/base, fixed vs percentage, refund/cancellation consequences, tax treatment, settlement period/currency, manual adjustments and partner balance.
+tenant/property isolation;
 
-## Operations — DECISION REQUIRED
-Validate/decide generic Task/SLA/escalation/priority/assignment/reassignment/completion lifecycles and generic Housekeeping/Maintenance/Guest Request states. Property implementations do not automatically become universal product rules.
+API;
 
-## Services — DECISION REQUIRED
-Validate/decide taxonomy, resource/capacity/duration/availability, staff/buffers, pricing, cancellation, packages and concurrency.
+integrations;
 
-## Multi-Property — VALIDATE / DECISION REQUIRED
-Validate organization/property hierarchy, shared vs isolated Guest data, cross-property operations, permissions, finance separation, configuration inheritance, reporting, shared services and Partner relationships. Do not create enterprise complexity without evidence.
+tests;
 
----
+deployment evidence;
 
-# 11. AI DECISION QUEUE
-
-Status: VALIDATE / DECISION REQUIRED
-
-Still requires decisions/evidence for provider/model strategy, fallback, tool runtime, agent specialization, conversation storage/memory/retrieval, property knowledge, prompt versioning, observability/evaluation, risk classification, detailed Human Confirmation matrix, generic financial action policy, privacy/retention, cost controls and rate limits.
-
-Approved AI boundaries D-008..D-013 remain mandatory while these implementation choices are open.
+AI capabilities if present.
 
 ---
 
-# 12. OMNICHANNEL VALIDATION QUEUE
+# 11. GAP ANALYSIS RULE
 
-Status: VALIDATE per channel
+GAP определяется только как:
 
-WEB / TELEGRAM / WHATSAPP / INSTAGRAM must each be validated for official API, auth/scopes, webhooks, capabilities, rate limits, pricing, regional availability, policy restrictions, identity linking and operational suitability.
+APPROVED TARGET
+−
+VERIFIED CURRENT STATE
+=
+GAP
 
-Three Crowns D-019 approves its orchestration architecture but does not convert every generic provider/channel integration into a universally VERIFIED product integration.
+Не считать GAP автоматически immediate backlog item.
+
+Каждый GAP должен быть классифицирован:
+
+V1 REQUIRED
+
+VALIDATE
+
+DEFER
+
+POST-V1
+
+DECISION REQUIRED
+
+NOT PRODUCT SCOPE
 
 ---
 
-# 13. PAYMENT VALIDATION QUEUE
+# 12. NEXT-TASK SELECTION RULE
+
+После появления Current State следующая задача должна выбираться не по принципу:
+
+"что интереснее сделать".
+
+Приоритет учитывать:
+
+1. Product correctness
+2. Security
+3. Data integrity
+4. Critical Business Rules
+5. Dependencies
+6. V1 product value
+7. Operational value
+8. Commercial relevance
+9. Implementation risk
+10. Verification feasibility
+
+Выбирается одна следующая P0/P1 задача, если нет причины формировать пакет взаимозависимых задач.
+
+---
+
+# 13. DOMAIN DECISION QUEUE — RESERVATIONS
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+Reservation lifecycle;
+
+Reservation Request lifecycle;
+
+request expiration;
+
+cancellation;
+
+modification;
+
+no-show;
+
+walk-in;
+
+group reservations;
+
+waitlist;
+
+inventory hold behavior;
+
+overbooking policy;
+
+confirmation timeout;
+
+deposit/guarantee relationship.
+
+Не утверждать значения автоматически.
+
+Three Crowns property-specific approved behavior does not automatically resolve these generic Resort OS rules.
+
+---
+
+# 14. DOMAIN DECISION QUEUE — STAY
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+Stay creation;
+
+check-in;
+
+check-out;
+
+early arrival;
+
+late departure;
+
+no-show relationship;
+
+Stay closure;
+
+Room Move;
+
+Split Stay segmentation;
+
+history.
+
+---
+
+# 15. DOMAIN DECISION QUEUE — INVENTORY
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+inventory unit;
+
+room vs room-type inventory;
+
+availability calculation;
+
+temporary holds;
+
+maintenance blocks;
+
+out-of-order;
+
+concurrency;
+
+conflict handling;
+
+external synchronization;
+
+overbooking behavior.
+
+---
+
+# 16. DOMAIN DECISION QUEUE — PRICING
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+rate model;
+
+seasonality;
+
+weekday/weekend;
+
+occupancy pricing;
+
+adult/child pricing;
+
+extra beds;
+
+meal plans;
+
+packages;
+
+discounts;
+
+promo codes;
+
+partner rates;
+
+taxes;
+
+fees;
+
+currencies;
+
+rounding;
+
+price locking;
+
+repricing;
+
+Split Stay pricing.
+
+---
+
+# 17. DOMAIN DECISION QUEUE — FINANCE
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+Folio model;
+
+charges;
+
+payment relationship;
+
+deposits;
+
+refunds;
+
+corrections;
+
+voids;
+
+split folio;
+
+transfers;
+
+currencies;
+
+balance;
+
+closing/reopening;
+
+audit.
+
+Three Crowns D-020 определяет локальный V1 manual-prepayment boundary, но не закрывает generic finance domain model.
+
+---
+
+# 18. DOMAIN DECISION QUEUE — PARTNERS
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+commission formula;
+
+commission base;
+
+fixed vs percentage;
+
+refund consequences;
+
+cancellation consequences;
+
+tax treatment;
+
+settlement period;
+
+currency;
+
+manual adjustments;
+
+partner balance.
+
+---
+
+# 19. DOMAIN DECISION QUEUE — OPERATIONS
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+Task lifecycle;
+
+priority;
+
+assignment;
+
+reassignment;
+
+SLA;
+
+escalation;
+
+completion;
+
+Housekeeping statuses;
+
+Maintenance statuses;
+
+Guest Request statuses.
+
+Property-specific implemented states do not automatically become generic Resort OS rules.
+
+---
+
+# 20. DOMAIN DECISION QUEUE — SERVICES
+
+Status:
+DECISION REQUIRED
+
+Необходимо определить:
+
+service taxonomy;
+
+resource model;
+
+capacity;
+
+duration;
+
+availability;
+
+staff requirements;
+
+buffers;
+
+pricing;
+
+cancellation;
+
+packages;
+
+concurrency.
+
+---
+
+# 21. MULTI-PROPERTY DECISION QUEUE
 
 Status: VALIDATE
-Priority: HIGH BEFORE GENERIC PAYMENT-PROVIDER IMPLEMENTATION
+Decision: DECISION REQUIRED
 
-Research target countries, merchant location, guest payment-origin scenarios, providers/acquiring, currencies/settlement, fees, KYC, merchant requirements, API/webhooks/refunds/limits/regional restrictions/compliance/legal constraints.
+Необходимо определить:
 
-Do not select a provider from assumptions.
+organization/property hierarchy;
 
-Three Crowns D-020 intentionally uses manager-manual prepayment for its active V1 and therefore does not require provider selection before that property V1 launch. This does not promote generic payment-provider implementation from VALIDATE.
+shared vs isolated Guest data;
 
----
+cross-property operations;
 
-# 14. INTEGRATION VALIDATION QUEUE
+central permissions;
 
-Status: VALIDATE UNTIL VERIFIED
+financial separation;
 
-Potential categories: OTA, Channel Manager, payments, messaging, email, telephony, maps, accounting, fiscal systems, locks/access, IoT, POS/KDS, SPA systems and automation platforms.
+configuration inheritance;
 
-For each external system verify official documentation, API/auth/scopes/webhooks/rate limits/pricing/partner requirements/regional availability/data ownership/failure behavior.
+reporting;
 
----
+shared services;
 
-# 15. F&B / SIGNAGE / PHYSICAL-SERVICE QUEUES
+Partner relationships.
 
-F&B: VALIDATE. Determine V1 relevance, first-ICP demand, build/integrate value, integration availability and operational complexity before BUILD / INTEGRATE / HYBRID / DEFER.
-
-Signage: VALIDATE / POST-V1 CANDIDATE unless evidence changes priority.
-
-Dining/store/access/QR/billiards/LED exact business rules must not be invented. Property-specific work requires explicit rules/equipment/protocol evidence.
+Не создавать enterprise complexity без подтверждённой необходимости.
 
 ---
 
-# 16. FIRST ICP
+# 22. AI DECISION QUEUE
 
 Status: VALIDATE
-Priority: HIGH
+Decision: DECISION REQUIRED
 
-The broad Target Customer Spectrum exists, but FIRST ICP is not approved. Validate pain severity, willingness to pay, implementation complexity, sales cycle, competition, integrations, operational complexity, decision-maker accessibility and demonstration value.
+Необходимо определить:
 
-Result should inform FIRST ICP and generic V1 REQUIRED SCOPE.
+LLM provider;
+
+model strategy;
+
+fallback;
+
+tool runtime;
+
+single-agent vs internal specialization;
+
+conversation storage;
+
+memory strategy;
+
+retrieval;
+
+property knowledge;
+
+prompt versioning;
+
+AI observability;
+
+AI evaluation;
+
+risk classification;
+
+Human Confirmation matrix;
+
+financial action policy;
+
+privacy;
+
+retention;
+
+cost controls;
+
+rate limits.
 
 ---
 
-# 17. GENERIC V1 SCOPE
+# 23. OMNICHANNEL VALIDATION QUEUE
 
-Status: DECISION REQUIRED
+Каждый channel проверяется отдельно.
 
-Generic Resort OS V1 must be coherent, sellable, useful, safe, demonstrable and implementable, but exact universal V1 cannot be inferred from the full Product Bible. It depends on FIRST ICP, Current State, Gap Analysis, dependencies, commercial validation and implementation cost.
+## WEB
 
-Three Crowns has a property-specific active V1 execution boundary under D-019..D-022; that does not automatically become the generic Resort OS V1 definition.
+Status:
+VALIDATE
+
+## TELEGRAM
+
+Status:
+VALIDATE
+
+## WHATSAPP
+
+Status:
+VALIDATE
+
+## INSTAGRAM
+
+Status:
+VALIDATE
+
+Для каждого проверить:
+
+official API;
+
+authentication;
+
+permissions/scopes;
+
+webhooks;
+
+message capabilities;
+
+rate limits;
+
+pricing;
+
+regional availability;
+
+policy restrictions;
+
+identity linking;
+
+operational suitability.
+
+Three Crowns D-019 утверждает property orchestration boundary, но не делает каждый generic provider/channel integration universally VERIFIED.
 
 ---
 
-# 18. COMMERCIAL VALIDATION
+# 24. PAYMENT VALIDATION QUEUE
+
+Status:
+VALIDATE
+Priority:
+HIGH BEFORE GENERIC PAYMENT-PROVIDER IMPLEMENTATION
+
+Необходимо исследовать:
+
+target countries;
+
+merchant location;
+
+guest payment origin scenarios;
+
+providers;
+
+acquiring;
+
+currencies;
+
+settlement currencies;
+
+fees;
+
+KYC;
+
+merchant requirements;
+
+API;
+
+webhooks;
+
+refunds;
+
+limits;
+
+regional restrictions;
+
+compliance;
+
+legal constraints.
+
+Нельзя выбирать provider на основании предположений.
+
+Three Crowns D-020 intentionally uses manager-manual prepayment for active property V1 and therefore does not require generic provider selection as a Three Crowns V1 launch gate. Generic Resort OS payment-provider implementation remains VALIDATE.
+
+---
+
+# 25. INTEGRATION VALIDATION QUEUE
+
+Potential categories:
+
+OTA;
+
+Channel Manager;
+
+payments;
+
+messaging;
+
+email;
+
+telephony;
+
+maps;
+
+accounting;
+
+fiscal systems;
+
+locks/access;
+
+IoT;
+
+POS/KDS;
+
+SPA systems;
+
+automation platforms.
+
+Status for each:
+
+VALIDATE UNTIL VERIFIED.
+
+Для каждого external system проверять:
+
+official documentation;
+
+API;
+
+auth;
+
+scopes;
+
+webhooks;
+
+rate limits;
+
+pricing;
+
+partner requirements;
+
+regional availability;
+
+data ownership;
+
+failure behavior.
+
+---
+
+# 26. F&B DECISION QUEUE
+
+Status:
+VALIDATE
+
+Potential scope:
+
+Restaurant;
+
+Dining Hall;
+
+Bar;
+
+Tables;
+
+Waiters;
+
+Menu;
+
+Room Service;
+
+Kitchen;
+
+KDS.
+
+Необходимо определить:
+
+V1 relevance;
+
+first ICP demand;
+
+own-build value;
+
+integration availability;
+
+operational complexity.
+
+Strategy:
+
+BUILD / INTEGRATE / HYBRID / DEFER
+
+Decision:
+NOT YET MADE.
+
+---
+
+# 27. SIGNAGE DECISION
 
 Status: VALIDATE
+Scope: POST-V1 CANDIDATE
 
-For significant capabilities use:
+Potential capability:
 
-`FEATURE -> TARGET CUSTOMER -> PAIN -> CURRENT WAY -> PROPOSED WAY -> BUSINESS VALUE -> DEMO VALUE -> WILLINGNESS TO PAY`
+screen groups;
 
-Do not invent ROI, market demand, pricing, conversion, customer savings or revenue uplift.
+all screens;
 
----
+menu;
 
-# 19. DEMO BACKLOG PRINCIPLE
+announcement;
 
-Status: APPROVED CONCEPT
+schedule;
 
-Demonstrations should show end-to-end operational flows, not disconnected screens. Potential examples include booking request -> availability -> calculation -> Human Confirmation -> Reservation, guest request -> task -> staff -> completion, and AI natural-language request -> verified context -> controlled tool -> result.
+event;
 
-Exact demo flows depend on scope/ICP and must respect Current State evidence.
+image;
 
----
+welcome;
 
-# 20. IMPLEMENTATION AND VERIFICATION GATES
+emergency information.
 
-Before significant implementation know, as applicable:
-- WHY / WHAT;
-- approved business rule;
-- Current State;
-- Target State;
-- dependencies/risks;
-- acceptance criteria;
-- verification method.
-
-If critical information is absent: BLOCKED or DECISION REQUIRED.
-
-After implementation, do not automatically promote IMPLEMENTED to VERIFIED. Evidence may include tests, integration/permission/negative tests, runtime behavior, data-integrity/security checks and manual acceptance where required.
+Не считать V1 requirement без validation.
 
 ---
 
-# 21. CANONICAL CHANGE RULES
+# 28. FIRST ICP
 
-Product Bible changes:
-`NEW IDEA -> PROPOSED / VALIDATE -> ANALYSIS -> DECISION -> APPROVED / REJECTED -> UPDATE 00`
+Status:
+VALIDATE
+Priority:
+HIGH
 
-Domain rule changes:
-`QUESTION -> ANALYSIS -> OPTIONS -> PROPOSED -> EXPLICIT DECISION -> APPROVED / REJECTED -> UPDATE 01`
+Target Customer Spectrum уже определён широко.
 
-Architecture changes:
-`PROBLEM -> REQUIREMENTS -> CONSTRAINTS -> OPTIONS -> TRADE-OFFS -> DECISION -> UPDATE 02 IF CANONICAL`
+Но FIRST ICP ещё не должен считаться утверждённым.
 
-AI capability changes:
-`BUSINESS NEED -> APPROVED RULE -> RISK -> TOOL/PERMISSION/HUMAN-CONFIRMATION DESIGN -> IMPLEMENT -> TEST -> EVIDENCE -> VERIFIED -> ENABLEMENT`
+Необходимо учитывать:
 
-Do not rewrite canonical target documents merely to hide a GAP or match an incomplete implementation.
+pain severity;
+
+willingness to pay;
+
+implementation complexity;
+
+sales cycle;
+
+competition;
+
+required integrations;
+
+property operational complexity;
+
+decision-maker accessibility;
+
+demonstration value.
+
+Результат должен определить:
+
+FIRST ICP
+
+и
+
+V1 REQUIRED SCOPE.
 
 ---
 
-# 22. DEFERRED / NOT YET DECIDED
+# 29. V1 SCOPE
 
-Do not treat the following as mandatory generic V1 merely because they appear in vision: full POS/KDS, advanced Signage/SPA, IoT/locks, advanced Multi-Property, enterprise functionality, every omnichannel integration, every payment scenario, advanced automation or complex revenue management.
+Status:
+DECISION REQUIRED
 
-Each capability needs a scope decision.
+V1 должен быть:
+
+coherent;
+
+sellable;
+
+operationally useful;
+
+safe;
+
+demonstrable;
+
+implementable.
+
+Но exact generic Resort OS V1 scope не должен определяться только из длинного списка Product Bible.
+
+Он зависит от:
+
+FIRST ICP;
+
+Current State;
+
+Gap Analysis;
+
+dependencies;
+
+commercial validation;
+
+implementation cost.
+
+Three Crowns D-019…D-022 формируют property-specific active V1 boundary и не должны автоматически считаться generic Resort OS V1 definition.
 
 ---
 
-# 23. CURRENT KNOWLEDGE BASELINE
+# 30. COMMERCIAL VALIDATION
 
-Current canonical baseline:
-- `00_PRODUCT_BIBLE.md` — ACTIVE canonical product target;
-- `01_DOMAIN_BUSINESS_RULES.md` — ACTIVE canonical domain rules;
-- `02_SYSTEM_ARCHITECTURE.md` — ACTIVE canonical target architecture;
-- `03_AI_ADMIN.md` — ACTIVE canonical AI rules;
-- `04_CURRENT_STATE.md` — ESTABLISHED and continuously evidence-updated factual implementation state;
-- `05_DECISIONS_AND_BACKLOG.md` — ACTIVE canonical decisions/validation/backlog register.
+Status:
+VALIDATE
+
+Для significant capability использовать цепочку:
+
+FEATURE
+→ TARGET CUSTOMER
+→ PAIN
+→ CURRENT WAY
+→ PROPOSED WAY
+→ BUSINESS VALUE
+→ DEMO VALUE
+→ WILLINGNESS TO PAY
+
+Не придумывать:
+
+ROI;
+
+market demand;
+
+pricing;
+
+conversion;
+
+customer savings;
+
+revenue uplift.
+
+Такие claims требуют evidence.
+
+---
+
+# 31. DEMO BACKLOG PRINCIPLE
+
+Status:
+APPROVED CONCEPT
+
+Сильная product demonstration должна показывать end-to-end operational flow, а не набор disconnected screens.
+
+Potential future demo flows:
+
+Booking Request
+→ Availability
+→ Calculation
+→ Human Confirmation
+→ Reservation
+
+Guest QR
+→ Request
+→ Task
+→ Staff
+→ Status
+→ Completion
+
+Guest
+→ Restaurant Order
+→ Kitchen
+→ Ready
+→ Delivery
+→ Charge/Payment where applicable
+
+AI Manager
+→ Natural Language Request
+→ Verified Context
+→ Controlled Tool
+→ Result
+
+Конкретные demo flows выбираются после определения V1/ICP.
+
+---
+
+# 32. BACKLOG ENTRY FORMAT
+
+Каждая значимая backlog item должна по возможности содержать:
+
+ID:
+
+TITLE:
+
+STATUS:
+
+PRIORITY:
+
+AREA:
+
+PROBLEM:
+
+BUSINESS VALUE:
+
+CURRENT STATE:
+
+TARGET STATE:
+
+DEPENDENCIES:
+
+RISKS:
+
+IMPLEMENTATION SCOPE:
+
+OUT OF SCOPE:
+
+TESTS:
+
+VERIFIED CRITERIA:
+
+EVIDENCE REQUIRED:
+
+DECISIONS REQUIRED:
+
+Не заполнять неизвестные поля фантазиями.
+
+---
+
+# 33. IMPLEMENTATION GATE
+
+До начала significant implementation должны быть известны:
+
+WHY
+
+WHAT
+
+BUSINESS RULE
+
+CURRENT STATE
+
+TARGET STATE
+
+DEPENDENCIES
+
+RISKS
+
+ACCEPTANCE CRITERIA
+
+VERIFICATION METHOD
+
+Если критическая информация отсутствует:
+
+BLOCKED
+
+или
+
+DECISION REQUIRED.
+
+---
+
+# 34. VERIFICATION GATE
+
+После implementation:
+
+IMPLEMENTED
+
+не изменяется автоматически на:
+
+VERIFIED.
+
+Для VERIFIED требуется evidence.
+
+Potential evidence:
+
+tests passed;
+
+integration tests;
+
+permission tests;
+
+negative tests;
+
+runtime behavior;
+
+data integrity checks;
+
+security checks;
+
+manual acceptance where required.
+
+Конкретный evidence зависит от capability.
+
+---
+
+# 35. KNOWLEDGE UPDATE AFTER IMPLEMENTATION
+
+После успешной реализации:
+
+IMPLEMENT
+→ TEST
+→ EVIDENCE
+→ VERIFIED
+→ UPDATE 04_CURRENT_STATE.md
+
+Если реализация изменила утверждённую architecture или Business Rules:
+
+сначала проверить, было ли это явным approved decision.
+
+Нельзя менять canonical target задним числом только потому, что implementation получилась другой.
+
+---
+
+# 36. PRODUCT BIBLE CHANGE RULE
+
+00_PRODUCT_BIBLE.md является frozen product baseline до явного решения об изменении.
+
+Новая идея:
+
+NEW IDEA
+→ PROPOSED / VALIDATE
+→ ANALYSIS
+→ DECISION
+→ APPROVED / REJECTED
+
+Только APPROVED изменение может попасть в новую версию Product Bible.
+
+Не изменять Product Bible, чтобы скрыть GAP.
+
+---
+
+# 37. BUSINESS RULE CHANGE RULE
+
+Новая Domain Business Rule:
+
+QUESTION
+→ ANALYSIS
+→ OPTIONS
+→ PROPOSED
+→ EXPLICIT DECISION
+→ APPROVED / REJECTED
+→ UPDATE 01_DOMAIN_BUSINESS_RULES.md
+
+Industry practice не является автоматическим основанием для APPROVED.
+
+---
+
+# 38. ARCHITECTURE CHANGE RULE
+
+Significant Architecture Decision:
+
+PROBLEM
+→ REQUIREMENTS
+→ CONSTRAINTS
+→ OPTIONS
+→ TRADE-OFFS
+→ RECOMMENDATION
+→ DECISION
+→ UPDATE 02_SYSTEM_ARCHITECTURE.md IF CANONICAL
+
+Implementation convenience не является достаточным основанием для изменения Product Business Rule.
+
+---
+
+# 39. AI CHANGE RULE
+
+New AI capability:
+
+BUSINESS NEED
+→ APPROVED BUSINESS RULE
+→ RISK ANALYSIS
+→ TOOL DESIGN
+→ PERMISSION DESIGN
+→ HUMAN CONFIRMATION RULE
+→ IMPLEMENTATION
+→ TEST
+→ EVIDENCE
+→ VERIFIED
+→ ENABLEMENT
+
+LLM capability alone does not justify product enablement.
+
+---
+
+# 40. DEFERRED / NOT YET DECIDED
+
+Следующие вещи нельзя считать обязательным V1 только потому, что они присутствуют в vision:
+
+full POS;
+
+full KDS;
+
+advanced Signage;
+
+advanced SPA;
+
+IoT;
+
+locks;
+
+advanced Multi-Property;
+
+large enterprise functionality;
+
+all omnichannel integrations;
+
+all payment scenarios;
+
+advanced automation;
+
+complex revenue management.
+
+Каждая capability должна пройти scope decision.
+
+---
+
+# 41. IMMEDIATE NEXT PHASE
+
+Current canonical Knowledge baseline:
+
+00_PRODUCT_BIBLE.md
+= ACTIVE PRODUCT TARGET
+
+01_DOMAIN_BUSINESS_RULES.md
+= ACTIVE DOMAIN RULES
+
+02_SYSTEM_ARCHITECTURE.md
+= ACTIVE TARGET ARCHITECTURE
+
+03_AI_ADMIN.md
+= ACTIVE AI RULES
+
+04_CURRENT_STATE.md
+= ESTABLISHED / CONTINUOUSLY EVIDENCE-UPDATED CURRENT STATE
+
+05_DECISIONS_AND_BACKLOG.md
+= ACTIVE DECISION / VALIDATION / BACKLOG REGISTER
 
 Supporting Three Crowns documents:
-- `06_THREE_CROWNS_MASTER_SPEC.md` — subordinate property implementation specification;
-- `07_EXECUTION_PLAN_THREE_CROWNS.md` — supporting execution plan;
-- `08_CLIENT_AUTOMATION_N8N_BOUNDARY.md` — supporting decision extract.
 
-There is no active “wait for real project evidence” bootstrap phase. The real repository exists. Work proceeds from verified Current State to the next evidence-backed GAP/priority.
+06_THREE_CROWNS_MASTER_SPEC.md
+= SUBORDINATE PROPERTY IMPLEMENTATION SPECIFICATION
+
+07_EXECUTION_PLAN_THREE_CROWNS.md
+= SUPPORTING EXECUTION PLAN
+
+08_CLIENT_AUTOMATION_N8N_BOUNDARY.md
+= SUPPORTING DECISION EXTRACT
+
+Следующий meaningful phase выбирается не после появления проекта — real project уже существует — а из verified Current State:
+
+VERIFIED CURRENT STATE
+→ GAP
+→ PRIORITY / DECISION
+→ ONE BOUNDED P0/P1 TASK
+→ IMPLEMENT
+→ TEST
+→ EVIDENCE
+→ UPDATE 04_CURRENT_STATE.md
+
+Generic Product/Domain/ICP/V1/integration/payment/AI validation queues остаются открытыми там, где отдельного canonical decision/evidence нет.
 
 ---
 
-# 24. CANONICAL DEVELOPMENT LOOP
+# 42. CANONICAL DEVELOPMENT LOOP
 
-`PRODUCT VISION -> APPROVED PRODUCT BIBLE -> APPROVED BUSINESS RULES -> TARGET ARCHITECTURE`
+PRODUCT VISION
+→ APPROVED PRODUCT BIBLE
+→ APPROVED BUSINESS RULES
+→ TARGET ARCHITECTURE
 
-Parallel factual lane:
+PARALLEL:
 
-`REAL CODE / SYSTEM -> AUDIT -> EVIDENCE -> CURRENT STATE`
+REAL CODE / SYSTEM
+→ AUDIT
+→ CURRENT STATE
 
-Then:
+THEN:
 
-`TARGET - CURRENT = GAP -> DECISION -> BACKLOG -> PLAN -> IMPLEMENT -> TEST -> EVIDENCE -> VERIFIED / NOT VERIFIED -> UPDATE CURRENT STATE -> NEXT PRIORITY`
+TARGET
+−
+CURRENT
+=
+GAP
 
-Human approval remains mandatory wherever canonical Product/Domain/AI rules require it.
+GAP
+→ DECISION
+→ BACKLOG
+→ PLAN
+→ HUMAN APPROVAL
+→ IMPLEMENT
+→ TEST
+→ EVIDENCE
+→ VERIFIED
+→ CURRENT STATE UPDATE
+→ NEXT PRIORITY
 
 ---
 
-# 25. FINAL BACKLOG PRINCIPLE
+# 43. FINAL BACKLOG PRINCIPLE
 
 DO NOT IMPLEMENT RANDOMLY.
 
@@ -529,11 +1897,19 @@ DO NOT CHANGE PRODUCT TARGET TO MATCH AN INCOMPLETE IMPLEMENTATION.
 DO NOT ALLOW TECHNICAL CONVENIENCE TO SILENTLY REDEFINE BUSINESS RULES.
 
 Every meaningful next step must answer:
-- what problem is being solved;
-- why now;
-- what is approved;
-- what is currently verified;
-- what is the GAP;
-- what decision is required;
-- what priority applies;
-- what will count as VERIFIED.
+
+WHAT PROBLEM ARE WE SOLVING?
+
+WHY NOW?
+
+WHAT IS ALREADY APPROVED?
+
+WHAT IS CURRENTLY VERIFIED?
+
+WHAT IS THE GAP?
+
+WHAT DECISION IS REQUIRED?
+
+WHAT IS THE PRIORITY?
+
+WHAT WILL COUNT AS VERIFIED?
