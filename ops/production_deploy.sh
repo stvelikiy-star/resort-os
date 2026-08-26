@@ -60,7 +60,8 @@ reject_placeholder LAST_VERIFIED_BACKUP_AT "${LAST_VERIFIED_BACKUP_AT:-}"
 [ "${REQUIRE_RECENT_BACKUP:-}" = "true" ] || fail "REQUIRE_RECENT_BACKUP must be true for production deploy"
 [ "${REQUIRE_MIGRATION_HISTORY:-}" = "true" ] || fail "REQUIRE_MIGRATION_HISTORY must be true for production deploy"
 [ "${COOKIE_SECURE:-}" = "true" ] || fail "COOKIE_SECURE must be true for production deploy"
-[ "${REQUIRE_COOKIE_DOMAIN:-}" = "true" ] || fail "REQUIRE_COOKIE_DOMAIN must be true for production deploy"
+[ "${REQUIRE_COOKIE_DOMAIN:-false}" = "false" ] || fail "REQUIRE_COOKIE_DOMAIN must be false for host-isolated production sessions"
+[ -z "${COOKIE_DOMAIN:-}" ] || fail "COOKIE_DOMAIN must be empty so production sessions remain host-only"
 
 [[ "${MAX_BACKUP_AGE_HOURS:-}" =~ ^[1-9][0-9]*$ ]] || fail "MAX_BACKUP_AGE_HOURS must be a positive integer"
 BACKUP_EPOCH="$(date -u -d "$LAST_VERIFIED_BACKUP_AT" +%s 2>/dev/null)" || fail "LAST_VERIFIED_BACKUP_AT must be a valid ISO-8601 timestamp"
@@ -140,7 +141,7 @@ docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm \
   -e REQUIRE_MIGRATION_HISTORY=true \
   -e EXPECTED_ROOM_COUNT="${EXPECTED_ROOM_COUNT:-84}" \
   -e EXPECTED_ROOM_TYPE_COUNT="${EXPECTED_ROOM_TYPE_COUNT:-12}" \
-  -e REQUIRE_COOKIE_DOMAIN=true \
+  -e REQUIRE_COOKIE_DOMAIN=false \
   api python /app/scripts/production_preflight.py
 
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" up -d api
