@@ -196,8 +196,8 @@ async def _conflicts(conn, reservation_id: uuid.UUID, schedule: list[ScheduleSeg
                     "inventory_block_id": str(row["id"]),
                     "room_code": row["room_code"],
                     "block_type": row["block_type"],
-                    "start": row["startDate"],
-                    "end": row["endDate"],
+                    "start": row["startDate"].isoformat(),
+                    "end": row["endDate"].isoformat(),
                     "booking_number": row["bookingNumber"],
                     "reason": row["reason"],
                 }
