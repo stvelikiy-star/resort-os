@@ -1,0 +1,45 @@
+{
+  email {$ACME_EMAIL}
+  servers {
+    protocols h1 h2 h3
+  }
+}
+
+{$PUBLIC_HOST:3korony.com}, {$WWW_HOST:www.3korony.com} {
+  encode zstd gzip
+  handle_path /core/* {
+    reverse_proxy api:8000
+  }
+  handle {
+    reverse_proxy web:3000
+  }
+}
+
+{$PMS_HOST:pms.3korony.com} {
+  encode zstd gzip
+  @pmsws path /ws/*
+  handle @pmsws {
+    reverse_proxy api:8000
+  }
+  handle_path /core/* {
+    reverse_proxy api:8000
+  }
+  handle {
+    reverse_proxy admin:3001
+  }
+}
+
+{$STAFF_HOST:staff.3korony.com} {
+  encode zstd gzip
+  handle_path /core/* {
+    reverse_proxy api:8000
+  }
+  handle {
+    reverse_proxy staff:3002
+  }
+}
+
+{$CORE_HOST:core.3korony.com} {
+  encode zstd gzip
+  reverse_proxy api:8000
+}
