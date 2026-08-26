@@ -100,6 +100,8 @@ jobs:
         run: |
           CODE=$(curl -sS -o /tmp/anonymous.json -w '%{http_code}' http://127.0.0.1:8000/api/v1/automation/read/hotel-facts)
           test "$CODE" = "401"
+          CRM_CODE=$(curl -sS -o /tmp/anonymous-crm.json -w '%{http_code}' http://127.0.0.1:8000/api/v1/automation/read/crm-feed)
+          test "$CRM_CODE" = "401"
 
       - name: Verify canonical hotel and guest facts
         run: |
@@ -183,6 +185,32 @@ jobs:
           assert d['request']['is_reservation'] is False
           assert d['reservation'] is None
           assert d['payments']['received_kgs']==0
+          PY
+
+      - name: Verify authoritative CRM mirror feed
+        run: |
+          RID=$(cat /tmp/request-id)
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/automation/read/crm-feed?limit=50" \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" > /tmp/crm-feed.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/crm-feed.json'))
+          rid=open('/tmp/request-id').read().strip()
+          assert d['contract_version']=='1.0'
+          assert d['property_code']=='THREE_CROWNS'
+          assert d['source_of_truth']=='RESORT_CORE'
+          assert d['requests']['truncated'] is False
+          assert d['reservations']['truncated'] is False
+          assert d['payments']['truncated'] is False
+          leads={row['lead_id']: row for row in d['requests']['items']}
+          assert rid in leads
+          lead=leads[rid]
+          assert lead['status']=='NEW'
+          assert lead['booking_id'] is None
+          assert lead['received_kgs']==0
+          assert lead['outstanding_kgs'] is None
+          assert d['reservations']['items']==[]
+          assert d['payments']['items']==[]
           PY
 
       - name: Verify retry idempotency
