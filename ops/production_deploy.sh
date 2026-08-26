@@ -30,6 +30,7 @@ need curl
 need sha256sum
 need awk
 need grep
+need date
 
 [ -f "$ENV_FILE" ] || fail "Missing $ENV_FILE"
 [ -s "$MIGRATION" ] || fail "Missing immutable migration baseline: $MIGRATION"
@@ -54,10 +55,20 @@ reject_placeholder AUTOMATION_SERVICE_KEY "${AUTOMATION_SERVICE_KEY:-}"
 reject_placeholder ACME_EMAIL "${ACME_EMAIL:-}"
 reject_placeholder LAST_VERIFIED_BACKUP_AT "${LAST_VERIFIED_BACKUP_AT:-}"
 
+[ "${PRODUCTION_CUTOVER_APPROVED:-false}" = "true" ] || fail "PRODUCTION_CUTOVER_APPROVED must be true after explicit owner cutover approval"
+[ "${PUBLIC_DNS_READY:-false}" = "true" ] || fail "PUBLIC_DNS_READY must be true before automatic TLS/public smoke"
 [ "${REQUIRE_RECENT_BACKUP:-}" = "true" ] || fail "REQUIRE_RECENT_BACKUP must be true for production deploy"
 [ "${REQUIRE_MIGRATION_HISTORY:-}" = "true" ] || fail "REQUIRE_MIGRATION_HISTORY must be true for production deploy"
 [ "${COOKIE_SECURE:-}" = "true" ] || fail "COOKIE_SECURE must be true for production deploy"
 [ "${REQUIRE_COOKIE_DOMAIN:-}" = "true" ] || fail "REQUIRE_COOKIE_DOMAIN must be true for production deploy"
+
+[[ "${MAX_BACKUP_AGE_HOURS:-}" =~ ^[1-9][0-9]*$ ]] || fail "MAX_BACKUP_AGE_HOURS must be a positive integer"
+BACKUP_EPOCH="$(date -u -d "$LAST_VERIFIED_BACKUP_AT" +%s 2>/dev/null)" || fail "LAST_VERIFIED_BACKUP_AT must be a valid ISO-8601 timestamp"
+NOW_EPOCH="$(date -u +%s)"
+[ "$BACKUP_EPOCH" -le "$NOW_EPOCH" ] || fail "LAST_VERIFIED_BACKUP_AT cannot be in the future"
+BACKUP_AGE_SECONDS=$((NOW_EPOCH - BACKUP_EPOCH))
+MAX_BACKUP_AGE_SECONDS=$((MAX_BACKUP_AGE_HOURS * 3600))
+[ "$BACKUP_AGE_SECONDS" -le "$MAX_BACKUP_AGE_SECONDS" ] || fail "LAST_VERIFIED_BACKUP_AT is older than MAX_BACKUP_AGE_HOURS"
 
 mkdir -p "$BACKUP_DIR"
 
@@ -78,6 +89,11 @@ docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
 
 APP_TABLE_COUNT="$(query_postgres "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('properties','rooms','reservations');")"
+MIGRATION_TABLE="$(query_postgres "SELECT CASE WHEN to_regclass('public._prisma_migrations') IS NULL THEN 0 ELSE 1 END;")"
+if [ "$APP_TABLE_COUNT" -gt 0 ] && [ "$MIGRATION_TABLE" != "1" ]; then
+  fail "Existing application schema has no Prisma migration history; prove schema equivalence and baseline it outside this deploy script"
+fi
+
 STAFF_TABLE="$(query_postgres "SELECT CASE WHEN to_regclass('public.staff_users') IS NULL THEN 0 ELSE 1 END;")"
 OWNER_COUNT=0
 if [ "$STAFF_TABLE" = "1" ]; then
