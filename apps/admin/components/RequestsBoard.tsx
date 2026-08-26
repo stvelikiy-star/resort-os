@@ -28,6 +28,30 @@ type AvailabilityOption = {
 };
 
 const fmt = (value?: number | null) => value == null ? "—" : new Intl.NumberFormat("ru-RU").format(value) + " сом";
+const requestStatusLabel: Record<string, string> = {
+  NEW: "Новая",
+  QUOTED: "Рассчитана",
+  AWAITING_PREPAYMENT: "На согласовании оплаты",
+  CONVERTED: "Забронирована",
+  CANCELLED: "Отменена",
+  REJECTED: "Отклонена",
+  EXPIRED: "Истекла",
+};
+
+function makePaymentKey(requestId: string) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `pms-request-payment-${requestId}-${random}`;
+}
+
+function paymentErrorMessage(body: any) {
+  if (typeof body?.detail === "string") return body.detail;
+  if (body?.detail?.code === "PAYMENT_EXTERNAL_REF_CONFLICT") {
+    const amount = typeof body.detail.amount_kgs === "number" ? ` · ${fmt(body.detail.amount_kgs)}` : "";
+    return `Этот номер операции уже записан${amount}. Проверьте существующий платёж перед созданием брони.`;
+  }
+  if (body?.detail?.code === "IDEMPOTENCY_CONFLICT") return "Запрос подтверждения уже использован для другой заявки. Обновите список и повторите.";
+  return "Не удалось зафиксировать оплату и создать бронь";
+}
 
 export default function RequestsBoard() {
   const [items, setItems] = useState<RequestItem[]>([]);
@@ -91,7 +115,7 @@ export default function RequestsBoard() {
         body: JSON.stringify({ room_type_code: roomTypeCode }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось рассчитать заявку");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось рассчитать заявку");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка расчёта");
@@ -118,15 +142,14 @@ export default function RequestsBoard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount_kgs: amount,
+          amount_kgs: Math.trunc(amount),
           method: "MANAGER_MANUAL_CONFIRMATION",
-          provider: "MANAGER_MANUAL",
           external_ref: externalRef,
-          idempotency_key: `pms-${item.id}-${Date.now()}`,
+          idempotency_key: makePaymentKey(item.id),
         }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось зафиксировать оплату и создать бронь");
+      if (!response.ok) throw new Error(paymentErrorMessage(body));
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка фиксации оплаты");
@@ -162,7 +185,7 @@ export default function RequestsBoard() {
           {visible.map((item) => (
             <article className="request-card" key={item.id}>
               <div className="request-main">
-                <div><span className={`status-pill s-${item.status}`}>{item.status}</span><h3>{item.guest_name}</h3><a href={`tel:${item.phone}`}>{item.phone}</a></div>
+                <div><span className={`status-pill s-${item.status}`}>{requestStatusLabel[item.status] || item.status}</span><h3>{item.guest_name}</h3><a href={`tel:${item.phone}`}>{item.phone}</a></div>
                 <div className="request-dates"><b>{item.check_in} → {item.check_out}</b><span>{item.adults} взр. · {item.children} дет.</span></div>
               </div>
               <div className="request-money">
