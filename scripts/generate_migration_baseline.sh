@@ -74,7 +74,11 @@ for needle in "${required[@]}"; do
   fi
 done
 
-sha256sum "$MIGRATION_FILE" | tee "$MIGRATION_FILE.sha256"
+(
+  cd "$MIGRATION_DIR"
+  sha256sum migration.sql | tee migration.sql.sha256
+  sha256sum -c migration.sql.sha256
+)
 
 echo
 echo "Baseline generated: $MIGRATION_FILE"
