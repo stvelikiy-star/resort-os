@@ -42,9 +42,12 @@ def static_checks() -> tuple[list[str], list[str]]:
         errors.append("APP_ENV must be production")
     if not truthy("COOKIE_SECURE"):
         errors.append("COOKIE_SECURE must be true")
+
     cookie_domain = os.environ.get("COOKIE_DOMAIN", "").strip()
-    if not cookie_domain:
-        errors.append("COOKIE_DOMAIN must be set for production sibling subdomains")
+    if truthy("REQUIRE_COOKIE_DOMAIN") and not cookie_domain:
+        errors.append("COOKIE_DOMAIN is required because REQUIRE_COOKIE_DOMAIN=true")
+    elif not cookie_domain:
+        warnings.append("COOKIE_DOMAIN is empty; sessions will use host-only cookies. Verify this matches reverse-proxy/hostname design")
 
     if os.environ.get("BOOTSTRAP_OWNER_PASSWORD", "").strip():
         errors.append("BOOTSTRAP_OWNER_PASSWORD must be cleared after bootstrap")
@@ -80,7 +83,7 @@ def static_checks() -> tuple[list[str], list[str]]:
         warnings.append("OPENAI_API_KEY is set but no Resort OS OpenAI model is configured")
 
     if os.environ.get("NFC_UID_PEPPER"):
-        warnings.append("NFC_UID_PEPPER is set although NFC is deferred; verify no dormant NFC route is being activated operationally")
+        warnings.append("NFC_UID_PEPPER is set although NFC is deferred; active Resort Core should not compose NFC routes")
 
     return errors, warnings
 
