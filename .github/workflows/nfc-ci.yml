@@ -69,6 +69,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
+      - name: Resolve hotel-local test dates
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+          today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'D0={today.isoformat()}\n')
+              f.write(f'D2={(today + timedelta(days=2)).isoformat()}\n')
+          PY
+
       - name: Create database schema
         working-directory: packages/database
         run: |
@@ -106,7 +118,7 @@ jobs:
 
       - name: Create a guaranteed reservation and check in
         run: |
-          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-27&check_out=2026-08-29&adults=2&children=0" > /tmp/nfc-availability.json
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=$D0&check_out=$D2&adults=2&children=0" > /tmp/nfc-availability.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/nfc-availability.json'))
@@ -117,7 +129,7 @@ jobs:
           ROOM_TYPE=$(cat /tmp/nfc-room-type)
           RESPONSE=$(curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
             -H 'Content-Type: application/json' \
-            -d "{\"guest_name\":\"NFC CI Guest\",\"phone\":\"+996700000099\",\"check_in\":\"2026-08-27\",\"check_out\":\"2026-08-29\",\"adults\":2,\"children\":0,\"room_type_code\":\"$ROOM_TYPE\",\"source\":\"NFC_CI\"}")
+            -d "{\"guest_name\":\"NFC CI Guest\",\"phone\":\"+996700000099\",\"check_in\":\"$D0\",\"check_out\":\"$D2\",\"adults\":2,\"children\":0,\"room_type_code\":\"$ROOM_TYPE\",\"source\":\"NFC_CI\"}")
           echo "$RESPONSE" | python -c 'import json,sys; d=json.load(sys.stdin); open("/tmp/nfc-request-id","w").write(d["id"])'
           curl --fail -sS -c /tmp/nfc-owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
             -H 'Content-Type: application/json' -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/nfc-owner-login.json
