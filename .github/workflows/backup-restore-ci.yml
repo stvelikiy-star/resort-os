@@ -54,6 +54,14 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
       - name: Create development source schema
         working-directory: packages/database
         run: |
