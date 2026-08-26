@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.5
+Version: 1.6
 Date: 2026-08-26
 Status: DELIVERY RELEASE CANDIDATE / CURRENT EXECUTABLE BASELINE CI-VERIFIED / NOT PRODUCTION READY
 Canonical: YES
@@ -19,9 +19,9 @@ Repository: `stvelikiy-star/resort-os`.
 
 Current executable code baseline verified in GitHub Actions:
 
-`3023226c025a2f57cc801298e22b892c0862d8c6`
+`f68e2ff6428929f4e069d650ff2b8d30a6224599`
 
-This current baseline contains the recovered executable stack, payment-idempotency hardening, Control Center monorepo verification hardening, the security maintenance upgrade of Admin/Public Web/Staff to Next.js 15.5.24 with React/React DOM 19.2.8, the current Three Crowns public-site/catalog implementation, read-only CRM mirror contract, inactive n8n Google Sheets mirror workflow, and the fail-closed public-site truth guard.
+This current baseline contains the recovered executable stack, payment-idempotency hardening, Control Center monorepo verification hardening, the security maintenance upgrade of Admin/Public Web/Staff to Next.js 15.5.24 with React/React DOM 19.2.8, the current Three Crowns public-site/catalog implementation, read-only CRM mirror contract, inactive n8n Google Sheets mirror workflow, the standalone presentation-only Admin `/demo` surface, vendor-neutral privacy-safe public booking-funnel analytics, and the fail-closed public-site/privacy truth guard.
 
 The repository-owned AI PROF verification contract remains fail-closed: root `npm test` validates the exact trusted Git blob identities of all three app manifests before running their typechecks/builds and Core/scripts Python compilation. The trusted manifest blobs at this baseline remain:
 - `apps/admin/package.json` -> `e29254cc30c879d2e581db42002367a30d850bf7`;
@@ -259,6 +259,13 @@ Current manager navigation:
 
 Command Center drill-down navigates into operational areas. PMS is not a mock.
 
+A standalone Admin `/demo` presentation route is also present and CI-built:
+- it uses explicitly synthetic demonstration data;
+- it provides a client-facing chessboard/dashboard showcase without production credentials or a live Core dependency;
+- it is presentation-only and does not write to Resort Core/PostgreSQL;
+- production `/` remains the authenticated Core-backed operational surface;
+- demo data must never be represented as current hotel truth, production occupancy or a production runtime proof.
+
 Finance UI derives only from stored manager-confirmed facts:
 - received amount/count for a selected period;
 - active Reservation booked total / received / outstanding;
@@ -331,7 +338,7 @@ Those runbooks and `knowledge/08_CLIENT_AUTOMATION_N8N_BOUNDARY.md` are supporti
 
 ## 11. Public sales site
 
-STATUS: **IMPLEMENTED DELIVERY BASELINE; BUILD + PUBLIC-TRUTH GUARD VERIFIED; FINAL MEDIA COMPLETENESS / VISUAL ACCEPTANCE STILL OPEN**.
+STATUS: **IMPLEMENTED DELIVERY BASELINE; BUILD + PUBLIC-TRUTH/PRIVACY GUARD VERIFIED; FINAL MEDIA COMPLETENESS / VISUAL ACCEPTANCE STILL OPEN**.
 
 Current `apps/web` includes:
 - rebuilt premium canonical homepage;
@@ -348,7 +355,17 @@ Current `apps/web` includes:
 - explicit request-not-yet-booking / no automatic room-block wording;
 - manager confirmation/prepayment boundary;
 - metadata/OpenGraph/JSON-LD/sitemap/robots;
-- cross-route navigation and mobile browsing.
+- cross-route navigation and mobile browsing;
+- vendor-neutral public booking-funnel analytics event bus.
+
+Current analytics truth:
+- events cover search started/succeeded/failed, room selection and request started/succeeded/failed;
+- analytics payloads contain only event-specific aggregate/commercial fields such as guest counts, nights, room type code, availability counts and quote values;
+- guest name, phone, email, free-text notes, request IDs and exact travel dates are intentionally excluded;
+- TypeScript event-specific payload types plus runtime allowlists reject unknown/non-scalar payload fields;
+- `scripts/public_site_truth_guard.py` additionally checks the analytics allowlist and forbids sensitive keys from being added silently;
+- events currently publish to `window.dataLayer` and a local `three-crowns:analytics` CustomEvent;
+- no external GTM/GA/other analytics vendor is configured or VERIFIED by this repository evidence.
 
 Current media truth:
 - rendered primary public media use repository-local Three Crowns assets;
@@ -357,10 +374,10 @@ Current media truth:
 - `conference.webp`, billiards, laundry and sauna are not allowed to become public CURRENT claims without separate canonical verification.
 
 Fail-closed public truth enforcement:
-- `scripts/public_site_truth_guard.py` protects homepage, metadata, room catalog/pages, BookingWidget and roomCatalog;
-- it rejects stale fixed-prepayment rules, the old two-day unpaid hold, fixed first-night prepayment, uncanonicalized conference/billiards/laundry/sauna claims, conference media promotion and remote/hotlinked media;
+- `scripts/public_site_truth_guard.py` protects homepage, metadata, room catalog/pages, BookingWidget, roomCatalog and the public analytics module;
+- it rejects stale fixed-prepayment rules, the old two-day unpaid hold, fixed first-night prepayment, uncanonicalized conference/billiards/laundry/sauna claims, conference media promotion, remote/hotlinked media and sensitive analytics allowlist keys;
 - it requires the live Core availability/request endpoints, explicit request-not-confirmed-booking wording and exactly 12 public categories;
-- dedicated `Public Site Truth CI` is active and passed on exact current main `3023226c025a2f57cc801298e22b892c0862d8c6`.
+- dedicated `Public Site Truth CI` is active and passed on exact current executable main `f68e2ff6428929f4e069d650ff2b8d30a6224599`.
 
 Website and PMS read the same InventoryBlock truth; no separate availability synchronization job is required.
 
@@ -452,7 +469,7 @@ Security-maintenance evidence:
 - canonical security baseline commit is `97f69cb5c091b49650bfa4b80beb095def75886b`;
 - GitHub Actions reported 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found.
 
-Public/CRM baseline lineage after that security baseline includes:
+Public/CRM/demo/analytics baseline lineage after that security baseline includes:
 - `e165c9fdeba76f71cef75880ee51f840966ea2c1` — verified Three Crowns 2026 brand/rate/local-media integration;
 - `ff688bcdfb46aeb6e659d3c4ad28392c32b01d5c` — rendered primary backgrounds forced to local media; post-merge Resort Core CI #413 and Contract CI #22 succeeded;
 - `33c384964e2936533ecdaa3380130dd085ef3abd` — full 2026 public price presentation baseline;
@@ -460,13 +477,17 @@ Public/CRM baseline lineage after that security baseline includes:
 - `fe1278fba5ea129b96bc8974d8613c76946b4bce` — inactive importable n8n Google Sheets CRM sync workflow plus JSON/safety CI;
 - `7c5cb5e166bac98841467b22515d04c34ac9b570` — canonical public 12-category room catalog and category pages;
 - `7f193e9476ba6aa8f13e4e35b8d58a7916543b43` — canonical public homepage rebuilt with unverified CURRENT service claims removed;
-- current main `3023226c025a2f57cc801298e22b892c0862d8c6` — fail-closed public-site truth guard and dedicated CI.
+- `3023226c025a2f57cc801298e22b892c0862d8c6` — fail-closed public-site truth guard and dedicated CI;
+- `402eb4bf0f18df223e7b428ca9e85ba6abac81b4` — docs-only Current State v1.5 synchronization; no executable change was inferred from this docs merge;
+- `461fc1ea3ed0d3087eb5fd66bccc15ad3872c7b5` — isolated Admin `/demo` presentation route merge, with post-merge Resort Core CI #432 succeeding;
+- current executable main `f68e2ff6428929f4e069d650ff2b8d30a6224599` — privacy-safe public funnel analytics plus strengthened fail-closed privacy/public-truth guard.
 
 Exact current-main Actions evidence:
-- query for `head_sha=3023226c025a2f57cc801298e22b892c0862d8c6` returned 14 push-triggered runs;
-- no `failure` conclusion was found;
-- no `cancelled` conclusion was found;
-- `Public Site Truth CI` run #2 completed with `success` on that exact SHA.
+- query for `head_sha=f68e2ff6428929f4e069d650ff2b8d30a6224599` returned 14 push-triggered runs;
+- query for the same exact SHA filtered to `status=success` also returned 14 runs;
+- therefore exact post-merge result is **14/14 SUCCESS**;
+- `Public Site Truth CI` run #6 completed with `success` on that exact SHA;
+- the matrix includes full Resort Core build/lifecycle verification and the Control Center monorepo fail-closed contract.
 
 Active baseline matrix retained from the core implementation includes:
 1. Resort Core CI;
@@ -485,12 +506,12 @@ Active baseline matrix retained from the core implementation includes:
 14. Data Intake Integrity CI.
 
 Additional focused guards now include:
-- Public Site Truth CI;
+- Public Site Truth CI, including public analytics privacy allowlist enforcement;
 - n8n Workflow JSON/safety CI for committed workflow artifacts.
 
 Interpretation boundary:
 
-**Development CI success proves the exercised development contracts on the exact cited code baselines. It does not prove staging acceptance, production secrets, production migration execution, live Google Sheets synchronization, monitoring, rollback, exact Vercel source correspondence or DNS cutover.**
+**Development CI success proves the exercised development contracts on the exact cited code baselines. It does not prove staging acceptance, production secrets, production migration execution, live Google Sheets synchronization, a live external analytics vendor, monitoring, rollback, exact Vercel source correspondence or DNS cutover.**
 
 ---
 
