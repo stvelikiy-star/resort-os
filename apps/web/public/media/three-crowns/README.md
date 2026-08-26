@@ -2,11 +2,8 @@
 
 Guest-facing media supplied for the Three Crowns property is stored here as optimized local derivatives so the public site can avoid third-party recovery hotlinks.
 
-Current repository-visible derivatives:
+The public site currently references only the canonical-safe subset selected in code. Other files in this directory may exist as source/candidate assets and must not be treated as public operational truth merely because a binary is present.
 
-- `hero-resort.webp`
-- `room-double.webp`
-- `lake-night.webp`
-- `conference.webp`
+Asset presence and filename are not authority for operational/public claims. The public site may use an asset only with copy that remains inside the canonical factual boundary in `knowledge/04_CURRENT_STATE.md`.
 
-Asset presence and filename are not authority for operational/public claims. The public site may use an asset only with copy that remains inside the canonical factual boundary in `knowledge/04_CURRENT_STATE.md`. In particular, `conference.webp` must not by itself be treated as proof of a currently offered conference/group-event service.
+In particular, conference/group-event, billiards, laundry or other service capability must not be inferred from media alone; each requires the normal evidence/canonical update path before publication as a CURRENT fact.
