@@ -17,6 +17,7 @@ concurrency:
   group: production-migration-baseline
   cancel-in-progress: true
 
+# Generates once, verifies on clean PostgreSQL, then rehearses backup -> clean restore.
 jobs:
   baseline:
     runs-on: ubuntu-latest
