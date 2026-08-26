@@ -14,6 +14,7 @@ PUBLIC_FILES = [
     ROOT / "apps/web/app/rooms/[slug]/page.tsx",
     ROOT / "apps/web/components/BookingWidget.tsx",
     ROOT / "apps/web/lib/roomCatalog.ts",
+    ROOT / "apps/web/lib/publicAnalytics.ts",
 ]
 
 # These rules are either stale commercial rules or amenities whose CURRENT
@@ -51,7 +52,30 @@ REQUIRED_SNIPPETS = {
         "Заявка ≠ подтверждённая бронь",
         "номер автоматически не блокируется",
     ],
+    ROOT / "apps/web/lib/publicAnalytics.ts": [
+        "ALLOWED_PAYLOAD_KEYS",
+        "Public analytics rejected non-allowlisted field",
+        "Public analytics rejected non-scalar field",
+    ],
 }
+
+ANALYTICS_SENSITIVE_KEYS = (
+    "name",
+    "guest_name",
+    "guestName",
+    "phone",
+    "email",
+    "note",
+    "notes",
+    "request_id",
+    "requestId",
+    "check_in",
+    "check_out",
+    "checkIn",
+    "checkOut",
+    "date",
+    "dates",
+)
 
 
 def main() -> int:
@@ -84,9 +108,24 @@ def main() -> int:
     if category_count != 12:
         errors.append(f"roomCatalog.ts: expected 12 public categories, found {category_count}")
 
+    analytics = texts.get(ROOT / "apps/web/lib/publicAnalytics.ts", "")
+    allowlist_match = re.search(
+        r"const\s+ALLOWED_PAYLOAD_KEYS\s*=\s*\{(?P<body>.*?)\}\s*as\s+const\s+satisfies",
+        analytics,
+        re.S,
+    )
+    if not allowlist_match:
+        errors.append("publicAnalytics.ts: analytics payload allowlist block is missing or unparsable")
+    else:
+        allowlist_body = allowlist_match.group("body")
+        for key in ANALYTICS_SENSITIVE_KEYS:
+            if re.search(rf'[\"\']{re.escape(key)}[\"\']', allowlist_body):
+                errors.append(f"publicAnalytics.ts: sensitive analytics key is forbidden in allowlist: {key}")
+
     print("Three Crowns public-site truth guard")
     print(f"FACT: protected_files={len(PUBLIC_FILES)}")
     print(f"FACT: public_room_categories={category_count}")
+    print(f"FACT: analytics_allowlist={'present' if allowlist_match else 'missing'}")
 
     if errors:
         for error in errors:
