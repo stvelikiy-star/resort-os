@@ -99,6 +99,16 @@ jobs:
           grep -Fq 'COOKIE_SECURE=true' ops/production.env.example
           grep -Fq 'REQUIRE_COOKIE_DOMAIN=true' ops/production.env.example
 
+      - name: Assert production cutover gates
+        run: |
+          grep -Fq 'PRODUCTION_CUTOVER_APPROVED=false' ops/production.env.example
+          grep -Fq 'PUBLIC_DNS_READY=false' ops/production.env.example
+          grep -Fq 'PRODUCTION_CUTOVER_APPROVED must be true' ops/production_deploy.sh
+          grep -Fq 'PUBLIC_DNS_READY must be true' ops/production_deploy.sh
+          grep -Fq 'Existing application schema has no Prisma migration history' ops/production_deploy.sh
+          grep -Fq 'LAST_VERIFIED_BACKUP_AT cannot be in the future' ops/production_deploy.sh
+          grep -Fq 'LAST_VERIFIED_BACKUP_AT is older than MAX_BACKUP_AGE_HOURS' ops/production_deploy.sh
+
       - name: Assert migration and preflight contract
         run: |
           grep -Fq 'prisma/migrations/0_init' ops/production_deploy.sh
