@@ -3,11 +3,32 @@ name: Resort Core CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/**'
+      - '.github/workflows/core-ci.yml'
   pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/**'
+      - '.github/workflows/core-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   core:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -43,34 +64,36 @@ jobs:
       - name: Validate and create development schema
         working-directory: packages/database
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npx prisma validate
           npx prisma db push
 
       - name: Typecheck and build PMS admin
         working-directory: apps/admin
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
 
       - name: Typecheck and build public site
         working-directory: apps/web
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
 
       - name: Typecheck and build staff PWA
         working-directory: apps/staff
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
 
       - name: Install and compile Core
         run: |

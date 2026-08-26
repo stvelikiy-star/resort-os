@@ -3,11 +3,32 @@ name: PMS Chessboard Mutation CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/admin/**'
+      - '.github/workflows/pms-chessboard-ci.yml'
   pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'apps/admin/**'
+      - '.github/workflows/pms-chessboard-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   chessboard:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -55,20 +76,22 @@ jobs:
       - name: Create development database
         working-directory: packages/database
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npx prisma validate
           npx prisma db push
 
       - name: Typecheck and build PMS admin V2
         working-directory: apps/admin
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npm run typecheck
           npm run build
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
 
       - name: Install Core and seed
         run: |

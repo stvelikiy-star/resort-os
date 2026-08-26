@@ -3,11 +3,30 @@ name: Realtime PMS CI
 on:
   push:
     branches: [main]
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - '.github/workflows/realtime-ci.yml'
   pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - '.github/workflows/realtime-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   realtime:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -43,13 +62,15 @@ jobs:
       - name: Create database schema
         working-directory: packages/database
         run: |
-          npm install
+          npm install --no-audit --no-fund
           npx prisma validate
           npx prisma db push
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
 
       - name: Install API dependencies
         run: pip install -r services/api/requirements.txt
