@@ -90,8 +90,10 @@ jobs:
         run: |
           psql "$PGURL" -v ON_ERROR_STOP=1 -c "UPDATE operational_tasks SET status='DONE',\"completedAt\"=now(),\"updatedAt\"=now() WHERE id='40000000-0000-0000-0000-000000000001'"
           psql "$PGURL" -v ON_ERROR_STOP=1 -c "INSERT INTO operational_tasks (id,\"propertyId\",\"roomId\",type,status,priority,title,\"createdByType\",source,\"updatedAt\") VALUES ('40000000-0000-0000-0000-000000000003','11111111-1111-1111-1111-111111111111','33333333-3333-3333-3333-333333333333','HOUSEKEEPING','OPEN','NORMAL','HK after done','STAFF','CI',now())"
-          test "$(psql "$PGURL" -Atc \"SELECT count(*) FROM operational_tasks WHERE \\\"roomId\\\"='33333333-3333-3333-3333-333333333333' AND type='HOUSEKEEPING'\")" = '2'
-          test "$(psql "$PGURL" -Atc \"SELECT count(*) FROM operational_tasks WHERE \\\"roomId\\\"='33333333-3333-3333-3333-333333333333' AND type='HOUSEKEEPING' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')\")" = '1'
+          hk_total="$(psql "$PGURL" -Atc 'SELECT count(*) FROM operational_tasks WHERE "roomId"='"'"'33333333-3333-3333-3333-333333333333'"'"' AND type='"'"'HOUSEKEEPING'"'"'')"
+          hk_active="$(psql "$PGURL" -Atc 'SELECT count(*) FROM operational_tasks WHERE "roomId"='"'"'33333333-3333-3333-3333-333333333333'"'"' AND type='"'"'HOUSEKEEPING'"'"' AND status IN ('"'"'OPEN'"'"','"'"'IN_PROGRESS'"'"','"'"'IN_INSPECTION'"'"')')"
+          test "$hk_total" = '2'
+          test "$hk_active" = '1'
 
       - name: Prove independent guest requests remain unconstrained
         run: |
@@ -100,4 +102,5 @@ jobs:
             ('60000000-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','33333333-3333-3333-3333-333333333333','GUEST_REQUEST','OPEN','NORMAL','Guest request 1','STAFF','CI',now()),
             ('60000000-0000-0000-0000-000000000002','11111111-1111-1111-1111-111111111111','33333333-3333-3333-3333-333333333333','GUEST_REQUEST','OPEN','NORMAL','Guest request 2','STAFF','CI',now());
           SQL
-          test "$(psql "$PGURL" -Atc \"SELECT count(*) FROM operational_tasks WHERE \\\"roomId\\\"='33333333-3333-3333-3333-333333333333' AND type='GUEST_REQUEST' AND status='OPEN'\")" = '2'
+          guest_active="$(psql "$PGURL" -Atc 'SELECT count(*) FROM operational_tasks WHERE "roomId"='"'"'33333333-3333-3333-3333-333333333333'"'"' AND type='"'"'GUEST_REQUEST'"'"' AND status='"'"'OPEN'"'"'')"
+          test "$guest_active" = '2'
