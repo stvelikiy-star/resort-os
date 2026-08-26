@@ -12,6 +12,7 @@ COPY services/api ./services/api
 COPY data-intake ./data-intake
 COPY scripts/seed_from_intake.py ./scripts/seed_from_intake.py
 COPY scripts/bootstrap_owner.py ./scripts/bootstrap_owner.py
+COPY scripts/production_preflight.py ./scripts/production_preflight.py
 
 RUN useradd --create-home --uid 10001 resort && chown -R resort:resort /app
 USER resort
