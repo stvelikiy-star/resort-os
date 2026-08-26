@@ -24,8 +24,21 @@ if [[ ! -f "$DB_DIR/prisma/schema.prisma" || ! -f "$CUSTOM_SQL" ]]; then
 fi
 
 cd "$DB_DIR"
-npm install --no-audit --no-fund
-npx prisma validate
+EXPECTED_PRISMA="$(node -p "require('./package.json').devDependencies.prisma")"
+if [[ ! "$EXPECTED_PRISMA" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "ERROR: package.json must pin Prisma to an exact semver, got: $EXPECTED_PRISMA" >&2
+  exit 1
+fi
+if [[ ! -x node_modules/.bin/prisma ]]; then
+  echo "ERROR: pinned Prisma toolchain is not installed. Run npm install in packages/database before baseline generation." >&2
+  exit 1
+fi
+INSTALLED_PRISMA="$(node -p "require('./node_modules/prisma/package.json').version")"
+if [[ "$INSTALLED_PRISMA" != "$EXPECTED_PRISMA" ]]; then
+  echo "ERROR: installed Prisma $INSTALLED_PRISMA does not match pinned package.json version $EXPECTED_PRISMA" >&2
+  exit 1
+fi
+npx --no-install prisma validate
 
 if [[ -e prisma/migrations ]]; then
   backup="prisma/migrations.prebaseline.$(date +%Y%m%d%H%M%S)"
@@ -37,7 +50,7 @@ mkdir -p "$MIGRATION_DIR"
 TMP_FILE="$(mktemp)"
 trap 'rm -f "$TMP_FILE"' EXIT
 
-npx prisma migrate diff \
+npx --no-install prisma migrate diff \
   --from-empty \
   --to-schema-datamodel prisma/schema.prisma \
   --script > "$TMP_FILE"
@@ -86,7 +99,7 @@ echo
 cat <<'NEXT'
 Required next steps before committing/using this baseline:
 1. Review migration.sql, especially PostgreSQL enums/indexes/FKs and appended custom constraints.
-2. Apply it to a clean PostgreSQL database with `npx prisma migrate deploy`.
+2. Apply it to a clean PostgreSQL database with the exact pinned Prisma toolchain and `npx --no-install prisma migrate deploy`.
 3. Run seed + Resort Core release checks against that clean migrated database.
 4. Compare an existing db-push staging schema with the baseline before any `migrate resolve --applied 0_init`.
 5. Never run `migrate resolve` merely to hide schema drift.
