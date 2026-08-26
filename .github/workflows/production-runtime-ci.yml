@@ -2,12 +2,21 @@ name: Production Runtime CI
 
 on:
   push:
-    branches: [feat/production-runtime-hardening]
+    branches: [main, feat/production-runtime-hardening]
     paths:
       - 'compose.production.yaml'
       - 'compose.production.edge.yaml'
       - 'infra/Caddyfile'
       - 'ops/production.env.example'
+      - 'ops/production_deploy.sh'
+      - 'ops/production_smoke.sh'
+      - 'services/api/Dockerfile'
+      - 'packages/database/Dockerfile'
+      - 'packages/database/package.json'
+      - 'packages/database/prisma/**'
+      - 'scripts/production_preflight.py'
+      - 'scripts/seed_from_intake.py'
+      - 'scripts/bootstrap_owner.py'
       - '.github/workflows/production-runtime-ci.yml'
   pull_request:
     paths:
@@ -15,14 +24,36 @@ on:
       - 'compose.production.edge.yaml'
       - 'infra/Caddyfile'
       - 'ops/production.env.example'
+      - 'ops/production_deploy.sh'
+      - 'ops/production_smoke.sh'
+      - 'services/api/Dockerfile'
+      - 'packages/database/Dockerfile'
+      - 'packages/database/package.json'
+      - 'packages/database/prisma/**'
+      - 'scripts/production_preflight.py'
+      - 'scripts/seed_from_intake.py'
+      - 'scripts/bootstrap_owner.py'
       - '.github/workflows/production-runtime-ci.yml'
 
-# Validates the exact container/TLS routing contract before production cutover.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Source-only validation. This workflow never touches production credentials, DNS or databases.
 jobs:
   runtime-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate production shell entrypoints
+        run: |
+          bash -n ops/production_deploy.sh
+          bash -n ops/production_smoke.sh
 
       - name: Materialize non-secret validation env
         run: |
@@ -31,6 +62,7 @@ jobs:
           sed -i 's/CHANGE_ME_OWNER_EMAIL/ops@example.com/' /tmp/production.env
           sed -i 's/CHANGE_ME_64_PLUS_RANDOM_CHARS/validation-automation-service-key-000000000000000000000000000000000000/' /tmp/production.env
           sed -i 's/CHANGE_ME_MIN_12_CHARS/ValidationOwnerPassword123!/' /tmp/production.env
+          sed -i 's/CHANGE_ME_VERIFIED_BACKUP_ISO8601/2026-08-26T00:00:00Z/' /tmp/production.env
 
       - name: Validate merged production Compose model
         run: |
@@ -38,11 +70,13 @@ jobs:
             -f compose.production.yaml \
             -f compose.production.edge.yaml \
             config >/tmp/compose-rendered.yaml
-          grep -q 'edge:' /tmp/compose-rendered.yaml
-          grep -q 'api:' /tmp/compose-rendered.yaml
-          grep -q 'web:' /tmp/compose-rendered.yaml
-          grep -q 'admin:' /tmp/compose-rendered.yaml
-          grep -q 'staff:' /tmp/compose-rendered.yaml
+          for service in postgres migrator backup api web admin staff edge; do
+            grep -q "^  ${service}:" /tmp/compose-rendered.yaml
+          done
+          if grep -q 'BOOTSTRAP_OWNER_PASSWORD' /tmp/compose-rendered.yaml; then
+            echo 'ERROR: bootstrap owner password leaked into persistent Compose service environment' >&2
+            exit 1
+          fi
 
       - name: Validate Caddy configuration
         run: |
@@ -62,3 +96,54 @@ jobs:
           test "$(grep -Fc 'handle_path /core/*' infra/Caddyfile)" -ge 3
           grep -Fq 'COOKIE_DOMAIN=.3korony.com' ops/production.env.example
           grep -Fq 'COOKIE_SECURE=true' ops/production.env.example
+          grep -Fq 'REQUIRE_COOKIE_DOMAIN=true' ops/production.env.example
+
+      - name: Assert migration and preflight contract
+        run: |
+          grep -Fq 'prisma/migrations/0_init' ops/production_deploy.sh
+          grep -Fq 'run --rm migrator' ops/production_deploy.sh
+          grep -Fq 'npx prisma migrate status' ops/production_deploy.sh
+          grep -Fq 'production_preflight.py' ops/production_deploy.sh
+          grep -Fq 'REQUIRE_RECENT_BACKUP=true' ops/production_deploy.sh
+          grep -Fq 'REQUIRE_MIGRATION_HISTORY=true' ops/production_deploy.sh
+          if grep -Fq 'psql -v ON_ERROR_STOP' ops/production_deploy.sh; then
+            echo 'ERROR: deploy script bypasses Prisma migration history with direct baseline SQL' >&2
+            exit 1
+          fi
+
+      - name: Prove missing baseline fails before deployment actions
+        run: |
+          if [ ! -s packages/database/prisma/migrations/0_init/migration.sql ]; then
+            if ENV_FILE=/tmp/production.env bash ops/production_deploy.sh >/tmp/deploy.out 2>/tmp/deploy.err; then
+              echo 'ERROR: deploy script unexpectedly continued without committed baseline' >&2
+              exit 1
+            fi
+            grep -Fq 'Missing immutable migration baseline' /tmp/deploy.err
+          else
+            test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
+            expected="$(awk 'NR==1 {print $1}' packages/database/prisma/migrations/0_init/migration.sql.sha256)"
+            actual="$(sha256sum packages/database/prisma/migrations/0_init/migration.sql | awk '{print $1}')"
+            test "$expected" = "$actual"
+          fi
+
+      - name: Build production helper images
+        run: |
+          docker compose --env-file /tmp/production.env \
+            -f compose.production.yaml \
+            -f compose.production.edge.yaml \
+            build migrator api
+
+      - name: Verify API image contains one-shot operational scripts
+        run: |
+          docker compose --env-file /tmp/production.env \
+            -f compose.production.yaml \
+            -f compose.production.edge.yaml \
+            run --rm --no-deps api sh -lc \
+            'test -f /app/scripts/seed_from_intake.py && test -f /app/scripts/bootstrap_owner.py && test -f /app/scripts/production_preflight.py'
+
+      - name: Verify migrator image has Prisma CLI
+        run: |
+          docker compose --env-file /tmp/production.env \
+            -f compose.production.yaml \
+            -f compose.production.edge.yaml \
+            run --rm --no-deps migrator npx prisma --version
