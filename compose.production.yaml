@@ -15,6 +15,37 @@ services:
       retries: 10
     networks: [resort]
 
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    command:
+      - sh
+      - -lc
+      - |
+        set -eu
+        mkdir -p /backups
+        while true; do
+          stamp=$$(date -u +%Y%m%dT%H%M%SZ)
+          tmp="/backups/resort_os-$${stamp}.dump.tmp"
+          out="/backups/resort_os-$${stamp}.dump"
+          PGPASSWORD="$$POSTGRES_PASSWORD" pg_dump -h postgres -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -Fc > "$$tmp"
+          test -s "$$tmp"
+          mv "$$tmp" "$$out"
+          find /backups -type f -name 'resort_os-*.dump' -mtime +"$$BACKUP_RETENTION_DAYS" -delete
+          sleep 86400
+        done
+    volumes:
+      - resort_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [resort]
+
   api:
     build:
       context: .
@@ -37,6 +68,9 @@ services:
       TELEGRAM_STAFF_WEBHOOK_SECRET: ${TELEGRAM_STAFF_WEBHOOK_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL}
+      BOOTSTRAP_OWNER_USERNAME: ${BOOTSTRAP_OWNER_USERNAME}
+      BOOTSTRAP_OWNER_PASSWORD: ${BOOTSTRAP_OWNER_PASSWORD}
+      BOOTSTRAP_OWNER_DISPLAY_NAME: ${BOOTSTRAP_OWNER_DISPLAY_NAME}
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,3 +146,4 @@ networks:
 
 volumes:
   resort_pgdata:
+  resort_backups:
