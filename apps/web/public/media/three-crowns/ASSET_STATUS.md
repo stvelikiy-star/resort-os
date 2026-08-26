@@ -1,13 +1,12 @@
 # Asset status
 
-Repository-visible media state on this branch:
+Public-site media status on this branch:
 
 - `hero-resort.webp` — materialized and used by the public site;
 - `room-double.webp` — materialized and used by the public site;
-- `lake-night.webp` — materialized and used by the public site;
-- `conference.webp` — materialized but intentionally **not** used to assert a CURRENT conference-hall capability until canonical factual verification is complete.
+- `lake-night.webp` — materialized and used by the public site.
 
-The public site now uses the verified local media subset above and does not depend on the previous third-party recovery hotlinks for those placements.
+Additional repository-visible media derivatives, including `conference.webp`, `logo-primary.webp`, and any later materialized files in this directory, are retained as source/candidate assets unless and until the public implementation deliberately references them inside the canonical factual boundary.
 
 Media presence is evidence of an asset, not by itself authority to promote an amenity, service, operational capability, capacity, commercial promise, or booking offer into CURRENT state. `knowledge/04_CURRENT_STATE.md` remains the canonical owner of factual implementation/public-truth status.
 
