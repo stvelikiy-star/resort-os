@@ -51,3 +51,18 @@ jobs:
 
       - name: Run repository-owned Stage 01B verification contract
         run: npm test
+
+      - name: Prove trusted manifest drift fails closed
+        run: |
+          set -euo pipefail
+          backup="$(mktemp)"
+          log="$(mktemp)"
+          cp apps/admin/package.json "$backup"
+          trap 'cp "$backup" apps/admin/package.json; rm -f "$backup" "$log"' EXIT
+          printf '\n' >> apps/admin/package.json
+          set +e
+          npm test >"$log" 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'trusted package manifest drift: apps/admin/package.json' "$log"
