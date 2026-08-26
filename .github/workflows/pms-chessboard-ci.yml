@@ -334,11 +334,12 @@ jobs:
           RID=$(cat /tmp/reservation_id)
           python - <<'PY'
           import os,uuid,asyncio,asyncpg
+          from datetime import date
           async def main():
               conn=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               try:
                   room=uuid.UUID(open('/tmp/target1').read().strip())
-                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,os.environ['D2'],os.environ['D5'])
+                  await conn.execute('''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"createdAt","updatedAt") VALUES ($1,$2,'MANUAL',$3::date,$4::date,true,'CI conflict',now(),now())''',uuid.uuid4(),room,date.fromisoformat(os.environ['D2']),date.fromisoformat(os.environ['D5']))
               finally: await conn.close()
           asyncio.run(main())
           PY
