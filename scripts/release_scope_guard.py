@@ -42,7 +42,9 @@ FORBIDDEN_PATH_FRAGMENTS = (
     "/beach/charge",
 )
 
-_PREPAYMENT_KEY = re.compile(r"^\s*PREPAYMENT_PERCENT\s*(?:=|:)")
+_PREPAYMENT_KEY = re.compile(
+    r"^\s*(?:(?:\"PREPAYMENT_PERCENT\")|(?:'PREPAYMENT_PERCENT')|PREPAYMENT_PERCENT)\s*(?:=|:)"
+)
 
 
 def exposes_active_prepayment_percent(text: str) -> bool:
@@ -61,6 +63,8 @@ def run_self_test() -> int:
         "PREPAYMENT_PERCENT=30\n": True,
         "  PREPAYMENT_PERCENT = 30\n": True,
         "      PREPAYMENT_PERCENT: ${PREPAYMENT_PERCENT}\n": True,
+        "      \"PREPAYMENT_PERCENT\": 30\n": True,
+        "      'PREPAYMENT_PERCENT': 30\n": True,
         "# PREPAYMENT_PERCENT=30\n": False,
         "   # PREPAYMENT_PERCENT: 30\n": False,
         "OTHER_PREPAYMENT_PERCENT=30\n": False,
@@ -72,7 +76,7 @@ def run_self_test() -> int:
         if actual != expected:
             print(f"FAIL: PREPAYMENT_PERCENT parser mismatch for {text!r}: {actual} != {expected}")
             return 1
-    print("PASS: PREPAYMENT_PERCENT guard handles dotenv, YAML, comments and false positives")
+    print("PASS: PREPAYMENT_PERCENT guard handles dotenv, YAML, quoted keys, comments and false positives")
     return 0
 
 
