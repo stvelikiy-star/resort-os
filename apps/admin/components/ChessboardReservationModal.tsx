@@ -60,6 +60,20 @@ type PreviewResponse = {
 export type ChessboardMode = "MOVE" | "DATES" | "RELOCATE";
 
 const money = (value?: number | null) => value == null ? "—" : `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
+const statusLabel: Record<string, string> = {
+  GUARANTEED: "Ожидает заезд",
+  CHECKED_IN: "Проживает",
+  CHECKED_OUT: "Выехал",
+  CANCELLED: "Отменена",
+  NO_SHOW: "Не заехал",
+};
+const roomStateLabel: Record<string, string> = {
+  CLEAN: "Готов",
+  DIRTY: "Нужна уборка",
+  IN_INSPECTION: "На проверке",
+  TECH_BLOCK: "Ремонт",
+  UNKNOWN: "Не указан",
+};
 
 function shiftDate(value: string, days: number) {
   const [y, m, d] = value.split("-").map(Number);
@@ -72,9 +86,12 @@ function normalizeError(body: any, fallback: string) {
   if (body?.detail?.code === "STALE_RESERVATION") return "Бронь уже изменена в другом окне. Обновите данные и повторите.";
   if (["ROOM_CONFLICT", "ROOM_CONFLICT_RACE"].includes(body?.detail?.code)) return "Выбранный номер уже занят в части этого периода. Исходная бронь не изменена.";
   if (body?.detail?.code === "PAST_ROOM_HISTORY_IMMUTABLE") return "Нельзя переписать уже прожитые ночи. Используйте переселение с текущей даты.";
-  if (body?.detail?.code === "TARGET_ROOM_TECH_BLOCK") return "Целевой номер находится в техническом блоке.";
+  if (body?.detail?.code === "TARGET_ROOM_TECH_BLOCK") return "Целевой номер находится в ремонте.";
   if (body?.detail?.code === "TARGET_ROOM_NOT_READY") return `Номер ${body.detail.room_code || ""} ещё не готов к переселению.`.trim();
-  if (body?.detail?.code === "CHECK_IN_ROOM_NOT_READY") return `Номер ${body.detail.room_code || ""} не готов к заселению (${body.detail.room_state || "статус неизвестен"}).`.trim();
+  if (body?.detail?.code === "CHECK_IN_ROOM_NOT_READY") return `Номер ${body.detail.room_code || ""} не готов к заселению (${roomStateLabel[body.detail.room_state] || body.detail.room_state || "статус неизвестен"}).`.trim();
+  if (body?.detail?.code === "CHECK_IN_DATE_OUTSIDE_SCHEDULE") return `Сегодня не входит в даты этой брони. Сначала измените график: ${body.detail.planned_check_in} → ${body.detail.planned_check_out}.`;
+  if (body?.detail?.code === "CHECK_OUT_AFTER_SCHEDULE") return `Фактическая дата уже позже запланированного выезда ${body.detail.planned_check_out}. Сначала продлите бронь в шахматке.`;
+  if (body?.detail?.code === "CHECK_OUT_WOULD_CREATE_ZERO_NIGHT_STAY") return "Нельзя оформить выезд в дату заезда в текущей модели проживания. Проверьте даты брони.";
   if (body?.detail?.code === "CURRENT_SCHEDULE_NOT_CONTIGUOUS" || body?.detail?.code === "CURRENT_SCHEDULE_RANGE_MISMATCH") return "У этой брони нарушен текущий график размещения. Сначала требуется проверка менеджером.";
   return fallback;
 }
@@ -257,6 +274,12 @@ export default function ChessboardReservationModal({
 
   async function stayAction(action: "check-in" | "check-out") {
     if (!data) return;
+    const activeRoom = data.schedule.find((item) => item.start <= data.local_today && data.local_today < item.end) || data.schedule[0];
+    const message = action === "check-in"
+      ? `Подтвердить заезд ${data.guest.name || "гостя"} в номер ${activeRoom?.room_code || "—"}?`
+      : `Подтвердить выезд ${data.guest.name || "гостя"}? Фактически освобождённый номер станет «Нужна уборка».`;
+    if (!window.confirm(message)) return;
+
     setBusy(true);
     setError(null);
     try {
@@ -286,7 +309,7 @@ export default function ChessboardReservationModal({
 
         {loading ? <div className="loading">Загрузка брони…</div> : !data ? <div className="error-box">{error || "Бронь не найдена"}</div> : <>
           <div className="chess-stay-summary">
-            <div><span>Статус</span><strong>{data.reservation.status}</strong></div>
+            <div><span>Статус</span><strong className={`stay-status-text s-${data.reservation.status}`}>{statusLabel[data.reservation.status] || data.reservation.status}</strong></div>
             <div><span>Даты</span><strong>{data.reservation.check_in} → {data.reservation.check_out}</strong></div>
             <div><span>Гостей</span><strong>{data.reservation.adults} взр. · {data.reservation.children} дет.</strong></div>
             <div><span>Стоимость в брони</span><strong>{money(data.reservation.stored_total_kgs)}</strong></div>
@@ -294,13 +317,13 @@ export default function ChessboardReservationModal({
 
           <div className="chess-current-schedule">
             <strong>Текущее размещение</strong>
-            {data.schedule.map((item) => <div key={item.inventory_block_id || `${item.room_id}-${item.start}`}><b>№ {item.room_code}</b><span>{item.start} → {item.end}</span><small>{item.room_type_name}</small></div>)}
+            {data.schedule.map((item) => <div key={item.inventory_block_id || `${item.room_id}-${item.start}`}><b>№ {item.room_code}</b><span>{item.start} → {item.end}</span><small>{item.room_type_name}{item.room_state ? ` · ${roomStateLabel[item.room_state] || item.room_state}` : ""}</small></div>)}
           </div>
 
           <ReservationQuickFacts reservationId={reservationId} refreshKey={data.reservation.version} />
 
           <div className="chess-lifecycle-actions">
-            {data.reservation.status === "GUARANTEED" && <button className="btn primary" disabled={busy} onClick={() => stayAction("check-in")}>Заселить гостя</button>}
+            {data.reservation.status === "GUARANTEED" && <button className="btn primary" disabled={busy} onClick={() => stayAction("check-in")}>Подтвердить заезд</button>}
             {data.reservation.status === "CHECKED_IN" && <button className="btn primary" disabled={busy} onClick={() => stayAction("check-out")}>Оформить выезд</button>}
           </div>
 
@@ -310,6 +333,8 @@ export default function ChessboardReservationModal({
               <button className={mode === "DATES" ? "active" : ""} onClick={() => { setMode("DATES"); setPreview(null); setError(null); }}>Изменить даты</button>
               <button className={mode === "RELOCATE" ? "active" : ""} onClick={() => { setMode("RELOCATE"); setPreview(null); setError(null); }}>Переселить с даты</button>
             </nav>
+
+            {data.reservation.status === "CHECKED_IN" && <div className="chess-history-rule">Гость уже заселён: дату заезда и прожитые ночи менять нельзя. Можно продлить/сократить будущий выезд или переселить гостя с текущей/будущей даты.</div>}
 
             <div className="chess-mutation-form">
               {mode === "MOVE" && <div className="chess-move-fields">
