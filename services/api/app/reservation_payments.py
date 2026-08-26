@@ -5,6 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .payment_idempotency import (
+    ensure_same_payment_payload,
+    lock_payment_identity,
+    normalize_optional_text,
+    normalize_required_text,
+)
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-payments"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -49,8 +55,14 @@ async def record_reservation_payment(
     request: Request,
     user: dict[str, Any] = Depends(manager_access),
 ):
+    method = normalize_required_text(payload.method)
+    external_ref = normalize_optional_text(payload.external_ref)
+    note = normalize_optional_text(payload.note)
+
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
+            await lock_payment_identity(conn, payload.idempotency_key, external_ref)
+
             pid = await conn.fetchval(
                 "SELECT id FROM properties WHERE code=$1",
                 user["property_code"],
@@ -73,7 +85,8 @@ async def record_reservation_payment(
 
             existing = await conn.fetchrow(
                 '''
-                SELECT id,"reservationId","amountKgs",method,status::text AS status,"externalRef"
+                SELECT id,"reservationId","amountKgs",method,status::text AS status,"externalRef",
+                       metadata->>'note' AS note
                 FROM payments
                 WHERE "idempotencyKey"=$1
                 ''',
@@ -88,6 +101,14 @@ async def record_reservation_payment(
                             "message": "This idempotency key belongs to another reservation.",
                         },
                     )
+                ensure_same_payment_payload(
+                    existing,
+                    amount_kgs=payload.amount_kgs,
+                    method=method,
+                    external_ref=external_ref,
+                    note=note,
+                    compare_note=True,
+                )
                 totals = await _totals(conn, reservation_id)
                 return {
                     "idempotent_replay": True,
@@ -103,7 +124,6 @@ async def record_reservation_payment(
                     "finance": totals,
                 }
 
-            external_ref = payload.external_ref.strip() if payload.external_ref else None
             if external_ref:
                 reference_payment = await conn.fetchrow(
                     '''
@@ -140,10 +160,10 @@ async def record_reservation_payment(
                 payment_id,
                 reservation_id,
                 payload.amount_kgs,
-                payload.method.strip(),
+                method,
                 external_ref,
                 payload.idempotency_key,
-                payload.note.strip() if payload.note else None,
+                note,
                 user["id"],
             )
 
@@ -171,7 +191,7 @@ async def record_reservation_payment(
                 str(reservation_id),
                 str(payment_id),
                 payload.amount_kgs,
-                payload.method.strip(),
+                method,
                 external_ref,
                 totals["paid_kgs"],
                 totals["remaining_kgs"],
@@ -185,7 +205,7 @@ async def record_reservation_payment(
         "booking_number": reservation["bookingNumber"],
         "payment": {
             "amount_kgs": payload.amount_kgs,
-            "method": payload.method.strip(),
+            "method": method,
             "status": "RECEIVED",
             "provider": "MANAGER_MANUAL",
             "external_ref": external_ref,
