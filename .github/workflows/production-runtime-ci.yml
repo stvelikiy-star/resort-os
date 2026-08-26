@@ -1,0 +1,63 @@
+name: Production Runtime CI
+
+on:
+  push:
+    branches: [feat/production-runtime-hardening]
+    paths:
+      - 'compose.production.yaml'
+      - 'compose.production.edge.yaml'
+      - 'infra/Caddyfile'
+      - 'ops/production.env.example'
+      - '.github/workflows/production-runtime-ci.yml'
+  pull_request:
+    paths:
+      - 'compose.production.yaml'
+      - 'compose.production.edge.yaml'
+      - 'infra/Caddyfile'
+      - 'ops/production.env.example'
+      - '.github/workflows/production-runtime-ci.yml'
+
+jobs:
+  runtime-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Materialize non-secret validation env
+        run: |
+          cp ops/production.env.example /tmp/production.env
+          sed -i 's/CHANGE_ME_LONG_RANDOM_PASSWORD/validation-password-only/' /tmp/production.env
+          sed -i 's/CHANGE_ME_OWNER_EMAIL/ops@example.com/' /tmp/production.env
+          sed -i 's/CHANGE_ME_64_PLUS_RANDOM_CHARS/validation-automation-service-key-000000000000000000000000000000000000/' /tmp/production.env
+          sed -i 's/CHANGE_ME_MIN_12_CHARS/ValidationOwnerPassword123!/' /tmp/production.env
+
+      - name: Validate merged production Compose model
+        run: |
+          docker compose --env-file /tmp/production.env \
+            -f compose.production.yaml \
+            -f compose.production.edge.yaml \
+            config >/tmp/compose-rendered.yaml
+          grep -q 'edge:' /tmp/compose-rendered.yaml
+          grep -q 'api:' /tmp/compose-rendered.yaml
+          grep -q 'web:' /tmp/compose-rendered.yaml
+          grep -q 'admin:' /tmp/compose-rendered.yaml
+          grep -q 'staff:' /tmp/compose-rendered.yaml
+
+      - name: Validate Caddy configuration
+        run: |
+          docker run --rm \
+            -e ACME_EMAIL=ops@example.com \
+            -e PUBLIC_HOST=3korony.com \
+            -e WWW_HOST=www.3korony.com \
+            -e PMS_HOST=pms.3korony.com \
+            -e STAFF_HOST=staff.3korony.com \
+            -e CORE_HOST=core.3korony.com \
+            -v "$PWD/infra/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Assert PMS realtime and same-origin Core routing
+        run: |
+          grep -Fq '@pmsws path /ws/*' infra/Caddyfile
+          test "$(grep -Fc 'handle_path /core/*' infra/Caddyfile)" -ge 3
+          grep -Fq 'COOKIE_DOMAIN=.3korony.com' ops/production.env.example
+          grep -Fq 'COOKIE_SECURE=true' ops/production.env.example
