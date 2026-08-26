@@ -385,6 +385,26 @@ jobs:
       - name: Check-out uses actual current room and creates housekeeping
         run: |
           RID=$(cat /tmp/reservation_id)
+          python - <<'PY'
+          import os, asyncio, asyncpg, uuid
+          from datetime import date, timedelta
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  reservation_id = uuid.UUID(open('/tmp/reservation_id').read().strip())
+                  lived_from = date.fromisoformat(os.environ['D0']) - timedelta(days=1)
+                  await conn.execute('UPDATE reservations SET "checkIn"=$1,"updatedAt"=now() WHERE id=$2', lived_from, reservation_id)
+                  await conn.execute(
+                      '''UPDATE inventory_blocks SET "startDate"=$1,"updatedAt"=now()
+                         WHERE id=(SELECT id FROM inventory_blocks
+                                   WHERE "reservationId"=$2 AND active=true AND "blockType"='RESERVATION'
+                                   ORDER BY "startDate" LIMIT 1)''',
+                      lived_from, reservation_id,
+                  )
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RID/check-out" > /tmp/checkout.json
           python - <<'PY'
           import json
