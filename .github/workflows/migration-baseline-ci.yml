@@ -125,7 +125,7 @@ jobs:
       - name: Upload baseline candidate for explicit review
         uses: actions/upload-artifact@v4
         with:
-          name: three-crowns-migration-baseline-${{ github.sha }}
+          name: three-crowns-migration-baseline-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             packages/database/prisma/migrations/0_init/migration.sql
             packages/database/prisma/migrations/0_init/migration.sql.sha256
