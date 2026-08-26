@@ -143,8 +143,8 @@ async def ingest_normalized_channel_message(
                   "firstResponseAt","createdAt","updatedAt"
                 ) VALUES (
                   $1,$2,$3,$4,$5,$6,$7,$8,'OPEN',
-                  CASE WHEN $9 THEN $11 ELSE NULL END,
-                  CASE WHEN $10 THEN $11 ELSE NULL END,
+                  CASE WHEN $9 THEN $11::timestamp ELSE NULL END,
+                  CASE WHEN $10 THEN $11::timestamp ELSE NULL END,
                   NULL,now(),now()
                 )
                 ON CONFLICT ("channelId","externalConversationId") DO UPDATE SET
@@ -154,14 +154,14 @@ async def ingest_normalized_channel_message(
                   "contactUsername"=COALESCE(EXCLUDED."contactUsername",conversations."contactUsername"),
                   status=CASE WHEN $9 AND conversations.status IN ('RESOLVED','ARCHIVED') THEN 'OPEN'::"ConversationStatus" ELSE conversations.status END,
                   "lastInboundAt"=CASE
-                    WHEN $9 AND (conversations."lastInboundAt" IS NULL OR conversations."lastInboundAt" < $11)
-                    THEN $11 ELSE conversations."lastInboundAt" END,
+                    WHEN $9 AND (conversations."lastInboundAt" IS NULL OR conversations."lastInboundAt" < $11::timestamp)
+                    THEN $11::timestamp ELSE conversations."lastInboundAt" END,
                   "lastOutboundAt"=CASE
-                    WHEN $10 AND (conversations."lastOutboundAt" IS NULL OR conversations."lastOutboundAt" < $11)
-                    THEN $11 ELSE conversations."lastOutboundAt" END,
+                    WHEN $10 AND (conversations."lastOutboundAt" IS NULL OR conversations."lastOutboundAt" < $11::timestamp)
+                    THEN $11::timestamp ELSE conversations."lastOutboundAt" END,
                   "firstResponseAt"=CASE
                     WHEN $10 AND conversations."firstResponseAt" IS NULL AND conversations."lastInboundAt" IS NOT NULL
-                    THEN $11 ELSE conversations."firstResponseAt" END,
+                    THEN $11::timestamp ELSE conversations."firstResponseAt" END,
                   "resolvedAt"=CASE WHEN $9 THEN NULL ELSE conversations."resolvedAt" END,
                   "updatedAt"=now()
                 RETURNING id
