@@ -15,6 +15,7 @@ on:
       - 'packages/database/Dockerfile'
       - 'packages/database/package.json'
       - 'packages/database/prisma/**'
+      - 'scripts/generate_migration_baseline.sh'
       - 'scripts/production_preflight.py'
       - 'scripts/seed_from_intake.py'
       - 'scripts/bootstrap_owner.py'
@@ -31,6 +32,7 @@ on:
       - 'packages/database/Dockerfile'
       - 'packages/database/package.json'
       - 'packages/database/prisma/**'
+      - 'scripts/generate_migration_baseline.sh'
       - 'scripts/production_preflight.py'
       - 'scripts/seed_from_intake.py'
       - 'scripts/bootstrap_owner.py'
@@ -55,6 +57,7 @@ jobs:
         run: |
           bash -n ops/production_deploy.sh
           bash -n ops/production_smoke.sh
+          bash -n scripts/generate_migration_baseline.sh
 
       - name: Materialize non-secret validation env
         run: |
@@ -127,6 +130,17 @@ jobs:
           grep -Fq 'LAST_VERIFIED_BACKUP_AT cannot be in the future' ops/production_deploy.sh
           grep -Fq 'LAST_VERIFIED_BACKUP_AT is older than MAX_BACKUP_AGE_HOURS' ops/production_deploy.sh
 
+      - name: Assert pinned migration toolchain and generator contract
+        run: |
+          grep -Fq '"prisma": "6.15.0"' packages/database/package.json
+          grep -Fq '"@prisma/client": "6.15.0"' packages/database/package.json
+          grep -Fq 'npx prisma validate' scripts/generate_migration_baseline.sh
+          grep -Fq 'sha256sum -c migration.sql.sha256' scripts/generate_migration_baseline.sh
+          if grep -Fq 'npx prisma format' scripts/generate_migration_baseline.sh; then
+            echo 'ERROR: baseline generator must not rewrite canonical schema before diff' >&2
+            exit 1
+          fi
+
       - name: Assert migration and preflight contract
         run: |
           grep -Fq 'prisma/migrations/0_init' ops/production_deploy.sh
@@ -149,10 +163,10 @@ jobs:
             fi
             grep -Fq 'Missing immutable migration baseline' /tmp/deploy.err
           else
-            test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
-            expected="$(awk 'NR==1 {print $1}' packages/database/prisma/migrations/0_init/migration.sql.sha256)"
-            actual="$(sha256sum packages/database/prisma/migrations/0_init/migration.sql | awk '{print $1}')"
-            test "$expected" = "$actual"
+            MIGRATION_DIR=packages/database/prisma/migrations/0_init
+            test -s "$MIGRATION_DIR/migration.sql.sha256"
+            test "$(awk 'NR==1 {print $2}' "$MIGRATION_DIR/migration.sql.sha256")" = 'migration.sql'
+            (cd "$MIGRATION_DIR" && sha256sum -c migration.sql.sha256)
           fi
 
       - name: Build production helper images
@@ -170,9 +184,10 @@ jobs:
             run --rm --no-deps api sh -lc \
             'test -f /app/scripts/seed_from_intake.py && test -f /app/scripts/bootstrap_owner.py && test -f /app/scripts/production_preflight.py'
 
-      - name: Verify migrator image has Prisma CLI
+      - name: Verify migrator image has pinned Prisma CLI
         run: |
           docker compose --env-file /tmp/production.env \
             -f compose.production.yaml \
             -f compose.production.edge.yaml \
-            run --rm --no-deps migrator npx prisma --version
+            run --rm --no-deps migrator sh -lc \
+            'npx prisma --version | grep -F "prisma                  : 6.15.0"'
