@@ -1,0 +1,159 @@
+name: Data Intake Integrity CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data-intake/**'
+      - 'scripts/**'
+      - 'packages/database/**'
+      - 'services/api/requirements.txt'
+      - '.github/workflows/data-intake-ci.yml'
+  pull_request:
+    paths:
+      - 'data-intake/**'
+      - 'scripts/**'
+      - 'packages/database/**'
+      - 'services/api/requirements.txt'
+      - '.github/workflows/data-intake-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  data-intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Validate and create database schema
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install API dependencies
+        run: pip install -r services/api/requirements.txt
+
+      - name: Compile intake and database scripts
+        run: python -m compileall scripts/seed_from_intake.py scripts/apply_core_constraints.py
+
+      - name: Validate source CSV invariants before database writes
+        run: |
+          python - <<'PY'
+          from datetime import date
+          from scripts.seed_from_intake import ROOM_TYPE_CODES, load_rates, load_rooms
+
+          rooms = load_rooms()
+          rates = load_rates()
+          assert len(rooms) == 84
+          assert len({row['room_code'].strip() for row in rooms}) == 84
+          assert {row['room_type'].strip() for row in rooms} == set(ROOM_TYPE_CODES)
+          assert rates, 'rates.csv must not be empty'
+
+          seen = set()
+          covered_types = set()
+          for row in rates:
+              room_type = row['room_type'].strip()
+              valid_from = date.fromisoformat(row['valid_from'])
+              valid_to = date.fromisoformat(row['valid_to'])
+              assert valid_from <= valid_to, row
+              int(row['price_kgs'])
+              assert row['meal_included'].strip(), row
+              key = (room_type, valid_from, valid_to)
+              assert key not in seen, f'duplicate rate period: {key}'
+              seen.add(key)
+              covered_types.add(room_type)
+
+          assert covered_types == set(ROOM_TYPE_CODES), (
+              f'rate coverage mismatch: missing={sorted(set(ROOM_TYPE_CODES) - covered_types)}'
+          )
+          print(f'PASS: source intake rooms={len(rooms)} rates={len(rates)} room_types={len(covered_types)}')
+          PY
+
+      - name: Apply constraints and seed source of truth
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+
+      - name: Verify seeded database matches intake cardinality
+        run: |
+          python - <<'PY'
+          import asyncio
+          import csv
+          import os
+          from pathlib import Path
+          import asyncpg
+
+          ROOT = Path.cwd()
+          with (ROOT / 'data-intake/rates.csv').open('r', encoding='utf-8-sig', newline='') as handle:
+              expected_rates = len(list(csv.DictReader(handle)))
+
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  property_id = await conn.fetchval("SELECT id FROM properties WHERE code='THREE_CROWNS'")
+                  assert property_id is not None
+                  room_count = await conn.fetchval('SELECT count(*) FROM rooms WHERE "propertyId"=$1', property_id)
+                  type_count = await conn.fetchval('SELECT count(*) FROM room_types WHERE "propertyId"=$1', property_id)
+                  rate_count = await conn.fetchval(
+                      '''SELECT count(*) FROM rate_periods rp
+                         JOIN rate_plans p ON p.id=rp."ratePlanId"
+                         WHERE p."propertyId"=$1 AND p.code='DIRECT_2026_27' ''',
+                      property_id,
+                  )
+                  assert room_count == 84, room_count
+                  assert type_count == 12, type_count
+                  assert rate_count == expected_rates, (rate_count, expected_rates)
+                  print(f'PASS: database rooms={room_count} room_types={type_count} rates={rate_count}')
+              finally:
+                  await conn.close()
+
+          asyncio.run(main())
+          PY
