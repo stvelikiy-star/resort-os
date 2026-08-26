@@ -8,6 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .payment_idempotency import (
+    ensure_same_payment_payload,
+    lock_payment_identity,
+    normalize_optional_text,
+    normalize_required_text,
+)
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
@@ -226,60 +232,71 @@ async def confirm_payment_and_reserve(
     request: Request,
     user: dict[str, Any] = Depends(manager_access),
 ):
+    method = normalize_required_text(payload.method)
+    external_ref = normalize_optional_text(payload.external_ref)
+
     async with request.app.state.db.acquire() as conn:
-        existing = await conn.fetchrow(
-            '''
-            SELECT p.id,p."requestId",p."reservationId",r."bookingNumber",r.status::text AS reservation_status
-            FROM payments p
-            LEFT JOIN reservations r ON r.id=p."reservationId"
-            WHERE p."idempotencyKey"=$1
-            ''',
-            payload.idempotency_key,
-        )
-        if existing:
-            if existing["requestId"] != request_id:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "IDEMPOTENCY_CONFLICT",
-                        "message": "This idempotency key belongs to another reservation request.",
-                    },
-                )
-            return {
-                "idempotent_replay": True,
-                "payment_id": str(existing["id"]),
-                "reservation_id": str(existing["reservationId"]) if existing["reservationId"] else None,
-                "booking_number": existing["bookingNumber"],
-                "reservation_status": existing["reservation_status"],
-            }
-
-        external_ref = payload.external_ref.strip() if payload.external_ref else None
-        if external_ref:
-            reference_payment = await conn.fetchrow(
-                '''
-                SELECT id,"requestId","reservationId","amountKgs",method,status::text AS status
-                FROM payments
-                WHERE provider=$1 AND "externalRef"=$2
-                ''',
-                MANUAL_PAYMENT_PROVIDER,
-                external_ref,
-            )
-            if reference_payment:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "PAYMENT_EXTERNAL_REF_CONFLICT",
-                        "message": "This manager payment reference is already recorded.",
-                        "payment_id": str(reference_payment["id"]),
-                        "request_id": str(reference_payment["requestId"]) if reference_payment["requestId"] else None,
-                        "reservation_id": str(reference_payment["reservationId"]) if reference_payment["reservationId"] else None,
-                        "amount_kgs": int(reference_payment["amountKgs"]),
-                        "method": reference_payment["method"],
-                        "status": reference_payment["status"],
-                    },
-                )
-
         async with conn.transaction():
+            await lock_payment_identity(conn, payload.idempotency_key, external_ref)
+
+            existing = await conn.fetchrow(
+                '''
+                SELECT p.id,p."requestId",p."reservationId",p."amountKgs",p.method,p."externalRef",
+                       r."bookingNumber",r.status::text AS reservation_status
+                FROM payments p
+                LEFT JOIN reservations r ON r.id=p."reservationId"
+                WHERE p."idempotencyKey"=$1
+                ''',
+                payload.idempotency_key,
+            )
+            if existing:
+                if existing["requestId"] != request_id:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "IDEMPOTENCY_CONFLICT",
+                            "message": "This idempotency key belongs to another reservation request.",
+                        },
+                    )
+                ensure_same_payment_payload(
+                    existing,
+                    amount_kgs=payload.amount_kgs,
+                    method=method,
+                    external_ref=external_ref,
+                )
+                return {
+                    "idempotent_replay": True,
+                    "payment_id": str(existing["id"]),
+                    "reservation_id": str(existing["reservationId"]) if existing["reservationId"] else None,
+                    "booking_number": existing["bookingNumber"],
+                    "reservation_status": existing["reservation_status"],
+                }
+
+            if external_ref:
+                reference_payment = await conn.fetchrow(
+                    '''
+                    SELECT id,"requestId","reservationId","amountKgs",method,status::text AS status
+                    FROM payments
+                    WHERE provider=$1 AND "externalRef"=$2
+                    ''',
+                    MANUAL_PAYMENT_PROVIDER,
+                    external_ref,
+                )
+                if reference_payment:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "PAYMENT_EXTERNAL_REF_CONFLICT",
+                            "message": "This manager payment reference is already recorded.",
+                            "payment_id": str(reference_payment["id"]),
+                            "request_id": str(reference_payment["requestId"]) if reference_payment["requestId"] else None,
+                            "reservation_id": str(reference_payment["reservationId"]) if reference_payment["reservationId"] else None,
+                            "amount_kgs": int(reference_payment["amountKgs"]),
+                            "method": reference_payment["method"],
+                            "status": reference_payment["status"],
+                        },
+                    )
+
             pid = await property_id(conn)
             rr = await conn.fetchrow(
                 '''
@@ -300,12 +317,16 @@ async def confirm_payment_and_reserve(
                 request_id,
             )
             if already:
-                return {
-                    "idempotent_replay": True,
-                    "reservation_id": str(already["id"]),
-                    "booking_number": already["bookingNumber"],
-                    "reservation_status": already["status"],
-                }
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "REQUEST_ALREADY_CONVERTED",
+                        "message": "This reservation request was already converted by another payment operation.",
+                        "reservation_id": str(already["id"]),
+                        "booking_number": already["bookingNumber"],
+                        "reservation_status": already["status"],
+                    },
+                )
 
             if str(rr["status"]) not in {"QUOTED", "AWAITING_PREPAYMENT"}:
                 raise HTTPException(status_code=409, detail="Request must be quoted before manager confirms prepayment")
@@ -372,7 +393,7 @@ async def confirm_payment_and_reserve(
                   "externalRef","idempotencyKey","paidAt","createdAt","updatedAt")
                 VALUES ($1,$2,$3,$4,$5,'RECEIVED',$6,$7,$8,now(),now(),now())
                 ''',
-                payment_id,request_id,reservation_id,payload.amount_kgs,payload.method.strip(),
+                payment_id,request_id,reservation_id,payload.amount_kgs,method,
                 MANUAL_PAYMENT_PROVIDER,external_ref,payload.idempotency_key,
             )
             await conn.execute(
