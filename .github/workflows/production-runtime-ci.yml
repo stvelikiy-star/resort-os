@@ -17,6 +17,7 @@ on:
       - 'ops/production.env.example'
       - '.github/workflows/production-runtime-ci.yml'
 
+# Validates the exact container/TLS routing contract before production cutover.
 jobs:
   runtime-contract:
     runs-on: ubuntu-latest
