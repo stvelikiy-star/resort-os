@@ -7,9 +7,30 @@
 
 {$PUBLIC_HOST:3korony.com}, {$WWW_HOST:www.3korony.com} {
   encode zstd gzip
-  handle_path /core/* {
+
+  @publicAvailability {
+    path /core/api/v1/booking/check-availability
+    method GET
+  }
+  handle @publicAvailability {
+    uri strip_prefix /core
     reverse_proxy api:8000
   }
+
+  @publicReservationRequest {
+    path /core/api/v1/booking/requests
+    method POST
+  }
+  handle @publicReservationRequest {
+    uri strip_prefix /core
+    reverse_proxy api:8000
+  }
+
+  @blockedPublicCore path /core/*
+  handle @blockedPublicCore {
+    respond "Not Found" 404
+  }
+
   handle {
     reverse_proxy web:3000
   }
