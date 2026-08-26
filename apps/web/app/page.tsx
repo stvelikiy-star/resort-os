@@ -94,13 +94,14 @@ export default function HomePage() {
           <div className="wrap">
             <div className="section-heading-row"><div><span className="eyebrow dark">Проживание</span><h2 className="display-title">12 категорий номеров</h2></div><a className="text-link" href="#booking">Проверить цены на даты →</a></div>
             <p className="section-copy">От компактных одноместных вариантов до двухкомнатных номеров, апартаментов и категории с кухней. Точная стоимость и питание зависят от выбранных дат и показываются в поиске.</p>
+            <p className="mobile-scroll-hint" aria-hidden="true">Листайте категории →</p>
             <div className="room-groups">{roomCategories.map(([num, title, text]) => <article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p><a href="#booking">Наличие и цена →</a></article>)}</div>
           </div>
         </section>
 
         <section className="resort-image" id="resort"><div className="wrap overlay-copy"><span className="eyebrow">Берег Иссык-Куля</span><h2 className="display-title light">Собственный пляж<br />и 150-метровый пирс</h2><div className="resort-stats"><span>Пирс 150 м</span><span>Собственный пляж</span><span>Чолпон-Ата</span><span>Иссык-Куль</span></div></div></section>
 
-        <section className="section spa-section" id="spa"><div className="wrap spa-grid"><div><span className="eyebrow dark">SPA & Wellness</span><h2 className="display-title">Отдых и восстановление</h2><p className="lead">SPA и массаж дополняют отдых у озера. На территории также работает открытый бассейн 15×8 м.</p><a className="primary-button" href="#booking">Выбрать даты</a></div><div className="spa-photo"><div><small>Курортная инфраструктура</small><b>SPA · массаж · бассейн</b></div></div></div></section>
+        <section className="section spa-section" id="spa"><div className="wrap spa-grid"><div><span className="eyebrow dark">SPA & Wellness</span><h2 className="display-title">Отдых и восстановление</h2><p className="lead">SPA и массаж дополняют отдых у озера. На территории также работает открытый бассейн 15×8 м.</p><a className="primary-button" href="#booking">Выбрать даты</a></div><div className="spa-photo"><div><small>Курортная инфраструктура</small><b>SPA · массаж · бассейн</b></div></div></section>
 
         <section className="section services-section"><div className="wrap"><span className="eyebrow dark">Курорт</span><h2 className="display-title">Главное для отдыха</h2><div className="service-grid">{resortFacts.map(([title, text]) => <article key={title}><b>{title}</b><p>{text}</p></article>)}</div></div></section>
 
