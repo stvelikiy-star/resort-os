@@ -1,0 +1,121 @@
+name: Production Migration Baseline
+
+on:
+  push:
+    branches: [feat/production-migration-baseline]
+    paths:
+      - 'packages/database/**'
+      - 'data-intake/**'
+      - 'scripts/seed_from_intake.py'
+      - '.github/workflows/production-migration-baseline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: production-migration-baseline
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PGURL: postgresql://resort:resort@localhost:5432/resort_os
+      PROPERTY_CODE: THREE_CROWNS
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/production-migration-baseline
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Prisma
+        working-directory: packages/database
+        run: npm install --no-audit --no-fund
+
+      - name: Generate immutable baseline SQL when missing
+        working-directory: packages/database
+        run: |
+          set -euo pipefail
+          TARGET="prisma/migrations/20260826_resort_os_baseline/migration.sql"
+          if [ ! -f "$TARGET" ]; then
+            mkdir -p "$(dirname "$TARGET")"
+            npx prisma migrate diff \
+              --from-empty \
+              --to-schema-datamodel prisma/schema.prisma \
+              --script > "$TARGET"
+            printf '\n\n-- Critical PostgreSQL constraints outside Prisma datamodel.\n' >> "$TARGET"
+            cat sql/001_core_constraints.sql >> "$TARGET"
+          fi
+          test -s "$TARGET"
+          grep -q 'no_overlapping_active_room_blocks' "$TARGET"
+
+      - name: Apply baseline to a clean database
+        working-directory: packages/database
+        run: |
+          psql "$PGURL" -v ON_ERROR_STOP=1 -f prisma/migrations/20260826_resort_os_baseline/migration.sql
+          npx prisma migrate diff \
+            --from-url "$PGURL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code || code=$?
+          if [ "${code:-0}" -eq 2 ]; then
+            echo 'Schema drift detected after baseline apply.' >&2
+            exit 1
+          fi
+
+      - name: Seed canonical Three Crowns inventory
+        run: |
+          pip install asyncpg
+          python scripts/seed_from_intake.py
+          psql "$PGURL" -Atc 'SELECT count(*) FROM rooms' | grep -qx '84'
+          psql "$PGURL" -Atc 'SELECT count(*) FROM room_types' | grep -qx '12'
+          psql "$PGURL" -Atc "SELECT count(*) FROM pg_constraint WHERE conname='no_overlapping_active_room_blocks'" | grep -qx '1'
+
+      - name: Rehearse backup and clean restore
+        run: |
+          set -euo pipefail
+          pg_dump "$PGURL" --format=custom --file=/tmp/resort_os.dump
+          test -s /tmp/resort_os.dump
+          createdb -h localhost -U resort resort_restore
+          pg_restore -h localhost -U resort -d resort_restore --exit-on-error /tmp/resort_os.dump
+          psql postgresql://resort:resort@localhost:5432/resort_restore -Atc 'SELECT count(*) FROM rooms' | grep -qx '84'
+          psql postgresql://resort:resort@localhost:5432/resort_restore -Atc 'SELECT count(*) FROM room_types' | grep -qx '12'
+          psql postgresql://resort:resort@localhost:5432/resort_restore -Atc "SELECT count(*) FROM pg_constraint WHERE conname='no_overlapping_active_room_blocks'" | grep -qx '1'
+
+      - name: Commit generated baseline back to branch
+        run: |
+          if git status --porcelain | grep -q 'packages/database/prisma/migrations/20260826_resort_os_baseline/migration.sql'; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add packages/database/prisma/migrations/20260826_resort_os_baseline/migration.sql
+            git commit -m 'db: add immutable Resort OS production baseline migration'
+            git push origin HEAD:feat/production-migration-baseline
+          else
+            echo 'Baseline already committed; verification only.'
+          fi
