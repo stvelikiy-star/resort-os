@@ -1,0 +1,302 @@
+name: Live Client Staging
+
+on:
+  push:
+    branches: [ops/live-client-staging]
+    paths:
+      - '.github/workflows/live-client-staging.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: live-client-staging
+  cancel-in-progress: true
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: development
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      CORE_API_URL: http://127.0.0.1:8000
+      COOKIE_SECURE: false
+      BOOTSTRAP_OWNER_USERNAME: client-demo
+      BOOTSTRAP_OWNER_PASSWORD: ThreeCrownsDemo!2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: Three Crowns Demo Owner
+      DEMO_OWNER_USERNAME: client-demo
+      DEMO_OWNER_PASSWORD: ThreeCrownsDemo!2026
+      DEMO_SHOWCASE_OUTPUT: /tmp/three-crowns-demo-showcase.json
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install database tooling and create schema
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma db push
+
+      - name: Install Core and seed Three Crowns
+        run: |
+          pip install -r services/api/requirements.txt
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Create synthetic staff accounts and room-state showcase
+        run: |
+          python - <<'PY'
+          import asyncio, os, uuid
+          import asyncpg
+          from argon2 import PasswordHasher
+
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
+              try:
+                  property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', os.environ['PROPERTY_CODE'])
+                  users = [
+                      ('demo-maid', 'ThreeCrownsMaid!2026', 'Demo Maid', 'MAID'),
+                      ('demo-tech', 'ThreeCrownsTech!2026', 'Demo Technician', 'TECHNICIAN'),
+                  ]
+                  for username, password, display_name, role in users:
+                      await conn.execute(
+                          '''INSERT INTO staff_users (id,"propertyId",username,"displayName","passwordHash",role,"isActive","createdAt","updatedAt")
+                             VALUES ($1,$2,$3,$4,$5,$6,true,now(),now())
+                             ON CONFLICT ("propertyId",username) DO UPDATE SET
+                               "displayName"=EXCLUDED."displayName", "passwordHash"=EXCLUDED."passwordHash",
+                               role=EXCLUDED.role, "isActive"=true, "updatedAt"=now()''',
+                          uuid.uuid4(), property_id, username, display_name, ph.hash(password), role,
+                      )
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\', "updatedAt"=now() WHERE "propertyId"=$1', property_id)
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
+          echo $! > /tmp/resort-api.pid
+          for i in {1..30}; do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/ready.json; then break; fi
+            sleep 1
+          done
+          cat /tmp/ready.json
+
+      - name: Populate real booking flow with synthetic showcase data
+        run: |
+          python scripts/prepare_demo_showcase.py
+          cat /tmp/three-crowns-demo-showcase.json
+
+      - name: Shape synthetic reservations for arrivals, departures and in-house views
+        run: |
+          curl --fail -sS -c /tmp/demo-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"client-demo","password":"ThreeCrownsDemo!2026"}' >/tmp/demo-login.json
+          python - <<'PY'
+          import asyncio, json, os, uuid
+          from datetime import date, timedelta
+          import asyncpg
+
+          async def main():
+              demo = json.load(open('/tmp/three-crowns-demo-showcase.json', encoding='utf-8'))
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  today = date.today()
+                  shapes = [
+                      (today - timedelta(days=1), today),
+                      (today - timedelta(days=1), today + timedelta(days=3)),
+                      (today, today + timedelta(days=2)),
+                  ]
+                  for item, (check_in, check_out) in zip(demo[:3], shapes):
+                      rid = uuid.UUID(item['reservation_id'])
+                      await conn.execute('UPDATE reservations SET "checkIn"=$1,"checkOut"=$2,"updatedAt"=now() WHERE id=$3', check_in, check_out, rid)
+                      await conn.execute(
+                          '''UPDATE inventory_blocks SET "startDate"=$1,"endDate"=$2,"updatedAt"=now()
+                             WHERE "reservationId"=$3 AND active=true AND "blockType"='RESERVATION' ''',
+                          check_in, check_out, rid,
+                      )
+                  # Put three unreserved rooms into operational showcase states.
+                  reserved = {x.get('room_code') for x in demo if x.get('room_code')}
+                  rows = await conn.fetch('SELECT id,code FROM rooms ORDER BY code')
+                  free = [r for r in rows if r['code'] not in reserved]
+                  for row, state in zip(free[:3], ['DIRTY', 'IN_INSPECTION', 'TECH_BLOCK']):
+                      await conn.execute('UPDATE rooms SET "operationalState"=$1,"updatedAt"=now() WHERE id=$2', state, row['id'])
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
+          FIRST=$(python -c "import json; print(json.load(open('/tmp/three-crowns-demo-showcase.json'))[0]['reservation_id'])")
+          SECOND=$(python -c "import json; print(json.load(open('/tmp/three-crowns-demo-showcase.json'))[1]['reservation_id'])")
+          curl --fail -sS -b /tmp/demo-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$FIRST/check-in" >/tmp/checkin-1.json
+          curl --fail -sS -b /tmp/demo-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$SECOND/check-in" >/tmp/checkin-2.json
+          cat /tmp/checkin-1.json
+          cat /tmp/checkin-2.json
+
+      - name: Install and build public web
+        working-directory: apps/web
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Install and build PMS admin
+        working-directory: apps/admin
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Install and build Staff PWA
+        working-directory: apps/staff
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Start web, admin and staff applications
+        run: |
+          (cd apps/web && CORE_API_URL=http://127.0.0.1:8000 npm start > /tmp/web.log 2>&1 & echo $! > /tmp/web.pid)
+          (cd apps/admin && CORE_API_URL=http://127.0.0.1:8000 npm start > /tmp/admin.log 2>&1 & echo $! > /tmp/admin.pid)
+          (cd apps/staff && CORE_API_URL=http://127.0.0.1:8000 npm start > /tmp/staff.log 2>&1 & echo $! > /tmp/staff.pid)
+          for port in 3000 3001 3002; do
+            for i in {1..30}; do
+              if curl --fail -sS "http://127.0.0.1:$port" >/dev/null; then break; fi
+              sleep 1
+            done
+          done
+          curl --fail -sS http://127.0.0.1:3000 >/dev/null
+          curl --fail -sS http://127.0.0.1:3001 >/dev/null
+          curl --fail -sS http://127.0.0.1:3002 >/dev/null
+
+      - name: Run live smoke tests before exposure
+        run: |
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-27&check_out=2026-08-29&adults=2&children=0" >/tmp/live-availability.json
+          curl --fail -sS -b /tmp/demo-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-05" >/tmp/live-grid.json
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/live-availability.json'))
+          g=json.load(open('/tmp/live-grid.json'))
+          assert len(g['rooms']) == 84
+          assert any(x['pricing']['sellable'] for x in a['results'])
+          assert any(b.get('reservation_id') for r in g['rooms'] for b in r['blocks'])
+          print('Live smoke OK: 84 rooms, sellable availability, reservation blocks present')
+          PY
+
+      - name: Install Cloudflare tunnel client
+        run: |
+          curl -L --fail --retry 3 -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /tmp/cloudflared
+          /tmp/cloudflared --version
+
+      - name: Expose temporary HTTPS staging URLs
+        id: tunnels
+        run: |
+          /tmp/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3000 > /tmp/tunnel-web.log 2>&1 &
+          /tmp/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3001 > /tmp/tunnel-admin.log 2>&1 &
+          /tmp/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:3002 > /tmp/tunnel-staff.log 2>&1 &
+          /tmp/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8000 > /tmp/tunnel-core.log 2>&1 &
+
+          find_url() {
+            local file="$1"
+            local url=""
+            for i in {1..60}; do
+              url=$(grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' "$file" | head -1 || true)
+              if [ -n "$url" ]; then echo "$url"; return 0; fi
+              sleep 1
+            done
+            echo "Could not obtain tunnel URL from $file" >&2
+            cat "$file" >&2 || true
+            return 1
+          }
+
+          WEB_URL=$(find_url /tmp/tunnel-web.log)
+          ADMIN_URL=$(find_url /tmp/tunnel-admin.log)
+          STAFF_URL=$(find_url /tmp/tunnel-staff.log)
+          CORE_URL=$(find_url /tmp/tunnel-core.log)
+
+          echo "web_url=$WEB_URL" >> "$GITHUB_OUTPUT"
+          echo "admin_url=$ADMIN_URL" >> "$GITHUB_OUTPUT"
+          echo "staff_url=$STAFF_URL" >> "$GITHUB_OUTPUT"
+          echo "core_url=$CORE_URL" >> "$GITHUB_OUTPUT"
+
+          curl --fail -sS "$WEB_URL" >/dev/null
+          curl --fail -sS "$ADMIN_URL/demo" >/dev/null
+          curl --fail -sS "$STAFF_URL" >/dev/null
+          curl --fail -sS "$CORE_URL/health/live" >/dev/null
+
+      - name: Publish live links to issue 25
+        env:
+          WEB_URL: ${{ steps.tunnels.outputs.web_url }}
+          ADMIN_URL: ${{ steps.tunnels.outputs.admin_url }}
+          STAFF_URL: ${{ steps.tunnels.outputs.staff_url }}
+          CORE_URL: ${{ steps.tunnels.outputs.core_url }}
+        run: |
+          cat > /tmp/live-links.md <<EOF
+          ## LIVE CLIENT STAGING is online
+
+          Exact commit: \`${GITHUB_SHA}\`
+
+          - Public website: ${WEB_URL}
+          - PMS login: ${ADMIN_URL}
+          - PMS standalone showcase: ${ADMIN_URL}/demo
+          - Staff PWA: ${STAFF_URL}
+          - Resort Core health: ${CORE_URL}/health/ready
+
+          ### Synthetic demo credentials
+          - OWNER: \`client-demo\` / \`ThreeCrownsDemo!2026\`
+          - MAID: \`demo-maid\` / \`ThreeCrownsMaid!2026\`
+          - TECHNICIAN: \`demo-tech\` / \`ThreeCrownsTech!2026\`
+
+          This environment contains **synthetic presentation data only**. It is temporary and expires when the GitHub runner stops. It is not production and must not receive real guest data or real payments.
+          EOF
+          gh api "repos/${GITHUB_REPOSITORY}/issues/25/comments" -f body="$(cat /tmp/live-links.md)"
+          cat /tmp/live-links.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep client staging online
+        run: |
+          echo "Staging will remain available for approximately five hours unless this workflow is cancelled or replaced."
+          sleep 18000
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo '=== CORE ==='; tail -200 /tmp/resort-api.log || true
+          echo '=== WEB ==='; tail -200 /tmp/web.log || true
+          echo '=== ADMIN ==='; tail -200 /tmp/admin.log || true
+          echo '=== STAFF ==='; tail -200 /tmp/staff.log || true
+          echo '=== TUNNELS ==='; cat /tmp/tunnel-*.log || true
