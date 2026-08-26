@@ -53,6 +53,7 @@ type ReceptionItem = {
 };
 
 type FinanceMode = "ALL" | "PAID" | "PARTIAL" | "UNPAID" | "DEBT";
+type FinanceState = "loading" | "ready" | "partial" | "error";
 type OccupancyMode = "ALL" | "FREE" | "OCCUPIED" | "BLOCKED";
 type DailyMode = "ALL" | "ARRIVALS" | "DEPARTURES" | "IN_HOUSE" | "FREE_TODAY" | "DEBT" | "ATTENTION";
 type Density = "COMPACT" | "COMFORTABLE";
@@ -185,6 +186,9 @@ export default function PMSGridV3() {
   const [advancedOpen, setAdvancedOpen] = useState(true);
   const [data, setData] = useState<GridResponse | null>(null);
   const [financeItems, setFinanceItems] = useState<ReceptionItem[]>([]);
+  const [financeState, setFinanceState] = useState<FinanceState>("loading");
+  const [financeError, setFinanceError] = useState<string | null>(null);
+  const [financeUpdatedAt, setFinanceUpdatedAt] = useState<Date | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [realtime, setRealtime] = useState<"connecting" | "live" | "offline">("connecting");
@@ -206,6 +210,7 @@ export default function PMSGridV3() {
   const stateWidth = density === "COMPACT" ? 104 : 122;
   const fixedWidth = roomWidth + stateWidth;
   const gridTemplateColumns = `${roomWidth}px ${stateWidth}px repeat(${windowDays}, ${dayWidth}px)`;
+  const financeComplete = financeState === "ready";
 
   useEffect(() => {
     try {
@@ -214,23 +219,50 @@ export default function PMSGridV3() {
     } catch { /* ignore damaged local state */ }
   }, []);
 
+  const loadFinance = useCallback(async () => {
+    try {
+      const response = await fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setFinanceItems([]);
+        setFinanceState("error");
+        setFinanceError(typeof body.detail === "string" ? body.detail : `Finance HTTP ${response.status}`);
+        return;
+      }
+      if (!Array.isArray(body.items)) {
+        setFinanceItems([]);
+        setFinanceState("error");
+        setFinanceError("Resort Core вернул некорректный финансовый список");
+        return;
+      }
+      const items = body.items as ReceptionItem[];
+      setFinanceItems(items);
+      setFinanceUpdatedAt(new Date());
+      if (items.length >= 500) {
+        setFinanceState("partial");
+        setFinanceError("Получено 500 броней — достигнут лимит endpoint. Общие KPI и фильтры долга отключены как потенциально неполные.");
+      } else {
+        setFinanceState("ready");
+        setFinanceError(null);
+      }
+    } catch {
+      setFinanceItems([]);
+      setFinanceState("error");
+      setFinanceError("Не удалось получить финансовые данные из Resort Core");
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({ start: localDateString(start), end: localDateString(end) });
-      const [gridResponse, receptionResponse] = await Promise.all([
-        fetch(`/core/api/v1/pms/grid?${params}`, { cache: "no-store" }),
-        fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" }),
-      ]);
+      const gridResponse = await fetch(`/core/api/v1/pms/grid?${params}`, { cache: "no-store" });
       const gridBody = await gridResponse.json().catch(() => ({}));
       if (!gridResponse.ok) throw new Error(gridBody.detail || `Grid HTTP ${gridResponse.status}`);
       setData(gridBody as GridResponse);
-      if (receptionResponse.ok) {
-        const receptionBody = await receptionResponse.json().catch(() => ({}));
-        setFinanceItems(receptionBody.items || []);
-      }
     } catch (cause) {
+      setData(null);
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить шахматку");
     } finally {
       setLoading(false);
@@ -238,6 +270,21 @@ export default function PMSGridV3() {
   }, [start, end, refreshToken]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    void loadFinance();
+    const timer = window.setInterval(() => { void loadFinance(); }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [loadFinance]);
+
+  useEffect(() => {
+    if (financeState !== "error" && financeState !== "partial") return;
+    setFilters((current) => {
+      const daily = current.daily === "DEBT" ? "ALL" : current.daily;
+      if (current.finance === "ALL" && daily === current.daily) return current;
+      return { ...current, finance: "ALL", daily };
+    });
+  }, [financeState]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -306,7 +353,7 @@ export default function PMSGridV3() {
     if (mode === "ALL") return true;
     if (mode === "FREE_TODAY") return room.operational_state !== "TECH_BLOCK" && !hasBlockToday(room);
     if (mode === "ATTENTION") return ["DIRTY", "IN_INSPECTION", "TECH_BLOCK"].includes(room.operational_state);
-    if (mode === "DEBT") return reservationForRoom(room).some((item) => item.remainingKgs > 0 && ["GUARANTEED", "CHECKED_IN"].includes(item.status));
+    if (mode === "DEBT") return financeComplete && reservationForRoom(room).some((item) => item.remainingKgs > 0 && ["GUARANTEED", "CHECKED_IN"].includes(item.status));
     return room.blocks.some((block) => {
       if (!block.reservation_id || block.type !== "RESERVATION") return false;
       const bounds = reservationBounds.get(block.reservation_id);
@@ -331,37 +378,51 @@ export default function PMSGridV3() {
       if (filters.state !== "ALL" && room.operational_state !== filters.state) return false;
       if (filters.blockType !== "ALL" && !room.blocks.some((block) => block.type === filters.blockType)) return false;
       if (filters.reservationStatus !== "ALL" && !room.blocks.some((block) => block.reservation_status === filters.reservationStatus)) return false;
-      if (filters.finance !== "ALL" && !reservationForRoom(room).some((item) => financeMatches(filters.finance, item))) return false;
+      if (financeComplete && filters.finance !== "ALL" && !reservationForRoom(room).some((item) => financeMatches(filters.finance, item))) return false;
       if (filters.occupancy === "FREE" && (hasBlockToday(room) || room.operational_state === "TECH_BLOCK")) return false;
       if (filters.occupancy === "OCCUPIED" && !hasReservationToday(room)) return false;
       if (filters.occupancy === "BLOCKED" && !(room.operational_state === "TECH_BLOCK" || room.blocks.some((block) => block.type !== "RESERVATION" && block.start <= today && today < block.end))) return false;
       return roomMatchesQuickView(room, filters.daily);
     });
-  }, [data, filters, financeByReservation, reservationBounds, today]);
+  }, [data, filters, financeByReservation, financeComplete, reservationBounds, today]);
 
   const metrics = useMemo(() => {
     const source = data?.rooms || [];
-    const activeReservations = financeItems.filter((item) => ["GUARANTEED", "CHECKED_IN"].includes(item.status));
+    const arrivals = new Set<string>();
+    const departures = new Set<string>();
+    const inHouse = new Set<string>();
+    source.forEach((room) => room.blocks.forEach((block) => {
+      if (!block.reservation_id || block.type !== "RESERVATION") return;
+      const bounds = reservationBounds.get(block.reservation_id);
+      if (!bounds) return;
+      if (block.reservation_status === "GUARANTEED" && bounds.start === today) arrivals.add(block.reservation_id);
+      if (block.reservation_status === "CHECKED_IN" && bounds.end === today) departures.add(block.reservation_id);
+      if (block.reservation_status === "CHECKED_IN" && block.start <= today && today < block.end) inHouse.add(block.reservation_id);
+    }));
+    const activeReservations = financeComplete ? financeItems.filter((item) => ["GUARANTEED", "CHECKED_IN"].includes(item.status)) : [];
     return {
       total: source.length,
       shown: rooms.length,
-      arrivals: activeReservations.filter((item) => item.status === "GUARANTEED" && item.checkIn === today).length,
-      departures: activeReservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut === today).length,
-      inHouse: activeReservations.filter((item) => item.status === "CHECKED_IN").length,
+      arrivals: arrivals.size,
+      departures: departures.size,
+      inHouse: inHouse.size,
       free: source.filter((room) => room.operational_state !== "TECH_BLOCK" && !hasBlockToday(room)).length,
       dirty: source.filter((room) => room.operational_state === "DIRTY").length,
       inspection: source.filter((room) => room.operational_state === "IN_INSPECTION").length,
       tech: source.filter((room) => room.operational_state === "TECH_BLOCK").length,
-      debtCount: activeReservations.filter((item) => item.remainingKgs > 0).length,
-      debtKgs: activeReservations.reduce((sum, item) => sum + Math.max(0, item.remainingKgs), 0),
+      debtCount: financeComplete ? activeReservations.filter((item) => item.remainingKgs > 0).length : null,
+      debtKgs: financeComplete ? activeReservations.reduce((sum, item) => sum + Math.max(0, item.remainingKgs), 0) : null,
     };
-  }, [data, financeItems, rooms, today]);
+  }, [data, financeItems, financeComplete, reservationBounds, rooms, today]);
 
   const quickCounts = useMemo(() => {
-    const result = new Map<DailyMode, number>();
-    QUICK_VIEWS.forEach((view) => result.set(view.key, data?.rooms.filter((room) => roomMatchesQuickView(room, view.key)).length || 0));
+    const result = new Map<DailyMode, number | null>();
+    QUICK_VIEWS.forEach((view) => {
+      if (view.key === "DEBT" && !financeComplete) result.set(view.key, null);
+      else result.set(view.key, data?.rooms.filter((room) => roomMatchesQuickView(room, view.key)).length || 0);
+    });
     return result;
-  }, [data, financeItems, financeByReservation, reservationBounds, today]);
+  }, [data, financeItems, financeByReservation, financeComplete, reservationBounds, today]);
 
   const activeFilters = useMemo(() => {
     const chips: Array<{ key: keyof Filters; label: string }> = [];
@@ -389,7 +450,12 @@ export default function PMSGridV3() {
     window.localStorage.setItem("resort-pms-v3-views", JSON.stringify(next));
   }
 
-  function applyView(view: SavedView) { setFilters(view.filters); setWindowDays(view.windowDays); setDensity(view.density); }
+  function applyView(view: SavedView) {
+    const safeFilters = financeComplete ? view.filters : { ...view.filters, finance: "ALL" as FinanceMode, daily: view.filters.daily === "DEBT" ? "ALL" as DailyMode : view.filters.daily };
+    setFilters(safeFilters);
+    setWindowDays(view.windowDays);
+    setDensity(view.density);
+  }
   function deleteView(id: string) {
     const next = savedViews.filter((view) => view.id !== id);
     setSavedViews(next);
@@ -424,6 +490,10 @@ export default function PMSGridV3() {
     setSelectedReservation({ id: reservationId, targetRoomId: room.id, initialCheckIn: targetDate, initialCheckOut: shiftDate(targetDate, nights) });
   }
 
+  const financeBadge = financeState === "ready"
+    ? `Финансы Core${financeUpdatedAt ? ` · ${financeUpdatedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}` : ""}`
+    : financeState === "partial" ? "Финансы неполные" : financeState === "error" ? "Финансы недоступны" : "Финансы загружаются";
+
   return <main className={`mega-pms-shell density-${density.toLowerCase()}`}>
     <header className="mega-pms-head">
       <div>
@@ -433,7 +503,8 @@ export default function PMSGridV3() {
       </div>
       <div className="mega-head-actions">
         <span className={`mega-connection ${error ? "is-error" : realtime === "live" ? "is-live" : ""}`}><i />{error ? "Core недоступен" : realtime === "live" ? "Realtime live" : realtime === "connecting" ? "Подключение" : "HTTP fallback"}</span>
-        <button className="btn" onClick={() => setRefreshToken((value) => value + 1)}>↻ Обновить</button>
+        <span className={`mega-connection ${financeState === "ready" ? "is-live" : financeState === "partial" ? "is-warning" : financeState === "error" ? "is-error" : ""}`}><i />{financeBadge}</span>
+        <button className="btn" onClick={() => { setRefreshToken((value) => value + 1); void loadFinance(); }}>↻ Обновить</button>
       </div>
     </header>
 
@@ -445,8 +516,14 @@ export default function PMSGridV3() {
       <button className={`mega-filter-toggle ${activeFilters.length ? "has-filters" : ""}`} onClick={() => setAdvancedOpen((value) => !value)}>Фильтры {activeFilters.length > 0 && <b>{activeFilters.length}</b>} {advancedOpen ? "↑" : "↓"}</button>
     </section>
 
+    {financeState !== "ready" && <div className={`mega-finance-warning state-${financeState}`} role="status"><strong>Финансовая истина не подтверждена</strong><span>{financeError || "Финансовые данные ещё загружаются из Resort Core."} KPI и фильтры долга не показывают нулевые значения вместо неизвестных.</span></div>}
+
     <section className="mega-quick-grid" aria-label="Операционные режимы">
-      {QUICK_VIEWS.map((view) => <button key={view.key} className={filters.daily === view.key ? "active" : ""} onClick={() => setFilters((current) => ({ ...current, daily: view.key }))}><span>{view.label}<small>{view.hint}</small></span><strong>{quickCounts.get(view.key) || 0}</strong></button>)}
+      {QUICK_VIEWS.map((view) => {
+        const disabled = view.key === "DEBT" && !financeComplete;
+        const count = quickCounts.get(view.key);
+        return <button key={view.key} disabled={disabled} className={filters.daily === view.key ? "active" : ""} onClick={() => !disabled && setFilters((current) => ({ ...current, daily: view.key }))} title={disabled ? "Фильтр долга доступен только при полной финансовой выборке Resort Core" : undefined}><span>{view.label}<small>{view.hint}</small></span><strong>{count == null ? "—" : count}</strong></button>;
+      })}
     </section>
 
     {advancedOpen && <section className="mega-filter-panel">
@@ -457,7 +534,7 @@ export default function PMSGridV3() {
         <label><span>Этаж</span><select value={filters.floor} onChange={(event) => setFilters((current) => ({ ...current, floor: event.target.value }))}><option value="ALL">Все этажи</option>{floors.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label><span>Статус номера</span><select value={filters.state} onChange={(event) => setFilters((current) => ({ ...current, state: event.target.value }))}><option value="ALL">Любой</option>{Object.entries(ROOM_STATE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>
         <label><span>Статус брони</span><select value={filters.reservationStatus} onChange={(event) => setFilters((current) => ({ ...current, reservationStatus: event.target.value }))}><option value="ALL">Любой</option><option value="GUARANTEED">Ожидает заезд</option><option value="CHECKED_IN">Проживает</option><option value="CHECKED_OUT">Выехал</option><option value="CANCELLED">Отменена</option><option value="NO_SHOW">Не заехал</option></select></label>
-        <label><span>Оплата</span><select value={filters.finance} onChange={(event) => setFilters((current) => ({ ...current, finance: event.target.value as FinanceMode }))}><option value="ALL">Любая</option><option value="PAID">Оплачено полностью</option><option value="PARTIAL">Частичная оплата</option><option value="UNPAID">Без оплаты</option><option value="DEBT">Есть остаток</option></select></label>
+        <label><span>Оплата</span><select disabled={!financeComplete} value={filters.finance} onChange={(event) => setFilters((current) => ({ ...current, finance: event.target.value as FinanceMode }))} title={!financeComplete ? "Фильтр оплаты отключён, пока финансовая выборка Resort Core не подтверждена полностью" : undefined}><option value="ALL">{financeComplete ? "Любая" : "Финансы недоступны"}</option><option value="PAID">Оплачено полностью</option><option value="PARTIAL">Частичная оплата</option><option value="UNPAID">Без оплаты</option><option value="DEBT">Есть остаток</option></select></label>
         <label><span>Занятость сегодня</span><select value={filters.occupancy} onChange={(event) => setFilters((current) => ({ ...current, occupancy: event.target.value as OccupancyMode }))}><option value="ALL">Любая</option><option value="FREE">Свободные</option><option value="OCCUPIED">Заняты гостями</option><option value="BLOCKED">Заблокированы</option></select></label>
         <label><span>Тип блока</span><select value={filters.blockType} onChange={(event) => setFilters((current) => ({ ...current, blockType: event.target.value as BlockMode }))}><option value="ALL">Любой</option><option value="RESERVATION">Бронь</option><option value="MAINTENANCE">Ремонт</option><option value="MANUAL">Служебный</option></select></label>
       </div>
@@ -470,7 +547,7 @@ export default function PMSGridV3() {
       <article className="kpi-blue"><span>Проживают</span><strong>{metrics.inHouse}</strong></article>
       <article className="kpi-green"><span>Свободно сегодня</span><strong>{metrics.free}</strong></article>
       <article className="kpi-cyan"><span>Заезды / выезды</span><strong>{metrics.arrivals}<small> / {metrics.departures}</small></strong></article>
-      <article className="kpi-red"><span>Долг по активным</span><strong>{money(metrics.debtKgs)}<small> сом · {metrics.debtCount}</small></strong></article>
+      <article className="kpi-red"><span>Долг по активным</span><strong>{metrics.debtKgs == null ? "—" : money(metrics.debtKgs)}<small>{metrics.debtCount == null ? " данные не подтверждены" : ` сом · ${metrics.debtCount}`}</small></strong></article>
       <article className="kpi-amber"><span>Уборка / проверка</span><strong>{metrics.dirty}<small> / {metrics.inspection}</small></strong></article>
       <article className="kpi-gray"><span>Техблок</span><strong>{metrics.tech}</strong></article>
     </section>
@@ -498,18 +575,18 @@ export default function PMSGridV3() {
               const payment = financeClass(finance);
               const interactive = block.type === "RESERVATION" && Boolean(block.reservation_id);
               const title = block.type === "RESERVATION" ? block.guest_name || block.booking_number || "Бронь" : block.reason || (block.type === "MAINTENANCE" ? "Ремонт" : "Блок");
-              return <button key={block.id} draggable={interactive} className={`mega-block type-${block.type.toLowerCase()} status-${(block.reservation_status || "none").toLowerCase()} payment-${payment}`} style={{ gridColumn: place.column }} onDragStart={(event) => { if (!interactive || !block.reservation_id) { event.preventDefault(); return; } setDraggingReservationId(block.reservation_id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-resort-reservation", block.reservation_id); }} onDragEnd={() => { setDraggingReservationId(null); setDropRoomId(null); setDropDate(null); }} onClick={() => { if (block.reservation_id) setSelectedReservation({ id: block.reservation_id }); }} title={[title, block.booking_number, finance ? `Оплачено ${money(finance.paidKgs)} / ${money(finance.totalKgs)} сом` : null].filter(Boolean).join(" · ")}>
+              return <button key={block.id} draggable={interactive} className={`mega-block type-${block.type.toLowerCase()} status-${(block.reservation_status || "none").toLowerCase()} payment-${payment}`} style={{ gridColumn: place.column }} onDragStart={(event) => { if (!interactive || !block.reservation_id) { event.preventDefault(); return; } setDraggingReservationId(block.reservation_id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("application/x-resort-reservation", block.reservation_id); }} onDragEnd={() => { setDraggingReservationId(null); setDropRoomId(null); setDropDate(null); }} onClick={() => { if (block.reservation_id) setSelectedReservation({ id: block.reservation_id }); }} title={[title, block.booking_number, finance ? `Оплачено ${money(finance.paidKgs)} / ${money(finance.totalKgs)} сом` : "Финансы не загружены для этой брони"].filter(Boolean).join(" · ")}>
                 <span className="mega-block-title">{title}</span>
-                <span className="mega-block-meta">{block.booking_number || (block.type === "MAINTENANCE" ? "TECH" : "BLOCK")}{finance && <b className={`money-${payment}`}>{finance.remainingKgs <= 0 ? "✓" : `${money(finance.remainingKgs)}₽`}</b>}</span>
+                <span className="mega-block-meta">{block.booking_number || (block.type === "MAINTENANCE" ? "TECH" : "BLOCK")}{finance && <b className={`money-${payment}`}>{finance.remainingKgs <= 0 ? "✓" : `${money(finance.remainingKgs)} сом`}</b>}</span>
               </button>;
             })}
           </div>)}
         </div>
       </div>}
-      <footer className="mega-board-footer"><span>Drag & drop: перенос брони на номер + дату</span><span>Клик по брони: карточка / даты / переселение / заезд</span><span>Клик по номеру: задачи, блоки и статус комнаты</span></footer>
+      <footer className="mega-board-footer"><span>Перетащите бронь: выберите номер и дату, затем подтвердите server preview</span><span>Клик по брони: карточка / даты / переселение / заезд</span><span>Клик по номеру: задачи, блоки и статус комнаты</span></footer>
     </section>
 
     {selectedRoomId && <RoomDetailModal roomId={selectedRoomId} onClose={() => setSelectedRoomId(null)} />}
-    {selectedReservation && data && <ChessboardReservationModal reservationId={selectedReservation.id} rooms={data.rooms.map((room) => ({ id: room.id, code: room.code, room_type_code: room.room_type_code, room_type_name: room.room_type_name, operational_state: room.operational_state }))} onClose={() => setSelectedReservation(null)} onUpdated={() => { setSelectedReservation(null); setRefreshToken((value) => value + 1); }} initialMode="MOVE" initialTargetRoomId={selectedReservation.targetRoomId} initialCheckIn={selectedReservation.initialCheckIn} initialCheckOut={selectedReservation.initialCheckOut} />}
+    {selectedReservation && data && <ChessboardReservationModal reservationId={selectedReservation.id} rooms={data.rooms.map((room) => ({ id: room.id, code: room.code, room_type_code: room.room_type_code, room_type_name: room.room_type_name, operational_state: room.operational_state }))} onClose={() => setSelectedReservation(null)} onUpdated={() => { setSelectedReservation(null); setRefreshToken((value) => value + 1); void loadFinance(); }} initialMode="MOVE" initialTargetRoomId={selectedReservation.targetRoomId} initialCheckIn={selectedReservation.initialCheckIn} initialCheckOut={selectedReservation.initialCheckOut} />}
   </main>;
 }
