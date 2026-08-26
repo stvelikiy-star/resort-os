@@ -5,6 +5,7 @@ import "./final-polish.css";
 import "./home-v2.css";
 import "./action-v3.css";
 import "./action-finishing.css";
+import "./action-motion.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://3korony.com"),
