@@ -33,12 +33,20 @@ type HistoryItem = {
 
 const typeLabel: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
 const statusLabel: Record<string, string> = { OPEN: "Открыта", IN_PROGRESS: "В работе", IN_INSPECTION: "Проверка", DONE: "Готово", CANCELLED: "Отменена" };
+const roomStateLabel: Record<string, string> = { CLEAN: "Готов", DIRTY: "Нужна уборка", IN_INSPECTION: "На проверке", TECH_BLOCK: "Ремонт", UNKNOWN: "Не указан" };
 const actionLabel: Record<string, string> = { CREATE: "Создана", CLAIM: "Взята в работу", ASSIGN: "Назначен сотрудник", UNASSIGN: "Снято назначение", STATUS_CHANGE: "Изменён статус", VOICE_MAINTENANCE_INTAKE: "Создана голосом" };
 
 function dateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function operationError(body: any, fallback: string) {
+  if (typeof body?.detail === "string") return body.detail;
+  if (body?.detail?.code === "INVALID_TASK_TRANSITION") return `Задача уже находится в статусе «${statusLabel[body.detail.from_status] || body.detail.from_status}». Обновите список.`;
+  if (body?.detail?.code === "HOUSEKEEPING_ROOM_NOT_IN_INSPECTION") return `Номер нельзя принять как готовый: текущее состояние — ${roomStateLabel[body.detail.room_state] || body.detail.room_state || "неизвестно"}.`;
+  return fallback;
 }
 
 export default function OperationsBoard({ user }: { user: User }) {
@@ -59,6 +67,7 @@ export default function OperationsBoard({ user }: { user: User }) {
   const [historyTaskId, setHistoryTaskId] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [statusBusy, setStatusBusy] = useState<string | null>(null);
 
   const isManager = ["OWNER", "MANAGER"].includes(user.role);
 
@@ -95,7 +104,7 @@ export default function OperationsBoard({ user }: { user: User }) {
     }
   }, [isManager]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const activeTasks = useMemo(() => tasks.filter((task) => !["DONE", "CANCELLED"].includes(task.status)), [tasks]);
   const metrics = useMemo(() => ({
@@ -123,6 +132,11 @@ export default function OperationsBoard({ user }: { user: User }) {
   }
 
   async function updateStatus(task: Task, status: string) {
+    if (status === "DONE" && task.type === "HOUSEKEEPING" && !window.confirm(`Принять уборку номера ${task.room_code || ""} и отметить номер готовым?`)) return;
+    if (status === "IN_PROGRESS" && task.status === "IN_INSPECTION" && !window.confirm(`Вернуть номер ${task.room_code || ""} на доработку? Статус номера снова станет «Нужна уборка».`)) return;
+    if (status === "CANCELLED" && !window.confirm("Отменить эту задачу?")) return;
+
+    setStatusBusy(task.id);
     setError(null);
     try {
       const response = await fetch(`/core/api/v1/ops/tasks/${task.id}/status`, {
@@ -131,11 +145,13 @@ export default function OperationsBoard({ user }: { user: User }) {
         body: JSON.stringify({ status }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось изменить статус");
+      if (!response.ok) throw new Error(operationError(body, "Не удалось изменить статус"));
       await load();
       if (historyTaskId === task.id) await loadHistory(task.id, true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка обновления");
+    } finally {
+      setStatusBusy(null);
     }
   }
 
@@ -150,7 +166,7 @@ export default function OperationsBoard({ user }: { user: User }) {
         body: JSON.stringify({ assigned_to_id: assignedToId || null }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось назначить сотрудника");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось назначить сотрудника");
       await load();
       if (historyTaskId === task.id) await loadHistory(task.id, true);
     } catch (e) {
@@ -172,7 +188,7 @@ export default function OperationsBoard({ user }: { user: User }) {
     try {
       const response = await fetch(`/core/api/v1/ops/tasks/${taskId}/history`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось загрузить историю задачи");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось загрузить историю задачи");
       setHistoryItems(body.history || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка истории задачи");
@@ -194,7 +210,7 @@ export default function OperationsBoard({ user }: { user: User }) {
         body: JSON.stringify({ type: taskType, room_id: roomId || null, priority, title: title.trim(), source: "PMS" }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось создать задачу");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось создать задачу");
       setTitle("");
       setRoomId("");
       await load();
@@ -211,7 +227,7 @@ export default function OperationsBoard({ user }: { user: User }) {
   return (
     <main className="work-shell">
       <div className="work-head">
-        <div><p className="eyebrow">Операции · персонал</p><h1>Задачи пансионата</h1><p className="subtitle">Уборка, ремонт и запросы гостей с синхронизацией статуса номера.</p></div>
+        <div><p className="eyebrow">Операции · персонал</p><h1>Задачи пансионата</h1><p className="subtitle">Уборка, ремонт и запросы гостей с контролируемыми переходами статуса номера.</p></div>
         <button className="btn" onClick={load}>Обновить</button>
       </div>
 
@@ -236,7 +252,7 @@ export default function OperationsBoard({ user }: { user: User }) {
           {user.role !== "MAID" && <option value="MAINTENANCE">Ремонт</option>}
           {isManager && <option value="GUEST_REQUEST">Запрос гостя</option>}
         </select>
-        {isManager ? <select value={roomId} onChange={(e) => setRoomId(e.target.value)}><option value="">Без номера</option>{rooms.map((room) => <option key={room.id} value={room.id}>{room.code} · {room.room_type_name} · {room.operational_state}</option>)}</select> : <input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="ID номера (из Telegram/PWA)" />}
+        {isManager ? <select value={roomId} onChange={(e) => setRoomId(e.target.value)}><option value="">Без номера</option>{rooms.map((room) => <option key={room.id} value={room.id}>{room.code} · {room.room_type_name} · {roomStateLabel[room.operational_state] || room.operational_state}</option>)}</select> : <input value={roomId} onChange={(e) => setRoomId(e.target.value)} placeholder="ID номера (из Telegram/PWA)" />}
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Что нужно сделать" required minLength={2} />
         <select value={priority} onChange={(e) => setPriority(e.target.value)}><option value="NORMAL">Обычный</option><option value="HIGH">Высокий</option><option value="URGENT">Срочно</option><option value="LOW">Низкий</option></select>
         <button className="btn primary" disabled={creating}>{creating ? "Создаю…" : "Создать задачу"}</button>
@@ -246,7 +262,7 @@ export default function OperationsBoard({ user }: { user: User }) {
         {visible.map((task) => <article className={`task-card p-${task.priority}`} key={task.id}>
           <div className="task-meta"><span>{typeLabel[task.type] || task.type}</span><b>{statusLabel[task.status] || task.status}</b></div>
           <h3>{task.title}</h3>
-          <p>{task.room_code ? `Номер ${task.room_code}` : "Без привязки к номеру"}{task.room_state ? ` · ${task.room_state}` : ""}</p>
+          <p>{task.room_code ? `Номер ${task.room_code}` : "Без привязки к номеру"}{task.room_state ? ` · ${roomStateLabel[task.room_state] || task.room_state}` : ""}</p>
           <p>{task.assigned_to_name ? `Ответственный: ${task.assigned_to_name}` : "Ответственный не назначен"} · создана {dateTime(task.created_at)}</p>
           {task.description && <p>{task.description}</p>}
 
@@ -259,11 +275,12 @@ export default function OperationsBoard({ user }: { user: User }) {
           </label>}
 
           <div className="task-actions">
-            {task.status === "OPEN" && <button className="btn" onClick={() => updateStatus(task, "IN_PROGRESS")}>Взять в работу</button>}
-            {task.type === "HOUSEKEEPING" && task.status === "IN_PROGRESS" && <button className="btn primary" onClick={() => updateStatus(task, "IN_INSPECTION")}>Уборка закончена → проверка</button>}
-            {task.type === "HOUSEKEEPING" && task.status === "IN_INSPECTION" && isManager && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Принять номер → CLEAN</button>}
-            {task.type === "MAINTENANCE" && task.status === "IN_PROGRESS" && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Ремонт завершён</button>}
-            {task.type === "GUEST_REQUEST" && task.status === "IN_PROGRESS" && isManager && <button className="btn primary" onClick={() => updateStatus(task, "DONE")}>Выполнено</button>}
+            {task.status === "OPEN" && isManager && <button className="btn" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "IN_PROGRESS")}>Начать работу</button>}
+            {task.type === "HOUSEKEEPING" && task.status === "IN_PROGRESS" && <button className="btn primary" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "IN_INSPECTION")}>Уборка закончена → проверка</button>}
+            {task.type === "HOUSEKEEPING" && task.status === "IN_INSPECTION" && isManager && <><button className="btn primary" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "DONE")}>Принять номер → готов</button><button className="btn" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "IN_PROGRESS")}>Вернуть на доработку</button></>}
+            {task.type === "MAINTENANCE" && task.status === "IN_PROGRESS" && <button className="btn primary" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "DONE")}>Ремонт завершён</button>}
+            {task.type === "GUEST_REQUEST" && task.status === "IN_PROGRESS" && isManager && <button className="btn primary" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "DONE")}>Выполнено</button>}
+            {isManager && !["DONE", "CANCELLED"].includes(task.status) && <button className="btn danger" disabled={statusBusy === task.id} onClick={() => updateStatus(task, "CANCELLED")}>Отменить</button>}
             {canSeeHistory && <button className="btn" type="button" onClick={() => loadHistory(task.id)}>{historyTaskId === task.id ? "Скрыть историю" : "История"}</button>}
           </div>
           {canSeeHistory && historyTaskId === task.id && <div className="task-history">
