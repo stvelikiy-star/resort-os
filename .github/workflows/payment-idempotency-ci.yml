@@ -15,6 +15,7 @@ on:
       - 'scripts/seed_from_intake.py'
       - 'scripts/bootstrap_owner.py'
       - 'scripts/payment_idempotency_contract_test.py'
+      - 'scripts/payment_idempotency_helper_test.py'
       - '.github/workflows/payment-idempotency-ci.yml'
   pull_request:
     paths:
@@ -29,6 +30,7 @@ on:
       - 'scripts/seed_from_intake.py'
       - 'scripts/bootstrap_owner.py'
       - 'scripts/payment_idempotency_contract_test.py'
+      - 'scripts/payment_idempotency_helper_test.py'
       - '.github/workflows/payment-idempotency-ci.yml'
   workflow_dispatch:
 
@@ -99,7 +101,12 @@ jobs:
       - name: Install and compile finance contract
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts/payment_idempotency_contract_test.py
+          python -m compileall services/api/app scripts/payment_idempotency_contract_test.py scripts/payment_idempotency_helper_test.py
+
+      - name: Verify payment normalization contract
+        env:
+          PYTHONPATH: services/api
+        run: python scripts/payment_idempotency_helper_test.py
 
       - name: Apply constraints and seed hotel
         run: |
