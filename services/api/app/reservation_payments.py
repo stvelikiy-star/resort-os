@@ -103,6 +103,30 @@ async def record_reservation_payment(
                     "finance": totals,
                 }
 
+            external_ref = payload.external_ref.strip() if payload.external_ref else None
+            if external_ref:
+                reference_payment = await conn.fetchrow(
+                    '''
+                    SELECT id,"reservationId","amountKgs",method,status::text AS status
+                    FROM payments
+                    WHERE provider='MANAGER_MANUAL' AND "externalRef"=$1
+                    ''',
+                    external_ref,
+                )
+                if reference_payment:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "PAYMENT_EXTERNAL_REF_CONFLICT",
+                            "message": "This manager payment reference is already recorded.",
+                            "payment_id": str(reference_payment["id"]),
+                            "reservation_id": str(reference_payment["reservationId"]) if reference_payment["reservationId"] else None,
+                            "amount_kgs": int(reference_payment["amountKgs"]),
+                            "method": reference_payment["method"],
+                            "status": reference_payment["status"],
+                        },
+                    )
+
             payment_id = uuid.uuid4()
             await conn.execute(
                 '''
@@ -117,7 +141,7 @@ async def record_reservation_payment(
                 reservation_id,
                 payload.amount_kgs,
                 payload.method.strip(),
-                payload.external_ref.strip() if payload.external_ref else None,
+                external_ref,
                 payload.idempotency_key,
                 payload.note.strip() if payload.note else None,
                 user["id"],
@@ -148,7 +172,7 @@ async def record_reservation_payment(
                 str(payment_id),
                 payload.amount_kgs,
                 payload.method.strip(),
-                payload.external_ref.strip() if payload.external_ref else None,
+                external_ref,
                 totals["paid_kgs"],
                 totals["remaining_kgs"],
                 totals["overpaid_kgs"],
@@ -164,7 +188,7 @@ async def record_reservation_payment(
             "method": payload.method.strip(),
             "status": "RECEIVED",
             "provider": "MANAGER_MANUAL",
-            "external_ref": payload.external_ref.strip() if payload.external_ref else None,
+            "external_ref": external_ref,
         },
         "finance": totals,
         "truth": "Internal manager-recorded payment fact only. No acquiring or automatic prepayment policy was applied.",
