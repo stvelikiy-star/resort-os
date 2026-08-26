@@ -26,7 +26,10 @@ export default function SiteHeader() {
   return (
     <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
       <div className="wrap header-inner">
-        <a className="brand" href="#top" aria-label="Три Короны — на главную" onClick={closeMenu}><strong>ТРИ КОРОНЫ</strong><span>Resort & SPA · Issyk-Kul</span></a>
+        <a className="brand" href="#top" aria-label="Три Короны — на главную" onClick={closeMenu}>
+          <img src="/brand/three-crowns-mark.svg" alt="" width="118" height="33" />
+          <span className="brand-copy"><strong>ТРИ КОРОНЫ</strong><small>Resort & SPA · Issyk-Kul</small></span>
+        </a>
         <nav className="desktop-nav" aria-label="Основная навигация"><a href="#rooms">Номера</a><a href="#resort">Курорт</a><a href="#spa">SPA</a><a href="#gallery">Галерея</a><a href="#contacts">Контакты</a></nav>
         <a className="header-book desktop-only" href="#booking">Проверить даты</a>
         <button className="menu-toggle" type="button" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? "Закрыть меню" : "Открыть меню"} onClick={() => setOpen((value) => !value)}><span /><span /></button>
