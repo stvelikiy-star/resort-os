@@ -4,19 +4,21 @@ on:
   push:
     branches: [main]
     paths:
-      - 'services/api/app/app_entry.py'
-      - 'services/api/app/nfc.py'
-      - 'services/api/app/nfc_reporting.py'
+      - 'services/api/app/**'
       - 'services/api/requirements.txt'
       - 'scripts/release_scope_guard.py'
+      - '.env.example'
+      - '.env.production.example'
+      - 'compose.production.yaml'
       - '.github/workflows/nfc-ci.yml'
   pull_request:
     paths:
-      - 'services/api/app/app_entry.py'
-      - 'services/api/app/nfc.py'
-      - 'services/api/app/nfc_reporting.py'
+      - 'services/api/app/**'
       - 'services/api/requirements.txt'
       - 'scripts/release_scope_guard.py'
+      - '.env.example'
+      - '.env.production.example'
+      - 'compose.production.yaml'
       - '.github/workflows/nfc-ci.yml'
   workflow_dispatch:
 
@@ -48,5 +50,5 @@ jobs:
       - name: Self-test release scope parser
         run: python scripts/release_scope_guard.py --self-test
 
-      - name: Verify deferred NFC routes are not composed
+      - name: Verify active V1 release boundary
         run: python scripts/release_scope_guard.py
