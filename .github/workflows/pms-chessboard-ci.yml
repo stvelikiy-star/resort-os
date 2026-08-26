@@ -260,6 +260,17 @@ jobs:
       - name: Immediate relocation preserves lived history and dirties vacated room
         run: |
           RID=$(cat /tmp/reservation_id)
+          python - <<'PY'
+          import os, asyncio, asyncpg, uuid
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  target = uuid.UUID(open('/tmp/target2').read().strip())
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\',"updatedAt"=now() WHERE id=$1', target)
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
           curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule" > /tmp/pre-relocate-schedule.json
           python - <<'PY'
           import json
