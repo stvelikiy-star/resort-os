@@ -1,11 +1,10 @@
 "use client";
 
 import PMSGridV5 from "./PMSGridV5";
-import PMSReceptionCockpit from "./PMSReceptionCockpit";
 
+// Reception Cockpit source remains available for review, but the active V6
+// wrapper fails closed until the reception list can prove completeness for
+// arrival/departure/overdue KPIs and exact-head CI executes successfully.
 export default function PMSGridV6() {
-  return <div className="pms-v6-stack">
-    <PMSReceptionCockpit />
-    <PMSGridV5 />
-  </div>;
+  return <PMSGridV5 />;
 }
