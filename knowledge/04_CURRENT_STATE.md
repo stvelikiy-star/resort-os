@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.4
+Version: 1.5
 Date: 2026-08-26
 Status: DELIVERY RELEASE CANDIDATE / CURRENT EXECUTABLE BASELINE CI-VERIFIED / NOT PRODUCTION READY
 Canonical: YES
@@ -19,11 +19,11 @@ Repository: `stvelikiy-star/resort-os`.
 
 Current executable code baseline verified in GitHub Actions:
 
-`97f69cb5c091b49650bfa4b80beb095def75886b`
+`ff688bcdfb46aeb6e659d3c4ad28392c32b01d5c`
 
-This current baseline contains the recovered executable stack, payment-idempotency hardening, public-site recovery, Control Center monorepo verification hardening, and the security maintenance upgrade of Admin/Public Web/Staff from Next.js 14.2.35 to patched Next.js 15.5.24 with React/React DOM 19.2.8.
+This current executable baseline contains the recovered stack, payment-idempotency hardening, Control Center monorepo verification hardening, the patched Next.js 15.5.24 / React 19.2.8 security baseline, the verified Three Crowns 2026 public brand/rate/local-media integration, factual public-claim hardening, and the final local-background override for hero, resort feature and final CTA.
 
-The repository-owned AI PROF verification contract remains fail-closed: root `npm test` validates the exact trusted Git blob identities of all three app manifests before running their typechecks/builds and Core/scripts Python compilation. The trusted manifest blobs at this baseline are:
+The repository-owned AI PROF verification contract remains fail-closed: root `npm test` validates the exact trusted Git blob identities of all three app manifests before running their typechecks/builds and Core/scripts Python compilation. The trusted manifest blobs remain:
 - `apps/admin/package.json` -> `e29254cc30c879d2e581db42002367a30d850bf7`;
 - `apps/web/package.json` -> `abe10c8520756ae0863702f2389bda821a956384`;
 - `apps/staff/package.json` -> `85e54aabc4afefc58d1d20b2a92031c4c364a1fa`.
@@ -320,15 +320,17 @@ That README and `knowledge/08_CLIENT_AUTOMATION_N8N_BOUNDARY.md` are supporting 
 
 ## 11. Public sales site
 
-STATUS: **IMPLEMENTED DELIVERY BASELINE; BUILD VERIFIED; OWNED MEDIA STILL REQUIRED FOR PRODUCTION VISUAL ACCEPTANCE**.
+STATUS: **IMPLEMENTED DELIVERY BASELINE / BUILD + CORE CONTRACT VERIFIED / LOCAL PRIMARY MEDIA IN REPOSITORY / PRODUCTION VISUAL ACCEPTANCE STILL OPEN**.
 
 Current `apps/web` includes:
 - premium guest-facing hero/sections;
+- Three Crowns visual identity in the public header;
 - 12 category structure;
 - confirmed resort facts: own beach, 150 m pier, SPA/massage, outdoor pool 15×8, Cholpon-Ata;
 - confirmed contacts;
 - live Core availability/pricing;
 - tariff-derived meal information;
+- a 2026 seasonal rate reference presentation backed by repository `data-intake/rates.csv` while exact category/date booking pricing remains authoritative in Resort Core;
 - sellable-first/price-sorted results;
 - mobile-friendly date/guest search;
 - selected-room request flow;
@@ -336,16 +338,19 @@ Current `apps/web` includes:
 - explicit request-not-yet-booking wording;
 - manager confirmation/prepayment boundary;
 - metadata/OpenGraph/JSON-LD/sitemap/robots;
-- sticky mobile booking CTA.
+- sticky mobile booking CTA;
+- local Three Crowns media for the primary public hero, resort feature, room/gallery placements and final CTA.
 
-Unconfirmed public claims were removed during copy audit.
+Unconfirmed public claims remain excluded. In particular, repository media assets do not by themselves promote billiards, conference/group-event service, laundry or other not-yet-canonicalized capabilities into CURRENT public truth.
 
-Remaining visual blocker:
-- replace temporary/hotlinked media with owned Three Crowns photography before production cutover.
+The earlier third-party recovery background declarations remain only as superseded legacy CSS declarations; the final imported media override makes the rendered hero, resort feature and final CTA resolve to local `/media/three-crowns/*` assets.
+
+Remaining visual gate:
+- production visual acceptance / final approved-media review is still required before cutover. Repository-local media and successful builds do not by themselves prove final owner/production visual acceptance.
 
 Website and PMS read the same InventoryBlock truth; no separate availability synchronization job is required.
 
-Existing Vercel project `three-crowns-resort-preview` is a legacy static mock with fake availability text and must not be presented as the canonical Resort OS runtime.
+Existing legacy/static Vercel surfaces must not be presented as the canonical Resort OS runtime merely because they are serving. Production deployment/cutover remains a separate explicit gate.
 
 ---
 
@@ -400,7 +405,7 @@ Dormant NFC schema artifacts must not drive active V1 feature scope.
 Do not claim production-ready until the remaining gates are completed:
 1. generated/reviewed/applied Prisma migration baseline/history rather than permanent `db push`;
 2. production-like current-schema backup -> clean restore proof for the intended deployment procedure;
-3. owned public-site photography and visual acceptance;
+3. production visual acceptance / final approved-media review;
 4. staging acceptance;
 5. production secrets/HTTPS/hostnames;
 6. monitoring/alerts;
@@ -428,9 +433,22 @@ Payment-integrity evidence:
 
 Security-maintenance evidence:
 - PR #9 exact head `a7b6bf9db44bf4990bd3d91313b7da40750e0701` upgraded Admin/Public Web/Staff to Next.js 15.5.24 and React/React DOM 19.2.8 while updating the trusted manifest fingerprints rather than weakening verification;
-- squash-merged canonical `main` is `97f69cb5c091b49650bfa4b80beb095def75886b`;
-- GitHub Actions reports exactly 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found;
-- the post-merge tree remains the exact security-maintenance tree `978df6e5b4cb4b4e0ce4e521a2f4e45402914b2e`.
+- squash-merged security baseline was `97f69cb5c091b49650bfa4b80beb095def75886b`;
+- GitHub Actions reported exactly 7 push-triggered workflow runs for that exact post-merge SHA, all completed successfully, with no failure or cancelled conclusion found;
+- the post-merge tree remained the exact security-maintenance tree `978df6e5b4cb4b4e0ce4e521a2f4e45402914b2e`.
+
+Three Crowns public brand/rate/media evidence:
+- PR #11 final exact head `127503b1ac210a0d5076f3b5cbb3f3478206c7e3` passed `Resort Core CI #410` and `Control Center Monorepo Contract CI #19`;
+- PR #11 was squash-merged as `e165c9fdeba76f71cef75880ee51f840966ea2c1`;
+- exact post-merge `e165c9fd...` passed `Resort Core CI #411` and `Control Center Monorepo Contract CI #20`;
+- the public implementation preserved Resort Core as exact pricing/inventory authority and removed unverified billiards, conference, laundry and group-event claims from guest-facing code;
+- repository media documentation explicitly separates asset presence from CURRENT operational/public authority.
+
+Primary local-background hardening evidence:
+- PR #12 exact head `fb28a5ff898fdbab9f39e0efd6f2e875f395294b` passed `Resort Core CI #412` and `Control Center Monorepo Contract CI #21`;
+- PR #12 was squash-merged as current executable baseline `ff688bcdfb46aeb6e659d3c4ad28392c32b01d5c`;
+- exact post-merge `ff688bcd...` passed `Resort Core CI #413` and `Control Center Monorepo Contract CI #22`;
+- the final CSS cascade makes the rendered hero, resort feature and final CTA use local Three Crowns media.
 
 Active matrix on the verified executable baseline includes:
 1. Resort Core CI;
@@ -448,7 +466,7 @@ Active matrix on the verified executable baseline includes:
 13. NFC Deferred Scope CI;
 14. Data Intake Integrity CI.
 
-The security-maintenance commit changes dependency manifests/locks and trusted verifier fingerprints only; it does not promote staging or production gates.
+The public/media changes do not promote staging, production deployment, production database, secrets, monitoring, rollback, DNS cutover or final visual acceptance to VERIFIED.
 
 Interpretation boundary:
 
@@ -463,7 +481,7 @@ Remaining work should now proceed from verified current state, not from historic
 1. production migration baseline generation/review -> clean staging apply/verification;
 2. production-like backup/restore rehearsal using the intended migration/deploy procedure;
 3. staging acceptance of public site + PMS + Staff + Core + n8n handoff contracts;
-4. replace public-site temporary/hotlinked media with owned photography;
+4. production visual acceptance / final approved-media review;
 5. production secrets/HTTPS/hostnames and operational monitoring;
 6. rollback rehearsal;
 7. explicit owner DNS/cutover gate.
