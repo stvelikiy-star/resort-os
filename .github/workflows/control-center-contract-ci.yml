@@ -1,0 +1,56 @@
+name: Control Center Monorepo Contract CI
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'apps/**'
+      - 'services/api/app/**'
+      - 'scripts/**'
+      - '.github/workflows/control-center-contract-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'apps/**'
+      - 'services/api/app/**'
+      - 'scripts/**'
+      - '.github/workflows/control-center-contract-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            apps/admin/package-lock.json
+            apps/web/package-lock.json
+            apps/staff/package-lock.json
+
+      - name: Install application dependencies
+        run: |
+          set -euo pipefail
+          npm --prefix apps/admin install --no-audit --no-fund
+          npm --prefix apps/web install --no-audit --no-fund
+          npm --prefix apps/staff install --no-audit --no-fund
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run repository-owned Stage 01B verification contract
+        run: npm test
