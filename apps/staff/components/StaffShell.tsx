@@ -1,13 +1,12 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import BeachTerminal from "./BeachTerminal";
 
 type User = {
   id: string;
   username: string;
   display_name: string;
-  role: "OWNER" | "MANAGER" | "MAID" | "TECHNICIAN" | "BEACH_PARTNER";
+  role: "OWNER" | "MANAGER" | "MAID" | "TECHNICIAN";
   property_code: string;
 };
 
@@ -38,10 +37,10 @@ declare global {
   }
 }
 
+const ACTIVE_STAFF_ROLES = new Set(["MAID", "TECHNICIAN", "OWNER", "MANAGER"]);
 const roleLabel: Record<string, string> = {
   MAID: "Горничная",
   TECHNICIAN: "Техник",
-  BEACH_PARTNER: "Пляжный партнёр",
   OWNER: "Владелец",
   MANAGER: "Менеджер",
 };
@@ -58,6 +57,10 @@ const priorityLabel: Record<string, string> = {
   NORMAL: "Обычный",
   LOW: "Низкий",
 };
+
+function activeStaffUser(value: any): value is User {
+  return Boolean(value && typeof value.role === "string" && ACTIVE_STAFF_ROLES.has(value.role));
+}
 
 export default function StaffShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -80,6 +83,10 @@ export default function StaffShell() {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
 
     let cancelled = false;
+    async function clearUnsupportedSession() {
+      await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+    }
+
     async function bootstrapIdentity() {
       const initData = window.Telegram?.WebApp?.initData || "";
       if (initData) {
@@ -92,15 +99,18 @@ export default function StaffShell() {
             body: JSON.stringify({ init_data: initData }),
           });
           if (telegramResponse.ok) {
-            const telegramUser = (await telegramResponse.json()) as User;
-            if (!cancelled) {
-              setUser(telegramUser);
-              setTelegramNotice("Вход выполнен через Telegram");
-              setChecking(false);
+            const telegramUser = await telegramResponse.json();
+            if (activeStaffUser(telegramUser)) {
+              if (!cancelled) {
+                setUser(telegramUser);
+                setTelegramNotice("Вход выполнен через Telegram");
+                setChecking(false);
+              }
+              return;
             }
-            return;
-          }
-          if (telegramResponse.status !== 403 && telegramResponse.status !== 503) {
+            await clearUnsupportedSession();
+            if (!cancelled) setTelegramNotice("Эта роль сейчас не входит в активный Staff PWA. Доступен вход сотрудника отеля.");
+          } else if (telegramResponse.status !== 403 && telegramResponse.status !== 503) {
             if (!cancelled) setTelegramNotice("Telegram-подпись не принята. Доступен обычный вход.");
           }
         } catch {
@@ -110,8 +120,16 @@ export default function StaffShell() {
 
       try {
         const response = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
-        const existingUser = response.ok ? (await response.json()) as User : null;
-        if (!cancelled) setUser(existingUser);
+        const existingUser = response.ok ? await response.json() : null;
+        if (existingUser && !activeStaffUser(existingUser)) {
+          await clearUnsupportedSession();
+          if (!cancelled) {
+            setUser(null);
+            setTelegramNotice("Эта роль сейчас не входит в активный Staff PWA.");
+          }
+        } else if (!cancelled) {
+          setUser(existingUser as User | null);
+        }
       } catch {
         if (!cancelled) setUser(null);
       } finally {
@@ -119,12 +137,12 @@ export default function StaffShell() {
       }
     }
 
-    bootstrapIdentity();
+    void bootstrapIdentity();
     return () => { cancelled = true; };
   }, []);
 
   const loadTasks = useCallback(async () => {
-    if (!user || user.role === "BEACH_PARTNER") return;
+    if (!user) return;
     setLoading(true);
     setError(null);
     try {
@@ -143,7 +161,7 @@ export default function StaffShell() {
     }
   }, [user]);
 
-  useEffect(() => { if (user && user.role !== "BEACH_PARTNER") loadTasks(); }, [user, loadTasks]);
+  useEffect(() => { if (user) void loadTasks(); }, [user, loadTasks]);
 
   const visible = useMemo(() => tasks.filter((task) => {
     if (filter === "DONE") return task.status === "DONE";
@@ -164,9 +182,10 @@ export default function StaffShell() {
         setLoginError("Неверный логин или пароль");
         return;
       }
-      const payload = (await response.json()) as User;
-      if (!["MAID", "TECHNICIAN", "BEACH_PARTNER", "OWNER", "MANAGER"].includes(payload.role)) {
-        setLoginError("Эта роль не имеет доступа к интерфейсу персонала");
+      const payload = await response.json();
+      if (!activeStaffUser(payload)) {
+        await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+        setLoginError("Эта роль сейчас не входит в активный интерфейс персонала.");
         return;
       }
 
@@ -208,7 +227,7 @@ export default function StaffShell() {
     try {
       const response = await fetch(`/core/api/v1/ops/tasks/${task.id}/claim`, { method: "POST" });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось взять задачу");
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось взять задачу");
       await loadTasks();
       setFilter("MINE");
     } catch (e) {
@@ -228,7 +247,14 @@ export default function StaffShell() {
         body: JSON.stringify({ status }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось обновить задачу");
+      if (!response.ok) {
+        const message = typeof body.detail === "string"
+          ? body.detail
+          : body.detail?.code === "INVALID_TASK_TRANSITION"
+            ? "Статус задачи уже изменился. Обновите список и повторите."
+            : "Не удалось обновить задачу";
+        throw new Error(message);
+      }
       await loadTasks();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка операции");
@@ -266,41 +292,40 @@ export default function StaffShell() {
 
       {telegramNotice && <div className="notice">{telegramNotice}</div>}
 
-      {user.role === "BEACH_PARTNER" ? <BeachTerminal /> : <>
-        <section className="quick-stats">
-          <div><strong>{tasks.filter((x) => x.status === "OPEN").length}</strong><span>свободно</span></div>
-          <div><strong>{tasks.filter((x) => x.assigned_to_id === user.id && x.status === "IN_PROGRESS").length}</strong><span>у меня</span></div>
-          <div><strong>{tasks.filter((x) => x.status === "IN_INSPECTION").length}</strong><span>проверка</span></div>
-        </section>
+      <section className="quick-stats">
+        <div><strong>{tasks.filter((x) => x.status === "OPEN").length}</strong><span>свободно</span></div>
+        <div><strong>{tasks.filter((x) => x.assigned_to_id === user.id && x.status === "IN_PROGRESS").length}</strong><span>у меня</span></div>
+        <div><strong>{tasks.filter((x) => x.status === "IN_INSPECTION").length}</strong><span>проверка</span></div>
+      </section>
 
-        <nav className="filters">
-          <button className={filter === "ACTIVE" ? "active" : ""} onClick={() => setFilter("ACTIVE")}>Активные</button>
-          <button className={filter === "MINE" ? "active" : ""} onClick={() => setFilter("MINE")}>Мои</button>
-          <button className={filter === "DONE" ? "active" : ""} onClick={() => setFilter("DONE")}>Готовые</button>
-          <button onClick={loadTasks}>↻</button>
-        </nav>
+      <nav className="filters">
+        <button className={filter === "ACTIVE" ? "active" : ""} onClick={() => setFilter("ACTIVE")}>Активные</button>
+        <button className={filter === "MINE" ? "active" : ""} onClick={() => setFilter("MINE")}>Мои</button>
+        <button className={filter === "DONE" ? "active" : ""} onClick={() => setFilter("DONE")}>Готовые</button>
+        <button onClick={loadTasks}>↻</button>
+      </nav>
 
-        {error && <div className="error">{error}</div>}
-        {loading ? <div className="loading">Обновляю задачи…</div> : <section className="task-stack">
-          {visible.length === 0 && <div className="empty"><strong>Задач нет</strong><span>Новые задачи появятся здесь автоматически.</span></div>}
-          {visible.map((task) => {
-            const mine = task.assigned_to_id === user.id;
-            return <article key={task.id} className={`task priority-${task.priority}`}>
-              <div className="task-top"><span className="priority">{priorityLabel[task.priority]}</span><span className="status">{statusLabel[task.status]}</span></div>
-              <h2>{task.room_code ? `№ ${task.room_code}` : "Общая задача"}</h2>
-              <h3>{task.title}</h3>
-              {task.description && <p>{task.description}</p>}
-              {task.assigned_to_name && <small>Исполнитель: {task.assigned_to_name}</small>}
-              <div className="actions">
-                {isLineStaff && task.status === "OPEN" && !task.assigned_to_id && <button className="primary" disabled={busy === task.id} onClick={() => claim(task)}>Взять задачу</button>}
-                {isLineStaff && mine && task.status === "IN_PROGRESS" && task.type === "HOUSEKEEPING" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "IN_INSPECTION")}>Уборка закончена</button>}
-                {isLineStaff && mine && task.status === "IN_PROGRESS" && task.type === "MAINTENANCE" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "DONE")}>Ремонт завершён</button>}
-                {!isLineStaff && task.status === "IN_INSPECTION" && task.type === "HOUSEKEEPING" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "DONE")}>Принять номер</button>}
-              </div>
-            </article>;
-          })}
-        </section>}
-      </>}
+      {error && <div className="error">{error}</div>}
+      {loading ? <div className="loading">Обновляю задачи…</div> : <section className="task-stack">
+        {visible.length === 0 && <div className="empty"><strong>Задач нет</strong><span>Новые задачи появятся здесь автоматически.</span></div>}
+        {visible.map((task) => {
+          const mine = task.assigned_to_id === user.id;
+          return <article key={task.id} className={`task priority-${task.priority}`}>
+            <div className="task-top"><span className="priority">{priorityLabel[task.priority]}</span><span className="status">{statusLabel[task.status]}</span></div>
+            <h2>{task.room_code ? `№ ${task.room_code}` : "Общая задача"}</h2>
+            <h3>{task.title}</h3>
+            {task.description && <p>{task.description}</p>}
+            {task.assigned_to_name && <small>Исполнитель: {task.assigned_to_name}</small>}
+            <div className="actions">
+              {isLineStaff && task.status === "OPEN" && !task.assigned_to_id && <button className="primary" disabled={busy === task.id} onClick={() => claim(task)}>Взять задачу</button>}
+              {isLineStaff && mine && task.status === "IN_PROGRESS" && task.type === "HOUSEKEEPING" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "IN_INSPECTION")}>Уборка закончена</button>}
+              {isLineStaff && mine && task.status === "IN_PROGRESS" && task.type === "MAINTENANCE" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "DONE")}>Ремонт завершён</button>}
+              {!isLineStaff && task.status === "OPEN" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "IN_PROGRESS")}>Начать</button>}
+              {!isLineStaff && task.status === "IN_INSPECTION" && task.type === "HOUSEKEEPING" && <button className="primary" disabled={busy === task.id} onClick={() => changeStatus(task, "DONE")}>Принять номер</button>}
+            </div>
+          </article>;
+        })}
+      </section>}
     </main>
   );
 }
