@@ -11,6 +11,8 @@ type Reservation = {
   adults: number;
   children: number;
   totalKgs: number;
+  paidKgs: number;
+  remainingKgs: number;
   firstName?: string | null;
   phone?: string | null;
   room_code?: string | null;
@@ -55,6 +57,15 @@ function actionError(body: any, fallback: string) {
   if (typeof body?.detail === "string") return body.detail;
   if (body?.detail?.code === "CHECK_IN_ROOM_NOT_READY") {
     return `Номер ${body.detail.room_code || ""} не готов к заселению (${roomStateLabel[body.detail.room_state] || body.detail.room_state || "неизвестный статус"}).`.trim();
+  }
+  if (body?.detail?.code === "CHECK_IN_DATE_OUTSIDE_SCHEDULE") {
+    return `Сегодня не входит в даты брони. Сначала измените даты в шахматке (${body.detail.planned_check_in} → ${body.detail.planned_check_out}).`;
+  }
+  if (body?.detail?.code === "CHECK_OUT_AFTER_SCHEDULE") {
+    return `Дата выезда уже позже графика брони. Сначала продлите проживание в шахматке до ${body.detail.actual_local_date}.`;
+  }
+  if (body?.detail?.code === "CHECK_OUT_WOULD_CREATE_ZERO_NIGHT_STAY") {
+    return "Нельзя оформить выезд в дату заезда в текущей модели проживания. Проверьте даты брони.";
   }
   return fallback;
 }
@@ -103,6 +114,11 @@ export default function ReceptionBoard() {
   }, [items, filter, query, localDate]);
 
   async function transition(item: Reservation, action: "check-in" | "check-out") {
+    const prompt = action === "check-in"
+      ? `Подтвердить заезд ${item.firstName || "гостя"} в номер ${item.room_code || "—"}?`
+      : `Подтвердить выезд ${item.firstName || "гостя"} из номера ${item.room_code || "—"}? Номер станет «Нужна уборка».`;
+    if (!window.confirm(prompt)) return;
+
     setBusy(item.id);
     setError(null);
     try {
@@ -135,7 +151,7 @@ export default function ReceptionBoard() {
 
   return <main className="work-shell reception-shell">
     <div className="work-head">
-      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер и история размещения берутся из того же графика, что и шахматка.</p></div>
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, внутренние оплаты и история размещения берутся из Resort Core.</p></div>
       <button className="btn" onClick={load}>Обновить</button>
     </div>
 
@@ -157,11 +173,11 @@ export default function ReceptionBoard() {
     {loading ? <div className="loading">Загрузка броней…</div> : <div className="reception-list">
       {visible.length === 0 && <div className="empty">По выбранному фильтру броней нет.</div>}
       {visible.map((item) => <article className="reception-card" key={item.id}>
-        <div><span className="status-pill">{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong>{item.has_room_move && <small className="room-move-note">Переселение · {item.schedule_segments} сегм.</small>}</div>
+        <div><span className={`status-pill s-${item.status}`}>{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong>{item.has_room_move && <small className="room-move-note">Переселение · {item.schedule_segments} сегм.</small>}</div>
         <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
         <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small>{item.room_state && <small>{roomStateLabel[item.room_state] || item.room_state}</small>}</div>
         <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
-        <div><span className="field-label">Стоимость</span><b>{money(item.totalKgs)}</b></div>
+        <div className="reception-finance"><span className="field-label">Оплата</span><b>{money(item.paidKgs)} / {money(item.totalKgs)}</b><small className={item.remainingKgs > 0 ? "balance-due" : "balance-ok"}>{item.remainingKgs > 0 ? `Остаток ${money(item.remainingKgs)}` : "Оплачено полностью"}</small></div>
         <div className="reception-actions">
           <button className="btn" onClick={() => openDetail(item.id)} disabled={detailLoading}>Карточка</button>
           {item.status === "GUARANTEED" && <button className="btn primary" onClick={() => transition(item, "check-in")} disabled={busy === item.id}>Заезд</button>}
@@ -172,7 +188,7 @@ export default function ReceptionBoard() {
 
     {detail && <div className="detail-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setDetail(null); }}>
       <section className="reservation-detail" role="dialog" aria-modal="true">
-        <header><div><p className="eyebrow">Карточка брони</p><h2>{detail.reservation.booking_number}</h2><span className="status-pill">{statusLabel[detail.reservation.status] || detail.reservation.status}</span></div><button className="btn" onClick={() => setDetail(null)}>Закрыть</button></header>
+        <header><div><p className="eyebrow">Карточка брони</p><h2>{detail.reservation.booking_number}</h2><span className={`status-pill s-${detail.reservation.status}`}>{statusLabel[detail.reservation.status] || detail.reservation.status}</span></div><button className="btn" onClick={() => setDetail(null)}>Закрыть</button></header>
 
         <div className="detail-summary">
           <div><span>Гость</span><strong>{[detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Без имени"}</strong>{detail.guest.phone && <a href={`tel:${detail.guest.phone}`}>{detail.guest.phone}</a>}{detail.guest.email && <small>{detail.guest.email}</small>}</div>
