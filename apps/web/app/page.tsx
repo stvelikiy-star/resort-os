@@ -177,7 +177,7 @@ export default function HomePage() {
           <p className="eyebrow light" data-reveal>Берег Иссык-Куля</p>
           <h2 id="resort-title" data-reveal data-delay="1">150 метров<br />в сторону озера.</h2>
           <div className="action-water-bottom" data-reveal data-delay="2">
-            <p>Собственный пляж и пирс длиной 150 метров — ключевая часть отдыха в «Трёх Коронах». Пространство у воды работает как главный визуальный и эмоциональный центр курорта.</p>
+            <p>Собственный пляж — ключевая часть отдыха в «Трёх Коронах». Пирс длиной 150 метров продолжает пространство курорта в сторону озера.</p>
             <div className="action-water-tags"><span>Собственный пляж</span><span>Пирс 150 м</span><span>Бассейн 15×8 м</span></div>
           </div>
         </div>
@@ -188,7 +188,7 @@ export default function HomePage() {
           <div className="action-wellness-copy" data-reveal>
             <p className="eyebrow">SPA & Wellness</p>
             <h2 id="wellness-title">Сбавить темп.<br /><em>Не впечатления.</em></h2>
-            <p>В подтверждённую инфраструктуру входят SPA, массаж и открытый бассейн 15×8 м. Остальные сервисы публикуем только после проверки их актуальной операционной доступности.</p>
+            <p>Подтверждённая инфраструктура включает SPA и массаж. Открытый бассейн 15×8 м также входит в текущую публичную базу проекта. Остальные сервисы публикуем только после проверки их актуальной операционной доступности.</p>
             <div className="action-wellness-list"><span>SPA</span><span>Массаж</span><span>Открытый бассейн</span></div>
             <a className="button button-dark" href="#booking">Выбрать даты</a>
           </div>
