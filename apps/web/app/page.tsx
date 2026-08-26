@@ -1,62 +1,138 @@
+import Image from "next/image";
+import Link from "next/link";
+
 import BookingWidget from "../components/BookingWidget";
 import ResortGallery from "../components/ResortGallery";
 import SiteHeader from "../components/SiteHeader";
+import { formatKgs, roomCategories } from "../lib/roomCatalog";
 
-const rooms = [
-  ["01","Одноместный, цоколь","1 гость","16 м²","3 000","4 000","3 000"],
-  ["02","Двухместный стандарт, цоколь","2 гостя","16–24 м²","4 500","6 000","4 500"],
-  ["03","Одноместный улучшенный","1 гость","21 м²","4 800","6 000","4 800"],
-  ["04","Двухместный улучшенный","2 гостя","24–32 м²","5 500","7 500","5 500"],
-  ["05","Стандарт в коттеджном доме","2 гостя","27 м²","6 000","8 000","6 000"],
-  ["06","Полулюкс без балкона","2 гостя","26 м²","5 500","7 500","5 500"],
-  ["07","Люкс двухместный","2 гостя","36 м²","7 000","8 500","7 000"],
-  ["08","Люкс трёхместный","3 гостя","36 м²","9 000","11 500","9 000"],
-  ["09","Двухкомнатный полулюкс","до 4 гостей","36 м²","11 000","14 000","11 000"],
-  ["10","Двухкомнатный стандарт","до 4 гостей","30 м²","9 500","12 000","9 500"],
-  ["11","Апартаменты","до 4 гостей","45–50 м²","12 500","15 000","12 500"],
-  ["12","Апартаменты с кухней","до 4 гостей","45–50 м²","13 000","15 500","13 000"],
-];
-const bookingSteps = [
-  ["01","Выберите даты","Заезд, выезд и состав гостей задают поиск по реальному инвентарю."],
-  ["02","Сравните варианты","Наличие и итоговая стоимость приходят из Resort Core для выбранного периода."],
-  ["03","Отправьте заявку","Выбранная категория и контакты передаются менеджеру прямо из результатов."],
-  ["04","Подтвердите условия","После согласования условий и предоплаты менеджер подтверждает действующую бронь."],
-];
 const seasonRates = [
-  {dates:"1 июня — 6 июля",label:"Начало сезона",range:"3 000–13 000 сом"},
-  {dates:"7 июля — 25 августа",label:"Высокий сезон",range:"4 000–15 500 сом"},
-  {dates:"26 августа — 15 сентября",label:"Бархатный сезон",range:"3 000–13 000 сом"},
+  { index: "01", dates: "1 июня — 6 июля", label: "Начало сезона", range: "3 000–13 000 сом" },
+  { index: "02", dates: "7 июля — 25 августа", label: "Высокий сезон", range: "4 000–15 500 сом", peak: true },
+  { index: "03", dates: "26 августа — 15 сентября", label: "Бархатный сезон", range: "3 000–13 000 сом" },
 ];
+
+const bookingSteps = [
+  ["01", "Выберите даты", "Заезд, выезд и состав гостей задают поиск по реальному инвентарю отеля."],
+  ["02", "Сравните варианты", "Resort Core возвращает фактическую доступность и итоговую стоимость для выбранного периода."],
+  ["03", "Отправьте заявку", "Выбранная категория и контакты передаются менеджеру. Номер автоматически не блокируется."],
+  ["04", "Подтвердите условия", "После согласования условий и предоплаты менеджер создаёт действующую подтверждённую бронь."],
+];
+
 const galleryImages = [
-  {src:"/media/three-crowns/hero-resort.webp",alt:"Корпуса и территория отеля Три Короны",label:"Территория"},
-  {src:"/media/three-crowns/room-double.webp",alt:"Двухместный номер отеля Три Короны",label:"Проживание"},
-  {src:"/media/three-crowns/lake-night.webp",alt:"Ночной Иссык-Куль у отеля Три Короны",label:"Иссык-Куль ночью"},
-  {src:"/media/three-crowns/conference.webp",alt:"Конференц-зал отеля Три Короны",label:"Конференц-зал"},
+  { src: "/media/three-crowns/hero-resort.webp", alt: "Территория Три Короны Resort & SPA", label: "Территория" },
+  { src: "/media/three-crowns/room-double.webp", alt: "Номер в Три Короны Resort & SPA", label: "Номерной фонд" },
+  { src: "/media/three-crowns/lake-night.webp", alt: "Иссык-Куль у Три Короны Resort & SPA", label: "Иссык-Куль" },
 ];
+
 const hotelJsonLd = {
-  "@context":"https://schema.org","@type":"LodgingBusiness",name:"Три Короны Resort & SPA",url:"https://3korony.com",email:"3koronykg@mail.ru",telephone:"+996558085002",
-  address:{"@type":"PostalAddress",addressLocality:"Чолпон-Ата",addressRegion:"Иссык-Кульская область",addressCountry:"KG"},
-  amenityFeature:[
-    {"@type":"LocationFeatureSpecification",name:"Собственный пляж",value:true},{"@type":"LocationFeatureSpecification",name:"Пирс 150 м",value:true},{"@type":"LocationFeatureSpecification",name:"SPA",value:true},{"@type":"LocationFeatureSpecification",name:"Массаж",value:true},{"@type":"LocationFeatureSpecification",name:"Открытый бассейн 15×8 м",value:true},{"@type":"LocationFeatureSpecification",name:"Бильярд",value:true},{"@type":"LocationFeatureSpecification",name:"Конференц-зал",value:true},{"@type":"LocationFeatureSpecification",name:"Прачечная",value:true},
+  "@context": "https://schema.org",
+  "@type": "LodgingBusiness",
+  name: "Три Короны Resort & SPA",
+  url: "https://3korony.com",
+  email: "3koronykg@mail.ru",
+  telephone: "+996558085002",
+  address: {
+    "@type": "PostalAddress",
+    addressLocality: "Чолпон-Ата",
+    addressRegion: "Иссык-Кульская область",
+    addressCountry: "KG",
+  },
+  amenityFeature: [
+    { "@type": "LocationFeatureSpecification", name: "Собственный пляж", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Пирс 150 м", value: true },
+    { "@type": "LocationFeatureSpecification", name: "SPA", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Массаж", value: true },
+    { "@type": "LocationFeatureSpecification", name: "Открытый бассейн 15×8 м", value: true },
   ],
 };
-export default function HomePage(){return <>
-  <script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(hotelJsonLd)}}/><SiteHeader/>
-  <main id="top">
-    <section className="hero" aria-labelledby="hero-title"><div className="hero-shade" aria-hidden="true"/><div className="wrap hero-content"><p className="eyebrow light">Три Короны · Resort & SPA · Чолпон-Ата</p><h1 id="hero-title">Иссык-Куль.<br/>Отдых у самой воды.</h1><p className="hero-copy">84 номера, собственный пляж, 150-метровый пирс, SPA и открытый бассейн — курортный сценарий в одном месте.</p><div className="hero-actions"><a className="button button-accent" href="#booking">Проверить свободные номера</a><a className="button button-quiet" href="#rooms">Смотреть категории</a></div><div className="hero-facts" aria-label="Ключевые факты"><span>Чолпон-Ата</span><span>84 номера</span><span>12 категорий</span><span>Пирс 150 м</span></div></div><a className="hero-scroll" href="#booking" aria-label="Перейти к поиску номеров"><span>Проверка наличия</span><i aria-hidden="true">↓</i></a></section>
-    <div className="wrap booking-lift"><BookingWidget/></div>
-    <section className="section intro-section" aria-labelledby="intro-title"><div className="wrap intro-layout"><div><p className="eyebrow">Три Короны</p><h2 className="display-title" id="intro-title">Курортный ритм<br/>у большого озера</h2></div><div className="intro-copy"><p>Иссык-Куль задаёт ритм отдыха: пляж, длинный пирс, зелёная территория, проживание и wellness-инфраструктура.</p><a className="text-link" href="#resort">Посмотреть курорт →</a></div></div><div className="wrap stat-line" aria-label="Факты о курорте"><div><strong>84</strong><span>номера</span></div><div><strong>220</strong><span>гостевых мест</span></div><div><strong>12</strong><span>категорий</span></div><div><strong>150 м</strong><span>пирс</span></div><div><strong>15×8 м</strong><span>открытый бассейн</span></div></div></section>
-    <section className="section rate-section" id="rates" aria-labelledby="rates-title"><div className="wrap section-heading compact"><div><p className="eyebrow">Официальный прайс · 2026</p><h2 className="display-title" id="rates-title">Прозрачные цены.<br/>Точная сумма — по датам.</h2></div><div className="section-aside"><p>Стоимость в официальном летнем прайсе указана за номер на базе завтрака. Booking-модуль считает точное проживание по выбранным ночам через Resort Core.</p><a className="text-link" href="#booking">Рассчитать мои даты →</a></div></div><div className="wrap rate-bands">{seasonRates.map((rate,index)=><article key={rate.dates} className={index===1?"is-peak":""}><span>{String(index+1).padStart(2,"0")}</span><p>{rate.label}</p><h3>{rate.dates}</h3><strong>{rate.range}</strong><small>за номер / сутки · завтрак включён</small></article>)}</div><div className="wrap rate-matrix-wrap"><table className="rate-matrix"><thead><tr><th>Категория</th><th>1.06–6.07</th><th>7.07–25.08</th><th>26.08–15.09</th></tr></thead><tbody>{rooms.map(([,name,,,early,peak,late])=><tr key={name}><th>{name}</th><td>{early} сом</td><td className="peak">{peak} сом</td><td>{late} сом</td></tr>)}</tbody></table></div><div className="wrap rate-support"><article><span>Доп. взрослый</span><strong>1 500 сом / сутки</strong></article><article><span>Доп. ребёнок</span><strong>850 сом / сутки</strong></article><article><span>Питание</span><strong>Завтрак 500 · Обед 750 · Ужин 650</strong></article><article><span>Оплата</span><strong>Visa · MasterCard · QR · наличные · перевод</strong></article></div><div className="wrap rate-note"><strong>Важно</strong><p>Таблица отражает официальный сезонный прайс 2026. Финальная сумма и доступность всегда подтверждаются по выбранным датам в системе отеля.</p></div></section>
-    <section className="section rooms-section" id="rooms" aria-labelledby="rooms-title"><div className="wrap section-heading"><div><p className="eyebrow">Проживание</p><h2 className="display-title" id="rooms-title">От компактного номера<br/>до апартаментов</h2></div><div className="section-aside"><p>Площадь и базовая вместимость сверены с текущим инвентарём проекта. Точная конфигурация конкретного номера подтверждается менеджером.</p><a className="text-link" href="#booking">Проверить наличие →</a></div></div><div className="wrap accommodation-editorial"><figure className="accommodation-photo"><img src="/media/three-crowns/room-double.webp" alt="Реальный двухместный номер Три Короны" loading="lazy"/><figcaption><span>Реальный номер «Три Короны»</span><small>Фото из актуального медиапакета отеля.</small></figcaption></figure><div className="room-list" role="list">{rooms.map(([num,name,capacity,area])=><article className="room-row" key={num} role="listitem"><span className="room-index">{num}</span><div><h3>{name}</h3><p>{capacity} · {area}</p></div><a href="#booking" aria-label={`Проверить наличие: ${name}`}>Наличие <span aria-hidden="true">↗</span></a></article>)}</div></div></section>
-    <section className="resort-feature" id="resort" aria-labelledby="resort-title"><div className="resort-feature-image" aria-hidden="true"/><div className="resort-feature-shade" aria-hidden="true"/><div className="wrap resort-feature-content"><p className="eyebrow light">Берег Иссык-Куля</p><h2 className="display-title light" id="resort-title">Собственный пляж.<br/>Пирс длиной 150 метров.</h2><p>Пространство у воды — одна из ключевых особенностей «Трёх Корон».</p><div className="feature-tags" aria-label="Инфраструктура у воды"><span>Собственный пляж</span><span>Пирс 150 м</span><span>Открытый бассейн 15×8 м</span></div></div></section>
-    <section className="section wellness-section" id="spa" aria-labelledby="spa-title"><div className="wrap wellness-layout"><div className="wellness-copy"><p className="eyebrow">SPA & Wellness</p><h2 className="display-title" id="spa-title">Отдых после дня у озера</h2><p className="lead">SPA и массаж дополняют отдых у воды. В инфраструктуре отеля также подтверждены сауна и открытый бассейн 15×8 м.</p><div className="trust-line"><span>SPA</span><span>Массаж</span><span>Сауна</span><span>Бассейн 15×8 м</span></div><a className="button button-dark" href="#booking">Выбрать даты</a></div><figure className="wellness-photo"><img src="/media/three-crowns/hero-resort.webp" alt="Территория отеля Три Короны" loading="lazy"/><figcaption><span>Курортная территория</span><strong>Озеро · SPA · отдых</strong></figcaption></figure></div></section>
-    <section className="section amenities-section" id="experience" aria-labelledby="amenities-title"><div className="wrap"><div className="section-heading compact"><div><p className="eyebrow">На территории</p><h2 className="display-title" id="amenities-title">Отдых, встречи<br/>и бытовой комфорт</h2></div><p className="section-aside">Используем только подтверждённые объекты и сервисы.</p></div><div className="amenity-list"><article><span>01</span><h3>Собственный пляж</h3></article><article><span>02</span><h3>SPA и массаж</h3></article><article><span>03</span><h3>Бильярд</h3></article><article><span>04</span><h3>Конференц-зал</h3></article><article><span>05</span><h3>Прачечная</h3></article><article><span>06</span><h3>Сауна и бассейн</h3></article></div><div className="visual-proof"><figure><img src="/media/three-crowns/conference.webp" alt="Конференц-зал Три Короны" loading="lazy"/><figcaption>Конференц-зал</figcaption></figure><figure><img src="/media/three-crowns/hero-resort.webp" alt="Территория Три Короны" loading="lazy"/><figcaption>Зелёная территория</figcaption></figure><figure><img src="/media/three-crowns/lake-night.webp" alt="Иссык-Куль ночью" loading="lazy"/><figcaption>Вечер у озера</figcaption></figure></div></div></section>
-    <section className="section groups-section" aria-labelledby="groups-title"><div className="wrap groups-layout"><div><p className="eyebrow light">Группы и события</p><h2 className="display-title light" id="groups-title">Пространство для<br/>совместных поездок.</h2></div><div><p>Конференц-зал и номерной фонд позволяют отдельно работать с корпоративными и групповыми запросами. Расчёт делает менеджер под даты и состав группы.</p><a className="button button-accent" href="tel:+996558085002">Обсудить поездку</a><div className="group-photo-caption">Реальный конференц-зал отеля используется фоном этого блока.</div></div></div></section>
-    <section className="section gallery-section" id="gallery" aria-labelledby="gallery-title"><div className="wrap section-heading"><div><p className="eyebrow">Атмосфера</p><h2 className="display-title" id="gallery-title">Территория, номера,<br/>Иссык-Куль.</h2></div><p className="section-aside">Ключевые кадры на странице — из актуального медиапакета «Трёх Корон».</p></div><ResortGallery images={galleryImages}/></section>
-    <section className="section booking-story" id="booking-how" aria-labelledby="booking-story-title"><div className="wrap"><div className="booking-story-head"><p className="eyebrow light">Как работает бронирование</p><h2 className="display-title light" id="booking-story-title">Сначала реальная доступность.<br/>Потом подтверждение.</h2><p>Поиск на сайте опирается на Resort Core и тот же инвентарь, который используется PMS.</p></div><div className="booking-steps">{bookingSteps.map(([num,title,text])=><article key={num}><span>{num}</span><h3>{title}</h3><p>{text}</p></article>)}</div><div className="booking-truth"><strong>Важно</strong><p>Отправленная заявка — ещё не действующая бронь и не блокирует номер автоматически. Бронь подтверждается после согласования условий и предоплаты менеджером.</p></div></div></section>
-    <section className="section contact-section" id="contacts" aria-labelledby="contacts-title"><div className="wrap contact-layout"><div><p className="eyebrow">Контакты</p><h2 className="display-title" id="contacts-title">Чолпон-Ата.<br/>Иссык-Куль.</h2><p className="lead">По датам, категории и групповым запросам можно сразу связаться с бронированием.</p></div><div className="contact-list"><a href="tel:+996558085002"><span>Бронирование</span><strong>+996 558 08 50 02</strong></a><a href="https://wa.me/996558085008" target="_blank" rel="noreferrer"><span>WhatsApp менеджера</span><strong>+996 558 08 50 08</strong></a><a href="mailto:3koronykg@mail.ru"><span>Email</span><strong>3koronykg@mail.ru</strong></a><div><span>Местоположение</span><strong>Чолпон-Ата, Иссык-Кульская область, Кыргызстан</strong></div></div></div></section>
-    <section className="final-cta" aria-labelledby="final-title"><div className="wrap final-cta-layout"><div><p className="eyebrow light">Ваши даты</p><h2 className="display-title light" id="final-title">Посмотрите, что свободно<br/>именно сейчас.</h2></div><a className="button button-accent" href="#booking">Проверить наличие</a></div></section>
-  </main>
-  <footer className="site-footer"><div className="wrap footer-top"><a className="footer-brand" href="#top"><strong>ТРИ КОРОНЫ</strong><span>Resort & SPA · Issyk-Kul</span></a><nav aria-label="Навигация в подвале"><a href="#rooms">Номера</a><a href="#rates">Цены 2026</a><a href="#resort">Курорт</a><a href="#experience">Отдых</a><a href="#gallery">Галерея</a><a href="#contacts">Контакты</a></nav></div><div className="wrap footer-bottom"><span>© 2026 Три Короны Resort & SPA</span><div><a href="tel:+996558085002">+996 558 08 50 02</a><a href="mailto:3koronykg@mail.ru">3koronykg@mail.ru</a></div></div></footer>
-  <a className="mobile-book" href="#booking">Проверить свободные номера</a>
-</>;}
+
+export default function HomePage() {
+  return <>
+    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(hotelJsonLd) }} />
+    <SiteHeader />
+    <main className="home-page" id="top">
+      <section className="home-hero" aria-labelledby="hero-title">
+        <div className="home-hero-media" aria-hidden="true"><Image src="/media/three-crowns/hero-resort.webp" alt="" fill priority sizes="100vw" /></div>
+        <div className="home-hero-shade" aria-hidden="true" />
+        <div className="wrap home-hero-content">
+          <p className="eyebrow light">Три Короны · Resort & SPA · Чолпон-Ата</p>
+          <h1 id="hero-title">Иссык-Куль.<br />Отдых у самой воды.</h1>
+          <p className="home-hero-copy">84 номера, 12 категорий, собственный пляж, 150-метровый пирс, SPA и открытый бассейн 15×8 м — с реальной проверкой свободных вариантов по вашим датам.</p>
+          <div className="home-hero-actions"><a className="button button-accent" href="#booking">Проверить свободные номера</a><Link className="button button-quiet" href="/rooms">Смотреть 12 категорий</Link></div>
+          <div className="home-hero-facts" aria-label="Ключевые факты"><span>Чолпон-Ата</span><span>84 номера</span><span>12 категорий</span><span>Пирс 150 м</span></div>
+        </div>
+      </section>
+
+      <div className="wrap home-booking-lift"><BookingWidget /></div>
+
+      <section className="home-section home-intro" aria-labelledby="intro-title">
+        <div className="wrap home-intro-grid">
+          <div><p className="eyebrow">Три Короны</p><h2 className="display-title" id="intro-title">Курортный ритм<br />у большого озера</h2></div>
+          <div className="home-intro-copy"><p>Пляж и длинный пирс задают день у воды, SPA и массаж — спокойный вечер, а номерной фонд позволяет выбрать формат от компактной категории до апартаментов.</p><a className="text-link" href="#resort">Посмотреть курорт →</a></div>
+        </div>
+        <div className="wrap home-facts" aria-label="Подтверждённые факты о курорте">
+          <div className="home-fact"><strong>84</strong><span>номерные позиции</span></div>
+          <div className="home-fact"><strong>12</strong><span>категорий размещения</span></div>
+          <div className="home-fact"><strong>150 м</strong><span>пирс у собственного пляжа</span></div>
+          <div className="home-fact"><strong>15×8 м</strong><span>открытый бассейн</span></div>
+        </div>
+      </section>
+
+      <section className="home-section home-rooms" id="rooms" aria-labelledby="rooms-title">
+        <div className="wrap home-section-head">
+          <div><p className="eyebrow">Проживание</p><h2 className="display-title" id="rooms-title">От одноместного номера<br />до апартаментов</h2></div>
+          <div className="home-head-copy"><p>В каталоге показываем только подтверждённые параметры: базовую вместимость, площадь и сезонный прайс. Конфигурацию конкретного номера и дополнительные места подтверждает менеджер.</p><Link className="text-link" href="/rooms">Открыть полный каталог →</Link></div>
+        </div>
+        <div className="wrap home-room-editorial">
+          <figure className="home-room-photo"><Image src="/media/three-crowns/room-double.webp" alt="Номер из актуального медиапакета Три Короны" fill sizes="(max-width: 980px) 100vw, 50vw" /><figcaption className="home-room-photo-caption">Фото номерного фонда из актуального медиапакета. Для каждой категории отдельные фотографии будут привязаны после загрузки и верификации фотопакета.</figcaption></figure>
+          <div className="home-room-list" role="list">{roomCategories.map((room) => <article className="home-room-row" key={room.slug} role="listitem"><span>{room.index}</span><div><h3>{room.name}</h3><p>{room.capacity} · {room.area}</p></div><Link href={`/rooms/${room.slug}`} aria-label={`Подробнее: ${room.name}`}>Подробнее ↗</Link></article>)}</div>
+        </div>
+        <div className="wrap home-room-all"><p>Наличие конкретной категории зависит от выбранных дат и текущего инвентаря Resort Core.</p><Link className="button button-accent" href="/rooms">Сравнить все категории</Link></div>
+      </section>
+
+      <section className="home-section home-rates" id="rates" aria-labelledby="rates-title">
+        <div className="wrap home-section-head">
+          <div><p className="eyebrow">Официальный летний прайс · 2026</p><h2 className="display-title" id="rates-title">Прозрачный ориентир.<br />Точная сумма — по датам.</h2></div>
+          <div className="home-head-copy"><p>Сезонная матрица даёт ориентир за номер в сутки. Итог проживания рассчитывает Core по выбранным ночам и доступной категории.</p><a className="text-link" href="#booking">Рассчитать мои даты →</a></div>
+        </div>
+        <div className="wrap home-rate-bands">{seasonRates.map((rate) => <article className={`home-rate-band ${rate.peak ? "is-peak" : ""}`} key={rate.dates}><span>{rate.index} · {rate.label}</span><h3>{rate.dates}</h3><p>официальный сезонный период</p><strong>{rate.range}</strong></article>)}</div>
+        <div className="wrap home-rate-table-wrap"><table className="home-rate-table"><thead><tr><th>Категория</th><th>1.06–6.07</th><th>7.07–25.08</th><th>26.08–15.09</th></tr></thead><tbody>{roomCategories.map((room) => <tr key={room.slug}><th>{room.name}</th><td>{formatKgs(room.rates.early)} сом</td><td>{formatKgs(room.rates.peak)} сом</td><td>{formatKgs(room.rates.late)} сом</td></tr>)}</tbody></table></div>
+        <div className="wrap home-rate-note"><strong>Важно</strong><p>Летняя матрица отражает официальный прайс 2026. Точный продаваемый тариф, питание и итоговая стоимость для конкретного периода возвращаются системой отеля при поиске.</p></div>
+      </section>
+
+      <section className="home-water" id="resort" aria-labelledby="resort-title">
+        <div className="home-water-media" aria-hidden="true"><Image src="/media/three-crowns/lake-night.webp" alt="" fill sizes="100vw" /></div>
+        <div className="home-water-shade" aria-hidden="true" />
+        <div className="wrap home-water-content"><p className="eyebrow light">Берег Иссык-Куля</p><h2 className="display-title light" id="resort-title">Собственный пляж.<br />Пирс длиной 150 метров.</h2><p className="home-water-copy">Пространство у воды — ключевая часть отдыха в «Трёх Коронах». Здесь мы показываем только те характеристики курорта, которые входят в текущую подтверждённую публичную базу проекта.</p><div className="home-water-tags"><span>Собственный пляж</span><span>Пирс 150 м</span><span>Открытый бассейн 15×8 м</span></div></div>
+      </section>
+
+      <section className="home-section home-wellness" id="experience" aria-labelledby="wellness-title">
+        <div className="wrap home-wellness-grid">
+          <div className="home-wellness-copy"><p className="eyebrow">SPA & Wellness</p><h2 className="display-title" id="wellness-title">Спокойное продолжение<br />дня у озера</h2><p className="lead">В текущую подтверждённую публичную инфраструктуру входят SPA, массаж и открытый бассейн 15×8 м. Остальные сервисы публикуем только после отдельной проверки их актуальной операционной доступности.</p><div className="home-wellness-tags"><span>SPA</span><span>Массаж</span><span>Бассейн 15×8 м</span></div><a className="button button-dark" href="#booking">Выбрать даты</a></div>
+          <figure className="home-wellness-photo"><Image src="/media/three-crowns/hero-resort.webp" alt="Территория Три Короны Resort & SPA" fill sizes="(max-width: 980px) 100vw, 55vw" /><figcaption>Три Короны · Чолпон-Ата · Иссык-Куль</figcaption></figure>
+        </div>
+      </section>
+
+      <section className="home-section home-gallery" id="gallery" aria-labelledby="gallery-title">
+        <div className="wrap home-section-head"><div><p className="eyebrow">Галерея</p><h2 className="display-title" id="gallery-title">Только локальные<br />материалы проекта</h2></div><div className="home-head-copy"><p>Сейчас используются три материализованных фотографии из репозитория. Категорийные фото будут расширены после загрузки собственником полного медиапакета в подготовленную структуру Drive.</p></div></div>
+        <ResortGallery images={galleryImages} />
+      </section>
+
+      <section className="home-section home-booking-journey" aria-labelledby="journey-title">
+        <div className="wrap home-section-head"><div><p className="eyebrow">Как бронируем</p><h2 className="display-title" id="journey-title">Четыре понятных шага</h2></div><div className="home-head-copy"><p>Сайт не создаёт ложную «бронь» до оплаты. Он проверяет живой инвентарь, принимает заявку и передаёт её менеджеру.</p></div></div>
+        <div className="wrap home-steps">{bookingSteps.map(([index, title, text]) => <article className="home-step" key={index}><span>{index}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
+      </section>
+
+      <section className="home-section home-contacts" id="contacts" aria-labelledby="contacts-title">
+        <div className="wrap home-section-head"><div><p className="eyebrow">Контакты</p><h2 className="display-title" id="contacts-title">Связаться с бронированием</h2></div><div className="home-head-copy"><p>Три Короны Resort & SPA находится в Чолпон-Ате, Иссык-Кульская область. Для бронирования используйте подтверждённый телефон или email.</p></div></div>
+        <div className="wrap home-contact-grid"><a className="home-contact-card" href="tel:+996558085002"><div><span>Телефон бронирования</span><strong>+996 558 08 50 02</strong><p>Нажмите, чтобы позвонить</p></div><b>Позвонить →</b></a><a className="home-contact-card" href="mailto:3koronykg@mail.ru"><div><span>Email</span><strong>3koronykg@mail.ru</strong><p>Чолпон-Ата · Иссык-Куль</p></div><b>Написать →</b></a></div>
+      </section>
+
+      <section className="home-final" aria-labelledby="final-title"><div className="wrap home-final-grid"><div><p className="eyebrow light">Ваши даты</p><h2 className="display-title" id="final-title">Проверьте свободные номера<br />в системе отеля</h2><p>Вы увидите только фактически доступные категории и стоимость для выбранного периода.</p></div><div className="home-final-actions"><a className="button button-accent" href="#booking">Проверить даты</a><a className="button button-quiet" href="tel:+996558085002">Позвонить менеджеру</a></div></div></section>
+    </main>
+
+    <footer className="home-footer"><div className="wrap home-footer-inner"><strong>Три Короны · Resort & SPA</strong><div className="home-footer-links"><Link href="/rooms">Номера</Link><a href="/#booking">Бронирование</a><a href="tel:+996558085002">+996 558 08 50 02</a></div></div></footer>
+    <a className="mobile-book" href="#booking">Проверить свободные номера</a>
+  </>;
+}
