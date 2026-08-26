@@ -1,0 +1,38 @@
+services:
+  edge:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      staff:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL}
+      PUBLIC_HOST: ${PUBLIC_HOST:-3korony.com}
+      WWW_HOST: ${WWW_HOST:-www.3korony.com}
+      PMS_HOST: ${PMS_HOST:-pms.3korony.com}
+      STAFF_HOST: ${STAFF_HOST:-staff.3korony.com}
+      CORE_HOST: ${CORE_HOST:-core.3korony.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [resort]
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  caddy_data:
+  caddy_config:
