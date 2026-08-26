@@ -16,6 +16,7 @@ import "./chessboard-payment.css";
 import "./chessboard-v2.css";
 import "./chessboard-v3.css";
 import "./chessboard-v3-fixes.css";
+import "./chessboard-v4.css";
 
 export const metadata: Metadata = {
   title: "Три Короны — PMS",
