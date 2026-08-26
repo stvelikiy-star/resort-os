@@ -3,6 +3,7 @@ import "./globals.css";
 import "./premium-expansion.css";
 import "./final-polish.css";
 import "./home-v2.css";
+import "./action-v3.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://3korony.com"),
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
 };
 
-export const viewport: Viewport = { themeColor: "#0b2d63", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#07140f", colorScheme: "light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="ru"><body>{children}</body></html>;
