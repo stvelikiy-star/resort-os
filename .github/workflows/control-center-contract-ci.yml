@@ -35,11 +35,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: |
-            apps/admin/package-lock.json
-            apps/web/package-lock.json
-            apps/staff/package-lock.json
 
       - name: Install application dependencies
         run: |
