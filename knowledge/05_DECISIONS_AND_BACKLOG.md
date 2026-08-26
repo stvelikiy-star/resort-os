@@ -1,6 +1,6 @@
 # RESORT OS — DECISIONS AND BACKLOG
 
-Version: 0.1
+Version: 0.2
 Lifecycle: ACTIVE
 Canonical: YES
 Document Type: Decisions, Validation Queue & Product Backlog
@@ -10,6 +10,7 @@ Depends On:
 - 01_DOMAIN_BUSINESS_RULES.md
 - 02_SYSTEM_ARCHITECTURE.md
 - 03_AI_ADMIN.md
+- 04_CURRENT_STATE.md for factual implementation evidence
 
 ---
 
@@ -72,6 +73,8 @@ WHAT SHOULD BE DONE NEXT?
 05_DECISIONS_AND_BACKLOG.md
 = WHAT MUST BE DECIDED / VALIDATED / DONE NEXT
 
+Supporting property documents `06`, `07` and `08` are subordinate to canonical `00`–`05`. They may elaborate implementation requirements, execution order or decision extracts, but they must not independently redefine Product, Domain, Architecture, AI or factual Current State truth.
+
 ---
 
 # 3. STATUS MODEL
@@ -107,6 +110,9 @@ VERIFIED
 
 BLOCKED
 = работа не может продолжаться без недостающих данных, доступа, решения или зависимости.
+
+RESOLVED
+= исторический blocker/question закрыт подтверждённым evidence/decision и хранится для traceability.
 
 REJECTED
 = решение сознательно отклонено.
@@ -586,6 +592,100 @@ VERIFIED требует соответствующих проверок и evide
 
 ---
 
+## DECISION D-019
+
+TITLE:
+THREE CROWNS CLIENT AUTOMATION BOUNDARY
+
+STATUS:
+APPROVED
+
+AREA:
+Three Crowns / Client Automation
+
+DECISION:
+
+Для активного Three Crowns V1 утверждён следующий client orchestration boundary:
+
+Instagram -> ManyChat -> n8n;
+
+WhatsApp -> API Green -> n8n;
+
+other client channels may use n8n where appropriate;
+
+public booking website -> Resort Core directly.
+
+n8n / AI может использовать authoritative Core facts и создавать/read ReservationRequest, но не может напрямую писать PostgreSQL, придумывать availability/price/policy, подтверждать payment, создавать guaranteed Reservation вне controlled human conversion, check-in/out/refund или мутировать hotel money.
+
+Фактическая реализация и verification принадлежат только 04_CURRENT_STATE.md.
+
+---
+
+## DECISION D-020
+
+TITLE:
+THREE CROWNS MANAGER-MANUAL PREPAYMENT BOUNDARY
+
+STATUS:
+APPROVED
+
+AREA:
+Three Crowns / Payments / V1
+
+DECISION:
+
+Для активного Three Crowns V1:
+
+manager decides prepayment amount, terms and method;
+
+manager collects payment manually;
+
+Resort OS records manager-confirmed internal payment facts;
+
+automation does not choose amount/method, generate payment links, collect money or decide sufficiency;
+
+automated acquiring/payment-provider integration is not a V1 launch gate.
+
+Это property-specific решение не закрывает generic Resort OS provider/acquiring/cross-border VALIDATE queue по D-015.
+
+---
+
+## DECISION D-021
+
+TITLE:
+THREE CROWNS NFC DEFERRED
+
+STATUS:
+APPROVED / DEFER
+
+AREA:
+Three Crowns / NFC
+
+DECISION:
+
+NFC / wristband / internal-wallet work исключён из активного Three Crowns V1 queue. Dormant source/schema evidence может оставаться. Reactivation требует нового explicit owner decision.
+
+---
+
+## DECISION D-022
+
+TITLE:
+THREE CROWNS PMS CHESSBOARD PRIMARY DAILY SURFACE
+
+STATUS:
+APPROVED
+
+AREA:
+Three Crowns / PMS / UX
+
+DECISION:
+
+PMS chessboard является primary daily operating surface Three Crowns и должен использовать ту же Resort Core truth, что reception, operations, finance и public availability.
+
+Фактическая реализация и verification принадлежат только 04_CURRENT_STATE.md.
+
+---
+
 # 8. CURRENT PROJECT REALITY
 
 Canonical implementation reality is maintained in:
@@ -599,48 +699,48 @@ This document may reference Current State when prioritizing decisions and backlo
 ## BLOCKER B-001
 
 TITLE:
-CURRENT STATE NOT ESTABLISHED
+CURRENT STATE BASELINE ESTABLISHED
 
 STATUS:
-BLOCKED
+RESOLVED
 
 AREA:
 Project Baseline
 
-PROBLEM:
+HISTORICAL PROBLEM:
 
-Невозможно корректно определить фактический GAP между Target Product и Existing Implementation без evidence существующего проекта.
+На bootstrap-этапе Knowledge Pack отсутствовало достаточное evidence реального проекта для корректного GAP между Target Product и Existing Implementation.
 
-REQUIRED INPUT:
+RESOLUTION:
 
-real project source;
-repository/archive;
-configuration where appropriate;
-database/migrations/schema where available;
-tests;
-relevant technical documentation.
+Реальный repository `stvelikiy-star/resort-os`, schema, code, workflows/tests и deployment artifacts доступны и проаудированы.
 
-RESULT WHEN RESOLVED:
+Canonical factual implementation reality теперь поддерживается в:
 
 04_CURRENT_STATE.md
 
+B-001 является historical traceability record и не должен использоваться как текущий blocker, пока 04_CURRENT_STATE.md не зафиксирует новую фактическую потерю project evidence.
+
 ---
 
-# 10. REQUIRED FUTURE CURRENT STATE AUDIT
+# 10. CONTINUOUS CURRENT STATE AUDIT
 
-Status: PLANNED
-Execution: BLOCKED
+Status: ACTIVE
+Execution: EVIDENCE-DRIVEN
 
-Когда реальный проект станет доступен, выполнить:
+Current State уже установлен и больше не является future bootstrap task.
 
-REAL PROJECT
-→ AUDIT
+После каждого meaningful implementation change выполнять:
+
+REAL CODE / SYSTEM
+→ TEST / AUDIT
 → EVIDENCE
+→ VERIFIED / NOT VERIFIED
 → 04_CURRENT_STATE.md
 → TARGET VS CURRENT
 → GAP
 
-Audit должен установить как минимум:
+Периодический audit должен устанавливать/перепроверять как минимум:
 
 technology stack;
 
@@ -765,6 +865,8 @@ confirmation timeout;
 deposit/guarantee relationship.
 
 Не утверждать значения автоматически.
+
+Three Crowns property-specific approved behavior does not automatically resolve these generic Resort OS rules.
 
 ---
 
@@ -904,6 +1006,8 @@ closing/reopening;
 
 audit.
 
+Three Crowns D-020 определяет локальный V1 manual-prepayment boundary, но не закрывает generic finance domain model.
+
 ---
 
 # 18. DOMAIN DECISION QUEUE — PARTNERS
@@ -961,6 +1065,8 @@ Housekeeping statuses;
 Maintenance statuses;
 
 Guest Request statuses.
+
+Property-specific implemented states do not automatically become generic Resort OS rules.
 
 ---
 
@@ -1119,6 +1225,8 @@ identity linking;
 
 operational suitability.
 
+Three Crowns D-019 утверждает property orchestration boundary, но не делает каждый generic provider/channel integration universally VERIFIED.
+
 ---
 
 # 24. PAYMENT VALIDATION QUEUE
@@ -1126,7 +1234,7 @@ operational suitability.
 Status:
 VALIDATE
 Priority:
-HIGH BEFORE PAYMENT IMPLEMENTATION
+HIGH BEFORE GENERIC PAYMENT-PROVIDER IMPLEMENTATION
 
 Необходимо исследовать:
 
@@ -1165,6 +1273,8 @@ compliance;
 legal constraints.
 
 Нельзя выбирать provider на основании предположений.
+
+Three Crowns D-020 intentionally uses manager-manual prepayment for active property V1 and therefore does not require generic provider selection as a Three Crowns V1 launch gate. Generic Resort OS payment-provider implementation remains VALIDATE.
 
 ---
 
@@ -1365,7 +1475,7 @@ demonstrable;
 
 implementable.
 
-Но exact V1 scope не должен определяться только из длинного списка Product Bible.
+Но exact generic Resort OS V1 scope не должен определяться только из длинного списка Product Bible.
 
 Он зависит от:
 
@@ -1380,6 +1490,8 @@ dependencies;
 commercial validation;
 
 implementation cost.
+
+Three Crowns D-019…D-022 формируют property-specific active V1 boundary и не должны автоматически считаться generic Resort OS V1 definition.
 
 ---
 
@@ -1687,51 +1799,49 @@ complex revenue management.
 
 # 41. IMMEDIATE NEXT PHASE
 
-Current Knowledge baseline:
+Current canonical Knowledge baseline:
 
 00_PRODUCT_BIBLE.md
-= CREATED
+= ACTIVE PRODUCT TARGET
 
 01_DOMAIN_BUSINESS_RULES.md
-= CREATED
+= ACTIVE DOMAIN RULES
 
 02_SYSTEM_ARCHITECTURE.md
-= CREATED
+= ACTIVE TARGET ARCHITECTURE
 
 03_AI_ADMIN.md
-= CREATED
+= ACTIVE AI RULES
 
 04_CURRENT_STATE.md
-= BLOCKED UNTIL REAL PROJECT EVIDENCE
+= ESTABLISHED / CONTINUOUSLY EVIDENCE-UPDATED CURRENT STATE
 
 05_DECISIONS_AND_BACKLOG.md
-= CREATED
+= ACTIVE DECISION / VALIDATION / BACKLOG REGISTER
 
-Следующий meaningful project phase после появления реального проекта:
+Supporting Three Crowns documents:
 
-REAL PROJECT
-→ CURRENT STATE AUDIT
-→ 04_CURRENT_STATE.md
-→ GAP ANALYSIS
-→ FIRST P0/P1 DECISION
+06_THREE_CROWNS_MASTER_SPEC.md
+= SUBORDINATE PROPERTY IMPLEMENTATION SPECIFICATION
 
-До появления проекта допустимо продолжать:
+07_EXECUTION_PLAN_THREE_CROWNS.md
+= SUPPORTING EXECUTION PLAN
 
-Product decisions;
+08_CLIENT_AUTOMATION_N8N_BOUNDARY.md
+= SUPPORTING DECISION EXTRACT
 
-Domain Business Rule decisions;
+Следующий meaningful phase выбирается не после появления проекта — real project уже существует — а из verified Current State:
 
-ICP validation;
+VERIFIED CURRENT STATE
+→ GAP
+→ PRIORITY / DECISION
+→ ONE BOUNDED P0/P1 TASK
+→ IMPLEMENT
+→ TEST
+→ EVIDENCE
+→ UPDATE 04_CURRENT_STATE.md
 
-V1 scope analysis;
-
-integration research;
-
-payment research;
-
-AI architecture decisions.
-
-Но нельзя выдавать это за Current State.
+Generic Product/Domain/ICP/V1/integration/payment/AI validation queues остаются открытыми там, где отдельного canonical decision/evidence нет.
 
 ---
 
