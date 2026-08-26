@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'packages/database/package.json'
+      - 'packages/database/package-lock.json'
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/**'
       - 'packages/database/sql/**'
@@ -15,6 +16,7 @@ on:
     branches: [main]
     paths:
       - 'packages/database/package.json'
+      - 'packages/database/package-lock.json'
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/**'
       - 'packages/database/sql/**'
@@ -70,6 +72,27 @@ jobs:
           fi
           grep -q 'baseline generation is disabled' /tmp/generator-prod.err
 
+      - name: Install exact reviewed database toolchain
+        working-directory: packages/database
+        run: |
+          set -euo pipefail
+          BASELINE=prisma/migrations/0_init/migration.sql
+          EXPECTED="$(node -p "require('./package.json').devDependencies.prisma")"
+          test "$EXPECTED" = '6.15.0'
+          if [ -s "$BASELINE" ] && [ ! -s package-lock.json ]; then
+            echo 'ERROR: committed baseline requires a committed package-lock.json from the reviewed baseline artifact' >&2
+            exit 1
+          fi
+          if [ -s package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+            test -s package-lock.json
+          fi
+          INSTALLED="$(node -p "require('./node_modules/prisma/package.json').version")"
+          test "$INSTALLED" = "$EXPECTED"
+          npx --no-install prisma validate
+
       - name: Materialize baseline for this source
         run: |
           set -euo pipefail
@@ -91,6 +114,7 @@ jobs:
           MIGRATION_DIR=packages/database/prisma/migrations/0_init
           test -s "$MIGRATION_DIR/migration.sql"
           test -s "$MIGRATION_DIR/migration.sql.sha256"
+          test -s packages/database/package-lock.json
           grep -q 'no_overlapping_active_room_blocks' "$MIGRATION_DIR/migration.sql"
           grep -q 'payment_positive_amount' "$MIGRATION_DIR/migration.sql"
           grep -q 'payment_has_context' "$MIGRATION_DIR/migration.sql"
@@ -100,8 +124,8 @@ jobs:
       - name: Apply baseline to clean PostgreSQL with Prisma migration history
         working-directory: packages/database
         run: |
-          npx prisma migrate deploy
-          npx prisma migrate status
+          npx --no-install prisma migrate deploy
+          npx --no-install prisma migrate status
 
       - uses: actions/setup-python@v5
         with:
@@ -140,12 +164,13 @@ jobs:
           test "$migration_count" = '1'
           test "$overlap_guard_count" = '1'
 
-      - name: Upload exact-head baseline for explicit review
+      - name: Upload exact-head baseline toolchain for explicit review
         uses: actions/upload-artifact@v4
         with:
           name: three-crowns-migration-baseline-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             packages/database/prisma/migrations/0_init/migration.sql
             packages/database/prisma/migrations/0_init/migration.sql.sha256
+            packages/database/package-lock.json
           if-no-files-found: error
           retention-days: 7
