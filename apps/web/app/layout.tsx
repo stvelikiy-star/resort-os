@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./premium-expansion.css";
 import "./final-polish.css";
+import "./home-v2.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://3korony.com"),
