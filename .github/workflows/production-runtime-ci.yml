@@ -189,5 +189,5 @@ jobs:
           docker compose --env-file /tmp/production.env \
             -f compose.production.yaml \
             -f compose.production.edge.yaml \
-            run --rm --no-deps migrator sh -lc \
-            'npx prisma --version | grep -F "prisma                  : 6.15.0"'
+            run --rm --no-deps migrator node -e \
+            'const v=require("prisma/package.json").version; if(v!=="6.15.0"){console.error(`unexpected Prisma ${v}`); process.exit(1)}'
