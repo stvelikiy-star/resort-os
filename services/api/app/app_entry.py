@@ -9,8 +9,6 @@ from .hotel_finance import router as hotel_finance_router
 from .inbox import router as inbox_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
-from .nfc import router as nfc_router
-from .nfc_reporting import router as nfc_reporting_router
 from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
@@ -62,8 +60,6 @@ app.include_router(ai_sales_router)
 app.include_router(realtime_router)
 app.include_router(manager_dashboard_router)
 
-# NFC remains composed for backward compatibility with existing implementation,
-# but it is explicitly deferred from the active Three Crowns engineering plan.
-app.include_router(nfc_router)
-app.include_router(nfc_reporting_router)
-app.version = "0.28.0"
+# NFC implementation remains dormant in source and is intentionally not composed
+# into the active Resort Core application until the owner explicitly reactivates it.
+app.version = "0.29.0"
