@@ -19,6 +19,14 @@ export default function ActionRuntime() {
       });
     };
 
+    const onPointerMove = (event: PointerEvent) => {
+      if (reduced || event.pointerType === "touch") return;
+      const x = ((event.clientX / window.innerWidth) - 0.5) * 16;
+      const y = ((event.clientY / window.innerHeight) - 0.5) * 10;
+      root.style.setProperty("--action-pointer-x", `${x.toFixed(2)}px`);
+      root.style.setProperty("--action-pointer-y", `${y.toFixed(2)}px`);
+    };
+
     const revealNodes = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]"));
     let observer: IntersectionObserver | null = null;
 
@@ -42,12 +50,14 @@ export default function ActionRuntime() {
     document.body.classList.add("action-ready");
     window.addEventListener("scroll", updateScroll, { passive: true });
     window.addEventListener("resize", updateScroll, { passive: true });
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
     updateScroll();
 
     return () => {
       document.body.classList.remove("action-ready");
       window.removeEventListener("scroll", updateScroll);
       window.removeEventListener("resize", updateScroll);
+      window.removeEventListener("pointermove", onPointerMove);
       observer?.disconnect();
       if (raf) window.cancelAnimationFrame(raf);
     };
