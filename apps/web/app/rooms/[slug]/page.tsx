@@ -64,7 +64,7 @@ export default async function RoomCategoryPage({ params }: RoomPageProps) {
         </div>
       </section>
 
-      <div className="wrap room-detail-booking" id="booking"><BookingWidget /></div>
+      <div className="wrap room-detail-booking"><BookingWidget /></div>
     </main>
     <footer className="rooms-footer"><div className="wrap rooms-footer-inner"><strong>Три Короны · Resort & SPA</strong><a href="tel:+996558085002">Бронирование: +996 558 08 50 02</a></div></footer>
   </>;
