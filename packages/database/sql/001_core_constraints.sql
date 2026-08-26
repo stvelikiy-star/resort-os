@@ -35,8 +35,27 @@ ALTER TABLE "payments"
   ADD CONSTRAINT payment_has_context CHECK ("requestId" IS NOT NULL OR "reservationId" IS NOT NULL);
 
 -- Operational task creation can be initiated from several manager/automation
--- surfaces. The database is the final concurrency boundary: for a room there
--- may be at most one active HOUSEKEEPING task and one active MAINTENANCE task.
+-- surfaces. Before installing the invariant, fail closed if historical data
+-- already violates it. Never delete or merge tasks automatically during a
+-- migration: operators must reconcile the conflicting active records first.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM operational_tasks
+    WHERE "roomId" IS NOT NULL
+      AND type IN ('HOUSEKEEPING', 'MAINTENANCE')
+      AND status IN ('OPEN', 'IN_PROGRESS', 'IN_INSPECTION')
+    GROUP BY "roomId", type
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'active operational task duplicates exist; reconcile same-room/same-type HOUSEKEEPING or MAINTENANCE tasks before applying the invariant';
+  END IF;
+END
+$$;
+
+-- The database is the final concurrency boundary: for a room there may be at
+-- most one active HOUSEKEEPING task and one active MAINTENANCE task.
 -- Completed/cancelled history remains unlimited, and GUEST_REQUEST is not
 -- constrained because multiple independent guest requests may legitimately
 -- be active for the same room.
