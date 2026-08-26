@@ -75,6 +75,14 @@ const STATE_LABELS: Record<Room["operational_state"], string> = {
   TECH_BLOCK: "Ремонт",
 };
 
+const RESERVATION_STATUS_LABELS: Record<string, string> = {
+  GUARANTEED: "Ожидает заезд",
+  CHECKED_IN: "Проживает",
+  CHECKED_OUT: "Выехал",
+  CANCELLED: "Отменена",
+  NO_SHOW: "Не заехал",
+};
+
 const VIEW_LABELS: Array<{ key: DailyView; label: string }> = [
   { key: "ALL", label: "Все номера" },
   { key: "ARRIVALS", label: "Заезды сегодня" },
@@ -123,6 +131,12 @@ function daysBetween(left: string, right: string) {
 function blockTitle(block: Block) {
   if (block.type === "RESERVATION") return block.guest_name || block.booking_number || "Бронь";
   return block.reason || (block.type === "MAINTENANCE" ? "Ремонт" : "Блок");
+}
+
+function blockSubtitle(block: Block) {
+  if (block.type !== "RESERVATION") return block.reason || "";
+  const status = block.reservation_status ? RESERVATION_STATUS_LABELS[block.reservation_status] || block.reservation_status : null;
+  return [block.booking_number, status].filter(Boolean).join(" · ");
 }
 
 function websocketBase() {
@@ -437,7 +451,16 @@ export default function PMSGridV2() {
     </section>
 
     <section className="pms-v2-card">
-      <div className="pms-v2-toolbar"><div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div><div className="pms-v2-help"><span>Перетащить = номер + дата</span><span>Потянуть внешний край = даты</span><span>Клик = карточка / переселение / заезд</span></div></div>
+      <div className="pms-v2-toolbar">
+        <div><strong>{startIso}</strong> — <strong>{localDateString(addDays(end, -1))}</strong></div>
+        <div className="pms-v2-help"><span>Перетащить = номер + дата</span><span>Потянуть внешний край = даты</span><span>Клик = карточка / переселение / заезд</span></div>
+      </div>
+      <div className="pms-v2-legend" aria-label="Легенда шахматки">
+        <span className="legend-item"><i className="legend-swatch guaranteed" />Ожидает заезд</span>
+        <span className="legend-item"><i className="legend-swatch checked-in" />Проживает</span>
+        <span className="legend-item"><i className="legend-swatch maintenance" />Ремонт</span>
+        <span className="legend-item"><i className="legend-swatch manual" />Служебный блок</span>
+      </div>
       {error && <div className="error-box">{error}</div>}
       {loading && !data ? <div className="loading">Загрузка шахматки…</div> : rooms.length === 0 ? <div className="empty">Нет номеров по выбранным фильтрам.</div> : <div className="pms-v2-scroll">
         <div className="pms-v2-board" style={{ minWidth: `${308 + windowDays * 72}px` }}>
@@ -474,8 +497,9 @@ export default function PMSGridV2() {
               const place = blockPlacement(visualBlock);
               if (!place) return null;
               const draggable = interactive && block.reservation_status === "GUARANTEED" && bounds?.segments === 1 && !resizing;
+              const reservationStatusClass = interactive && block.reservation_status ? `reservation-status-${block.reservation_status}` : "";
 
-              return <div key={block.id} className={`v2-booking-bar ${block.type} ${interactive ? "interactive" : ""} ${draggable ? "draggable" : ""} ${resizing ? "resizing" : ""}`} style={{ gridColumn: place.column }} draggable={draggable} onDragStart={(event) => {
+              return <div key={block.id} className={`v2-booking-bar ${block.type} ${reservationStatusClass} ${interactive ? "interactive" : ""} ${draggable ? "draggable" : ""} ${resizing ? "resizing" : ""}`} style={{ gridColumn: place.column }} draggable={draggable} onDragStart={(event) => {
                 if (!draggable || !block.reservation_id) return;
                 setDraggingReservationId(block.reservation_id);
                 event.dataTransfer.effectAllowed = "move";
@@ -483,7 +507,7 @@ export default function PMSGridV2() {
               }} onDragEnd={() => { setDraggingReservationId(null); setDropRoomId(null); setDropDate(null); }}>
                 {canResizeLeft && block.reservation_id ? <button className="v2-resize-handle left" title="Потянуть дату заезда" aria-label="Изменить дату заезда" onPointerDown={(event) => beginResize(event, block, "LEFT")} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); } }}>‹</button> : <span className="v2-resize-spacer" />}
                 <button className="v2-bar-main" disabled={!interactive} onClick={() => interactive && block.reservation_id && setSelectedReservation({ id: block.reservation_id })} title={`${blockTitle(block)} · ${block.start} → ${block.end}${draggable ? " · можно перетащить по номеру и дате" : bounds && bounds.segments > 1 ? " · составное размещение: перенос через карточку" : ""}`}>
-                  <strong>{blockTitle(block)}</strong><span>{block.booking_number || block.reason || ""}</span>
+                  <strong>{blockTitle(block)}</strong><span>{blockSubtitle(block)}</span>
                 </button>
                 {canResizeRight && block.reservation_id ? <button className="v2-resize-handle right" title="Потянуть дату выезда" aria-label="Изменить дату выезда" onPointerDown={(event) => beginResize(event, block, "RIGHT")} onKeyDown={(event) => { if (["Enter", " "].includes(event.key)) { event.preventDefault(); setSelectedReservation({ id: block.reservation_id!, initialMode: "DATES" }); } }}>›</button> : <span className="v2-resize-spacer" />}
                 {resizing && <span className="v2-resize-live">{resizeDraft.checkIn} → {resizeDraft.checkOut}</span>}
