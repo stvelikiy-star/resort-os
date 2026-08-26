@@ -13,6 +13,30 @@ TASK_STATUSES = {"OPEN", "IN_PROGRESS", "IN_INSPECTION", "DONE", "CANCELLED"}
 TASK_PRIORITIES = {"LOW", "NORMAL", "HIGH", "URGENT"}
 ROOM_STATES = {"UNKNOWN", "CLEAN", "DIRTY", "IN_INSPECTION", "TECH_BLOCK"}
 
+TASK_TRANSITIONS: dict[str, dict[str, set[str]]] = {
+    "HOUSEKEEPING": {
+        "OPEN": {"IN_PROGRESS", "CANCELLED"},
+        "IN_PROGRESS": {"IN_INSPECTION", "CANCELLED"},
+        "IN_INSPECTION": {"IN_PROGRESS", "DONE", "CANCELLED"},
+        "DONE": set(),
+        "CANCELLED": set(),
+    },
+    "MAINTENANCE": {
+        "OPEN": {"IN_PROGRESS", "CANCELLED"},
+        "IN_PROGRESS": {"DONE", "CANCELLED"},
+        "IN_INSPECTION": set(),
+        "DONE": set(),
+        "CANCELLED": set(),
+    },
+    "GUEST_REQUEST": {
+        "OPEN": {"IN_PROGRESS", "CANCELLED"},
+        "IN_PROGRESS": {"DONE", "CANCELLED"},
+        "IN_INSPECTION": set(),
+        "DONE": set(),
+        "CANCELLED": set(),
+    },
+}
+
 
 class TaskCreate(BaseModel):
     type: str
@@ -194,9 +218,10 @@ async def claim_task(
                 current_user_id, task_id,
             )
             await conn.execute(
-                '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
-                   VALUES ($1,$2,'STAFF',$3,'CLAIM','OperationalTask',$4,'STAFF_PWA','SUCCESS',now())''',
-                uuid.uuid4(), pid, user["id"], str(task_id),
+                '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'CLAIM','OperationalTask',$4,'STAFF_PWA','SUCCESS',
+                     jsonb_build_object('from_status',$5::text,'status','IN_PROGRESS'),now())''',
+                uuid.uuid4(), pid, user["id"], str(task_id), task["status"],
             )
     return {"id": str(task_id), "status": "IN_PROGRESS", "assigned_to_id": user["id"]}
 
@@ -226,13 +251,49 @@ async def change_task_status(
             if user["role"] in {"MAID", "TECHNICIAN"} and task["assignedToId"] != uuid.UUID(user["id"]):
                 raise HTTPException(status_code=403, detail="Claim the task before changing its status")
 
-            if user["role"] == "MAID" and payload.status == "DONE":
-                raise HTTPException(status_code=403, detail="Housekeeping completion requires inspection")
+            current_status = task["status"]
+            allowed_targets = TASK_TRANSITIONS.get(task["type"], {}).get(current_status, set())
+            if payload.status not in allowed_targets:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "INVALID_TASK_TRANSITION",
+                        "task_type": task["type"],
+                        "from_status": current_status,
+                        "to_status": payload.status,
+                    },
+                )
+
+            is_manager = user["role"] in {"OWNER", "MANAGER"}
+            if payload.status == "CANCELLED" and not is_manager:
+                raise HTTPException(status_code=403, detail="Only management can cancel an operational task")
+            if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status in {"IN_PROGRESS", "DONE"} and not is_manager:
+                raise HTTPException(status_code=403, detail="Inspection decision can only be made by management")
+
+            room_state = None
+            if task["roomId"]:
+                room_state = await conn.fetchval(
+                    'SELECT "operationalState"::text FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
+                    task["roomId"], pid,
+                )
+
             if task["type"] == "HOUSEKEEPING" and payload.status == "IN_INSPECTION" and task["roomId"]:
-                await conn.execute('UPDATE rooms SET "operationalState"=\'IN_INSPECTION\', "updatedAt"=now() WHERE id=$1', task["roomId"])
+                if room_state != "TECH_BLOCK":
+                    await conn.execute('UPDATE rooms SET "operationalState"=\'IN_INSPECTION\', "updatedAt"=now() WHERE id=$1', task["roomId"])
+            if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status == "IN_PROGRESS" and task["roomId"]:
+                await conn.execute(
+                    'UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1 AND "operationalState"=\'IN_INSPECTION\'',
+                    task["roomId"],
+                )
             if task["type"] == "HOUSEKEEPING" and payload.status == "DONE" and task["roomId"]:
-                if user["role"] not in {"OWNER", "MANAGER"}:
-                    raise HTTPException(status_code=403, detail="Inspection can only be approved by management")
+                if room_state != "IN_INSPECTION":
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "HOUSEKEEPING_ROOM_NOT_IN_INSPECTION",
+                            "room_state": room_state,
+                        },
+                    )
                 await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\', "updatedAt"=now() WHERE id=$1', task["roomId"])
             if task["type"] == "MAINTENANCE" and payload.status == "DONE" and task["roomId"]:
                 await conn.execute('UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1', task["roomId"])
@@ -245,8 +306,8 @@ async def change_task_status(
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES ($1,$2,'STAFF',$3,'STATUS_CHANGE','OperationalTask',$4,'OPS','SUCCESS',
-                     jsonb_build_object('status',$5::text),now())''',
-                uuid.uuid4(), pid, user["id"], str(task_id), payload.status,
+                     jsonb_build_object('from_status',$5::text,'status',$6::text),now())''',
+                uuid.uuid4(), pid, user["id"], str(task_id), current_status, payload.status,
             )
     return {"id": str(task_id), "status": payload.status}
 
