@@ -6,7 +6,16 @@ from fastapi import HTTPException
 
 
 def normalize_required_text(value: str) -> str:
-    return value.strip()
+    normalized = value.strip()
+    if not normalized:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "INVALID_PAYMENT_METHOD",
+                "message": "Payment method must contain a non-whitespace value.",
+            },
+        )
+    return normalized
 
 
 def normalize_optional_text(value: str | None) -> str | None:
