@@ -1,18 +1,27 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.2
+Version: 1.3
 Date: 2026-08-26
-Status: DELIVERY RELEASE CANDIDATE / LATEST MAIN NOT CI-VERIFIED
+Status: DELIVERY RELEASE CANDIDATE / CURRENT EXECUTABLE BASELINE CI-VERIFIED / NOT PRODUCTION READY
 Canonical: YES
 Document Type: Evidence-Based Current System State
+Authority: **This is the only canonical owner of factual implementation reality.**
 
 Critical rule: **TARGET != CURRENT. IMPLEMENTED != VERIFIED. DEVELOPMENT VERIFIED != PRODUCTION READY.**
 
+Supporting property documents (`06`, `07`, `08`) may describe requirements, plans or decision extracts, but they must not redefine Current State. If they conflict with this document about what actually exists, this document controls until new implementation evidence is captured here.
+
 ---
 
-## 1. Canonical architecture
+## 1. Verified code baseline and architecture
 
 Repository: `stvelikiy-star/resort-os`.
+
+Current executable code baseline verified in GitHub Actions:
+
+`9420d48209c8e869a055b2e552e2491c1f19bd63`
+
+That merge contains the CI-recovery baseline plus payment-idempotency hardening. The subsequent docs-only Knowledge synchronization does not change executable code and therefore does not supersede this code-verification anchor.
 
 Current owner-approved V1 architecture:
 
@@ -38,62 +47,78 @@ Client channels are orchestrated outside Resort Core:
 - WhatsApp -> API Green -> n8n;
 - website -> Resort Core directly.
 
-n8n objective = **HOT QUALIFIED LEAD**. It must not write PostgreSQL, confirm payment, create guaranteed Reservation directly, check-in/out/refund or invent price/availability/policy.
+n8n objective = **HOT QUALIFIED LEAD**. It must not write PostgreSQL directly, confirm payment, create guaranteed Reservation directly, check-in/out/refund or invent price/availability/policy.
 
-### NFC owner freeze
+---
+
+## 2. NFC active-scope truth
 
 NFC is **DEFERRED / DORMANT** and excluded from active V1 runtime/work.
 
 Current enforcement:
 - NFC source/schema artifacts may remain as historical/dormant implementation;
 - `app.app_entry:app` does **not** compose NFC/beach payment routers;
-- normal hotel checkout no longer queries or mutates NFC tables;
-- active Staff PWA no longer imports/renders the beach terminal branch;
-- `scripts/release_scope_guard.py` fails if NFC/beach routes are accidentally composed again.
+- normal hotel checkout does not query or mutate NFC tables;
+- active Staff PWA does not expose the beach terminal branch;
+- `scripts/release_scope_guard.py` fails if NFC/beach routes are accidentally composed again;
+- `NFC Deferred Scope CI` is part of the active verification matrix.
 
-Do not reactivate NFC without an explicit owner instruction.
+Do not reactivate NFC without an explicit owner decision recorded through canonical decision authority.
 
 ---
 
-## 2. Prepayment / finance truth
+## 3. Prepayment and finance truth
 
-Owner-approved V1 rule:
+Owner-approved Three Crowns V1 rule:
 - manager decides prepayment amount, terms and payment method;
 - manager collects prepayment manually;
-- no global `PREPAYMENT_PERCENT` exists in the active contract;
+- no global active `PREPAYMENT_PERCENT` exists in the runtime contract;
 - automation does not generate/collect/approve prepayment;
 - Resort OS records manager-confirmed internal payment facts only;
 - `ReservationRequest != Reservation`;
 - unpaid request does not hold inventory;
-- automation cannot say a room is booked until manager-confirmed Reservation truth exists.
+- automation cannot state that a room is booked until manager-confirmed Reservation truth exists.
 
 Current booking flow:
 
 `ReservationRequest -> manager quote of stay value -> manager records accepted payment fact -> atomic Guest + Reservation + InventoryBlock + Payment`.
 
-Booking conversion and additional reservation payments have idempotency protection. A global idempotency key cannot be replayed against another request/reservation; such misuse returns `409 IDEMPOTENCY_CONFLICT`.
+Current payment-idempotency behavior is VERIFIED on the executable baseline:
+- `payments.idempotencyKey` remains globally unique in PostgreSQL;
+- `(provider, externalRef)` remains unique where an external reference exists;
+- exact normalized retries are idempotent;
+- the same key with changed amount/method/external reference returns `409 IDEMPOTENCY_PAYLOAD_MISMATCH`;
+- additional Reservation payments also bind the normalized note to the idempotent payload;
+- the same key used for another request/reservation returns `409 IDEMPOTENCY_CONFLICT`;
+- a different payment operation against an already converted request returns `409 REQUEST_ALREADY_CONVERTED` rather than a false replay;
+- duplicate manager external references return `409 PAYMENT_EXTERNAL_REF_CONFLICT`;
+- whitespace-only normalized payment methods are rejected with `422 INVALID_PAYMENT_METHOD`;
+- transaction-scoped PostgreSQL advisory locks serialize global idempotency-key/external-reference races;
+- focused concurrent tests prove one durable write and deterministic conflict behavior instead of duplicate writes/unique-constraint 500s.
 
 Internal finance is operational control, **not accounting profit/tax/revenue recognition**.
 
+Automated acquiring/payment-provider integration remains outside the active Three Crowns V1 requirement. General Resort OS payment-provider implementation remains a separate VALIDATE decision; the existence of manager-manual recording does not promote a generic provider integration to VERIFIED.
+
 ---
 
-## 3. PMS Chessboard V2 — primary product surface
+## 4. PMS Chessboard V2 — primary product surface
 
-STATUS: **IMPLEMENTED / NOT CI-VERIFIED ON LATEST MAIN**.
+STATUS: **VERIFIED DEVELOPMENT BASELINE**.
 
 Server-authoritative mutation contract:
 - `GET /api/v1/admin/pms/reservations/{id}/schedule`;
 - `POST /api/v1/admin/pms/reservations/{id}/schedule/preview`;
 - `POST /api/v1/admin/pms/reservations/{id}/schedule/commit`.
 
-Implemented capabilities:
+Verified capabilities include:
 - one spanning reservation bar per room/date segment;
 - move a future simple reservation to another room;
-- drag future simple reservation to another room and start date while preserving duration;
-- direct outer-edge pointer resize for check-in/check-out dates;
+- drag a future simple reservation to another room/start date while preserving duration;
+- outer-edge pointer resize for check-in/check-out dates;
 - explicit date editor for touch/tablet;
 - split one Reservation into contiguous room-assignment segments;
-- relocate CHECKED_IN guest from an effective date without rewriting already-lived history;
+- relocate a CHECKED_IN guest from an effective date without rewriting already-lived history;
 - server pricing preview/delta without silently modifying stored commercial total;
 - explicit manager confirmation before commit;
 - stale-version protection;
@@ -101,16 +126,15 @@ Implemented capabilities:
 - PostgreSQL exclusion constraint as final double-booking guard;
 - TECH_BLOCK rejection;
 - immediate relocation requires CLEAN target room;
-- immediate relocation marks old room DIRTY and creates/reuses housekeeping inside the same transaction;
+- immediate relocation dirties the vacated room and creates/reuses housekeeping in the same transaction;
 - AuditLog before/after evidence;
 - realtime PMS snapshots.
 
 Concurrency hardening:
 - Reservation is locked before mutation;
 - active reservation InventoryBlocks are locked separately;
-- room rows are then locked in deterministic sorted order;
-- joined room rows are not accidentally locked earlier by the schedule query;
-- this reduces deadlock risk when two managers mutate schedules concurrently.
+- room rows are locked in deterministic sorted order;
+- joined room rows are not accidentally locked earlier by the schedule query.
 
 Daily quick views:
 - all rooms;
@@ -119,25 +143,18 @@ Daily quick views:
 - in-house;
 - free today.
 
-Recent UI hardening:
-- guaranteed/future Reservation bars are blue;
-- checked-in/current stay bars are green;
-- maintenance and manual blocks have distinct legend colors;
-- bar subtitle includes booking number + human stay state;
-- booking workspace uses human status labels rather than raw enums;
-- checked-in workspace explains that check-in date/already-lived nights are immutable;
-- check-in/check-out actions require explicit manager confirmation.
+UI hardening includes human stay labels, distinct reservation/current-stay/maintenance/manual-block states, quick booking facts, and explicit confirmation for check-in/check-out.
 
 Intermediate relocation segment boundaries are not treated as hotel arrival/departure boundaries.
 
 ---
 
-## 4. Reception / reservation workspace
+## 5. Reception / reservation workspace
 
-STATUS: **IMPLEMENTED / NOT CI-VERIFIED ON LATEST MAIN**.
+STATUS: **VERIFIED DEVELOPMENT BASELINE**.
 
 Schedule-aware behavior:
-- one row per Reservation even when stay uses several rooms;
+- one row per Reservation even when a stay uses several rooms;
 - current/working room is resolved from complete schedule and hotel-local date/status;
 - booking detail returns the complete room route;
 - room tasks are collected across every room used by the stay;
@@ -145,30 +162,22 @@ Schedule-aware behavior:
 - internal payments, paid amount and outstanding balance are visible;
 - recent AuditLog events are visible.
 
-Reception list now shows without opening the card:
-- human stay status;
-- guest and room;
-- dates;
-- manager-recorded paid / total amount;
-- remaining balance or `Оплачено полностью`.
+Reception list exposes stay status, guest/room, dates, manager-recorded paid/total amount and remaining balance/full-payment state.
 
-Check-in/out failures are translated to operator-facing messages for room readiness/date schedule conflicts. Both actions require confirmation in UI.
-
-Chessboard booking modal embeds quick facts and manager actions so reception can work without jumping between many tabs.
+Check-in/out failures are translated to operator-facing room-readiness/date-schedule messages. Both actions require explicit confirmation in UI.
 
 Additional internal payment endpoint:
 - `POST /api/v1/admin/booking/reservations/{id}/payments`;
 - manager-entered positive amount/method/reference/note;
 - provider stored as `MANAGER_MANUAL`;
-- same-reservation retries are idempotent;
-- same idempotency key used by another Reservation returns `409 IDEMPOTENCY_CONFLICT`;
+- payload-bound idempotency and conflict behavior described in section 3;
 - payment fact is audited.
 
 ---
 
-## 5. Stay / room-condition safety
+## 6. Stay / room-condition safety
 
-STATUS: **IMPLEMENTED / NOT CI-VERIFIED ON LATEST MAIN**.
+STATUS: **VERIFIED DEVELOPMENT BASELINE**.
 
 Check-in:
 - only GUARANTEED Reservation;
@@ -188,13 +197,11 @@ Check-out:
 
 ---
 
-## 6. Housekeeping / maintenance transition safety
+## 7. Housekeeping / maintenance transition safety
 
-STATUS: **IMPLEMENTED / NOT CI-VERIFIED ON LATEST MAIN**.
+STATUS: **VERIFIED DEVELOPMENT BASELINE**.
 
-Core now enforces a transition matrix rather than accepting arbitrary task-state jumps.
-
-HOUSEKEEPING:
+HOUSEKEEPING transition matrix:
 - `OPEN -> IN_PROGRESS`;
 - `IN_PROGRESS -> IN_INSPECTION`;
 - manager acceptance: `IN_INSPECTION -> DONE`;
@@ -202,7 +209,7 @@ HOUSEKEEPING:
 - manager may cancel active work;
 - DONE/CANCELLED are terminal.
 
-Room-condition path with rework:
+Room-condition rework path:
 
 `DIRTY -> IN_INSPECTION -> DIRTY -> IN_INSPECTION -> CLEAN`.
 
@@ -210,35 +217,29 @@ Safety rules:
 - skipped transitions return `409 INVALID_TASK_TRANSITION`;
 - line staff must claim/own tasks before changing status;
 - only OWNER/MANAGER decides housekeeping inspection acceptance/rework;
-- housekeeping going to inspection does not overwrite `TECH_BLOCK`;
+- housekeeping inspection does not overwrite `TECH_BLOCK`;
 - housekeeping DONE is allowed only when physical room state is `IN_INSPECTION`;
-- a TECH_BLOCK room therefore cannot be silently turned CLEAN by a housekeeping task;
+- TECH_BLOCK cannot be silently turned CLEAN by housekeeping;
 - maintenance DONE changes room to DIRTY for subsequent housekeeping;
-- AuditLog status changes include previous/new states.
+- AuditLog captures status transitions.
 
-Admin Operations UI includes:
-- assignment/reassignment;
-- `Принять номер → готов`;
-- `Вернуть на доработку`;
-- active-task cancellation;
-- action history.
+Admin Operations includes assignment/reassignment, accept-ready, return-to-rework, active-task cancellation and action history.
 
-Staff PWA active roles:
+Active Staff PWA roles:
 - OWNER;
 - MANAGER;
 - MAID;
 - TECHNICIAN.
 
-MAID flow: unassigned/own housekeeping -> claim -> IN_PROGRESS -> IN_INSPECTION.
-TECHNICIAN flow: maintenance -> claim -> IN_PROGRESS -> DONE.
-
-BEACH_PARTNER terminal flow is not active in current Staff PWA.
+BEACH_PARTNER terminal flow is not active.
 
 Photo/checklist evidence remains future work because exact mandatory checklist rules have not been approved.
 
 ---
 
-## 7. PMS/admin areas
+## 8. PMS/admin and internal finance areas
+
+STATUS: **VERIFIED DEVELOPMENT BASELINE FOR CURRENT CI-COVERED FLOWS**.
 
 Current manager navigation:
 - **Главная** — Command Center;
@@ -250,28 +251,12 @@ Current manager navigation:
 - **Персонал** — roles, task load, Telegram/session operational facts;
 - **Аудит сообщений** — optional communication/audit workspace; n8n remains the client orchestrator.
 
-Command Center drill-down navigates into the corresponding operational areas rather than acting only as a passive report.
-
-Recent UX hardening:
-- laptop/tablet-safe horizontally scrollable admin navigation;
-- room detail and task history;
-- manager assignment/reassignment;
-- chessboard booking quick facts and payment form;
-- reservation paid/outstanding visibility directly in reception list.
-
-PMS is not a mock.
-
----
-
-## 8. Internal hotel finance
-
-STATUS: **API + PMS UI IMPLEMENTED / NOT CI-VERIFIED ON LATEST MAIN**.
+Command Center drill-down navigates into operational areas. PMS is not a mock.
 
 Finance UI derives only from stored manager-confirmed facts:
 - received amount/count for a selected period;
 - active Reservation booked total / received / outstanding;
-- received amounts by recorded method;
-- received amounts by day;
+- received amounts by recorded method/day;
 - payment status snapshot;
 - recent payment records;
 - all-time refund-status snapshot where representable by the current Payment model.
@@ -286,47 +271,51 @@ Explicitly not included:
 
 ## 9. Staff / voice / Telegram
 
-STATUS: **IMPLEMENTED BASELINE; RECENT EXTENSIONS NOT CI-VERIFIED**.
+STATUS: **VERIFIED DEVELOPMENT BASELINE FOR ACTIVE CI-COVERED CONTRACTS**.
 
-Implemented:
+Implemented and exercised by the active matrix:
 - staff PWA for active hotel roles;
 - task claim/assignment/reassignment;
-- strict housekeeping/maintenance status transitions;
+- strict housekeeping/maintenance transitions;
 - task action history;
 - Telegram Mini App staff identity/linking;
-- conservative voice-maintenance adapter code.
+- conservative voice-maintenance adapter behavior.
 
 Voice safety:
 - linked active staff only;
 - exact single real-room match can create a room-linked task;
-- ambiguous/no room match becomes review task without blocking a guessed room;
+- ambiguous/no room match becomes review work without blocking a guessed room;
 - short room numbers require explicit room context;
 - automatic urgency remains NORMAL until exact severity rules are approved.
+
+Direct client-provider adapters retained in Core remain optional/reference code and are not an active V1 dependency.
 
 ---
 
 ## 10. n8n automation boundary
 
-STATUS: **IMPLEMENTED CORE CONTRACT / LATEST CHANGES NOT CI-VERIFIED**.
+STATUS: **VERIFIED DEVELOPMENT CORE CONTRACT**.
 
 Protected by `X-Resort-Service-Key`.
 
-Approved n8n/Core capabilities include:
+Current allowed contract includes:
 - hotel facts;
 - deterministic availability/pricing;
 - create/read ReservationRequest;
 - request/reservation/payment status facts that exist in Core;
 - structured staff intake where applicable.
 
-Canonical n8n documentation: `automation/n8n/README.md`.
+n8n/AI cannot bypass Core authority to create guaranteed reservations, confirm manager payments, check-in/out, refund or mutate hotel money.
 
-Direct Telegram/provider adapters retained in Core are optional/reference code, not an active V1 dependency.
+Implementation/runbook detail: `automation/n8n/README.md`.
+
+That README and `knowledge/08_CLIENT_AUTOMATION_N8N_BOUNDARY.md` are supporting implementation/decision documents; neither replaces canonical Product/Domain/AI/Current-State authority.
 
 ---
 
 ## 11. Public sales site
 
-STATUS: **IMPLEMENTED DELIVERY BASELINE / OWNED MEDIA STILL REQUIRED FOR PRODUCTION VISUAL ACCEPTANCE**.
+STATUS: **IMPLEMENTED DELIVERY BASELINE; BUILD VERIFIED; OWNED MEDIA STILL REQUIRED FOR PRODUCTION VISUAL ACCEPTANCE**.
 
 Current `apps/web` includes:
 - premium guest-facing hero/sections;
@@ -335,7 +324,7 @@ Current `apps/web` includes:
 - confirmed contacts;
 - live Core availability/pricing;
 - tariff-derived meal information;
-- sellable-first/price-sorted availability results;
+- sellable-first/price-sorted results;
 - mobile-friendly date/guest search;
 - selected-room request flow;
 - real ReservationRequest creation;
@@ -344,78 +333,56 @@ Current `apps/web` includes:
 - metadata/OpenGraph/JSON-LD/sitemap/robots;
 - sticky mobile booking CTA.
 
-Recent public-copy audit removed unconfirmed sauna/conference/restaurant claims and internal development wording.
+Unconfirmed public claims were removed during copy audit.
 
 Remaining visual blocker:
 - replace temporary/hotlinked media with owned Three Crowns photography before production cutover.
 
 Website and PMS read the same InventoryBlock truth; no separate availability synchronization job is required.
 
-Existing Vercel project `three-crowns-resort-preview` was inspected and is a legacy static mock with fake availability text; it must not be presented as the current canonical Resort OS.
+Existing Vercel project `three-crowns-resort-preview` is a legacy static mock with fake availability text and must not be presented as the canonical Resort OS runtime.
 
 ---
 
-## 12. Deployment / release candidate
+## 12. Deployment / release tooling
 
-STATUS: **DELIVERY TOOLING IMPLEMENTED / PRODUCTION GATES OPEN**.
+STATUS: **DELIVERY TOOLING IMPLEMENTED / DEVELOPMENT CI VERIFIED / PRODUCTION GATES OPEN**.
 
 Implemented:
 - API/admin/web/staff Dockerfiles;
 - production compose;
-- canonical `/health/live` and `/health/ready` probes plus legacy aliases;
+- canonical `/health/live` and `/health/ready` probes plus compatibility aliases;
 - environment templates aligned with manager-owned prepayment;
 - privacy-safe request-id logging;
 - production preflight;
 - backup/manifest and restore-verification tooling;
 - migration-baseline generation helper/procedure;
-- updated README;
 - `docs/DEMO_ACCEPTANCE_2026-08-26.md`;
 - development-only `scripts/prepare_demo_showcase.py`;
 - `scripts/release_scope_guard.py`;
 - `scripts/release_operations_smoke.py`;
 - `scripts/release_candidate_check.sh`.
 
-Current local RC check has 13 areas:
-1. PostgreSQL availability;
-2. Prisma validation/development schema;
-3. Python compile + active route/scope guard;
-4. critical PostgreSQL constraints + 84/12 seed + synthetic RC maid;
-5. admin typecheck/build;
-6. web typecheck/build;
-7. Staff PWA typecheck/build;
-8. Core health/readiness 84/12;
-9. auth + protected PMS + 84 unique rooms;
-10. availability + ReservationRequest not-a-reservation truth;
-11. manager quote/payment -> GUARANTEED Reservation -> chessboard schedule;
-12. existing-reservation payment idempotency;
-13. housekeeping inspection/rework lifecycle smoke.
-
-The operations smoke proves:
-
-`DIRTY -> IN_PROGRESS -> IN_INSPECTION -> DIRTY -> IN_INSPECTION -> CLEAN`.
-
-`RC_SEED_DEMO=1` can prepare synthetic presentation records after the release checks.
-
-This local script is a delivery/staging verifier, **not production readiness evidence**.
+The local RC script remains a delivery/staging verifier, not production readiness evidence.
 
 ---
 
 ## 13. Production database migration status
 
-STATUS: **PROCESS + GENERATION HELPER IMPLEMENTED / BASELINE NOT YET EXECUTED AND VERIFIED**.
+STATUS: **PROCESS + GENERATION HELPER IMPLEMENTED / PRODUCTION BASELINE NOT YET EXECUTED AND VERIFIED**.
 
 `docs/PRODUCTION_DATABASE_MIGRATIONS.md` defines the gate.
-`scripts/generate_migration_baseline.sh` can generate an initial Prisma migration from the current canonical schema and append reviewed active core PostgreSQL constraints.
+`scripts/generate_migration_baseline.sh` can generate an initial Prisma migration from the current canonical schema and append reviewed active-core PostgreSQL constraints.
 
 Still required before production:
 - generate baseline in a controlled workspace;
 - review SQL;
-- apply to clean staging DB;
+- apply it to clean staging DB;
 - verify schema/constraints;
 - establish `_prisma_migrations` history correctly;
-- backup -> restore rehearsal.
+- perform the required production-like backup/restore rehearsal.
 
-Do not use `prisma db push` as permanent production migration strategy.
+Do not use `prisma db push` as the permanent production migration strategy.
 
 Dormant NFC schema artifacts must not drive active V1 feature scope.
 
@@ -423,53 +390,72 @@ Dormant NFC schema artifacts must not drive active V1 feature scope.
 
 ## 14. Production gates still open
 
-Do not claim production-ready until these are completed:
-1. generated/reviewed/applied Prisma migration baseline/history rather than permanent `db push`;
-2. current-schema backup -> clean restore proof;
-3. accepted current-main executed build/E2E evidence;
-4. owned public-site photography;
-5. staging acceptance;
-6. production secrets/HTTPS/hostnames;
-7. monitoring/alerts;
-8. rollback rehearsal;
-9. explicit DNS/cutover owner gate.
+**Development CI verification is now satisfied for the current executable baseline. Production readiness is not.**
 
-Automated payment-provider integration is **not** a V1 gate under the current manager-manual prepayment workflow.
+Do not claim production-ready until the remaining gates are completed:
+1. generated/reviewed/applied Prisma migration baseline/history rather than permanent `db push`;
+2. production-like current-schema backup -> clean restore proof for the intended deployment procedure;
+3. owned public-site photography and visual acceptance;
+4. staging acceptance;
+5. production secrets/HTTPS/hostnames;
+6. monitoring/alerts;
+7. rollback rehearsal;
+8. explicit DNS/cutover owner gate.
+
+Automated payment-provider integration is **not** a Three Crowns V1 gate under the current manager-manual prepayment workflow.
 
 ---
 
-## 15. CI / verification state
+## 15. CI / verification evidence
 
-Last explicitly confirmed full green historical baseline:
+The former GitHub Actions execution blocker (`steps=null` before workflow execution) is **RESOLVED as a current blocker**. It remains historical evidence only.
 
-`7038818db41756b94e8d5235410404b9b6172c1e`
+CI recovery evidence:
+- recovery PR #1 exact head `ba9f362e664f631f5369be7ee24e7239fd0e1243` passed 13/13 triggered workflows;
+- merge commit `46843ce9d8ddd71b0a3dbb39917f1cbd150966e5` then produced 13/13 completed push workflows on `main`, with no failure/cancellation in the verified matrix;
+- this recovery added focused Data Intake Integrity coverage and aligned active NFC scope with the owner freeze.
 
-Historical successful workflows included Resort Core, Automation Contract and Realtime PMS. Historical NFC success is irrelevant to active V1 because NFC is deferred.
+Payment-integrity evidence:
+- finance PR #2 exact head `a0993354b1c002848ac926961fa322baaac28350` passed 14/14 triggered workflows;
+- merge commit `9420d48209c8e869a055b2e552e2491c1f19bd63` produced 14/14 completed push workflows on `main`;
+- `failure=0`, `cancelled=0` for that exact post-merge SHA;
+- `Payment Idempotency CI` passed schema, normalization, real API/PostgreSQL contract tests and concurrent collision tests.
 
-Current GitHub Actions symptom remains explicitly confirmed on current work. Example:
-- Hotel Operations CI run `32923329835`;
-- head commit `648e7d75946486d831c6d15e16ef7e8e001db508`;
-- job id `98041117598`;
-- conclusion `failure`;
-- `steps=null`;
-- no job log URL/content.
+Active matrix on the verified executable baseline includes:
+1. Resort Core CI;
+2. Hotel Operations CI;
+3. PMS Chessboard Mutation CI;
+4. Payment Idempotency CI;
+5. Automation Contract CI;
+6. n8n Resort Core Contract CI;
+7. Unified Inbox CI;
+8. AI Sales Draft CI;
+9. Telegram Sales CI;
+10. Staff Voice CI;
+11. Realtime PMS CI;
+12. PostgreSQL Backup Restore CI;
+13. NFC Deferred Scope CI;
+14. Data Intake Integrity CI.
 
-Therefore that run did **not execute the workflow steps** and is not evidence that the code/tests failed.
+Interpretation boundary:
 
-Latest changes remain **IMPLEMENTED / NOT CI-VERIFIED** until `scripts/release_candidate_check.sh`, staging, or restored Actions execution evidence is captured.
+**14/14 development CI success proves the exercised development contracts on that exact code baseline. It does not prove staging acceptance, production secrets, production migration execution, monitoring, rollback or DNS cutover.**
 
 ---
 
 ## 16. Immediate delivery order
 
-1. Run `bash scripts/release_candidate_check.sh` and preserve `/tmp/three-crowns-rc` output.
-2. Fix only locally reproduced build/runtime failures.
-3. Optionally create clearly marked development demo reservations with `RC_SEED_DEMO=1`.
-4. Execute `docs/DEMO_ACCEPTANCE_2026-08-26.md` end-to-end.
-5. Replace site media when owned photography is available.
-6. For production: migration baseline -> backup/restore proof -> staging -> monitoring/rollback -> cutover gate.
+Remaining work should now proceed from verified current state, not from historical bootstrap assumptions:
 
-Do not spend delivery time on NFC, direct Instagram/WhatsApp provider code, automated acquiring, or unspecified dining/store/access/QR/billiards/LED business rules.
+1. production migration baseline generation/review -> clean staging apply/verification;
+2. production-like backup/restore rehearsal using the intended migration/deploy procedure;
+3. staging acceptance of public site + PMS + Staff + Core + n8n handoff contracts;
+4. replace public-site temporary/hotlinked media with owned photography;
+5. production secrets/HTTPS/hostnames and operational monitoring;
+6. rollback rehearsal;
+7. explicit owner DNS/cutover gate.
+
+Do not spend active delivery time on deferred NFC, automated acquiring, direct provider-specific CRM logic, or unspecified dining/store/access/QR/billiards/LED business rules unless canonical decision authority changes their scope.
 
 Development rule:
 
