@@ -26,9 +26,9 @@ export function trackPublicEvent(event: PublicAnalyticsEvent, payload: PublicAna
   if (typeof window === "undefined") return;
 
   const record: AnalyticsRecord = {
+    ...payload,
     event,
     event_time: new Date().toISOString(),
-    ...payload,
   };
 
   const analyticsWindow = window as AnalyticsWindow;
