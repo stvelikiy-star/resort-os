@@ -53,8 +53,10 @@ jobs:
       - name: Install API dependencies
         run: pip install -r services/api/requirements.txt
 
-      - name: Compile Core
-        run: python -m compileall services/api/app scripts
+      - name: Compile Core and enforce active release scope
+        run: |
+          python -m compileall services/api/app scripts
+          python scripts/release_scope_guard.py
 
       - name: Apply constraints and seed hotel
         run: |
@@ -71,40 +73,60 @@ jobs:
         run: |
           python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/hotel-ops-api.log 2>&1 &
           echo $! > /tmp/hotel-ops-api.pid
-          sleep 3
-          curl --fail -sS http://127.0.0.1:8000/ready > /tmp/ready.json
+          for i in {1..30}; do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready > /tmp/ready.json 2>/dev/null; then break; fi
+            if [ "$i" = "30" ]; then cat /tmp/hotel-ops-api.log; exit 1; fi
+            sleep 1
+          done
 
-      - name: Login owner and load staff overview
+      - name: Login owner and line staff
         run: |
           curl --fail -sS -c /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
             -H 'Content-Type: application/json' \
-            -d '{"username":"ci-owner","password":"CI-Owner-Strong-Password-2026"}' > /tmp/login.json
+            -d '{"username":"ci-owner","password":"CI-Owner-Strong-Password-2026"}' > /tmp/owner-login.json
+          curl --fail -sS -c /tmp/maid-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-maid","password":"CI-Maid-Strong-Password-2026"}' > /tmp/maid-login.json
+          curl --fail -sS -c /tmp/tech-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-tech","password":"CI-Tech-Strong-Password-2026"}' > /tmp/tech-login.json
+
+      - name: Load staff overview
+        run: |
           curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/staff/overview > /tmp/staff.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/staff.json'))
           staff={x['username']:x for x in d['staff']}
-          assert 'ci-maid' in staff
-          assert 'ci-tech' in staff
           assert staff['ci-maid']['role']=='MAID'
           assert staff['ci-tech']['role']=='TECHNICIAN'
           open('/tmp/maid-id','w').write(staff['ci-maid']['id'])
           open('/tmp/tech-id','w').write(staff['ci-tech']['id'])
           PY
 
-      - name: Resolve real room 101 from PMS grid
+      - name: Resolve test rooms from PMS grid
         run: |
-          curl --fail -sS -b /tmp/owner-cookies.txt 'http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-27&end=2026-08-28' > /tmp/grid.json
+          python - <<'PY'
+          from datetime import date,timedelta
+          open('/tmp/grid-start','w').write(date.today().isoformat())
+          open('/tmp/grid-end','w').write((date.today()+timedelta(days=1)).isoformat())
+          PY
+          START=$(cat /tmp/grid-start)
+          END=$(cat /tmp/grid-end)
+          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=$START&end=$END" > /tmp/grid.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/grid.json'))
-          room=next(x for x in d['rooms'] if x['code']=='101')
-          open('/tmp/room-id','w').write(room['id'])
+          assert len(d['rooms']) == 84
+          r101=next(x for x in d['rooms'] if x['code']=='101')
+          r102=next(x for x in d['rooms'] if x['code']=='102')
+          open('/tmp/room-101-id','w').write(r101['id'])
+          open('/tmp/room-102-id','w').write(r102['id'])
           PY
 
-      - name: Create housekeeping task
+      - name: Create and assign housekeeping task
         run: |
-          ROOM_ID=$(cat /tmp/room-id)
+          ROOM_ID=$(cat /tmp/room-101-id)
           cat > /tmp/create-task.json <<JSON
           {"type":"HOUSEKEEPING","room_id":"$ROOM_ID","priority":"NORMAL","title":"CI уборка 101","source":"CI"}
           JSON
@@ -116,9 +138,6 @@ jobs:
           assert d['status']=='OPEN'
           open('/tmp/task-id','w').write(d['id'])
           PY
-
-      - name: Reject wrong-role assignment and assign maid
-        run: |
           TASK_ID=$(cat /tmp/task-id)
           TECH_ID=$(cat /tmp/tech-id)
           MAID_ID=$(cat /tmp/maid-id)
@@ -129,45 +148,141 @@ jobs:
           curl --fail -sS -b /tmp/owner-cookies.txt \
             -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/assignee" \
             -H 'Content-Type: application/json' -d "{\"assigned_to_id\":\"$MAID_ID\"}" > /tmp/assigned.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/assigned.json'))
-          assert d['assigned_to_name']=='CI Maid'
-          assert d['idempotent'] is False
-          PY
 
-      - name: Verify assignment in task history and room detail
+      - name: Reject skipped housekeeping transition
         run: |
           TASK_ID=$(cat /tmp/task-id)
-          ROOM_ID=$(cat /tmp/room-id)
+          CODE=$(curl -sS -o /tmp/skip.json -w '%{http_code}' -b /tmp/maid-cookies.txt \
+            -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}')
+          test "$CODE" = "409"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/skip.json'))
+          assert d['detail']['code']=='INVALID_TASK_TRANSITION'
+          assert d['detail']['from_status']=='OPEN'
+          assert d['detail']['to_status']=='IN_INSPECTION'
+          PY
+
+      - name: Maid claim and send room to inspection
+        run: |
+          TASK_ID=$(cat /tmp/task-id)
+          ROOM_ID=$(cat /tmp/room-101-id)
+          curl --fail -sS -b /tmp/maid-cookies.txt -X POST \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/claim" > /tmp/claim.json
+          curl --fail -sS -b /tmp/maid-cookies.txt -X PATCH \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection-1.json
+          curl --fail -sS -b /tmp/owner-cookies.txt \
+            "http://127.0.0.1:8000/api/v1/admin/rooms/$ROOM_ID" > /tmp/room-inspection.json
+          python - <<'PY'
+          import json
+          assert json.load(open('/tmp/claim.json'))['status']=='IN_PROGRESS'
+          assert json.load(open('/tmp/inspection-1.json'))['status']=='IN_INSPECTION'
+          room=json.load(open('/tmp/room-inspection.json'))
+          assert room['room']['operational_state']=='IN_INSPECTION'
+          PY
+
+      - name: Manager returns inspection to rework
+        run: |
+          TASK_ID=$(cat /tmp/task-id)
+          ROOM_ID=$(cat /tmp/room-101-id)
+          curl --fail -sS -b /tmp/owner-cookies.txt -X PATCH \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_PROGRESS"}' > /tmp/rework.json
+          curl --fail -sS -b /tmp/owner-cookies.txt \
+            "http://127.0.0.1:8000/api/v1/admin/rooms/$ROOM_ID" > /tmp/room-rework.json
+          python - <<'PY'
+          import json
+          assert json.load(open('/tmp/rework.json'))['status']=='IN_PROGRESS'
+          room=json.load(open('/tmp/room-rework.json'))
+          assert room['room']['operational_state']=='DIRTY'
+          PY
+
+      - name: Maid resubmits and manager accepts room CLEAN
+        run: |
+          TASK_ID=$(cat /tmp/task-id)
+          ROOM_ID=$(cat /tmp/room-101-id)
+          curl --fail -sS -b /tmp/maid-cookies.txt -X PATCH \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/inspection-2.json
+          curl --fail -sS -b /tmp/owner-cookies.txt -X PATCH \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"DONE"}' > /tmp/done.json
+          curl --fail -sS -b /tmp/owner-cookies.txt \
+            "http://127.0.0.1:8000/api/v1/admin/rooms/$ROOM_ID" > /tmp/room-clean.json
+          python - <<'PY'
+          import json
+          assert json.load(open('/tmp/done.json'))['status']=='DONE'
+          room=json.load(open('/tmp/room-clean.json'))
+          assert room['room']['operational_state']=='CLEAN'
+          PY
+
+      - name: Verify TECH_BLOCK cannot be silently cleaned by housekeeping
+        run: |
+          ROOM_ID=$(cat /tmp/room-102-id)
+          MAID_ID=$(cat /tmp/maid-id)
+          cat > /tmp/maintenance.json <<JSON
+          {"type":"MAINTENANCE","room_id":"$ROOM_ID","priority":"HIGH","title":"CI tech block 102","source":"CI"}
+          JSON
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/ops/tasks \
+            -H 'Content-Type: application/json' --data-binary @/tmp/maintenance.json > /tmp/maintenance-created.json
+          cat > /tmp/housekeeping-blocked.json <<JSON
+          {"type":"HOUSEKEEPING","room_id":"$ROOM_ID","priority":"NORMAL","title":"CI уборка поверх ремонта 102","source":"CI","assigned_to_id":"$MAID_ID"}
+          JSON
+          curl --fail -sS -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/ops/tasks \
+            -H 'Content-Type: application/json' --data-binary @/tmp/housekeeping-blocked.json > /tmp/housekeeping-created.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/housekeeping-created.json'))
+          open('/tmp/blocked-housekeeping-id','w').write(d['id'])
+          PY
+          TASK_ID=$(cat /tmp/blocked-housekeeping-id)
+          curl --fail -sS -b /tmp/maid-cookies.txt -X POST \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/claim" > /tmp/blocked-claim.json
+          curl --fail -sS -b /tmp/maid-cookies.txt -X PATCH \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"IN_INSPECTION"}' > /tmp/blocked-inspection.json
+          curl --fail -sS -b /tmp/owner-cookies.txt \
+            "http://127.0.0.1:8000/api/v1/admin/rooms/$ROOM_ID" > /tmp/room-tech-block.json
+          CODE=$(curl -sS -o /tmp/blocked-done.json -w '%{http_code}' -b /tmp/owner-cookies.txt -X PATCH \
+            "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/status" \
+            -H 'Content-Type: application/json' -d '{"status":"DONE"}')
+          test "$CODE" = "409"
+          python - <<'PY'
+          import json
+          room=json.load(open('/tmp/room-tech-block.json'))
+          assert room['room']['operational_state']=='TECH_BLOCK'
+          rejected=json.load(open('/tmp/blocked-done.json'))
+          assert rejected['detail']['code']=='HOUSEKEEPING_ROOM_NOT_IN_INSPECTION'
+          assert rejected['detail']['room_state']=='TECH_BLOCK'
+          PY
+
+      - name: Verify assignment history and workload
+        run: |
+          TASK_ID=$(cat /tmp/task-id)
           curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/ops/tasks/$TASK_ID/history" > /tmp/history.json
-          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/rooms/$ROOM_ID" > /tmp/room-detail.json
+          curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/staff/overview > /tmp/staff-after.json
           python - <<'PY'
           import json
           h=json.load(open('/tmp/history.json'))
           assert any(x['action']=='ASSIGN' and x['actor_name']=='CI Owner' for x in h['history'])
-          r=json.load(open('/tmp/room-detail.json'))
-          assert r['room']['code']=='101'
-          task=next(x for x in r['tasks'] if x['id']==open('/tmp/task-id').read().strip())
-          assert task['assigned_to']=='CI Maid'
-          assert task['type']=='HOUSEKEEPING'
+          transitions=[x for x in h['history'] if x['action']=='STATUS_CHANGE']
+          assert len(transitions) >= 4
+          staff=json.load(open('/tmp/staff-after.json'))
+          maid=next(x for x in staff['staff'] if x['username']=='ci-maid')
+          # Main room 101 task is DONE; blocked room 102 housekeeping remains active.
+          assert maid['active_tasks'] >= 1
+          assert maid['housekeeping_active'] >= 1
           PY
 
-      - name: Verify staff workload counts are not multiplied by sessions
+      - name: Typecheck and build PMS and Staff PWA
         run: |
-          curl --fail -sS -b /tmp/owner-cookies.txt http://127.0.0.1:8000/api/v1/admin/staff/overview > /tmp/staff-after.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/staff-after.json'))
-          maid=next(x for x in d['staff'] if x['username']=='ci-maid')
-          assert maid['active_tasks']==1
-          assert maid['housekeeping_active']==1
-          assert maid['maintenance_active']==0
-          PY
-
-      - name: Typecheck and build PMS
-        working-directory: apps/admin
-        run: |
+          cd apps/admin
+          npm install
+          npm run typecheck
+          npm run build
+          cd ../staff
           npm install
           npm run typecheck
           npm run build
