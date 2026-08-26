@@ -299,7 +299,7 @@ jobs:
           assert d['immediate_relocation']
           assert d['immediate_relocation']['vacated_room_will_become_dirty'] is True
           x=json.load(open('/tmp/relocate.json'))
-          x['expected_version']=open('/tmp/version2').read().strip()
+          x['expected_version']=d['reservation']['version']
           json.dump(x,open('/tmp/relocate-commit.json','w'))
           PY
           curl --fail -sS -b /tmp/cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/pms/reservations/$RID/schedule/commit" \
