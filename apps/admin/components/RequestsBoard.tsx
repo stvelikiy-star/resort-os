@@ -17,6 +17,9 @@ type RequestItem = {
   room_type_name?: string | null;
   quoted_total_kgs?: number | null;
   required_prepayment_kgs?: number | null;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   reservation?: { id: string; booking_number: string; status: string } | null;
 };
 
@@ -53,6 +56,17 @@ function paymentErrorMessage(body: any) {
   return "Не удалось зафиксировать оплату и создать бронь";
 }
 
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function requestNights(item: RequestItem) {
+  const start = new Date(`${item.check_in}T00:00:00Z`).getTime();
+  const end = new Date(`${item.check_out}T00:00:00Z`).getTime();
+  return Number.isFinite(start) && Number.isFinite(end) ? Math.max(Math.round((end - start) / 86400000), 0) : "";
+}
+
 export default function RequestsBoard() {
   const [items, setItems] = useState<RequestItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +97,49 @@ export default function RequestsBoard() {
     if (filter === "ACTIVE") return !["CONVERTED", "CANCELLED", "REJECTED", "EXPIRED"].includes(item.status);
     return item.status === filter;
   }), [items, filter]);
+
+  function downloadCrmCsv() {
+    const headers = [
+      "Lead ID", "Дата/время", "Канал", "Имя", "Телефон", "Контакт/ник", "Город/страна",
+      "Заезд", "Выезд", "Ночей", "Гостей", "Дети", "Тип номера", "Бюджет KGS", "Статус",
+      "Ответственный", "Последний контакт", "Следующий контакт", "Источник/кампания", "Комментарий",
+      "Ссылка на чат", "Booking ID",
+    ];
+    const rows = visible.map((item) => [
+      item.id,
+      item.created_at || "",
+      item.source || "",
+      item.guest_name,
+      item.phone,
+      item.email || "",
+      "",
+      item.check_in,
+      item.check_out,
+      requestNights(item),
+      item.adults + item.children,
+      item.children,
+      item.room_type_name || item.room_type_code || "",
+      item.quoted_total_kgs ?? "",
+      requestStatusLabel[item.status] || item.status,
+      "",
+      item.updated_at || "",
+      "",
+      item.source || "",
+      item.notes || "",
+      "",
+      item.reservation?.id || "",
+    ]);
+    const csv = "\uFEFF" + [headers, ...rows].map((row) => row.map(csvCell).join(";")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `three-crowns-crm-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }
 
   async function findOptions(item: RequestItem) {
     setBusy(item.id);
@@ -175,6 +232,7 @@ export default function RequestsBoard() {
             <option value="CONVERTED">Забронированы</option>
             <option value="ALL">Все</option>
           </select>
+          <button className="btn" onClick={downloadCrmCsv} disabled={visible.length === 0}>CSV для CRM</button>
           <button className="btn" onClick={load}>Обновить</button>
         </div>
       </div>
