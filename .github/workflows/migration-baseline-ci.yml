@@ -3,7 +3,9 @@ name: Production Migration Baseline CI
 on:
   pull_request:
     paths:
+      - 'packages/database/package.json'
       - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/prisma/migrations/**'
       - 'packages/database/sql/**'
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/seed_from_intake.py'
@@ -12,9 +14,10 @@ on:
   push:
     branches: [main]
     paths:
+      - 'packages/database/package.json'
       - 'packages/database/prisma/schema.prisma'
-      - 'packages/database/sql/**'
       - 'packages/database/prisma/migrations/**'
+      - 'packages/database/sql/**'
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/seed_from_intake.py'
       - 'scripts/production_preflight.py'
@@ -67,10 +70,22 @@ jobs:
           fi
           grep -q 'baseline generation is disabled' /tmp/generator-prod.err
 
-      - name: Generate reviewed-input baseline candidate
-        run: bash scripts/generate_migration_baseline.sh
+      - name: Materialize baseline for this source
+        run: |
+          set -euo pipefail
+          MIGRATION_DIR=packages/database/prisma/migrations
+          MIGRATION_FILE="$MIGRATION_DIR/0_init/migration.sql"
+          if [ -e "$MIGRATION_DIR" ] && [ ! -s "$MIGRATION_FILE" ]; then
+            echo 'ERROR: migration history exists but canonical 0_init baseline is missing; refusing to regenerate/overwrite history' >&2
+            exit 1
+          fi
+          if [ -s "$MIGRATION_FILE" ]; then
+            echo 'Using committed 0_init baseline; generator overwrite protection remains intact.'
+          else
+            bash scripts/generate_migration_baseline.sh
+          fi
 
-      - name: Verify generated candidate and portable checksum
+      - name: Verify baseline and portable checksum
         run: |
           set -euo pipefail
           MIGRATION_DIR=packages/database/prisma/migrations/0_init
@@ -125,7 +140,7 @@ jobs:
           test "$migration_count" = '1'
           test "$overlap_guard_count" = '1'
 
-      - name: Upload baseline candidate for explicit review
+      - name: Upload exact-head baseline for explicit review
         uses: actions/upload-artifact@v4
         with:
           name: three-crowns-migration-baseline-${{ github.event.pull_request.head.sha || github.sha }}
