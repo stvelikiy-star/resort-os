@@ -143,6 +143,24 @@ jobs:
             -d "{\"amount_kgs\":$MANAGER_AMOUNT,\"method\":\"CI_MANUAL\",\"provider\":\"NFC_CI\",\"external_ref\":\"nfc-prepay-001\",\"idempotency_key\":\"nfc-prepayment-idempotency-001\"}" > /tmp/nfc-reservation.json
           python -c 'import json; d=json.load(open("/tmp/nfc-reservation.json")); open("/tmp/nfc-reservation-id","w").write(d["reservation_id"])'
           RESERVATION_ID=$(cat /tmp/nfc-reservation-id)
+          python - <<'PY'
+          import asyncio, os, uuid
+          import asyncpg
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  reservation_id = uuid.UUID(open('/tmp/nfc-reservation-id').read().strip())
+                  await conn.execute(
+                      '''UPDATE rooms SET "operationalState"='CLEAN',"updatedAt"=now()
+                         WHERE id=(SELECT "roomId" FROM inventory_blocks
+                                   WHERE "reservationId"=$1 AND active=true AND "blockType"='RESERVATION'
+                                   ORDER BY "startDate" LIMIT 1)''',
+                      reservation_id,
+                  )
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
           curl --fail -sS -b /tmp/nfc-owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/stays/reservations/$RESERVATION_ID/check-in" > /tmp/nfc-checkin.json
           python -c 'import json; assert json.load(open("/tmp/nfc-checkin.json"))["status"] == "CHECKED_IN"'
 
