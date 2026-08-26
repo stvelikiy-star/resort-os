@@ -24,8 +24,7 @@ if [[ ! -f "$DB_DIR/prisma/schema.prisma" || ! -f "$CUSTOM_SQL" ]]; then
 fi
 
 cd "$DB_DIR"
-npm install
-npx prisma format
+npm install --no-audit --no-fund
 npx prisma validate
 
 if [[ -e prisma/migrations ]]; then
