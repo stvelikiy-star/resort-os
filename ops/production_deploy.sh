@@ -18,7 +18,6 @@ need curl
 [ -f "$ENV_FILE" ] || fail "Missing $ENV_FILE"
 [ -f "$MIGRATION" ] || fail "Missing immutable migration baseline: $MIGRATION"
 
-# Load host-visible values for validation only. Secrets stay in the host-local file.
 set -a
 # shellcheck disable=SC1090
 . "$ENV_FILE"
@@ -56,8 +55,9 @@ done
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
   'PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null
 
-TABLES=$(docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
-  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_schema='"'"'public'"'"' AND table_name IN ('"'"'properties'"'"','"'"'rooms'"'"','"'"'reservations'"'"');"')
+SCHEMA_PROBE="SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('properties','rooms','reservations');"
+TABLES=$(printf '%s\n' "$SCHEMA_PROBE" | docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T postgres sh -lc \
+  'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At')
 
 if [ "$TABLES" = "0" ]; then
   echo "Applying initial immutable database baseline..."
@@ -74,11 +74,9 @@ for i in {1..60}; do
 done
 curl --fail --show-error --silent http://127.0.0.1:8000/health/ready >/dev/null
 
-# Both scripts are intentionally baked into the API image and are idempotent/reconciling.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T api python /app/scripts/seed_from_intake.py
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" exec -T api python /app/scripts/bootstrap_owner.py
 
-# Start all user-facing services, TLS edge, and daily backup loop.
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" up -d backup web admin staff edge
 
 bash ops/production_smoke.sh "$ENV_FILE"
