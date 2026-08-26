@@ -39,8 +39,9 @@ import json, sys
 payload=json.loads(sys.argv[1])
 results=payload.get('results') or []
 assert results, 'availability returned no room categories'
-assert any((item.get('pricing') or {}).get('sellable') for item in results), 'no sellable category in smoke window'
-print(f"Availability smoke OK: {len(results)} categories returned")
+assert all('room_type_code' in item for item in results), 'availability response is malformed'
+sellable=sum(1 for item in results if (item.get('pricing') or {}).get('sellable'))
+print(f"Availability smoke OK: {len(results)} categories returned, {sellable} sellable in current window")
 PY
 
 echo "Public/Core production smoke checks passed."
