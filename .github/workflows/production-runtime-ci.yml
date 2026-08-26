@@ -14,6 +14,7 @@ on:
       - 'services/api/Dockerfile'
       - 'packages/database/Dockerfile'
       - 'packages/database/package.json'
+      - 'packages/database/package-lock.json'
       - 'packages/database/prisma/**'
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/production_preflight.py'
@@ -31,6 +32,7 @@ on:
       - 'services/api/Dockerfile'
       - 'packages/database/Dockerfile'
       - 'packages/database/package.json'
+      - 'packages/database/package-lock.json'
       - 'packages/database/prisma/**'
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/production_preflight.py'
@@ -134,12 +136,21 @@ jobs:
         run: |
           grep -Fq '"prisma": "6.15.0"' packages/database/package.json
           grep -Fq '"@prisma/client": "6.15.0"' packages/database/package.json
-          grep -Fq 'npx prisma validate' scripts/generate_migration_baseline.sh
+          grep -Fq 'npx --no-install prisma validate' scripts/generate_migration_baseline.sh
+          grep -Fq 'npx --no-install prisma migrate diff' scripts/generate_migration_baseline.sh
           grep -Fq 'sha256sum -c migration.sql.sha256' scripts/generate_migration_baseline.sh
+          grep -Fq 'pinned Prisma toolchain is not installed' scripts/generate_migration_baseline.sh
+          if grep -Eq '^[[:space:]]*npm (install|ci)' scripts/generate_migration_baseline.sh; then
+            echo 'ERROR: baseline generator must not install dependencies or resolve network packages' >&2
+            exit 1
+          fi
           if grep -Fq 'npx prisma format' scripts/generate_migration_baseline.sh; then
             echo 'ERROR: baseline generator must not rewrite canonical schema before diff' >&2
             exit 1
           fi
+          grep -Fq 'COPY packages/database/package*.json ./' packages/database/Dockerfile
+          grep -Fq 'npm ci --no-audit --no-fund' packages/database/Dockerfile
+          grep -Fq 'CMD ["npx", "--no-install", "prisma", "migrate", "deploy"]' packages/database/Dockerfile
 
       - name: Assert migration and preflight contract
         run: |
@@ -165,6 +176,7 @@ jobs:
           else
             MIGRATION_DIR=packages/database/prisma/migrations/0_init
             test -s "$MIGRATION_DIR/migration.sql.sha256"
+            test -s packages/database/package-lock.json
             test "$(awk 'NR==1 {print $2}' "$MIGRATION_DIR/migration.sql.sha256")" = 'migration.sql'
             (cd "$MIGRATION_DIR" && sha256sum -c migration.sql.sha256)
           fi
