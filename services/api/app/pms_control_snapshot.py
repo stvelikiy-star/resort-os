@@ -115,12 +115,16 @@ async def control_snapshot(
             prop["id"],
         )
 
-        state_rows = await conn.fetch(
+        rooms = await conn.fetch(
             '''
-            SELECT "operationalState"::text AS state,count(*)::int AS count
-            FROM rooms
-            WHERE "propertyId"=$1
-            GROUP BY "operationalState"
+            SELECT room.id,room.code,room.name,
+                   room."operationalState"::text AS state,
+                   room."buildingOrZone" AS building_or_zone,room.floor,
+                   rt.code AS room_type_code,rt.name AS room_type_name
+            FROM rooms room
+            JOIN room_types rt ON rt.id=room."roomTypeId"
+            WHERE room."propertyId"=$1
+            ORDER BY room.code,room.id
             ''',
             prop["id"],
         )
@@ -174,7 +178,23 @@ async def control_snapshot(
         for row in tasks
     ]
 
-    room_states = {row["state"]: row["count"] for row in state_rows}
+    room_items = [
+        {
+            "id": str(row["id"]),
+            "code": row["code"],
+            "name": row["name"],
+            "state": row["state"],
+            "building_or_zone": row["building_or_zone"],
+            "floor": row["floor"],
+            "room_type_code": row["room_type_code"],
+            "room_type_name": row["room_type_name"],
+        }
+        for row in rooms
+    ]
+    room_states: dict[str, int] = {}
+    for item in room_items:
+        room_states[item["state"]] = room_states.get(item["state"], 0) + 1
+
     debt_total = sum(
         item["remainingKgs"]
         for item in reservation_items
@@ -187,9 +207,11 @@ async def control_snapshot(
         "local_date": local_today,
         "window": {"start": start, "end": end},
         "room_states": room_states,
+        "rooms": room_items,
         "reservations": reservation_items,
         "tasks": task_items,
         "summary": {
+            "room_count": len(room_items),
             "active_reservations": len(reservation_items),
             "active_tasks": len(task_items),
             "debt_total_kgs": debt_total,
@@ -199,5 +221,5 @@ async def control_snapshot(
                 if item["status"] == "GUARANTEED" and not item["room_id"]
             ),
         },
-        "truth": "Complete manager read-model for the requested <=62 day guaranteed window plus all currently CHECKED_IN stays. Reservation/payment truth comes from Resort Core; room assignment comes from active RESERVATION inventory segments; task truth comes from active operational_tasks.",
+        "truth": "Complete manager read-model for the requested <=62 day guaranteed window plus all currently CHECKED_IN stays. Reservation/payment truth comes from Resort Core; room assignment comes from active RESERVATION inventory segments; room state comes from rooms; task truth comes from active operational_tasks.",
     }
