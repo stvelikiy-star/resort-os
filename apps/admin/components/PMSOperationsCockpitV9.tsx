@@ -1,72 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-
-type ReservationItem = {
-  id: string;
-  bookingNumber: string;
-  status: "GUARANTEED" | "CHECKED_IN";
-  checkIn: string;
-  checkOut: string;
-  totalKgs: number;
-  paidKgs: number;
-  remainingKgs: number;
-  firstName?: string | null;
-  lastName?: string | null;
-  phone?: string | null;
-  room_id?: string | null;
-  room_code?: string | null;
-  room_state?: string | null;
-  room_type_name?: string | null;
-  schedule_segments: number;
-  has_room_move: boolean;
-};
-
-type TaskItem = {
-  id: string;
-  type: "HOUSEKEEPING" | "MAINTENANCE" | "GUEST_REQUEST";
-  status: "OPEN" | "IN_PROGRESS" | "IN_INSPECTION";
-  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
-  title: string;
-  room_code?: string | null;
-  room_state?: string | null;
-  assigned_to_name?: string | null;
-  created_at: string;
-};
-
-type Snapshot = {
-  complete: boolean;
-  generated_at: string;
-  local_date: string;
-  room_states: Record<string, number>;
-  reservations: ReservationItem[];
-  tasks: TaskItem[];
-  summary: {
-    active_reservations: number;
-    active_tasks: number;
-    debt_total_kgs: number;
-    unassigned_guaranteed: number;
-  };
-};
-
-function dateOnly(value = new Date()) {
-  const y = value.getFullYear();
-  const m = String(value.getMonth() + 1).padStart(2, "0");
-  const d = String(value.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function addDays(value: Date, amount: number) {
-  const next = new Date(value.getFullYear(), value.getMonth(), value.getDate());
-  next.setDate(next.getDate() + amount);
-  return next;
-}
+import { useMemo, useState } from "react";
+import { ControlReservationV9, ControlTaskV9, usePMSControlSnapshotV9 } from "./PMSControlSnapshotV9";
 
 function money(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-function taskLabel(type: TaskItem["type"]) {
+function taskLabel(type: ControlTaskV9["type"]) {
   if (type === "HOUSEKEEPING") return "Уборка";
   if (type === "MAINTENANCE") return "Ремонт";
   return "Запрос гостя";
@@ -82,37 +23,11 @@ function errorText(body: any, fallback: string) {
 }
 
 export default function PMSOperationsCockpitV9() {
-  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { snapshot, loading, refreshing, error: snapshotError, refresh } = usePMSControlSnapshotV9();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const start = dateOnly(new Date());
-      const end = dateOnly(addDays(new Date(), 31));
-      const params = new URLSearchParams({ start, end });
-      const response = await fetch(`/core/api/v1/admin/pms/control-snapshot?${params}`, { cache: "no-store" });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Snapshot HTTP ${response.status}`);
-      if (!body.complete || !Array.isArray(body.reservations) || !Array.isArray(body.tasks)) throw new Error("Resort Core вернул неполный control snapshot");
-      setSnapshot(body as Snapshot);
-    } catch (cause) {
-      setSnapshot(null);
-      setError(cause instanceof Error ? cause.message : "Не удалось загрузить control snapshot");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    const timer = window.setInterval(() => { void load(); }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [load]);
-
-  const localToday = snapshot?.local_date || dateOnly(new Date());
+  const localToday = snapshot?.local_date || "";
   const arrivals = useMemo(() => (snapshot?.reservations || []).filter((item) => item.status === "GUARANTEED" && item.checkIn === localToday), [snapshot, localToday]);
   const departures = useMemo(() => (snapshot?.reservations || []).filter((item) => item.status === "CHECKED_IN" && item.checkOut === localToday), [snapshot, localToday]);
   const overdue = useMemo(() => (snapshot?.reservations || []).filter((item) => item.status === "CHECKED_IN" && item.checkOut < localToday), [snapshot, localToday]);
@@ -120,18 +35,18 @@ export default function PMSOperationsCockpitV9() {
   const debtQueue = useMemo(() => (snapshot?.reservations || []).filter((item) => item.remainingKgs > 0).sort((a, b) => b.remainingKgs - a.remainingKgs).slice(0, 8), [snapshot]);
   const urgentTasks = useMemo(() => (snapshot?.tasks || []).slice(0, 8), [snapshot]);
 
-  async function stayAction(item: ReservationItem, action: "check-in" | "check-out") {
+  async function stayAction(item: ControlReservationV9, action: "check-in" | "check-out") {
     const verb = action === "check-in" ? "заселение" : "выезд";
     if (!window.confirm(`Подтвердить ${verb}: ${item.firstName || item.bookingNumber}${item.room_code ? ` · № ${item.room_code}` : ""}?`)) return;
     setBusyId(item.id);
-    setError(null);
+    setActionError(null);
     try {
       const response = await fetch(`/core/api/v1/admin/stays/reservations/${item.id}/${action}`, { method: "POST" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(errorText(body, `Не удалось выполнить ${verb}`));
-      await load();
+      await refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : `Ошибка: ${verb}`);
+      setActionError(cause instanceof Error ? cause.message : `Ошибка: ${verb}`);
     } finally {
       setBusyId(null);
     }
@@ -142,11 +57,12 @@ export default function PMSOperationsCockpitV9() {
   }
 
   const roomStates = snapshot?.room_states || {};
+  const error = actionError || snapshotError;
 
   return <section className="v9-cockpit">
     <header className="v9-head">
-      <div><p className="eyebrow">PMS Integration · V9</p><h2>Один Core · одна смена · одна шахматка</h2><span>Reception, оплаты, room-state и активные задачи сведены в один полный snapshot. Изменения размещения остаются в Universal Tape Chart.</span></div>
-      <div className="v9-actions"><span className={`v9-source ${snapshot ? "ok" : "bad"}`}>{snapshot ? "Core snapshot complete" : "Snapshot offline"}</span><button className="btn" onClick={() => void load()} disabled={loading}>↻ Обновить</button><button className="btn primary" onClick={jumpToTape}>К шахматке ↓</button></div>
+      <div><p className="eyebrow">PMS Integration · V9</p><h2>Один Core · одна смена · одна шахматка</h2><span>Reception, оплаты, room-state и активные задачи используют один общий live snapshot. Изменения размещения выполняются в Universal Tape Chart через Core preview/commit.</span></div>
+      <div className="v9-actions"><span className={`v9-source ${snapshot ? "ok" : "bad"}`}>{snapshot ? `Core complete · ${snapshot.local_date}` : "Snapshot offline"}</span><button className="btn" onClick={() => void refresh()} disabled={refreshing}>↻ {refreshing ? "Обновляю" : "Обновить"}</button><button className="btn primary" onClick={jumpToTape}>К шахматке ↓</button></div>
     </header>
 
     {error && <div className="v9-error">{error}</div>}
@@ -164,15 +80,15 @@ export default function PMSOperationsCockpitV9() {
       <section className="v9-card">
         <div className="v9-section-head"><div><strong>Смена ресепшена</strong><span>Заезды, выезды и исключения сегодня.</span></div><b>{arrivals.length + departures.length + overdue.length}</b></div>
         <div className="v9-events">
-          {overdue.map((item) => <article className="critical" key={`over-${item.id}`}><div><em>Просроченный выезд</em><strong>{item.firstName || "Гость"} · {item.bookingNumber}</strong><span>№ {item.room_code || "—"} · план {item.checkOut}</span></div><div className="v9-row-actions">{item.remainingKgs > 0 && <b>{money(item.remainingKgs)} сом</b>}<button disabled={busyId === item.id} onClick={() => void stayAction(item, "check-out")}>Выезд</button></div></article>)}
+          {overdue.map((item) => <article className="critical" key={`over-${item.id}`}><div><em>Просроченный выезд · сначала график</em><strong>{item.firstName || "Гость"} · {item.bookingNumber}</strong><span>№ {item.room_code || "—"} · план {item.checkOut}. Core не позволит оформить выезд позже графика без его явного продления.</span></div><div className="v9-row-actions">{item.remainingKgs > 0 && <b>{money(item.remainingKgs)} сом</b>}<button onClick={jumpToTape}>Исправить график</button></div></article>)}
           {arrivals.map((item) => <article className={!item.room_id || item.room_state !== "CLEAN" ? "critical" : "arrival"} key={`arr-${item.id}`}><div><em>{!item.room_id ? "Заезд · номер не назначен" : item.room_state !== "CLEAN" ? "Заезд · номер не готов" : "Заезд сегодня"}</em><strong>{item.firstName || "Гость"} · {item.bookingNumber}</strong><span>№ {item.room_code || "—"} · {item.room_type_name || "категория"}{item.has_room_move ? " · split stay" : ""}</span></div><div className="v9-row-actions">{item.remainingKgs > 0 && <b>{money(item.remainingKgs)} сом</b>}<button disabled={busyId === item.id || !item.room_id || item.room_state !== "CLEAN"} onClick={() => void stayAction(item, "check-in")}>Заезд</button></div></article>)}
-          {departures.filter((item) => !overdue.some((over) => over.id === item.id)).map((item) => <article className="departure" key={`dep-${item.id}`}><div><em>Выезд сегодня</em><strong>{item.firstName || "Гость"} · {item.bookingNumber}</strong><span>№ {item.room_code || "—"}</span></div><div className="v9-row-actions">{item.remainingKgs > 0 && <b>{money(item.remainingKgs)} сом</b>}<button disabled={busyId === item.id} onClick={() => void stayAction(item, "check-out")}>Выезд</button></div></article>)}
+          {departures.map((item) => <article className="departure" key={`dep-${item.id}`}><div><em>Выезд сегодня</em><strong>{item.firstName || "Гость"} · {item.bookingNumber}</strong><span>№ {item.room_code || "—"}</span></div><div className="v9-row-actions">{item.remainingKgs > 0 && <b>{money(item.remainingKgs)} сом</b>}<button disabled={busyId === item.id} onClick={() => void stayAction(item, "check-out")}>Выезд</button></div></article>)}
           {!loading && arrivals.length + departures.length + overdue.length === 0 && <p className="v9-empty">На сегодня нет событий проживания.</p>}
         </div>
       </section>
 
       <section className="v9-card">
-        <div className="v9-section-head"><div><strong>Операционная очередь</strong><span>Все активные задачи приходят из того же Core snapshot.</span></div><b>{snapshot?.tasks.length ?? "—"}</b></div>
+        <div className="v9-section-head"><div><strong>Операционная очередь</strong><span>Все активные задачи приходят из общего Core snapshot.</span></div><b>{snapshot?.tasks.length ?? "—"}</b></div>
         <div className="v9-tasks">{urgentTasks.map((task) => <article key={task.id}><div className={`v9-task-type type-${task.type.toLowerCase()}`}>{taskLabel(task.type)}</div><div><strong>{task.room_code ? `№ ${task.room_code} · ` : ""}{task.title}</strong><span>{task.status} · {task.priority} · {task.assigned_to_name || "без ответственного"}</span></div></article>)}{!loading && urgentTasks.length === 0 && <p className="v9-empty">Активных задач нет.</p>}</div>
       </section>
 
