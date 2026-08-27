@@ -23,6 +23,7 @@ import "./chessboard-v6-hover.css";
 import "./chessboard-v7.css";
 import "./chessboard-v8.css";
 import "./chessboard-v9.css";
+import "./chessboard-v9-bulk.css";
 
 export const metadata: Metadata = {
   title: "Три Короны — PMS",
