@@ -22,7 +22,7 @@ export default function SiteHeader() {
   }, [open]);
 
   const closeMenu = () => setOpen(false);
-  const links = [["/rooms","Номера"],["/#rates","Цены"],["/#resort","Курорт"],["/#experience","Отдых"],["/#gallery","Галерея"],["/#contacts","Контакты"]];
+  const links = [["/rooms","Номера"],["/#resort","Территория"],["/#experience","На территории"],["/#reviews","Отзывы"],["/#groups","Группам"],["/#contacts","Контакты"]];
 
   return (
     <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
