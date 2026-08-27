@@ -1,0 +1,177 @@
+name: PMS V9 Integration CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'services/api/app/pms_control_snapshot.py'
+      - 'services/api/app/pms_bulk_tasks.py'
+      - 'services/api/app/app_entry.py'
+      - 'packages/database/sql/001_core_constraints.sql'
+      - '.github/workflows/pms-v9-integration-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+      - 'services/api/app/pms_control_snapshot.py'
+      - 'services/api/app/pms_bulk_tasks.py'
+      - 'services/api/app/app_entry.py'
+      - 'packages/database/sql/001_core_constraints.sql'
+      - '.github/workflows/pms-v9-integration-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_v9
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_v9"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_v9?schema=public
+      PGURL: postgresql://resort:resort@localhost:5432/resort_v9
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build database schema and invariants
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma db push
+          cd ../..
+          psql "$PGURL" -v ON_ERROR_STOP=1 -f packages/database/sql/001_core_constraints.sql
+
+      - name: Typecheck and build PMS V9
+        working-directory: apps/admin
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install Core and seed canonical hotel
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start Core and authenticate manager
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/v9-api.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail -sS -c /tmp/cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' >/tmp/login.json
+
+      - name: Verify complete V9 control snapshot matches canonical room inventory
+        run: |
+          START=$(python - <<'PY'
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          print(datetime.now(ZoneInfo('Asia/Bishkek')).date().isoformat())
+          PY
+          )
+          END=$(python - <<'PY'
+          from datetime import datetime,timedelta
+          from zoneinfo import ZoneInfo
+          print((datetime.now(ZoneInfo('Asia/Bishkek')).date()+timedelta(days=31)).isoformat())
+          PY
+          )
+          curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/admin/pms/control-snapshot?start=$START&end=$END" >/tmp/snapshot.json
+          curl --fail -sS -b /tmp/cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=$START&end=$END" >/tmp/grid.json
+          python - <<'PY'
+          import json
+          s=json.load(open('/tmp/snapshot.json'))
+          g=json.load(open('/tmp/grid.json'))
+          assert s['complete'] is True
+          assert s['summary']['room_count']==84, s['summary']
+          assert len(s['rooms'])==84
+          assert len(g['rooms'])==84
+          assert {x['id'] for x in s['rooms']} == {x['id'] for x in g['rooms']}
+          assert sum(s['room_states'].values())==84
+          PY
+
+      - name: Prove bulk housekeeping is deduplicated and reflected by snapshot
+        run: |
+          python - <<'PY'
+          import asyncio, asyncpg, json, os
+          async def main():
+              conn=await asyncpg.connect(os.environ['PGURL'])
+              try:
+                  row=await conn.fetchrow('''
+                    SELECT id,code FROM rooms
+                    WHERE "operationalState"='CLEAN'
+                    ORDER BY code LIMIT 1
+                  ''')
+                  assert row
+                  await conn.execute('UPDATE rooms SET "operationalState"=\'DIRTY\',"updatedAt"=now() WHERE id=$1',row['id'])
+                  await conn.execute('DELETE FROM operational_tasks WHERE "roomId"=$1',row['id'])
+                  open('/tmp/room_id','w').write(str(row['id']))
+                  open('/tmp/room_code','w').write(row['code'])
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
+          ROOM_ID=$(cat /tmp/room_id)
+          ROOM_CODE=$(cat /tmp/room_code)
+          cat >/tmp/bulk.json <<JSON
+          {"source":"CI_V9","items":[{"room_id":"$ROOM_ID","type":"HOUSEKEEPING","priority":"NORMAL","title":"CI housekeeping $ROOM_CODE"}]}
+          JSON
+          curl --fail -sS -b /tmp/cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/pms/tasks/bulk-create \
+            -H 'Content-Type: application/json' --data-binary @/tmp/bulk.json >/tmp/bulk1.json
+          curl --fail -sS -b /tmp/cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/pms/tasks/bulk-create \
+            -H 'Content-Type: application/json' --data-binary @/tmp/bulk.json >/tmp/bulk2.json
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/bulk1.json')); b=json.load(open('/tmp/bulk2.json'))
+          assert a['created_count']==1 and a['skipped_count']==0, a
+          assert b['created_count']==0 and b['skipped_count']==1, b
+          assert b['skipped'][0]['reason']=='ACTIVE_TASK_EXISTS'
+          PY
+          psql "$PGURL" -Atc "SELECT count(*) FROM operational_tasks WHERE \"roomId\"='$ROOM_ID' AND type='HOUSEKEEPING' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')" | grep -x 1
+
+      - name: Verify Core remains healthy after V9 mutations
+        run: |
+          curl --fail -sS http://127.0.0.1:8000/health/live
+          curl --fail -sS http://127.0.0.1:8000/health/ready
+          if grep -q 'Traceback' /tmp/v9-api.log; then cat /tmp/v9-api.log; exit 1; fi
