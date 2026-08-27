@@ -8,7 +8,6 @@ import "./rooms-premium.css";
 import "./gallery-premium.css";
 import "./site-v3.css";
 import "./video-sections.css";
-import "./territory-photo-pack.css";
 import "./premium-experience.css";
 
 export const metadata: Metadata = {
