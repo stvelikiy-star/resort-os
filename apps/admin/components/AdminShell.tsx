@@ -8,6 +8,7 @@ import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV2";
 import ReceptionBoard from "./ReceptionBoard";
 import RequestsBoard from "./RequestsBoard";
+import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 
 type User = {
@@ -18,7 +19,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -87,7 +88,7 @@ export default function AdminShell() {
         <form className="login-card" onSubmit={login}>
           <p className="eyebrow">Три Короны · Resort OS</p>
           <h1>Вход в управление</h1>
-          <p className="login-copy">Шахматка, бронирования и операционные данные доступны только сотрудникам.</p>
+          <p className="login-copy">Шахматка, CRM, бронирования, сайт и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
           <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></label>
           {error && <div className="login-error">{error}</div>}
@@ -106,12 +107,13 @@ export default function AdminShell() {
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
-          {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
+          {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
+          {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
           {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
-          {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Аудит сообщений</button>}
+          {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
@@ -120,6 +122,7 @@ export default function AdminShell() {
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
+      {tab === "CONTENT" && isManager && <SiteContentBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard />}
       {tab === "INBOX" && isManager && <InboxBoard />}
