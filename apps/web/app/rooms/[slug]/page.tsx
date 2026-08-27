@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -19,12 +20,13 @@ export async function generateMetadata({ params }: RoomPageProps): Promise<Metad
 
   return {
     title: room.name,
-    description: `${room.name} в Три Короны Resort & SPA: ${room.capacity}, ${room.area}. Сезонный прайс и реальная проверка доступности по датам.`,
+    description: `${room.name} в Три Короны Resort & SPA: ${room.capacity}, ${room.area}. Сезонные цены и проверка свободных вариантов по датам.`,
     alternates: { canonical: `/rooms/${room.slug}` },
     openGraph: {
       title: `${room.name} · Три Короны`,
-      description: `${room.capacity} · ${room.area}. Проверьте реальную доступность и итоговую стоимость на свои даты.`,
+      description: `${room.capacity} · ${room.area}. Проверьте наличие и стоимость проживания на свои даты.`,
       url: `/rooms/${room.slug}`,
+      images: [{ url: "/media/three-crowns/room-double.webp", alt: "Номер в Три Короны Resort & SPA" }],
     },
   };
 }
@@ -38,11 +40,13 @@ export default async function RoomCategoryPage({ params }: RoomPageProps) {
     <SiteHeader />
     <main className="rooms-page" id="top">
       <section className="room-detail-hero" aria-labelledby="room-detail-title">
-        <div className="wrap">
+        <div className="room-detail-hero-media" aria-hidden="true"><Image src="/media/three-crowns/room-double.webp" alt="" fill priority sizes="100vw" /></div>
+        <div className="room-detail-hero-shade" aria-hidden="true" />
+        <div className="wrap room-detail-hero-content">
           <Link className="room-detail-back" href="/rooms">← Все категории</Link>
           <p className="eyebrow light">Категория {room.index} · Три Короны</p>
           <h1 id="room-detail-title">{room.name}</h1>
-          <div className="room-detail-kicker"><span>{room.capacity}</span><span>{room.area}</span><span>Проверка наличия через Resort Core</span></div>
+          <div className="room-detail-kicker"><span>{room.capacity}</span><span>{room.area}</span><span>Наличие — по выбранным датам</span></div>
         </div>
       </section>
 
@@ -50,16 +54,17 @@ export default async function RoomCategoryPage({ params }: RoomPageProps) {
         <div className="wrap room-detail-layout">
           <div className="room-detail-copy">
             <p className="eyebrow">О категории</p>
-            <h2 className="display-title">Понятный формат<br />без неподтверждённых деталей</h2>
-            <p className="lead">{room.summary} Точную конфигурацию конкретного номера, дополнительные места и другие детали размещения менеджер подтверждает для выбранных дат.</p>
-            <div className="room-detail-facts"><div><span>Базовая вместимость</span><strong>{room.capacity}</strong></div><div><span>Площадь</span><strong>{room.area}</strong></div></div>
-            <div className="room-detail-safety"><strong>Как работает бронирование</strong><p>Выберите даты ниже. Система покажет фактическую доступность и стоимость. Отправленная заявка не блокирует номер автоматически: подтверждённая бронь создаётся менеджером после согласования условий и предоплаты.</p></div>
+            <h2 className="display-title">Ваш формат<br />отдыха у озера</h2>
+            <p className="lead">{room.summary} Перед бронированием менеджер поможет уточнить детали конкретного номера и дополнительные места, если они нужны.</p>
+            <div className="room-detail-facts"><div><span>Размещение</span><strong>{room.capacity}</strong></div><div><span>Площадь</span><strong>{room.area}</strong></div></div>
+            <div className="room-detail-safety"><strong>Как забронировать</strong><p>Выберите даты ниже и посмотрите доступность и итоговую стоимость. Отправленная заявка не блокирует номер автоматически: подтверждённая бронь создаётся менеджером после согласования условий и предоплаты.</p></div>
           </div>
 
           <aside className="room-rate-card" aria-label="Сезонный прайс категории">
-            <p>Официальный летний прайс · 2026</p>
+            <p>Летний прайс · 2026</p>
             {publicRatePeriods.map((period) => <div className="room-rate-row" key={period.key}><span>{period.label}</span><strong>{formatKgs(room.rates[period.key])} сом</strong></div>)}
-            <p className="room-rate-note">Цена указана за номер / сутки по сезонной матрице. Точная сумма за поездку рассчитывается по выбранным ночам в Resort Core.</p>
+            <p className="room-rate-note">Цена указана за номер / сутки по сезонному периоду. Точная сумма за весь отдых рассчитывается после выбора дат.</p>
+            <a className="button button-accent room-rate-cta" href="#booking">Проверить даты</a>
           </aside>
         </div>
       </section>
