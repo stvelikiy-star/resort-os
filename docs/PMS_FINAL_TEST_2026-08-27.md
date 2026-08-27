@@ -1,11 +1,13 @@
-# Three Crowns PMS / CRM — Final Test Baseline
+# Three Crowns PMS / CRM / Site Admin — Final Test Baseline
 
 Date: 2026-08-27
 Branch: `pms/final-test-20260827`
 
 ## Purpose
 
-This branch marks the acceptance baseline for the owner-facing final interactive PMS/CRM test build. It expands the earlier standalone `/demo` and PALADIN UX reference into the target Three Crowns operating surface while preserving Resort Core as production authority.
+This branch marks the acceptance baseline for the owner-facing final interactive Resort OS test build. It expands the earlier standalone `/demo` and PALADIN UX reference into the target Three Crowns operating surface while preserving Resort Core as production authority.
+
+The current acceptance artifact is a single offline HTML file with a white / Three Crowns blue visual system, embedded official logo, desktop/mobile navigation and local persistence.
 
 ## Test modules
 
@@ -20,7 +22,8 @@ This branch marks the acceptance baseline for the owner-facing final interactive
 9. Finance — operational accrued/paid/balance, ADR/RevPAR display, channel revenue, debtor control. Not accounting authority.
 10. Analytics — occupancy forecast, channel mix, category performance and owner KPIs.
 11. NFC / beach — test UI for bracelet balance, top-up, charge and 5% hotel commission. Production processor remains a later connected contour.
-12. Reports / RBAC — CSV outputs, daily owner summary and OWNER/MANAGER/MAID/TECHNICIAN/BEACH_PARTNER roles.
+12. Site / content admin — RU/KG/EN guest copy, contacts, SEO, publish state, local persistence and JSON import/export. The offline module is UX acceptance for the target Content API; it does not claim that API is deployed.
+13. Reports / RBAC — CSV outputs, daily owner summary and OWNER/MANAGER/MAID/TECHNICIAN/BEACH_PARTNER roles.
 
 ## Canonical safety rules preserved
 
@@ -31,14 +34,32 @@ This branch marks the acceptance baseline for the owner-facing final interactive
 - CHECKED_OUT/CANCELLED/NO_SHOW schedules are read-only.
 - TECH_BLOCK rooms cannot receive booking moves.
 - Schedule changes show current stored total, suggested tariff and delta; they do not silently rewrite commercial value.
-- Public booking and PMS must use the same inventory truth.
+- Public booking and PMS use the same inventory truth.
+- CMS edits copy/translations/SEO only and cannot write inventory or silently create a reservation.
+- Website booking requests remain requests until the approved manager/prepayment workflow confirms a reservation.
 
 ## Data note
 
 84 rooms and 12 categories are canonical property-level facts. The standalone final test uses safe demo guests, booking numbers and a demo distribution of physical room codes across the 12 categories until the production room inventory is imported from Resort Core/PostgreSQL.
 
+## Site/PMS integration
+
+The already verified development baseline proves:
+
+`PUBLIC SITE -> CORE AVAILABILITY -> POSTGRESQL`
+
+and:
+
+`PMS ADMIN -> LIVE PMS GRID API -> POSTGRESQL`
+
+The target content-admin path is separately defined by `docs/SITE_ADMIN_CONTENT_CONTRACT.md`:
+
+`ADMIN CONTENT -> CONTENT API -> VERSIONED PUBLISHED CONTENT -> PUBLIC SITE REVALIDATION`
+
 ## Standalone acceptance artifact
 
-The generated single-file acceptance UI is `three-crowns-pms-crm-final-test/index.html` in the handoff package created on 2026-08-27. Test changes persist in browser localStorage and can be reset from the top bar.
+The handoff file is `three-crowns-resort-os-onefile.html`.
+
+It contains all CSS, JavaScript, official logo and demo data inline; no external stylesheet/script/media dependency is required to open the interface. Test mutations and content edits persist in browser localStorage and can be reset from the top bar.
 
 This branch is intentionally separate from `main` so production authority is not changed by presentation/demo acceptance work.
