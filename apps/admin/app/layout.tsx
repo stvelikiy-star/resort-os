@@ -14,10 +14,11 @@ import "./chessboard.css";
 import "./chessboard-lifecycle.css";
 import "./chessboard-payment.css";
 import "./chessboard-v2.css";
+import "./three-crowns-admin.css";
 
 export const metadata: Metadata = {
-  title: "Три Короны — PMS",
-  description: "Resort OS control center for Three Crowns",
+  title: "Три Короны — Resort OS",
+  description: "PMS, CRM, сайт и операционный центр Three Crowns",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
