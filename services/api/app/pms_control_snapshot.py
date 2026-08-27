@@ -8,8 +8,6 @@ from .auth import require_roles
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-control"])
 manager_access = require_roles("OWNER", "MANAGER")
 
-ACTIVE_TASK_STATUSES = ("OPEN", "IN_PROGRESS", "IN_INSPECTION")
-
 
 @router.get("/control-snapshot")
 async def control_snapshot(
@@ -80,9 +78,14 @@ async def control_snapshot(
               WHERE p."reservationId"=r.id
             ) pay ON true
             WHERE r."propertyId"=$1
-              AND r.status IN ('GUARANTEED','CHECKED_IN')
-              AND r."checkOut" > $3::date
-              AND r."checkIn" < $4::date
+              AND (
+                r.status='CHECKED_IN'
+                OR (
+                  r.status='GUARANTEED'
+                  AND r."checkOut" > $3::date
+                  AND r."checkIn" < $4::date
+                )
+              )
             ORDER BY
               CASE r.status::text WHEN 'CHECKED_IN' THEN 0 ELSE 1 END,
               r."checkIn",r."createdAt" DESC
@@ -196,5 +199,5 @@ async def control_snapshot(
                 if item["status"] == "GUARANTEED" and not item["room_id"]
             ),
         },
-        "truth": "Complete manager read-model for the requested <=62 day window. Reservation/payment truth comes from Resort Core; room assignment comes from active RESERVATION inventory segments; task truth comes from active operational_tasks.",
+        "truth": "Complete manager read-model for the requested <=62 day guaranteed window plus all currently CHECKED_IN stays. Reservation/payment truth comes from Resort Core; room assignment comes from active RESERVATION inventory segments; task truth comes from active operational_tasks.",
     }
