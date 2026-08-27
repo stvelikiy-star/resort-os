@@ -62,6 +62,20 @@ async def bulk_create_tasks(
 
                 for item in payload.items:
                     room = room_by_id[item.room_id]
+                    expected_state = "DIRTY" if item.type == "HOUSEKEEPING" else "TECH_BLOCK"
+                    if room["state"] != expected_state:
+                        skipped.append(
+                            {
+                                "room_id": str(item.room_id),
+                                "room_code": room["code"],
+                                "type": item.type,
+                                "room_state": room["state"],
+                                "expected_room_state": expected_state,
+                                "reason": "ROOM_STATE_CHANGED",
+                            }
+                        )
+                        continue
+
                     existing = await conn.fetchrow(
                         '''
                         SELECT id,status::text AS status
@@ -107,18 +121,6 @@ async def bulk_create_tasks(
                         payload.source,
                     )
 
-                    if item.type == "MAINTENANCE":
-                        await conn.execute(
-                            '''UPDATE rooms SET "operationalState"='TECH_BLOCK',"updatedAt"=now() WHERE id=$1''',
-                            item.room_id,
-                        )
-                    else:
-                        await conn.execute(
-                            '''UPDATE rooms SET "operationalState"='DIRTY',"updatedAt"=now()
-                               WHERE id=$1 AND "operationalState"<>'TECH_BLOCK' ''',
-                            item.room_id,
-                        )
-
                     after = {
                         "room_id": str(item.room_id),
                         "room_code": room["code"],
@@ -126,6 +128,7 @@ async def bulk_create_tasks(
                         "status": "OPEN",
                         "priority": item.priority,
                         "title": item.title,
+                        "room_state": room["state"],
                     }
                     await conn.execute(
                         '''
@@ -149,7 +152,7 @@ async def bulk_create_tasks(
                     "skipped": skipped,
                     "created_count": len(created),
                     "skipped_count": len(skipped),
-                    "message": "Rooms were locked in deterministic order. Existing active same-room/same-type tasks were preserved and skipped.",
+                    "message": "Rooms were locked in deterministic order. Room state and active same-room/same-type tasks were rechecked under lock; stale or duplicate items were skipped.",
                 }
     except UniqueViolationError as exc:
         raise HTTPException(
