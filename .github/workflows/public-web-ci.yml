@@ -30,24 +30,48 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: apps/web/package-lock.json
-      - name: Install
+
+      - name: Assert exact public-web toolchain pins
+        run: |
+          node - <<'NODE'
+          const p=require('./apps/web/package.json');
+          const expected={
+            next:'15.5.24',
+            react:'19.2.8',
+            'react-dom':'19.2.8',
+            typescript:'5.7.2',
+          };
+          const actual={...p.dependencies,...p.devDependencies};
+          for (const [name,version] of Object.entries(expected)) {
+            if (actual[name] !== version) {
+              console.error(`unexpected ${name}: ${actual[name]} (expected ${version})`);
+              process.exit(1);
+            }
+          }
+          NODE
+
+      - name: Install current pinned web dependencies
         working-directory: apps/web
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund --package-lock=false
+
       - name: Typecheck
         working-directory: apps/web
         run: npm run typecheck
+
       - name: Build
         working-directory: apps/web
         run: npm run build
+
       - name: Enforce canonical public truth
         run: python3 scripts/public_site_truth_guard.py
+
       - name: Assert action homepage contract
         run: |
           grep -q 'ActionRuntime' apps/web/app/page.tsx
           grep -q 'action-room-rail' apps/web/app/page.tsx
           grep -q 'prefers-reduced-motion' apps/web/app/action-v3.css
+          grep -Fq '.action-room-card:hover{transform:none}' apps/web/app/action-motion.css
+          grep -Fq '.action-room-card:hover .action-room-card-link b{transform:none}' apps/web/app/action-motion.css
           grep -Fq 'Пирс длиной 150 метров' apps/web/app/page.tsx
           grep -Fq 'Открытый бассейн 15×8 м' apps/web/app/page.tsx
           grep -Fq 'Номер автоматически не блокируется' apps/web/app/page.tsx
