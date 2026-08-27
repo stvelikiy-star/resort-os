@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
 };
 
-export const viewport: Viewport = { themeColor: "#0b2d63", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#0d2d23", colorScheme: "light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="ru"><body>{children}</body></html>;
