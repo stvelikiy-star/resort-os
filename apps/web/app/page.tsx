@@ -205,7 +205,7 @@ export default function HomePage() {
       <section className="v3-rooms" id="rooms" aria-labelledby="rooms-title">
         <div className="wrap v3-section-head">
           <div><p className="eyebrow">Номерной фонд</p><h2 className="display-title" id="rooms-title">Все 12 категорий.<br />Выбирайте спокойно.</h2></div>
-          <div><p>Каждая карточка ведёт на отдельную страницу категории: описание, вместимость, площадь, сезонные цены и форма проверки дат. Пока используем общий подтверждённый кадр номерного фонда — индивидуальные фото просто заменим после вашей загрузки.</p><Link className="text-link" href="/rooms">Открыть полный каталог →</Link></div>
+          <div><p>Каждая карточка ведёт на отдельную страницу категории: описание, вместимость, площадь, сезонные цены и форма проверки дат. Пока используем общий кадр номерного фонда — индивидуальные фотографии добавим после вашей загрузки.</p><Link className="text-link" href="/rooms">Открыть полный каталог →</Link></div>
         </div>
 
         <div className="wrap v3-room-grid">
