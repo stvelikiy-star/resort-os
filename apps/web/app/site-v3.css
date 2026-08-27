@@ -2,7 +2,7 @@
 .landing-v3 .display-title{max-width:980px}
 
 .v3-hero{position:relative;min-height:100svh;display:flex;align-items:flex-end;overflow:hidden;background:#071d17;color:#fff}
-.v3-hero-media{position:absolute;inset:0}
+.v3-hero-media{position:absolute;inset:0;background:url('/media/three-crowns/hero-resort.webp') center 48%/cover no-repeat}
 .v3-hero-media video{width:100%;height:100%;object-fit:cover;object-position:center 48%}
 .v3-hero-shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,22,16,.94) 0%,rgba(4,22,16,.66) 44%,rgba(4,22,16,.16) 84%),linear-gradient(0deg,rgba(3,16,12,.88) 0%,rgba(3,16,12,.14) 52%,rgba(3,16,12,.16) 100%)}
 .v3-hero-content{position:relative;z-index:2;padding:160px 0 118px}
@@ -77,8 +77,8 @@
 .v3-territory{padding:clamp(104px,11vw,164px) 0;background:#071d17;color:#fff}
 .light-head .display-title{color:#fff}
 .light-head>p{color:rgba(255,255,255,.62)}
-.v3-territory-film{position:relative;margin-top:62px;overflow:hidden;background:#102e25;box-shadow:0 30px 80px rgba(0,0,0,.25)}
-.v3-territory-film video{width:100%;height:min(72vw,760px);display:block;object-fit:cover;background:#0b241c}
+.v3-territory-film{position:relative;margin-top:62px;overflow:hidden;background:#102e25 url('/media/three-crowns/hero-resort.webp') center/cover no-repeat;box-shadow:0 30px 80px rgba(0,0,0,.25)}
+.v3-territory-film video{width:100%;height:min(72vw,760px);display:block;object-fit:cover;background:transparent}
 .v3-film-caption{position:absolute;left:22px;bottom:22px;display:grid;gap:3px;padding:15px 18px;background:rgba(5,25,18,.76);backdrop-filter:blur(12px)}
 .v3-film-caption span{color:#e5c98f;font-size:.58rem;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
 .v3-film-caption strong{font-family:var(--serif);font-size:1.24rem;font-weight:500}
