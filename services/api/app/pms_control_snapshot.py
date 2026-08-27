@@ -119,7 +119,8 @@ async def control_snapshot(
             '''
             SELECT room.id,room.code,room.name,
                    room."operationalState"::text AS state,
-                   room."buildingOrZone" AS building_or_zone,room.floor,
+                   room."buildingOrZone" AS building_or_zone,
+                   room."floorLabel" AS floor,
                    rt.code AS room_type_code,rt.name AS room_type_name
             FROM rooms room
             JOIN room_types rt ON rt.id=room."roomTypeId"
