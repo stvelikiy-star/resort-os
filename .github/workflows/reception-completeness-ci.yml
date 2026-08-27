@@ -1,0 +1,171 @@
+name: Reception Completeness CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/reception_reservations.py'
+      - '.github/workflows/reception-completeness-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/app/reception_reservations.py'
+      - '.github/workflows/reception-completeness-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reception-completeness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_reception_ci
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_reception_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_reception_ci?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      COOKIE_SECURE: false
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Reception-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Reception Owner
+      PGPASSWORD: resort
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Create disposable database schema
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install and compile Resort Core
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts
+
+      - name: Apply constraints, seed property and bootstrap owner
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Seed exactly two minimal reservations
+        run: |
+          psql -h 127.0.0.1 -U resort -d resort_reception_ci -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO reservations
+            (id,"propertyId","bookingNumber",status,"checkIn","checkOut",adults,children,"totalKgs","updatedAt")
+          SELECT
+            '71000000-0000-0000-0000-000000000001'::uuid,
+            id,
+            'RCI-001',
+            'GUARANTEED',
+            DATE '2026-08-28',
+            DATE '2026-08-30',
+            2,
+            0,
+            1000,
+            now()
+          FROM properties WHERE code='THREE_CROWNS';
+
+          INSERT INTO reservations
+            (id,"propertyId","bookingNumber",status,"checkIn","checkOut",adults,children,"totalKgs","updatedAt")
+          SELECT
+            '71000000-0000-0000-0000-000000000002'::uuid,
+            id,
+            'RCI-002',
+            'GUARANTEED',
+            DATE '2026-08-29',
+            DATE '2026-08-31',
+            1,
+            0,
+            2000,
+            now()
+          FROM properties WHERE code='THREE_CROWNS';
+
+          test "$(psql -h 127.0.0.1 -U resort -d resort_reception_ci -Atc \"SELECT count(*) FROM reservations\")" = '2'
+          SQL
+
+      - name: Start Resort Core and login owner
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/reception-api.log 2>&1 &
+          echo $! > /tmp/reception-api.pid
+          for i in {1..30}; do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/dev/null 2>&1 || curl --fail -sS http://127.0.0.1:8000/ready >/dev/null 2>&1; then
+              break
+            fi
+            if [ "$i" = '30' ]; then cat /tmp/reception-api.log; exit 1; fi
+            sleep 1
+          done
+          curl --fail -sS -c /tmp/reception-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci-owner","password":"CI-Reception-Strong-Password-2026"}' > /tmp/login.json
+
+      - name: Prove truncated list is explicitly incomplete
+        run: |
+          curl --fail -sS -b /tmp/reception-cookies.txt \
+            'http://127.0.0.1:8000/api/v1/admin/reception/reservations?limit=1' > /tmp/reception-limit-1.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/reception-limit-1.json'))
+          assert d['limit'] == 1
+          assert d['returned'] == 1
+          assert d['complete'] is False
+          assert len(d['items']) == 1
+          item=d['items'][0]
+          for key in ('id','bookingNumber','status','checkIn','checkOut','adults','children','totalKgs','paidKgs','remainingKgs','schedule_segments','has_room_move'):
+              assert key in item, key
+          PY
+
+      - name: Prove full list is explicitly complete
+        run: |
+          curl --fail -sS -b /tmp/reception-cookies.txt \
+            'http://127.0.0.1:8000/api/v1/admin/reception/reservations?limit=500' > /tmp/reception-limit-500.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/reception-limit-500.json'))
+          assert d['limit'] == 500
+          assert d['returned'] == 2
+          assert d['complete'] is True
+          assert len(d['items']) == 2
+          assert {x['bookingNumber'] for x in d['items']} == {'RCI-001','RCI-002'}
+          PY
+
+      - name: Prove reception list remains manager-protected
+        run: |
+          CODE=$(curl -sS -o /tmp/reception-unauth.json -w '%{http_code}' \
+            'http://127.0.0.1:8000/api/v1/admin/reception/reservations?limit=1')
+          test "$CODE" = '401'
+
+      - name: Show Core logs on failure
+        if: failure()
+        run: cat /tmp/reception-api.log || true
