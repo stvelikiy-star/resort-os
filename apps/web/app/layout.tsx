@@ -11,6 +11,7 @@ import "./gallery-premium.css";
 import "./site-v3.css";
 import "./video-sections.css";
 import "./premium-experience.css";
+import "./site-cms.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { content } = await getPublishedSiteContent("ru");
