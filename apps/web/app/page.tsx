@@ -225,7 +225,7 @@ export default function HomePage() {
       <section className="v3-territory" id="resort" aria-labelledby="territory-title">
         <div className="wrap v3-section-head light-head">
           <div><p className="eyebrow light">Территория курорта</p><h2 className="display-title light" id="territory-title">От первого шага<br />до конца пирса</h2></div>
-          <p>Этот блок будет открываться вашим большим дроном-видео о пансионате. Уже сейчас заложена готовая видео-зона: когда вы нарежете ролик, достаточно заменить файл — вся композиция останется на месте.</p>
+          <p>Раздел открывается большим видео о пансионате и показывает курорт как единый маршрут — от размещения до берега Иссык-Куля.</p>
         </div>
 
         <div className="wrap v3-territory-film">
@@ -256,7 +256,7 @@ export default function HomePage() {
       <section className="v3-reviews" id="reviews" aria-labelledby="reviews-title">
         <div className="wrap v3-section-head">
           <div><p className="eyebrow">Отзывы гостей</p><h2 className="display-title" id="reviews-title">Что запоминается<br />после поездки</h2></div>
-          <p>Пока не подставляем выдуманные цитаты. Показываем реальные темы, которые чаще всего встречаются в публичных отзывах: расположение у озера, пляж, пирс и удобство курортного формата. Позже подключим ваши актуальные отзывы с именами и источниками.</p>
+          <p>Пока не подставляем выдуманные цитаты. Показываем реальные темы, которые чаще всего встречаются в публичных отзывах: расположение у озера, пляж, пирс и удобство курортного формата. Позже подключим актуальные отзывы с именами и источниками.</p>
         </div>
         <div className="wrap v3-review-grid">{reviewThemes.map((review) => <article key={review.score}><span>{review.score}</span><h3>{review.title}</h3><p>{review.text}</p></article>)}</div>
 
