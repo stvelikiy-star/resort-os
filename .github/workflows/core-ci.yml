@@ -152,6 +152,12 @@ jobs:
           curl --fail -sS -b /tmp/resort-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/me.json
           python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"]=="OWNER"'
 
+      - name: Verify unified Site CMS CRM PMS contour
+        env:
+          SMOKE_OWNER_USERNAME: ci-owner
+          SMOKE_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+        run: python scripts/site_pms_cms_smoke.py
+
       - name: Quote stay without automatic prepayment rule
         run: |
           REQUEST_ID=$(cat /tmp/request_id)
