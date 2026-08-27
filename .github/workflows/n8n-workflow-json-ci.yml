@@ -80,5 +80,50 @@ jobs:
           if (serialized.includes('CI-AUTOMATION-SERVICE-KEY') || serialized.includes('AIza') || serialized.includes('ya29.')) {
             throw new Error('workflow appears to contain a literal secret/token');
           }
+          if (serialized.includes("GUARANTEED:'CONFIRMED'") || serialized.includes('PENDING_PAYMENT')) {
+            throw new Error('CRM mirror contains stale booking-status translation');
+          }
           console.log('CRM mirror workflow safety contract verified');
+          JS
+
+      - name: Verify Google Control Center mirror safety contract
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const file = 'automation/n8n/google-control-center-sync.json';
+          const workflow = JSON.parse(fs.readFileSync(file, 'utf8'));
+          if (workflow.active !== false) throw new Error('Google Control sync must be committed inactive');
+          const spreadsheet = '1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw';
+          const sheets = workflow.nodes.filter((node) => node.type === 'n8n-nodes-base.googleSheets');
+          if (sheets.length !== 8) throw new Error(`expected 8 Google Sheets nodes, found ${sheets.length}`);
+          const expected = new Map([
+            ['Upsert Requests', ['Request ID', '100001']],
+            ['Upsert Reservations', ['Reservation ID', '100002']],
+            ['Upsert Payments', ['Payment ID', '100004']],
+            ['Upsert Rooms', ['Room ID', '100005']],
+            ['Upsert Guests', ['Guest ID', '100003']],
+            ['Upsert Housekeeping', ['Task ID', '100006']],
+            ['Upsert Maintenance', ['Task ID', '100007']],
+            ['Upsert Site Content', ['Locale', '100008']],
+          ]);
+          for (const node of sheets) {
+            if (node.parameters?.operation !== 'appendOrUpdate') throw new Error(`${node.name}: must appendOrUpdate`);
+            const rule = expected.get(node.name);
+            if (!rule) throw new Error(`unexpected Control Center Sheets node: ${node.name}`);
+            const [key, sheetId] = rule;
+            const matching = node.parameters?.columns?.matchingColumns ?? [];
+            if (!matching.includes(key)) throw new Error(`${node.name}: missing stable match key ${key}`);
+            if (String(node.parameters?.sheetName?.value) !== sheetId) throw new Error(`${node.name}: wrong sheet id`);
+            if (node.parameters?.documentId?.value !== spreadsheet) throw new Error(`${node.name}: wrong Control Center spreadsheet`);
+          }
+          const siteNode = sheets.find((node) => node.name === 'Upsert Site Content');
+          for (const key of ['Locale', 'Section', 'Field']) {
+            if (!siteNode.parameters.columns.matchingColumns.includes(key)) throw new Error(`Upsert Site Content missing composite key ${key}`);
+          }
+          const serialized = JSON.stringify(workflow);
+          if (!serialized.includes('/api/v1/automation/read/google-control-feed')) throw new Error('Control workflow does not read canonical Core feed');
+          if (serialized.includes('CI-AUTOMATION-SERVICE-KEY') || serialized.includes('AIza') || serialized.includes('ya29.')) {
+            throw new Error('Control workflow appears to contain a literal secret/token');
+          }
+          console.log('Google Control Center workflow safety contract verified');
           JS
