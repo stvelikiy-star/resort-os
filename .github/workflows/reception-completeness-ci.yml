@@ -111,9 +111,8 @@ jobs:
             2000,
             now()
           FROM properties WHERE code='THREE_CROWNS';
-
-          test "$(psql -h 127.0.0.1 -U resort -d resort_reception_ci -Atc \"SELECT count(*) FROM reservations\")" = '2'
           SQL
+          test "$(psql -h 127.0.0.1 -U resort -d resort_reception_ci -Atc 'SELECT count(*) FROM reservations')" = '2'
 
       - name: Start Resort Core and login owner
         run: |
