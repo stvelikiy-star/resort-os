@@ -21,6 +21,7 @@ from .reception_reservations import router as reception_reservations_router
 from .reservation_detail import router as reservation_detail_router
 from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
+from .site_content import router as site_content_router
 from .staff_control import router as staff_control_router
 from .staff_voice import router as staff_voice_router
 from .stays import router as stays_router
@@ -32,6 +33,7 @@ install_observability(app)
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
 app.include_router(health_router)
+app.include_router(site_content_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reservation_detail_router)
@@ -64,4 +66,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.29.1"
+app.version = "0.30.0"
