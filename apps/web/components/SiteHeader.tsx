@@ -41,9 +41,12 @@ export default function SiteHeader() {
   const closeMenu = () => setOpen(false);
   const copy = NAV[locale];
   const withLanguage = (href: string) => {
-    if (locale === "ru") return href;
-    const separator = href.includes("?") ? "&" : "?";
-    return `${href}${separator}lang=${locale}`;
+    const hashIndex = href.indexOf("#");
+    const base = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
+    const hash = hashIndex >= 0 ? href.slice(hashIndex) : "";
+    if (locale === "ru") return `${base}${hash}`;
+    const separator = base.includes("?") ? "&" : "?";
+    return `${base}${separator}lang=${locale}${hash}`;
   };
   const links = [[withLanguage("/rooms"), copy.rooms],[withLanguage("/#resort"), copy.territory],[withLanguage("/#experience"), copy.amenities],[withLanguage("/#reviews"), copy.reviews],[withLanguage("/#groups"), copy.groups],[withLanguage("/#contacts"), copy.contacts]];
 
