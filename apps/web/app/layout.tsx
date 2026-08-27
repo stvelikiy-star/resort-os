@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import PremiumMotion from "../components/PremiumMotion";
 import "./globals.css";
 import "./premium-expansion.css";
 import "./final-polish.css";
@@ -8,6 +9,7 @@ import "./gallery-premium.css";
 import "./site-v3.css";
 import "./video-sections.css";
 import "./territory-photo-pack.css";
+import "./premium-experience.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://3korony.com"),
@@ -33,8 +35,8 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
 };
 
-export const viewport: Viewport = { themeColor: "#0d2d23", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#0A1128", colorScheme: "dark light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body>{children}</body></html>;
+  return <html lang="ru"><body><PremiumMotion />{children}</body></html>;
 }
