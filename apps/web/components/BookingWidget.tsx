@@ -55,6 +55,15 @@ function nightsLabel(value: number) {
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${value} ночи`;
   return `${value} ночей`;
 }
+function adultsLabel(value: number) {
+  if (value === 1) return "1 взрослый";
+  return `${value} взрослых`;
+}
+function childrenLabel(value: number) {
+  if (value === 1) return "1 ребёнок";
+  if (value >= 2 && value <= 4) return `${value} ребёнка`;
+  return `${value} детей`;
+}
 function mealLabel(nights: PricingNight[]) {
   const values = Array.from(new Set(nights.map((night) => night.meal_included).filter(Boolean)));
   if (values.length !== 1) return values.length > 1 ? "Условия питания меняются по датам" : null;
@@ -229,7 +238,7 @@ export default function BookingWidget() {
     <section className="booking-shell" id="booking" aria-labelledby="booking-title" aria-busy={loading || sending}>
       <div className="booking-intro">
         <div><p className="eyebrow">Проверка наличия</p><h2 id="booking-title">Найдите номер на ваши даты</h2></div>
-        <p><span className="live-dot" aria-hidden="true" /> Наличие и цена одного номера — из системы отеля</p>
+        <p><span className="live-dot" aria-hidden="true" /> Наличие и стоимость обновляются из системы отеля</p>
       </div>
 
       <form className="booking-bar" onSubmit={findRooms}>
@@ -248,7 +257,7 @@ export default function BookingWidget() {
       {results && <div className="availability" id="availability">
         <div className="availability-head">
           <div><p className="eyebrow">Свободные варианты</p><h2>{nightsLabel(results.nights)}</h2></div>
-          <p>{formatDate(results.check_in)} → {formatDate(results.check_out)} · {results.adults} взр.{results.children ? ` · ${results.children} дет. · детские места — по подтверждению менеджера` : ""}</p>
+          <p>{formatDate(results.check_in)} → {formatDate(results.check_out)} · {adultsLabel(results.adults)}{results.children ? ` · ${childrenLabel(results.children)} · детские места — по подтверждению менеджера` : ""}</p>
         </div>
 
         {sortedResults.length === 0
@@ -257,12 +266,12 @@ export default function BookingWidget() {
               const meal = mealLabel(item.pricing.nights);
               const isSelected = selected?.room_type_id === item.room_type_id;
               return <article className={`availability-card ${isSelected ? "selected" : ""}`} key={item.room_type_id}>
-                <div className="availability-card-top"><span className="availability-count">Свободно: {item.available_count}</span><span className="availability-code">{item.room_type_code}</span></div>
+                <div className="availability-card-top"><span className="availability-count">Свободно: {item.available_count}</span><span className="availability-code">На ваши даты</span></div>
                 <h3>{item.room_type_name}</h3>
-                <p className="availability-meta">{item.capacity_adults} осн. мест{item.area ? ` · ${item.area} м²` : ""}{results.children > 0 && !item.children_capacity_confirmed ? " · детские места уточняются" : ""}</p>
+                <p className="availability-meta">{adultsLabel(item.capacity_adults)}{item.area ? ` · ${item.area} м²` : ""}{results.children > 0 && !item.children_capacity_confirmed ? " · детские места уточняются" : ""}</p>
                 <div className="availability-price">{item.pricing.sellable && item.pricing.total_kgs !== null
                   ? <><strong>{money(item.pricing.total_kgs)} сом</strong><small>за весь период{meal ? ` · ${meal}` : ""}</small></>
-                  : <><strong>По запросу</strong><small>тариф требует подтверждения менеджером</small></>}
+                  : <><strong>По запросу</strong><small>стоимость подтвердит менеджер</small></>}
                 </div>
                 <button className={isSelected ? "button button-dark" : "button button-outline"} onClick={() => selectRoom(item)} type="button" aria-pressed={isSelected}>{item.pricing.sellable ? (isSelected ? "Выбрано" : "Оставить заявку") : "Уточнить у менеджера"}</button>
               </article>;
