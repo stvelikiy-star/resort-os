@@ -156,7 +156,7 @@ jobs:
         run: |
           grep -Fq 'prisma/migrations/0_init' ops/production_deploy.sh
           grep -Fq 'run --rm migrator' ops/production_deploy.sh
-          grep -Fq 'npx prisma migrate status' ops/production_deploy.sh
+          grep -Fq 'npx --no-install prisma migrate status' ops/production_deploy.sh
           grep -Fq 'production_preflight.py' ops/production_deploy.sh
           grep -Fq 'REQUIRE_RECENT_BACKUP=true' ops/production_deploy.sh
           grep -Fq 'REQUIRE_MIGRATION_HISTORY=true' ops/production_deploy.sh
