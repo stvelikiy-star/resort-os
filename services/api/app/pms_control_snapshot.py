@@ -58,10 +58,14 @@ async def control_snapshot(
               ORDER BY
                 CASE
                   WHEN r.status='CHECKED_IN' AND ib."startDate" <= $2::date AND $2::date < ib."endDate" THEN 0
-                  WHEN r.status='CHECKED_IN' AND ib."endDate" = $2::date THEN 1
+                  WHEN r.status='CHECKED_IN' AND ib."endDate" <= $2::date THEN 1
                   WHEN r.status='GUARANTEED' AND ib."startDate" = r."checkIn" THEN 0
                   ELSE 2
                 END,
+                CASE
+                  WHEN r.status='CHECKED_IN' AND ib."endDate" <= $2::date THEN ib."endDate"
+                  ELSE NULL
+                END DESC NULLS LAST,
                 ib."startDate" ASC
               LIMIT 1
             ) selected ON true
@@ -222,5 +226,5 @@ async def control_snapshot(
                 if item["status"] == "GUARANTEED" and not item["room_id"]
             ),
         },
-        "truth": "Complete manager read-model for the requested <=62 day guaranteed window plus all currently CHECKED_IN stays. Reservation/payment truth comes from Resort Core; room assignment comes from active RESERVATION inventory segments; room state comes from rooms; task truth comes from active operational_tasks.",
+        "truth": "Complete manager read-model for the requested <=62 day guaranteed window plus all currently CHECKED_IN stays. Reservation/payment truth comes from Resort Core; room assignment comes from active RESERVATION inventory segments; overdue in-house room resolves to the latest completed segment; room state comes from rooms; task truth comes from active operational_tasks.",
     }
