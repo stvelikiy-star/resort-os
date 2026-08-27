@@ -54,7 +54,7 @@ type Detail = {
 };
 
 type Conflict = { key: string; severity: "critical" | "warning"; title: string; description: string; roomCode?: string; reservationId?: string };
-type FinanceState = "loading" | "ready" | "partial" | "error";
+type ReceptionState = "loading" | "ready" | "partial" | "error";
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const roomStateLabel: Record<string, string> = { CLEAN: "Готов", DIRTY: "Нужна уборка", IN_INSPECTION: "На проверке", TECH_BLOCK: "Ремонт", UNKNOWN: "Без статуса" };
@@ -79,7 +79,7 @@ function sortBlocks<T extends Pick<Block, "start" | "end">>(blocks: T[]) {
 export default function PMSReceptionCockpit() {
   const [grid, setGrid] = useState<GridResponse | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [financeState, setFinanceState] = useState<FinanceState>("loading");
+  const [receptionState, setReceptionState] = useState<ReceptionState>("loading");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
@@ -90,10 +90,12 @@ export default function PMSReceptionCockpit() {
   const today = localDate(new Date());
   const tomorrow = localDate(addDays(new Date(), 1));
   const horizonEnd = localDate(addDays(new Date(), 15));
+  const receptionComplete = receptionState === "ready";
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setReceptionState("loading");
     try {
       const params = new URLSearchParams({ start: localDate(addDays(new Date(), -1)), end: horizonEnd });
       const [gridResponse, receptionResponse] = await Promise.all([
@@ -105,18 +107,17 @@ export default function PMSReceptionCockpit() {
       setGrid(gridBody as GridResponse);
 
       const receptionBody = await receptionResponse.json().catch(() => ({}));
-      if (!receptionResponse.ok || !Array.isArray(receptionBody.items)) {
+      if (!receptionResponse.ok || !Array.isArray(receptionBody.items) || typeof receptionBody.complete !== "boolean") {
         setReservations([]);
-        setFinanceState("error");
+        setReceptionState("error");
       } else {
-        const items = receptionBody.items as Reservation[];
-        setReservations(items);
-        setFinanceState(items.length >= 500 ? "partial" : "ready");
+        setReservations(receptionBody.items as Reservation[]);
+        setReceptionState(receptionBody.complete ? "ready" : "partial");
       }
     } catch (cause) {
       setGrid(null);
       setReservations([]);
-      setFinanceState("error");
+      setReceptionState("error");
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить Reception Cockpit");
     } finally {
       setLoading(false);
@@ -148,11 +149,11 @@ export default function PMSReceptionCockpit() {
     return map;
   }, [grid, today]);
 
-  const arrivalsToday = useMemo(() => reservations.filter((item) => item.status === "GUARANTEED" && item.checkIn === today), [reservations, today]);
-  const arrivalsTomorrow = useMemo(() => reservations.filter((item) => item.status === "GUARANTEED" && item.checkIn === tomorrow), [reservations, tomorrow]);
-  const departuresToday = useMemo(() => reservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut === today), [reservations, today]);
-  const departuresTomorrow = useMemo(() => reservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut === tomorrow), [reservations, tomorrow]);
-  const overdue = useMemo(() => reservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut < today), [reservations, today]);
+  const arrivalsToday = useMemo(() => receptionComplete ? reservations.filter((item) => item.status === "GUARANTEED" && item.checkIn === today) : [], [reservations, today, receptionComplete]);
+  const arrivalsTomorrow = useMemo(() => receptionComplete ? reservations.filter((item) => item.status === "GUARANTEED" && item.checkIn === tomorrow) : [], [reservations, tomorrow, receptionComplete]);
+  const departuresToday = useMemo(() => receptionComplete ? reservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut === today) : [], [reservations, today, receptionComplete]);
+  const departuresTomorrow = useMemo(() => receptionComplete ? reservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut === tomorrow) : [], [reservations, tomorrow, receptionComplete]);
+  const overdue = useMemo(() => receptionComplete ? reservations.filter((item) => item.status === "CHECKED_IN" && item.checkOut < today) : [], [reservations, today, receptionComplete]);
 
   const notReadyArrivals = useMemo(() => arrivalsToday.filter((item) => {
     const linked = reservationRoom.get(item.id);
@@ -160,9 +161,9 @@ export default function PMSReceptionCockpit() {
     return !linked || state !== "CLEAN";
   }), [arrivalsToday, reservationRoom]);
 
-  const debtQueue = useMemo(() => financeState === "ready" ? reservations
+  const debtQueue = useMemo(() => receptionComplete ? reservations
     .filter((item) => ["GUARANTEED", "CHECKED_IN"].includes(item.status) && item.remainingKgs > 0)
-    .sort((a, b) => b.remainingKgs - a.remainingKgs) : [], [reservations, financeState]);
+    .sort((a, b) => b.remainingKgs - a.remainingKgs) : [], [reservations, receptionComplete]);
 
   const conflicts = useMemo(() => {
     const result: Conflict[] = [];
@@ -215,20 +216,22 @@ export default function PMSReceptionCockpit() {
       }
     });
 
-    arrivalsToday.forEach((item) => {
-      const linked = reservationRoom.get(item.id);
-      if (!linked) {
-        result.push({ key: `arrival-no-room-${item.id}`, severity: "critical", title: "Заезд сегодня без рабочего номера", description: `${item.firstName || item.bookingNumber} · ${item.bookingNumber}`, reservationId: item.id });
-      } else if (linked.room.operational_state !== "CLEAN") {
-        result.push({ key: `arrival-not-ready-${item.id}`, severity: "critical", title: `Номер № ${linked.room.code} не готов к заезду`, description: `${item.firstName || item.bookingNumber} · ${roomStateLabel[linked.room.operational_state] || linked.room.operational_state}`, roomCode: linked.room.code, reservationId: item.id });
-      }
-    });
+    if (receptionComplete) {
+      arrivalsToday.forEach((item) => {
+        const linked = reservationRoom.get(item.id);
+        if (!linked) {
+          result.push({ key: `arrival-no-room-${item.id}`, severity: "critical", title: "Заезд сегодня без рабочего номера", description: `${item.firstName || item.bookingNumber} · ${item.bookingNumber}`, reservationId: item.id });
+        } else if (linked.room.operational_state !== "CLEAN") {
+          result.push({ key: `arrival-not-ready-${item.id}`, severity: "critical", title: `Номер № ${linked.room.code} не готов к заезду`, description: `${item.firstName || item.bookingNumber} · ${roomStateLabel[linked.room.operational_state] || linked.room.operational_state}`, roomCode: linked.room.code, reservationId: item.id });
+        }
+      });
 
-    overdue.forEach((item) => result.push({ key: `overdue-${item.id}`, severity: "warning", title: "Просроченный выезд", description: `${item.firstName || item.bookingNumber} · плановый выезд ${item.checkOut}`, reservationId: item.id }));
+      overdue.forEach((item) => result.push({ key: `overdue-${item.id}`, severity: "warning", title: "Просроченный выезд", description: `${item.firstName || item.bookingNumber} · плановый выезд ${item.checkOut}`, reservationId: item.id }));
+    }
     return result;
-  }, [grid, arrivalsToday, overdue, reservationRoom]);
+  }, [grid, arrivalsToday, overdue, reservationRoom, receptionComplete]);
 
-  const activeConflictCount = conflicts.filter((item) => !acknowledged.includes(item.key)).length;
+  const activeConflictCount = receptionComplete ? conflicts.filter((item) => !acknowledged.includes(item.key)).length : null;
 
   function acknowledge(key: string) {
     const next = acknowledged.includes(key) ? acknowledged.filter((item) => item !== key) : [...acknowledged, key];
@@ -273,6 +276,7 @@ export default function PMSReceptionCockpit() {
   }
 
   const shiftQueue = useMemo(() => {
+    if (!receptionComplete) return [];
     const seen = new Set<string>();
     const items: Array<{ item: Reservation; kind: string; tone: string }> = [];
     overdue.forEach((item) => { if (!seen.has(item.id)) { seen.add(item.id); items.push({ item, kind: "Просроченный выезд", tone: "critical" }); } });
@@ -280,53 +284,61 @@ export default function PMSReceptionCockpit() {
     departuresToday.forEach((item) => { if (!seen.has(item.id)) { seen.add(item.id); items.push({ item, kind: "Выезд сегодня", tone: "warning" }); } });
     arrivalsToday.forEach((item) => { if (!seen.has(item.id)) { seen.add(item.id); items.push({ item, kind: "Заезд сегодня", tone: "normal" }); } });
     return items;
-  }, [overdue, notReadyArrivals, departuresToday, arrivalsToday]);
+  }, [overdue, notReadyArrivals, departuresToday, arrivalsToday, receptionComplete]);
+
+  const receptionStatusText = receptionState === "ready"
+    ? `Смена · ${today}`
+    : receptionState === "partial"
+      ? "Reception incomplete"
+      : receptionState === "error"
+        ? "Reception unavailable"
+        : "Reception loading";
 
   return <section className="v6-cockpit">
     <header className="v6-head">
       <div><p className="eyebrow">Reception Cockpit · V6</p><h2>Смена ресепшена</h2><span>Заезды, выезды, readiness, долги и конфликтные состояния из Resort Core.</span></div>
-      <div className="v6-head-actions"><span className={error ? "v6-status error" : "v6-status live"}>{error ? "Core warning" : loading ? "Обновление…" : `Смена · ${today}`}</span><button className="btn" onClick={() => void load()}>↻ Обновить</button></div>
+      <div className="v6-head-actions"><span className={error || receptionState === "error" || receptionState === "partial" ? "v6-status error" : "v6-status live"}>{error ? "Core warning" : loading ? "Обновление…" : receptionStatusText}</span><button className="btn" onClick={() => void load()}>↻ Обновить</button></div>
     </header>
 
     {error && <div className="v6-error">{error}</div>}
+    {!receptionComplete && <div className="v6-error">Reception list completeness не подтверждена. Заезды, выезды, просрочки, долги и следующие 24 часа показываются как неизвестные, а не как ноль. V6 требует server `complete=true`.</div>}
 
     <div className="v6-kpis">
-      <article><span>Заезды сегодня</span><strong>{arrivalsToday.length}</strong><small>{notReadyArrivals.length ? `${notReadyArrivals.length} не готовы` : "готовность проверена"}</small></article>
-      <article><span>Выезды сегодня</span><strong>{departuresToday.length}</strong><small>{overdue.length ? `+ ${overdue.length} просрочено` : "без просрочек"}</small></article>
-      <article className={notReadyArrivals.length ? "danger" : "ok"}><span>Не готово к заезду</span><strong>{notReadyArrivals.length}</strong><small>статус номера ≠ CLEAN</small></article>
-      <article className={activeConflictCount ? "danger" : "ok"}><span>Conflict Center</span><strong>{activeConflictCount}</strong><small>{conflicts.length - activeConflictCount} принято в работу</small></article>
-      <article className={financeState === "ready" ? "money" : "muted"}><span>Активных с долгом</span><strong>{financeState === "ready" ? debtQueue.length : "—"}</strong><small>{financeState === "partial" ? "выборка неполная" : financeState === "error" ? "финансы недоступны" : financeState === "loading" ? "загрузка" : debtQueue.length ? money(debtQueue.reduce((sum, item) => sum + item.remainingKgs, 0)) : "остатков нет"}</small></article>
-      <article><span>Следующие 24ч</span><strong>{arrivalsTomorrow.length + departuresTomorrow.length}</strong><small>{arrivalsTomorrow.length} заезд · {departuresTomorrow.length} выезд</small></article>
+      <article className={!receptionComplete ? "muted" : ""}><span>Заезды сегодня</span><strong>{receptionComplete ? arrivalsToday.length : "—"}</strong><small>{!receptionComplete ? "полнота не подтверждена" : notReadyArrivals.length ? `${notReadyArrivals.length} не готовы` : "готовность проверена"}</small></article>
+      <article className={!receptionComplete ? "muted" : ""}><span>Выезды сегодня</span><strong>{receptionComplete ? departuresToday.length : "—"}</strong><small>{!receptionComplete ? "полнота не подтверждена" : overdue.length ? `+ ${overdue.length} просрочено` : "без просрочек"}</small></article>
+      <article className={!receptionComplete ? "muted" : notReadyArrivals.length ? "danger" : "ok"}><span>Не готово к заезду</span><strong>{receptionComplete ? notReadyArrivals.length : "—"}</strong><small>{receptionComplete ? "статус номера ≠ CLEAN" : "неизвестно"}</small></article>
+      <article className={activeConflictCount == null ? "muted" : activeConflictCount ? "danger" : "ok"}><span>Conflict Center</span><strong>{activeConflictCount == null ? "—" : activeConflictCount}</strong><small>{activeConflictCount == null ? "общая полнота не подтверждена" : `${conflicts.length - activeConflictCount} принято в работу`}</small></article>
+      <article className={receptionComplete ? "money" : "muted"}><span>Активных с долгом</span><strong>{receptionComplete ? debtQueue.length : "—"}</strong><small>{receptionState === "partial" ? "выборка неполная" : receptionState === "error" ? "reception недоступен" : receptionState === "loading" ? "загрузка" : debtQueue.length ? money(debtQueue.reduce((sum, item) => sum + item.remainingKgs, 0)) : "остатков нет"}</small></article>
+      <article className={!receptionComplete ? "muted" : ""}><span>Следующие 24ч</span><strong>{receptionComplete ? arrivalsTomorrow.length + departuresTomorrow.length : "—"}</strong><small>{receptionComplete ? `${arrivalsTomorrow.length} заезд · ${departuresTomorrow.length} выезд` : "полнота не подтверждена"}</small></article>
     </div>
 
     <div className="v6-workbench">
       <section className="v6-shift-card">
-        <div className="v6-section-head"><div><strong>Очередь смены</strong><span>Сначала просрочки и неподготовленные заезды.</span></div><b>{shiftQueue.length}</b></div>
-        <div className="v6-shift-list">{shiftQueue.length === 0 ? <p className="v6-empty">На текущую смену срочных гостевых событий нет.</p> : shiftQueue.map(({ item, kind, tone }) => {
+        <div className="v6-section-head"><div><strong>Очередь смены</strong><span>Сначала просрочки и неподготовленные заезды.</span></div><b>{receptionComplete ? shiftQueue.length : "—"}</b></div>
+        <div className="v6-shift-list">{!receptionComplete ? <p className="v6-empty">Полную очередь смены нельзя подтвердить: reception list incomplete/unavailable.</p> : shiftQueue.length === 0 ? <p className="v6-empty">На текущую смену срочных гостевых событий нет.</p> : shiftQueue.map(({ item, kind, tone }) => {
           const linked = reservationRoom.get(item.id);
           const roomCode = linked?.room.code || item.room_code || "—";
           const roomState = linked?.room.operational_state || item.room_state || "UNKNOWN";
           return <article key={`${kind}-${item.id}`} className={`tone-${tone}`}>
             <div className="v6-event-main"><span className="v6-event-kind">{kind}</span><strong>{item.firstName || "Гость"}</strong><small>{item.bookingNumber} · № {roomCode} · {roomStateLabel[roomState] || roomState}</small></div>
-            <div className="v6-event-finance">{financeState === "ready" && <><span>Остаток</span><strong className={item.remainingKgs > 0 ? "due" : "paid"}>{money(Math.max(0, item.remainingKgs))}</strong></>}</div>
+            <div className="v6-event-finance"><><span>Остаток</span><strong className={item.remainingKgs > 0 ? "due" : "paid"}>{money(Math.max(0, item.remainingKgs))}</strong></></div>
             <div className="v6-event-actions"><button onClick={() => void openDetail(item.id)} disabled={detailLoading}>Карточка</button>{item.phone && <a href={`tel:${item.phone}`}>Позвонить</a>}{item.status === "GUARANTEED" && item.checkIn === today && <button className="primary" onClick={() => void transition(item, "check-in")} disabled={busy === item.id}>Заезд</button>}{item.status === "CHECKED_IN" && item.checkOut <= today && <button className="primary" onClick={() => void transition(item, "check-out")} disabled={busy === item.id}>Выезд</button>}</div>
           </article>;
         })}</div>
       </section>
 
       <section className="v6-conflict-card">
-        <div className="v6-section-head"><div><strong>Conflict Center</strong><span>Overlap/gap, просрочки и readiness.</span></div><b>{activeConflictCount}</b></div>
-        <div className="v6-conflict-list">{conflicts.length === 0 ? <p className="v6-empty">Конфликтов не обнаружено в текущем горизонте.</p> : conflicts.slice(0, 16).map((conflict) => {
+        <div className="v6-section-head"><div><strong>Conflict Center</strong><span>Overlap/gap, просрочки и readiness.</span></div><b>{activeConflictCount == null ? "—" : activeConflictCount}</b></div>
+        <div className="v6-conflict-list">{conflicts.length === 0 ? <p className="v6-empty">{receptionComplete ? "Конфликтов не обнаружено в текущем горизонте." : "Grid-конфликты не обнаружены, но общая полнота Conflict Center не подтверждена без полного reception list."}</p> : conflicts.slice(0, 16).map((conflict) => {
           const ack = acknowledged.includes(conflict.key);
           return <article key={conflict.key} className={`${conflict.severity} ${ack ? "ack" : ""}`}><button className="v6-ack" onClick={() => acknowledge(conflict.key)} title="Локальная отметка этой рабочей станции">{ack ? "✓" : "!"}</button><div><strong>{conflict.title}</strong><span>{conflict.description}</span></div>{conflict.reservationId && <button onClick={() => void openDetail(conflict.reservationId!)}>Бронь</button>}</article>;
         })}</div>
-        <p className="v6-local-note">✓ — локальная отметка «принято в работу» на этой станции; она не меняет Resort Core и не скрывает сам конфликт.</p>
+        <p className="v6-local-note">✓ — локальная отметка «принято в работу» на этой станции; она не меняет Resort Core и не скрывает сам конфликт.{!receptionComplete ? " Общая полнота Conflict Center не подтверждена." : ""}</p>
       </section>
 
       <section className="v6-next-card">
-        <div className="v6-section-head"><div><strong>Следующие 24 часа</strong><span>Подготовка следующей смены.</span></div><b>{arrivalsTomorrow.length + departuresTomorrow.length}</b></div>
-        <div className="v6-next-block"><span>Заезды завтра</span>{arrivalsTomorrow.slice(0, 8).map((item) => <button key={item.id} onClick={() => void openDetail(item.id)}><strong>{item.firstName || item.bookingNumber}</strong><small>{item.bookingNumber} · № {item.room_code || "—"}</small></button>)}{arrivalsTomorrow.length === 0 && <em>Нет</em>}</div>
-        <div className="v6-next-block"><span>Выезды завтра</span>{departuresTomorrow.slice(0, 8).map((item) => <button key={item.id} onClick={() => void openDetail(item.id)}><strong>{item.firstName || item.bookingNumber}</strong><small>{item.bookingNumber} · № {item.room_code || "—"}</small></button>)}{departuresTomorrow.length === 0 && <em>Нет</em>}</div>
+        <div className="v6-section-head"><div><strong>Следующие 24 часа</strong><span>Подготовка следующей смены.</span></div><b>{receptionComplete ? arrivalsTomorrow.length + departuresTomorrow.length : "—"}</b></div>
+        {!receptionComplete ? <p className="v6-empty">Следующие 24 часа неизвестны: reception list completeness не подтверждена.</p> : <><div className="v6-next-block"><span>Заезды завтра</span>{arrivalsTomorrow.slice(0, 8).map((item) => <button key={item.id} onClick={() => void openDetail(item.id)}><strong>{item.firstName || item.bookingNumber}</strong><small>{item.bookingNumber} · № {item.room_code || "—"}</small></button>)}{arrivalsTomorrow.length === 0 && <em>Нет</em>}</div><div className="v6-next-block"><span>Выезды завтра</span>{departuresTomorrow.slice(0, 8).map((item) => <button key={item.id} onClick={() => void openDetail(item.id)}><strong>{item.firstName || item.bookingNumber}</strong><small>{item.bookingNumber} · № {item.room_code || "—"}</small></button>)}{departuresTomorrow.length === 0 && <em>Нет</em>}</div></>}
       </section>
     </div>
 
