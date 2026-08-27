@@ -10,8 +10,8 @@ import "./site-v3.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://3korony.com"),
   title: { default: "Три Короны — Resort & SPA на Иссык-Куле", template: "%s · Три Короны" },
-  description: "Три Короны Resort & SPA в Чолпон-Ате: собственный пляж, пирс 150 м, SPA, бассейн, 12 категорий номеров, дополнительные услуги и проверка свободных вариантов по датам.",
-  keywords: ["Три Короны", "Иссык-Куль", "Чолпон-Ата", "отель Иссык-Куль", "Resort & SPA", "отдых на Иссык-Куле", "бронирование Чолпон-Ата", "корпоративный отдых Иссык-Куль", "семейный отдых Иссык-Куль"],
+  description: "Три Короны Resort & SPA в Чолпон-Ате: 84 номера, 12 категорий, собственный пляж, 150-метровый пирс, SPA, открытый бассейн, семейный отдых и групповые заезды.",
+  keywords: ["Три Короны", "Иссык-Куль", "Чолпон-Ата", "отель Иссык-Куль", "Resort & SPA", "отдых на Иссык-Куле", "бронирование Чолпон-Ата", "семейный отдых Иссык-Куль", "спортивные сборы Иссык-Куль", "корпоративный отдых Иссык-Куль"],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Три Короны — Resort & SPA на Иссык-Куле",
-    description: "Проверьте свободные номера и стоимость проживания на выбранные даты.",
+    description: "Проверяйте реальную доступность и стоимость проживания на выбранные даты.",
     images: ["/media/three-crowns/hero-resort.webp"],
   },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 } },
