@@ -25,6 +25,20 @@ function setHref(selector: string, href: string | undefined) {
   if (element) element.href = href;
 }
 
+function preserveInternalLanguage(locale: SiteLocale) {
+  if (locale === "ru") return;
+  document.querySelectorAll<HTMLAnchorElement>('a[href^="/"]').forEach((link) => {
+    try {
+      const url = new URL(link.href, window.location.origin);
+      if (url.origin !== window.location.origin) return;
+      url.searchParams.set("lang", locale);
+      link.href = `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return;
+    }
+  });
+}
+
 function applyContent(content: SiteContent, locale: SiteLocale) {
   document.documentElement.lang = locale === "kg" ? "ky" : locale;
 
@@ -80,6 +94,7 @@ function applyContent(content: SiteContent, locale: SiteLocale) {
     meta.content = content.seo.description;
   }
 
+  preserveInternalLanguage(locale);
   window.dispatchEvent(new CustomEvent("three-crowns:content-ready", { detail: { locale } }));
 }
 
