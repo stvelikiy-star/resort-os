@@ -33,3 +33,32 @@ ALTER TABLE "inventory_blocks"
 ALTER TABLE "payments"
   ADD CONSTRAINT payment_positive_amount CHECK ("amountKgs" > 0),
   ADD CONSTRAINT payment_has_context CHECK ("requestId" IS NOT NULL OR "reservationId" IS NOT NULL);
+
+-- Operational tasks may be created from PMS, staff and automations. Before
+-- installing the invariant, fail closed if historical data already violates
+-- it. Reconciliation must be an explicit manager operation; migrations never
+-- silently delete or merge operational history.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM operational_tasks
+    WHERE "roomId" IS NOT NULL
+      AND type IN ('HOUSEKEEPING', 'MAINTENANCE')
+      AND status IN ('OPEN', 'IN_PROGRESS', 'IN_INSPECTION')
+    GROUP BY "roomId", type
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'active operational task duplicates exist; reconcile same-room/same-type HOUSEKEEPING or MAINTENANCE tasks before applying the invariant';
+  END IF;
+END
+$$;
+
+-- Final concurrency boundary for operational work: at most one active
+-- HOUSEKEEPING and one active MAINTENANCE task per room. Guest requests remain
+-- unconstrained because several independent requests may legitimately coexist.
+CREATE UNIQUE INDEX active_room_operational_task_type_unique
+  ON operational_tasks ("roomId", type)
+  WHERE "roomId" IS NOT NULL
+    AND type IN ('HOUSEKEEPING', 'MAINTENANCE')
+    AND status IN ('OPEN', 'IN_PROGRESS', 'IN_INSPECTION');
