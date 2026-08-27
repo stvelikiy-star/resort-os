@@ -81,11 +81,16 @@ async def list_reception_reservations(
             ''',
             prop["id"],
             local_today,
-            limit,
+            limit + 1,
         )
 
+    complete = len(rows) <= limit
+    visible_rows = rows[:limit]
     return {
         "local_date": local_today,
+        "limit": limit,
+        "returned": len(visible_rows),
+        "complete": complete,
         "items": [
             {
                 "id": str(row["id"]),
@@ -106,9 +111,9 @@ async def list_reception_reservations(
                 "schedule_segments": row["schedule_segments"],
                 "has_room_move": row["schedule_segments"] > 1,
             }
-            for row in rows
+            for row in visible_rows
         ],
-        "truth": "One row per Reservation. Display room is selected from the active room schedule according to stay status and hotel-local date. Payment fields include only manager-recorded RECEIVED facts in Resort Core.",
+        "truth": "One row per Reservation. Display room is selected from the active room schedule according to stay status and hotel-local date. Payment fields include only manager-recorded RECEIVED facts in Resort Core. complete=true proves the returned items contain the full ordered reservation list for this property; complete=false means the requested limit truncated the list.",
     }
 
 
