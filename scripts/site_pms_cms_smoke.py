@@ -6,12 +6,12 @@ seed is loaded and a temporary OWNER account is available through environment va
 Never use real guest/payment data in this check.
 """
 
+import http.cookiejar
 import json
 import os
 import sys
 import urllib.error
 import urllib.request
-import http.cookiejar
 from datetime import date, timedelta
 
 BASE = os.environ.get("CORE_API_URL", "http://127.0.0.1:8000").rstrip("/")
@@ -49,7 +49,8 @@ def check(condition: bool, message: str):
 def main() -> int:
     status, ready = request("/ready")
     check(status == 200, "Core readiness")
-    check(ready.get("property_code") in (None, "THREE_CROWNS") or ready.get("property", {}).get("code") == "THREE_CROWNS", "Three Crowns property context")
+    check(ready.get("property") == "THREE_CROWNS", "Three Crowns property context")
+    check(ready.get("room_count") == 84 and ready.get("room_type_count") == 12, "Canonical 84 rooms / 12 categories")
 
     status, public_before = request("/api/v1/site/content?locale=ru")
     check(status == 200 and isinstance(public_before.get("content"), dict), "Public CMS content returns an object")
@@ -79,7 +80,6 @@ def main() -> int:
     status, public_after = request("/api/v1/site/content?locale=ru")
     check(public_after.get("content", {}).get("hero", {}).get("title") == marker, "Public site sees published CMS version")
 
-    # Restore the original public hero immediately so the smoke check is non-destructive.
     restore = json.loads(json.dumps(draft, ensure_ascii=False))
     restore.setdefault("hero", {})["title"] = original_title
     request("/api/v1/admin/site/content/ru/draft", method="PUT", body={"content": restore}, authenticated=True)
