@@ -5,7 +5,7 @@ import DashboardBoard from "./DashboardBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
-import PMSGrid from "./PMSGridV8";
+import PMSGrid from "./PMSGridV9";
 import ReceptionBoard from "./ReceptionBoard";
 import RequestsBoard from "./RequestsBoard";
 import StaffBoard from "./StaffBoard";
