@@ -115,7 +115,7 @@ fi
 
 echo "Applying committed Prisma migration history..."
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm migrator
-docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm migrator npx prisma migrate status
+docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm migrator npx --no-install prisma migrate status
 
 echo "Reconciling canonical Three Crowns intake..."
 docker compose --env-file "$ENV_FILE" "${COMPOSE[@]}" run --rm api python /app/scripts/seed_from_intake.py
