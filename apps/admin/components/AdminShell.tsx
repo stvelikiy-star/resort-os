@@ -5,7 +5,7 @@ import DashboardBoard from "./DashboardBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
-import PMSGrid from "./PMSGridV2";
+import PMSGrid from "./PMSGridV9";
 import ReceptionBoard from "./ReceptionBoard";
 import RequestsBoard from "./RequestsBoard";
 import SiteContentBoard from "./SiteContentBoard";
@@ -106,12 +106,12 @@ export default function AdminShell() {
         <div className="admin-identity"><strong>Три Короны · Resort OS</strong><span>{user.display_name} · {user.role}</span></div>
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
-          {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Шахматка</button>}
+          {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
-          {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони</button>}
+          {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
-          <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>
+          <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>
           {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
           {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
         </nav>
