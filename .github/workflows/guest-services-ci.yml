@@ -69,7 +69,7 @@ jobs:
       - name: Validate Prisma schema and clean migration chain
         working-directory: packages/database
         run: |
-          npm ci --no-audit --no-fund
+          npm install --no-audit --no-fund
           npx prisma validate
           npx prisma migrate deploy
 
