@@ -130,7 +130,7 @@ services:
     networks: [resort]
 
   n8n:
-    image: ${N8N_IMAGE:-n8nio/n8n:latest}
+    image: ${N8N_IMAGE:-n8nio/n8n:2.36.2}
     restart: unless-stopped
     environment:
       N8N_HOST: ${AUTOMATION_HOST}
