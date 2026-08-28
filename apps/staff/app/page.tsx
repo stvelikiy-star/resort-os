@@ -1,5 +1,5 @@
-import StaffShell from "../components/StaffShell";
+import StaffShiftV2 from "../components/StaffShiftV2";
 
 export default function StaffPage() {
-  return <StaffShell />;
+  return <StaffShiftV2 />;
 }
