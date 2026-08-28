@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.8
+Version: 1.9
 Date: 2026-08-28
-Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL DOCKER STAGING VERIFIED / EXTERNAL STAGING NOT VERIFIED / NOT PRODUCTION READY
+Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL DOCKER STAGING VERIFIED / SINGLE-SERVER PRODUCTION PACKAGE VERIFIED IN CI / EXTERNAL HOST NOT VERIFIED / NOT PRODUCTION READY
 Canonical: YES
 Document Type: Evidence-Based Current System State
 Authority: factual implementation reality only
@@ -21,9 +21,11 @@ Integration branch: `integration/site-pms-cms-20260827`.
 
 Open integration PR: `#37 — Unify site, V9 PMS/CRM, analytics, staff and staging through Resort Core`.
 
-Current verified staging-gate code head: `9b5c21293704a8573a904c2bf25221348a21a9bd`.
+Current fully CI-audited release code head: `be6809381220444ff663bdf82aec65a0ea9b1e06`.
 
-Current architecture:
+On that head all 21 associated workflow contours completed with conclusion `success`, including Resort Core, Full Staging Gate, Single Server Production Package, dependency security, migration baseline, backup/restore, Control Center, PMS/realtime/operations, public truth, automation/n8n, staff voice, Telegram, AI Sales, inbox, data intake and NFC deferred-scope checks.
+
+Current active architecture:
 
 `PUBLIC SITE / PMS ADMIN / STAFF PWA / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
@@ -38,18 +40,19 @@ Current repository surfaces:
 - `services/api` — FastAPI Resort Core;
 - `packages/database` — Prisma/PostgreSQL schema, migrations and critical constraints;
 - `automation/n8n` — orchestration workflows/runbooks;
-- `scripts` — seed, migration, backup/restore, staging/release checks;
+- `deploy` / production compose — one-server Caddy/Docker production package;
+- `scripts` — seed, migration, backup/restore, host/staging/release checks;
 - `knowledge` / `docs` — canonical and implementation evidence.
 
 ---
 
 ## 2. CI-local Docker staging verification
 
-STATUS: **VERIFIED on commit `9b5c21293704a8573a904c2bf25221348a21a9bd`.**
+STATUS: **VERIFIED on current audited code head `be6809381220444ff663bdf82aec65a0ea9b1e06`.**
 
-GitHub Actions run:
+GitHub Actions:
 - workflow: `Three Crowns Full Staging Gate`;
-- run id: `33142971361`;
+- run id: `33154426108`;
 - conclusion: `success`.
 
 The gate uses an isolated synthetic staging environment and does not require production guest/payment data.
@@ -66,13 +69,81 @@ Verified executed steps:
 9. active-runtime OpenAPI check proving NFC/beach HTTP routes are not composed;
 10. clean teardown.
 
-This is stronger evidence than individual build/unit contracts because the complete repository applications are composed together against a clean migrated PostgreSQL database.
-
-It is still **CI-local container staging**, not an external HTTPS/WSS deployment and not a production proof.
+This is strong repository-level composition evidence. It is still **CI-local container staging**, not an external HTTPS/WSS deployment and not production proof.
 
 ---
 
-## 3. Migration / database truth
+## 3. Single-server production package
+
+STATUS: **VERIFIED IN CI / NOT EXTERNALLY DEPLOYED.**
+
+The approved Three Crowns deployment simplification is now implemented as one VPS/VDS production package rather than a mandatory Vercel/Supabase/Replit dependency chain.
+
+Intended one-server runtime:
+- Caddy on public ports 80/443/443-UDP;
+- public Next.js web;
+- PMS/Admin Next.js;
+- Staff PWA;
+- FastAPI Resort Core;
+- private PostgreSQL;
+- n8n automation client;
+- persistent host media / PostgreSQL / n8n state;
+- local backup directory with off-site copy expected outside the server.
+
+GitHub Actions:
+- workflow: `Three Crowns Single Server Production Package CI`;
+- run id: `33154426092`;
+- conclusion: `success`.
+
+Verified by that run:
+- production Docker Compose graph renders successfully;
+- PostgreSQL is not published through host port 5432;
+- Admin build receives `NEXT_PUBLIC_CORE_WS_URL=wss://api.3korony.com`;
+- Caddy configuration validates;
+- `scripts/production_backup.sh` and `scripts/host_preflight.sh` pass shell validation;
+- pinned `n8nio/n8n:2.36.2` image is pullable;
+- API/web/admin/staff production Docker images build successfully from committed dependency locks using `npm ci`.
+
+This does **not** prove that the currently purchased `3korony.com` hosting is a suitable VPS/VDS. That remains an external host fact.
+
+---
+
+## 4. Production dependency/security hardening
+
+STATUS: **VERIFIED FOR THE CURRENT LOCKED NEXT RUNTIME TREE.**
+
+Current frontend runtime declarations:
+- Next.js `15.5.24`;
+- React `19.2.8`;
+- React DOM `19.2.8`;
+- explicit PostCSS override `8.5.23`.
+
+The production build audit originally exposed a high-severity transitive PostCSS advisory in the Next 15 dependency tree. The remediation was implemented as an explicit patched PostCSS override without forcing an unrelated Next 16 architecture upgrade.
+
+Committed `package-lock.json` files now exist for web/admin/staff and production Dockerfiles use deterministic `npm ci`.
+
+GitHub Actions:
+- workflow: `Three Crowns Dependency Security Inspection`;
+- run id: `33154426079`;
+- conclusion: `success`.
+
+Exact audit metadata on the current audited code head:
+- info: 0;
+- low: 0;
+- moderate: 0;
+- high: 0;
+- critical: 0;
+- total: 0.
+
+The dependency-security workflow uses read-only repository permission and verifies committed lockfiles rather than mutating the integration branch.
+
+n8n production baseline is explicitly pinned to `2.36.2`, a release at/above the remediation floor for the reviewed 2026 high-severity n8n advisories. `latest` is not the production default.
+
+GitHub-hosted action warnings about Node 20 action-runtime deprecation remain ecosystem/tooling warnings and are not evidence of an application runtime vulnerability. They should be migrated when supported action majors are reviewed.
+
+---
+
+## 5. Migration / database truth
 
 STATUS: **VERIFIED IN CLEAN CI AND CI-LOCAL DOCKER STAGING.**
 
@@ -91,15 +162,15 @@ Verified current facts:
 - active room/date overlap remains protected by PostgreSQL GiST exclusion constraint;
 - payment/date/amount integrity checks remain present.
 
-`Production Migration Baseline CI` succeeds on the two-migration chain.
+`Production Migration Baseline CI` run `33154426088` succeeds on the two-migration chain.
 
-`PostgreSQL Backup Restore CI` also succeeds after the forward migration and verifies migration-aware backup -> clean restore -> matching migration ledger and critical constraints.
+`PostgreSQL Backup Restore CI` run `33154426085` verifies migration-aware backup -> clean restore -> matching migration ledger and critical constraints.
 
 Production database itself has not yet been migrated or proven by this CI evidence.
 
 ---
 
-## 4. Reservation / availability / PMS truth
+## 6. Reservation / availability / PMS truth
 
 STATUS: **VERIFIED FOR CURRENT THREE CROWNS V1 FLOW.**
 
@@ -132,11 +203,13 @@ Verified schedule capabilities include:
 - AuditLog evidence;
 - realtime PMS contract.
 
+The current production package explicitly supplies the Admin client with the public Core WSS origin. Caddy routes the API host to FastAPI; external WSS behavior must still be proven on the actual HTTPS host.
+
 Database overlap protection remains the final double-booking guard.
 
 ---
 
-## 5. Guest / Reservation / Stay gap
+## 7. Guest / Reservation / Stay gap
 
 STATUS: **PARTIAL.**
 
@@ -154,7 +227,7 @@ This is an architectural target/current GAP, not evidence that current Three Cro
 
 ---
 
-## 6. Pricing / finance
+## 8. Pricing / finance
 
 STATUS: **PARTIAL; CURRENT V1 DETERMINISTIC PRICING AND MANAGER-MANUAL PAYMENT CONTROL VERIFIED.**
 
@@ -170,7 +243,7 @@ Automated acquiring/payment-provider integration is not an active Three Crowns V
 
 ---
 
-## 7. Authentication / RBAC / property boundary
+## 9. Authentication / RBAC / property boundary
 
 STATUS: **VERIFIED FOR CURRENT SINGLE-PROPERTY ROLE CONTOUR; GENERIC MULTI-TENANCY NOT IMPLEMENTED.**
 
@@ -192,7 +265,7 @@ External HTTPS cookie/CORS behavior still requires deployed staging verification
 
 ---
 
-## 8. Operations / Staff PWA
+## 10. Operations / Staff PWA
 
 STATUS: **VERIFIED IN CURRENT CI CONTOUR; REAL-DEVICE ACCEPTANCE OPEN.**
 
@@ -206,7 +279,7 @@ Automated/container verification does not replace real iPhone/Android/Telegram M
 
 ---
 
-## 9. CRM / omnichannel / AI
+## 11. CRM / omnichannel / AI
 
 STATUS: **PARTIAL.**
 
@@ -233,7 +306,7 @@ Live production provider credentials/delivery remain unverified.
 
 ---
 
-## 10. Public site / CMS / analytics
+## 12. Public site / CMS / analytics
 
 STATUS: **IMPLEMENTED AND CI/CI-LOCAL-STAGING VERIFIED; EXTERNAL VISUAL/MEDIA ACCEPTANCE OPEN.**
 
@@ -249,13 +322,13 @@ Current public web includes:
 - metadata/SEO routes;
 - repository-local property media baseline.
 
-The production-like staging gate exposed and then verified the missing CMS migration. Public/CMS smoke now succeeds after clean `migrate deploy`.
+The production-like staging gate exposed and then verified the missing CMS migration. Public/CMS smoke succeeds after clean `migrate deploy`.
 
 The existing Vercel project `three-crowns-v3-preview` is only a simple preview/stub and is **not** accepted as Resort OS staging evidence.
 
 ---
 
-## 11. Dashboard / analytics
+## 13. Dashboard / analytics
 
 STATUS: **IMPLEMENTED + CI-COVERED; NOT PRODUCTION-VERIFIED.**
 
@@ -265,7 +338,7 @@ Management allocation metrics are explicitly not represented as statutory accoun
 
 ---
 
-## 12. NFC
+## 14. NFC
 
 STATUS: **DEFERRED / DORMANT.**
 
@@ -279,7 +352,7 @@ Reactivation requires explicit owner decision.
 
 ---
 
-## 13. Physical Three Crowns room truth
+## 15. Physical Three Crowns room truth
 
 STATUS: **DEVELOPMENT 84/12 BASELINE VERIFIED / PRODUCTION IMPORT BLOCKED ON OWNER FACTS.**
 
@@ -296,41 +369,60 @@ Therefore development 84/12 data is not yet owner-approved physical production t
 
 ---
 
-## 14. Deployment state
+## 16. Deployment state
 
 ### CI-local staging
 
 STATUS: **VERIFIED.**
 
-A complete isolated Docker topology for PostgreSQL/Core/web/admin/staff has been built, started and passed the complete staging acceptance on clean migrations with synthetic data.
+Current audited run `33154426108` passed the complete isolated Docker topology and acceptance on clean migrations with synthetic data.
+
+### Single-server deployment package
+
+STATUS: **VERIFIED IN CI.**
+
+Current audited run `33154426092` proves the approved one-VPS package is syntactically/build-valid, has pinned n8n, deterministic frontend builds, private PostgreSQL and explicit PMS WSS wiring.
+
+### Purchased `3korony.com` hosting
+
+STATUS: **UNKNOWN / BLOCKED ON HOST ACCESS.**
+
+The project does not yet have evidence whether the currently purchased hosting is shared hosting or a VPS/VDS with sufficient CPU/RAM/disk/root/Docker capability.
+
+`scripts/host_preflight.sh` is implemented specifically for this gate. It is non-destructive and reports PASS / PASS WITH WARNINGS / BLOCKED without installing, stopping or overwriting anything.
+
+The currently live legacy `3korony.com` must remain intact until it has been backed up and the new system passes staging acceptance.
 
 ### External HTTPS/WSS staging
 
 STATUS: **BLOCKED / NOT VERIFIED.**
 
-No connected suitable container/VPS host is currently available through the project tooling. The connected Vercel preview does not represent the required PostgreSQL + persistent FastAPI + WebSocket + multi-app staging topology.
+The actual purchased host has not yet been inspected/deployed. Real TLS, secure cookies, CORS, WSS upgrade, network/firewall and device behavior remain unproven.
 
-Do not substitute the Vercel stub for external staging evidence.
+Do not substitute Vercel/Replit preview evidence for the approved one-server external acceptance.
 
 ### Production
 
 STATUS: **NOT PRODUCTION READY.**
 
 Remaining production blockers:
-1. owner-confirmed physical 84-room register;
-2. isolated external HTTPS/WSS staging for PostgreSQL/Core/web/admin/staff;
-3. complete gate against that deployed external staging;
-4. real iPhone/Android/Telegram acceptance;
-5. fresh production backup/restore proof immediately before cutover;
-6. production secrets, DNS cutover and documented rollback point.
+1. actual purchased hosting must pass host preflight or be upgraded to suitable VPS/VDS;
+2. existing live site must have a verified backup and rollback point before any replacement;
+3. owner-confirmed physical 84-room register;
+4. isolated external HTTPS/WSS staging on the actual host and complete acceptance;
+5. real iPhone/Android/Telegram acceptance;
+6. fresh production backup/clean-restore proof immediately before cutover;
+7. production secrets, controlled DNS/apex cutover and documented rollback evidence.
 
 No CI result alone authorizes production DNS cutover.
 
 ---
 
-## 15. High-priority target/current gaps
+## 17. High-priority target/current gaps
 
 ### P0 / production blockers
+- purchased host capability/access + non-destructive preflight;
+- preserve/back up current legacy site before replacement;
 - external HTTPS/WSS staging environment and acceptance;
 - owner physical 84-room confirmation;
 - real-device mobile/Telegram acceptance;
@@ -357,7 +449,7 @@ No CI result alone authorizes production DNS cutover.
 
 ---
 
-## 16. Foundations that should be extended, not rewritten without evidence
+## 18. Foundations that should be extended, not rewritten without evidence
 
 Preserve unless a later audit proves a concrete defect:
 - FastAPI Resort Core as hotel truth boundary;
@@ -371,20 +463,24 @@ Preserve unless a later audit proves a concrete defect:
 - read-only CRM mirror boundary;
 - n8n orchestration without direct DB authority;
 - public site using Core availability/pricing/request creation;
-- dormant NFC isolation.
+- dormant NFC isolation;
+- single-server production package unless actual hosting evidence proves a concrete limitation.
 
 ---
 
-## 17. Next release task
+## 19. Next release task
 
-NEXT TASK: **Provision a real external isolated HTTPS/WSS staging host capable of running PostgreSQL + persistent FastAPI/WebSocket + web/admin/staff containers, then execute the same full gate there.**
+NEXT TASK: **Run the non-destructive host capability preflight on the currently purchased `3korony.com` hosting, preserve the existing live site, and—if the host is suitable—deploy an isolated external staging contour on that same server before replacing the apex site.**
 
 Why this is next:
-- CI-local Docker topology is now verified;
-- migration/backup/restore chains are verified;
-- the remaining highest-risk unknown is real network/TLS/cookie/CORS/WebSocket/mobile behavior;
-- adding unrelated product features before external staging would increase code surface without reducing launch risk.
+- current code head has all 21 CI workflows successful;
+- current full Docker staging gate is successful;
+- current one-server production package is CI-verified;
+- dependency audit is zero on the exact locked frontend tree;
+- migration and backup/restore chains are verified;
+- the remaining highest-risk unknown is the real purchased host/network/TLS/cookie/CORS/WSS/device environment;
+- adding unrelated features now would increase surface area without reducing launch risk.
 
-Owner involvement should be limited to factual room-register confirmations and, when infrastructure is ready, real-device acceptance; technical staging execution remains an engineering task.
+Owner involvement should remain limited to providing/accessing the hosting account if no connector exists, factual room-register confirmations, and real-device acceptance. Technical deployment execution remains an engineering task.
 
 LAST AUDITED: 2026-08-28
