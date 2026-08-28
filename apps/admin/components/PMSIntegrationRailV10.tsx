@@ -45,6 +45,8 @@ export default function PMSIntegrationRailV10() {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [services, setServices] = useState<GuestService[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [servicesComplete, setServicesComplete] = useState(false);
+  const [reservationsComplete, setReservationsComplete] = useState(false);
   const [state, setState] = useState<LoadState>("loading");
   const [updatedAt, setUpdatedAt] = useState<string>("");
 
@@ -63,18 +65,25 @@ export default function PMSIntegrationRailV10() {
 
       if (!dashboardResponse.ok) throw new Error("dashboard");
 
+      const serviceItems = servicesResponse.ok && Array.isArray(servicesBody.items) ? servicesBody.items : [];
+      const reservationItems = reservationsResponse.ok && Array.isArray(reservationsBody.items) ? reservationsBody.items : [];
+      const servicesOk = servicesResponse.ok && serviceItems.length < 300;
+      const reservationsOk = reservationsResponse.ok && reservationItems.length < 500;
+
       setDashboard(dashboardBody as DashboardResponse);
-      setServices(servicesResponse.ok && Array.isArray(servicesBody.items) ? servicesBody.items : []);
-      setReservations(
-        reservationsResponse.ok && Array.isArray(reservationsBody.items) ? reservationsBody.items : [],
-      );
-      setState(servicesResponse.ok && reservationsResponse.ok ? "ready" : "partial");
+      setServices(serviceItems);
+      setReservations(reservationItems);
+      setServicesComplete(servicesOk);
+      setReservationsComplete(reservationsOk);
+      setState(servicesOk && reservationsOk ? "ready" : "partial");
       setUpdatedAt(new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }));
     } catch {
       setState("error");
       setDashboard(null);
       setServices([]);
       setReservations([]);
+      setServicesComplete(false);
+      setReservationsComplete(false);
     }
   }, []);
 
@@ -117,7 +126,7 @@ export default function PMSIntegrationRailV10() {
         </div>
         <div className="v9-actions">
           <span className={`v9-source ${state === "ready" ? "ok" : state === "error" ? "bad" : ""}`}>
-            {state === "loading" ? "Обновление…" : state === "ready" ? `Core online · ${updatedAt}` : state === "partial" ? "Core partial" : "Core unavailable"}
+            {state === "loading" ? "Обновление…" : state === "ready" ? `Core complete · ${updatedAt}` : state === "partial" ? "Core partial · часть счётчиков скрыта" : "Core unavailable"}
           </span>
           <button className="btn" onClick={() => void load()} disabled={state === "loading"}>↻ Обновить всё</button>
         </div>
@@ -125,9 +134,9 @@ export default function PMSIntegrationRailV10() {
 
       <div className="v9-kpis">
         <article><span>Заявки</span><strong>{state === "loading" ? "…" : dashboard?.requests?.active ?? "—"}</strong><small>ReservationRequest · ещё не бронь</small></article>
-        <article><span>Активные брони</span><strong>{state === "loading" ? "…" : activeReservations}</strong><small>GUARANTEED + CHECKED_IN</small></article>
-        <article><span>Услуги гостей</span><strong>{state === "loading" ? "…" : services.length}</strong><small>{urgentServices ? `срочных: ${urgentServices}` : "без срочных"}</small></article>
-        <article className={debtReservations ? "danger" : "ok"}><span>С остатком</span><strong>{state === "loading" ? "…" : debtReservations}</strong><small>активные брони с долгом</small></article>
+        <article><span>Активные брони</span><strong>{state === "loading" ? "…" : reservationsComplete ? activeReservations : "—"}</strong><small>{reservationsComplete ? "GUARANTEED + CHECKED_IN" : "неполная выборка — fail closed"}</small></article>
+        <article><span>Услуги гостей</span><strong>{state === "loading" ? "…" : servicesComplete ? services.length : "—"}</strong><small>{servicesComplete ? (urgentServices ? `срочных: ${urgentServices}` : "без срочных") : "неполная выборка — fail closed"}</small></article>
+        <article className={reservationsComplete && debtReservations ? "danger" : reservationsComplete ? "ok" : ""}><span>С остатком</span><strong>{state === "loading" ? "…" : reservationsComplete ? debtReservations : "—"}</strong><small>{reservationsComplete ? "активные брони с долгом" : "финансовый счётчик скрыт"}</small></article>
       </div>
 
       <div className="v9-actions" style={{ marginTop: 12, flexWrap: "wrap" }}>
