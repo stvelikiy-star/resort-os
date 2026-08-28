@@ -39,8 +39,10 @@ jobs:
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
-      - name: Validate backup script syntax
-        run: bash -n scripts/production_backup.sh
+      - name: Validate operational shell scripts
+        run: |
+          bash -n scripts/production_backup.sh
+          bash -n scripts/host_preflight.sh
 
       - name: Build Resort OS application images
         run: docker compose --env-file .env.production.ci -f compose.production.yaml build api web admin staff
