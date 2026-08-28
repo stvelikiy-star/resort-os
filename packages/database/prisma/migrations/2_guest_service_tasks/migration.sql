@@ -44,13 +44,11 @@ BEGIN
     END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS operational_tasks_reservation_status_idx
-    ON operational_tasks ("reservationId", status)
-    WHERE "reservationId" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "operational_tasks_reservationId_status_idx"
+    ON operational_tasks ("reservationId", status);
 
-CREATE INDEX IF NOT EXISTS operational_tasks_service_queue_idx
-    ON operational_tasks ("propertyId", "serviceCode", status, "serviceDate")
-    WHERE type = 'GUEST_REQUEST' AND "serviceCode" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS "operational_tasks_propertyId_serviceCode_status_serviceDate_idx"
+    ON operational_tasks ("propertyId", "serviceCode", status, "serviceDate");
 
 COMMENT ON COLUMN operational_tasks."reservationId" IS
     'Optional Reservation context for a structured guest-service GUEST_REQUEST; validated against the task property by Core.';
