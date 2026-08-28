@@ -100,6 +100,7 @@ services:
       dockerfile: apps/admin/Dockerfile
       args:
         CORE_API_URL: http://api:8000
+        NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}
     restart: unless-stopped
     depends_on:
       api:
