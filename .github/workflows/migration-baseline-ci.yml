@@ -11,7 +11,7 @@ on:
       - 'scripts/production_preflight.py'
       - '.github/workflows/migration-baseline-ci.yml'
   push:
-    branches: [main, integration/site-pms-cms-20260827]
+    branches: [main]
     paths:
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/sql/**'
@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -69,18 +69,15 @@ jobs:
           grep -q 'baseline generation is disabled' /tmp/generator-prod.err
 
       - name: Prepare baseline candidate or validate committed baseline inputs
-        id: baseline
         run: |
           if test -s packages/database/prisma/migrations/0_init/migration.sql; then
             echo 'Using committed 0_init baseline.'
-            echo 'generated=false' >> "$GITHUB_OUTPUT"
             cd packages/database
             npm install --no-audit --no-fund
             npx prisma format
             npx prisma validate
           else
             echo 'Generating 0_init baseline candidate.'
-            echo 'generated=true' >> "$GITHUB_OUTPUT"
             bash scripts/generate_migration_baseline.sh
           fi
 
@@ -142,16 +139,6 @@ jobs:
           constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
           test "$migration_count" = '1'
           test "$constraint_count" = '13'
-
-      - name: Commit verified baseline to integration branch once
-        if: github.event_name == 'push' && github.ref == 'refs/heads/integration/site-pms-cms-20260827' && steps.baseline.outputs.generated == 'true'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add packages/database/prisma/migrations/0_init/migration.sql packages/database/prisma/migrations/0_init/migration.sql.sha256
-          git diff --cached --quiet && exit 0
-          git commit -m 'chore(database): commit verified production migration baseline'
-          git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Upload baseline candidate for explicit review
         uses: actions/upload-artifact@v4
