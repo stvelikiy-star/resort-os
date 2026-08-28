@@ -1,15 +1,15 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.7
+Version: 1.8
 Date: 2026-08-28
-Status: EVIDENCE-BASED INTEGRATION RELEASE CANDIDATE / NOT PRODUCTION CUTOVER READY
+Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL DOCKER STAGING VERIFIED / EXTERNAL STAGING NOT VERIFIED / NOT PRODUCTION READY
 Canonical: YES
 Document Type: Evidence-Based Current System State
 Authority: factual implementation reality only
 
-Critical rule: **TARGET != CURRENT. IMPLEMENTED != VERIFIED. DEVELOPMENT/CI VERIFIED != PRODUCTION VERIFIED.**
+Critical rule: **TARGET != CURRENT. IMPLEMENTED != VERIFIED. CI-LOCAL STAGING VERIFIED != EXTERNAL STAGING VERIFIED != PRODUCTION VERIFIED.**
 
-This document describes the current integration candidate on branch `integration/site-pms-cms-20260827` and its verified evidence. It does not redefine Product Bible, Domain Business Rules, target architecture or AI governance.
+This document describes factual implementation evidence for the current Three Crowns integration candidate. It does not redefine Product Bible, Domain Business Rules, target architecture or AI governance.
 
 ---
 
@@ -17,510 +17,374 @@ This document describes the current integration candidate on branch `integration
 
 Repository: `stvelikiy-star/resort-os`.
 
-Audited integration head: `db2ba85466c985cecfe0c1fb08bbc29d33a990c4`.
+Integration branch: `integration/site-pms-cms-20260827`.
 
 Open integration PR: `#37 — Unify site, V9 PMS/CRM, analytics, staff and staging through Resort Core`.
 
-PR state at audit time:
-- OPEN;
-- not merged;
-- mergeable;
-- current integration branch remains separate from canonical `main`.
+Current verified staging-gate code head: `9b5c21293704a8573a904c2bf25221348a21a9bd`.
 
-Current physical/runtime architecture evidenced in repository:
+Current architecture:
 
 `PUBLIC SITE / PMS ADMIN / STAFF PWA / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
-Canonical application entrypoint: `services/api/app/app_entry.py` -> `app.app_entry:app`.
+Canonical runtime entrypoint: `services/api/app/app_entry.py` -> `app.app_entry:app`.
 
-Integration app version is set to `0.34.0` in the composition layer.
+Integration composition version: `0.34.0`.
 
-Repository shape:
-- `apps/web` — public Next.js web;
-- `apps/admin` — PMS/admin Next.js;
+Current repository surfaces:
+- `apps/web` — public Next.js application;
+- `apps/admin` — PMS/admin Next.js application;
 - `apps/staff` — staff Next.js/PWA;
 - `services/api` — FastAPI Resort Core;
-- `packages/database` — Prisma/PostgreSQL schema, SQL constraints, migration baseline;
-- `automation/n8n` — workflow definitions/runbooks;
-- `scripts` — seed, migration, backup/restore, release/staging checks;
-- `knowledge` / `docs` — canonical and implementation documentation.
+- `packages/database` — Prisma/PostgreSQL schema, migrations and critical constraints;
+- `automation/n8n` — orchestration workflows/runbooks;
+- `scripts` — seed, migration, backup/restore, staging/release checks;
+- `knowledge` / `docs` — canonical and implementation evidence.
 
 ---
 
-## 2. Verification evidence on audited head
+## 2. CI-local Docker staging verification
 
-GitHub Actions for commit `db2ba85466c985cecfe0c1fb08bbc29d33a990c4` completed with `success` for the active repository matrix, including:
-- Resort Core CI;
-- PMS Chessboard Mutation CI;
-- Hotel Operations CI;
-- Realtime PMS CI;
-- Payment Idempotency CI;
-- Production Migration Baseline CI;
-- PostgreSQL Backup Restore CI;
-- Public Site Truth CI;
-- Control Center Monorepo Contract CI;
-- Data Intake Integrity CI;
-- Staff Voice CI;
-- Telegram Sales CI;
-- AI Sales Draft CI;
-- Unified Inbox CI;
-- n8n Resort Core Contract CI;
-- Automation Contract CI;
-- NFC Deferred Scope CI.
+STATUS: **VERIFIED on commit `9b5c21293704a8573a904c2bf25221348a21a9bd`.**
 
-Important correction to previous transient CI blocker: on this audited head, workflow jobs contain actual executed step lists. `steps=null` is NOT the state of the audited head.
+GitHub Actions run:
+- workflow: `Three Crowns Full Staging Gate`;
+- run id: `33142971361`;
+- conclusion: `success`.
 
-Representative verified Core CI steps include:
-- admin/web/staff typecheck + production build;
-- Core install/compile/start;
-- schema + constraints + Three Crowns seed;
-- public availability + ReservationRequest creation;
-- protected PMS authentication;
-- unified Site/CMS/CRM/PMS smoke;
-- manager quote without global automatic prepayment rule;
-- manager-recorded payment -> atomic Reservation creation;
-- payment idempotency;
-- Reservation visibility in PMS;
-- check-in -> checkout -> housekeeping lifecycle.
+The gate uses an isolated synthetic staging environment and does not require production guest/payment data.
 
-Representative verified Chessboard CI steps include:
-- schedule read;
-- preview and atomic whole-reservation move;
-- stale-snapshot rejection;
-- resize and Split Stay across two rooms;
-- CLEAN-room requirement for check-in;
-- immediate relocation preserving lived history;
-- vacated-room dirtying;
-- conflict rollback;
-- schedule-aware checkout;
-- AuditLog evidence.
+Verified executed steps:
+1. isolated PostgreSQL container start;
+2. committed Prisma migration chain application with `prisma migrate deploy`;
+3. synthetic Three Crowns seed and OWNER/MAID/TECHNICIAN bootstrap;
+4. migration ledger, 84-room/12-category baseline and critical DB-invariant checks;
+5. release-scope, public-truth and i18n guards;
+6. Docker build and start of real FastAPI Core + public web + PMS admin + staff PWA;
+7. proof that all three frontend origins return substantial Resort OS application surfaces rather than preview stubs;
+8. complete `scripts/staging_full_gate.py` acceptance;
+9. active-runtime OpenAPI check proving NFC/beach HTTP routes are not composed;
+10. clean teardown.
 
-Production-like migration and backup/restore workflows also execute real steps on clean PostgreSQL containers, including Prisma migration history and critical database constraints.
+This is stronger evidence than individual build/unit contracts because the complete repository applications are composed together against a clean migrated PostgreSQL database.
 
-These are CI/development environment proofs, not production runtime proofs.
+It is still **CI-local container staging**, not an external HTTPS/WSS deployment and not a production proof.
 
 ---
 
-## 3. Canonical Three Crowns V1 business boundary
+## 3. Migration / database truth
 
-STATUS: VERIFIED IN CURRENT CI-COVERED FLOW.
+STATUS: **VERIFIED IN CLEAN CI AND CI-LOCAL DOCKER STAGING.**
 
-Active property-specific rule:
+Current committed migration chain:
+- `0_init` — canonical baseline with core schema and critical PostgreSQL invariants;
+- `1_site_content` — forward migration for `site_content_documents`.
+
+The second migration was added after the production-like staging gate correctly exposed a migration gap that normal development `prisma db push` had masked. The fix was implemented as a forward migration; `0_init` was not rewritten.
+
+Verified current facts:
+- `prisma migrate deploy` succeeds on clean PostgreSQL;
+- migration ledger contains `0_init,1_site_content`;
+- `site_content_documents` exists after migration;
+- 84 development room positions / 12 room categories seed successfully;
+- 13 critical database constraints are present;
+- active room/date overlap remains protected by PostgreSQL GiST exclusion constraint;
+- payment/date/amount integrity checks remain present.
+
+`Production Migration Baseline CI` succeeds on the two-migration chain.
+
+`PostgreSQL Backup Restore CI` also succeeds after the forward migration and verifies migration-aware backup -> clean restore -> matching migration ledger and critical constraints.
+
+Production database itself has not yet been migrated or proven by this CI evidence.
+
+---
+
+## 4. Reservation / availability / PMS truth
+
+STATUS: **VERIFIED FOR CURRENT THREE CROWNS V1 FLOW.**
+
+Canonical active boundary remains:
+
+`ReservationRequest -> manager/human confirmation -> Reservation`.
+
+Verified rules:
 - `ReservationRequest != Reservation`;
-- final Reservation confirmation requires manager/human action;
-- an unpaid request does not hold inventory;
-- manager chooses prepayment amount/terms/method;
-- manager collects payment manually;
-- Resort OS records manager-confirmed payment facts;
-- no active global `PREPAYMENT_PERCENT` is authoritative;
-- n8n/AI cannot directly create a guaranteed Reservation, confirm payment, check-in/out/refund or mutate hotel money.
+- request creation does not itself hold inventory;
+- no authoritative global automatic prepayment percentage exists;
+- manager chooses payment amount/terms/method and records accepted payment fact;
+- n8n/AI cannot directly create guaranteed Reservation or confirm payment;
+- availability and pricing are server-authoritative Core facts.
 
-Public request endpoint creates `ReservationRequest` and explicitly returns `is_reservation: false`.
+PMS V9 remains the primary daily operating surface while mutations are server-authoritative.
 
-Manager conversion is the controlled path to Reservation + InventoryBlock + Payment.
-
----
-
-## 4. PMS / Smart Booking Board
-
-STATUS: VERIFIED DEVELOPMENT/CI BASELINE ON INTEGRATION HEAD.
-
-Primary production admin surface includes PMS V9 UI while mutation authority remains server-side.
-
-Server-authoritative schedule contract retains read -> preview -> explicit commit semantics.
-
-Verified behavior includes:
-- visual reservation spans;
-- room/date drag movement;
-- date resize;
-- full move;
-- Split Stay / segmented room assignment through multiple Reservation inventory blocks;
+Verified schedule capabilities include:
+- room/date move;
+- resize;
+- Split Stay / segmented room assignment;
 - partial relocation from an effective date;
-- stale-version rejection;
-- conflict preview/rollback;
-- PostgreSQL exclusion constraint as final active-overlap guard;
-- TECH_BLOCK safety;
+- stale snapshot rejection;
+- conflict rollback;
+- TECH_BLOCK protection;
 - CLEAN requirement for immediate destination room;
 - vacated room -> DIRTY plus housekeeping creation/reuse;
-- server-side pricing impact preview;
-- explicit manager confirmation before commit;
+- server price-impact preview;
+- explicit manager commit;
 - AuditLog evidence;
-- realtime PMS snapshot contract.
+- realtime PMS contract.
 
-PMS V9 adds control snapshot and safe bulk task operations in the integration branch. Their code is composed into Resort Core and covered by the current integrated CI contour, but external production usage is not yet proven.
-
----
-
-## 5. Availability / inventory / concurrency
-
-STATUS: VERIFIED FOR CURRENT ROOM-level Three Crowns MODEL IN CI.
-
-Current model uses physical `Room` inventory plus `InventoryBlock` date ranges.
-
-Database invariant:
-- active `InventoryBlock` rows for the same room cannot overlap because PostgreSQL uses a GiST exclusion constraint over `[startDate,endDate)`.
-
-Current availability query:
-- excludes `TECH_BLOCK` rooms;
-- checks active overlapping room blocks;
-- uses half-open date interval semantics `[)`;
-- reads pricing from server-side rate periods.
-
-Concurrency protections for schedule mutation and payment idempotency are exercised by dedicated CI contracts.
-
-Generic Resort OS room-type inventory/overbooking/external channel inventory rules remain product/domain decisions and are not promoted from this property-specific implementation.
+Database overlap protection remains the final double-booking guard.
 
 ---
 
-## 6. Pricing
+## 5. Guest / Reservation / Stay gap
 
-STATUS: PARTIAL / VERIFIED FOR CURRENT THREE CROWNS RATE-PERIOD BASELINE.
+STATUS: **PARTIAL.**
 
-Current deterministic server pricing exists in Resort Core:
-- rate plan + room type + date periods;
-- integer KGS prices;
-- OPEN/CLOSED/CONFIRM_REQUIRED sale states;
-- nightly calculation;
-- missing-rate failure;
-- server-side schedule-change price delta preview.
-
-Current implementation does NOT prove a generic Resort OS pricing engine for:
-- child-age rules;
-- extra bed;
-- meal-plan calculation beyond stored label;
-- promo/discount/corporate/partner rules;
-- tax/fee rules;
-- multi-currency conversion;
-- generic Split Stay repricing policy.
-
-Those remain governed by canonical DECISION REQUIRED / VALIDATE rules.
-
----
-
-## 7. Guest / Reservation / Stay domain model
-
-STATUS: PARTIAL.
-
-Verified separate persisted concepts:
+Persisted concepts currently include:
 - `Guest`;
 - `ReservationRequest`;
 - `Reservation`;
-- `InventoryBlock` room/date segments.
+- segmented `InventoryBlock` room/date assignments.
 
-Current implementation does NOT contain a distinct persisted canonical `Stay` entity in the audited Prisma schema.
+A distinct persisted canonical `Stay` entity is not implemented in the current Prisma model. Operational stay state is represented primarily through Reservation lifecycle plus segmented inventory assignments.
 
-Operational stay lifecycle is currently represented largely through `Reservation.status` (`GUARANTEED`, `CHECKED_IN`, `CHECKED_OUT`, etc.) plus segmented InventoryBlocks.
+Therefore canonical `Guest != Reservation != Stay` separation is not fully implemented.
 
-Therefore:
-- Guest != Reservation is implemented;
-- ReservationRequest != Reservation is implemented;
-- Split Stay behavior is implemented through segmented inventory assignment;
-- canonical `Guest != Reservation != Stay` data-model separation is NOT fully implemented.
-
-This is a target/current architectural GAP. It is not, by itself, evidence that current Three Crowns V1 flows are broken. Any migration to a distinct Stay aggregate must be designed from approved business rules and migration impact rather than performed as an automatic rewrite.
+This is an architectural target/current GAP, not evidence that current Three Crowns V1 booking/check-in/check-out flow is broken. Do not perform an automatic rewrite before Stay business rules and migration consequences are approved.
 
 ---
 
-## 8. Finance / payments
+## 6. Pricing / finance
 
-STATUS: PARTIAL; MANAGER-MANUAL PAYMENT CONTROL VERIFIED.
+STATUS: **PARTIAL; CURRENT V1 DETERMINISTIC PRICING AND MANAGER-MANUAL PAYMENT CONTROL VERIFIED.**
 
-Implemented persisted `Payment` facts include:
-- positive integer KGS amount;
-- status;
-- method;
-- provider/reference fields;
-- request/reservation context;
-- globally unique idempotency key;
-- `(provider, externalRef)` uniqueness.
+Current pricing supports server-side rate periods by room type/date using integer KGS values and explicit sale states.
 
-Dedicated CI verifies idempotency and manager payment conversion behavior.
+Current Payment model and CI cover manager-entered payment facts, positive amounts, request/reservation context and idempotency/conflict protection.
 
-Current finance is operational payment control, not a full accounting/folio system.
+Current finance is operational payment control, not statutory accounting.
 
-No canonical persisted Folio/Charge/Adjustment/Void aggregate is implemented in the audited schema.
+A complete canonical Folio/Charge/Adjustment/Void/Refund domain is not implemented.
 
 Automated acquiring/payment-provider integration is not an active Three Crowns V1 launch requirement.
 
 ---
 
-## 9. Authentication / authorization / property isolation
+## 7. Authentication / RBAC / property boundary
 
-STATUS: VERIFIED FOR CURRENT SINGLE-PROPERTY ROLE-BASED CONTOUR; GENERIC MULTI-TENANCY NOT IMPLEMENTED.
+STATUS: **VERIFIED FOR CURRENT SINGLE-PROPERTY ROLE CONTOUR; GENERIC MULTI-TENANCY NOT IMPLEMENTED.**
 
-Current staff auth evidence:
-- Argon2 password hashing;
-- random session token stored only as SHA-256 hash;
-- HttpOnly cookie;
-- session expiry/revocation;
-- inactive-user rejection;
-- server-side `require_roles(...)` dependencies;
-- audit on login;
-- user bound to a Property.
+Current evidence includes:
+- Argon2 passwords;
+- random session tokens persisted only as SHA-256 hashes;
+- HttpOnly cookies;
+- expiry/revocation;
+- active-user checks;
+- server-side role dependencies;
+- Property binding;
+- AuditLog on authentication actions.
 
-Current runtime is explicitly property-selected by environment `PROPERTY_CODE` and rejects sessions whose property code differs from the active property.
+Current Three Crowns runtime is property-selected by `PROPERTY_CODE`.
 
-This is a useful fail-closed Three Crowns boundary, but it is NOT a generic multi-tenant architecture proof.
+Generic organization/tenant hierarchy, cross-property workflows and a universal resource-level permission model remain future architecture work.
 
-Current gaps/risks:
-- generic Organization/Tenant hierarchy not implemented;
-- cross-property workflows/reports not implemented;
-- resource-level permission model remains narrower than target universal RBAC;
-- explicit application-level login rate limiting is not evidenced in `auth.py`;
-- production cookie/TLS settings depend on environment and therefore require deployed staging/production verification.
+External HTTPS cookie/CORS behavior still requires deployed staging verification.
 
 ---
 
-## 10. Operations / housekeeping / maintenance
+## 8. Operations / Staff PWA
 
-STATUS: VERIFIED FOR ACTIVE THREE CROWNS FLOW.
+STATUS: **VERIFIED IN CURRENT CI CONTOUR; REAL-DEVICE ACCEPTANCE OPEN.**
 
-Implemented reusable `OperationalTask` covers:
-- HOUSEKEEPING;
-- MAINTENANCE;
-- GUEST_REQUEST.
+Current `OperationalTask` supports HOUSEKEEPING, MAINTENANCE and GUEST_REQUEST.
 
-Current task states:
-`OPEN -> IN_PROGRESS -> IN_INSPECTION -> DONE`, with cancellation and manager inspection/rework controls where applicable.
+Verified safeguards include assignment/claim rules, controlled task transitions, housekeeping inspection, TECH_BLOCK protection, maintenance -> DIRTY/housekeeping behavior and audit history.
 
-Verified safeguards include:
-- assignment/claim rules;
-- housekeeping inspection boundary;
-- TECH_BLOCK protection;
-- maintenance completion -> DIRTY/housekeeping behavior;
-- task transition AuditLog.
+Integration Staff PWA V2 includes mobile `Моя смена`, housekeeping checklist/report and technician completion reporting.
 
-Integration branch Staff PWA V2 adds mobile `Моя смена` flow, housekeeping checklist/report and technician completion reporting. Current CI succeeds on the integrated head. Real-device mobile acceptance is still required before production cutover.
+Automated/container verification does not replace real iPhone/Android/Telegram Mini App acceptance.
 
 ---
 
-## 11. CRM / omnichannel / AI
+## 9. CRM / omnichannel / AI
 
-STATUS: PARTIAL.
+STATUS: **PARTIAL.**
 
-Implemented communication data model includes property-scoped channels, conversations and messages.
-
-Current active architecture decision:
+Current approved Three Crowns channel boundary:
 - Instagram -> ManyChat -> n8n;
 - WhatsApp -> API Green -> n8n;
 - website -> Resort Core directly;
-- Google Sheets CRM is a mirror/control surface, not hotel truth.
+- Google Sheets is a mirror/control surface, not hotel source of truth.
 
-Repository contains n8n workflow contracts and a read-only CRM feed. Repository/CI evidence does not by itself prove live production credentials/provider delivery.
+Core contains property-scoped conversation/message models and protected automation contracts.
 
-AI Sales current implementation is manager-review draft assistance:
-- OWNER/MANAGER only;
-- loads property-scoped Core facts;
-- treats guest messages as untrusted conversation data in its prompt contract;
-- does not auto-send;
-- does not confirm payments/reservations;
-- stores AI output as INTERNAL `AI_DRAFT` message;
-- records AuditLog evidence.
+AI Sales is manager-review draft assistance only:
+- OWNER/MANAGER access;
+- Core facts loaded server-side;
+- guest conversation treated as untrusted content;
+- no auto-send;
+- no payment/reservation confirmation authority;
+- output stored as INTERNAL `AI_DRAFT`;
+- AuditLog evidence.
 
-This is NOT the full target AI Administrator. In particular, a universal AI Operations tool layer and complete risk/approval tool matrix are not implemented.
+A universal AI Operations Administrator controlled-tool layer is not yet implemented.
+
+Live production provider credentials/delivery remain unverified.
 
 ---
 
-## 12. Public site / CMS / analytics
+## 10. Public site / CMS / analytics
 
-STATUS: IMPLEMENTED IN INTEGRATION CANDIDATE; CI-COVERED BUILD/TRUTH CONTRACTS VERIFIED; FINAL EXTERNAL VISUAL/MEDIA ACCEPTANCE OPEN.
+STATUS: **IMPLEMENTED AND CI/CI-LOCAL-STAGING VERIFIED; EXTERNAL VISUAL/MEDIA ACCEPTANCE OPEN.**
 
 Current public web includes:
-- premium Three Crowns site;
+- premium Three Crowns presentation;
 - 12-category room catalog/pages;
 - Core-backed availability/pricing;
 - ReservationRequest submission;
 - explicit request-not-booking boundary;
-- multilingual RU/KG/EN integration branch work;
-- CMS content runtime with Resort Core boundary;
-- privacy-safe vendor-neutral booking funnel events;
+- RU/KG/EN runtime;
+- CMS content storage/read boundary;
+- privacy-safe booking-funnel analytics events;
 - metadata/SEO routes;
 - repository-local property media baseline.
 
-Public Site Truth CI succeeds on audited head.
+The production-like staging gate exposed and then verified the missing CMS migration. Public/CMS smoke now succeeds after clean `migrate deploy`.
 
-Production public acceptance remains dependent on external staging/mobile/media review.
-
----
-
-## 13. Analytics / Command Center
-
-STATUS: IMPLEMENTED + CI-COVERED ON INTEGRATION CANDIDATE; NOT PRODUCTION-VERIFIED.
-
-Integration branch adds `GET /api/v1/admin/reports/overview` and admin report UI covering management metrics such as:
-- occupancy / room nights;
-- management ADR / RevPAR;
-- received payments and current debtors;
-- arrivals / departures;
-- CRM funnel and channels;
-- 12-category performance;
-- operations.
-
-Accounting truth is explicitly separated from management allocation metrics.
-
-No claim of statutory accounting/revenue recognition is made.
+The existing Vercel project `three-crowns-v3-preview` is only a simple preview/stub and is **not** accepted as Resort OS staging evidence.
 
 ---
 
-## 14. Services / resources / partners / guest portal
+## 11. Dashboard / analytics
 
-STATUS: NOT IMPLEMENTED AS GENERIC TARGET DOMAINS / UNKNOWN WHERE NO EXECUTABLE DOMAIN EXISTS.
+STATUS: **IMPLEMENTED + CI-COVERED; NOT PRODUCTION-VERIFIED.**
 
-No evidence in the audited core schema establishes complete target implementations for:
-- Folio/Charge engine;
-- generic Service engine;
-- generic Resource/Scheduling engine;
-- Partner/Agent settlement domain;
-- secure Guest Portal/Stay token boundary;
-- generic multi-property management.
+Current management reporting includes occupancy/room nights, management ADR/RevPAR, received payments/current debtors, arrivals/departures, CRM funnel/channels, 12-category performance and operations metrics.
 
-These are target gaps and/or VALIDATE/DECISION REQUIRED areas. They are not all Three Crowns V1 launch blockers.
+Management allocation metrics are explicitly not represented as statutory accounting/revenue-recognition truth.
 
 ---
 
-## 15. NFC
+## 12. NFC
 
-STATUS: DEFERRED / DORMANT.
+STATUS: **DEFERRED / DORMANT.**
 
-Historical NFC schema/source remains in repository, including `BEACH_PARTNER`/NFC models and SQL.
+Historical NFC/wristband/beach source/schema may remain in the repository.
 
-`app.app_entry:app` intentionally does not compose NFC routers on the audited integration head.
+The active application composition intentionally excludes NFC routers.
 
-NFC must not be reactivated without an explicit owner decision.
+The full staging gate directly verifies that active OpenAPI exposes no NFC/beach HTTP routes.
 
----
-
-## 16. Database / migrations / backup-restore
-
-STATUS: VERIFIED IN CLEAN CI ENVIRONMENT; PRODUCTION CUTOVER PROOF STILL REQUIRED.
-
-Current integration candidate includes:
-- PostgreSQL;
-- Prisma schema;
-- committed `prisma/migrations/0_init/migration.sql` plus SHA-256 checksum;
-- clean `prisma migrate deploy` CI;
-- migration history validation;
-- critical PostgreSQL constraints;
-- migration-aware backup artifact;
-- clean restore verification;
-- restored migration ledger comparison.
-
-Critical current DB constraints include date/amount checks and the active room-overlap exclusion guard.
-
-Production database is not yet proven by CI container evidence alone.
+Reactivation requires explicit owner decision.
 
 ---
 
-## 17. Physical Three Crowns room truth
+## 13. Physical Three Crowns room truth
 
-STATUS: BLOCKED FOR PRODUCTION IMPORT / DEVELOPMENT BASELINE VERIFIED.
+STATUS: **DEVELOPMENT 84/12 BASELINE VERIFIED / PRODUCTION IMPORT BLOCKED ON OWNER FACTS.**
 
-Development intake contains 84 room positions / 12 categories and is integrity-checked in CI.
+Development intake contains 84 room positions / 12 categories and passes integrity checks.
 
-The physical room register still contains reconstruction questions (`UNKNOWN` / explicit confirmation items). A fail-closed owner approval sheet exists in Google Drive:
+Google Drive contains the fail-closed production register:
 `НОМЕРНОЙ ФОНД — Три Короны — Production Import 84`.
 
-`scripts/import_physical_rooms.py` is dry-run/fail-closed and requires exactly 84 confirmed rooms before guarded production reconciliation.
+`OWNER_CHECKLIST` still contains unresolved factual questions about specific buildings/floors, mansard rooms, cottages and several room groups. Those facts must not be guessed.
 
-Therefore 84/12 development data must not be described as owner-approved physical production truth yet.
+`scripts/import_physical_rooms.py` remains dry-run/fail-closed and requires exactly 84 owner-confirmed room rows before production reconciliation.
+
+Therefore development 84/12 data is not yet owner-approved physical production truth.
 
 ---
 
-## 18. Deployment / production state
+## 14. Deployment state
 
-STATUS: NOT PRODUCTION CUTOVER READY.
+### CI-local staging
 
-Repository contains:
-- production compose/runbooks;
-- staging env template;
-- isolated staging compose;
-- staging Caddy example;
-- staging bootstrap and acceptance scripts;
-- production preflight;
-- backup/restore tooling.
+STATUS: **VERIFIED.**
 
-Production cutover remains blocked by external/runtime evidence, specifically:
+A complete isolated Docker topology for PostgreSQL/Core/web/admin/staff has been built, started and passed the complete staging acceptance on clean migrations with synthetic data.
+
+### External HTTPS/WSS staging
+
+STATUS: **BLOCKED / NOT VERIFIED.**
+
+No connected suitable container/VPS host is currently available through the project tooling. The connected Vercel preview does not represent the required PostgreSQL + persistent FastAPI + WebSocket + multi-app staging topology.
+
+Do not substitute the Vercel stub for external staging evidence.
+
+### Production
+
+STATUS: **NOT PRODUCTION READY.**
+
+Remaining production blockers:
 1. owner-confirmed physical 84-room register;
-2. isolated HTTPS/WSS staging deployment for PostgreSQL/Core/web/admin/staff;
-3. full `staging_full_gate.py` against deployed staging;
-4. real iPhone/Android/Telegram mobile acceptance;
+2. isolated external HTTPS/WSS staging for PostgreSQL/Core/web/admin/staff;
+3. complete gate against that deployed external staging;
+4. real iPhone/Android/Telegram acceptance;
 5. fresh production backup/restore proof immediately before cutover;
-6. production secrets, DNS cutover and rollback point.
+6. production secrets, DNS cutover and documented rollback point.
 
-No CI result alone authorizes production merge/DNS cutover.
+No CI result alone authorizes production DNS cutover.
 
 ---
 
-## 19. High-priority target/current gaps
+## 15. High-priority target/current gaps
 
 ### P0 / production blockers
-- physical 84-room owner confirmation for production import;
-- deployed HTTPS/WSS staging acceptance before cutover;
+- external HTTPS/WSS staging environment and acceptance;
+- owner physical 84-room confirmation;
+- real-device mobile/Telegram acceptance;
 - final production backup/preflight/secrets/DNS/rollback evidence.
 
-### P1 architecture/product gaps (not automatic rewrite mandates)
-- distinct canonical Stay domain/persistence is not implemented;
-- current auth/property model is single-property oriented, not generic multi-tenancy;
-- full Folio/Charge financial domain is absent;
-- complete AI Administrator controlled tool/risk model is absent.
+### P1 architecture/product gaps — not automatic rewrite mandates
+- distinct canonical Stay persistence;
+- generic multi-property/tenant architecture;
+- full Folio/Charge financial domain;
+- complete AI Administrator controlled-tool/risk model.
 
 ### VALIDATE / DECISION REQUIRED
-- generic reservation/stay lifecycle details beyond property-specific implemented baseline;
-- generic pricing rules;
-- Folio/refund/adjustment/void rules;
+- generic reservation/stay lifecycle beyond property-specific implementation;
+- generic pricing/children/extra-bed rules;
+- Folio/refund/void rules;
 - Partner/Agent commissions/settlements;
-- Service/Resource scheduling model;
-- generic multi-property model;
-- payment provider/acquiring strategy;
-- complete AI provider/tool approval model;
-- live omnichannel provider credentials and production verification.
+- Service/Resource scheduling;
+- payment-provider strategy;
+- complete AI tool/approval matrix;
+- live omnichannel provider verification.
 
 ### DEFER
 - NFC / beach wallet for current Three Crowns V1.
 
 ---
 
-## 20. Things that should be extended rather than rewritten without evidence
+## 16. Foundations that should be extended, not rewritten without evidence
 
-The following current foundations have strong implementation/CI evidence and should be preserved unless a later audit proves a concrete defect:
+Preserve unless a later audit proves a concrete defect:
 - FastAPI Resort Core as hotel truth boundary;
-- PostgreSQL room/date inventory and overlap exclusion constraint;
-- ReservationRequest -> human manager conversion boundary;
-- server-authoritative PMS schedule preview/commit contract;
-- payment idempotency contract;
+- PostgreSQL room/date inventory and exclusion constraint;
+- ReservationRequest -> human manager conversion;
+- server-authoritative PMS schedule preview/commit;
+- payment idempotency;
 - AuditLog pattern;
-- property-scoped staff sessions/RBAC baseline;
-- OperationalTask engine for housekeeping/maintenance/guest requests;
+- property-scoped staff session/RBAC baseline;
+- OperationalTask engine;
 - read-only CRM mirror boundary;
-- n8n as orchestration rather than DB authority;
-- public site using Resort Core for availability/pricing/request creation;
-- dormant NFC separation from active V1 runtime.
+- n8n orchestration without direct DB authority;
+- public site using Core availability/pricing/request creation;
+- dormant NFC isolation.
 
 ---
 
-## 21. Next technical task from this audit
+## 17. Next release task
 
-NEXT TASK: **Provision isolated HTTPS/WSS Three Crowns staging and execute the complete staging gate on the audited integration candidate.**
+NEXT TASK: **Provision a real external isolated HTTPS/WSS staging host capable of running PostgreSQL + persistent FastAPI/WebSocket + web/admin/staff containers, then execute the same full gate there.**
 
-Priority: P0 production dependency.
+Why this is next:
+- CI-local Docker topology is now verified;
+- migration/backup/restore chains are verified;
+- the remaining highest-risk unknown is real network/TLS/cookie/CORS/WebSocket/mobile behavior;
+- adding unrelated product features before external staging would increase code surface without reducing launch risk.
 
-Why first:
-- current code has strong clean-CI evidence;
-- production cutover is still blocked by environment/runtime verification;
-- staging can expose integration/configuration/security/mobile defects that code-only CI cannot prove;
-- performing a new architectural rewrite before this gate would reduce evidence quality and increase migration risk.
-
-Required verification:
-- clean staging PostgreSQL with committed migration baseline;
-- Core/web/admin/staff start successfully;
-- Secure cookie + exact CORS origins + HTTPS/WSS;
-- `staging_full_gate.py` / staging acceptance succeeds with synthetic data;
-- public booking boundary remains Request -> human confirmation;
-- PMS move/split/conflict/check-in/out/housekeeping flows succeed;
-- analytics/report endpoint responds with synthetic management data;
-- staff MAID/TECHNICIAN lifecycle succeeds;
-- no NFC routes are exposed;
-- provider credentials remain staging-only;
-- real mobile/Telegram acceptance follows before production cutover.
+Owner involvement should be limited to factual room-register confirmations and, when infrastructure is ready, real-device acceptance; technical staging execution remains an engineering task.
 
 LAST AUDITED: 2026-08-28
