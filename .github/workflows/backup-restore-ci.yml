@@ -67,15 +67,21 @@ jobs:
         run: |
           if test -s packages/database/prisma/migrations/0_init/migration.sql; then
             echo 'Using committed migration baseline.'
-            cd packages/database
-            npm install --no-audit --no-fund
-            npx prisma validate
+            (
+              cd packages/database
+              npm install --no-audit --no-fund
+              npx prisma validate
+            )
           else
             echo 'No committed baseline yet; generating review candidate for restore proof.'
             bash scripts/generate_migration_baseline.sh
           fi
           test -s packages/database/prisma/migrations/0_init/migration.sql
           test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
+          (
+            cd packages/database/prisma/migrations/0_init
+            sha256sum -c migration.sql.sha256
+          )
 
       - name: Apply migration baseline to clean source database
         working-directory: packages/database
