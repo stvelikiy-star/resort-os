@@ -111,7 +111,7 @@ Generate independent strong values for:
 
 Never commit `.env.production` or copy it into ordinary backup archives.
 
-Before production cutover, replace the n8n `latest` image reference with an explicitly tested pinned version.
+The production baseline pins `n8nio/n8n:2.36.2`, a known patched 2.x release. Do not replace it with `latest`; upgrade n8n only through an explicit tested release change.
 
 ## 7. First deployment sequence
 
