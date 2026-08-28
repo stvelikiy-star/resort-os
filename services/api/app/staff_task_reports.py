@@ -63,10 +63,7 @@ async def complete_task_with_report(
             raise HTTPException(status_code=422, detail="Housekeeping completion requires a checklist")
         incomplete = [item.code for item in payload.checklist if not item.done]
         if incomplete:
-            raise HTTPException(
-                status_code=422,
-                detail={"code": "CHECKLIST_INCOMPLETE", "items": incomplete},
-            )
+            raise HTTPException(status_code=422, detail={"code": "CHECKLIST_INCOMPLETE", "items": incomplete})
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -74,7 +71,7 @@ async def complete_task_with_report(
             task = await conn.fetchrow(
                 '''
                 SELECT t.id,t.type::text AS type,t.status::text AS status,t."roomId",t."assignedToId",
-                       room.code AS room_code,room."operationalState"::text AS room_state
+                       room.code AS room_code
                 FROM operational_tasks t
                 LEFT JOIN rooms room ON room.id=t."roomId"
                 WHERE t.id=$1 AND t."propertyId"=$2
@@ -90,10 +87,19 @@ async def complete_task_with_report(
             if task["assignedToId"] != actor_id:
                 raise HTTPException(status_code=403, detail="Task must be assigned to current employee")
             if task["status"] != "IN_PROGRESS":
-                raise HTTPException(
-                    status_code=409,
-                    detail={"code": "TASK_NOT_IN_PROGRESS", "status": task["status"]},
+                raise HTTPException(status_code=409, detail={"code": "TASK_NOT_IN_PROGRESS", "status": task["status"]})
+
+            # All operational flows use task -> room lock order. Locking the room here
+            # serializes concurrent housekeeping/maintenance completions on one room.
+            current_room_state = None
+            if task["roomId"]:
+                current_room_state = await conn.fetchval(
+                    '''SELECT "operationalState"::text FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                    task["roomId"],
+                    pid,
                 )
+                if current_room_state is None:
+                    raise HTTPException(status_code=409, detail="Task room no longer exists")
 
             report_json = {
                 "summary": payload.summary.strip(),
@@ -104,7 +110,7 @@ async def complete_task_with_report(
 
             housekeeping_task_id = None
             remaining_maintenance_tasks = 0
-            resulting_room_state = task["room_state"]
+            resulting_room_state = current_room_state
 
             if expected_type == "HOUSEKEEPING":
                 next_status = "IN_INSPECTION"
@@ -112,7 +118,7 @@ async def complete_task_with_report(
                     '''UPDATE operational_tasks SET status='IN_INSPECTION',"updatedAt"=now() WHERE id=$1''',
                     task_id,
                 )
-                if task["roomId"] and task["room_state"] != "TECH_BLOCK":
+                if task["roomId"] and current_room_state != "TECH_BLOCK":
                     await conn.execute(
                         '''UPDATE rooms SET "operationalState"='IN_INSPECTION',"updatedAt"=now() WHERE id=$1''',
                         task["roomId"],
