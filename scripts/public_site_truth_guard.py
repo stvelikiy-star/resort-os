@@ -13,8 +13,13 @@ PUBLIC_FILES = [
     ROOT / "apps/web/app/rooms/page.tsx",
     ROOT / "apps/web/app/rooms/[slug]/page.tsx",
     ROOT / "apps/web/components/BookingWidget.tsx",
+    ROOT / "apps/web/components/PublicUiI18nRuntime.tsx",
+    ROOT / "apps/web/components/SiteContentRuntime.tsx",
     ROOT / "apps/web/lib/roomCatalog.ts",
+    ROOT / "apps/web/lib/publicLocale.ts",
+    ROOT / "apps/web/lib/siteContent.ts",
     ROOT / "apps/web/lib/publicAnalytics.ts",
+    ROOT / "services/api/data/site_content_defaults.json",
 ]
 
 # These rules are either stale commercial rules or amenities whose CURRENT
