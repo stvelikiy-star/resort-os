@@ -7,6 +7,7 @@ from .channel_outbound import router as channel_outbound_router
 from .communication_ingest import router as communication_ingest_router
 from .crm_sync import router as crm_sync_router
 from .google_control import router as google_control_router
+from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
 from .inbox import router as inbox_router
@@ -53,6 +54,7 @@ app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)
+app.include_router(guest_services_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
@@ -78,4 +80,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.35.0"
+app.version = "0.36.0"
