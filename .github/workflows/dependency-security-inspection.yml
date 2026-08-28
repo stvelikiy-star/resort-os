@@ -7,6 +7,9 @@ on:
       - integration/site-pms-cms-20260827
       - main
 
+permissions:
+  contents: write
+
 jobs:
   inspect-next-runtime:
     runs-on: ubuntu-latest
@@ -24,13 +27,11 @@ jobs:
         run: npm install --package-lock-only --ignore-scripts
 
       - name: Capture exact audit report
-        id: audit
         working-directory: apps/web
         shell: bash
         run: |
           set +e
           npm audit --json > npm-audit.json
-          code=$?
           set -e
           node - <<'NODE'
           const fs = require('fs');
@@ -54,7 +55,6 @@ jobs:
           console.log(JSON.stringify({metadata: report.metadata, vulnerabilities: rows}, null, 2));
           fs.writeFileSync('npm-audit-summary.json', JSON.stringify({metadata: report.metadata, vulnerabilities: rows}, null, 2));
           NODE
-          echo "npm_audit_exit=$code" >> "$GITHUB_OUTPUT"
 
       - name: Verify all three Next apps declare the same runtime dependency versions
         run: |
@@ -68,9 +68,12 @@ jobs:
             if (new Set(vals).size !== 1) throw new Error(`${key} differs across apps: ${vals.join(', ')}`);
             console.log(`${key}=${vals[0]}`);
           }
+          const postcss=pkgs.map(p=>p.overrides?.postcss);
+          if (new Set(postcss).size !== 1 || !postcss[0]) throw new Error(`postcss override differs/missing: ${postcss.join(', ')}`);
+          console.log(`postcss_override=${postcss[0]}`);
           NODE
 
-      - name: Prepare deterministic lock artifacts for all Next apps
+      - name: Prepare deterministic lockfiles for all Next apps
         run: |
           cp apps/web/package-lock.json apps/admin/package-lock.json
           cp apps/web/package-lock.json apps/staff/package-lock.json
@@ -89,6 +92,19 @@ jobs:
           }
           NODE
 
+      - name: Gate high and critical vulnerabilities
+        working-directory: apps/web
+        run: |
+          node - <<'NODE'
+          const r=require('./npm-audit.json');
+          const counts=r.metadata?.vulnerabilities || {};
+          console.log('audit_counts='+JSON.stringify(counts));
+          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) {
+            console.error('High/critical npm vulnerability detected.');
+            process.exit(1);
+          }
+          NODE
+
       - name: Upload dependency evidence
         uses: actions/upload-artifact@v4
         with:
@@ -101,15 +117,16 @@ jobs:
             apps/web/npm-audit-summary.json
           retention-days: 7
 
-      - name: Gate critical vulnerabilities
-        working-directory: apps/web
+      - name: Commit deterministic lockfiles on integration branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/integration/site-pms-cms-20260827'
         run: |
-          node - <<'NODE'
-          const r=require('./npm-audit.json');
-          const counts=r.metadata?.vulnerabilities || {};
-          console.log('audit_counts='+JSON.stringify(counts));
-          if ((counts.critical || 0) > 0) {
-            console.error('Critical npm vulnerability detected.');
-            process.exit(1);
-          }
-          NODE
+          if git diff --quiet -- apps/web/package-lock.json apps/admin/package-lock.json apps/staff/package-lock.json && \
+             git ls-files --error-unmatch apps/web/package-lock.json apps/admin/package-lock.json apps/staff/package-lock.json >/dev/null 2>&1; then
+            echo 'Lockfiles already committed and unchanged.'
+            exit 0
+          fi
+          git config user.name 'three-crowns-ci'
+          git config user.email 'three-crowns-ci@users.noreply.github.com'
+          git add apps/web/package-lock.json apps/admin/package-lock.json apps/staff/package-lock.json
+          git commit -m 'Lock verified Next dependency tree'
+          git push origin HEAD:integration/site-pms-cms-20260827
