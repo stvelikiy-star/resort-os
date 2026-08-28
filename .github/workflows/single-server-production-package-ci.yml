@@ -7,6 +7,9 @@ on:
       - integration/site-pms-cms-20260827
       - main
 
+permissions:
+  contents: read
+
 jobs:
   validate-production-package:
     runs-on: ubuntu-latest
@@ -24,8 +27,15 @@ jobs:
           sed -i 's#HOST_DATA_DIR=/srv/three-crowns/data#HOST_DATA_DIR=./.ci-data#' .env.production.ci
           mkdir -p .ci-data/postgres .ci-data/n8n .ci-data/media/public
 
-      - name: Validate Docker Compose production graph
-        run: docker compose --env-file .env.production.ci -f compose.production.yaml config --quiet
+      - name: Validate Docker Compose production graph and WSS wiring
+        run: |
+          docker compose --env-file .env.production.ci -f compose.production.yaml config > .production-compose.rendered.yml
+          grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://api.3korony.com' .production-compose.rendered.yml
+          grep -F 'image: n8nio/n8n:2.36.2' .production-compose.rendered.yml
+          if grep -Eq '(^|[^0-9])5432:5432' .production-compose.rendered.yml; then
+            echo 'PostgreSQL must not publish 5432 to the host.' >&2
+            exit 1
+          fi
 
       - name: Validate Caddy configuration
         run: |
@@ -44,5 +54,8 @@ jobs:
           bash -n scripts/production_backup.sh
           bash -n scripts/host_preflight.sh
 
-      - name: Build Resort OS application images
+      - name: Pull pinned n8n production image
+        run: docker pull n8nio/n8n:2.36.2
+
+      - name: Build deterministic Resort OS application images
         run: docker compose --env-file .env.production.ci -f compose.production.yaml build api web admin staff
