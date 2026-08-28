@@ -17,6 +17,7 @@ import "./premium-experience.css";
 import "./site-cms.css";
 import "./mobile-hardening.css";
 import "./ai-admin.css";
+import "./luxury-director.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { content } = await getPublishedSiteContent("ru");
