@@ -3,12 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DashboardResponse = {
-  arrivals_today?: number;
-  departures_today?: number;
-  active_requests?: number;
-  messages_waiting?: number;
-  payments_today_kgs?: number;
-  room_attention?: number;
+  stays?: {
+    arrivals_today?: number;
+    departures_today?: number;
+    in_house?: number;
+    guaranteed?: number;
+    occupancy_percent?: number;
+  };
+  requests?: { active?: number; awaiting_prepayment?: number };
+  tasks?: { guest_requests_active?: number; urgent_active?: number };
+  communications?: { needs_reply?: number };
+  finance?: { confirmed_payments_today_kgs?: number; active_reservations_remaining_kgs?: number };
+  rooms?: { total?: number; clean?: number; dirty?: number; in_inspection?: number; tech_block?: number };
 };
 
 type GuestService = {
@@ -30,9 +36,9 @@ function money(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value || 0);
 }
 
-function scrollToSection(id: string) {
+function scrollToSelector(selector: string) {
   if (typeof document === "undefined") return;
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 export default function PMSIntegrationRailV10() {
@@ -93,6 +99,10 @@ export default function PMSIntegrationRailV10() {
     () => services.filter((item) => item.priority === "URGENT" && ["OPEN", "IN_PROGRESS"].includes(item.status)).length,
     [services],
   );
+  const roomAttention =
+    Number(dashboard?.rooms?.dirty || 0) +
+    Number(dashboard?.rooms?.in_inspection || 0) +
+    Number(dashboard?.rooms?.tech_block || 0);
 
   return (
     <section className="v9-cockpit" id="pms-v10-control">
@@ -106,7 +116,7 @@ export default function PMSIntegrationRailV10() {
           </span>
         </div>
         <div className="v9-actions">
-          <span className={`v9-source ${state === "ready" ? "ok" : state === "error" ? "danger" : ""}`}>
+          <span className={`v9-source ${state === "ready" ? "ok" : state === "error" ? "bad" : ""}`}>
             {state === "loading" ? "Обновление…" : state === "ready" ? `Core online · ${updatedAt}` : state === "partial" ? "Core partial" : "Core unavailable"}
           </span>
           <button className="btn" onClick={() => void load()} disabled={state === "loading"}>↻ Обновить всё</button>
@@ -114,21 +124,21 @@ export default function PMSIntegrationRailV10() {
       </header>
 
       <div className="v9-kpis">
-        <article><span>Заявки</span><strong>{state === "loading" ? "…" : dashboard?.active_requests ?? "—"}</strong><small>ReservationRequest · ещё не бронь</small></article>
+        <article><span>Заявки</span><strong>{state === "loading" ? "…" : dashboard?.requests?.active ?? "—"}</strong><small>ReservationRequest · ещё не бронь</small></article>
         <article><span>Активные брони</span><strong>{state === "loading" ? "…" : activeReservations}</strong><small>GUARANTEED + CHECKED_IN</small></article>
         <article><span>Услуги гостей</span><strong>{state === "loading" ? "…" : services.length}</strong><small>{urgentServices ? `срочных: ${urgentServices}` : "без срочных"}</small></article>
         <article className={debtReservations ? "danger" : "ok"}><span>С остатком</span><strong>{state === "loading" ? "…" : debtReservations}</strong><small>активные брони с долгом</small></article>
       </div>
 
       <div className="v9-actions" style={{ marginTop: 12, flexWrap: "wrap" }}>
-        <button className="btn" onClick={() => scrollToSection("pms-operations")}>Ресепшен / сегодня</button>
-        <button className="btn" onClick={() => scrollToSection("guest-services")}>Услуги гостей</button>
-        <button className="btn" onClick={() => scrollToSection("pms-bulk-guard")}>Массовые операции</button>
-        <button className="btn primary" onClick={() => scrollToSection("pms-universal-board")}>Открыть шахматку</button>
+        <button className="btn" onClick={() => scrollToSelector("#pms-v10-control + .v9-cockpit")}>Ресепшен / сегодня</button>
+        <button className="btn" onClick={() => scrollToSelector("#guest-services")}>Услуги гостей</button>
+        <button className="btn" onClick={() => scrollToSelector(".v9-bulk")}>Массовые операции</button>
+        <button className="btn primary" onClick={() => scrollToSelector(".v8-board")}>Открыть шахматку</button>
       </div>
 
       <p className="v9-empty" style={{ marginTop: 12 }}>
-        Платежи сегодня: {money(Number(dashboard?.payments_today_kgs || 0))} KGS · Заезды: {dashboard?.arrivals_today ?? "—"} · Выезды: {dashboard?.departures_today ?? "—"} · Сообщения без ответа: {dashboard?.messages_waiting ?? "—"} · Номера требуют внимания: {dashboard?.room_attention ?? "—"}.
+        Платежи сегодня: {money(Number(dashboard?.finance?.confirmed_payments_today_kgs || 0))} KGS · Заезды: {dashboard?.stays?.arrivals_today ?? "—"} · Выезды: {dashboard?.stays?.departures_today ?? "—"} · Сообщения без ответа: {dashboard?.communications?.needs_reply ?? "—"} · Номера требуют внимания: {roomAttention}.
       </p>
     </section>
   );
