@@ -22,12 +22,14 @@ PUBLIC_FILES = [
     ROOT / "services/api/data/site_content_defaults.json",
 ]
 
-# These rules are either stale commercial rules or amenities whose CURRENT
+# These rules are either stale commercial/payment rules or amenities whose CURRENT
 # operational availability has not been canonicalized for public promotion.
 FORBIDDEN_PATTERNS = {
     "fixed 30 percent prepayment": re.compile(r"30\s*%[^\n]{0,80}предоплат|предоплат[^\n]{0,80}30\s*%", re.I),
     "stale two-day unpaid hold": re.compile(r"(?:через\s+)?2\s+дн(?:я|ей)[^\n]{0,100}(?:брон|предоплат|оплат)|(?:брон|предоплат|оплат)[^\n]{0,100}2\s+дн(?:я|ей)", re.I),
     "fixed first-night prepayment": re.compile(r"предоплат[^\n]{0,80}(?:перв(?:ые|ую|ой)?\s+(?:сут|ноч))", re.I),
+    "unverified online card acquiring": re.compile(r"(?:visa|mastercard|карт(?:ой|а|ы))[^\n]{0,120}(?:онлайн\s+на\s+сайт|online\s+on\s+(?:the\s+)?site)|(?:онлайн\s+на\s+сайт|online\s+on\s+(?:the\s+)?site)[^\n]{0,120}(?:visa|mastercard|карт)", re.I),
+    "unverified elsom payment route": re.compile(r"\b(?:элсом|elsom)\b", re.I),
     "uncanonicalized conference claim": re.compile(r"конференц[- ]зал", re.I),
     "uncanonicalized billiards claim": re.compile(r"бильярд", re.I),
     "uncanonicalized laundry claim": re.compile(r"прачечн", re.I),
