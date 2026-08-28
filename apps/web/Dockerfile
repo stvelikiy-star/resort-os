@@ -2,8 +2,8 @@ FROM node:22-alpine AS build
 ARG CORE_API_URL=http://api:8000
 ENV CORE_API_URL=${CORE_API_URL}
 WORKDIR /app
-COPY apps/web/package.json ./package.json
-RUN npm install
+COPY apps/web/package.json apps/web/package-lock.json ./
+RUN npm ci
 COPY apps/web ./
 RUN npm run build
 
