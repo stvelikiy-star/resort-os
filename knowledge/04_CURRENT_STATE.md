@@ -21,9 +21,11 @@ Integration branch: `integration/site-pms-cms-20260827`.
 
 Open integration PR: `#37 — Unify site, V9 PMS/CRM, analytics, staff and staging through Resort Core`.
 
-Current fully CI-audited release code head: `be6809381220444ff663bdf82aec65a0ea9b1e06`.
+Fully audited executable/package code head: `be6809381220444ff663bdf82aec65a0ea9b1e06`.
 
-On that head all 21 associated workflow contours completed with conclusion `success`, including Resort Core, Full Staging Gate, Single Server Production Package, dependency security, migration baseline, backup/restore, Control Center, PMS/realtime/operations, public truth, automation/n8n, staff voice, Telegram, AI Sales, inbox, data intake and NFC deferred-scope checks.
+On that code head all 21 associated workflow contours completed with conclusion `success`, including Resort Core, Full Staging Gate, Single Server Production Package, dependency security, migration baseline, backup/restore, Control Center, PMS/realtime/operations, public truth, automation/n8n, staff voice, Telegram, AI Sales, inbox, data intake and NFC deferred-scope checks.
+
+Documentation-only commits may move the integration branch beyond this audited executable head. Those documentation commits do not retroactively change the recorded executable evidence.
 
 Current active architecture:
 
@@ -48,7 +50,7 @@ Current repository surfaces:
 
 ## 2. CI-local Docker staging verification
 
-STATUS: **VERIFIED on current audited code head `be6809381220444ff663bdf82aec65a0ea9b1e06`.**
+STATUS: **VERIFIED on audited code head `be6809381220444ff663bdf82aec65a0ea9b1e06`.**
 
 GitHub Actions:
 - workflow: `Three Crowns Full Staging Gate`;
@@ -127,7 +129,7 @@ GitHub Actions:
 - run id: `33154426079`;
 - conclusion: `success`.
 
-Exact audit metadata on the current audited code head:
+Exact audit metadata on the audited code head:
 - info: 0;
 - low: 0;
 - moderate: 0;
@@ -375,13 +377,13 @@ Therefore development 84/12 data is not yet owner-approved physical production t
 
 STATUS: **VERIFIED.**
 
-Current audited run `33154426108` passed the complete isolated Docker topology and acceptance on clean migrations with synthetic data.
+Audited run `33154426108` passed the complete isolated Docker topology and acceptance on clean migrations with synthetic data.
 
 ### Single-server deployment package
 
 STATUS: **VERIFIED IN CI.**
 
-Current audited run `33154426092` proves the approved one-VPS package is syntactically/build-valid, has pinned n8n, deterministic frontend builds, private PostgreSQL and explicit PMS WSS wiring.
+Audited run `33154426092` proves the approved one-VPS package is syntactically/build-valid, has pinned n8n, deterministic frontend builds, private PostgreSQL and explicit PMS WSS wiring.
 
 ### Purchased `3korony.com` hosting
 
@@ -473,7 +475,7 @@ Preserve unless a later audit proves a concrete defect:
 NEXT TASK: **Run the non-destructive host capability preflight on the currently purchased `3korony.com` hosting, preserve the existing live site, and—if the host is suitable—deploy an isolated external staging contour on that same server before replacing the apex site.**
 
 Why this is next:
-- current code head has all 21 CI workflows successful;
+- audited executable code head has all 21 CI workflows successful;
 - current full Docker staging gate is successful;
 - current one-server production package is CI-verified;
 - dependency audit is zero on the exact locked frontend tree;
