@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 1.9
+Version: 2.0
 Date: 2026-08-28
 Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL DOCKER STAGING VERIFIED / SINGLE-SERVER PRODUCTION PACKAGE VERIFIED IN CI / EXTERNAL HOST NOT VERIFIED / NOT PRODUCTION READY
 Canonical: YES
@@ -25,7 +25,16 @@ Fully audited executable/package code head: `be6809381220444ff663bdf82aec65a0ea9
 
 On that code head all 21 associated workflow contours completed with conclusion `success`, including Resort Core, Full Staging Gate, Single Server Production Package, dependency security, migration baseline, backup/restore, Control Center, PMS/realtime/operations, public truth, automation/n8n, staff voice, Telegram, AI Sales, inbox, data intake and NFC deferred-scope checks.
 
-Documentation-only commits may move the integration branch beyond this audited executable head. Those documentation commits do not retroactively change the recorded executable evidence.
+A later, narrower public AI Administrator increment is separately audited on executable head `731cf9114d860d9625901f5ba5cfd48cdc756540`.
+
+Verified evidence for that increment:
+- workflow: `Three Crowns AI Administrator CI`;
+- run id: `33160438772`;
+- head SHA: `731cf9114d860d9625901f5ba5cfd48cdc756540`;
+- conclusion: `success`;
+- job steps are present and completed successfully, including deterministic public-web dependencies, web typecheck/build, Core AI module compile, WhatsApp n8n authority-boundary validation, Core-direct website routing and production env/Compose wiring.
+
+The current branch head may contain later documentation-only commits. Documentation movement does not broaden executable verification beyond the exact audited code heads above.
 
 Current active architecture:
 
@@ -283,7 +292,7 @@ Automated/container verification does not replace real iPhone/Android/Telegram M
 
 ## 11. CRM / omnichannel / AI
 
-STATUS: **PARTIAL.**
+STATUS: **PARTIAL; PUBLIC WEBSITE AI ADMINISTRATOR VERIFIED IN CI / LIVE PROVIDER DELIVERY NOT VERIFIED.**
 
 Current approved Three Crowns channel boundary:
 - Instagram -> ManyChat -> n8n;
@@ -293,7 +302,7 @@ Current approved Three Crowns channel boundary:
 
 Core contains property-scoped conversation/message models and protected automation contracts.
 
-AI Sales is manager-review draft assistance only:
+Existing internal AI Sales contour remains manager-review draft assistance:
 - OWNER/MANAGER access;
 - Core facts loaded server-side;
 - guest conversation treated as untrusted content;
@@ -302,9 +311,32 @@ AI Sales is manager-review draft assistance only:
 - output stored as INTERNAL `AI_DRAFT`;
 - AuditLog evidence.
 
-A universal AI Operations Administrator controlled-tool layer is not yet implemented.
+A separate public website AI Administrator contour is implemented on audited executable head `731cf9114d860d9625901f5ba5cfd48cdc756540`:
+- globally mounted responsive website widget;
+- browser calls Resort Core directly through `/core/api/v1/public/ai-admin/chat`;
+- explicit check-in/check-out/adults/children availability search;
+- availability/pricing is obtained from the existing server-authoritative Core availability path;
+- only sellable options with integer `total_kgs` are exposed as current price options;
+- hotel facts and current availability are constructed server-side before LLM response composition;
+- guest conversation is treated as untrusted content;
+- public request rate limiting is implemented;
+- missing OpenAI provider configuration fails with `503` rather than fabricating an answer;
+- provider transport/rejection failures fail explicitly rather than being represented as success;
+- AI cannot confirm Reservation, confirm payment, choose prepayment amount/terms/method or invent payment links/QR;
+- when sellable availability exists, the widget hands off to the existing `#booking` flow, which creates a `ReservationRequest` rather than a guaranteed Reservation.
 
-Live production provider credentials/delivery remain unverified.
+Dedicated evidence:
+- workflow: `Three Crowns AI Administrator CI`;
+- run id: `33160438772`;
+- exact head: `731cf9114d860d9625901f5ba5cfd48cdc756540`;
+- conclusion: `success`;
+- executed job steps include web dependency verification, public web typecheck/build, Core AI module compile, WhatsApp n8n authority-boundary validation, Core-direct website routing and production env/Compose wiring.
+
+WhatsApp/API Green workflow/configuration exists in the repository boundary but real production credentials, real provider webhook delivery, real hotel-number E2E behavior and external HTTPS execution remain **NOT VERIFIED / NOT LIVE**.
+
+The public AI website contour is therefore **VERIFIED IN CI**, not production verified.
+
+A universal internal AI Operations Administrator controlled-tool layer is not yet implemented.
 
 ---
 
@@ -322,9 +354,10 @@ Current public web includes:
 - CMS content storage/read boundary;
 - privacy-safe booking-funnel analytics events;
 - metadata/SEO routes;
-- repository-local property media baseline.
+- repository-local property media baseline;
+- public AI Administrator widget verified separately on executable head `731cf9114d860d9625901f5ba5cfd48cdc756540`.
 
-The production-like staging gate exposed and then verified the missing CMS migration. Public/CMS smoke succeeds after clean `migrate deploy`.
+The production-like staging gate exposed and then verified the missing CMS migration. Public/CMS smoke succeeds after clean `migrate deploy` on the fully audited integration baseline.
 
 The existing Vercel project `three-crowns-v3-preview` is only a simple preview/stub and is **not** accepted as Resort OS staging evidence.
 
@@ -403,6 +436,12 @@ The actual purchased host has not yet been inspected/deployed. Real TLS, secure 
 
 Do not substitute Vercel/Replit preview evidence for the approved one-server external acceptance.
 
+### Live AI / messaging providers
+
+STATUS: **BLOCKED / NOT VERIFIED.**
+
+Repository code/configuration does not prove real OpenAI production credentials, API Green credentials, actual webhook delivery, actual hotel-number WhatsApp E2E, prompt-injection handling in the live provider path, or external browser/mobile AI acceptance.
+
 ### Production
 
 STATUS: **NOT PRODUCTION READY.**
@@ -413,8 +452,10 @@ Remaining production blockers:
 3. owner-confirmed physical 84-room register;
 4. isolated external HTTPS/WSS staging on the actual host and complete acceptance;
 5. real iPhone/Android/Telegram acceptance;
-6. fresh production backup/clean-restore proof immediately before cutover;
-7. production secrets, controlled DNS/apex cutover and documented rollback evidence.
+6. real website AI Administrator browser/mobile acceptance;
+7. real OpenAI/API Green secrets and WhatsApp E2E acceptance if those provider contours are activated for launch;
+8. fresh production backup/clean-restore proof immediately before cutover;
+9. production secrets, controlled DNS/apex cutover and documented rollback evidence.
 
 No CI result alone authorizes production DNS cutover.
 
@@ -428,13 +469,14 @@ No CI result alone authorizes production DNS cutover.
 - external HTTPS/WSS staging environment and acceptance;
 - owner physical 84-room confirmation;
 - real-device mobile/Telegram acceptance;
+- external website AI acceptance and, if enabled for launch, real provider/WhatsApp acceptance;
 - final production backup/preflight/secrets/DNS/rollback evidence.
 
 ### P1 architecture/product gaps — not automatic rewrite mandates
 - distinct canonical Stay persistence;
 - generic multi-property/tenant architecture;
 - full Folio/Charge financial domain;
-- complete AI Administrator controlled-tool/risk model.
+- complete universal internal AI Operations Administrator controlled-tool/risk model.
 
 ### VALIDATE / DECISION REQUIRED
 - generic reservation/stay lifecycle beyond property-specific implementation;
@@ -465,6 +507,7 @@ Preserve unless a later audit proves a concrete defect:
 - read-only CRM mirror boundary;
 - n8n orchestration without direct DB authority;
 - public site using Core availability/pricing/request creation;
+- public AI website using Core facts/availability without Reservation/payment authority;
 - dormant NFC isolation;
 - single-server production package unless actual hosting evidence proves a concrete limitation.
 
@@ -475,14 +518,15 @@ Preserve unless a later audit proves a concrete defect:
 NEXT TASK: **Run the non-destructive host capability preflight on the currently purchased `3korony.com` hosting, preserve the existing live site, and—if the host is suitable—deploy an isolated external staging contour on that same server before replacing the apex site.**
 
 Why this is next:
-- audited executable code head has all 21 CI workflows successful;
-- current full Docker staging gate is successful;
+- the fully audited executable integration baseline has all 21 associated workflow contours successful;
+- the later public AI Administrator increment has its own successful dedicated CI evidence on exact head `731cf9114d860d9625901f5ba5cfd48cdc756540`;
+- current full Docker staging gate is successful on the full audited baseline;
 - current one-server production package is CI-verified;
 - dependency audit is zero on the exact locked frontend tree;
 - migration and backup/restore chains are verified;
 - the remaining highest-risk unknown is the real purchased host/network/TLS/cookie/CORS/WSS/device environment;
 - adding unrelated features now would increase surface area without reducing launch risk.
 
-Owner involvement should remain limited to providing/accessing the hosting account if no connector exists, factual room-register confirmations, and real-device acceptance. Technical deployment execution remains an engineering task.
+Owner involvement should remain limited to providing/accessing the hosting account if no connector exists, factual room-register confirmations, real provider secrets where launch activation is approved, and real-device acceptance. Technical deployment execution remains an engineering task.
 
 LAST AUDITED: 2026-08-28
