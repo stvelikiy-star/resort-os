@@ -10,6 +10,7 @@ on:
       - "scripts/public_i18n_guard.py"
       - "scripts/external_public_truth_probe.py"
       - "scripts/external_public_truth_probe_test.py"
+      - "scripts/owner_guest_facts_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
   push:
     branches: [main]
@@ -21,6 +22,7 @@ on:
       - "scripts/public_i18n_guard.py"
       - "scripts/external_public_truth_probe.py"
       - "scripts/external_public_truth_probe_test.py"
+      - "scripts/owner_guest_facts_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
 
 permissions:
@@ -36,6 +38,8 @@ jobs:
           python-version: "3.12"
       - name: Enforce canonical public sales boundary
         run: python3 scripts/public_site_truth_guard.py
+      - name: Enforce owner-approved guest service facts
+        run: python3 scripts/owner_guest_facts_guard.py
       - name: Test external rendered-site truth probe
         run: python3 scripts/external_public_truth_probe_test.py
       - name: Enforce RU KG EN public locale contract
