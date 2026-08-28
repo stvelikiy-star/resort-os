@@ -1,6 +1,8 @@
 FROM node:22-alpine AS build
 ARG CORE_API_URL=http://api:8000
-ENV CORE_API_URL=${CORE_API_URL}
+ARG NEXT_PUBLIC_CORE_WS_URL=
+ENV CORE_API_URL=${CORE_API_URL} \
+    NEXT_PUBLIC_CORE_WS_URL=${NEXT_PUBLIC_CORE_WS_URL}
 WORKDIR /app
 COPY apps/admin/package.json ./package.json
 RUN npm install
