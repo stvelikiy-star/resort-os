@@ -5,6 +5,7 @@ import "./admin-nav-polish.css";
 import "./nfc.css";
 import "./finance.css";
 import "./hotel-finance.css";
+import "./reports.css";
 import "./dashboard.css";
 import "./reception.css";
 import "./inbox.css";
