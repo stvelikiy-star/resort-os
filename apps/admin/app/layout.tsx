@@ -14,6 +14,16 @@ import "./chessboard.css";
 import "./chessboard-lifecycle.css";
 import "./chessboard-payment.css";
 import "./chessboard-v2.css";
+import "./chessboard-v3.css";
+import "./chessboard-v3-fixes.css";
+import "./chessboard-v4.css";
+import "./chessboard-v5.css";
+import "./chessboard-v6.css";
+import "./chessboard-v6-hover.css";
+import "./chessboard-v7.css";
+import "./chessboard-v8.css";
+import "./chessboard-v9.css";
+import "./chessboard-v9-bulk.css";
 import "./three-crowns-admin.css";
 
 export const metadata: Metadata = {
