@@ -8,7 +8,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   inspect-next-runtime:
@@ -22,9 +22,31 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Resolve exact dependency tree
-        working-directory: apps/web
-        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify committed lockfiles exist
+        run: test -s apps/web/package-lock.json && test -s apps/admin/package-lock.json && test -s apps/staff/package-lock.json
+
+      - name: Verify all three Next apps declare the same runtime dependency versions
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const paths=['apps/web/package.json','apps/admin/package.json','apps/staff/package.json'];
+          const pkgs=paths.map(p=>JSON.parse(fs.readFileSync(p,'utf8')));
+          const keys=['next','react','react-dom'];
+          for (const key of keys) {
+            const vals=pkgs.map(p=>p.dependencies?.[key]);
+            if (new Set(vals).size !== 1) throw new Error(`${key} differs across apps: ${vals.join(', ')}`);
+            console.log(`${key}=${vals[0]}`);
+          }
+          const postcss=pkgs.map(p=>p.overrides?.postcss);
+          if (new Set(postcss).size !== 1 || !postcss[0]) throw new Error(`postcss override differs/missing: ${postcss.join(', ')}`);
+          console.log(`postcss_override=${postcss[0]}`);
+          NODE
+
+      - name: Prove lockfiles match package manifests
+        run: |
+          for app in web admin staff; do
+            (cd "apps/$app" && npm ci --ignore-scripts --no-audit)
+          done
 
       - name: Capture exact audit report
         working-directory: apps/web
@@ -56,42 +78,6 @@ jobs:
           fs.writeFileSync('npm-audit-summary.json', JSON.stringify({metadata: report.metadata, vulnerabilities: rows}, null, 2));
           NODE
 
-      - name: Verify all three Next apps declare the same runtime dependency versions
-        run: |
-          node - <<'NODE'
-          const fs=require('fs');
-          const paths=['apps/web/package.json','apps/admin/package.json','apps/staff/package.json'];
-          const pkgs=paths.map(p=>JSON.parse(fs.readFileSync(p,'utf8')));
-          const keys=['next','react','react-dom'];
-          for (const key of keys) {
-            const vals=pkgs.map(p=>p.dependencies?.[key]);
-            if (new Set(vals).size !== 1) throw new Error(`${key} differs across apps: ${vals.join(', ')}`);
-            console.log(`${key}=${vals[0]}`);
-          }
-          const postcss=pkgs.map(p=>p.overrides?.postcss);
-          if (new Set(postcss).size !== 1 || !postcss[0]) throw new Error(`postcss override differs/missing: ${postcss.join(', ')}`);
-          console.log(`postcss_override=${postcss[0]}`);
-          NODE
-
-      - name: Prepare deterministic lockfiles for all Next apps
-        run: |
-          cp apps/web/package-lock.json apps/admin/package-lock.json
-          cp apps/web/package-lock.json apps/staff/package-lock.json
-          node - <<'NODE'
-          const fs=require('fs');
-          const mapping={
-            'apps/web/package-lock.json':'@resort-os/web',
-            'apps/admin/package-lock.json':'@resort-os/admin',
-            'apps/staff/package-lock.json':'@resort-os/staff'
-          };
-          for (const [path,name] of Object.entries(mapping)) {
-            const lock=JSON.parse(fs.readFileSync(path,'utf8'));
-            lock.name=name;
-            if (lock.packages && lock.packages['']) lock.packages[''].name=name;
-            fs.writeFileSync(path, JSON.stringify(lock,null,2)+'\n');
-          }
-          NODE
-
       - name: Gate high and critical vulnerabilities
         working-directory: apps/web
         run: |
@@ -116,17 +102,3 @@ jobs:
             apps/web/npm-audit.json
             apps/web/npm-audit-summary.json
           retention-days: 7
-
-      - name: Commit deterministic lockfiles on integration branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/integration/site-pms-cms-20260827'
-        run: |
-          if git diff --quiet -- apps/web/package-lock.json apps/admin/package-lock.json apps/staff/package-lock.json && \
-             git ls-files --error-unmatch apps/web/package-lock.json apps/admin/package-lock.json apps/staff/package-lock.json >/dev/null 2>&1; then
-            echo 'Lockfiles already committed and unchanged.'
-            exit 0
-          fi
-          git config user.name 'three-crowns-ci'
-          git config user.email 'three-crowns-ci@users.noreply.github.com'
-          git add apps/web/package-lock.json apps/admin/package-lock.json apps/staff/package-lock.json
-          git commit -m 'Lock verified Next dependency tree'
-          git push origin HEAD:integration/site-pms-cms-20260827
