@@ -46,6 +46,7 @@ jobs:
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
+      REQUIRE_MIGRATION_HISTORY: 'true'
 
     steps:
       - uses: actions/checkout@v4
@@ -62,12 +63,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
-      - name: Create development source schema
+      - name: Prepare production-like migration baseline
+        run: |
+          if test -s packages/database/prisma/migrations/0_init/migration.sql; then
+            echo 'Using committed migration baseline.'
+            cd packages/database
+            npm install --no-audit --no-fund
+            npx prisma validate
+          else
+            echo 'No committed baseline yet; generating review candidate for restore proof.'
+            bash scripts/generate_migration_baseline.sh
+          fi
+          test -s packages/database/prisma/migrations/0_init/migration.sql
+          test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
+
+      - name: Apply migration baseline to clean source database
         working-directory: packages/database
         run: |
-          npm install --no-audit --no-fund
-          npx prisma validate
-          npx prisma db push
+          npx prisma migrate deploy
+          npx prisma migrate status
 
       - uses: actions/setup-python@v5
         with:
@@ -84,12 +98,19 @@ jobs:
           pg_restore --version
           psql --version
 
-      - name: Apply constraints and seed source database
-        run: |
-          python scripts/apply_core_constraints.py
-          python scripts/seed_from_intake.py
+      - name: Seed canonical Three Crowns source database
+        run: python scripts/seed_from_intake.py
 
-      - name: Create verified-format backup artifact
+      - name: Verify source migration ledger and all critical invariants
+        env:
+          PGPASSWORD: resort
+        run: |
+          migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
+          test "$migration_count" -ge 1
+          test "$constraint_count" = '13'
+
+      - name: Create migration-aware backup artifact
         env:
           BACKUP_DIR: /tmp/three-crowns-backups
         run: |
@@ -98,6 +119,8 @@ jobs:
           BACKUP_MANIFEST=$(grep '^BACKUP_MANIFEST=' /tmp/backup-output.txt | cut -d= -f2-)
           test -s "$BACKUP_FILE"
           test -s "$BACKUP_MANIFEST"
+          grep -q '^BACKUP_MIGRATIONS=' /tmp/backup-output.txt
+          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=13$' /tmp/backup-output.txt
           echo "BACKUP_FILE=$BACKUP_FILE" >> "$GITHUB_ENV"
           echo "BACKUP_MANIFEST=$BACKUP_MANIFEST" >> "$GITHUB_ENV"
 
@@ -108,7 +131,7 @@ jobs:
           psql -h 127.0.0.1 -U resort -d postgres -c 'DROP DATABASE IF EXISTS resort_os_restore;'
           psql -h 127.0.0.1 -U resort -d postgres -c 'CREATE DATABASE resort_os_restore;'
 
-      - name: Restore and compare hotel facts
+      - name: Restore and compare data, migrations and constraints
         env:
           RESTORE_DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os_restore
         run: |
@@ -116,4 +139,15 @@ jobs:
           grep -q '^RESTORE_VERIFICATION=SUCCESS$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOMS=84$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOM_TYPES=12$' /tmp/restore-output.txt
+          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=13$' /tmp/restore-output.txt
+          grep -q '^RESTORED_MIGRATION_HISTORY_PRESENT=True$' /tmp/restore-output.txt
+          grep -Eq '^RESTORED_APPLIED_MIGRATIONS=[1-9][0-9]*$' /tmp/restore-output.txt
           grep -q '^LAST_VERIFIED_BACKUP_AT=' /tmp/restore-output.txt
+
+      - name: Verify restored migration ledger directly
+        env:
+          PGPASSWORD: resort
+        run: |
+          source_migrations="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select migration_name || ':' || checksum from _prisma_migrations where finished_at is not null and rolled_back_at is null order by started_at,migration_name")"
+          restored_migrations="$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select migration_name || ':' || checksum from _prisma_migrations where finished_at is not null and rolled_back_at is null order by started_at,migration_name")"
+          test "$source_migrations" = "$restored_migrations"
