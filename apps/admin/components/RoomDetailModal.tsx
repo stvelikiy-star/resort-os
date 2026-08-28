@@ -67,7 +67,7 @@ function dateTime(value?: string | null) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-export default function RoomDetailModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
+export default function RoomDetailModal({ roomId, onClose }: { roomId: string; onClose: () => void; onUpdated?: () => void }) {
   const [data, setData] = useState<RoomDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
