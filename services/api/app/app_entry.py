@@ -1,4 +1,5 @@
 from .ai_sales import router as ai_sales_router
+from .analytics_reports import router as analytics_reports_router
 from .automation import router as automation_router
 from .automation_read import router as automation_read_router
 from .booking_admin import router as booking_admin_router
@@ -44,6 +45,7 @@ app.include_router(reservation_payments_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(hotel_finance_router)
+app.include_router(analytics_reports_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_control_snapshot_router)
@@ -72,4 +74,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.32.0"
+app.version = "0.33.0"
