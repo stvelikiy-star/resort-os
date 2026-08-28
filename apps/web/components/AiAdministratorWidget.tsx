@@ -3,12 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 
 type Role = "user" | "assistant";
-
-type Message = {
-  role: Role;
-  content: string;
-};
-
+type Message = { role: Role; content: string };
 type AvailabilityOption = {
   room_type_code: string | null;
   room_type_name: string | null;
@@ -17,7 +12,6 @@ type AvailabilityOption = {
   total_kgs: number;
   nights: number;
 };
-
 type AssistantResponse = {
   answer: string;
   availability?: {
@@ -42,10 +36,7 @@ function todayIso(offset = 0) {
 export default function AiAdministratorWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "assistant",
-      content: "Здравствуйте! Я AI-администратор «Три Короны». Помогу с номерами, датами и вопросами об отдыхе. Для точной проверки свободных номеров укажите даты и количество гостей.",
-    },
+    { role: "assistant", content: "Здравствуйте! Я AI-администратор «Три Короны». Помогу с номерами, датами и вопросами об отдыхе. Для точной проверки свободных номеров укажите даты и количество гостей." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -104,10 +95,7 @@ export default function AiAdministratorWidget() {
       {open && (
         <section className="ai-admin-panel" aria-label="AI-администратор Три Короны">
           <header className="ai-admin-header">
-            <div>
-              <strong>AI-администратор</strong>
-              <span>Три Короны · 24/7</span>
-            </div>
+            <div><strong>AI-администратор</strong><span>Три Короны · 24/7</span></div>
             <button type="button" className="ai-admin-close" onClick={() => setOpen(false)} aria-label="Закрыть чат">×</button>
           </header>
 
@@ -122,36 +110,36 @@ export default function AiAdministratorWidget() {
           </div>
 
           <div className="ai-admin-messages" aria-live="polite">
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`ai-admin-message ${message.role}`}>{message.content}</div>
-            ))}
+            {messages.map((message, index) => <div key={`${message.role}-${index}`} className={`ai-admin-message ${message.role}`}>{message.content}</div>)}
             {loading && <div className="ai-admin-message assistant ai-admin-typing">Проверяю…</div>}
             {error && <div className="ai-admin-error">{error}</div>}
           </div>
 
           {availability && availability.options.length > 0 && (
-            <div className="ai-admin-options">
-              {availability.options.slice(0, 4).map((option) => (
-                <article key={option.room_type_code || option.room_type_name || String(option.total_kgs)}>
-                  <strong>{option.room_type_name}</strong>
-                  <span>{option.nights} ноч. · доступно {option.available_count ?? "—"}</span>
-                  <b>{option.total_kgs.toLocaleString("ru-RU")} KGS</b>
-                </article>
-              ))}
-            </div>
+            <>
+              <div className="ai-admin-options">
+                {availability.options.slice(0, 4).map((option) => (
+                  <article key={option.room_type_code || option.room_type_name || String(option.total_kgs)}>
+                    <strong>{option.room_type_name}</strong>
+                    <span>{option.nights} ноч. · доступно {option.available_count ?? "—"}</span>
+                    <b>{option.total_kgs.toLocaleString("ru-RU")} KGS</b>
+                  </article>
+                ))}
+              </div>
+              <a className="ai-admin-booking-handoff" href="/#booking" onClick={() => setOpen(false)}>Выбрать номер и оставить заявку</a>
+            </>
           )}
 
           <form className="ai-admin-form" onSubmit={sendMessage}>
             <input value={input} maxLength={1600} onChange={(e) => setInput(e.target.value)} placeholder="Спросите о номерах, SPA, пляже…" aria-label="Сообщение AI-администратору" />
             <button type="submit" disabled={!input.trim() || loading}>Отправить</button>
           </form>
-          <p className="ai-admin-note">AI проверяет цены и наличие через Resort Core. Подтверждение брони и условия предоплаты — у менеджера.</p>
+          <p className="ai-admin-note">AI проверяет цены и наличие через Resort Core. Заявка не является подтверждённой бронью; подтверждение и условия предоплаты — у менеджера.</p>
         </section>
       )}
 
       <button type="button" className="ai-admin-launcher" onClick={() => setOpen((value) => !value)} aria-expanded={open}>
-        <span className="ai-admin-orb">AI</span>
-        <span><strong>Онлайн-администратор</strong><small>Проверить даты</small></span>
+        <span className="ai-admin-orb">AI</span><span><strong>Онлайн-администратор</strong><small>Проверить даты</small></span>
       </button>
     </div>
   );
