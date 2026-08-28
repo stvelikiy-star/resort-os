@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import AiAdministratorWidget from "../components/AiAdministratorWidget";
 import PremiumMotion from "../components/PremiumMotion";
 import PublicUiI18nRuntime from "../components/PublicUiI18nRuntime";
 import SiteContentRuntime from "../components/SiteContentRuntime";
@@ -14,6 +15,7 @@ import "./video-sections.css";
 import "./premium-experience.css";
 import "./site-cms.css";
 import "./mobile-hardening.css";
+import "./ai-admin.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { content } = await getPublishedSiteContent("ru");
@@ -42,5 +44,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { themeColor: "#0A1128", colorScheme: "dark light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body><PremiumMotion /><SiteContentRuntime /><PublicUiI18nRuntime />{children}</body></html>;
+  return <html lang="ru"><body><PremiumMotion /><SiteContentRuntime /><PublicUiI18nRuntime />{children}<AiAdministratorWidget /></body></html>;
 }
