@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import PremiumMotion from "../components/PremiumMotion";
+import PublicUiI18nRuntime from "../components/PublicUiI18nRuntime";
 import SiteContentRuntime from "../components/SiteContentRuntime";
 import { getPublishedSiteContent } from "../lib/siteContent";
 import "./globals.css";
@@ -41,5 +42,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { themeColor: "#0A1128", colorScheme: "dark light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body><PremiumMotion /><SiteContentRuntime />{children}</body></html>;
+  return <html lang="ru"><body><PremiumMotion /><SiteContentRuntime /><PublicUiI18nRuntime />{children}</body></html>;
 }
