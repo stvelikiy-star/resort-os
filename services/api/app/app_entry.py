@@ -27,6 +27,7 @@ from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
 from .site_content import router as site_content_router
 from .staff_control import router as staff_control_router
+from .staff_task_reports import router as staff_task_reports_router
 from .staff_voice import router as staff_voice_router
 from .stays import router as stays_router
 from .telegram_auth import router as telegram_auth_router
@@ -53,6 +54,7 @@ app.include_router(pms_bulk_tasks_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
+app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
 app.include_router(telegram_auth_router)
 
@@ -74,4 +76,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.33.0"
+app.version = "0.34.0"
