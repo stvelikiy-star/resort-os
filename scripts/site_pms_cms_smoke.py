@@ -22,7 +22,7 @@ jar = http.cookiejar.CookieJar()
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 
 
-def request(path: str, *, method: str = "GET", body=None, authenticated: bool = False):
+def request(path: str, *, method: str = "GET", body=None, authenticated: bool = False, allow_error: bool = False):
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         BASE + path,
@@ -37,6 +37,12 @@ def request(path: str, *, method: str = "GET", body=None, authenticated: bool = 
             return response.status, json.loads(payload) if payload else {}
     except urllib.error.HTTPError as exc:
         payload = exc.read().decode("utf-8")
+        try:
+            decoded = json.loads(payload) if payload else {}
+        except json.JSONDecodeError:
+            decoded = {"raw": payload}
+        if allow_error:
+            return exc.code, decoded
         raise RuntimeError(f"{method} {path}: HTTP {exc.code} {payload}") from exc
 
 
@@ -66,6 +72,40 @@ def main() -> int:
     check(status == 200 and len(admin_content.get("items", [])) == 3, "CMS admin exposes RU/KG/EN")
 
     ru_item = next(item for item in admin_content["items"] if item["locale"] == "ru")
+
+    forbidden = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
+    forbidden.setdefault("booking", {})["intro"] = "Для подтверждения нужна 30% предоплата."
+    status, rejected = request(
+        "/api/v1/admin/site/content/ru/draft",
+        method="PUT",
+        body={"content": forbidden},
+        authenticated=True,
+        allow_error=True,
+    )
+    check(status == 422 and rejected.get("detail", {}).get("code") == "PUBLIC_CONTENT_TRUTH_VIOLATION", "CMS rejects fixed 30% prepayment claim")
+
+    forbidden_amenity = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
+    forbidden_amenity.setdefault("advantages", {})["intro"] = "На территории работает сауна."
+    status, rejected = request(
+        "/api/v1/admin/site/content/ru/draft",
+        method="PUT",
+        body={"content": forbidden_amenity},
+        authenticated=True,
+        allow_error=True,
+    )
+    check(status == 422 and rejected.get("detail", {}).get("code") == "PUBLIC_CONTENT_TRUTH_VIOLATION", "CMS rejects uncanonicalized sauna claim")
+
+    unknown_schema = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
+    unknown_schema["unreviewed_section"] = {"copy": "test"}
+    status, rejected = request(
+        "/api/v1/admin/site/content/ru/draft",
+        method="PUT",
+        body={"content": unknown_schema},
+        authenticated=True,
+        allow_error=True,
+    )
+    check(status == 422 and rejected.get("detail", {}).get("code") == "PUBLIC_CONTENT_UNKNOWN_SECTION", "CMS rejects unknown public schema sections")
+
     draft = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
     marker = "[SMOKE] Три Короны CMS"
     draft.setdefault("hero", {})["title"] = marker
