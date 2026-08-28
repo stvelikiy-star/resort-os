@@ -1,0 +1,135 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+
+type DashboardResponse = {
+  arrivals_today?: number;
+  departures_today?: number;
+  active_requests?: number;
+  messages_waiting?: number;
+  payments_today_kgs?: number;
+  room_attention?: number;
+};
+
+type GuestService = {
+  id: string;
+  status: string;
+  priority: string;
+  service_code: string;
+};
+
+type Reservation = {
+  id: string;
+  status: string;
+  remainingKgs?: number;
+};
+
+type LoadState = "loading" | "ready" | "partial" | "error";
+
+function money(value: number) {
+  return new Intl.NumberFormat("ru-RU").format(value || 0);
+}
+
+function scrollToSection(id: string) {
+  if (typeof document === "undefined") return;
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+export default function PMSIntegrationRailV10() {
+  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [services, setServices] = useState<GuestService[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [state, setState] = useState<LoadState>("loading");
+  const [updatedAt, setUpdatedAt] = useState<string>("");
+
+  const load = useCallback(async () => {
+    setState("loading");
+    try {
+      const [dashboardResponse, servicesResponse, reservationsResponse] = await Promise.all([
+        fetch("/core/api/v1/admin/dashboard", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/guest-services?status=ACTIVE&limit=300", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" }),
+      ]);
+
+      const dashboardBody = await dashboardResponse.json().catch(() => ({}));
+      const servicesBody = await servicesResponse.json().catch(() => ({}));
+      const reservationsBody = await reservationsResponse.json().catch(() => ({}));
+
+      if (!dashboardResponse.ok) throw new Error("dashboard");
+
+      setDashboard(dashboardBody as DashboardResponse);
+      setServices(servicesResponse.ok && Array.isArray(servicesBody.items) ? servicesBody.items : []);
+      setReservations(
+        reservationsResponse.ok && Array.isArray(reservationsBody.items) ? reservationsBody.items : [],
+      );
+      setState(servicesResponse.ok && reservationsResponse.ok ? "ready" : "partial");
+      setUpdatedAt(new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }));
+    } catch {
+      setState("error");
+      setDashboard(null);
+      setServices([]);
+      setReservations([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const timer = window.setInterval(() => void load(), 60000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  const activeReservations = useMemo(
+    () => reservations.filter((item) => ["GUARANTEED", "CHECKED_IN"].includes(item.status)).length,
+    [reservations],
+  );
+  const debtReservations = useMemo(
+    () =>
+      reservations.filter(
+        (item) => ["GUARANTEED", "CHECKED_IN"].includes(item.status) && Number(item.remainingKgs || 0) > 0,
+      ).length,
+    [reservations],
+  );
+  const urgentServices = useMemo(
+    () => services.filter((item) => item.priority === "URGENT" && ["OPEN", "IN_PROGRESS"].includes(item.status)).length,
+    [services],
+  );
+
+  return (
+    <section className="v9-cockpit" id="pms-v10-control">
+      <header className="v9-head">
+        <div>
+          <p className="eyebrow">PMS V10 · Unified Control</p>
+          <h2>Сайт → Core → бронь → проживание → услуги → финансы</h2>
+          <span>
+            Единая рабочая цепочка Resort OS. Сайт создаёт ReservationRequest, подтверждение брони остаётся за менеджером,
+            а шахматка и операционные модули читают фактическое состояние из Resort Core/PostgreSQL.
+          </span>
+        </div>
+        <div className="v9-actions">
+          <span className={`v9-source ${state === "ready" ? "ok" : state === "error" ? "danger" : ""}`}>
+            {state === "loading" ? "Обновление…" : state === "ready" ? `Core online · ${updatedAt}` : state === "partial" ? "Core partial" : "Core unavailable"}
+          </span>
+          <button className="btn" onClick={() => void load()} disabled={state === "loading"}>↻ Обновить всё</button>
+        </div>
+      </header>
+
+      <div className="v9-kpis">
+        <article><span>Заявки</span><strong>{state === "loading" ? "…" : dashboard?.active_requests ?? "—"}</strong><small>ReservationRequest · ещё не бронь</small></article>
+        <article><span>Активные брони</span><strong>{state === "loading" ? "…" : activeReservations}</strong><small>GUARANTEED + CHECKED_IN</small></article>
+        <article><span>Услуги гостей</span><strong>{state === "loading" ? "…" : services.length}</strong><small>{urgentServices ? `срочных: ${urgentServices}` : "без срочных"}</small></article>
+        <article className={debtReservations ? "danger" : "ok"}><span>С остатком</span><strong>{state === "loading" ? "…" : debtReservations}</strong><small>активные брони с долгом</small></article>
+      </div>
+
+      <div className="v9-actions" style={{ marginTop: 12, flexWrap: "wrap" }}>
+        <button className="btn" onClick={() => scrollToSection("pms-operations")}>Ресепшен / сегодня</button>
+        <button className="btn" onClick={() => scrollToSection("guest-services")}>Услуги гостей</button>
+        <button className="btn" onClick={() => scrollToSection("pms-bulk-guard")}>Массовые операции</button>
+        <button className="btn primary" onClick={() => scrollToSection("pms-universal-board")}>Открыть шахматку</button>
+      </div>
+
+      <p className="v9-empty" style={{ marginTop: 12 }}>
+        Платежи сегодня: {money(Number(dashboard?.payments_today_kgs || 0))} KGS · Заезды: {dashboard?.arrivals_today ?? "—"} · Выезды: {dashboard?.departures_today ?? "—"} · Сообщения без ответа: {dashboard?.messages_waiting ?? "—"} · Номера требуют внимания: {dashboard?.room_attention ?? "—"}.
+      </p>
+    </section>
+  );
+}
