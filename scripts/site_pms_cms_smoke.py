@@ -120,7 +120,25 @@ def main() -> int:
     )
     check(status == 200 and isinstance(grid.get("rooms"), list), "PMS chessboard reads the same Core inventory")
 
-    print("\nUnified Site/PMS/CRM/CMS smoke check completed successfully.")
+    today = date.today()
+    snapshot_end = today + timedelta(days=31)
+    status, snapshot = request(
+        f"/api/v1/admin/pms/control-snapshot?start={today.isoformat()}&end={snapshot_end.isoformat()}",
+        authenticated=True,
+    )
+    check(status == 200 and snapshot.get("complete") is True, "V9 manager control snapshot is fail-closed complete")
+    check(snapshot.get("summary", {}).get("room_count") == 84 and len(snapshot.get("rooms", [])) == 84, "V9 snapshot covers all 84 physical rooms")
+    check(isinstance(snapshot.get("reservations"), list) and isinstance(snapshot.get("tasks"), list), "V9 snapshot includes reservations and operational tasks")
+    check(all(item.get("status") in {"GUARANTEED", "CHECKED_IN"} for item in snapshot.get("reservations", [])), "V9 active reservation projection uses canonical lifecycle statuses")
+
+    active_pairs = [
+        (task.get("room_id"), task.get("type"))
+        for task in snapshot.get("tasks", [])
+        if task.get("room_id") and task.get("type") in {"HOUSEKEEPING", "MAINTENANCE"}
+    ]
+    check(len(active_pairs) == len(set(active_pairs)), "No duplicate active housekeeping/maintenance pair in V9 snapshot")
+
+    print("\nUnified Site/PMS/CRM/CMS/V9 smoke check completed successfully.")
     return 0
 
 
