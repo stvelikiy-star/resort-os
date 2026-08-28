@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "apps/web/**"
+      - "services/api/app/site_content.py"
+      - "services/api/data/site_content_defaults.json"
       - "scripts/public_site_truth_guard.py"
       - "scripts/public_i18n_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
@@ -11,6 +13,8 @@ on:
     branches: [main]
     paths:
       - "apps/web/**"
+      - "services/api/app/site_content.py"
+      - "services/api/data/site_content_defaults.json"
       - "scripts/public_site_truth_guard.py"
       - "scripts/public_i18n_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
