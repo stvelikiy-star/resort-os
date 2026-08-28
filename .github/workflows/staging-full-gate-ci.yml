@@ -1,0 +1,274 @@
+name: Three Crowns Full Staging Gate
+
+on:
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'apps/**'
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'data-intake/**'
+      - 'compose.staging.yaml'
+      - '.env.staging.example'
+      - '.github/workflows/staging-full-gate-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/**'
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/**'
+      - 'data-intake/**'
+      - 'compose.staging.yaml'
+      - '.env.staging.example'
+      - '.github/workflows/staging-full-gate-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  staging-full-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      APP_ENV: staging
+      POSTGRES_DB: resort_os_staging_ci
+      POSTGRES_USER: resort_staging
+      POSTGRES_PASSWORD: CI-Staging-Database-Password-2026
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      DATABASE_URL: postgresql://resort_staging:CI-Staging-Database-Password-2026@127.0.0.1:15432/resort_os_staging_ci?schema=public
+      CORE_API_URL: http://127.0.0.1:18000
+      CORE_WS_URL: ws://127.0.0.1:18000
+      CORS_ORIGINS: ''
+      NEXT_PUBLIC_CORE_WS_URL: ws://127.0.0.1:18000
+      SESSION_TTL_HOURS: '8'
+      COOKIE_SECURE: 'false'
+      REQUIRE_COOKIE_DOMAIN: 'false'
+      COOKIE_DOMAIN: ''
+      AUTOMATION_SERVICE_KEY: CI-Staging-Automation-Service-Key-2026-0000000001
+      AUTOMATION_SERVICE_NAME: n8n-staging
+      REQUIRE_AUTOMATION_SERVICE: 'true'
+      EXPECTED_ROOM_COUNT: '84'
+      EXPECTED_ROOM_TYPE_COUNT: '12'
+      REQUIRE_MIGRATION_HISTORY: 'true'
+      REQUIRE_RECENT_BACKUP: 'false'
+      LAST_VERIFIED_BACKUP_AT: ''
+      MAX_BACKUP_AGE_HOURS: ''
+      TELEGRAM_BOT_TOKEN: ''
+      TELEGRAM_INITDATA_MAX_AGE_SECONDS: '600'
+      TELEGRAM_STAFF_WEBHOOK_SECRET: ''
+      STAFF_VOICE_MAX_BYTES: '20000000'
+      OPENAI_API_KEY: ''
+      OPENAI_TRANSCRIBE_MODEL: ''
+      OPENAI_API_BASE_URL: https://api.openai.com/v1
+      OPENAI_TRANSCRIBE_TIMEOUT_SECONDS: '60'
+      TELEGRAM_SALES_BOT_TOKEN: ''
+      TELEGRAM_SALES_WEBHOOK_SECRET: ''
+      TELEGRAM_SALES_CHANNEL_CODE: TELEGRAM_SALES_STAGING
+      TELEGRAM_SALES_DISPLAY_NAME: Telegram Sales Staging
+      TELEGRAM_SALES_ACCOUNT_ID: ''
+      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: '10'
+      TELEGRAM_BOT_API_BASE_URL: https://api.telegram.org
+      BOOTSTRAP_OWNER_USERNAME: staging_owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Staging-Owner-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: Staging Owner
+      STAGING_MAID_USERNAME: staging_maid
+      STAGING_MAID_PASSWORD: CI-Staging-Maid-Password-2026
+      STAGING_MAID_DISPLAY_NAME: Staging Maid
+      STAGING_TECHNICIAN_USERNAME: staging_tech
+      STAGING_TECHNICIAN_PASSWORD: CI-Staging-Tech-Password-2026
+      STAGING_TECHNICIAN_DISPLAY_NAME: Staging Technician
+      SMOKE_OWNER_USERNAME: staging_owner
+      SMOKE_OWNER_PASSWORD: CI-Staging-Owner-Password-2026
+      SMOKE_MAID_USERNAME: staging_maid
+      SMOKE_MAID_PASSWORD: CI-Staging-Maid-Password-2026
+      SMOKE_TECHNICIAN_USERNAME: staging_tech
+      SMOKE_TECHNICIAN_PASSWORD: CI-Staging-Tech-Password-2026
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Create synthetic staging env file
+        shell: bash
+        run: |
+          cat > .env.staging.ci <<'EOF'
+          POSTGRES_DB=resort_os_staging_ci
+          POSTGRES_USER=resort_staging
+          POSTGRES_PASSWORD=CI-Staging-Database-Password-2026
+          PROPERTY_CODE=THREE_CROWNS
+          RATE_PLAN_CODE=DIRECT_2026_27
+          APP_ENV=staging
+          CORS_ORIGINS=
+          NEXT_PUBLIC_CORE_WS_URL=ws://127.0.0.1:18000
+          SESSION_TTL_HOURS=8
+          COOKIE_SECURE=false
+          REQUIRE_COOKIE_DOMAIN=false
+          COOKIE_DOMAIN=
+          AUTOMATION_SERVICE_KEY=CI-Staging-Automation-Service-Key-2026-0000000001
+          AUTOMATION_SERVICE_NAME=n8n-staging
+          REQUIRE_AUTOMATION_SERVICE=true
+          EXPECTED_ROOM_COUNT=84
+          EXPECTED_ROOM_TYPE_COUNT=12
+          REQUIRE_MIGRATION_HISTORY=true
+          REQUIRE_RECENT_BACKUP=false
+          LAST_VERIFIED_BACKUP_AT=
+          MAX_BACKUP_AGE_HOURS=
+          TELEGRAM_BOT_TOKEN=
+          TELEGRAM_INITDATA_MAX_AGE_SECONDS=600
+          TELEGRAM_STAFF_WEBHOOK_SECRET=
+          STAFF_VOICE_MAX_BYTES=20000000
+          OPENAI_API_KEY=
+          OPENAI_TRANSCRIBE_MODEL=
+          OPENAI_API_BASE_URL=https://api.openai.com/v1
+          OPENAI_TRANSCRIBE_TIMEOUT_SECONDS=60
+          TELEGRAM_SALES_BOT_TOKEN=
+          TELEGRAM_SALES_WEBHOOK_SECRET=
+          TELEGRAM_SALES_CHANNEL_CODE=TELEGRAM_SALES_STAGING
+          TELEGRAM_SALES_DISPLAY_NAME=Telegram Sales Staging
+          TELEGRAM_SALES_ACCOUNT_ID=
+          TELEGRAM_PROVIDER_TIMEOUT_SECONDS=10
+          TELEGRAM_BOT_API_BASE_URL=https://api.telegram.org
+          BOOTSTRAP_OWNER_USERNAME=staging_owner
+          BOOTSTRAP_OWNER_PASSWORD=CI-Staging-Owner-Password-2026
+          BOOTSTRAP_OWNER_DISPLAY_NAME=Staging Owner
+          STAGING_MAID_USERNAME=staging_maid
+          STAGING_MAID_PASSWORD=CI-Staging-Maid-Password-2026
+          STAGING_MAID_DISPLAY_NAME=Staging Maid
+          STAGING_TECHNICIAN_USERNAME=staging_tech
+          STAGING_TECHNICIAN_PASSWORD=CI-Staging-Tech-Password-2026
+          STAGING_TECHNICIAN_DISPLAY_NAME=Staging Technician
+          SMOKE_OWNER_USERNAME=staging_owner
+          SMOKE_OWNER_PASSWORD=CI-Staging-Owner-Password-2026
+          SMOKE_MAID_USERNAME=staging_maid
+          SMOKE_MAID_PASSWORD=CI-Staging-Maid-Password-2026
+          SMOKE_TECHNICIAN_USERNAME=staging_tech
+          SMOKE_TECHNICIAN_PASSWORD=CI-Staging-Tech-Password-2026
+          EOF
+
+      - name: Start isolated PostgreSQL
+        run: |
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml down -v --remove-orphans || true
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml up -d postgres
+          for i in $(seq 1 30); do
+            if pg_isready -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml logs --no-color postgres
+          exit 1
+
+      - name: Apply committed Prisma migration baseline
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          cd prisma/migrations/0_init
+          sha256sum -c migration.sql.sha256
+          cd ../../..
+          npx prisma migrate deploy
+          npx prisma migrate status
+
+      - name: Install Core tooling and seed synthetic staging baseline
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+          python scripts/bootstrap_staging_staff.py
+
+      - name: Verify migration ledger and database invariants
+        env:
+          PGPASSWORD: CI-Staging-Database-Password-2026
+        run: |
+          migration_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          migration_names="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          constraint_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
+          room_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from rooms")"
+          room_type_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from room_types")"
+          test "$migration_count" = '1'
+          test "$migration_names" = '0_init'
+          test "$constraint_count" = '13'
+          test "$room_count" = '84'
+          test "$room_type_count" = '12'
+
+      - name: Enforce release scope and public truth guards
+        run: |
+          python scripts/release_scope_guard.py
+          python scripts/public_site_truth_guard.py
+          python scripts/public_i18n_guard.py
+
+      - name: Build and start real staging application containers
+        run: |
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml up -d --build api web admin staff
+          for i in $(seq 1 45); do
+            if curl --fail --silent http://127.0.0.1:18000/health/ready >/tmp/staging-ready.json; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:18000/health/ready
+          for url in http://127.0.0.1:13000/ http://127.0.0.1:13001/ http://127.0.0.1:13002/; do
+            for i in $(seq 1 30); do
+              if curl --fail --silent "$url" >/tmp/frontend.html; then
+                break
+              fi
+              sleep 2
+            done
+            curl --fail --silent "$url" >/dev/null
+          done
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml ps
+
+      - name: Prove deployed frontends are real Resort OS surfaces, not preview stubs
+        run: |
+          curl --fail --silent http://127.0.0.1:13000/ > /tmp/web.html
+          curl --fail --silent http://127.0.0.1:13001/ > /tmp/admin.html
+          curl --fail --silent http://127.0.0.1:13002/ > /tmp/staff.html
+          grep -q 'Три Короны' /tmp/web.html
+          grep -q 'Resort OS' /tmp/admin.html
+          grep -Eq 'Resort OS|Моя смена|Три Короны' /tmp/staff.html
+          test "$(wc -c </tmp/web.html)" -gt 1000
+          test "$(wc -c </tmp/admin.html)" -gt 1000
+          test "$(wc -c </tmp/staff.html)" -gt 1000
+
+      - name: Run complete staging acceptance gate
+        run: python scripts/staging_full_gate.py
+
+      - name: Verify NFC routes remain absent from active runtime
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          doc = json.load(urllib.request.urlopen('http://127.0.0.1:18000/openapi.json', timeout=10))
+          paths = set(doc.get('paths', {}))
+          forbidden = sorted(path for path in paths if '/nfc' in path.lower() or '/beach' in path.lower())
+          if forbidden:
+              raise SystemExit('Dormant NFC/beach routes unexpectedly composed: ' + ', '.join(forbidden))
+          print('PASS: active staging runtime contains no NFC/beach HTTP routes')
+          PY
+
+      - name: Dump staging diagnostics on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml ps || true
+          docker compose --env-file .env.staging.ci -f compose.staging.yaml logs --no-color --tail=250 postgres api web admin staff || true
+
+      - name: Tear down isolated staging
+        if: always()
+        run: docker compose --env-file .env.staging.ci -f compose.staging.yaml down -v --remove-orphans || true
