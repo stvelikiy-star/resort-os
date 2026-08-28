@@ -11,44 +11,28 @@ The current integration candidate preserves the core invariant:
 Google Sheets, CMS, n8n and AI are not parallel booking, inventory, pricing, payment or reservation-confirmation sources of truth.
 
 Current audited AI-administrator integration head:
-`0f4231c8b038ce6ce60c7aea172bff497d79b24a`.
+`731cf9114d860d9625901f5ba5cfd48cdc756540`.
 
-All associated workflow contours on that head completed with conclusion `success`, including Resort Core, Full Staging Gate, Single Server Production Package, Public Site Truth, n8n JSON/Core contracts, dependency security and the dedicated AI Administrator contract.
-
-## Verified product / repository gates
-
-- public site truth and multilingual booking boundaries;
-- Admin/Web/Staff typecheck and production builds;
-- Resort Core availability -> ReservationRequest -> manager payment -> Reservation -> PMS -> check-in -> checkout -> housekeeping;
-- PMS schedule preview/commit, move, resize, Split Stay and history protection;
-- authenticated realtime PMS WebSocket contract;
-- housekeeping / maintenance lifecycle;
-- unified inbox, Telegram sales and AI draft-only boundaries;
-- payment idempotency;
-- n8n and automation contracts;
-- data-intake integrity: 84 rooms / 12 categories development baseline;
-- 13 critical PostgreSQL invariants including active room-overlap exclusion;
-- migration-aware PostgreSQL backup -> clean restore -> identical migration ledger;
-- Control Center trusted-manifest fail-closed contract;
-- dormant NFC exclusion from active runtime.
+The dedicated AI Administrator contract is green on this head. The previous complete AI-integration head `0f4231c8b038ce6ce60c7aea172bff497d79b24a` also passed all associated repository workflows, including Resort Core, Full Staging Gate, Single Server Production Package, Public Site Truth, n8n contracts, migrations, backup/restore and dependency security.
 
 ## AI Administrator V1 — VERIFIED IN CI / NOT LIVE WITH REAL PROVIDERS
 
 ### Website
 
-The public site now includes a globally mounted responsive AI Administrator popup.
+The public site includes a globally mounted responsive AI Administrator popup.
 
 Runtime boundary:
 `3korony.com -> Resort Core public AI endpoint -> verified hotel facts / Core availability -> OpenAI response composition`.
 
 Implemented:
 - free-form guest Q&A;
-- explicit check-in/check-out/adults/children availability checker;
+- explicit check-in/check-out/adults/children checker;
 - Core-backed sellable room categories and integer KGS totals;
 - server-side verified context construction;
 - public request rate limiting;
 - no n8n dependency for website chat;
-- no payment/reservation confirmation authority.
+- no payment/reservation confirmation authority;
+- after sellable availability is returned, a booking handoff sends the guest to the existing `#booking` flow, which creates `ReservationRequest` rather than an automatic reservation.
 
 Core endpoints:
 - `GET /api/v1/public/ai-admin/capabilities`;
@@ -76,7 +60,7 @@ Implemented flow:
 The workflow is intentionally committed as `active:false`. It is IMPLEMENTED but is not represented as LIVE until real GREEN API/OpenAI credentials and an external HTTPS n8n endpoint are connected and tested.
 
 Dedicated workflow: `Three Crowns AI Administrator CI`.
-Successful run: `33160040211`.
+Latest successful run after the booking-handoff UX addition: `33160438772`.
 
 Verified by that run:
 - deterministic public web dependency tree;
@@ -86,14 +70,30 @@ Verified by that run:
 - website remains Core-direct rather than routing through n8n;
 - production environment/Compose wiring.
 
-On the same audited head, current related gates are also successful:
+Previous complete related integration run-set on head `0f4231c8b038ce6ce60c7aea172bff497d79b24a` is also successful:
 - Full Staging Gate `33160040308`;
 - Resort Core CI `33160040237`;
 - Public Site Truth CI `33160040288`;
 - n8n Workflow JSON CI `33160040226`;
 - n8n Resort Core Contract CI `33160040259`;
 - Single Server Production Package CI `33160040278`;
-- Dependency Security Inspection `33160040309`.
+- Dependency Security Inspection `33160040309`;
+- Production Migration Baseline CI `33160040269`;
+- PostgreSQL Backup Restore CI `33160040192`.
+
+## Reservation / payment authority
+
+Canonical boundary remains:
+`ReservationRequest -> manager/human confirmation -> Reservation`.
+
+AI/n8n cannot:
+- guarantee a Reservation;
+- confirm payment;
+- invent a prepayment percentage, QR or payment link;
+- bypass Core availability/pricing;
+- directly write PostgreSQL.
+
+Manager chooses payment amount, terms and method for current Three Crowns V1.
 
 ## Verified production-like migration chain
 
@@ -105,22 +105,9 @@ Verified:
 - clean `prisma migrate deploy`;
 - exact migration ledger `0_init,1_site_content`;
 - `site_content_documents` present after migration;
-- 84/12 seed;
+- 84/12 development seed;
 - 13 critical database constraints;
 - backup/restore with the complete migration ledger.
-
-Current audited runs on the AI integration head:
-- Production Migration Baseline CI `33160040269` — success;
-- PostgreSQL Backup Restore CI `33160040192` — success.
-
-## Verified CI-local Docker staging gate
-
-Workflow: `Three Crowns Full Staging Gate`.
-Successful GitHub Actions run on current audited AI integration head: `33160040308`.
-
-Status: **CI-LOCAL DOCKER STAGING VERIFIED**.
-
-It is not equivalent to external HTTPS/WSS staging or production verification.
 
 ## Verified single-server production package
 
@@ -129,11 +116,9 @@ The approved production simplification remains a single VPS/VDS package:
 - web/admin/staff Next.js;
 - FastAPI Core;
 - private PostgreSQL;
-- n8n;
+- pinned n8n `2.36.2`;
 - persistent media/PostgreSQL/n8n state;
 - local backup path with off-site copy expected.
-
-Current successful package run: `33160040278`.
 
 Status: **SINGLE-SERVER PRODUCTION PACKAGE VERIFIED IN CI / NOT EXTERNALLY DEPLOYED**.
 
@@ -146,8 +131,6 @@ Current locked frontend runtime:
 - PostCSS override `8.5.23`.
 
 Committed lockfiles exist for web/admin/staff and Docker builds use `npm ci`.
-
-Dependency Security Inspection run `33160040309` completed successfully.
 
 ## External/provider truth
 
