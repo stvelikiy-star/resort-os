@@ -1,0 +1,5 @@
+.mega-block-meta b{font-size:0}.mega-block-meta b::after{font-size:.52rem;font-weight:900;letter-spacing:.02em}.mega-block-meta .money-paid::after{content:"✓"}.mega-block-meta .money-partial::after,.mega-block-meta .money-unpaid::after{content:"долг"}.mega-block-meta .money-unknown::after{content:""}
+.mega-connection.is-warning{color:var(--mega-amber)}.mega-connection.is-warning i{background:var(--mega-amber);box-shadow:0 0 0 4px rgba(183,121,22,.12)}
+.mega-finance-warning{max-width:1800px;margin:12px auto;display:flex;align-items:flex-start;gap:10px;border:1px solid #ead6ae;border-radius:12px;padding:11px 14px;background:#fff8e8;color:#76531a;font-size:.72rem}.mega-finance-warning strong{flex:0 0 auto}.mega-finance-warning span{color:#796744}.mega-finance-warning.state-error{border-color:#edc8c8;background:#fff1f1;color:#963c3c}.mega-finance-warning.state-error span{color:#7d5353}
+.mega-quick-grid button:disabled,.mega-filter-grid select:disabled{cursor:not-allowed;opacity:.52}.mega-quick-grid button:disabled:hover{transform:none;border-color:var(--mega-line)}
+@media(max-width:820px){.mega-finance-warning{flex-direction:column;gap:4px}}
