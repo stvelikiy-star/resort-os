@@ -10,10 +10,12 @@ The current integration candidate preserves the core invariant:
 
 Google Sheets and CMS are not parallel booking, inventory, or payment sources of truth.
 
-Current fully audited code head:
+Fully audited executable/package code head:
 `be6809381220444ff663bdf82aec65a0ea9b1e06`.
 
-All 21 workflow contours associated with that audited head completed with conclusion `success`.
+All 21 workflow contours associated with that audited code head completed with conclusion `success`.
+
+Documentation-only commits may move the PR branch beyond the audited code head; they do not retroactively change the recorded executable evidence.
 
 ## Verified product / repository gates
 
