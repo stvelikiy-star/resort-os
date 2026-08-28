@@ -92,10 +92,7 @@ async def complete_task_with_report(
             if task["status"] != "IN_PROGRESS":
                 raise HTTPException(
                     status_code=409,
-                    detail={
-                        "code": "TASK_NOT_IN_PROGRESS",
-                        "status": task["status"],
-                    },
+                    detail={"code": "TASK_NOT_IN_PROGRESS", "status": task["status"]},
                 )
 
             report_json = {
@@ -106,14 +103,13 @@ async def complete_task_with_report(
             }
 
             housekeeping_task_id = None
+            remaining_maintenance_tasks = 0
+            resulting_room_state = task["room_state"]
+
             if expected_type == "HOUSEKEEPING":
                 next_status = "IN_INSPECTION"
                 await conn.execute(
-                    '''
-                    UPDATE operational_tasks
-                    SET status='IN_INSPECTION',"updatedAt"=now()
-                    WHERE id=$1
-                    ''',
+                    '''UPDATE operational_tasks SET status='IN_INSPECTION',"updatedAt"=now() WHERE id=$1''',
                     task_id,
                 )
                 if task["roomId"] and task["room_state"] != "TECH_BLOCK":
@@ -121,6 +117,9 @@ async def complete_task_with_report(
                         '''UPDATE rooms SET "operationalState"='IN_INSPECTION',"updatedAt"=now() WHERE id=$1''',
                         task["roomId"],
                     )
+                    resulting_room_state = "IN_INSPECTION"
+                elif task["roomId"]:
+                    resulting_room_state = "TECH_BLOCK"
             else:
                 next_status = "DONE"
                 await conn.execute(
@@ -132,42 +131,68 @@ async def complete_task_with_report(
                     task_id,
                 )
                 if task["roomId"]:
-                    await conn.execute(
-                        '''UPDATE rooms SET "operationalState"='DIRTY',"updatedAt"=now() WHERE id=$1''',
-                        task["roomId"],
-                    )
-                    existing_housekeeping = await conn.fetchval(
-                        '''
-                        SELECT id FROM operational_tasks
-                        WHERE "roomId"=$1 AND type='HOUSEKEEPING'
-                          AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
-                        ORDER BY "createdAt" DESC LIMIT 1
-                        ''',
-                        task["roomId"],
-                    )
-                    if existing_housekeeping:
-                        housekeeping_task_id = existing_housekeeping
-                    else:
-                        housekeeping_task_id = uuid.uuid4()
-                        await conn.execute(
+                    remaining_maintenance_tasks = int(
+                        await conn.fetchval(
                             '''
-                            INSERT INTO operational_tasks (
-                              id,"propertyId","roomId",type,status,priority,title,description,
-                              "createdByType","createdById",source,"createdAt","updatedAt"
-                            ) VALUES ($1,$2,$3,'HOUSEKEEPING','OPEN','HIGH',$4,$5,'SYSTEM',$6,'MAINTENANCE_COMPLETE',now(),now())
+                            SELECT count(*)::int
+                            FROM operational_tasks
+                            WHERE "propertyId"=$1 AND "roomId"=$2 AND type='MAINTENANCE'
+                              AND id<>$3
+                              AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
                             ''',
-                            housekeeping_task_id,
                             pid,
                             task["roomId"],
-                            f"Уборка после ремонта · {task['room_code'] or 'номер'}",
-                            f"Создано после завершения ремонта {task_id}",
-                            str(actor_id),
+                            task_id,
                         )
+                        or 0
+                    )
+
+                    if remaining_maintenance_tasks > 0:
+                        await conn.execute(
+                            '''UPDATE rooms SET "operationalState"='TECH_BLOCK',"updatedAt"=now() WHERE id=$1''',
+                            task["roomId"],
+                        )
+                        resulting_room_state = "TECH_BLOCK"
+                    else:
+                        await conn.execute(
+                            '''UPDATE rooms SET "operationalState"='DIRTY',"updatedAt"=now() WHERE id=$1''',
+                            task["roomId"],
+                        )
+                        resulting_room_state = "DIRTY"
+                        existing_housekeeping = await conn.fetchval(
+                            '''
+                            SELECT id FROM operational_tasks
+                            WHERE "roomId"=$1 AND type='HOUSEKEEPING'
+                              AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+                            ORDER BY "createdAt" DESC LIMIT 1
+                            ''',
+                            task["roomId"],
+                        )
+                        if existing_housekeeping:
+                            housekeeping_task_id = existing_housekeeping
+                        else:
+                            housekeeping_task_id = uuid.uuid4()
+                            await conn.execute(
+                                '''
+                                INSERT INTO operational_tasks (
+                                  id,"propertyId","roomId",type,status,priority,title,description,
+                                  "createdByType","createdById",source,"createdAt","updatedAt"
+                                ) VALUES ($1,$2,$3,'HOUSEKEEPING','OPEN','HIGH',$4,$5,'SYSTEM',$6,'MAINTENANCE_COMPLETE',now(),now())
+                                ''',
+                                housekeeping_task_id,
+                                pid,
+                                task["roomId"],
+                                f"Уборка после ремонта · {task['room_code'] or 'номер'}",
+                                f"Создано после завершения ремонта {task_id}",
+                                str(actor_id),
+                            )
 
             audit_after = {
                 "from_status": "IN_PROGRESS",
                 "status": next_status,
+                "room_state": resulting_room_state,
                 "report": report_json,
+                "remaining_maintenance_tasks": remaining_maintenance_tasks,
                 "housekeeping_task_id": str(housekeeping_task_id) if housekeeping_task_id else None,
             }
             await conn.execute(
@@ -189,7 +214,8 @@ async def complete_task_with_report(
         "task_id": str(task_id),
         "status": next_status,
         "room_code": task["room_code"],
-        "room_state": "IN_INSPECTION" if expected_type == "HOUSEKEEPING" and task["room_state"] != "TECH_BLOCK" else "TECH_BLOCK" if expected_type == "HOUSEKEEPING" else "DIRTY",
+        "room_state": resulting_room_state,
+        "remaining_maintenance_tasks": remaining_maintenance_tasks,
         "housekeeping_task_id": str(housekeeping_task_id) if housekeeping_task_id else None,
         "report_recorded": True,
     }
