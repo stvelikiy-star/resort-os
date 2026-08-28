@@ -12,6 +12,22 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import asyncpg
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
+BACKUP_FORMAT = "three-crowns-postgres-backup-v2"
+CRITICAL_CONSTRAINTS = {
+    "rate_period_valid_dates",
+    "rate_period_nonnegative_price",
+    "reservation_request_valid_dates",
+    "reservation_request_positive_adults",
+    "reservation_request_nonnegative_children",
+    "reservation_valid_dates",
+    "reservation_positive_adults",
+    "reservation_nonnegative_children",
+    "reservation_nonnegative_total",
+    "inventory_block_valid_dates",
+    "no_overlapping_active_room_blocks",
+    "payment_positive_amount",
+    "payment_has_context",
+}
 
 
 def clean_postgres_url(value: str) -> str:
@@ -35,6 +51,36 @@ async def collect_facts(dsn: str) -> dict:
         if not prop:
             raise RuntimeError(f"Property {PROPERTY_CODE} is not loaded")
         pid = prop["id"]
+
+        constraint_rows = await conn.fetch(
+            "SELECT conname FROM pg_constraint WHERE conname = ANY($1::text[]) ORDER BY conname",
+            list(CRITICAL_CONSTRAINTS),
+        )
+        constraints = [row["conname"] for row in constraint_rows]
+        missing_constraints = sorted(CRITICAL_CONSTRAINTS - set(constraints))
+        if missing_constraints:
+            raise RuntimeError("Database is missing critical constraints: " + ", ".join(missing_constraints))
+
+        migration_table = await conn.fetchval("SELECT to_regclass('public._prisma_migrations') IS NOT NULL")
+        migrations = []
+        if migration_table:
+            rows = await conn.fetch(
+                '''
+                SELECT migration_name,checksum,finished_at,rolled_back_at
+                FROM _prisma_migrations
+                WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
+                ORDER BY started_at,migration_name
+                '''
+            )
+            migrations = [
+                {
+                    "migration_name": row["migration_name"],
+                    "checksum": row["checksum"],
+                }
+                for row in rows
+            ]
+
+        server_version = await conn.fetchval("SHOW server_version")
         return {
             "property": {
                 "code": prop["code"],
@@ -51,6 +97,12 @@ async def collect_facts(dsn: str) -> dict:
                 "staff_users": await conn.fetchval('SELECT COUNT(*) FROM staff_users WHERE "propertyId"=$1', pid),
                 "operational_tasks": await conn.fetchval('SELECT COUNT(*) FROM operational_tasks WHERE "propertyId"=$1', pid),
                 "audit_logs": await conn.fetchval('SELECT COUNT(*) FROM audit_logs WHERE "propertyId"=$1', pid),
+            },
+            "database": {
+                "postgres_version": server_version,
+                "critical_constraints": constraints,
+                "migration_history_present": bool(migration_table),
+                "applied_migrations": migrations,
             },
         }
     finally:
@@ -72,6 +124,13 @@ async def main() -> int:
     manifest_file = backup_dir / f"three-crowns-{stamp}.manifest.json"
 
     facts = await collect_facts(dsn)
+    require_migration_history = os.environ.get("REQUIRE_MIGRATION_HISTORY", "true").lower() not in {"0", "false", "no"}
+    if require_migration_history and not facts["database"]["migration_history_present"]:
+        print("Backup rejected: _prisma_migrations is missing", file=sys.stderr)
+        return 1
+    if require_migration_history and not facts["database"]["applied_migrations"]:
+        print("Backup rejected: no successfully applied Prisma migration is recorded", file=sys.stderr)
+        return 1
 
     command = [
         "pg_dump",
@@ -96,7 +155,7 @@ async def main() -> int:
 
     checksum = sha256_file(backup_file)
     manifest = {
-        "format": "three-crowns-postgres-backup-v1",
+        "format": BACKUP_FORMAT,
         "created_at": created_at.isoformat(),
         "property_code": PROPERTY_CODE,
         "backup_file": backup_file.name,
@@ -110,6 +169,8 @@ async def main() -> int:
     print(f"BACKUP_MANIFEST={manifest_file}")
     print(f"BACKUP_SHA256={checksum}")
     print(f"BACKUP_SIZE_BYTES={size_bytes}")
+    print(f"BACKUP_MIGRATIONS={len(facts['database']['applied_migrations'])}")
+    print(f"BACKUP_CRITICAL_CONSTRAINTS={len(facts['database']['critical_constraints'])}")
     return 0
 
 
