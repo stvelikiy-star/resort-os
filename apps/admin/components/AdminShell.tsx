@@ -7,6 +7,7 @@ import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV9";
 import ReceptionBoard from "./ReceptionBoard";
+import ReportsBoard from "./ReportsBoard";
 import RequestsBoard from "./RequestsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
@@ -19,7 +20,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "REPORTS" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -110,6 +111,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
+          {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
           {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
           <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>
           {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
@@ -117,11 +119,12 @@ export default function AdminShell() {
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
-      {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination)} />}
+      {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
+      {tab === "REPORTS" && isManager && <ReportsBoard />}
       {tab === "CONTENT" && isManager && <SiteContentBoard />}
       {tab === "OPS" && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard />}
