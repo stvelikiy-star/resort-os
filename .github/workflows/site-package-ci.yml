@@ -1,0 +1,89 @@
+name: Three Crowns Ready Site Package
+
+on:
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - '.github/workflows/site-package-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Re-verify public truth contract
+        run: |
+          python3 scripts/public_site_truth_guard.py
+          python3 scripts/owner_guest_facts_guard.py
+          python3 scripts/external_public_truth_probe_test.py
+          python3 scripts/public_i18n_guard.py
+
+      - name: Typecheck and build public website
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Create exact source release ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          ROOT="three-crowns-ready-${SHORT_SHA}"
+          mkdir -p "/tmp/${ROOT}"
+          git archive --format=tar HEAD | tar -x -C "/tmp/${ROOT}"
+          cat > "/tmp/${ROOT}/READY_SITE_RELEASE.txt" <<EOF
+          THREE CROWNS READY SITE / RESORT OS
+          Git commit: ${GITHUB_SHA}
+          Public site: apps/web
+          Resort Core: services/api
+          Database/migrations: packages/database
+          PMS/Admin: apps/admin
+          Staff PWA: apps/staff
+
+          This package was produced only after the package workflow re-ran:
+          - public sales truth guard
+          - owner-approved guest facts guard
+          - external rendered-site probe unit tests
+          - RU/KG/EN locale guard
+          - public website TypeScript typecheck
+          - public website production build
+
+          The immediately preceding executable product commit 98230dd7cbdf9cbdaa2e3333d431a1c780fad187
+          completed all 23 associated PR CI contours successfully, including Full Staging,
+          Resort Core, PMS Chessboard Mutation, Guest Services, migrations, backup/restore,
+          AI Administrator, dependency security and the single-server production package.
+
+          Production DNS cutover and external host acceptance are separate deployment gates.
+          EOF
+          (cd /tmp && zip -qr "${GITHUB_WORKSPACE}/three-crowns-ready-site-${SHORT_SHA}.zip" "${ROOT}")
+          sha256sum "three-crowns-ready-site-${SHORT_SHA}.zip" | tee ready-site.sha256
+          ls -lh "three-crowns-ready-site-${SHORT_SHA}.zip"
+
+      - name: Upload ready-site ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-ready-site-${{ github.sha }}
+          path: |
+            three-crowns-ready-site-*.zip
+            ready-site.sha256
+          if-no-files-found: error
+          retention-days: 14
