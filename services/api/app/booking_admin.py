@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .guest_identity import resolve_or_create_guest
 from .payment_idempotency import (
     ensure_same_payment_payload,
     lock_payment_identity,
@@ -361,16 +362,18 @@ async def confirm_payment_and_reserve(
             if not chosen:
                 raise HTTPException(status_code=409, detail="Availability changed; no room remains")
 
-            guest_id = uuid.uuid4()
+            identity = await resolve_or_create_guest(
+                conn,
+                property_id=pid,
+                guest_name=rr["guestName"],
+                phone=rr["phone"],
+                email=rr["email"],
+            )
+            guest_id = identity["guest_id"]
             reservation_id = uuid.uuid4()
             payment_id = uuid.uuid4()
             booking_number = f"TC-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
 
-            await conn.execute(
-                '''INSERT INTO guests (id,"propertyId","firstName",phone,email,"createdAt","updatedAt")
-                   VALUES ($1,$2,$3,$4,$5,now(),now())''',
-                guest_id,pid,rr["guestName"],rr["phone"],rr["email"],
-            )
             await conn.execute(
                 '''
                 INSERT INTO reservations (id,"propertyId","requestId","bookingNumber","primaryGuestId",
@@ -405,9 +408,11 @@ async def confirm_payment_and_reserve(
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                 VALUES ($1,$2,'STAFF',$3,'MANAGER_CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
                   jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text,
-                    'manager_confirmed_payment_kgs',$8::integer,'payment_provider',$9::text),now())
+                    'manager_confirmed_payment_kgs',$8::integer,'payment_provider',$9::text,
+                    'guest_id',$10::text,'guest_identity_created',$11::boolean,'guest_identity_match',$12::text),now())
                 ''',
-                uuid.uuid4(),pid,user["id"],str(reservation_id),booking_number,chosen["code"],str(payment_id),payload.amount_kgs,MANUAL_PAYMENT_PROVIDER,
+                uuid.uuid4(),pid,user["id"],str(reservation_id),booking_number,chosen["code"],str(payment_id),
+                payload.amount_kgs,MANUAL_PAYMENT_PROVIDER,str(guest_id),identity["created"],identity["matched_by"],
             )
 
     return {
@@ -419,6 +424,9 @@ async def confirm_payment_and_reserve(
         "payment_id": str(payment_id),
         "manager_confirmed_payment_kgs": payload.amount_kgs,
         "payment_collection": "MANAGER_MANUAL",
+        "guest_id": str(guest_id),
+        "guest_identity_created": identity["created"],
+        "guest_identity_match": identity["matched_by"],
     }
 
 
