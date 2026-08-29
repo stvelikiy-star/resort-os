@@ -83,7 +83,7 @@ async def prove_database_state(today: date):
         assert room_count == 84
         migrations = await conn.fetch("SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY started_at")
         names = [row["migration_name"] for row in migrations]
-        assert names == ["0_init", "1_site_content", "2_guest_service_tasks", "3_owner_analytics_snapshots"]
+        assert names == ["0_init", "1_site_content", "2_guest_service_tasks", "3_owner_analytics_snapshots", "4_guest_engagements"]
         snapshots = await conn.fetch(
             'SELECT "snapshotDate","horizonDays",jsonb_typeof("payloadJson") AS payload_type FROM owner_analytics_snapshots WHERE "propertyId"=$1 ORDER BY "snapshotDate"',
             pid,
