@@ -2,170 +2,120 @@
 
 Version: 2.4
 Date: 2026-08-29
-Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL DOCKER STAGING VERIFIED / SINGLE-SERVER PRODUCTION PACKAGE VERIFIED IN CI / EXTERNAL HOST NOT VERIFIED / NOT PRODUCTION READY
+Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / PRODUCTION PACKAGE VERIFIED IN CI / EXTERNAL HOST NOT VERIFIED / NOT PRODUCTION READY
 Canonical: YES
-Document Type: Evidence-Based Current System State
 Authority: factual implementation reality only
 
-Critical rule: **TARGET != CURRENT. IMPLEMENTED != VERIFIED. CI-LOCAL STAGING VERIFIED != EXTERNAL STAGING VERIFIED != PRODUCTION VERIFIED.**
+**TARGET != CURRENT. IMPLEMENTED != VERIFIED. CI-LOCAL VERIFIED != EXTERNAL VERIFIED != PRODUCTION VERIFIED.**
 
-## 1. Audited executable baseline
+## Audited executable boundary
 
-Repository: `stvelikiy-star/resort-os`
-Branch: `integration/site-pms-cms-20260827`
-PR: `#37`
+Repository `stvelikiy-star/resort-os`, branch `integration/site-pms-cms-20260827`, PR #37.
 
 LAST AUDITED EXECUTABLE HEAD: `eb30433f0dd3bd44fd80cb44a150e53e0e44a816`
 LAST AUDITED: 2026-08-29
 
-All **25** PR-triggered workflow contours associated with that exact executable head completed `success`:
+Exactly **25/25 PR workflow contours** associated with that executable head completed `success`, including Resort Core, Full Staging, Single Server Package, Dependency Security, Migration Baseline, Backup/Restore, PMS Mutation, Realtime, Payments, Guest Services, Owner Intelligence, Owner Control V2, Operations, Inbox, n8n, AI and Public Truth.
 
-- n8n Workflow JSON CI — `33243634671`
-- Dependency Security Inspection — `33243634667`
-- NFC Deferred Scope CI — `33243634678`
-- Public Site Truth CI — `33243634710`
-- Data Intake Integrity CI — `33243634724`
-- AI Administrator CI — `33243634684`
-- Production Migration Baseline CI — `33243634644`
-- PostgreSQL Backup Restore CI — `33243634730`
-- Staff Voice CI — `33243634662`
-- Payment Idempotency CI — `33243634700`
-- AI Sales Draft CI — `33243634636`
-- PMS Chessboard Mutation CI — `33243634705`
-- n8n Resort Core Contract CI — `33243634694`
-- Realtime PMS CI — `33243634714`
-- Automation Contract CI — `33243634740`
-- Guest Services PMS CI — `33243634701`
-- Control Center Monorepo Contract CI — `33243634688`
-- Hotel Operations CI — `33243634721`
-- Unified Inbox CI — `33243634654`
-- Telegram Sales CI — `33243634603`
-- Owner Intelligence CI — `33243634715`
-- Owner Control V2 CI — `33243634765`
-- Resort Core CI — `33243634661`
-- Three Crowns Full Staging Gate — `33243634787`
-- Single Server Production Package CI — `33243634632`
+Key runs:
+- Owner Control V2 CI `33243634765` / job `99077163420`
+- Owner Intelligence CI `33243634715`
+- Production Migration Baseline CI `33243634644`
+- PostgreSQL Backup Restore CI `33243634730`
+- Resort Core CI `33243634661`
+- Full Staging Gate `33243634787`
+- Single Server Package CI `33243634632`
 
-Documentation-only commits after this executable head do not broaden verification.
+Documentation-only commits after the audited head do not broaden executable verification.
 
-## 2. Active authority
+## Current source of truth
 
-`PUBLIC SITE / PMS ADMIN / STAFF PWA / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
+`PUBLIC SITE / PMS / STAFF / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
-Sheets, n8n, AI, reports and management snapshots are not parallel operational truth.
+ReservationRequest remains distinct from Reservation; manager/human confirmation is mandatory. AI/n8n cannot confirm payment or guarantee Reservation. Sheets, n8n, reports, Owner Intelligence and Owner Control do not replace Core/PostgreSQL authority. NFC remains deferred.
 
-`ReservationRequest -> manager/human confirmation -> Reservation` remains mandatory. No automatic global prepayment percentage is authoritative. AI/n8n cannot guarantee Reservation or confirm payment. NFC remains deferred.
+## Database
 
-## 3. Database
+Verified migration chain:
+`0_init -> 1_site_content -> 2_guest_service_tasks -> 3_owner_analytics_snapshots`.
 
-STATUS: **VERIFIED IN CLEAN CI + BACKUP/RESTORE + CI-LOCAL STAGING.**
+Clean migrate deploy, 84/12 development seed, critical inventory/payment constraints and migration-aware backup -> clean restore are verified.
 
-Committed migrations: `0_init`, `1_site_content`, `2_guest_service_tasks`, `3_owner_analytics_snapshots`.
+`owner_analytics_snapshots` is derived management history only: one property/date row, 1..367 day horizon check, object JSON payload, FK and unique protection.
 
-Clean `prisma migrate deploy` succeeds; ledger is exactly those four migrations; development seed is 84 rooms / 12 categories; critical room/date/payment constraints remain present; backup -> clean restore is verified.
+## PMS / Guest Services
 
-`owner_analytics_snapshots` is derived management evidence only: one property/date row, horizon 1..367, object JSON payload, FK and uniqueness protections.
+PMS V9 is canonical and CI-verified with realtime, server preview/commit, move/resize/Split Stay, conflict/stale protection, TECH_BLOCK protection, CLEAN check-in gate and audit/history.
 
-## 4. PMS / Guest Services
+Guest Services remain Reservation-linked OperationalTasks. Service creation has no automatic accommodation-total or Payment mutation.
 
-STATUS: **IMPLEMENTED + CI-VERIFIED.**
+## Owner Intelligence
 
-PMS V9 remains canonical with realtime, server preview->commit, move/resize/Split Stay, conflict/stale protection, TECH_BLOCK protection, CLEAN check-in gate and audit/history.
+Verified capabilities:
+- fail-closed repeat Guest identity resolution;
+- Guest directory and reservation/room/payment/service/conversation history;
+- 84-room daily heatmap;
+- period comparisons;
+- CSV / browser print;
+- real XLSX export with `Итоги`, `Занятость по номерам`, `Брони`, `Гости`, `Платежи`.
 
-Guest Services remain Reservation-linked `OperationalTask(type=GUEST_REQUEST)`. Service creation does not automatically change Reservation total or create Payment.
+Management figures are not statutory accounting.
 
-## 5. Owner Intelligence
+## Owner Control V2
 
-STATUS: **IMPLEMENTED + CI-VERIFIED.**
+Verified capabilities:
+- 7/30-day forward on-books occupancy;
+- booked/available rooms by day;
+- management allocated booked value;
+- arrivals/departures;
+- factual repeat-Guest segments;
+- Action Center: not-ready arrivals, unassigned 72h, debt 72h, urgent tasks, messages needing reply, Guest duplicates;
+- one hotel-local-date snapshot with AuditLog;
+- OWNER/MANAGER and service-auth capture;
+- real net booking pickup from stored prior snapshots;
+- `INSUFFICIENT_HISTORY` / `INSUFFICIENT_COVERAGE` fail-closed states;
+- no fabricated past and no statistical forecast claim.
 
-Includes fail-closed repeat-Guest identity resolution, Guest directory/history, room/payment/service/conversation drilldown, 84-room heatmap, period comparisons, CSV/print and actual XLSX (`Итоги`, `Занятость по номерам`, `Брони`, `Гости`, `Платежи`). Management metrics are not statutory accounting.
+Daily n8n snapshot template: 03:10 Asia/Bishkek, 180-day horizon, Core service-auth only, no direct DB write. Repository template remains inactive; live scheduler execution is NOT VERIFIED.
 
-## 6. Owner Control V2
+## Public / channels / AI / staff
 
-STATUS: **IMPLEMENTED + CI-VERIFIED.**
+Public truth guards remain green. Operations/Staff, Inbox, Telegram, AI Sales Draft, AI Administrator and n8n contracts remain green on the audited head. Real devices and live external providers remain NOT VERIFIED.
 
-Forward management includes 7/30-day on-books occupancy, booked/available rooms by day, management allocated value, arrivals/departures, repeat-Guest factual segments and Action Center: `ARRIVAL_NOT_READY_TODAY`, `UNASSIGNED_72H`, `DEBT_72H`, `URGENT_TASKS`, `MESSAGES_NEED_REPLY`, `GUEST_DUPLICATES`.
+Approved channels remain Instagram -> ManyChat -> n8n; WhatsApp -> API Green -> n8n; website -> Core; Sheets mirror/control only.
 
-Daily snapshot: one Core-derived row per hotel-local date; same-date recapture updates the date; manual OWNER/MANAGER and service-auth automation routes; AuditLog evidence.
+## Current gaps
 
-Pickup states: `INSUFFICIENT_HISTORY`, `INSUFFICIENT_COVERAGE`, `READY`. READY computes net room-night, occupancy-point and management booked-value pickup. No past history is invented and no statistical demand forecast is claimed.
+- distinct persisted Stay not implemented;
+- generic multi-property tenancy not implemented;
+- complete Folio/Charge accounting not implemented;
+- statistical forecast deferred until enough clean historical data and measurable accuracy;
+- NFC deferred;
+- physical production 84-room register not owner-confirmed.
 
-Repository n8n template is configured for `03:10` Asia/Bishkek, 180-day horizon, Core service-auth and no DB write; it remains `active:false`, so live deployed scheduling is NOT VERIFIED.
+## Deployment state
 
-Dedicated evidence: Owner Control V2 CI `33243634765`, job `99077163420`, success.
+- CI-local staging: VERIFIED (`33243634787`).
+- Single-server package: VERIFIED IN CI (`33243634632`).
+- Beget direction: approved; actual host capability NOT VERIFIED.
+- Rollback backup: BLOCKED / NOT VERIFIED.
+- External HTTPS/WSS staging: BLOCKED / NOT VERIFIED.
+- Live providers/devices: BLOCKED / NOT VERIFIED.
+- Production cutover: NOT PRODUCTION READY / NOT EXECUTED.
 
-## 7. Management surfaces
+## P0 release path
 
-STATUS: **IMPLEMENTED + CI-VERIFIED / NOT EXTERNALLY PRODUCTION-VERIFIED.**
+Beget access/preflight -> verified rollback backup -> isolated external staging -> activate/observe daily snapshots -> external public-truth/browser/device/provider acceptance -> fresh cutover evidence.
 
-1. Command Center — current operations.
-2. Reports / Owner Intelligence — historical/period analysis.
-3. Owner Control V2 — forward on-books + snapshot pickup.
+## Non-blocked P1 work
 
-No surface replaces Resort Core truth.
-
-## 8. Auth / staff / channels / AI
-
-Repository RBAC/session/audit, Operations/Staff, Inbox, Telegram, n8n contracts, AI Sales Draft and AI Administrator contours are green. Real provider delivery and real-device acceptance remain NOT VERIFIED.
-
-Approved channel boundary: Instagram -> ManyChat -> n8n; WhatsApp -> API Green -> n8n; website -> Core; Sheets mirror/control only.
-
-## 9. Public site
-
-STATUS: **CI + CI-LOCAL STAGING VERIFIED / EXTERNAL LIVE ACCEPTANCE OPEN.**
-
-Owner-approved facts and request/payment boundaries remain guarded; rejected gym/sports-ground and stale fixed-prepayment/acquiring claims remain excluded. Live legacy `3korony.com` is not the verified new Resort OS deployment.
-
-## 10. Known gaps
-
-- distinct persisted Stay: not implemented;
-- generic multi-property tenancy: not implemented;
-- complete Folio/Charge accounting: not implemented;
-- statistical demand forecasting: intentionally deferred until sufficient clean history and measurable accuracy;
-- NFC: deferred.
-
-## 11. Physical inventory
-
-STATUS: **DEVELOPMENT 84/12 VERIFIED / PRODUCTION PHYSICAL REGISTER NOT OWNER-CONFIRMED.**
-
-Development data must not silently become physical production truth.
-
-## 12. Deployment
-
-- CI-local staging: **VERIFIED** — `33243634787`.
-- Single-server package: **VERIFIED IN CI** — `33243634632`.
-- Beget direction: **APPROVED / ACTUAL HOST CAPABILITY NOT VERIFIED**.
-- Daily snapshot n8n template: **CONFIGURED + CI-VERIFIED / LIVE ACTIVATION NOT VERIFIED**.
-- Legacy rollback backup: **BLOCKED / NOT VERIFIED**.
-- External HTTPS/WSS staging: **BLOCKED / NOT VERIFIED**.
-- Live providers/devices: **BLOCKED / NOT VERIFIED**.
-- Production cutover: **NOT PRODUCTION READY / NOT EXECUTED**.
-
-## 13. P0 release blockers
-
-1. Beget access + host preflight.
-2. Verified rollback backup.
-3. Isolated external HTTPS/WSS staging.
-4. External public-truth probe.
-5. Owner-confirmed physical room register.
-6. Real device/browser acceptance.
-7. Launch provider acceptance.
-8. Fresh backup/restore/preflight/secrets/DNS/rollback evidence before cutover.
-
-## 14. Non-blocked P1
-
-- controlled post-stay feedback/NPS/review flow;
-- controlled repeat-Guest follow-up/reactivation queue;
+Continue without weakening P0 boundaries:
+- controlled post-stay feedback/NPS/review;
+- controlled repeat-Guest follow-up/reactivation;
 - safe historical Guest duplicate resolution if required;
 - monitoring/restore templates;
-- marketing attribution/control.
+- attribution/control.
 
-## 15. Extend, do not rewrite
+## Extension rule
 
-Preserve Resort Core authority, PostgreSQL inventory constraints, human Reservation confirmation, fail-closed Guest identity, PMS V9 preview/commit, Owner Intelligence, Owner Control derived snapshots/pickup, Reservation-linked Guest Services, Payment idempotency, AuditLog, RBAC, OperationalTask, n8n without DB authority, public Core booking flow and dormant NFC isolation.
-
-## 16. Next release task
-
-P0: **Beget preflight -> rollback backup -> isolated external staging -> activate/observe daily snapshots -> external truth/browser/device/provider acceptance.**
-
-In parallel, non-blocked product work may continue with controlled post-stay feedback and repeat-Guest follow-up without automatic outbound authority.
+Extend rather than rewrite Resort Core authority, PostgreSQL inventory constraints, human Reservation confirmation, fail-closed Guest identity, PMS V9 preview/commit, Owner Intelligence, Owner Control derived history, Guest Services, Payment idempotency, AuditLog, RBAC, OperationalTask and n8n-without-DB-authority.
