@@ -72,8 +72,11 @@ function fromIso(value: string) {
 function monthRanges(localDate: string) {
   const now = fromIso(localDate);
   const currentFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+  const elapsedIndex = now.getDate() - 1;
   const previousFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const previousTo = new Date(now.getFullYear(), now.getMonth(), 0);
+  const previousMonthLast = new Date(now.getFullYear(), now.getMonth(), 0);
+  const previousTo = new Date(previousFrom);
+  previousTo.setDate(previousTo.getDate() + Math.min(elapsedIndex, previousMonthLast.getDate() - 1));
   return {
     current: { from: iso(currentFrom), to: localDate },
     previous: { from: iso(previousFrom), to: iso(previousTo) },
@@ -155,6 +158,7 @@ export default function OwnerExecutivePack() {
 
   const forward = brief.forward.next_30_days;
   const pickupReady = pickup?.status === "READY" && pickup.summary;
+  const comparisonLabel = `${current.range.days} дн. MTD vs ${previous.range.days} дн. прошлого месяца`;
 
   return (
     <section className="owner-executive">
@@ -162,7 +166,7 @@ export default function OwnerExecutivePack() {
         <div>
           <p className="eyebrow">OWNER EXECUTIVE PACK · RESORT CORE</p>
           <h2>Сводка собственника</h2>
-          <p>{brief.property.local_date} · текущий месяц + следующие 30 дней · только факты Resort Core</p>
+          <p>{brief.property.local_date} · {comparisonLabel} · следующие 30 дней</p>
         </div>
         <div className="owner-executive-actions"><button className="btn" onClick={() => window.print()}>Печать / PDF</button><button className="btn" onClick={load}>Обновить</button></div>
       </div>
@@ -170,11 +174,11 @@ export default function OwnerExecutivePack() {
       {error && <div className="error-box">{error}</div>}
 
       <div className="owner-executive-grid">
-        <article><span>Загрузка · месяц</span><strong>{pct(current.kpi.occupancy_percent)}</strong><small>{delta(current.kpi.occupancy_percent, previous.kpi.occupancy_percent, "pct")} к прошлому месяцу</small></article>
-        <article><span>ADR · месяц</span><strong>{money(current.kpi.adr_kgs)}</strong><small>{delta(current.kpi.adr_kgs, previous.kpi.adr_kgs, "money")} к прошлому</small></article>
-        <article><span>RevPAR · месяц</span><strong>{money(current.kpi.revpar_kgs)}</strong><small>{delta(current.kpi.revpar_kgs, previous.kpi.revpar_kgs, "money")} к прошлому</small></article>
-        <article><span>Получено оплат · месяц</span><strong>{money(current.kpi.received_payments_kgs)}</strong><small>{delta(current.kpi.received_payments_kgs, previous.kpi.received_payments_kgs, "money")}</small></article>
-        <article><span>CRM-конверсия</span><strong>{pct(current.crm.conversion_percent)}</strong><small>{current.crm.converted} из {current.crm.leads} лидов</small></article>
+        <article><span>Загрузка · MTD</span><strong>{pct(current.kpi.occupancy_percent)}</strong><small>{delta(current.kpi.occupancy_percent, previous.kpi.occupancy_percent, "pct")} · равные календарные дни</small></article>
+        <article><span>ADR · MTD</span><strong>{money(current.kpi.adr_kgs)}</strong><small>{delta(current.kpi.adr_kgs, previous.kpi.adr_kgs, "money")} · равные дни</small></article>
+        <article><span>RevPAR · MTD</span><strong>{money(current.kpi.revpar_kgs)}</strong><small>{delta(current.kpi.revpar_kgs, previous.kpi.revpar_kgs, "money")} · равные дни</small></article>
+        <article><span>Получено оплат · MTD</span><strong>{money(current.kpi.received_payments_kgs)}</strong><small>{delta(current.kpi.received_payments_kgs, previous.kpi.received_payments_kgs, "money")} · равные дни</small></article>
+        <article><span>CRM-конверсия · MTD</span><strong>{pct(current.crm.conversion_percent)}</strong><small>{current.crm.converted} из {current.crm.leads} лидов · Δ {delta(current.crm.conversion_percent, previous.crm.conversion_percent, "pct")}</small></article>
         <article className={current.kpi.active_outstanding_kgs > 0 ? "executive-attention" : ""}><span>Дебиторка сейчас</span><strong>{money(current.kpi.active_outstanding_kgs)}</strong><small>{current.kpi.active_debtor_count || 0} активных броней</small></article>
         <article><span>Загрузка · 30 дней вперёд</span><strong>{pct(forward.occupancy_on_books_percent)}</strong><small>{forward.booked_room_nights} / {forward.available_room_nights} номеро-ночей</small></article>
         <article><span>Стоимость on-books · 30 дней</span><strong>{money(forward.allocated_booked_value_kgs)}</strong><small>{forward.arrivals} заездов · {forward.departures} выездов</small></article>
@@ -193,7 +197,8 @@ export default function OwnerExecutivePack() {
         <article className="owner-executive-truth">
           <p className="eyebrow">TRUTH BOUNDARY</p>
           <h3>Что означают цифры</h3>
-          <p>Месячные ADR/RevPAR/стоимость броней — управленческие метрики Resort Core, не бухгалтерская выручка.</p>
+          <p>MTD сравнивается с таким же количеством календарных дней прошлого месяца, а не с полным прошлым месяцем.</p>
+          <p>ADR/RevPAR/стоимость броней — управленческие метрики Resort Core, не бухгалтерская выручка.</p>
           <p>30 дней вперёд — текущие on-books брони и доступность, не статистический прогноз спроса.</p>
           <p>Pickup показывается только при наличии сохранённого исторического snapshot; иначе остаётся «—».</p>
           <p>NPS считается только по фактически записанным оценкам и всегда показывает размер выборки.</p>
