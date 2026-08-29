@@ -159,6 +159,7 @@ export default function OwnerExecutivePack() {
   const forward = brief.forward.next_30_days;
   const pickupReady = pickup?.status === "READY" && pickup.summary;
   const comparisonLabel = `${current.range.days} дн. MTD vs ${previous.range.days} дн. прошлого месяца`;
+  const comparisonNote = current.range.days === previous.range.days ? "равное число дней" : "до конца прошлого месяца";
 
   return (
     <section className="owner-executive">
@@ -174,10 +175,10 @@ export default function OwnerExecutivePack() {
       {error && <div className="error-box">{error}</div>}
 
       <div className="owner-executive-grid">
-        <article><span>Загрузка · MTD</span><strong>{pct(current.kpi.occupancy_percent)}</strong><small>{delta(current.kpi.occupancy_percent, previous.kpi.occupancy_percent, "pct")} · равные календарные дни</small></article>
-        <article><span>ADR · MTD</span><strong>{money(current.kpi.adr_kgs)}</strong><small>{delta(current.kpi.adr_kgs, previous.kpi.adr_kgs, "money")} · равные дни</small></article>
-        <article><span>RevPAR · MTD</span><strong>{money(current.kpi.revpar_kgs)}</strong><small>{delta(current.kpi.revpar_kgs, previous.kpi.revpar_kgs, "money")} · равные дни</small></article>
-        <article><span>Получено оплат · MTD</span><strong>{money(current.kpi.received_payments_kgs)}</strong><small>{delta(current.kpi.received_payments_kgs, previous.kpi.received_payments_kgs, "money")} · равные дни</small></article>
+        <article><span>Загрузка · MTD</span><strong>{pct(current.kpi.occupancy_percent)}</strong><small>{delta(current.kpi.occupancy_percent, previous.kpi.occupancy_percent, "pct")} · {comparisonNote}</small></article>
+        <article><span>ADR · MTD</span><strong>{money(current.kpi.adr_kgs)}</strong><small>{delta(current.kpi.adr_kgs, previous.kpi.adr_kgs, "money")} · {comparisonNote}</small></article>
+        <article><span>RevPAR · MTD</span><strong>{money(current.kpi.revpar_kgs)}</strong><small>{delta(current.kpi.revpar_kgs, previous.kpi.revpar_kgs, "money")} · {comparisonNote}</small></article>
+        <article><span>Получено оплат · MTD</span><strong>{money(current.kpi.received_payments_kgs)}</strong><small>{delta(current.kpi.received_payments_kgs, previous.kpi.received_payments_kgs, "money")} · {comparisonNote}</small></article>
         <article><span>CRM-конверсия · MTD</span><strong>{pct(current.crm.conversion_percent)}</strong><small>{current.crm.converted} из {current.crm.leads} лидов · Δ {delta(current.crm.conversion_percent, previous.crm.conversion_percent, "pct")}</small></article>
         <article className={current.kpi.active_outstanding_kgs > 0 ? "executive-attention" : ""}><span>Дебиторка сейчас</span><strong>{money(current.kpi.active_outstanding_kgs)}</strong><small>{current.kpi.active_debtor_count || 0} активных броней</small></article>
         <article><span>Загрузка · 30 дней вперёд</span><strong>{pct(forward.occupancy_on_books_percent)}</strong><small>{forward.booked_room_nights} / {forward.available_room_nights} номеро-ночей</small></article>
@@ -197,7 +198,7 @@ export default function OwnerExecutivePack() {
         <article className="owner-executive-truth">
           <p className="eyebrow">TRUTH BOUNDARY</p>
           <h3>Что означают цифры</h3>
-          <p>MTD сравнивается с таким же количеством календарных дней прошлого месяца, а не с полным прошлым месяцем.</p>
+          <p>MTD сравнивается с сопоставимым началом прошлого месяца; если прошлый месяц короче, сравнение ограничено его последним днём.</p>
           <p>ADR/RevPAR/стоимость броней — управленческие метрики Resort Core, не бухгалтерская выручка.</p>
           <p>30 дней вперёд — текущие on-books брони и доступность, не статистический прогноз спроса.</p>
           <p>Pickup показывается только при наличии сохранённого исторического snapshot; иначе остаётся «—».</p>
