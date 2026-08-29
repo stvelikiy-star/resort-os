@@ -153,6 +153,7 @@ model Property {
   nfcWallets            NfcWallet[]
   nfcBracelets          NfcBracelet[]
   nfcTransactions       NfcTransaction[]
+  analyticsSnapshots    OwnerAnalyticsSnapshot[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
@@ -464,28 +465,28 @@ model CommunicationChannel {
 }
 
 model Conversation {
-  id                     String             @id @default(uuid()) @db.Uuid
-  propertyId             String             @db.Uuid
-  property               Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  channelId              String             @db.Uuid
+  id                     String              @id @default(uuid()) @db.Uuid
+  propertyId             String              @db.Uuid
+  property               Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  channelId              String              @db.Uuid
   channel                CommunicationChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
   externalConversationId String?
   externalContactId      String?
   contactName            String?
   contactPhone           String?
   contactUsername        String?
-  status                 ConversationStatus @default(OPEN)
-  assignedToId           String?            @db.Uuid
-  assignedTo             StaffUser?         @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  reservationRequestId   String?            @db.Uuid
+  status                 ConversationStatus  @default(OPEN)
+  assignedToId           String?             @db.Uuid
+  assignedTo             StaffUser?          @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  reservationRequestId   String?             @db.Uuid
   reservationRequest     ReservationRequest? @relation(fields: [reservationRequestId], references: [id], onDelete: SetNull)
   lastInboundAt          DateTime?
   lastOutboundAt         DateTime?
   firstResponseAt        DateTime?
   resolvedAt             DateTime?
   messages               ConversationMessage[]
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   @@unique([channelId, externalConversationId])
   @@index([propertyId, status, updatedAt])
@@ -616,4 +617,19 @@ model AuditLog {
 
   @@index([propertyId, createdAt])
   @@map("audit_logs")
+}
+
+model OwnerAnalyticsSnapshot {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @db.Uuid
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  snapshotDate DateTime @db.Date
+  horizonDays  Int
+  payloadJson  Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([propertyId, snapshotDate])
+  @@index([propertyId, snapshotDate])
+  @@map("owner_analytics_snapshots")
 }
