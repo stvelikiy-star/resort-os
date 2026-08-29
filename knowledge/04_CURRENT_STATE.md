@@ -215,23 +215,7 @@ Primary daily composition:
 - `PMSUniversalBoard`;
 - shared `PMSControlSnapshotProviderV9`.
 
-Current implemented chessboard capabilities include:
-- search by guest/phone/booking/room/category/building context;
-- room type/building/floor/room-state/reservation-state filters;
-- finance/debt, occupancy and block-type filters;
-- quick views: arrivals, departures, in-house, free, debt, attention;
-- grouping by building/floor/category;
-- compact/comfortable density;
-- 7/14/21/31-day windows;
-- HTTP polling + PMS WebSocket realtime;
-- allowed whole-booking drag/move;
-- segment move;
-- Split Stay / scissors interaction;
-- server preview before commit;
-- TECH_BLOCK destination protection;
-- checked-in history protection;
-- unassigned guaranteed-reservation placement;
-- fail-closed finance filters when the finance read model is unavailable/incomplete.
+Current implemented chessboard capabilities include search, room/category/building/floor/state filters, finance/debt filters, arrivals/departures/in-house/free/debt/attention quick views, grouping, density, 7/14/21/31-day windows, HTTP polling + WebSocket, whole/segment move, Split Stay, server preview/commit, TECH_BLOCK protection, checked-in history protection and unassigned guaranteed placement.
 
 This is the canonical operational chessboard. Review/demo packaging must not become a second scheduling source of truth.
 
@@ -245,20 +229,13 @@ Current flow:
 
 `Reservation -> OperationalTask(type=GUEST_REQUEST) -> service context -> operational status`.
 
-Controlled hotel service codes:
-- `TRANSFER`;
-- `MEALS`;
-- `PARKING`;
-- `SAUNA`;
-- `BILLIARDS`;
-- `EXCURSIONS`.
+Controlled hotel service codes: `TRANSFER`, `MEALS`, `PARKING`, `SAUNA`, `BILLIARDS`, `EXCURSIONS`.
 
-The admin API `/api/v1/admin/guest-services` is OWNER/MANAGER scoped, property isolated, reservation linked, validates active `GUARANTEED`/`CHECKED_IN` reservations and rejects duplicate active same reservation/service/date/time.
+The admin API is OWNER/MANAGER scoped, property isolated, reservation linked and rejects duplicate active same reservation/service/date/time.
 
 Creating a guest service does **not** automatically modify `Reservation.totalKgs` or create a `Payment`.
 
-Dedicated evidence:
-- Guest Services PMS CI `33243634701` — `success`.
+Dedicated evidence: Guest Services PMS CI `33243634701` — `success`.
 
 ---
 
@@ -266,60 +243,21 @@ Dedicated evidence:
 
 STATUS: **IMPLEMENTED AND CI-VERIFIED ON AUDITED EXECUTABLE HEAD.**
 
-Current owner-management contour extends the existing Reports/Analytics and canonical Guest/Reservation data rather than creating a second CRM database.
+Current owner-management contour extends canonical Guest/Reservation data rather than creating a second CRM database.
 
-### Guest identity
+Manager confirmation resolves repeat Guests by normalized property-scoped phone/email and fails closed on identity conflict/ambiguity. Historical duplicate candidates are surfaced; automatic merge is disabled.
 
-Manager confirmation resolves an existing Guest by normalized property-scoped phone/email before creating a new profile.
+OWNER/MANAGER surfaces provide guest directory/search, reservation/completed-stay counts, accumulated nights, booked value/RECEIVED payment totals, last/next stay, source, complete reservation history, Split Stay room segments, payments, Guest Services, linked conversation/channel history and property isolation.
 
-Verified fail-closed behavior:
-- the same repeat guest with equivalent differently formatted phone/email reuses one Guest profile;
-- if phone and email identify different existing profiles, confirmation returns `GUEST_IDENTITY_CONFLICT` and Reservation/Payment are not created;
-- if multiple existing profiles already share the same phone or email, confirmation returns `GUEST_IDENTITY_AMBIGUOUS` instead of choosing a profile silently;
-- duplicate candidates are surfaced for manual review; automatic historical merge is disabled.
+`/api/v1/admin/intelligence/occupancy-matrix` provides a room-by-day management heatmap for up to 93 days.
 
-Phone/email are identity evidence, not permission for uncontrolled probabilistic merging.
+`/api/v1/admin/intelligence/export.xlsx` creates a real XLSX with `Итоги`, `Занятость по номерам`, `Брони`, `Гости`, `Платежи`.
 
-### Owner guest database and history
+Reports also retains CSV, browser print/PDF and previous-period comparisons.
 
-OWNER/MANAGER API under `/api/v1/admin/intelligence` provides:
-- guest directory/search;
-- reservation count and completed-stay count;
-- accumulated room nights;
-- stored booked value and RECEIVED payment totals;
-- last and next stay dates;
-- latest recorded source;
-- complete reservation history;
-- segmented room history / Split Stay schedule;
-- stored payments;
-- structured Guest Services;
-- linked conversation/channel history;
-- property isolation.
+Dedicated workflow: Owner Intelligence CI `33243634715` — `success`.
 
-Admin UI includes `Гости / История` with lifetime management metrics, room segments, payments, services, conversations and duplicate-candidate warnings.
-
-### Occupancy matrix
-
-`/api/v1/admin/intelligence/occupancy-matrix` provides a room-by-day management heatmap for periods up to 93 days, including all room rows, Reservation segments, maintenance/manual blocks and guest/booking context.
-
-### Management exports
-
-`/api/v1/admin/intelligence/export.xlsx` creates an actual XLSX workbook for selected periods up to 367 days.
-
-Verified sheets:
-- `Итоги`;
-- `Занятость по номерам`;
-- `Брони`;
-- `Гости`;
-- `Платежи`.
-
-Reports also retains CSV exports, browser print/PDF and previous equal-period comparisons for occupancy, ADR, RevPAR, received payments, booked room nights and CRM conversion.
-
-Dedicated workflow: `Owner Intelligence CI`.
-Run: `33243634715`.
-Conclusion: `success`.
-
-These are management/operational analytics. They are **not statutory accounting or tax reporting**.
+These are management/operational analytics, not statutory accounting.
 
 ---
 
@@ -331,85 +269,38 @@ Owner Control V2 extends Command Center with a factual forward-management layer.
 
 ### Forward on-books view
 
-`/api/v1/admin/intelligence/owner-brief` and the Dashboard UI provide:
-- 7-day forward on-books occupancy;
-- 30-day forward on-books occupancy;
-- daily booked/available rooms;
-- management allocated booked value;
-- daily arrivals and departures;
-- action/risk center;
-- repeat-guest factual segments.
+`/api/v1/admin/intelligence/owner-brief` and the Dashboard UI provide 7/30-day forward on-books occupancy, daily booked/available rooms, management allocated booked value, arrivals/departures, an action/risk center and factual repeat-guest segments.
 
-Current Action Center signals:
-- `ARRIVAL_NOT_READY_TODAY`;
-- `UNASSIGNED_72H`;
-- `DEBT_72H`;
-- `URGENT_TASKS`;
-- `MESSAGES_NEED_REPLY`;
-- `GUEST_DUPLICATES`.
-
-The 72-hour lists expose the supporting Reservations rather than only a synthetic risk score.
+Current Action Center signals: `ARRIVAL_NOT_READY_TODAY`, `UNASSIGNED_72H`, `DEBT_72H`, `URGENT_TASKS`, `MESSAGES_NEED_REPLY`, `GUEST_DUPLICATES`.
 
 ### Daily snapshots
 
 `owner_analytics_snapshots` stores one Core-derived management snapshot row per hotel-local date. Re-capturing on the same date updates that date's snapshot rather than fabricating additional intraday history.
 
-Admin route:
-- `POST /api/v1/admin/intelligence/snapshots/capture` — OWNER/MANAGER only.
-
-Automation route:
-- `POST /api/v1/automation/intelligence/snapshots/capture` — protected by `X-Resort-Service-Key`.
-
-Snapshot capture writes AuditLog evidence.
+Admin capture is OWNER/MANAGER-only. Automation capture is protected by `X-Resort-Service-Key`. Snapshot capture writes AuditLog evidence.
 
 ### Booking pickup
 
-`GET /api/v1/admin/intelligence/pickup` compares the current on-books state to a stored prior hotel-local-date snapshot.
+`GET /api/v1/admin/intelligence/pickup` compares current on-books state to a stored prior hotel-local-date snapshot.
 
 Verified behavior:
-- before a prior snapshot exists: `INSUFFICIENT_HISTORY`;
-- if a selected baseline does not cover the requested future dates: `INSUFFICIENT_COVERAGE`;
-- when history exists: `READY` with room-night pickup, occupancy-point pickup and management booked-value pickup;
-- pickup is net on-books change and naturally includes additions/cancellations;
+- no prior snapshot -> `INSUFFICIENT_HISTORY`;
+- inadequate baseline coverage -> `INSUFFICIENT_COVERAGE`;
+- valid history -> `READY` with room-night, occupancy-point and management booked-value pickup;
+- pickup is net on-books change, so additions and cancellations are both represented;
 - no past values are invented;
-- no demand forecast or statutory revenue-recognition claim is made.
+- no demand forecast or statutory revenue claim is made.
 
 ### Daily n8n capture template
 
-Repository workflow: `automation/n8n/owner-analytics-daily-snapshot.json`.
+`automation/n8n/owner-analytics-daily-snapshot.json` is configured for cron `10 3 * * *`, timezone `Asia/Bishkek`, 180-day horizon and Core service-auth only, with no direct PostgreSQL write.
 
-Configured schedule:
-- cron `10 3 * * *`;
-- timezone `Asia/Bishkek`;
-- 180-day horizon;
-- Core service-auth API only;
-- no direct PostgreSQL write.
+The repository workflow remains intentionally `active: false`. JSON/contract configuration is CI-verified; **live deployed n8n activation/execution is not verified**.
 
-The repository workflow is intentionally `active: false`. JSON/contract configuration is CI-verified; **live deployed n8n activation/execution is not verified**.
+Dedicated evidence:
+- Owner Control V2 CI run `33243634765`, job `99077163420` — `success`.
 
-### Dedicated evidence
-
-Owner Control V2 CI:
-- run `33243634765`;
-- job `99077163420`;
-- conclusion `success`.
-
-Dedicated E2E proves:
-- clean four-migration database chain;
-- 84-room development seed;
-- admin TypeScript typecheck and production build;
-- Core compile/start;
-- no fabricated pickup before historical snapshot exists;
-- baseline snapshot capture;
-- real Reservation creation through current manager-confirmation flow;
-- positive room-night and booked-value pickup after the baseline;
-- correct checkout-day departure movement;
-- debt-within-72-hours control;
-- unauthenticated/wrong service keys rejected;
-- correct service key accepted;
-- same-day snapshot remains one property/date record;
-- snapshot AuditLog evidence;
-- n8n workflow timezone/schedule/service-auth/no-direct-DB contract.
+The E2E proves the clean four-migration chain, 84-room development seed, admin production build, Core compile/start, no fabricated pickup before history, baseline capture, real manager-confirmed Reservation after baseline, positive pickup, correct checkout movement, debt-72h, service-auth rejection/acceptance, one same-day property/date snapshot, AuditLog evidence and n8n no-direct-DB contract.
 
 ---
 
@@ -417,13 +308,9 @@ Dedicated E2E proves:
 
 STATUS: **PARTIAL.**
 
-Persisted concepts include `Guest`, `ReservationRequest`, `Reservation` and segmented `InventoryBlock` room/date assignments.
+Persisted concepts include `Guest`, `ReservationRequest`, `Reservation` and segmented `InventoryBlock` assignments.
 
-Guest identity/repeat-reservation history is materially stronger through Owner Intelligence.
-
-A distinct persisted canonical `Stay` entity is still not implemented. Operational stay state is represented primarily through Reservation lifecycle and segmented inventory assignments.
-
-Therefore canonical `Guest != Reservation != Stay` separation is not yet fully implemented. This is a known target/current GAP, not permission for an unreviewed data-model rewrite.
+A distinct persisted canonical `Stay` entity is still not implemented. Therefore `Guest != Reservation != Stay` separation is not yet fully implemented.
 
 ---
 
@@ -431,15 +318,9 @@ Therefore canonical `Guest != Reservation != Stay` separation is not yet fully i
 
 STATUS: **PARTIAL; CURRENT V1 DETERMINISTIC PRICING AND MANAGER-MANUAL PAYMENT CONTROL VERIFIED.**
 
-Current pricing is server-side by room type/date using integer KGS values and sale-state controls.
+Pricing is server-side by room type/date using integer KGS and sale-state controls. Payment CI covers manager-entered facts, positive amounts, context and idempotency/conflict protection.
 
-Current Payment domain/CI covers manager-entered payment facts, positive amounts, request/reservation context and idempotency/conflict protection.
-
-Owner Intelligence and Owner Control booked-value / received-payment / ADR / RevPAR / pickup figures are management metrics from stored Resort Core facts. They do not transform current finance into statutory accounting.
-
-A complete Folio/Charge/Adjustment/Void/Refund accounting domain is not implemented.
-
-Automated acquiring/payment-provider integration is not an active Three Crowns V1 launch requirement.
+Owner analytics figures remain management metrics, not statutory accounting. Complete Folio/Charge/Adjustment/Void/Refund accounting is not implemented. Automated acquiring is not an active V1 launch requirement.
 
 ---
 
@@ -447,13 +328,9 @@ Automated acquiring/payment-provider integration is not an active Three Crowns V
 
 STATUS: **VERIFIED FOR CURRENT SINGLE-PROPERTY ROLE CONTOUR; GENERIC MULTI-TENANCY NOT IMPLEMENTED.**
 
-Current evidence includes Argon2 passwords, hashed session tokens, HttpOnly cookies, expiry/revocation, active-user checks, server-side roles, Property binding and AuditLog authentication evidence.
+Current evidence includes Argon2 passwords, hashed session tokens, HttpOnly cookies, expiry/revocation, active-user checks, server-side roles, Property binding and AuditLog.
 
-Owner Intelligence/Owner Control admin routes are OWNER/MANAGER scoped. Daily automation snapshot capture uses the existing service-auth boundary and never exposes a direct database credential to n8n workflow logic.
-
-Current runtime is property-selected by `PROPERTY_CODE`.
-
-Generic organization/tenant hierarchy, cross-property workflows and universal resource-level multi-property permissions are not established.
+Owner Intelligence/Control admin routes are OWNER/MANAGER scoped. Daily automation snapshot capture uses service auth and does not expose DB authority to n8n.
 
 External HTTPS cookie/CORS behavior remains an external staging gate.
 
@@ -463,11 +340,7 @@ External HTTPS cookie/CORS behavior remains an external staging gate.
 
 STATUS: **VERIFIED IN CI; REAL-DEVICE ACCEPTANCE OPEN.**
 
-`OperationalTask` supports HOUSEKEEPING, MAINTENANCE and GUEST_REQUEST.
-
-Hotel Operations CI `33243634721` completed `success` and covers owner/maid/technician authorization, housekeeping assignment/state transitions/rework/inspection/CLEAN acceptance, TECH_BLOCK protection, assignment history/workload and application build checks.
-
-Staff Voice CI `33243634662` also completed `success`.
+Hotel Operations CI `33243634721` and Staff Voice CI `33243634662` completed `success`.
 
 Real iPhone/Android/Telegram Mini App acceptance remains open.
 
@@ -485,8 +358,6 @@ Approved channel boundary:
 
 Internal AI Sales remains manager-review draft assistance only. AI does not auto-send, confirm payment or create guaranteed Reservations.
 
-Public website AI Administrator is implemented and CI-covered. It uses Core facts/availability, is rate limited, fails explicitly when provider configuration is unavailable, and hands sellable booking intent to the existing ReservationRequest flow.
-
 Evidence on audited head:
 - Three Crowns AI Administrator CI `33243634684` — `success`;
 - AI Sales Draft CI `33243634636` — `success`;
@@ -495,7 +366,7 @@ Evidence on audited head:
 - Telegram Sales CI `33243634603` — `success`;
 - Unified Inbox CI `33243634654` — `success`.
 
-Real OpenAI production credentials, API Green credentials, actual hotel-number webhook/E2E and external HTTPS provider execution remain **NOT VERIFIED / NOT LIVE**.
+Real OpenAI/API Green/provider execution remains **NOT VERIFIED / NOT LIVE**.
 
 ---
 
@@ -503,21 +374,13 @@ Real OpenAI production credentials, API Green credentials, actual hotel-number w
 
 STATUS: **IMPLEMENTED AND CI/CI-LOCAL-STAGING VERIFIED; EXTERNAL LIVE ACCEPTANCE OPEN.**
 
-Current public site preserves the approved visual direction and current owner-approved guest facts while keeping booking truth in Resort Core.
-
-Current owner-approved facts represented in the site truth contour include current transfer prices, current approved food baseline, free parking wording, winter-only sauna, billiards, free table tennis, current excursion program, seasonal independent water operators and hotel rules.
-
-Explicit owner rejection/current truth:
-- no gym / тренажёрный зал;
-- no sports grounds / sports fields / спортивные площадки.
-
-The site keeps the request-not-confirmation boundary and current payment truth. It must not publish stale fixed 30% prepayment, first-night automatic prepayment, two-day unpaid hold, unverified online-card acquiring, unverified Elsom or AI-generated payment instructions.
+The site keeps owner-approved guest facts, request-not-confirmation boundary and current payment truth. It does not publish rejected gym/sports-ground claims or stale fixed-prepayment/acquiring claims.
 
 Evidence:
 - Public Site Truth CI `33243634710` — `success`;
 - Full Staging Gate `33243634787` — `success`.
 
-The current live legacy `3korony.com` must not be represented as the verified new Resort OS deployment.
+The live legacy `3korony.com` is not the verified new Resort OS deployment.
 
 ---
 
@@ -525,11 +388,10 @@ The current live legacy `3korony.com` must not be represented as the verified ne
 
 STATUS: **IMPLEMENTED AND CI-VERIFIED; NOT EXTERNALLY PRODUCTION-VERIFIED.**
 
-Current management surfaces now cover three complementary levels:
-
-1. **Command Center** — live current-state control: arrivals/departures, occupancy, room attention, tasks, communications, payments and active debt.
-2. **Reports / Owner Intelligence** — historical/period management analysis: occupancy, ADR, RevPAR, payments, CRM, guest history, heatmap, comparisons, CSV/XLSX/print.
-3. **Owner Control V2** — factual forward on-books control and real snapshot-based pickup.
+Management now has three complementary levels:
+1. **Command Center** — live current-state control;
+2. **Reports / Owner Intelligence** — historical/period analysis, guest history, heatmap, comparisons and exports;
+3. **Owner Control V2** — factual forward on-books control and snapshot-based pickup.
 
 No layer becomes a parallel operational source of truth.
 
@@ -539,11 +401,7 @@ No layer becomes a parallel operational source of truth.
 
 STATUS: **DEFERRED / DORMANT.**
 
-Historical NFC/wristband/beach source/schema may remain in the repository, but active application composition excludes NFC routers.
-
-NFC Deferred Scope CI `33243634678` and Full Staging `33243634787` completed `success`.
-
-Reactivation requires explicit owner decision.
+Active application composition excludes NFC routers. NFC Deferred Scope CI `33243634678` and Full Staging `33243634787` completed `success`.
 
 ---
 
@@ -551,18 +409,16 @@ Reactivation requires explicit owner decision.
 
 STATUS: **DEVELOPMENT 84/12 BASELINE VERIFIED / PRODUCTION IMPORT BLOCKED ON OWNER FACTS.**
 
-Development intake contains 84 room positions / 12 categories and passes integrity checks.
+Development intake contains 84 room positions / 12 categories and passes integrity checks. Owner Intelligence/Control E2E use this development baseline.
 
-Owner Intelligence and Owner Control E2E use and verify the 84-room CI/development baseline.
-
-The production register remains fail-closed until exactly 84 physical room rows and unresolved building/floor/mansard/cottage details are owner-confirmed. Development seed data must not be silently promoted into physical production truth.
+Production physical room truth remains fail-closed until owner-confirmed.
 
 ---
 
 ## 21. Deployment state
 
 ### CI-local staging
-STATUS: **VERIFIED** on executable head `eb30433f0dd3bd44fd80cb44a150e53e0e44a816` / associated PR integration context. Run `33243634787` — `success`.
+STATUS: **VERIFIED** on executable head `eb30433f0dd3bd44fd80cb44a150e53e0e44a816`. Run `33243634787` — `success`.
 
 ### Single-server deployment package
 STATUS: **VERIFIED IN CI.** Run `33243634632` — `success`.
@@ -570,29 +426,19 @@ STATUS: **VERIFIED IN CI.** Run `33243634632` — `success`.
 ### Purchased hosting / Beget production direction
 STATUS: **HOST PLATFORM DIRECTION APPROVED / ACTUAL ACCOUNT AND HOST CAPABILITY NOT VERIFIED.**
 
-The intended autonomy-oriented production direction is Beget infrastructure with application compute, managed PostgreSQL/S3 where selected, self-healing container runtime, health monitoring and controlled backup/restore. No current repository/CI evidence proves that the actual purchased account, VPS resources, DBaaS/S3 configuration, DNS, network or credentials are already provisioned accordingly.
-
 `scripts/host_preflight.sh` remains the required non-destructive first infrastructure test.
 
 ### Daily Owner Control automation
 STATUS: **REPOSITORY WORKFLOW CONFIGURED AND CI-VERIFIED / LIVE n8n ACTIVATION NOT VERIFIED.**
 
-The daily 03:10 Asia/Bishkek snapshot workflow is present as an inactive template and calls Resort Core through service auth. Real deployed n8n scheduling has not been executed/observed by repository CI.
-
 ### Legacy rollback backup
 STATUS: **BLOCKED / NOT VERIFIED.**
-
-No verified full rollback backup of the exact currently live legacy site exists in accessible project evidence. A public crawl or old emergency archive is not sufficient proof of a full rollback point.
 
 ### External HTTPS/WSS staging
 STATUS: **BLOCKED / NOT VERIFIED.**
 
-Real TLS, secure cookies, CORS, WSS, firewall/network behavior, real browser and real-device behavior remain unproven.
-
 ### Live AI / messaging providers
 STATUS: **BLOCKED / NOT VERIFIED.**
-
-Repository configuration does not prove live credentials/provider delivery.
 
 ### Production
 STATUS: **NOT PRODUCTION READY / NOT PRODUCTION EXECUTED.**
@@ -604,78 +450,73 @@ No CI result alone authorizes DNS cutover.
 ## 22. High-priority gaps / blockers
 
 ### P0 production blockers
-1. actual Beget account/server access and non-destructive host capability preflight;
-2. verified full rollback backup for the current legacy site;
-3. isolated external HTTPS/WSS staging on the real host/network;
-4. external rendered public-truth probe against that staging;
+1. actual Beget access + host preflight;
+2. verified full rollback backup of current legacy site;
+3. isolated external HTTPS/WSS staging;
+4. external rendered public-truth probe;
 5. owner-confirmed physical 84-room register;
 6. real iPhone/Android/Telegram acceptance;
 7. real website AI browser/mobile acceptance;
-8. real provider/WhatsApp/Instagram acceptance for launch-enabled channels;
-9. fresh production backup/clean-restore/preflight/secrets/DNS/rollback evidence immediately before cutover.
+8. launch-enabled provider acceptance;
+9. fresh backup/restore/preflight/secrets/DNS/rollback evidence before cutover.
 
 ### P1 product/operations gaps
-- live activation and observation of the daily Owner Control snapshot workflow after staging deployment;
-- safe manual workflow for resolving historical Guest duplicate candidates if owner requires historical cleanup;
-- production monitoring/watchdog and backup restore cadence on the actual Beget environment;
+- live activation/observation of daily Owner Control snapshot workflow on staging;
+- safe historical Guest duplicate resolution if required;
+- production monitoring/watchdog + restore cadence;
 - post-stay feedback/NPS/review flow;
-- controlled lead follow-up/reactivation flow;
-- production marketing analytics destination/attribution;
-- statistical demand/revenue forecasting only after sufficient clean historical snapshot/booking data exists and forecast accuracy can be measured.
+- controlled lead follow-up/reactivation;
+- marketing attribution;
+- statistical forecast only after sufficient clean history and measurable forecast accuracy.
 
-### P2 architecture/product gaps — not automatic rewrite mandates
+### P2 architecture gaps
 - distinct canonical Stay persistence;
 - generic multi-property/tenant architecture;
 - complete Folio/Charge financial domain;
 - universal internal AI Operations Administrator controlled-tool/risk model.
 
 ### DEFER
-- NFC / beach wallet for current Three Crowns V1.
+- NFC / beach wallet for current V1.
 
 ---
 
 ## 23. Foundations to extend rather than rewrite
 
-Preserve unless later evidence proves a concrete defect:
-- FastAPI Resort Core as hotel truth boundary;
-- PostgreSQL room/date inventory and exclusion constraint;
+Preserve unless concrete evidence proves a defect:
+- FastAPI Resort Core truth boundary;
+- PostgreSQL inventory/exclusion constraint;
 - ReservationRequest -> human manager confirmation;
-- repeat-Guest fail-closed identity resolver;
+- fail-closed repeat-Guest identity resolver;
 - server-authoritative PMS preview/commit;
-- V9 universal chessboard composition;
-- Owner Intelligence guest/history/reporting surfaces over canonical Core data;
-- Owner Control snapshot/pickup history as derived management evidence, not source of truth;
-- reservation-linked structured guest-service tasks;
+- V9 universal chessboard;
+- Owner Intelligence over canonical Core data;
+- Owner Control derived snapshot/pickup history;
+- reservation-linked Guest Services;
 - payment idempotency;
-- AuditLog pattern;
-- property-scoped staff session/RBAC baseline;
-- OperationalTask engine;
-- n8n without direct DB authority;
-- public site using Core availability/pricing/ReservationRequest;
-- public AI using Core facts without Reservation/payment authority;
-- public truth fail-closed guards;
-- dormant NFC isolation;
-- current deployment package until real Beget host evidence proves a required topology change.
+- AuditLog;
+- property-scoped RBAC;
+- OperationalTask;
+- n8n without DB authority;
+- public Core availability/pricing/request flow;
+- public AI without Reservation/payment authority;
+- dormant NFC isolation.
 
 ---
 
 ## 24. Next release task
 
-NEXT TASK: **Run the non-destructive host capability preflight on the actual Beget hosting/VPS account, obtain a verified rollback backup of the current legacy site, and—if the host is suitable—deploy an isolated external HTTPS/WSS staging contour before replacing the apex site. On staging, activate/observe the daily Owner Control snapshot workflow, then run the external rendered public-truth probe and complete browser/device acceptance.**
+NEXT TASK: **Run the non-destructive host capability preflight on the actual Beget account, obtain a verified rollback backup, and—if suitable—deploy isolated external HTTPS/WSS staging. On staging, activate/observe the daily Owner Control snapshot workflow, then run external public-truth and browser/device acceptance.**
 
 Why this remains next:
-- all 25 PR-triggered workflow contours associated with the latest audited executable head are successful;
-- Owner Intelligence covers repeat-guest resolution, guest history, room-by-day heatmap and management exports;
-- Owner Control V2 adds factual forward on-books control and real snapshot-based booking pickup without invented forecast history;
+- all 25 PR-triggered workflow contours on the latest audited executable head are successful;
+- Owner Intelligence and Owner Control V2 are CI-verified;
 - the four-migration chain is clean-deploy verified;
-- migration-aware backup -> clean restore is verified;
-- CI-local Docker staging is verified;
-- the one-server production package is verified in CI;
-- PMS move/resize/Split Stay/realtime and structured Guest Services remain green;
-- public owner-approved guest facts remain guarded;
-- the highest-risk unknown is now the actual external Beget host/network/TLS/cookie/CORS/WSS/browser/device/provider environment.
+- backup -> clean restore is verified;
+- CI-local full staging is verified;
+- the production package is verified in CI;
+- the largest remaining uncertainty is the actual external infrastructure/device/provider environment.
 
-OWNER involvement should be limited to real human-only blockers: Beget account/infrastructure access when unavailable to engineering, physical room-register confirmations, launch secrets/financial/provider approval where required, real-device acceptance and irreversible production cutover approval.
+OWNER involvement should be limited to genuine human-only blockers: infrastructure access, physical room confirmation, launch secrets/provider approval, real-device acceptance and irreversible production cutover approval.
 
 LAST AUDITED EXECUTABLE HEAD: `eb30433f0dd3bd44fd80cb44a150e53e0e44a816`
 LAST AUDITED: 2026-08-29
