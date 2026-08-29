@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import DashboardBoard from "./DashboardBoard";
+import GuestHistoryBoard from "./GuestHistoryBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
@@ -20,7 +21,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "REPORTS" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "GUESTS" | "FINANCE" | "REPORTS" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -110,6 +111,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
+          {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
           {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
@@ -123,6 +125,7 @@ export default function AdminShell() {
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
+      {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
       {tab === "REPORTS" && isManager && <ReportsBoard />}
       {tab === "CONTENT" && isManager && <SiteContentBoard />}
