@@ -8,6 +8,7 @@ import "./hotel-finance.css";
 import "./reports.css";
 import "./owner-intelligence.css";
 import "./owner-control-v2.css";
+import "./growth-control.css";
 import "./guest-history.css";
 import "./dashboard.css";
 import "./reception.css";
