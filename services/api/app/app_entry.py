@@ -17,6 +17,7 @@ from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
 from .operations_history import router as operations_history_router
+from .owner_intelligence import router as owner_intelligence_router
 from .pms_bulk_tasks import router as pms_bulk_tasks_router
 from .pms_chessboard import router as pms_chessboard_router
 from .pms_chessboard_read import router as pms_chessboard_read_router
@@ -50,6 +51,7 @@ app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(hotel_finance_router)
 app.include_router(analytics_reports_router)
+app.include_router(owner_intelligence_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_control_snapshot_router)
@@ -80,4 +82,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.36.0"
+app.version = "0.37.0"
