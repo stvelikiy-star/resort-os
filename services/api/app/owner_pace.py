@@ -83,14 +83,22 @@ async def build_forward_snapshot(conn, prop, as_of: date, horizon_days: int) -> 
                    CASE WHEN (r."checkOut"-r."checkIn")>0
                         THEN r."totalKgs"::numeric/(r."checkOut"-r."checkIn")
                         ELSE 0 END
-                 ),0)::numeric AS allocated_value_kgs,
+                 ),0)::numeric AS allocated_value_kgs
+          FROM days day
+          LEFT JOIN reservations r
+            ON r."propertyId"=$1
+           AND r.status IN ('GUARANTEED','CHECKED_IN')
+           AND r."checkIn"<=day.d AND r."checkOut">day.d
+          GROUP BY day.d
+        ), movement AS (
+          SELECT day.d,
                  count(DISTINCT r.id) FILTER (WHERE r."checkIn"=day.d)::int AS arrivals,
                  count(DISTINCT r.id) FILTER (WHERE r."checkOut"=day.d)::int AS departures
           FROM days day
           LEFT JOIN reservations r
             ON r."propertyId"=$1
            AND r.status IN ('GUARANTEED','CHECKED_IN')
-           AND r."checkIn"<=day.d AND r."checkOut">day.d
+           AND (r."checkIn"=day.d OR r."checkOut"=day.d)
           GROUP BY day.d
         )
         SELECT day.d,
@@ -98,12 +106,13 @@ async def build_forward_snapshot(conn, prop, as_of: date, horizon_days: int) -> 
                COALESCE(booked.booked_rooms,0)::int AS booked_rooms,
                COALESCE(value_by_day.reservations,0)::int AS reservations,
                COALESCE(value_by_day.allocated_value_kgs,0)::numeric AS allocated_value_kgs,
-               COALESCE(value_by_day.arrivals,0)::int AS arrivals,
-               COALESCE(value_by_day.departures,0)::int AS departures
+               COALESCE(movement.arrivals,0)::int AS arrivals,
+               COALESCE(movement.departures,0)::int AS departures
         FROM days day
         LEFT JOIN capacity ON capacity.d=day.d
         LEFT JOIN booked ON booked.d=day.d
         LEFT JOIN value_by_day ON value_by_day.d=day.d
+        LEFT JOIN movement ON movement.d=day.d
         ORDER BY day.d
         ''',
         pid,
