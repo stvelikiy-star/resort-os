@@ -38,46 +38,62 @@ async def resolve_or_create_guest(
     phone: str | None,
     email: str | None,
 ) -> dict[str, Any]:
-    """Resolve one existing guest or create one without silently merging conflicts.
-
-    Phone/email are treated as identity evidence only inside the current property.
-    If both identifiers point at different existing guests the operation fails closed,
-    because automatic merging could corrupt reservation history.
-    """
+    """Resolve exactly one existing guest or create one without silent history merges."""
     normalized_phone = normalize_guest_phone(phone)
     normalized_email = normalize_guest_email(email)
 
-    phone_match = None
-    email_match = None
+    phone_matches = []
+    email_matches = []
 
     if normalized_phone:
-        phone_match = await conn.fetchrow(
+        phone_matches = await conn.fetch(
             '''
             SELECT id,"firstName","lastName",phone,email
             FROM guests
             WHERE "propertyId"=$1
               AND regexp_replace(COALESCE(phone,''),'\\D','','g') = regexp_replace($2,'\\D','','g')
             ORDER BY "updatedAt" DESC,id
-            LIMIT 1
             FOR UPDATE
             ''',
             property_id,
             normalized_phone,
         )
+        if len(phone_matches) > 1:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "GUEST_IDENTITY_AMBIGUOUS",
+                    "message": "Multiple existing guest profiles share this phone. Review duplicate candidates before confirming the reservation.",
+                    "identity": "PHONE",
+                    "guest_ids": [str(row["id"]) for row in phone_matches],
+                },
+            )
 
     if normalized_email:
-        email_match = await conn.fetchrow(
+        email_matches = await conn.fetch(
             '''
             SELECT id,"firstName","lastName",phone,email
             FROM guests
             WHERE "propertyId"=$1 AND lower(trim(COALESCE(email,'')))=$2
             ORDER BY "updatedAt" DESC,id
-            LIMIT 1
             FOR UPDATE
             ''',
             property_id,
             normalized_email,
         )
+        if len(email_matches) > 1:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "GUEST_IDENTITY_AMBIGUOUS",
+                    "message": "Multiple existing guest profiles share this email. Review duplicate candidates before confirming the reservation.",
+                    "identity": "EMAIL",
+                    "guest_ids": [str(row["id"]) for row in email_matches],
+                },
+            )
+
+    phone_match = phone_matches[0] if phone_matches else None
+    email_match = email_matches[0] if email_matches else None
 
     if phone_match and email_match and phone_match["id"] != email_match["id"]:
         raise HTTPException(
