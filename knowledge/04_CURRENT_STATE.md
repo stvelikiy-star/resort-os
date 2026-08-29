@@ -352,7 +352,7 @@ The 72-hour lists expose the supporting Reservations rather than only a syntheti
 
 ### Daily snapshots
 
-`owner_analytics_snapshots` stores one Core-derived management snapshot per hotel-local date. Re-capturing on the same date updates that date instead of fabricating intraday history.
+`owner_analytics_snapshots` stores one Core-derived management snapshot row per hotel-local date. Re-capturing on the same date updates that date's snapshot rather than fabricating additional intraday history.
 
 Admin route:
 - `POST /api/v1/admin/intelligence/snapshots/capture` — OWNER/MANAGER only.
