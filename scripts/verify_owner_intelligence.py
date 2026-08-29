@@ -124,7 +124,7 @@ def main():
     assert second["guest_id"] == first["guest_id"]
     assert second["guest_identity_match"] in {"PHONE", "EMAIL", "PHONE_AND_EMAIL"}
 
-    guests = client.get("/api/v1/admin/intelligence/guests", params={"search": "555 444 333", "limit": 300})
+    guests = client.get("/api/v1/admin/intelligence/guests", params={"search": "555444333", "limit": 300})
     guests.raise_for_status()
     matching = [item for item in guests.json()["items"] if item["id"] == first["guest_id"]]
     assert len(matching) == 1
