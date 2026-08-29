@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import OwnerControlV2 from "./OwnerControlV2";
+import OwnerExecutivePack from "./OwnerExecutivePack";
 
 type StayItem = {
   id: string;
@@ -95,6 +96,7 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
         <button className="btn" onClick={load}>Обновить</button>
       </div>
 
+      <OwnerExecutivePack />
       <OwnerControlV2 />
 
       <section className="command-kpis">
