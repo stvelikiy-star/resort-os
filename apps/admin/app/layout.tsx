@@ -6,6 +6,7 @@ import "./nfc.css";
 import "./finance.css";
 import "./hotel-finance.css";
 import "./reports.css";
+import "./owner-intelligence.css";
 import "./guest-history.css";
 import "./dashboard.css";
 import "./reception.css";
