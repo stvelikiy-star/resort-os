@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL("https://3korony.com"),
     title: { default: title, template: "%s · Три Короны" },
     description,
-    keywords: ["Три Короны", "Иссык-Куль", "Чолпон-Ата", "отель Иссык-Куль", "Resort & SPA", "отдых на Иссык-Куле", "бронирование Чолпон-Ата", "семейный отдых Иссык-Куль", "спортивные сборы Иссык-Куль", "корпоративный отдых Иссык-Куль"],
+    keywords: ["Три Короны", "Иссык-Куль", "Чолпон-Ата", "отель Иссык-Куль", "Resort & SPA", "отдых на Иссык-Куле", "бронирование Чолпон-Ата", "семейный отдых Иссык-Куль", "корпоративный отдых Иссык-Куль"],
     alternates: { canonical: "/" },
     openGraph: {
       type: "website",
