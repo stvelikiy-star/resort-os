@@ -7,33 +7,13 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import asyncpg
 
+from release_contract import CRITICAL_CONSTRAINTS, EXPECTED_MIGRATIONS, clean_postgres_url, migration_names_match_exactly
+
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
-BACKUP_FORMAT = "three-crowns-postgres-backup-v2"
-CRITICAL_CONSTRAINTS = {
-    "rate_period_valid_dates",
-    "rate_period_nonnegative_price",
-    "reservation_request_valid_dates",
-    "reservation_request_positive_adults",
-    "reservation_request_nonnegative_children",
-    "reservation_valid_dates",
-    "reservation_positive_adults",
-    "reservation_nonnegative_children",
-    "reservation_nonnegative_total",
-    "inventory_block_valid_dates",
-    "no_overlapping_active_room_blocks",
-    "payment_positive_amount",
-    "payment_has_context",
-}
-
-
-def clean_postgres_url(value: str) -> str:
-    parts = urlsplit(value)
-    query = [(key, val) for key, val in parse_qsl(parts.query, keep_blank_values=True) if key != "schema"]
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+BACKUP_FORMAT = "three-crowns-postgres-backup-v3"
 
 
 def sha256_file(path: Path) -> str:
@@ -92,16 +72,22 @@ async def collect_facts(dsn: str) -> dict:
                 "rooms": await conn.fetchval('SELECT COUNT(*) FROM rooms WHERE "propertyId"=$1', pid),
                 "room_types": await conn.fetchval('SELECT COUNT(*) FROM room_types WHERE "propertyId"=$1', pid),
                 "rate_periods": await conn.fetchval('''SELECT COUNT(*) FROM rate_periods rp JOIN rate_plans p ON p.id=rp."ratePlanId" WHERE p."propertyId"=$1''', pid),
+                "guests": await conn.fetchval('SELECT COUNT(*) FROM guests WHERE "propertyId"=$1', pid),
                 "reservation_requests": await conn.fetchval('SELECT COUNT(*) FROM reservation_requests WHERE "propertyId"=$1', pid),
                 "reservations": await conn.fetchval('SELECT COUNT(*) FROM reservations WHERE "propertyId"=$1', pid),
+                "payments": await conn.fetchval('SELECT COUNT(*) FROM payments WHERE "propertyId"=$1', pid),
+                "conversations": await conn.fetchval('SELECT COUNT(*) FROM conversations WHERE "propertyId"=$1', pid),
                 "staff_users": await conn.fetchval('SELECT COUNT(*) FROM staff_users WHERE "propertyId"=$1', pid),
                 "operational_tasks": await conn.fetchval('SELECT COUNT(*) FROM operational_tasks WHERE "propertyId"=$1', pid),
+                "owner_analytics_snapshots": await conn.fetchval('SELECT COUNT(*) FROM owner_analytics_snapshots WHERE "propertyId"=$1', pid),
+                "guest_engagements": await conn.fetchval('SELECT COUNT(*) FROM guest_engagements WHERE "propertyId"=$1', pid),
                 "audit_logs": await conn.fetchval('SELECT COUNT(*) FROM audit_logs WHERE "propertyId"=$1', pid),
             },
             "database": {
                 "postgres_version": server_version,
                 "critical_constraints": constraints,
                 "migration_history_present": bool(migration_table),
+                "expected_migration_names": list(EXPECTED_MIGRATIONS),
                 "applied_migrations": migrations,
             },
         }
@@ -128,8 +114,15 @@ async def main() -> int:
     if require_migration_history and not facts["database"]["migration_history_present"]:
         print("Backup rejected: _prisma_migrations is missing", file=sys.stderr)
         return 1
-    if require_migration_history and not facts["database"]["applied_migrations"]:
-        print("Backup rejected: no successfully applied Prisma migration is recorded", file=sys.stderr)
+    migration_names = [row["migration_name"] for row in facts["database"]["applied_migrations"]]
+    if require_migration_history and not migration_names_match_exactly(migration_names):
+        print(
+            "Backup rejected: migration ledger mismatch; expected "
+            + ",".join(EXPECTED_MIGRATIONS)
+            + "; found "
+            + ",".join(migration_names),
+            file=sys.stderr,
+        )
         return 1
 
     command = [
