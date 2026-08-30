@@ -51,6 +51,20 @@ async def collect_facts(dsn: str) -> dict:
                 {"migration_name": row["migration_name"], "checksum": row["checksum"]}
                 for row in migration_rows
             ]
+        payment_count = await conn.fetchval(
+            '''
+            SELECT COUNT(*)
+            FROM payments p
+            WHERE EXISTS (
+                SELECT 1 FROM reservation_requests rr
+                WHERE rr.id=p."requestId" AND rr."propertyId"=$1
+            ) OR EXISTS (
+                SELECT 1 FROM reservations r
+                WHERE r.id=p."reservationId" AND r."propertyId"=$1
+            )
+            ''',
+            pid,
+        )
         return {
             "property": {
                 "code": prop["code"],
@@ -65,7 +79,7 @@ async def collect_facts(dsn: str) -> dict:
                 "guests": await conn.fetchval('SELECT COUNT(*) FROM guests WHERE "propertyId"=$1', pid),
                 "reservation_requests": await conn.fetchval('SELECT COUNT(*) FROM reservation_requests WHERE "propertyId"=$1', pid),
                 "reservations": await conn.fetchval('SELECT COUNT(*) FROM reservations WHERE "propertyId"=$1', pid),
-                "payments": await conn.fetchval('SELECT COUNT(*) FROM payments WHERE "propertyId"=$1', pid),
+                "payments": payment_count,
                 "conversations": await conn.fetchval('SELECT COUNT(*) FROM conversations WHERE "propertyId"=$1', pid),
                 "staff_users": await conn.fetchval('SELECT COUNT(*) FROM staff_users WHERE "propertyId"=$1', pid),
                 "operational_tasks": await conn.fetchval('SELECT COUNT(*) FROM operational_tasks WHERE "propertyId"=$1', pid),
