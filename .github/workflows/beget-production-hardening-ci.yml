@@ -1,0 +1,105 @@
+name: Beget Production Hardening CI
+
+on:
+  pull_request:
+    paths:
+      - 'compose.beget.yaml'
+      - '.env.beget.example'
+      - 'deploy/Caddyfile'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
+      - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - 'scripts/beget_deployment_guard.py'
+      - 'scripts/public_site_truth_guard.py'
+      - 'apps/web/app/layout.tsx'
+      - '.github/workflows/beget-production-hardening-ci.yml'
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+      - main
+    paths:
+      - 'compose.beget.yaml'
+      - '.env.beget.example'
+      - 'deploy/Caddyfile'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
+      - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - 'scripts/beget_deployment_guard.py'
+      - 'scripts/public_site_truth_guard.py'
+      - 'apps/web/app/layout.tsx'
+      - '.github/workflows/beget-production-hardening-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  beget-hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify database release contract and DBaaS URL handling
+        run: python scripts/release_contract_test.py
+
+      - name: Verify Beget target topology contract
+        run: python scripts/beget_deployment_guard.py
+
+      - name: Verify public truth still blocks rejected sports/payment drift
+        run: python scripts/public_site_truth_guard.py
+
+      - name: Validate backup and host scripts
+        run: |
+          bash -n scripts/production_backup.sh
+          bash -n scripts/production_backup_test.sh
+          bash -n scripts/host_preflight.sh
+          bash scripts/production_backup_test.sh
+
+      - name: Render Beget Docker Compose graph
+        run: |
+          docker compose --env-file .env.beget.example -f compose.beget.yaml config > /tmp/beget-compose.yml
+          grep -q '^  api:' /tmp/beget-compose.yml
+          grep -q '^  web:' /tmp/beget-compose.yml
+          grep -q '^  admin:' /tmp/beget-compose.yml
+          grep -q '^  staff:' /tmp/beget-compose.yml
+          grep -q '^  n8n:' /tmp/beget-compose.yml
+          grep -q '^  caddy:' /tmp/beget-compose.yml
+          if grep -q '^  postgres:' /tmp/beget-compose.yml; then
+            echo 'Beget graph unexpectedly contains local PostgreSQL service' >&2
+            exit 1
+          fi
+          if grep -Eq '(^|[^0-9])5432:5432' /tmp/beget-compose.yml; then
+            echo 'Beget graph unexpectedly publishes PostgreSQL' >&2
+            exit 1
+          fi
+          grep -F 'sslmode=require' /tmp/beget-compose.yml >/dev/null
+          grep -F 'http://127.0.0.1:5678/healthz' /tmp/beget-compose.yml >/dev/null
+          grep -F 'max-size: 20m' /tmp/beget-compose.yml >/dev/null
+
+      - name: Validate Caddy syntax for production hostnames
+        run: |
+          docker run --rm \
+            -e TLS_EMAIL=ops@example.invalid \
+            -e PUBLIC_HOST=3korony.example.invalid \
+            -e ADMIN_HOST=admin.3korony.example.invalid \
+            -e STAFF_HOST=staff.3korony.example.invalid \
+            -e API_HOST=api.3korony.example.invalid \
+            -e AUTOMATION_HOST=automation.3korony.example.invalid \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Ensure Beget compose application images remain buildable
+        run: docker compose --env-file .env.beget.example -f compose.beget.yaml build api web admin staff
