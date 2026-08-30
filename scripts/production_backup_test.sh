@@ -23,7 +23,8 @@ EOF
 cat > "$TMP/bin/docker" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-# The backup script redirects this stdout to postgres.dump.
+# The backup script redirects this stdout to postgres.dump in both compose and
+# external-URL modes.
 printf 'FAKE-POSTGRES-CUSTOM-DUMP\n'
 EOF
 chmod +x "$TMP/bin/docker"
@@ -72,6 +73,24 @@ if find "$TMP/backups" -type f -name '*env*' | grep -q .; then
   exit 1
 fi
 
+# The pre-existing single-server Compose mode must remain functional.
+cat > "$TMP/root/.env.production.compose" <<'EOF'
+DB_BACKUP_MODE=compose
+POSTGRES_DB=resort_os
+POSTGRES_USER=resort
+POSTGRES_PASSWORD=secret
+OFFSITE_BACKUP_REQUIRED=false
+EOF
+PATH="$TMP/bin:$PATH" \
+ROOT_DIR="$TMP/root" \
+ENV_FILE="$TMP/root/.env.production.compose" \
+BACKUP_DIR="$TMP/backups-compose" \
+COMPOSE_FILE="$TMP/root/compose.production.yaml" \
+bash "$ROOT/scripts/production_backup.sh" > "$TMP/compose-output.txt"
+COMPOSE_TARGET="$(find "$TMP/backups-compose" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+test -s "$COMPOSE_TARGET/postgres.dump"
+grep -q 'WARN: off-site S3 backup not configured' "$TMP/compose-output.txt"
+
 # Required off-site mode must fail closed when S3 settings are incomplete.
 cat > "$TMP/root/.env.production.missing-s3" <<'EOF'
 DB_BACKUP_MODE=url
@@ -97,4 +116,4 @@ if PATH="$TMP/bin:$PATH" ROOT_DIR="$TMP/root" ENV_FILE="$TMP/root/.env.productio
 fi
 grep -q 'must not contain Prisma-only schema=' /tmp/three-crowns-backup-bad.err
 
-echo 'PASS: production backup supports DBaaS + required S3 off-site flow and fails closed on unsafe configuration'
+echo 'PASS: production backup supports DBaaS + required S3, preserves compose mode and fails closed on unsafe configuration'
