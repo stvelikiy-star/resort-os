@@ -1,0 +1,205 @@
+x-logging: &resort-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    init: true
+    environment:
+      TLS_EMAIL: ${TLS_EMAIL}
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      ADMIN_HOST: ${ADMIN_HOST}
+      STAFF_HOST: ${STAFF_HOST}
+      API_HOST: ${API_HOST}
+      AUTOMATION_HOST: ${AUTOMATION_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${HOST_DATA_DIR:-./data}/media/public:/srv/media/public:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      staff:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [resort]
+    logging: *resort-logging
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    init: true
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point to private Beget PostgreSQL DBaaS}
+      PROPERTY_CODE: ${PROPERTY_CODE}
+      RATE_PLAN_CODE: ${RATE_PLAN_CODE}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      REQUIRE_COOKIE_DOMAIN: ${REQUIRE_COOKIE_DOMAIN:-false}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY}
+      AUTOMATION_SERVICE_NAME: ${AUTOMATION_SERVICE_NAME}
+      REQUIRE_AUTOMATION_SERVICE: ${REQUIRE_AUTOMATION_SERVICE}
+      EXPECTED_ROOM_COUNT: ${EXPECTED_ROOM_COUNT}
+      EXPECTED_ROOM_TYPE_COUNT: ${EXPECTED_ROOM_TYPE_COUNT}
+      REQUIRE_MIGRATION_HISTORY: ${REQUIRE_MIGRATION_HISTORY}
+      REQUIRE_RECENT_BACKUP: ${REQUIRE_RECENT_BACKUP}
+      LAST_VERIFIED_BACKUP_AT: ${LAST_VERIFIED_BACKUP_AT}
+      MAX_BACKUP_AGE_HOURS: ${MAX_BACKUP_AGE_HOURS}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_INITDATA_MAX_AGE_SECONDS: ${TELEGRAM_INITDATA_MAX_AGE_SECONDS}
+      TELEGRAM_STAFF_WEBHOOK_SECRET: ${TELEGRAM_STAFF_WEBHOOK_SECRET}
+      STAFF_VOICE_MAX_BYTES: ${STAFF_VOICE_MAX_BYTES}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL}
+      OPENAI_PUBLIC_ASSISTANT_MODEL: ${OPENAI_PUBLIC_ASSISTANT_MODEL}
+      OPENAI_SALES_MODEL: ${OPENAI_SALES_MODEL}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS}
+      AI_ADMIN_MAX_MESSAGES: ${AI_ADMIN_MAX_MESSAGES}
+      AI_ADMIN_RATE_LIMIT_PER_MINUTE: ${AI_ADMIN_RATE_LIMIT_PER_MINUTE}
+      OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL}
+      OPENAI_TRANSCRIBE_TIMEOUT_SECONDS: ${OPENAI_TRANSCRIBE_TIMEOUT_SECONDS}
+      TELEGRAM_SALES_BOT_TOKEN: ${TELEGRAM_SALES_BOT_TOKEN}
+      TELEGRAM_SALES_WEBHOOK_SECRET: ${TELEGRAM_SALES_WEBHOOK_SECRET}
+      TELEGRAM_SALES_CHANNEL_CODE: ${TELEGRAM_SALES_CHANNEL_CODE}
+      TELEGRAM_SALES_DISPLAY_NAME: ${TELEGRAM_SALES_DISPLAY_NAME}
+      TELEGRAM_SALES_ACCOUNT_ID: ${TELEGRAM_SALES_ACCOUNT_ID}
+      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: ${TELEGRAM_PROVIDER_TIMEOUT_SECONDS}
+      TELEGRAM_BOT_API_BASE_URL: ${TELEGRAM_BOT_API_BASE_URL}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [resort]
+    logging: *resort-logging
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    networks: [resort]
+    logging: *resort-logging
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    networks: [resort]
+    logging: *resort-logging
+
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    networks: [resort]
+    logging: *resort-logging
+
+  n8n:
+    image: ${N8N_IMAGE:-n8nio/n8n:2.36.2}
+    restart: unless-stopped
+    init: true
+    environment:
+      N8N_HOST: ${AUTOMATION_HOST}
+      N8N_PROTOCOL: https
+      N8N_PORT: 5678
+      WEBHOOK_URL: https://${AUTOMATION_HOST}/
+      N8N_EDITOR_BASE_URL: https://${AUTOMATION_HOST}/
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "true"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      EXECUTIONS_DATA_PRUNE: "true"
+      EXECUTIONS_DATA_MAX_AGE: ${N8N_EXECUTIONS_DATA_MAX_AGE:-336}
+      GENERIC_TIMEZONE: Asia/Bishkek
+      TZ: Asia/Bishkek
+      RESORT_CORE_URL: http://api:8000
+      AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL}
+      OPENAI_WHATSAPP_MODEL: ${OPENAI_WHATSAPP_MODEL}
+      OPENAI_SALES_MODEL: ${OPENAI_SALES_MODEL}
+      GREEN_API_URL: ${GREEN_API_URL}
+      GREEN_API_ID_INSTANCE: ${GREEN_API_ID_INSTANCE}
+      GREEN_API_TOKEN_INSTANCE: ${GREEN_API_TOKEN_INSTANCE}
+      GREEN_API_WEBHOOK_SECRET: ${GREEN_API_WEBHOOK_SECRET}
+    volumes:
+      - ${HOST_DATA_DIR:-./data}/n8n:/home/node/.n8n
+      - ./automation/n8n:/opt/resort-workflows:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5678/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [resort]
+    logging: *resort-logging
+
+networks:
+  resort:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
