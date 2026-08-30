@@ -6,33 +6,17 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import asyncpg
 
+from release_contract import CRITICAL_CONSTRAINTS, EXPECTED_MIGRATIONS, clean_postgres_url, migration_names_match_exactly
+
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
-SUPPORTED_FORMATS = {"three-crowns-postgres-backup-v1", "three-crowns-postgres-backup-v2"}
-CRITICAL_CONSTRAINTS = {
-    "rate_period_valid_dates",
-    "rate_period_nonnegative_price",
-    "reservation_request_valid_dates",
-    "reservation_request_positive_adults",
-    "reservation_request_nonnegative_children",
-    "reservation_valid_dates",
-    "reservation_positive_adults",
-    "reservation_nonnegative_children",
-    "reservation_nonnegative_total",
-    "inventory_block_valid_dates",
-    "no_overlapping_active_room_blocks",
-    "payment_positive_amount",
-    "payment_has_context",
+SUPPORTED_FORMATS = {
+    "three-crowns-postgres-backup-v1",
+    "three-crowns-postgres-backup-v2",
+    "three-crowns-postgres-backup-v3",
 }
-
-
-def clean_postgres_url(value: str) -> str:
-    parts = urlsplit(value)
-    query = [(key, val) for key, val in parse_qsl(parts.query, keep_blank_values=True) if key != "schema"]
-    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def sha256_file(path: Path) -> str:
@@ -78,10 +62,15 @@ async def collect_facts(dsn: str) -> dict:
                 "rooms": await conn.fetchval('SELECT COUNT(*) FROM rooms WHERE "propertyId"=$1', pid),
                 "room_types": await conn.fetchval('SELECT COUNT(*) FROM room_types WHERE "propertyId"=$1', pid),
                 "rate_periods": await conn.fetchval('''SELECT COUNT(*) FROM rate_periods rp JOIN rate_plans p ON p.id=rp."ratePlanId" WHERE p."propertyId"=$1''', pid),
+                "guests": await conn.fetchval('SELECT COUNT(*) FROM guests WHERE "propertyId"=$1', pid),
                 "reservation_requests": await conn.fetchval('SELECT COUNT(*) FROM reservation_requests WHERE "propertyId"=$1', pid),
                 "reservations": await conn.fetchval('SELECT COUNT(*) FROM reservations WHERE "propertyId"=$1', pid),
+                "payments": await conn.fetchval('SELECT COUNT(*) FROM payments WHERE "propertyId"=$1', pid),
+                "conversations": await conn.fetchval('SELECT COUNT(*) FROM conversations WHERE "propertyId"=$1', pid),
                 "staff_users": await conn.fetchval('SELECT COUNT(*) FROM staff_users WHERE "propertyId"=$1', pid),
                 "operational_tasks": await conn.fetchval('SELECT COUNT(*) FROM operational_tasks WHERE "propertyId"=$1', pid),
+                "owner_analytics_snapshots": await conn.fetchval('SELECT COUNT(*) FROM owner_analytics_snapshots WHERE "propertyId"=$1', pid),
+                "guest_engagements": await conn.fetchval('SELECT COUNT(*) FROM guest_engagements WHERE "propertyId"=$1', pid),
                 "audit_logs": await conn.fetchval('SELECT COUNT(*) FROM audit_logs WHERE "propertyId"=$1', pid),
             },
             "database": {
@@ -165,18 +154,35 @@ async def main() -> int:
     if restored["database"]["missing_critical_constraints"]:
         errors.append("Missing critical constraints after restore: " + ", ".join(restored["database"]["missing_critical_constraints"]))
 
+    restored_migration_names = [row["migration_name"] for row in restored["database"]["applied_migrations"]]
+    if not migration_names_match_exactly(restored_migration_names):
+        errors.append(
+            "Restored migration ledger mismatch: expected "
+            + ",".join(EXPECTED_MIGRATIONS)
+            + "; found "
+            + ",".join(restored_migration_names)
+        )
+
     expected_database = expected.get("database") or {}
-    if manifest_format == "three-crowns-postgres-backup-v2":
+    if manifest_format in {"three-crowns-postgres-backup-v2", "three-crowns-postgres-backup-v3"}:
         if not restored["database"]["migration_history_present"]:
             errors.append("_prisma_migrations is missing after restore")
         expected_constraints = sorted(expected_database.get("critical_constraints") or [])
-        if expected_constraints != sorted(restored["database"]["critical_constraints"]):
+        # V3 fingerprints the current complete critical-constraint contract. V2 is
+        # accepted only as a historical manifest format; current-release restore
+        # still must pass CRITICAL_CONSTRAINTS above.
+        if expected_constraints and expected_constraints != sorted(restored["database"]["critical_constraints"]):
             errors.append("Critical constraint fingerprint differs from backup manifest")
         expected_migrations = expected_database.get("applied_migrations") or []
-        if expected_migrations != restored["database"]["applied_migrations"]:
+        if expected_migrations and expected_migrations != restored["database"]["applied_migrations"]:
             errors.append("Applied Prisma migration ledger differs from backup manifest")
         if expected_database.get("migration_history_present") is not True:
-            errors.append("V2 backup manifest did not prove migration history at backup time")
+            errors.append("Backup manifest did not prove migration history at backup time")
+
+    if manifest_format == "three-crowns-postgres-backup-v3":
+        manifest_expected = expected_database.get("expected_migration_names") or []
+        if tuple(manifest_expected) != EXPECTED_MIGRATIONS:
+            errors.append("V3 backup manifest does not identify the exact current release migration chain")
 
     print(f"BACKUP_SHA256={actual_sha}")
     print(f"RESTORED_PROPERTY={restored['property']['code']}")
