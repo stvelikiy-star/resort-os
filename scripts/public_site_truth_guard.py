@@ -22,11 +22,12 @@ PUBLIC_FILES = [
     ROOT / "services/api/data/site_content_defaults.json",
 ]
 
-# These rules are stale commercial/payment rules, owner-rejected sports amenities,
+# These rules are stale commercial/payment rules, owner-rejected sports AMENITIES,
 # or amenities whose CURRENT operational availability has not been canonicalized
-# for public promotion. Sauna and billiards are intentionally NOT forbidden here:
-# their owner-approved current facts live in ownerApprovedGuestFacts.ts and are
-# protected by owner_guest_facts_guard.py.
+# for public promotion. Hosting an organized/sports group is not itself an amenity
+# claim and remains allowed as long as no gym/field/court/ground is promised.
+# Sauna and billiards are intentionally NOT forbidden here: their owner-approved
+# facts live in ownerApprovedGuestFacts.ts and are protected separately.
 FORBIDDEN_PATTERNS = {
     "fixed 30 percent prepayment": re.compile(r"30\s*%[^\n]{0,80}предоплат|предоплат[^\n]{0,80}30\s*%", re.I),
     "stale two-day unpaid hold": re.compile(r"(?:через\s+)?2\s+дн(?:я|ей)[^\n]{0,100}(?:брон|предоплат|оплат)|(?:брон|предоплат|оплат)[^\n]{0,100}2\s+дн(?:я|ей)", re.I),
@@ -35,7 +36,6 @@ FORBIDDEN_PATTERNS = {
     "unverified elsom payment route": re.compile(r"\b(?:элсом|elsom)\b", re.I),
     "owner-rejected gym claim": re.compile(r"\b(?:gym|тренаж[её]рн(?:ый|ого|ом|ые|ых)?\s+зал)\b", re.I),
     "owner-rejected sports grounds claim": re.compile(r"(?:спорт(?:ивн\w*)?\s+(?:площад\w*|пол\w*|корт\w*)|sports?\s+(?:field|court|ground)s?)", re.I),
-    "owner-rejected sports camp SEO claim": re.compile(r"спортивн\w*\s+сбор\w*", re.I),
     "uncanonicalized conference claim": re.compile(r"конференц[- ]зал", re.I),
     "uncanonicalized laundry claim": re.compile(r"прачечн", re.I),
     "uncanonicalized conference media": re.compile(r"conference\.webp", re.I),
