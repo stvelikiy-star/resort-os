@@ -22,18 +22,22 @@ PUBLIC_FILES = [
     ROOT / "services/api/data/site_content_defaults.json",
 ]
 
-# These rules are either stale commercial/payment rules or amenities whose CURRENT
-# operational availability has not been canonicalized for public promotion.
+# These rules are stale commercial/payment rules, owner-rejected sports amenities,
+# or amenities whose CURRENT operational availability has not been canonicalized
+# for public promotion. Sauna and billiards are intentionally NOT forbidden here:
+# their owner-approved current facts live in ownerApprovedGuestFacts.ts and are
+# protected by owner_guest_facts_guard.py.
 FORBIDDEN_PATTERNS = {
     "fixed 30 percent prepayment": re.compile(r"30\s*%[^\n]{0,80}предоплат|предоплат[^\n]{0,80}30\s*%", re.I),
     "stale two-day unpaid hold": re.compile(r"(?:через\s+)?2\s+дн(?:я|ей)[^\n]{0,100}(?:брон|предоплат|оплат)|(?:брон|предоплат|оплат)[^\n]{0,100}2\s+дн(?:я|ей)", re.I),
     "fixed first-night prepayment": re.compile(r"предоплат[^\n]{0,80}(?:перв(?:ые|ую|ой)?\s+(?:сут|ноч))", re.I),
     "unverified online card acquiring": re.compile(r"(?:visa|mastercard|карт(?:ой|а|ы))[^\n]{0,120}(?:онлайн\s+на\s+сайт|online\s+on\s+(?:the\s+)?site)|(?:онлайн\s+на\s+сайт|online\s+on\s+(?:the\s+)?site)[^\n]{0,120}(?:visa|mastercard|карт)", re.I),
     "unverified elsom payment route": re.compile(r"\b(?:элсом|elsom)\b", re.I),
+    "owner-rejected gym claim": re.compile(r"\b(?:gym|тренаж[её]рн(?:ый|ого|ом|ые|ых)?\s+зал)\b", re.I),
+    "owner-rejected sports grounds claim": re.compile(r"(?:спорт(?:ивн\w*)?\s+(?:площад\w*|пол\w*|корт\w*)|sports?\s+(?:field|court|ground)s?)", re.I),
+    "owner-rejected sports camp SEO claim": re.compile(r"спортивн\w*\s+сбор\w*", re.I),
     "uncanonicalized conference claim": re.compile(r"конференц[- ]зал", re.I),
-    "uncanonicalized billiards claim": re.compile(r"бильярд", re.I),
     "uncanonicalized laundry claim": re.compile(r"прачечн", re.I),
-    "uncanonicalized sauna claim": re.compile(r"саун", re.I),
     "uncanonicalized conference media": re.compile(r"conference\.webp", re.I),
 }
 
