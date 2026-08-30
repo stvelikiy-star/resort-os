@@ -107,14 +107,21 @@ jobs:
       - name: Seed canonical Three Crowns source database
         run: python scripts/seed_from_intake.py
 
-      - name: Verify source migration ledger and all critical invariants
+      - name: Verify source exact release contract
         env:
-          PGPASSWORD: resort
+          APP_ENV: production
+          COOKIE_SECURE: 'true'
+          REQUIRE_RECENT_BACKUP: 'false'
+          CORS_ORIGINS: https://release-check.3korony.invalid
+          AUTOMATION_SERVICE_KEY: resort-core-automation-release-validation-key-00000001
+          EXPECTED_ROOM_COUNT: '84'
+          EXPECTED_ROOM_TYPE_COUNT: '12'
         run: |
-          migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-          constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
-          test "$migration_count" -ge 1
-          test "$constraint_count" = '13'
+          python scripts/production_preflight.py | tee /tmp/preflight.txt
+          grep -q '^FACT: applied_migrations=5$' /tmp/preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements'\]$" /tmp/preflight.txt
+          grep -q '^FACT: critical_constraint_count=24$' /tmp/preflight.txt
+          grep -q '^RESULT: READY FOR NEXT DEPLOYMENT GATE$' /tmp/preflight.txt
 
       - name: Create migration-aware backup artifact
         env:
@@ -125,8 +132,9 @@ jobs:
           BACKUP_MANIFEST=$(grep '^BACKUP_MANIFEST=' /tmp/backup-output.txt | cut -d= -f2-)
           test -s "$BACKUP_FILE"
           test -s "$BACKUP_MANIFEST"
-          grep -q '^BACKUP_MIGRATIONS=' /tmp/backup-output.txt
-          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=13$' /tmp/backup-output.txt
+          grep -q '^BACKUP_MIGRATIONS=5$' /tmp/backup-output.txt
+          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=24$' /tmp/backup-output.txt
+          grep -q 'three-crowns-postgres-backup-v3' "$BACKUP_MANIFEST"
           echo "BACKUP_FILE=$BACKUP_FILE" >> "$GITHUB_ENV"
           echo "BACKUP_MANIFEST=$BACKUP_MANIFEST" >> "$GITHUB_ENV"
 
@@ -145,9 +153,9 @@ jobs:
           grep -q '^RESTORE_VERIFICATION=SUCCESS$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOMS=84$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOM_TYPES=12$' /tmp/restore-output.txt
-          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=13$' /tmp/restore-output.txt
+          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=24$' /tmp/restore-output.txt
           grep -q '^RESTORED_MIGRATION_HISTORY_PRESENT=True$' /tmp/restore-output.txt
-          grep -Eq '^RESTORED_APPLIED_MIGRATIONS=[1-9][0-9]*$' /tmp/restore-output.txt
+          grep -q '^RESTORED_APPLIED_MIGRATIONS=5$' /tmp/restore-output.txt
           grep -q '^LAST_VERIFIED_BACKUP_AT=' /tmp/restore-output.txt
 
       - name: Verify restored migration ledger directly
