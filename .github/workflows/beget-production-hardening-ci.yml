@@ -12,6 +12,7 @@ on:
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
       - 'scripts/beget_deployment_guard.py'
+      - 'scripts/beget_env_preflight.py'
       - 'scripts/public_site_truth_guard.py'
       - 'apps/web/app/layout.tsx'
       - '.github/workflows/beget-production-hardening-ci.yml'
@@ -29,6 +30,7 @@ on:
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
       - 'scripts/beget_deployment_guard.py'
+      - 'scripts/beget_env_preflight.py'
       - 'scripts/public_site_truth_guard.py'
       - 'apps/web/app/layout.tsx'
       - '.github/workflows/beget-production-hardening-ci.yml'
@@ -58,6 +60,35 @@ jobs:
       - name: Verify Beget target topology contract
         run: python scripts/beget_deployment_guard.py
 
+      - name: Build synthetic non-secret Beget env and run static preflight
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.env.beget.example').read_text(encoding='utf-8').splitlines()
+          replacements = {
+              'TLS_EMAIL': 'ops@threecrowns.test',
+              'DATABASE_URL': 'postgresql://resort:ci-password@db.internal.test:5432/resort_os?sslmode=require',
+              'PG_DUMP_DATABASE_URL': 'postgresql://resort:ci-password@db.internal.test:5432/resort_os?sslmode=require',
+              'AUTOMATION_SERVICE_KEY': 'ci-automation-service-key-abcdefghijklmnopqrstuvwxyz',
+              'N8N_ENCRYPTION_KEY': 'ci-n8n-encryption-key-abcdefghijklmnopqrstuvwxyz',
+              'S3_ENDPOINT_URL': 'https://s3.internal.test',
+              'S3_REGION': 'kg-test-1',
+              'S3_BACKUP_BUCKET': 'three-crowns-ci-backups',
+              'S3_ACCESS_KEY_ID': 'CIACCESSKEY123456',
+              'S3_SECRET_ACCESS_KEY': 'CISECRETKEYabcdefghijklmnopqrstuvwxyz',
+          }
+          rendered = []
+          for line in source:
+              if '=' in line and not line.lstrip().startswith('#'):
+                  key = line.split('=', 1)[0]
+                  if key in replacements:
+                      line = f'{key}={replacements[key]}'
+              rendered.append(line)
+          Path('/tmp/beget.ci.env').write_text('\n'.join(rendered) + '\n', encoding='utf-8')
+          PY
+          python scripts/beget_env_preflight.py --env-file /tmp/beget.ci.env | tee /tmp/beget-env-preflight.txt
+          grep -q '^RESULT: PASS STATIC$' /tmp/beget-env-preflight.txt
+
       - name: Verify public truth still blocks rejected sports/payment drift
         run: python scripts/public_site_truth_guard.py
 
@@ -70,7 +101,7 @@ jobs:
 
       - name: Render Beget Docker Compose graph
         run: |
-          docker compose --env-file .env.beget.example -f compose.beget.yaml config > /tmp/beget-compose.yml
+          docker compose --env-file /tmp/beget.ci.env -f compose.beget.yaml config > /tmp/beget-compose.yml
           grep -q '^  api:' /tmp/beget-compose.yml
           grep -q '^  web:' /tmp/beget-compose.yml
           grep -q '^  admin:' /tmp/beget-compose.yml
@@ -92,14 +123,14 @@ jobs:
       - name: Validate Caddy syntax for production hostnames
         run: |
           docker run --rm \
-            -e TLS_EMAIL=ops@example.invalid \
-            -e PUBLIC_HOST=3korony.example.invalid \
-            -e ADMIN_HOST=admin.3korony.example.invalid \
-            -e STAFF_HOST=staff.3korony.example.invalid \
-            -e API_HOST=api.3korony.example.invalid \
-            -e AUTOMATION_HOST=automation.3korony.example.invalid \
+            -e TLS_EMAIL=ops@threecrowns.test \
+            -e PUBLIC_HOST=3korony.test \
+            -e ADMIN_HOST=admin.3korony.test \
+            -e STAFF_HOST=staff.3korony.test \
+            -e API_HOST=api.3korony.test \
+            -e AUTOMATION_HOST=automation.3korony.test \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
 
       - name: Ensure Beget compose application images remain buildable
-        run: docker compose --env-file .env.beget.example -f compose.beget.yaml build api web admin staff
+        run: docker compose --env-file /tmp/beget.ci.env -f compose.beget.yaml build api web admin staff
