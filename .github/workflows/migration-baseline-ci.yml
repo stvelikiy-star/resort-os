@@ -9,6 +9,8 @@ on:
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/seed_from_intake.py'
       - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
       - '.github/workflows/migration-baseline-ci.yml'
   push:
     branches: [main]
@@ -19,6 +21,8 @@ on:
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/seed_from_intake.py'
       - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
       - '.github/workflows/migration-baseline-ci.yml'
   workflow_dispatch:
 
@@ -125,6 +129,9 @@ jobs:
       - name: Install API dependencies
         run: pip install -r services/api/requirements.txt
 
+      - name: Verify shared release contract unit invariants
+        run: python scripts/release_contract_test.py
+
       - name: Seed canonical Three Crowns development intake
         run: python scripts/seed_from_intake.py
 
@@ -142,7 +149,7 @@ jobs:
           grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
           grep -q '^FACT: applied_migrations=5$' /tmp/production-preflight.txt
           grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements'\]$" /tmp/production-preflight.txt
-          grep -q '^FACT: critical_constraint_count=13$' /tmp/production-preflight.txt
+          grep -q '^FACT: critical_constraint_count=24$' /tmp/production-preflight.txt
           grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
           grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
           grep -q '^FACT: distinct_room_codes=84$' /tmp/production-preflight.txt
@@ -154,7 +161,7 @@ jobs:
         run: |
           migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
           migration_names="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-          constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
+          core_constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
           site_content_table="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select to_regclass('public.site_content_documents')::text")"
           guest_service_columns="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.columns where table_schema='public' and table_name='operational_tasks' and column_name in ('reservationId','serviceCode','serviceDate','serviceTime')")"
           guest_service_constraints="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('operational_tasks_service_context_type_check','operational_tasks_service_time_check','operational_tasks_reservationId_fkey')")"
@@ -166,7 +173,7 @@ jobs:
           guest_engagement_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='guest_engagements' and indexname='guest_engagements_feedback_reservation_key'")"
           test "$migration_count" = '5'
           test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements'
-          test "$constraint_count" = '13'
+          test "$core_constraint_count" = '13'
           test "$site_content_table" = 'site_content_documents'
           test "$guest_service_columns" = '4'
           test "$guest_service_constraints" = '3'
