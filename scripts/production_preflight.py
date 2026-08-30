@@ -7,24 +7,11 @@ from urllib.parse import urlsplit
 
 import asyncpg
 
+from release_contract import CRITICAL_CONSTRAINTS, EXPECTED_MIGRATIONS, clean_postgres_url, migration_names_match_exactly
+
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
-CRITICAL_CONSTRAINTS = {
-    "rate_period_valid_dates",
-    "rate_period_nonnegative_price",
-    "reservation_request_valid_dates",
-    "reservation_request_positive_adults",
-    "reservation_request_nonnegative_children",
-    "reservation_valid_dates",
-    "reservation_positive_adults",
-    "reservation_nonnegative_children",
-    "reservation_nonnegative_total",
-    "inventory_block_valid_dates",
-    "no_overlapping_active_room_blocks",
-    "payment_positive_amount",
-    "payment_has_context",
-}
 
 
 def truthy(name: str, default: bool = False) -> bool:
@@ -38,7 +25,10 @@ def database_dsn() -> str:
     value = os.environ.get("DATABASE_URL", "").strip()
     if not value:
         raise RuntimeError("DATABASE_URL is required")
-    return value.split("?", 1)[0]
+    # Remove only Prisma's schema= query parameter. Preserve DBaaS/TLS options
+    # such as sslmode=require; stripping the entire query can silently downgrade
+    # or break managed PostgreSQL connections.
+    return clean_postgres_url(value)
 
 
 def parse_utc_timestamp(value: str) -> datetime:
@@ -89,6 +79,10 @@ def static_checks() -> tuple[list[str], list[str]]:
                 warnings.append("DATABASE_URL points to localhost; verify this is intentional for the target production topology")
             if parsed.path and "staging" in parsed.path.lower():
                 errors.append("DATABASE_URL appears to reference a staging database")
+            if parsed.hostname not in {None, "localhost", "127.0.0.1", "::1", "postgres"}:
+                query_lower = parsed.query.lower()
+                if "sslmode=" not in query_lower:
+                    warnings.append("External PostgreSQL URL does not explicitly declare sslmode; verify the managed DB transport requires/enforces TLS")
         except ValueError:
             errors.append("DATABASE_URL is invalid")
 
@@ -208,8 +202,13 @@ async def database_checks() -> tuple[list[str], list[str], dict]:
                 facts["migration_names"] = [row["migration_name"] for row in migration_rows]
                 if not migration_rows:
                     errors.append("No completed Prisma migrations recorded")
-                if migration_rows and "0_init" not in facts["migration_names"]:
-                    errors.append("Production baseline migration 0_init is not recorded")
+                elif not migration_names_match_exactly(facts["migration_names"]):
+                    errors.append(
+                        "Migration ledger mismatch: expected "
+                        + ",".join(EXPECTED_MIGRATIONS)
+                        + "; found "
+                        + ",".join(facts["migration_names"])
+                    )
                 if failed > 0:
                     errors.append(f"Migration history contains {failed} unfinished/rolled-back migration(s)")
 
