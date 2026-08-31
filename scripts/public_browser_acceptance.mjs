@@ -138,8 +138,7 @@ async function verifyDesktop(browser) {
   await page.locator("form.booking-bar button.search-button").click();
   await page.waitForSelector("#availability .availability-card");
   const availabilityText = await page.locator("#availability").innerText();
-  const normalizedAvailabilityText = availabilityText.replace(/\s+/gu, "");
-  assert(normalizedAvailabilityText.includes("12000"), `Availability result does not show mocked full-stay price: ${JSON.stringify(availabilityText)}`);
+  assert(/12[\s,\.\u00a0\u202f]*000/u.test(availabilityText), `Availability result does not show mocked full-stay price: ${JSON.stringify(availabilityText)}`);
   await page.locator(".availability-card button").click();
   await page.locator('input[autocomplete="name"]').fill("Тестовый гость");
   await page.locator('input[autocomplete="tel"]').fill("+996700000000");
