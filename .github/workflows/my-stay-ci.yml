@@ -17,8 +17,10 @@ on:
       - 'services/api/app/reception_reservations.py'
       - 'services/api/app/reservation_payments.py'
       - 'services/api/requirements.txt'
+      - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/5_my_stay/**'
       - 'packages/database/prisma/migrations/6_public_access/**'
+      - 'packages/database/prisma/migrations/7_in_stay_task_context/**'
       - 'apps/web/app/my-stay/**'
       - 'apps/web/app/access/**'
       - 'apps/web/components/MyStayClient.tsx'
@@ -30,6 +32,7 @@ on:
       - 'apps/staff/components/DiningConsole.tsx'
       - 'scripts/my_stay_e2e.py'
       - 'scripts/public_access_e2e.py'
+      - 'scripts/prisma_my_stay_contract.py'
       - '.github/workflows/my-stay-ci.yml'
   workflow_dispatch:
 
@@ -93,6 +96,7 @@ jobs:
         run: |
           npm install --no-audit --no-fund
           npx prisma validate
+          npx prisma generate
           npx prisma migrate deploy
 
       - uses: actions/setup-python@v5
@@ -101,15 +105,22 @@ jobs:
           cache: pip
           cache-dependency-path: services/api/requirements.txt
 
+      - name: Verify canonical Prisma MY STAY contract
+        run: python scripts/prisma_my_stay_contract.py
+
       - name: Install Core and compile all Python
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall -q services/api/app scripts/my_stay_e2e.py scripts/public_access_e2e.py
+          python -m compileall -q services/api/app scripts/my_stay_e2e.py scripts/public_access_e2e.py scripts/prisma_my_stay_contract.py
 
       - name: Verify MY STAY and public-access migrations at database level
         run: |
           python - <<'PY'
           import asyncio, asyncpg, os
+          EXPECTED = [
+              '0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots',
+              '4_guest_engagements', '5_my_stay', '6_public_access', '7_in_stay_task_context',
+          ]
           async def main():
               c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               tables={r['tablename'] for r in await c.fetch("SELECT tablename FROM pg_tables WHERE schemaname='public'")}
@@ -118,8 +129,10 @@ jobs:
               assert not missing, f'Missing MY STAY/public access tables: {sorted(missing)}'
               roles={r['enumlabel'] for r in await c.fetch("SELECT enumlabel FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='StaffRole'")}
               assert {'OWNER','MANAGER','ADMIN','RECEPTION','DINING','MAID','TECHNICIAN','BEACH_PARTNER'} <= roles, roles
-              applied=await c.fetchval('SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL')
-              assert applied >= 7, applied
+              applied=[r['migration_name'] for r in await c.fetch('SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY started_at')]
+              assert applied == EXPECTED, applied
+              constraint_def=await c.fetchval("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='operational_tasks_service_context_type_check'")
+              assert constraint_def and 'HOUSEKEEPING' in constraint_def and 'MAINTENANCE' in constraint_def, constraint_def
               await c.close()
           asyncio.run(main())
           PY
