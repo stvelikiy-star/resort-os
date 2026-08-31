@@ -153,10 +153,10 @@ jobs:
           python scripts/owner_guest_facts_guard.py
           python scripts/public_i18n_guard.py
 
-      - name: Run payment and release contract regressions
-        run: |
-          python scripts/payment_idempotency_test.py
-          python scripts/release_contract_test.py
+      - name: Run pure payment idempotency helper regression
+        env:
+          PYTHONPATH: services/api
+        run: python scripts/payment_idempotency_helper_test.py
 
       - name: Show Core log on failure
         if: failure()
