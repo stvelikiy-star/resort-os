@@ -125,6 +125,29 @@ async def _point_for_guest(conn, ctx: dict[str, Any], code: str):
     return point
 
 
+@router.get("/api/v1/guest/access/current-room")
+async def guest_current_room_access(request: Request, resort_guest_session: str | None = Cookie(default=None)):
+    ctx = await _guest_context(request, resort_guest_session)
+    if not ctx["room_id"]:
+        raise HTTPException(status_code=409, detail="Current room is not resolved")
+    async with request.app.state.db.acquire() as conn:
+        point = await conn.fetchrow(
+            '''SELECT id,code,name,kind,"roomId","priceKgs",active,"controllerRef"
+               FROM smart_access_points
+               WHERE "propertyId"=$1 AND kind='ROOM' AND "roomId"=$2 AND active=true
+               ORDER BY "updatedAt" DESC, code
+               LIMIT 1''',
+            ctx["property_id"], ctx["room_id"],
+        )
+    if not point:
+        raise HTTPException(status_code=404, detail="Access point is unavailable")
+    return {
+        "code": point["code"], "name": point["name"], "kind": point["kind"],
+        "price_kgs": int(point["priceKgs"]), "payment_required": int(point["priceKgs"]) > 0,
+        "room_match": True, "room_code": ctx["room_code"],
+    }
+
+
 @router.get("/api/v1/guest/access/{code}")
 async def guest_access_quote(code: str, request: Request, resort_guest_session: str | None = Cookie(default=None)):
     ctx = await _guest_context(request, resort_guest_session)
