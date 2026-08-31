@@ -1,0 +1,128 @@
+name: PMS Owner Grid CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/**'
+      - 'apps/admin/**'
+      - 'scripts/verify_pms_owner_grid.py'
+      - 'scripts/pms_owner_grid_browser.mjs'
+      - 'data-intake/**'
+      - 'packages/database/**'
+      - '.github/workflows/pms-owner-grid-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  owner-grid:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      COOKIE_SECURE: false
+      CORE_API_URL: http://127.0.0.1:8000
+      ADMIN_BASE_URL: http://127.0.0.1:3001
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/admin/package-lock.json
+            packages/database/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Build clean database and seed 84-room intake
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma db push
+
+      - name: Install Core and enforce DB constraints
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts/verify_pms_owner_grid.py
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Typecheck and build owner PMS
+        working-directory: apps/admin
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Install Playwright Chromium
+        working-directory: apps/admin
+        run: |
+          npm install --no-audit --no-fund --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start real Core and production-mode admin
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/owner-grid-api.log 2>&1 &
+          echo $! > /tmp/owner-grid-api.pid
+          (cd apps/admin && nohup npm run start > /tmp/owner-grid-admin.log 2>&1 & echo $! > /tmp/owner-grid-admin.pid)
+          for i in {1..45}; do
+            curl --fail --silent http://127.0.0.1:8000/health >/dev/null && curl --fail --silent http://127.0.0.1:3001/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/owner-grid-api.log || true
+          cat /tmp/owner-grid-admin.log || true
+          exit 1
+
+      - name: Browser acceptance — owner square-cell workflow
+        run: node scripts/pms_owner_grid_browser.mjs
+
+      - name: Core E2E — pricing, conflicts, audit and no fake payment
+        run: python scripts/verify_pms_owner_grid.py
+
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          echo '--- Core ---'
+          cat /tmp/owner-grid-api.log || true
+          echo '--- Admin ---'
+          cat /tmp/owner-grid-admin.log || true
+
+      - name: Stop local services
+        if: always()
+        run: |
+          if [ -f /tmp/owner-grid-admin.pid ]; then kill "$(cat /tmp/owner-grid-admin.pid)" 2>/dev/null || true; fi
+          if [ -f /tmp/owner-grid-api.pid ]; then kill "$(cat /tmp/owner-grid-api.pid)" 2>/dev/null || true; fi
