@@ -11,6 +11,7 @@ import PMSGrid from "./PMSGridV9";
 import ReceptionBoard from "./ReceptionBoard";
 import ReportsBoard from "./ReportsBoard";
 import RequestsBoard from "./RequestsBoard";
+import RoomQrBoard from "./RoomQrBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 
@@ -22,7 +23,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "GUESTS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "GUESTS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "INBOX" | "OPS" | "STAFF";
 
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
@@ -102,6 +103,7 @@ export default function AdminShell() {
   }
 
   const isManager = ["OWNER", "MANAGER"].includes(user.role);
+  const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
 
   return (
     <>
@@ -113,6 +115,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
+          {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
           {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
@@ -128,6 +131,7 @@ export default function AdminShell() {
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
       {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
+      {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
       {tab === "GROWTH" && isManager && <GrowthControlBoard />}
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
       {tab === "REPORTS" && isManager && <ReportsBoard />}
