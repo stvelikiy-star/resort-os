@@ -241,6 +241,7 @@ jobs:
           room_type_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from room_types")"
           site_content_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.site_content_documents')::text")"
           guest_service_columns="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.columns where table_schema='public' and table_name='operational_tasks' and column_name in ('reservationId','serviceCode','serviceDate','serviceTime')")"
+          guest_service_context_def="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select pg_get_constraintdef(oid) from pg_constraint where conname='operational_tasks_service_context_type_check'")"
           owner_snapshot_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.owner_analytics_snapshots')::text")"
           owner_snapshot_constraints="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname in ('owner_analytics_snapshots_property_fkey','owner_analytics_snapshots_horizon_check','owner_analytics_snapshots_payload_object_check')")"
           guest_engagement_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.guest_engagements')::text")"
@@ -248,13 +249,15 @@ jobs:
           my_stay_tables="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_tables where schemaname='public' and tablename in ('guest_access_credentials','guest_sessions','reservation_meal_plans','dining_menu_items','dining_orders','dining_order_items','reservation_charges','smart_access_points','smart_access_grants')")"
           my_stay_roles="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='StaffRole' and e.enumlabel in ('ADMIN','RECEPTION','DINING')")"
           public_access_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.public_access_payment_intents')::text")"
-          test "$migration_count" = '7'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay,6_public_access'
+          test "$migration_count" = '8'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay,6_public_access,7_in_stay_task_context'
           test "$constraint_count" = '13'
           test "$room_count" = '84'
           test "$room_type_count" = '12'
           test "$site_content_table" = 'site_content_documents'
           test "$guest_service_columns" = '4'
+          echo "$guest_service_context_def" | grep -q 'HOUSEKEEPING'
+          echo "$guest_service_context_def" | grep -q 'MAINTENANCE'
           test "$owner_snapshot_table" = 'owner_analytics_snapshots'
           test "$owner_snapshot_constraints" = '3'
           test "$guest_engagement_table" = 'guest_engagements'
