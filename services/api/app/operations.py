@@ -12,6 +12,7 @@ TASK_TYPES = {"HOUSEKEEPING", "MAINTENANCE", "GUEST_REQUEST"}
 TASK_STATUSES = {"OPEN", "IN_PROGRESS", "IN_INSPECTION", "DONE", "CANCELLED"}
 TASK_PRIORITIES = {"LOW", "NORMAL", "HIGH", "URGENT"}
 ROOM_STATES = {"UNKNOWN", "CLEAN", "DIRTY", "IN_INSPECTION", "TECH_BLOCK"}
+IN_STAY_SOURCE = "GUEST_PORTAL_IN_STAY"
 
 TASK_TRANSITIONS: dict[str, dict[str, set[str]]] = {
     "HOUSEKEEPING": {
@@ -64,8 +65,10 @@ async def property_id(conn, property_code: str) -> uuid.UUID:
 
 
 def allowed_types_for_role(role: str) -> set[str]:
-    if role in {"OWNER", "MANAGER"}:
+    if role in {"OWNER", "ADMIN", "MANAGER"}:
         return TASK_TYPES
+    if role == "RECEPTION":
+        return {"GUEST_REQUEST"}
     if role == "MAID":
         return {"HOUSEKEEPING"}
     if role == "TECHNICIAN":
@@ -94,12 +97,7 @@ def task_to_dict(row) -> dict[str, Any]:
 
 
 async def settle_terminal_maintenance_room(conn, property_id_value, room_id, task_id, actor_id):
-    """Serialize terminal maintenance transitions on the room.
-
-    The room remains TECH_BLOCK while any other maintenance task is active. When
-    the last repair is completed/cancelled, force DIRTY and create/reuse a
-    housekeeping task so the room cannot jump directly from repair to sellable.
-    """
+    """Serialize terminal turnover-maintenance transitions on the room."""
     room = await conn.fetchrow(
         '''SELECT id,code,"operationalState"::text AS state FROM rooms
            WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -115,10 +113,12 @@ async def settle_terminal_maintenance_room(conn, property_id_value, room_id, tas
             SELECT count(*)::int FROM operational_tasks
             WHERE "propertyId"=$1 AND "roomId"=$2 AND type='MAINTENANCE'
               AND id<>$3 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+              AND COALESCE(source,'')<>$4
             ''',
             property_id_value,
             room_id,
             task_id,
+            IN_STAY_SOURCE,
         )
         or 0
     )
@@ -138,9 +138,11 @@ async def settle_terminal_maintenance_room(conn, property_id_value, room_id, tas
         SELECT id FROM operational_tasks
         WHERE "roomId"=$1 AND type='HOUSEKEEPING'
           AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+          AND COALESCE(source,'')<>$2
         ORDER BY "createdAt" DESC LIMIT 1
         ''',
         room_id,
+        IN_STAY_SOURCE,
     )
     if not housekeeping_task_id:
         housekeeping_task_id = uuid.uuid4()
@@ -174,6 +176,8 @@ async def list_tasks(
     user: dict[str, Any] = Depends(current_user),
 ):
     allowed = allowed_types_for_role(user["role"])
+    if not allowed:
+        raise HTTPException(status_code=403, detail="No operational task access for role")
     if task_type and task_type not in allowed:
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if task_status and task_status not in TASK_STATUSES:
@@ -246,10 +250,11 @@ async def create_task(
                 task_id, pid, payload.room_id, payload.type, payload.priority, payload.title,
                 payload.description, payload.assigned_to_id, user["id"], payload.source,
             )
-            if payload.room_id and payload.type == "MAINTENANCE":
-                await conn.execute('UPDATE rooms SET "operationalState"=\'TECH_BLOCK\', "updatedAt"=now() WHERE id=$1', payload.room_id)
-            elif payload.room_id and payload.type == "HOUSEKEEPING":
-                await conn.execute('UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1 AND "operationalState"<>\'TECH_BLOCK\'', payload.room_id)
+            if payload.source != IN_STAY_SOURCE:
+                if payload.room_id and payload.type == "MAINTENANCE":
+                    await conn.execute('UPDATE rooms SET "operationalState"=\'TECH_BLOCK\', "updatedAt"=now() WHERE id=$1', payload.room_id)
+                elif payload.room_id and payload.type == "HOUSEKEEPING":
+                    await conn.execute('UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1 AND "operationalState"<>\'TECH_BLOCK\'', payload.room_id)
 
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
@@ -311,7 +316,7 @@ async def change_task_status(
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             task = await conn.fetchrow(
-                '''SELECT id,type::text AS type,status::text AS status,"roomId","assignedToId" FROM operational_tasks
+                '''SELECT id,type::text AS type,status::text AS status,"roomId","assignedToId",source FROM operational_tasks
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 task_id, pid,
             )
@@ -335,7 +340,7 @@ async def change_task_status(
                     },
                 )
 
-            is_manager = user["role"] in {"OWNER", "MANAGER"}
+            is_manager = user["role"] in {"OWNER", "ADMIN", "MANAGER"}
             if payload.status == "CANCELLED" and not is_manager:
                 raise HTTPException(status_code=403, detail="Only management can cancel an operational task")
             if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status in {"IN_PROGRESS", "DONE"} and not is_manager:
@@ -349,36 +354,43 @@ async def change_task_status(
                 )
 
             maintenance_result = None
-            if task["type"] == "HOUSEKEEPING" and payload.status == "IN_INSPECTION" and task["roomId"]:
-                if room_state != "TECH_BLOCK":
-                    await conn.execute('UPDATE rooms SET "operationalState"=\'IN_INSPECTION\', "updatedAt"=now() WHERE id=$1', task["roomId"])
-            if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status == "IN_PROGRESS" and task["roomId"]:
-                await conn.execute(
-                    'UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1 AND "operationalState"=\'IN_INSPECTION\'',
-                    task["roomId"],
-                )
-            if task["type"] == "HOUSEKEEPING" and payload.status == "DONE" and task["roomId"]:
-                if room_state != "IN_INSPECTION":
-                    raise HTTPException(
-                        status_code=409,
-                        detail={"code": "HOUSEKEEPING_ROOM_NOT_IN_INSPECTION", "room_state": room_state},
+            in_stay_service = task["source"] == IN_STAY_SOURCE
+            if not in_stay_service:
+                if task["type"] == "HOUSEKEEPING" and payload.status == "IN_INSPECTION" and task["roomId"]:
+                    if room_state != "TECH_BLOCK":
+                        await conn.execute('UPDATE rooms SET "operationalState"=\'IN_INSPECTION\', "updatedAt"=now() WHERE id=$1', task["roomId"])
+                if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status == "IN_PROGRESS" and task["roomId"]:
+                    await conn.execute(
+                        'UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1 AND "operationalState"=\'IN_INSPECTION\'',
+                        task["roomId"],
                     )
-                await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\', "updatedAt"=now() WHERE id=$1', task["roomId"])
-            if task["type"] == "MAINTENANCE" and payload.status in {"DONE", "CANCELLED"} and task["roomId"]:
-                maintenance_result = await settle_terminal_maintenance_room(
-                    conn,
-                    pid,
-                    task["roomId"],
-                    task_id,
-                    user["id"],
-                )
+                if task["type"] == "HOUSEKEEPING" and payload.status == "DONE" and task["roomId"]:
+                    if room_state != "IN_INSPECTION":
+                        raise HTTPException(
+                            status_code=409,
+                            detail={"code": "HOUSEKEEPING_ROOM_NOT_IN_INSPECTION", "room_state": room_state},
+                        )
+                    await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\', "updatedAt"=now() WHERE id=$1', task["roomId"])
+                if task["type"] == "MAINTENANCE" and payload.status in {"DONE", "CANCELLED"} and task["roomId"]:
+                    maintenance_result = await settle_terminal_maintenance_room(
+                        conn,
+                        pid,
+                        task["roomId"],
+                        task_id,
+                        user["id"],
+                    )
 
             await conn.execute(
                 '''UPDATE operational_tasks SET status=$1::"OperationalTaskStatus",
                    "completedAt"=CASE WHEN $1='DONE' THEN now() ELSE NULL END, "updatedAt"=now() WHERE id=$2''',
                 payload.status, task_id,
             )
-            after_payload = {"from_status": current_status, "status": payload.status}
+            after_payload = {
+                "from_status": current_status,
+                "status": payload.status,
+                "in_stay_service": in_stay_service,
+                "room_state_preserved": in_stay_service and task["roomId"] is not None,
+            }
             if maintenance_result:
                 after_payload.update(maintenance_result)
             await conn.execute(
@@ -394,7 +406,7 @@ async def change_room_state(
     room_id: uuid.UUID,
     payload: RoomStatePatch,
     request: Request,
-    user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER")),
+    user: dict[str, Any] = Depends(require_roles("OWNER", "ADMIN", "MANAGER")),
 ):
     if payload.state not in ROOM_STATES:
         raise HTTPException(status_code=422, detail="Unknown room state")
