@@ -157,6 +157,7 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
             "id": str(room["id"]),
             "code": room["code"],
             "name": room["name"],
+            "room_type_id": str(room["roomTypeId"]),
             "room_type_code": room["room_type_code"],
             "room_type_name": room["room_type_name"],
             "beds_raw": room["bedConfiguration"],
@@ -260,16 +261,9 @@ async def commit_grid_reservation(
                     payload.check_out,
                     payload.adults,
                     payload.children,
-                    uuid.UUID(room["id"]),
+                    uuid.UUID(room["room_type_id"]),
                     payload.expected_total_kgs,
                     payload.notes,
-                )
-
-                # desiredRoomTypeId references room_types, not rooms.
-                await conn.execute(
-                    'UPDATE reservation_requests SET "desiredRoomTypeId"=(SELECT "roomTypeId" FROM rooms WHERE id=$1) WHERE id=$2',
-                    payload.room_id,
-                    request_id,
                 )
 
                 await conn.execute(
