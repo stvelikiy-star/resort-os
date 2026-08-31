@@ -344,6 +344,108 @@ async def _mark_vacated_room_dirty(conn, property_id, room_id, room_code, bookin
     return task_id
 
 
+async def _record_actual_relocation(
+    conn,
+    *,
+    property_id: uuid.UUID,
+    reservation_id: uuid.UUID,
+    from_room_id: uuid.UUID,
+    to_room_id: uuid.UUID,
+    booking_number: str,
+):
+    """Advance factual stay placement only when a checked-in guest moves now."""
+    stay = await conn.fetchrow(
+        '''
+        SELECT id,"guestId"
+        FROM stays
+        WHERE "propertyId"=$1 AND "reservationId"=$2 AND status='ACTIVE'
+        FOR UPDATE
+        ''',
+        property_id,
+        reservation_id,
+    )
+    if not stay:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "ACTIVE_STAY_REQUIRED_FOR_RELOCATION",
+                "action": "REPAIR_OR_RECHECK_STAY_BEFORE_ROOM_MOVE",
+            },
+        )
+
+    assignment = await conn.fetchrow(
+        '''
+        SELECT id,"roomId"
+        FROM room_assignments
+        WHERE "stayId"=$1 AND "endedAt" IS NULL
+        FOR UPDATE
+        ''',
+        stay["id"],
+    )
+    if not assignment or assignment["roomId"] != from_room_id:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CURRENT_ROOM_ASSIGNMENT_MISMATCH",
+                "expected_room_id": str(from_room_id),
+                "actual_room_id": str(assignment["roomId"]) if assignment else None,
+            },
+        )
+
+    target_assignment = await conn.fetchrow(
+        '''
+        SELECT id,"stayId"
+        FROM room_assignments
+        WHERE "roomId"=$1 AND "endedAt" IS NULL AND "stayId"<>$2
+        FOR UPDATE
+        ''',
+        to_room_id,
+        stay["id"],
+    )
+    if target_assignment:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "TARGET_ROOM_HAS_ACTIVE_STAY_ASSIGNMENT"},
+        )
+
+    await conn.execute(
+        'UPDATE room_assignments SET "endedAt"=now(),"updatedAt"=now() WHERE id=$1',
+        assignment["id"],
+    )
+    new_assignment_id = uuid.uuid4()
+    await conn.execute(
+        '''
+        INSERT INTO room_assignments (
+          id,"propertyId","stayId","roomId","startedAt",source,"createdAt","updatedAt"
+        ) VALUES ($1,$2,$3,$4,now(),'PMS_RELOCATION',now(),now())
+        ''',
+        new_assignment_id,
+        property_id,
+        stay["id"],
+        to_room_id,
+    )
+    await conn.execute(
+        '''
+        INSERT INTO guest_history_events (
+          id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
+        ) VALUES ($1,$2,$3,$4,'ROOM_RELOCATION','PMS_CHESSBOARD',
+          jsonb_build_object(
+            'from_room_id',$5::text,
+            'to_room_id',$6::text,
+            'booking_number',$7::text
+          ),now(),now())
+        ''',
+        uuid.uuid4(),
+        property_id,
+        stay["guestId"],
+        stay["id"],
+        str(from_room_id),
+        str(to_room_id),
+        booking_number,
+    )
+    return new_assignment_id
+
+
 @router.post("/reservations/{reservation_id}/schedule/preview")
 async def preview_schedule(reservation_id: uuid.UUID, payload: SchedulePreviewPayload, request: Request, user: dict[str, Any] = Depends(manager_access)):
     proposed = _normalize_segments(payload.segments)
@@ -408,8 +510,17 @@ async def commit_schedule(reservation_id: uuid.UUID, payload: ScheduleCommitPayl
                 )
 
                 relocation_task_id = None
+                relocation_assignment_id = None
                 relocation = preview["immediate_relocation"]
                 if relocation:
+                    relocation_assignment_id = await _record_actual_relocation(
+                        conn,
+                        property_id=prop["id"],
+                        reservation_id=reservation_id,
+                        from_room_id=uuid.UUID(relocation["from_room_id"]),
+                        to_room_id=uuid.UUID(relocation["to_room_id"]),
+                        booking_number=reservation["bookingNumber"],
+                    )
                     relocation_task_id = await _mark_vacated_room_dirty(
                         conn,
                         prop["id"],
@@ -434,6 +545,7 @@ async def commit_schedule(reservation_id: uuid.UUID, payload: ScheduleCommitPayl
                     "price_delta_kgs": preview["pricing"]["delta_kgs"],
                     "category_changed": preview["category_changed"],
                     "immediate_relocation": relocation,
+                    "relocation_room_assignment_id": str(relocation_assignment_id) if relocation_assignment_id else None,
                     "relocation_housekeeping_task_id": str(relocation_task_id) if relocation_task_id else None,
                 }
                 await conn.execute(
@@ -463,6 +575,7 @@ async def commit_schedule(reservation_id: uuid.UUID, payload: ScheduleCommitPayl
                     "stored_total_kgs": reservation["totalKgs"],
                     "pricing_preview": preview["pricing"],
                     "immediate_relocation": relocation,
+                    "relocation_room_assignment_id": str(relocation_assignment_id) if relocation_assignment_id else None,
                     "relocation_housekeeping_task_id": str(relocation_task_id) if relocation_task_id else None,
                     "message": "Schedule updated atomically; stored reservation total was not changed automatically.",
                 }
