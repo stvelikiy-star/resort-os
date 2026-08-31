@@ -1,0 +1,163 @@
+name: MY STAY Full Gate
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/my_stay.py'
+      - 'services/api/app/my_stay_qr.py'
+      - 'services/api/app/smart_access.py'
+      - 'services/api/app/smart_access_current.py'
+      - 'services/api/app/guest_security.py'
+      - 'services/api/app/reception_stays.py'
+      - 'services/api/app/operations.py'
+      - 'services/api/app/staff_task_reports.py'
+      - 'services/api/app/auth.py'
+      - 'services/api/app/app_entry.py'
+      - 'services/api/app/reception_reservations.py'
+      - 'services/api/app/reservation_payments.py'
+      - 'services/api/requirements.txt'
+      - 'packages/database/prisma/migrations/5_my_stay/**'
+      - 'apps/web/app/my-stay/**'
+      - 'apps/web/components/MyStayClient.tsx'
+      - 'apps/admin/app/my-stay/**'
+      - 'apps/admin/components/MyStayAdminBoard.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/staff/app/dining/**'
+      - 'apps/staff/components/DiningConsole.tsx'
+      - 'scripts/my_stay_e2e.py'
+      - '.github/workflows/my-stay-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: my-stay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  my-stay-full-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      APP_ENV: test
+      COOKIE_SECURE: 'false'
+      SESSION_TTL_HOURS: '8'
+      GUEST_HOST: guest.test.local
+      GUEST_SESSION_SECRET: MY_STAY_CI_GUEST_SESSION_SECRET_2026_AT_LEAST_64_CHARACTERS_LONG_123456
+      GUEST_SESSION_HOURS: '24'
+      SMART_ACCESS_CONTROLLER_URL: ''
+      SMART_ACCESS_HMAC_SECRET: ''
+      CORS_ORIGINS: ''
+      REQUIRE_MIGRATION_HISTORY: 'false'
+      REQUIRE_RECENT_BACKUP: 'false'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate and deploy database migrations
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install Core and compile all Python
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall -q services/api/app scripts/my_stay_e2e.py
+
+      - name: Verify MY STAY migration and RBAC at database level
+        run: |
+          python - <<'PY'
+          import asyncio, asyncpg, os
+          async def main():
+              c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              tables={r['tablename'] for r in await c.fetch("SELECT tablename FROM pg_tables WHERE schemaname='public'")}
+              required={'guest_access_credentials','guest_sessions','reservation_meal_plans','dining_menu_items','dining_orders','dining_order_items','reservation_charges','smart_access_points','smart_access_grants'}
+              missing=required-tables
+              assert not missing, f'Missing MY STAY tables: {sorted(missing)}'
+              roles={r['enumlabel'] for r in await c.fetch("SELECT enumlabel FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='StaffRole'")}
+              assert {'OWNER','MANAGER','ADMIN','RECEPTION','DINING','MAID','TECHNICIAN','BEACH_PARTNER'} <= roles, roles
+              applied=await c.fetchval('SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL')
+              assert applied >= 6, applied
+              await c.close()
+          asyncio.run(main())
+          PY
+
+      - name: Seed canonical Three Crowns inventory
+        run: python scripts/seed_from_intake.py
+
+      - name: Typecheck public website
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+
+      - name: Typecheck full PMS
+        working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+
+      - name: Typecheck Staff and Dining PWA
+        working-directory: apps/staff
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/my-stay-api.log 2>&1 &
+          echo $! > /tmp/my-stay-api.pid
+          for i in {1..40}; do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/my-stay-ready.json 2>/dev/null; then exit 0; fi
+            if [ "$i" = "40" ]; then cat /tmp/my-stay-api.log; exit 1; fi
+            sleep 1
+          done
+
+      - name: Run MY STAY end-to-end chain
+        run: python scripts/my_stay_e2e.py
+
+      - name: Run public truth regression guards
+        run: |
+          python scripts/public_site_truth_guard.py
+          python scripts/owner_guest_facts_guard.py
+          python scripts/public_i18n_guard.py
+
+      - name: Run payment and release contract regressions
+        run: |
+          python scripts/payment_idempotency_test.py
+          python scripts/release_contract_test.py
+
+      - name: Show Core log on failure
+        if: failure()
+        run: cat /tmp/my-stay-api.log || true
