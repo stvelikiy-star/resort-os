@@ -21,6 +21,7 @@ on:
       - 'packages/database/prisma/migrations/5_my_stay/**'
       - 'packages/database/prisma/migrations/6_public_access/**'
       - 'packages/database/prisma/migrations/7_in_stay_task_context/**'
+      - 'packages/database/prisma/migrations/8_public_access_unlock_claim/**'
       - 'apps/web/app/my-stay/**'
       - 'apps/web/app/access/**'
       - 'apps/web/components/MyStayClient.tsx'
@@ -120,6 +121,7 @@ jobs:
           EXPECTED = [
               '0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots',
               '4_guest_engagements', '5_my_stay', '6_public_access', '7_in_stay_task_context',
+              '8_public_access_unlock_claim',
           ]
           async def main():
               c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
@@ -131,8 +133,10 @@ jobs:
               assert {'OWNER','MANAGER','ADMIN','RECEPTION','DINING','MAID','TECHNICIAN','BEACH_PARTNER'} <= roles, roles
               applied=[r['migration_name'] for r in await c.fetch('SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY started_at')]
               assert applied == EXPECTED, applied
-              constraint_def=await c.fetchval("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='operational_tasks_service_context_type_check'")
-              assert constraint_def and 'HOUSEKEEPING' in constraint_def and 'MAINTENANCE' in constraint_def, constraint_def
+              task_constraint=await c.fetchval("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='operational_tasks_service_context_type_check'")
+              assert task_constraint and 'HOUSEKEEPING' in task_constraint and 'MAINTENANCE' in task_constraint, task_constraint
+              public_status=await c.fetchval("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='public_access_payment_intents_status_check'")
+              assert public_status and 'UNLOCKING' in public_status, public_status
               await c.close()
           asyncio.run(main())
           PY
