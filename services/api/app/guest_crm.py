@@ -1,3 +1,4 @@
+import json
 import uuid
 from collections import defaultdict
 from typing import Any
@@ -51,6 +52,11 @@ async def require_guest(conn, property_id_value: uuid.UUID, guest_id: uuid.UUID)
 
 
 def safe_payload(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return None
     if not isinstance(value, dict):
         return None
     clean = {key: value[key] for key in SAFE_EVENT_PAYLOAD_KEYS if key in value and value[key] is not None}
@@ -252,6 +258,7 @@ async def upsert_guest_preference(
                 normalized,
                 value,
             )
+            before_json = None if not before else json.dumps({"value": before["valueText"], "active": before["isActive"]})
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"beforeJson","afterJson","createdAt")
@@ -262,7 +269,7 @@ async def upsert_guest_preference(
                 pid,
                 user["id"],
                 str(preference_id),
-                None if not before else {"value": before["valueText"], "active": before["isActive"]},
+                before_json,
                 str(guest_id),
                 normalized,
                 value,
