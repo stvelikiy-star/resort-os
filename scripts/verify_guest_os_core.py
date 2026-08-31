@@ -301,7 +301,7 @@ def main():
     checkout.raise_for_status()
     checkout_body = checkout.json()
     assert checkout_body["status"] == "CHECKED_OUT"
-    assert checkout_body["guest_sessions_revoked"] >= 1
+    assert checkout_body["revoked_guest_sessions"] >= 1
     asyncio.run(prove_checkout(stay_id, session_id, qr_id, qr_hash))
 
     client.close()
