@@ -11,6 +11,8 @@ on:
       - 'scripts/production_preflight.py'
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
+      - 'scripts/prisma_my_stay_contract.py'
+      - 'scripts/migration_gate_consistency.py'
       - '.github/workflows/migration-baseline-ci.yml'
   push:
     branches: [main]
@@ -23,6 +25,8 @@ on:
       - 'scripts/production_preflight.py'
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
+      - 'scripts/prisma_my_stay_contract.py'
+      - 'scripts/migration_gate_consistency.py'
       - '.github/workflows/migration-baseline-ci.yml'
   workflow_dispatch:
 
@@ -80,6 +84,7 @@ jobs:
             npm install --no-audit --no-fund
             npx prisma format
             npx prisma validate
+            npx prisma generate
           else
             echo 'Generating 0_init baseline candidate.'
             bash scripts/generate_migration_baseline.sh
@@ -96,6 +101,7 @@ jobs:
           test -s packages/database/prisma/migrations/5_my_stay/migration.sql
           test -s packages/database/prisma/migrations/6_public_access/migration.sql
           test -s packages/database/prisma/migrations/7_in_stay_task_context/migration.sql
+          test -s packages/database/prisma/migrations/8_public_access_unlock_claim/migration.sql
           grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'reservation_nonnegative_total' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'inventory_block_valid_dates' packages/database/prisma/migrations/0_init/migration.sql
@@ -124,6 +130,8 @@ jobs:
           grep -q 'HOUSEKEEPING' packages/database/prisma/migrations/7_in_stay_task_context/migration.sql
           grep -q 'MAINTENANCE' packages/database/prisma/migrations/7_in_stay_task_context/migration.sql
           grep -q 'reservationId only' packages/database/prisma/migrations/7_in_stay_task_context/migration.sql
+          grep -q 'UNLOCKING' packages/database/prisma/migrations/8_public_access_unlock_claim/migration.sql
+          grep -q 'public_access_payment_intents_status_check' packages/database/prisma/migrations/8_public_access_unlock_claim/migration.sql
           cd packages/database/prisma/migrations/0_init
           sha256sum -c migration.sql.sha256
 
@@ -142,8 +150,11 @@ jobs:
       - name: Install API dependencies
         run: pip install -r services/api/requirements.txt
 
-      - name: Verify shared release contract unit invariants
-        run: python scripts/release_contract_test.py
+      - name: Verify shared release and Prisma contracts
+        run: |
+          python scripts/release_contract_test.py
+          python scripts/prisma_my_stay_contract.py
+          python scripts/migration_gate_consistency.py
 
       - name: Seed canonical Three Crowns development intake
         run: python scripts/seed_from_intake.py
@@ -160,9 +171,9 @@ jobs:
         run: |
           python scripts/production_preflight.py | tee /tmp/production-preflight.txt
           grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
-          grep -q '^FACT: applied_migrations=8$' /tmp/production-preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_my_stay', '6_public_access', '7_in_stay_task_context'\]$" /tmp/production-preflight.txt
-          grep -q '^FACT: critical_constraint_count=24$' /tmp/production-preflight.txt
+          grep -q '^FACT: applied_migrations=9$' /tmp/production-preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_my_stay', '6_public_access', '7_in_stay_task_context', '8_public_access_unlock_claim'\]$" /tmp/production-preflight.txt
+          grep -q '^FACT: critical_constraint_count=25$' /tmp/production-preflight.txt
           grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
           grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
           grep -q '^FACT: distinct_room_codes=84$' /tmp/production-preflight.txt
@@ -189,8 +200,9 @@ jobs:
           my_stay_roles="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='StaffRole' and e.enumlabel in ('ADMIN','RECEPTION','DINING')")"
           public_access_table="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select to_regclass('public.public_access_payment_intents')::text")"
           public_access_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='public_access_payment_intents' and indexname='public_access_payment_intents_provider_ref_unique_idx'")"
-          test "$migration_count" = '8'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay,6_public_access,7_in_stay_task_context'
+          public_access_status_def="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select pg_get_constraintdef(oid) from pg_constraint where conname='public_access_payment_intents_status_check'")"
+          test "$migration_count" = '9'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay,6_public_access,7_in_stay_task_context,8_public_access_unlock_claim'
           test "$core_constraint_count" = '13'
           test "$site_content_table" = 'site_content_documents'
           test "$guest_service_columns" = '4'
@@ -207,6 +219,7 @@ jobs:
           test "$my_stay_roles" = '3'
           test "$public_access_table" = 'public_access_payment_intents'
           test "$public_access_unique" = '1'
+          echo "$public_access_status_def" | grep -q 'UNLOCKING'
 
       - name: Upload migration chain for explicit review
         uses: actions/upload-artifact@v4
