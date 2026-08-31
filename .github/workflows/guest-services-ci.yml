@@ -1,26 +1,32 @@
-name: Guest Services PMS CI
+name: Guest Services Center CI
 
 on:
   pull_request:
     paths:
       - 'services/api/app/guest_services.py'
+      - 'services/api/app/staff_guest_requests.py'
       - 'services/api/app/app_entry.py'
-      - 'services/api/app/operations.py'
       - 'packages/database/prisma/schema.prisma'
-      - 'packages/database/prisma/migrations/2_guest_service_tasks/**'
-      - 'apps/admin/components/PMSGuestServicesV9.tsx'
+      - 'packages/database/prisma/migrations/**'
+      - 'apps/admin/components/GuestServicesCenter.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/PMSGridV9.tsx'
+      - 'scripts/verify_guest_services_center.py'
+      - 'scripts/upsert_staff_user.py'
       - '.github/workflows/guest-services-ci.yml'
   push:
     branches: [main]
     paths:
       - 'services/api/app/guest_services.py'
+      - 'services/api/app/staff_guest_requests.py'
       - 'services/api/app/app_entry.py'
-      - 'services/api/app/operations.py'
       - 'packages/database/prisma/schema.prisma'
-      - 'packages/database/prisma/migrations/2_guest_service_tasks/**'
-      - 'apps/admin/components/PMSGuestServicesV9.tsx'
+      - 'packages/database/prisma/migrations/**'
+      - 'apps/admin/components/GuestServicesCenter.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/PMSGridV9.tsx'
+      - 'scripts/verify_guest_services_center.py'
+      - 'scripts/upsert_staff_user.py'
       - '.github/workflows/guest-services-ci.yml'
   workflow_dispatch:
 
@@ -32,7 +38,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  guest-services:
+  guest-services-center:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -58,6 +64,7 @@ jobs:
       BOOTSTRAP_OWNER_USERNAME: ci-owner
       BOOTSTRAP_OWNER_PASSWORD: CI-Owner-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      RESORT_CORE_TEST_URL: http://127.0.0.1:8000
 
     steps:
       - uses: actions/checkout@v4
@@ -73,11 +80,12 @@ jobs:
           npx prisma validate
           npx prisma migrate deploy
 
-      - name: Typecheck PMS V9 guest services
+      - name: Typecheck and build unified admin surface
         working-directory: apps/admin
         run: |
           npm ci --no-audit --no-fund
           npm run typecheck
+          npm run build
 
       - uses: actions/setup-python@v5
         with:
@@ -85,167 +93,41 @@ jobs:
           cache: 'pip'
           cache-dependency-path: services/api/requirements.txt
 
-      - name: Install and compile Core
+      - name: Install and compile Resort Core and verifier
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app
+          python -m compileall services/api/app scripts/verify_guest_services_center.py scripts/upsert_staff_user.py
 
       - name: Seed Three Crowns and bootstrap OWNER
         run: |
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
 
-      - name: Start Resort Core and login
+      - name: Prove current RBAC roles are reproducible by staff helper
         run: |
-          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/guest-services-api.log 2>&1 &
-          echo $! > /tmp/guest-services-api.pid
+          STAFF_USERNAME=ci-reception STAFF_PASSWORD=CI-Reception-Password-2026 STAFF_DISPLAY_NAME='CI Reception' STAFF_ROLE=RECEPTION python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-dining STAFF_PASSWORD=CI-Dining-Password-2026 STAFF_DISPLAY_NAME='CI Dining' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-store STAFF_PASSWORD=CI-Store-Password-2026 STAFF_DISPLAY_NAME='CI Store' STAFF_ROLE=STORE_STAFF python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-content STAFF_PASSWORD=CI-Content-Password-2026 STAFF_DISPLAY_NAME='CI Content' STAFF_ROLE=CONTENT_MANAGER python scripts/upsert_staff_user.py
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/guest-services-center-api.log 2>&1 &
+          echo $! > /tmp/guest-services-center-api.pid
           for i in {1..30}; do
             if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/ready.json 2>/dev/null; then break; fi
-            if [ "$i" = "30" ]; then cat /tmp/guest-services-api.log; exit 1; fi
+            if [ "$i" = "30" ]; then cat /tmp/guest-services-center-api.log; exit 1; fi
             sleep 1
           done
-          curl --fail -sS -c /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"ci-owner","password":"CI-Owner-Strong-Password-2026"}' >/tmp/owner-login.json
 
-      - name: Create real Reservation through current manager flow
-        run: |
-          python - <<'PY'
-          from datetime import date,timedelta
-          start=date.today()+timedelta(days=20)
-          end=start+timedelta(days=2)
-          open('/tmp/check-in','w').write(start.isoformat())
-          open('/tmp/check-out','w').write(end.isoformat())
-          PY
-          IN=$(cat /tmp/check-in)
-          OUT=$(cat /tmp/check-out)
-          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=$IN&check_out=$OUT&adults=2&children=0" >/tmp/availability.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/availability.json'))
-          option=next(x for x in d['results'] if x['available_count']>0 and x['pricing']['sellable'])
-          open('/tmp/room-type','w').write(option['room_type_code'])
-          PY
-          TYPE=$(cat /tmp/room-type)
-          cat >/tmp/request.json <<JSON
-          {"guest_name":"Guest Services CI","phone":"+996555000111","check_in":"$IN","check_out":"$OUT","adults":2,"children":0,"room_type_code":"$TYPE","source":"CI_GUEST_SERVICES"}
-          JSON
-          curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests -H 'Content-Type: application/json' --data-binary @/tmp/request.json >/tmp/request-created.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/request-created.json'))
-          open('/tmp/request-id','w').write(d['id'])
-          PY
-          REQUEST=$(cat /tmp/request-id)
-          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST/quote" \
-            -H 'Content-Type: application/json' -d "{\"room_type_code\":\"$TYPE\"}" >/tmp/quote.json
-          curl --fail -sS -b /tmp/owner-cookies.txt -X POST "http://127.0.0.1:8000/api/v1/admin/booking/requests/$REQUEST/confirm-payment" \
-            -H 'Content-Type: application/json' \
-            -d '{"amount_kgs":1000,"method":"CI_MANAGER","external_ref":"guest-services-ci-001","idempotency_key":"guest-services-ci-payment-001"}' >/tmp/reservation.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/reservation.json'))
-          assert d['reservation_status']=='GUARANTEED'
-          open('/tmp/reservation-id','w').write(d['reservation_id'])
-          open('/tmp/booking-number','w').write(d['booking_number'])
-          PY
-
-      - name: Create structured transfer request and prove no automatic finance mutation
-        run: |
-          RID=$(cat /tmp/reservation-id)
-          IN=$(cat /tmp/check-in)
-          cat >/tmp/service.json <<JSON
-          {"reservation_id":"$RID","service_code":"TRANSFER","service_date":"$IN","service_time":"14:30","priority":"HIGH","description":"CI airport transfer"}
-          JSON
-          curl --fail -sS -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/guest-services \
-            -H 'Content-Type: application/json' --data-binary @/tmp/service.json >/tmp/service-created.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/service-created.json'))
-          assert d['service_code']=='TRANSFER'
-          assert d['status']=='OPEN'
-          assert d['reservation_id']==open('/tmp/reservation-id').read()
-          assert d['room_code']
-          open('/tmp/service-id','w').write(d['id'])
-          PY
-          python - <<'PY'
-          import asyncio,asyncpg,os
-          async def main():
-              c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
-              rid=open('/tmp/reservation-id').read()
-              row=await c.fetchrow('SELECT "totalKgs" FROM reservations WHERE id=$1::uuid',rid)
-              pays=await c.fetchval("SELECT count(*) FROM payments WHERE \"reservationId\"=$1::uuid",rid)
-              task=await c.fetchrow('SELECT type::text,"serviceCode","reservationId" FROM operational_tasks WHERE id=$1::uuid',open('/tmp/service-id').read())
-              assert row['totalKgs']>0
-              assert pays==1
-              assert task['type']=='GUEST_REQUEST' and task['serviceCode']=='TRANSFER' and str(task['reservationId'])==rid
-              await c.close()
-          asyncio.run(main())
-          PY
-
-      - name: Reject duplicate active service and invalid time
-        run: |
-          CODE=$(curl -sS -o /tmp/duplicate.json -w '%{http_code}' -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/guest-services \
-            -H 'Content-Type: application/json' --data-binary @/tmp/service.json)
-          test "$CODE" = "409"
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/duplicate.json'))
-          assert d['detail']['code']=='GUEST_SERVICE_DUPLICATE_ACTIVE'
-          PY
-          RID=$(cat /tmp/reservation-id)
-          CODE=$(curl -sS -o /tmp/bad-time.json -w '%{http_code}' -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/guest-services \
-            -H 'Content-Type: application/json' -d "{\"reservation_id\":\"$RID\",\"service_code\":\"SAUNA\",\"service_time\":\"25:00\"}")
-          test "$CODE" = "422"
-
-      - name: Prove property isolation
-        run: |
-          python - <<'PY'
-          import asyncio,asyncpg,os,uuid
-          from datetime import date,timedelta
-          async def main():
-              c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
-              pid=uuid.uuid4(); gid=uuid.uuid4(); rid=uuid.uuid4()
-              await c.execute('INSERT INTO properties(id,code,name,"createdAt","updatedAt") VALUES($1,$2,$3,now(),now())',pid,'OTHER_PROPERTY','Other Property')
-              await c.execute('INSERT INTO guests(id,"propertyId","firstName","createdAt","updatedAt") VALUES($1,$2,$3,now(),now())',gid,pid,'Other Guest')
-              start=date.today()+timedelta(days=20)
-              await c.execute('INSERT INTO reservations(id,"propertyId","bookingNumber","primaryGuestId",status,"checkIn","checkOut",adults,children,"totalKgs","createdAt","updatedAt") VALUES($1,$2,$3,$4,\'GUARANTEED\',$5,$6,1,0,1,now(),now())',rid,pid,'OTHER-CI-1',gid,start,start+timedelta(days=1))
-              open('/tmp/other-reservation-id','w').write(str(rid))
-              await c.close()
-          asyncio.run(main())
-          PY
-          OTHER=$(cat /tmp/other-reservation-id)
-          CODE=$(curl -sS -o /tmp/property-isolation.json -w '%{http_code}' -b /tmp/owner-cookies.txt -X POST http://127.0.0.1:8000/api/v1/admin/guest-services \
-            -H 'Content-Type: application/json' -d "{\"reservation_id\":\"$OTHER\",\"service_code\":\"MEALS\"}")
-          test "$CODE" = "404"
-
-      - name: List queue, transition task and verify audit trail
-        run: |
-          RID=$(cat /tmp/reservation-id)
-          SID=$(cat /tmp/service-id)
-          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/guest-services?status=ACTIVE&service_code=TRANSFER&reservation_id=$RID" >/tmp/services.json
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/services.json'))
-          assert len(d['items'])==1
-          assert d['items'][0]['service_code']=='TRANSFER'
-          PY
-          curl --fail -sS -b /tmp/owner-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$SID/status" -H 'Content-Type: application/json' -d '{"status":"IN_PROGRESS"}' >/tmp/in-progress.json
-          curl --fail -sS -b /tmp/owner-cookies.txt -X PATCH "http://127.0.0.1:8000/api/v1/ops/tasks/$SID/status" -H 'Content-Type: application/json' -d '{"status":"DONE"}' >/tmp/done.json
-          curl --fail -sS -b /tmp/owner-cookies.txt "http://127.0.0.1:8000/api/v1/admin/guest-services?status=DONE&reservation_id=$RID" >/tmp/services-done.json
-          python - <<'PY'
-          import asyncio,asyncpg,json,os
-          d=json.load(open('/tmp/services-done.json'))
-          assert len(d['items'])==1 and d['items'][0]['status']=='DONE'
-          async def main():
-              c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
-              sid=open('/tmp/service-id').read()
-              audit=await c.fetchval("SELECT count(*) FROM audit_logs WHERE action='CREATE_GUEST_SERVICE' AND \"resourceId\"=$1",sid)
-              assert audit==1
-              await c.close()
-          asyncio.run(main())
-          PY
+      - name: Run unified Guest Services Center E2E
+        run: python scripts/verify_guest_services_center.py
 
       - name: Show Core logs on failure
         if: failure()
-        run: cat /tmp/guest-services-api.log || true
+        run: cat /tmp/guest-services-center-api.log || true
+
+      - name: Stop Core
+        if: always()
+        run: |
+          if [ -f /tmp/guest-services-center-api.pid ]; then kill "$(cat /tmp/guest-services-center-api.pid)" || true; fi
