@@ -11,6 +11,7 @@ on:
       - "scripts/external_public_truth_probe.py"
       - "scripts/external_public_truth_probe_test.py"
       - "scripts/owner_guest_facts_guard.py"
+      - "scripts/public_media_integrity_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
   push:
     branches: [main]
@@ -23,6 +24,7 @@ on:
       - "scripts/external_public_truth_probe.py"
       - "scripts/external_public_truth_probe_test.py"
       - "scripts/owner_guest_facts_guard.py"
+      - "scripts/public_media_integrity_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
 
 permissions:
@@ -40,6 +42,8 @@ jobs:
         run: python3 scripts/public_site_truth_guard.py
       - name: Enforce owner-approved guest service facts
         run: python3 scripts/owner_guest_facts_guard.py
+      - name: Enforce public media integrity
+        run: python3 scripts/public_media_integrity_guard.py
       - name: Test external rendered-site truth probe
         run: python3 scripts/external_public_truth_probe_test.py
       - name: Enforce RU KG EN public locale contract
