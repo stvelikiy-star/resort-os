@@ -17,7 +17,7 @@ type GuestRequestItem = {
   updated_at: string;
 };
 
-const REQUEST_CODES = ["HOUSEKEEPING", "TOWELS", "LINEN", "MAINTENANCE", "TRANSFER", "MEALS", "SAUNA", "BILLIARDS", "EXCURSIONS", "ADMIN"] as const;
+const REQUEST_CODES = ["HOUSEKEEPING", "TOWELS", "LINEN", "MAINTENANCE", "TRANSFER", "MEALS", "PARKING", "SAUNA", "BILLIARDS", "EXCURSIONS", "ADMIN"] as const;
 type RequestCode = (typeof REQUEST_CODES)[number];
 
 const COPY = {
@@ -40,7 +40,7 @@ const COPY = {
     refresh: "Обновить",
     cancel: "Отменить",
     status: { OPEN: "Новая", IN_PROGRESS: "В работе", IN_INSPECTION: "На проверке", DONE: "Выполнено", CANCELLED: "Отменено" },
-    labels: { HOUSEKEEPING: "Уборка", TOWELS: "Полотенца", LINEN: "Замена белья", MAINTENANCE: "Поломка / ремонт", TRANSFER: "Трансфер", MEALS: "Питание", SAUNA: "Сауна", BILLIARDS: "Бильярд", EXCURSIONS: "Экскурсии", ADMIN: "Администратор" },
+    labels: { HOUSEKEEPING: "Уборка", TOWELS: "Полотенца", LINEN: "Замена белья", MAINTENANCE: "Поломка / ремонт", TRANSFER: "Трансфер", MEALS: "Питание", PARKING: "Парковка", SAUNA: "Сауна", BILLIARDS: "Бильярд", EXCURSIONS: "Экскурсии", ADMIN: "Администратор" },
   },
   kg: {
     eyebrow: "Жашоо учурундагы сервис",
@@ -61,7 +61,7 @@ const COPY = {
     refresh: "Жаңыртуу",
     cancel: "Жокко чыгаруу",
     status: { OPEN: "Жаңы", IN_PROGRESS: "Аткарылууда", IN_INSPECTION: "Текшерүүдө", DONE: "Аткарылды", CANCELLED: "Жокко чыгарылды" },
-    labels: { HOUSEKEEPING: "Тазалоо", TOWELS: "Сүлгү", LINEN: "Төшөк жабдыгын алмаштыруу", MAINTENANCE: "Бузулуу / оңдоо", TRANSFER: "Трансфер", MEALS: "Тамактануу", SAUNA: "Сауна", BILLIARDS: "Бильярд", EXCURSIONS: "Экскурсиялар", ADMIN: "Администратор" },
+    labels: { HOUSEKEEPING: "Тазалоо", TOWELS: "Сүлгү", LINEN: "Төшөк жабдыгын алмаштыруу", MAINTENANCE: "Бузулуу / оңдоо", TRANSFER: "Трансфер", MEALS: "Тамактануу", PARKING: "Унаа токтотуучу жай", SAUNA: "Сауна", BILLIARDS: "Бильярд", EXCURSIONS: "Экскурсиялар", ADMIN: "Администратор" },
   },
   en: {
     eyebrow: "Service during your stay",
@@ -82,7 +82,7 @@ const COPY = {
     refresh: "Refresh",
     cancel: "Cancel",
     status: { OPEN: "New", IN_PROGRESS: "In progress", IN_INSPECTION: "Inspection", DONE: "Done", CANCELLED: "Cancelled" },
-    labels: { HOUSEKEEPING: "Room cleaning", TOWELS: "Towels", LINEN: "Bed linen", MAINTENANCE: "Maintenance", TRANSFER: "Transfer", MEALS: "Meals", SAUNA: "Sauna", BILLIARDS: "Billiards", EXCURSIONS: "Excursions", ADMIN: "Administrator" },
+    labels: { HOUSEKEEPING: "Room cleaning", TOWELS: "Towels", LINEN: "Bed linen", MAINTENANCE: "Maintenance", TRANSFER: "Transfer", MEALS: "Meals", PARKING: "Parking", SAUNA: "Sauna", BILLIARDS: "Billiards", EXCURSIONS: "Excursions", ADMIN: "Administrator" },
   },
 } as const;
 

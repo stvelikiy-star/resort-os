@@ -16,6 +16,7 @@ REQUEST_LABELS: dict[str, str] = {
     "MAINTENANCE": "Сообщить о поломке",
     "TRANSFER": "Трансфер",
     "MEALS": "Питание",
+    "PARKING": "Парковка",
     "SAUNA": "Сауна",
     "BILLIARDS": "Бильярд",
     "EXCURSIONS": "Экскурсии / туры",
@@ -103,20 +104,27 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
             if payload.service_date and not (stay["checkIn"] <= payload.service_date <= stay["checkOut"]):
                 raise HTTPException(status_code=422, detail={"code": "SERVICE_DATE_OUTSIDE_STAY", "check_in": str(stay["checkIn"]), "check_out": str(stay["checkOut"])})
 
-            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', f'{stay["stayId"]}:{source}')
+            # Dedupe is a business fact, not a channel fact. A request created by
+            # Reception/PMS must block the same active Guest OS request and vice versa.
+            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', f'{stay["stayId"]}:{code}')
             duplicate = await conn.fetchrow(
                 '''
-                SELECT id,status::text AS status FROM operational_tasks
-                WHERE "stayId"=$1 AND source=$2
+                SELECT id,status::text AS status,source FROM operational_tasks
+                WHERE "stayId"=$1 AND type='GUEST_REQUEST' AND "serviceCode"=$2
                   AND "serviceDate" IS NOT DISTINCT FROM $3::date
                   AND "serviceTime" IS NOT DISTINCT FROM $4::text
                   AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
                 ORDER BY "createdAt" DESC LIMIT 1
                 ''',
-                stay["stayId"], source, payload.service_date, payload.service_time,
+                stay["stayId"], code, payload.service_date, payload.service_time,
             )
             if duplicate:
-                raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_DUPLICATE_ACTIVE", "task_id": str(duplicate["id"]), "status": duplicate["status"]})
+                raise HTTPException(status_code=409, detail={
+                    "code": "GUEST_REQUEST_DUPLICATE_ACTIVE",
+                    "task_id": str(duplicate["id"]),
+                    "status": duplicate["status"],
+                    "existing_source": duplicate["source"],
+                })
 
             task_id = uuid.uuid4()
             title = f"{REQUEST_LABELS[code]} · №{qr['room_code']}"
