@@ -94,6 +94,9 @@ jobs:
           npm install --no-audit --no-fund --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
+      - name: Expose Playwright to repository verifiers
+        run: ln -s apps/admin/node_modules node_modules
+
       - name: Start real Core and production-mode admin
         run: |
           python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/owner-grid-api.log 2>&1 &
