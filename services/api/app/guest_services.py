@@ -237,30 +237,13 @@ async def create_guest_service(
                         "reservation_status": reservation["status"],
                     },
                 )
-
-            duplicate = await conn.fetchrow(
-                '''
-                SELECT id,status::text AS status
-                FROM operational_tasks
-                WHERE "propertyId"=$1 AND type='GUEST_REQUEST' AND "reservationId"=$2
-                  AND "serviceCode"=$3 AND "serviceDate" IS NOT DISTINCT FROM $4::date
-                  AND "serviceTime" IS NOT DISTINCT FROM $5::text
-                  AND status IN ('OPEN','IN_PROGRESS')
-                FOR UPDATE
-                ''',
-                pid,
-                payload.reservation_id,
-                code,
-                payload.service_date,
-                payload.service_time,
-            )
-            if duplicate:
+            if payload.service_date and not (reservation["checkIn"] <= payload.service_date <= reservation["checkOut"]):
                 raise HTTPException(
-                    status_code=409,
+                    status_code=422,
                     detail={
-                        "code": "GUEST_SERVICE_DUPLICATE_ACTIVE",
-                        "task_id": str(duplicate["id"]),
-                        "status": duplicate["status"],
+                        "code": "GUEST_SERVICE_DATE_OUTSIDE_RESERVATION",
+                        "check_in": str(reservation["checkIn"]),
+                        "check_out": str(reservation["checkOut"]),
                     },
                 )
 
@@ -280,6 +263,48 @@ async def create_guest_service(
                     ''',
                     pid,
                     payload.reservation_id,
+                )
+                if not stay:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"code": "GUEST_SERVICE_ACTIVE_STAY_REQUIRED", "reservation_id": str(payload.reservation_id)},
+                    )
+                if not stay["roomId"]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"code": "GUEST_SERVICE_CURRENT_ROOM_REQUIRED", "stay_id": str(stay["id"])},
+                    )
+
+            # Serialize active duplicate detection across all request channels.
+            # Guest OS uses the same active Stay + service code lock key.
+            dedupe_scope = str(stay["id"]) if stay else str(payload.reservation_id)
+            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', f'{dedupe_scope}:{code}')
+            duplicate = await conn.fetchrow(
+                '''
+                SELECT id,status::text AS status,source
+                FROM operational_tasks
+                WHERE "propertyId"=$1 AND type='GUEST_REQUEST' AND "reservationId"=$2
+                  AND "serviceCode"=$3 AND "serviceDate" IS NOT DISTINCT FROM $4::date
+                  AND "serviceTime" IS NOT DISTINCT FROM $5::text
+                  AND status IN ('OPEN','IN_PROGRESS')
+                ORDER BY "createdAt" DESC LIMIT 1
+                FOR UPDATE
+                ''',
+                pid,
+                payload.reservation_id,
+                code,
+                payload.service_date,
+                payload.service_time,
+            )
+            if duplicate:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "GUEST_SERVICE_DUPLICATE_ACTIVE",
+                        "task_id": str(duplicate["id"]),
+                        "status": duplicate["status"],
+                        "existing_source": duplicate["source"],
+                    },
                 )
 
             task_id = uuid.uuid4()
@@ -348,7 +373,7 @@ async def create_guest_service(
                     stay["id"],
                     str(task_id),
                     code,
-                    str(stay["roomId"]) if stay["roomId"] else None,
+                    str(stay["roomId"]),
                 )
 
         row = await conn.fetchrow(BASE_SELECT + ' WHERE t.id=$1 AND t."propertyId"=$2', task_id, pid)
