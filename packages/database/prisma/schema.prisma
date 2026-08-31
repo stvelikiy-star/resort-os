@@ -59,6 +59,9 @@ enum StaffRole {
   MAID
   TECHNICIAN
   BEACH_PARTNER
+  ADMIN
+  RECEPTION
+  DINING
 }
 
 enum OperationalTaskType {
@@ -132,31 +135,39 @@ enum MessageDeliveryStatus {
 }
 
 model Property {
-  id                    String                   @id @default(uuid()) @db.Uuid
-  code                  String                   @unique
-  name                  String
-  timezone              String                   @default("Asia/Bishkek")
-  currency              String                   @default("KGS")
-  beachCommissionBps    Int                      @default(500)
-  roomTypes             RoomType[]
-  rooms                 Room[]
-  ratePlans             RatePlan[]
-  guests                Guest[]
-  requests              ReservationRequest[]
-  reservations          Reservation[]
-  auditLogs             AuditLog[]
-  staffUsers            StaffUser[]
-  tasks                 OperationalTask[]
-  automationEvents      AutomationInboundEvent[]
-  communicationChannels CommunicationChannel[]
-  conversations         Conversation[]
-  nfcWallets            NfcWallet[]
-  nfcBracelets          NfcBracelet[]
-  nfcTransactions       NfcTransaction[]
-  analyticsSnapshots    OwnerAnalyticsSnapshot[]
-  guestEngagements      GuestEngagement[]
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
+  id                         String                      @id @default(uuid()) @db.Uuid
+  code                       String                      @unique
+  name                       String
+  timezone                   String                      @default("Asia/Bishkek")
+  currency                   String                      @default("KGS")
+  beachCommissionBps         Int                         @default(500)
+  roomTypes                  RoomType[]
+  rooms                      Room[]
+  ratePlans                  RatePlan[]
+  guests                     Guest[]
+  requests                   ReservationRequest[]
+  reservations               Reservation[]
+  auditLogs                  AuditLog[]
+  staffUsers                 StaffUser[]
+  tasks                      OperationalTask[]
+  automationEvents           AutomationInboundEvent[]
+  communicationChannels      CommunicationChannel[]
+  conversations              Conversation[]
+  nfcWallets                 NfcWallet[]
+  nfcBracelets               NfcBracelet[]
+  nfcTransactions            NfcTransaction[]
+  analyticsSnapshots         OwnerAnalyticsSnapshot[]
+  guestEngagements           GuestEngagement[]
+  guestAccessCredentials     GuestAccessCredential[]
+  reservationMealPlans       ReservationMealPlan[]
+  diningMenuItems            DiningMenuItem[]
+  diningOrders               DiningOrder[]
+  reservationCharges         ReservationCharge[]
+  smartAccessPoints          SmartAccessPoint[]
+  smartAccessGrants          SmartAccessGrant[]
+  publicAccessPaymentIntents PublicAccessPaymentIntent[]
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
   @@map("properties")
 }
@@ -182,23 +193,24 @@ model RoomType {
 }
 
 model Room {
-  id               String               @id @default(uuid()) @db.Uuid
-  propertyId       String               @db.Uuid
-  property         Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomTypeId       String               @db.Uuid
-  roomType         RoomType             @relation(fields: [roomTypeId], references: [id])
-  code             String
-  name             String
-  buildingOrZone   String?
-  floorLabel       String?
-  bedConfiguration String?
-  areaLabel        String?
-  operationalState RoomOperationalState @default(UNKNOWN)
-  notes            String?
-  inventoryBlocks  InventoryBlock[]
-  tasks            OperationalTask[]
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id                String               @id @default(uuid()) @db.Uuid
+  propertyId        String               @db.Uuid
+  property          Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomTypeId        String               @db.Uuid
+  roomType          RoomType             @relation(fields: [roomTypeId], references: [id])
+  code              String
+  name              String
+  buildingOrZone    String?
+  floorLabel        String?
+  bedConfiguration  String?
+  areaLabel         String?
+  operationalState  RoomOperationalState @default(UNKNOWN)
+  notes             String?
+  inventoryBlocks   InventoryBlock[]
+  tasks             OperationalTask[]
+  smartAccessPoints SmartAccessPoint[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
   @@unique([propertyId, code])
   @@index([propertyId, roomTypeId])
@@ -289,28 +301,33 @@ model ReservationRequest {
 }
 
 model Reservation {
-  id             String              @id @default(uuid()) @db.Uuid
-  propertyId     String              @db.Uuid
-  property       Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  requestId      String?             @unique @db.Uuid
-  request        ReservationRequest? @relation(fields: [requestId], references: [id])
-  bookingNumber  String              @unique
-  primaryGuestId String?             @db.Uuid
-  primaryGuest   Guest?              @relation(fields: [primaryGuestId], references: [id])
-  status         ReservationStatus   @default(GUARANTEED)
-  checkIn        DateTime            @db.Date
-  checkOut       DateTime            @db.Date
-  adults         Int
-  children       Int                 @default(0)
-  totalKgs       Int
-  notes          String?
-  blocks         InventoryBlock[]
-  payments       Payment[]
-  serviceTasks   OperationalTask[]   @relation("ReservationGuestServices")
-  engagements    GuestEngagement[]
-  nfcWallet      NfcWallet?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id                    String                 @id @default(uuid()) @db.Uuid
+  propertyId            String                 @db.Uuid
+  property              Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requestId             String?                @unique @db.Uuid
+  request               ReservationRequest?    @relation(fields: [requestId], references: [id])
+  bookingNumber         String                 @unique
+  primaryGuestId        String?                @db.Uuid
+  primaryGuest          Guest?                 @relation(fields: [primaryGuestId], references: [id])
+  status                ReservationStatus      @default(GUARANTEED)
+  checkIn               DateTime               @db.Date
+  checkOut              DateTime               @db.Date
+  adults                Int
+  children              Int                    @default(0)
+  totalKgs              Int
+  notes                 String?
+  blocks                InventoryBlock[]
+  payments              Payment[]
+  serviceTasks          OperationalTask[]      @relation("ReservationGuestServices")
+  engagements           GuestEngagement[]
+  nfcWallet             NfcWallet?
+  guestAccessCredential GuestAccessCredential?
+  mealPlans             ReservationMealPlan[]
+  diningOrders          DiningOrder[]
+  charges               ReservationCharge[]
+  smartAccessGrants     SmartAccessGrant[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
   @@index([propertyId, checkIn, checkOut])
   @@map("reservations")
@@ -335,21 +352,23 @@ model InventoryBlock {
 }
 
 model Payment {
-  id             String              @id @default(uuid()) @db.Uuid
-  requestId      String?             @db.Uuid
-  request        ReservationRequest? @relation(fields: [requestId], references: [id])
-  reservationId  String?             @db.Uuid
-  reservation    Reservation?        @relation(fields: [reservationId], references: [id])
-  amountKgs      Int
-  method         String
-  status         PaymentStatus       @default(PENDING)
-  provider       String?
-  externalRef    String?
-  idempotencyKey String?             @unique
-  metadata       Json?
-  paidAt         DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id                  String              @id @default(uuid()) @db.Uuid
+  requestId           String?             @db.Uuid
+  request             ReservationRequest? @relation(fields: [requestId], references: [id])
+  reservationId       String?             @db.Uuid
+  reservation         Reservation?        @relation(fields: [reservationId], references: [id])
+  amountKgs           Int
+  method              String
+  status              PaymentStatus       @default(PENDING)
+  provider            String?
+  externalRef         String?
+  idempotencyKey      String?             @unique
+  metadata            Json?
+  paidAt              DateTime?
+  reservationCharges  ReservationCharge[]
+  smartAccessGrants   SmartAccessGrant[]
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
   @@index([requestId])
   @@index([reservationId])
@@ -358,23 +377,24 @@ model Payment {
 }
 
 model StaffUser {
-  id                    String            @id @default(uuid()) @db.Uuid
-  propertyId            String            @db.Uuid
-  property              Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  username              String
-  displayName           String
-  passwordHash          String
+  id                     String            @id @default(uuid()) @db.Uuid
+  propertyId             String            @db.Uuid
+  property               Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  username               String
+  displayName            String
+  passwordHash           String
   role                   StaffRole
-  isActive              Boolean           @default(true)
-  telegramUserId        String?
-  telegramUsername      String?
-  telegramLinkedAt      DateTime?
-  sessions              AuthSession[]
-  assignedTasks         OperationalTask[] @relation("TaskAssignee")
-  assignedConversations Conversation[]    @relation("ConversationAssignee")
-  beachTransactions     NfcTransaction[]  @relation("BeachPartnerTransactions")
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  isActive               Boolean           @default(true)
+  telegramUserId         String?
+  telegramUsername       String?
+  telegramLinkedAt       DateTime?
+  sessions               AuthSession[]
+  assignedTasks          OperationalTask[] @relation("TaskAssignee")
+  assignedConversations  Conversation[]    @relation("ConversationAssignee")
+  beachTransactions      NfcTransaction[]  @relation("BeachPartnerTransactions")
+  createdDiningMenuItems DiningMenuItem[]
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   @@unique([propertyId, username])
   @@unique([propertyId, telegramUserId])
@@ -387,10 +407,10 @@ model AuthSession {
   userId     String    @db.Uuid
   user       StaffUser @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique
-  expiresAt DateTime
-  revokedAt DateTime?
+  expiresAt  DateTime
+  revokedAt  DateTime?
   lastSeenAt DateTime  @default(now())
-  createdAt DateTime   @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
@@ -431,17 +451,17 @@ model OperationalTask {
 }
 
 model AutomationInboundEvent {
-  id               String    @id @default(uuid()) @db.Uuid
-  propertyId       String    @db.Uuid
-  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  id               String   @id @default(uuid()) @db.Uuid
+  propertyId       String   @db.Uuid
+  property         Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   source           String
   idempotencyKey   String
   eventType        String
   payloadJson      Json
   resultResource   String?
   resultResourceId String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([propertyId, source, idempotencyKey])
   @@index([propertyId, eventType, createdAt])
@@ -488,8 +508,8 @@ model Conversation {
   firstResponseAt        DateTime?
   resolvedAt             DateTime?
   messages               ConversationMessage[]
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   @@unique([channelId, externalConversationId])
   @@index([propertyId, status, updatedAt])
@@ -661,4 +681,206 @@ model GuestEngagement {
   @@index([guestId, createdAt])
   @@index([reservationId])
   @@map("guest_engagements")
+}
+
+model GuestAccessCredential {
+  id                  String         @id @db.Uuid
+  propertyId          String         @db.Uuid
+  property            Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId       String         @unique @db.Uuid
+  reservation         Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  pinHash             String
+  activationTokenHash String?
+  isActive            Boolean        @default(true)
+  expiresAt           DateTime       @db.Timestamptz(6)
+  issuedAt            DateTime       @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
+  sessions            GuestSession[]
+
+  @@index([propertyId, isActive, expiresAt], map: "guest_access_credentials_property_active_idx")
+  @@map("guest_access_credentials")
+}
+
+model GuestSession {
+  id                String             @id @db.Uuid
+  credentialId      String             @db.Uuid
+  credential        GuestAccessCredential @relation(fields: [credentialId], references: [id], onDelete: Cascade)
+  tokenHash         String             @unique
+  expiresAt         DateTime           @db.Timestamptz(6)
+  revokedAt         DateTime?          @db.Timestamptz(6)
+  lastSeenAt        DateTime           @default(now()) @db.Timestamptz(6)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(6)
+  smartAccessGrants SmartAccessGrant[]
+
+  @@index([credentialId, expiresAt], map: "guest_sessions_credential_expires_idx")
+  @@map("guest_sessions")
+}
+
+model ReservationMealPlan {
+  id            String      @id @db.Uuid
+  propertyId    String      @db.Uuid
+  property      Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId String      @db.Uuid
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  serviceDate   DateTime    @db.Date
+  mealType      String
+  included      Boolean     @default(false)
+  createdAt     DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime    @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([reservationId, serviceDate, mealType])
+  @@index([propertyId, serviceDate, mealType], map: "reservation_meal_plans_property_date_idx")
+  @@map("reservation_meal_plans")
+}
+
+model DiningMenuItem {
+  id                 String            @id @db.Uuid
+  propertyId         String            @db.Uuid
+  property           Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  serviceDate        DateTime          @db.Date
+  mealType           String
+  name               String
+  description        String?
+  priceKgs           Int               @default(0)
+  availableQty       Int?
+  includedInMealPlan Boolean           @default(false)
+  active             Boolean           @default(true)
+  sortOrder          Int               @default(0)
+  createdById        String?           @db.Uuid
+  createdBy          StaffUser?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  orderItems         DiningOrderItem[]
+  createdAt          DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@index([propertyId, serviceDate, mealType, active, sortOrder], map: "dining_menu_items_property_date_idx")
+  @@map("dining_menu_items")
+}
+
+model DiningOrder {
+  id            String            @id @db.Uuid
+  propertyId    String            @db.Uuid
+  property      Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId String            @db.Uuid
+  reservation   Reservation       @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  serviceDate   DateTime          @db.Date
+  mealType      String
+  status        String            @default("NEW")
+  paymentMode   String            @default("ROOM_FOLIO")
+  totalKgs      Int               @default(0)
+  notes         String?
+  items         DiningOrderItem[]
+  createdAt     DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+  completedAt   DateTime?         @db.Timestamptz(6)
+
+  @@index([propertyId, status, serviceDate, mealType], map: "dining_orders_property_status_idx")
+  @@index([reservationId, createdAt], map: "dining_orders_reservation_idx")
+  @@map("dining_orders")
+}
+
+model DiningOrderItem {
+  id             String         @id @db.Uuid
+  orderId        String         @db.Uuid
+  order          DiningOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId     String         @db.Uuid
+  menuItem       DiningMenuItem @relation(fields: [menuItemId], references: [id], onDelete: Restrict)
+  name           String
+  quantity       Int
+  unitPriceKgs   Int
+  lineTotalKgs   Int
+  includedByPlan Boolean        @default(false)
+  createdAt      DateTime       @default(now()) @db.Timestamptz(6)
+
+  @@index([orderId], map: "dining_order_items_order_idx")
+  @@map("dining_order_items")
+}
+
+model ReservationCharge {
+  id            String       @id @db.Uuid
+  propertyId    String       @db.Uuid
+  property      Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId String       @db.Uuid
+  reservation   Reservation  @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  sourceType    String
+  sourceId      String?      @db.Uuid
+  description   String
+  amountKgs     Int
+  status        String       @default("OPEN")
+  paymentId     String?      @db.Uuid
+  payment       Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime     @default(now()) @updatedAt @db.Timestamptz(6)
+  paidAt        DateTime?    @db.Timestamptz(6)
+
+  // sourceType/sourceId is protected by a partial unique index in migration 5;
+  // Prisma cannot model the WHERE sourceId IS NOT NULL predicate without changing semantics.
+  @@index([reservationId, status, createdAt], map: "reservation_charges_reservation_status_idx")
+  @@map("reservation_charges")
+}
+
+model SmartAccessPoint {
+  id                   String                      @id @db.Uuid
+  propertyId           String                      @db.Uuid
+  property             Property                    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  code                 String
+  name                 String
+  kind                 String
+  roomId               String?                     @db.Uuid
+  room                 Room?                       @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  priceKgs             Int                         @default(0)
+  active               Boolean                     @default(false)
+  controllerRef        String?
+  grants               SmartAccessGrant[]
+  publicPaymentIntents PublicAccessPaymentIntent[]
+  createdAt            DateTime                    @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                    @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([propertyId, code])
+  @@index([roomId, active], map: "smart_access_points_room_idx")
+  @@map("smart_access_points")
+}
+
+model SmartAccessGrant {
+  id             String            @id @db.Uuid
+  propertyId     String            @db.Uuid
+  property       Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  accessPointId  String            @db.Uuid
+  accessPoint    SmartAccessPoint  @relation(fields: [accessPointId], references: [id], onDelete: Cascade)
+  reservationId  String?           @db.Uuid
+  reservation    Reservation?      @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  guestSessionId String?           @db.Uuid
+  guestSession   GuestSession?     @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+  paymentId      String?           @db.Uuid
+  payment        Payment?          @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  tokenHash      String            @unique
+  status         String            @default("ISSUED")
+  expiresAt      DateTime          @db.Timestamptz(6)
+  usedAt         DateTime?         @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+
+  @@index([accessPointId, status, expiresAt], map: "smart_access_grants_point_status_idx")
+  @@map("smart_access_grants")
+}
+
+model PublicAccessPaymentIntent {
+  id            String           @id @db.Uuid
+  propertyId    String           @db.Uuid
+  property      Property         @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  accessPointId String           @db.Uuid
+  accessPoint   SmartAccessPoint @relation(fields: [accessPointId], references: [id], onDelete: Cascade)
+  tokenHash     String           @unique
+  amountKgs     Int
+  status        String           @default("PENDING")
+  provider      String?
+  externalRef   String?
+  expiresAt     DateTime         @db.Timestamptz(6)
+  paidAt        DateTime?        @db.Timestamptz(6)
+  usedAt        DateTime?        @db.Timestamptz(6)
+  createdAt     DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+
+  // provider/externalRef is protected by a partial unique index in migration 6;
+  // Prisma intentionally does not model it as an unconditional @@unique.
+  @@index([accessPointId, status, expiresAt], map: "public_access_payment_intents_point_status_idx")
+  @@map("public_access_payment_intents")
 }
