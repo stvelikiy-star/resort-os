@@ -6,6 +6,26 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function trackLocalMediaFailures(page) {
+  const failures = [];
+  const isLocalMedia = (url) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.origin !== new URL(BASE_URL).origin) return false;
+      return parsed.pathname.startsWith("/media/") || (parsed.pathname === "/_next/image" && (parsed.searchParams.get("url") || "").startsWith("/media/"));
+    } catch {
+      return false;
+    }
+  };
+  page.on("requestfailed", (request) => {
+    if (isLocalMedia(request.url())) failures.push(`${request.url()} :: ${request.failure()?.errorText || "request failed"}`);
+  });
+  page.on("response", (response) => {
+    if (isLocalMedia(response.url()) && response.status() >= 400) failures.push(`${response.url()} :: HTTP ${response.status()}`);
+  });
+  return failures;
+}
+
 async function verifyServerHtml() {
   const response = await fetch(`${BASE_URL}/`, { redirect: "follow" });
   assert(response.ok, `SSR home returned HTTP ${response.status}`);
@@ -100,6 +120,7 @@ async function assertServiceOrderAndLocale(page, locale, expectedHtmlLang) {
 async function verifyDesktop(browser) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
+  const mediaFailures = trackLocalMediaFailures(page);
   await installCoreMocks(page);
 
   await assertServiceOrderAndLocale(page, "ru", "ru");
@@ -127,6 +148,7 @@ async function verifyDesktop(browser) {
   const successText = await page.locator(".booking-notice.success").innerText();
   assert(successText.includes("Заявка"), "Booking request success feedback is missing");
   assert(successText.includes("не является подтверждённой бронью"), "Booking request must explicitly remain unconfirmed");
+  assert(mediaFailures.length === 0, `Desktop public media failures: ${mediaFailures.join(" | ")}`);
 
   await context.close();
 }
@@ -134,6 +156,7 @@ async function verifyDesktop(browser) {
 async function verifyMobile(browser) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
+  const mediaFailures = trackLocalMediaFailures(page);
   await installCoreMocks(page);
   await page.goto(`${BASE_URL}/?lang=kg`, { waitUntil: "networkidle" });
 
@@ -148,6 +171,7 @@ async function verifyMobile(browser) {
 
   const codes = await serviceCodes(page);
   assert(codes.indexOf("TRANSFER") < codes.indexOf("EXCURSIONS"), "Mobile KG services must keep TRANSFER before EXCURSIONS");
+  assert(mediaFailures.length === 0, `Mobile public media failures: ${mediaFailures.join(" | ")}`);
   await context.close();
 }
 
@@ -156,7 +180,7 @@ try {
   await verifyServerHtml();
   await verifyDesktop(browser);
   await verifyMobile(browser);
-  console.log("PASS: public browser acceptance (SSR, desktop, mobile, RU/KG/EN, booking request UX)");
+  console.log("PASS: public browser acceptance (SSR, desktop, mobile, RU/KG/EN, booking request UX, local media)");
 } finally {
   await browser.close();
 }
