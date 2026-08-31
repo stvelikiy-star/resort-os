@@ -19,6 +19,7 @@ router = APIRouter(tags=["public-access"])
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 PUBLIC_ACCESS_CHECKOUT_URL = os.environ.get("PUBLIC_ACCESS_CHECKOUT_URL", "").strip()
 PUBLIC_ACCESS_INTENT_MINUTES = int(os.environ.get("PUBLIC_ACCESS_INTENT_MINUTES", "10"))
+PUBLIC_ACCESS_UNLOCK_STALE_SECONDS = 45
 
 
 class PublicIntentToken(BaseModel):
@@ -61,6 +62,32 @@ async def _public_point(conn, property_id, code: str, lock: bool = False):
     if not point or not point["active"] or point["kind"] not in {"TOILET", "OTHER"}:
         raise HTTPException(status_code=404, detail="Public access point is unavailable")
     return point
+
+
+def _unlock_claim_is_stale(updated_at: datetime) -> bool:
+    return updated_at.replace(tzinfo=None) <= datetime.utcnow() - timedelta(seconds=PUBLIC_ACCESS_UNLOCK_STALE_SECONDS)
+
+
+async def _recover_stale_unlock_claim(conn, intent_id: uuid.UUID, access_point_id: uuid.UUID, updated_at: datetime) -> bool:
+    if not _unlock_claim_is_stale(updated_at):
+        return False
+    recovered = await conn.fetchval(
+        '''UPDATE public_access_payment_intents
+           SET status='PAID',"updatedAt"=now()
+           WHERE id=$1 AND status='UNLOCKING' AND "updatedAt"=$2
+           RETURNING id''',
+        intent_id,
+        updated_at,
+    )
+    if not recovered:
+        return False
+    await conn.execute(
+        '''UPDATE smart_access_grants
+           SET status='EXPIRED'
+           WHERE "accessPointId"=$1 AND status='ISSUED' AND "expiresAt"<=now()''',
+        access_point_id,
+    )
+    return True
 
 
 @router.get("/api/v1/public/access/{code}")
@@ -123,18 +150,25 @@ async def create_public_access_checkout(code: str, request: Request):
 async def public_access_intent_status(intent_id: uuid.UUID, payload: PublicIntentToken, request: Request):
     token_hash = _token_hash(payload.token)
     async with request.app.state.db.acquire() as conn:
-        row = await conn.fetchrow(
-            '''SELECT pai.status,pai."amountKgs",pai."expiresAt",ap.code,ap.name
-               FROM public_access_payment_intents pai
-               JOIN smart_access_points ap ON ap.id=pai."accessPointId"
-               WHERE pai.id=$1 AND pai."tokenHash"=$2''', intent_id, token_hash,
-        )
-        if not row:
-            raise HTTPException(status_code=404, detail="Access payment intent not found")
-        state = row["status"]
-        if row["expiresAt"].replace(tzinfo=None) <= datetime.utcnow() and state == "PENDING":
-            await conn.execute("UPDATE public_access_payment_intents SET status='EXPIRED',\"updatedAt\"=now() WHERE id=$1", intent_id)
-            state = "EXPIRED"
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                '''SELECT pai.status,pai."amountKgs",pai."expiresAt",pai."updatedAt",pai."accessPointId",ap.code,ap.name
+                   FROM public_access_payment_intents pai
+                   JOIN smart_access_points ap ON ap.id=pai."accessPointId"
+                   WHERE pai.id=$1 AND pai."tokenHash"=$2
+                   FOR UPDATE OF pai''',
+                intent_id, token_hash,
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="Access payment intent not found")
+            state = row["status"]
+            if state == "UNLOCKING" and await _recover_stale_unlock_claim(
+                conn, intent_id, row["accessPointId"], row["updatedAt"]
+            ):
+                state = "PAID"
+            if row["expiresAt"].replace(tzinfo=None) <= datetime.utcnow() and state == "PENDING":
+                await conn.execute("UPDATE public_access_payment_intents SET status='EXPIRED',\"updatedAt\"=now() WHERE id=$1", intent_id)
+                state = "EXPIRED"
     return {"intent_id": str(intent_id), "status": state, "amount_kgs": int(row["amountKgs"]), "access_point": row["code"], "name": row["name"]}
 
 
@@ -153,16 +187,16 @@ async def mark_public_access_paid(
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Public access payment intent not found")
+            if int(row["amountKgs"]) != payload.amount_kgs:
+                raise HTTPException(status_code=409, detail="Paid amount does not match access price")
+            if row["status"] in {"PAID", "UNLOCKING", "USED"}:
+                if row["provider"] != payload.provider or row["externalRef"] != payload.external_ref:
+                    raise HTTPException(status_code=409, detail="Payment callback conflicts with existing payment fact")
+                return {"ok": True, "idempotent": True, "status": row["status"]}
             if row["expiresAt"].replace(tzinfo=None) <= datetime.utcnow():
                 if row["status"] == "PENDING":
                     await conn.execute("UPDATE public_access_payment_intents SET status='EXPIRED',\"updatedAt\"=now() WHERE id=$1", intent_id)
                 raise HTTPException(status_code=409, detail="Payment intent expired")
-            if int(row["amountKgs"]) != payload.amount_kgs:
-                raise HTTPException(status_code=409, detail="Paid amount does not match access price")
-            if row["status"] == "PAID":
-                if row["provider"] != payload.provider or row["externalRef"] != payload.external_ref:
-                    raise HTTPException(status_code=409, detail="Payment callback conflicts with existing payment fact")
-                return {"ok": True, "idempotent": True, "status": "PAID"}
             if row["status"] != "PENDING":
                 raise HTTPException(status_code=409, detail=f"Intent cannot be paid from {row['status']}")
             duplicate = await conn.fetchval(
@@ -188,7 +222,6 @@ async def mark_public_access_paid(
 @router.post("/api/v1/public/access/intents/{intent_id}/unlock")
 async def unlock_public_access(intent_id: uuid.UUID, payload: PublicIntentToken, request: Request):
     token_hash = _token_hash(payload.token)
-    controller_url, controller_secret = _controller_config()
     grant_raw = secrets.token_urlsafe(24)
     grant_id = uuid.uuid4()
     grant_expires = datetime.utcnow() + timedelta(seconds=30)
@@ -196,7 +229,7 @@ async def unlock_public_access(intent_id: uuid.UUID, payload: PublicIntentToken,
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             row = await conn.fetchrow(
-                '''SELECT pai.id,pai."propertyId",pai."accessPointId",pai.status,pai."expiresAt",
+                '''SELECT pai.id,pai."propertyId",pai."accessPointId",pai.status,pai."expiresAt",pai."updatedAt",
                           ap.code,ap.kind,ap.active,ap."controllerRef"
                    FROM public_access_payment_intents pai
                    JOIN smart_access_points ap ON ap.id=pai."accessPointId"
@@ -205,12 +238,29 @@ async def unlock_public_access(intent_id: uuid.UUID, payload: PublicIntentToken,
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Access payment intent not found")
-            if row["status"] != "PAID":
-                raise HTTPException(status_code=409, detail="Access payment is not confirmed")
+            current_status = row["status"]
+            if current_status == "UNLOCKING" and await _recover_stale_unlock_claim(
+                conn, intent_id, row["accessPointId"], row["updatedAt"]
+            ):
+                current_status = "PAID"
+            if current_status != "PAID":
+                raise HTTPException(status_code=409, detail=f"Access payment cannot unlock from {current_status}")
             if row["expiresAt"].replace(tzinfo=None) <= datetime.utcnow():
                 raise HTTPException(status_code=409, detail="Access payment intent expired")
             if not row["active"] or row["kind"] not in {"TOILET", "OTHER"}:
                 raise HTTPException(status_code=409, detail="Access point is disabled")
+
+            # Fail before claiming the paid intent when the physical controller is unavailable.
+            controller_url, controller_secret = _controller_config()
+            claimed = await conn.fetchval(
+                '''UPDATE public_access_payment_intents
+                   SET status='UNLOCKING',"updatedAt"=now()
+                   WHERE id=$1 AND status='PAID'
+                   RETURNING id''',
+                intent_id,
+            )
+            if not claimed:
+                raise HTTPException(status_code=409, detail="Another unlock attempt is already in progress")
             await conn.execute(
                 '''INSERT INTO smart_access_grants(id,"propertyId","accessPointId","tokenHash",status,"expiresAt","createdAt")
                    VALUES($1,$2,$3,$4,'ISSUED',$5,now())''',
@@ -236,6 +286,7 @@ async def unlock_public_access(intent_id: uuid.UUID, payload: PublicIntentToken,
     except httpx.HTTPError:
         controller_ok = False
 
+    finalization_ok = True
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             await conn.execute(
@@ -243,16 +294,30 @@ async def unlock_public_access(intent_id: uuid.UUID, payload: PublicIntentToken,
                 grant_id, "USED" if controller_ok else "REVOKED",
             )
             if controller_ok:
+                finalized = await conn.fetchval(
+                    '''UPDATE public_access_payment_intents
+                       SET status='USED',"usedAt"=now(),"updatedAt"=now()
+                       WHERE id=$1 AND status='UNLOCKING'
+                       RETURNING id''',
+                    intent_id,
+                )
+                finalization_ok = bool(finalized)
+            else:
                 await conn.execute(
-                    '''UPDATE public_access_payment_intents SET status='USED',"usedAt"=now(),"updatedAt"=now() WHERE id=$1 AND status='PAID' ''',
+                    '''UPDATE public_access_payment_intents
+                       SET status='PAID',"updatedAt"=now()
+                       WHERE id=$1 AND status='UNLOCKING' ''',
                     intent_id,
                 )
             await conn.execute(
                 '''INSERT INTO audit_logs(id,"propertyId","actorType",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES($1,$2,'PUBLIC','SMART_ACCESS_UNLOCK','SmartAccessGrant',$3,'PUBLIC_QR',$4,
-                   jsonb_build_object('access_point_code',$5::text,'controller_http_status',$6::int),now())''',
-                uuid.uuid4(), row["propertyId"], str(grant_id), "SUCCESS" if controller_ok else "FAILED", row["code"], controller_status,
+                   jsonb_build_object('access_point_code',$5::text,'controller_http_status',$6::int,'finalization_ok',$7::boolean),now())''',
+                uuid.uuid4(), row["propertyId"], str(grant_id),
+                "SUCCESS" if controller_ok and finalization_ok else "FAILED", row["code"], controller_status, finalization_ok,
             )
     if not controller_ok:
         raise HTTPException(status_code=503, detail="Door controller did not confirm unlock")
+    if not finalization_ok:
+        raise HTTPException(status_code=500, detail="Door opened but access state finalization failed; retry is blocked")
     return {"ok": True, "status": "USED", "access_point": row["code"], "unlocked_seconds": 7}
