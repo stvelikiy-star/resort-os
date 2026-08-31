@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/reception", tags=["admin-reception"])
-manager_access = require_roles("OWNER", "MANAGER")
+reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 
 
 async def property_context(conn, property_code: str):
@@ -25,7 +25,7 @@ async def property_context(conn, property_code: str):
 async def list_reception_reservations(
     request: Request,
     limit: int = Query(default=250, ge=1, le=500),
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(reception_access),
 ):
     async with request.app.state.db.acquire() as conn:
         prop, local_today = await property_context(conn, user["property_code"])
@@ -137,7 +137,7 @@ def choose_display_segment(status: str, schedule: list[dict[str, Any]], local_to
 async def reception_reservation_detail(
     reservation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(reception_access),
 ):
     async with request.app.state.db.acquire() as conn:
         prop, local_today = await property_context(conn, user["property_code"])
