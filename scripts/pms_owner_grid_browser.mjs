@@ -28,6 +28,14 @@ async function closeBooking(page) {
   }
 }
 
+async function waitForNightPreview(page, nights) {
+  await page.waitForFunction((expected) => {
+    const facts = document.querySelector(".owner-stay-facts")?.textContent || "";
+    const loading = document.querySelector(".owner-price-card")?.textContent?.includes("Проверяем…");
+    return !loading && new RegExp(`Ночей\\s*${expected}`).test(facts);
+  }, nights, { timeout: 10000 });
+}
+
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 try {
@@ -50,7 +58,7 @@ try {
 
   await firstNight.click();
   await page.locator(".owner-booking-modal").waitFor({ state: "visible" });
-  await page.locator(".owner-price-card").waitFor({ state: "visible" });
+  await waitForNightPreview(page, 1);
   const oneNightFacts = await page.locator(".owner-stay-facts").innerText();
   assert(/Ночей\s*1/.test(oneNightFacts), `one selected square must preview 1 night: ${JSON.stringify(oneNightFacts)}`);
   assert((await page.locator(".owner-nightly-prices span").count()) === 1, "one-night preview must contain exactly one nightly rate");
@@ -68,7 +76,7 @@ try {
   await page.mouse.move(fourthBox.x + fourthBox.width / 2, fourthBox.y + fourthBox.height / 2, { steps: 8 });
   await page.mouse.up();
   await page.locator(".owner-booking-modal").waitFor({ state: "visible" });
-  await page.locator(".owner-price-card").waitFor({ state: "visible" });
+  await waitForNightPreview(page, 4);
   const multiFacts = await page.locator(".owner-stay-facts").innerText();
   assert(/Ночей\s*4/.test(multiFacts), `drag across four cells must preview 4 nights: ${JSON.stringify(multiFacts)}`);
   assert((await page.locator(".owner-nightly-prices span").count()) === 4, "four-night preview must contain four nightly rates");
