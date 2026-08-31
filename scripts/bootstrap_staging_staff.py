@@ -21,6 +21,18 @@ STAFF = [
         "password": os.environ.get("STAGING_TECHNICIAN_PASSWORD"),
         "display_name": os.environ.get("STAGING_TECHNICIAN_DISPLAY_NAME", "Staging Technician"),
     },
+    {
+        "role": "DINING",
+        "username": os.environ.get("STAGING_DINING_USERNAME"),
+        "password": os.environ.get("STAGING_DINING_PASSWORD"),
+        "display_name": os.environ.get("STAGING_DINING_DISPLAY_NAME", "Staging Dining"),
+    },
+    {
+        "role": "RECEPTION",
+        "username": os.environ.get("STAGING_RECEPTION_USERNAME"),
+        "password": os.environ.get("STAGING_RECEPTION_PASSWORD"),
+        "display_name": os.environ.get("STAGING_RECEPTION_DISPLAY_NAME", "Staging Reception"),
+    },
 ]
 
 password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
