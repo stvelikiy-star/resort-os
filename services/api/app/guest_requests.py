@@ -9,19 +9,18 @@ from .guest_os import GUEST_COOKIE, current_stay_for_room, resolve_room_qr, vali
 
 router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-requests"])
 
-REQUEST_DEFS: dict[str, dict[str, str | None]] = {
-    "HOUSEKEEPING": {"type": "HOUSEKEEPING", "title": "Уборка номера", "service_code": None},
-    "TOWELS": {"type": "HOUSEKEEPING", "title": "Полотенца", "service_code": None},
-    "LINEN": {"type": "HOUSEKEEPING", "title": "Замена белья", "service_code": None},
-    "MAINTENANCE": {"type": "MAINTENANCE", "title": "Сообщить о поломке", "service_code": None},
-    "TRANSFER": {"type": "GUEST_REQUEST", "title": "Трансфер", "service_code": "TRANSFER"},
-    "MEALS": {"type": "GUEST_REQUEST", "title": "Питание", "service_code": "MEALS"},
-    "SAUNA": {"type": "GUEST_REQUEST", "title": "Сауна", "service_code": "SAUNA"},
-    "BILLIARDS": {"type": "GUEST_REQUEST", "title": "Бильярд", "service_code": "BILLIARDS"},
-    "EXCURSIONS": {"type": "GUEST_REQUEST", "title": "Экскурсии / туры", "service_code": "EXCURSIONS"},
-    "ADMIN": {"type": "GUEST_REQUEST", "title": "Администратор", "service_code": "ADMIN"},
+REQUEST_LABELS: dict[str, str] = {
+    "HOUSEKEEPING": "Уборка номера",
+    "TOWELS": "Полотенца",
+    "LINEN": "Замена белья",
+    "MAINTENANCE": "Сообщить о поломке",
+    "TRANSFER": "Трансфер",
+    "MEALS": "Питание",
+    "SAUNA": "Сауна",
+    "BILLIARDS": "Бильярд",
+    "EXCURSIONS": "Экскурсии / туры",
+    "ADMIN": "Администратор",
 }
-ACTIVE_STATUSES = ("OPEN", "IN_PROGRESS", "IN_INSPECTION")
 
 
 class GuestRequestCreate(BaseModel):
@@ -33,11 +32,8 @@ class GuestRequestCreate(BaseModel):
 
 def normalize_request_code(value: str) -> str:
     code = value.strip().upper()
-    if code not in REQUEST_DEFS:
-        raise HTTPException(
-            status_code=422,
-            detail={"code": "UNKNOWN_GUEST_REQUEST", "request_code": code, "allowed": sorted(REQUEST_DEFS)},
-        )
+    if code not in REQUEST_LABELS:
+        raise HTTPException(status_code=422, detail={"code": "UNKNOWN_GUEST_REQUEST", "request_code": code, "allowed": sorted(REQUEST_LABELS)})
     return code
 
 
@@ -56,10 +52,10 @@ async def authorized_context(conn, token: str, raw_session: str | None):
 
 def row_to_guest_item(row) -> dict[str, Any]:
     source = row["source"] or ""
-    request_code = source.removeprefix("GUEST_OS_") if source.startswith("GUEST_OS_") else (row["serviceCode"] or row["type"])
+    code = source.removeprefix("GUEST_OS_") if source.startswith("GUEST_OS_") else (row["serviceCode"] or "ADMIN")
     return {
         "id": str(row["id"]),
-        "request_code": request_code,
+        "request_code": code,
         "type": row["type"],
         "status": row["status"],
         "priority": row["priority"],
@@ -74,27 +70,21 @@ def row_to_guest_item(row) -> dict[str, Any]:
 
 
 TASK_SELECT = '''
-    SELECT id,type::text AS type,status::text AS status,priority::text AS priority,
-           title,description,"serviceCode","serviceDate","serviceTime",source,
-           "createdAt","updatedAt","completedAt"
-    FROM operational_tasks
+SELECT id,type::text AS type,status::text AS status,priority::text AS priority,
+       title,description,"serviceCode","serviceDate","serviceTime",source,
+       "createdAt","updatedAt","completedAt"
+FROM operational_tasks
 '''
 
 
 @router.get("/rooms/{token}/requests")
-async def list_guest_requests(
-    token: str,
-    request: Request,
-    tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE),
-):
+async def list_guest_requests(token: str, request: Request, tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE)):
     async with request.app.state.db.acquire() as conn:
         _, stay, _ = await authorized_context(conn, token, tc_guest_session)
         rows = await conn.fetch(
-            TASK_SELECT
-            + '''
+            TASK_SELECT + '''
             WHERE "stayId"=$1 AND "createdByType"='GUEST' AND source LIKE 'GUEST_OS_%'
-            ORDER BY "createdAt" DESC
-            LIMIT 100
+            ORDER BY "createdAt" DESC LIMIT 100
             ''',
             stay["stayId"],
         )
@@ -102,14 +92,8 @@ async def list_guest_requests(
 
 
 @router.post("/rooms/{token}/requests", status_code=status.HTTP_201_CREATED)
-async def create_guest_request(
-    token: str,
-    payload: GuestRequestCreate,
-    request: Request,
-    tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE),
-):
+async def create_guest_request(token: str, payload: GuestRequestCreate, request: Request, tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE)):
     code = normalize_request_code(payload.request_code)
-    definition = REQUEST_DEFS[code]
     source = f"GUEST_OS_{code}"
     description = payload.description.strip() if payload.description and payload.description.strip() else None
 
@@ -117,14 +101,7 @@ async def create_guest_request(
         async with conn.transaction():
             qr, stay, session = await authorized_context(conn, token, tc_guest_session)
             if payload.service_date and not (stay["checkIn"] <= payload.service_date <= stay["checkOut"]):
-                raise HTTPException(
-                    status_code=422,
-                    detail={
-                        "code": "SERVICE_DATE_OUTSIDE_STAY",
-                        "check_in": str(stay["checkIn"]),
-                        "check_out": str(stay["checkOut"]),
-                    },
-                )
+                raise HTTPException(status_code=422, detail={"code": "SERVICE_DATE_OUTSIDE_STAY", "check_in": str(stay["checkIn"]), "check_out": str(stay["checkOut"])})
 
             await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', f'{stay["stayId"]}:{source}')
             duplicate = await conn.fetchrow(
@@ -139,50 +116,30 @@ async def create_guest_request(
                 stay["stayId"], source, payload.service_date, payload.service_time,
             )
             if duplicate:
-                raise HTTPException(
-                    status_code=409,
-                    detail={"code": "GUEST_REQUEST_DUPLICATE_ACTIVE", "task_id": str(duplicate["id"]), "status": duplicate["status"]},
-                )
+                raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_DUPLICATE_ACTIVE", "task_id": str(duplicate["id"]), "status": duplicate["status"]})
 
             task_id = uuid.uuid4()
-            title = f"{definition['title']} · №{qr['room_code']}"
+            title = f"{REQUEST_LABELS[code]} · №{qr['room_code']}"
             await conn.execute(
                 '''
                 INSERT INTO operational_tasks (
                   id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,description,
                   "serviceCode","serviceDate","serviceTime","createdByType","createdById",source,"createdAt","updatedAt"
-                ) VALUES (
-                  $1,$2,$3,$4,$5,$6::"OperationalTaskType",'OPEN','NORMAL',$7,$8,$9,$10,$11,
-                  'GUEST',$12,$13,now(),now()
-                )
+                ) VALUES ($1,$2,$3,$4,$5,'GUEST_REQUEST','OPEN','NORMAL',$6,$7,$8,$9,$10,'GUEST',$11,$12,now(),now())
                 ''',
-                task_id,
-                qr["propertyId"],
-                qr["roomId"],
-                stay["reservation_id"],
-                stay["stayId"],
-                definition["type"],
-                title,
-                description,
-                definition["service_code"],
-                payload.service_date,
-                payload.service_time,
-                str(stay["guestId"]),
-                source,
+                task_id, qr["propertyId"], qr["roomId"], stay["reservation_id"], stay["stayId"],
+                title, description, code, payload.service_date, payload.service_time, str(stay["guestId"]), source,
             )
-
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (
                   id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
                 ) VALUES ($1,$2,'GUEST',$3,'CREATE_GUEST_REQUEST','OperationalTask',$4,'GUEST_OS','SUCCESS',
-                  jsonb_build_object(
-                    'request_code',$5::text,'task_type',$6::text,'stay_id',$7::text,'room_id',$8::text,
-                    'guest_session_id',$9::text,'financial_effect','NONE_AUTOMATIC','room_state_effect','NONE_AUTOMATIC'
-                  ),now())
+                  jsonb_build_object('request_code',$5::text,'task_type','GUEST_REQUEST','stay_id',$6::text,'room_id',$7::text,
+                    'guest_session_id',$8::text,'financial_effect','NONE_AUTOMATIC','room_state_effect','NONE_AUTOMATIC'),now())
                 ''',
                 uuid.uuid4(), qr["propertyId"], str(stay["guestId"]), str(task_id), code,
-                definition["type"], str(stay["stayId"]), str(qr["roomId"]), str(session["id"]),
+                str(stay["stayId"]), str(qr["roomId"]), str(session["id"]),
             )
             await conn.execute(
                 '''
@@ -198,47 +155,29 @@ async def create_guest_request(
 
 
 @router.post("/rooms/{token}/requests/{task_id}/cancel")
-async def cancel_guest_request(
-    token: str,
-    task_id: uuid.UUID,
-    request: Request,
-    tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE),
-):
+async def cancel_guest_request(token: str, task_id: uuid.UUID, request: Request, tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             qr, stay, _ = await authorized_context(conn, token, tc_guest_session)
             task = await conn.fetchrow(
-                '''
-                SELECT id,status::text AS status,source FROM operational_tasks
-                WHERE id=$1 AND "stayId"=$2 AND "createdByType"='GUEST' AND source LIKE 'GUEST_OS_%'
-                FOR UPDATE
-                ''',
+                '''SELECT id,status::text AS status FROM operational_tasks
+                   WHERE id=$1 AND "stayId"=$2 AND "createdByType"='GUEST' AND source LIKE 'GUEST_OS_%' FOR UPDATE''',
                 task_id, stay["stayId"],
             )
             if not task:
                 raise HTTPException(status_code=404, detail={"code": "GUEST_REQUEST_NOT_FOUND"})
             if task["status"] != "OPEN":
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_CANNOT_CANCEL", "status": task["status"]})
+            await conn.execute('UPDATE operational_tasks SET status=\'CANCELLED\',"updatedAt"=now(),"completedAt"=now() WHERE id=$1', task_id)
             await conn.execute(
-                '''UPDATE operational_tasks SET status='CANCELLED',"updatedAt"=now(),"completedAt"=now() WHERE id=$1''',
-                task_id,
-            )
-            await conn.execute(
-                '''
-                INSERT INTO audit_logs (
-                  id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
-                ) VALUES ($1,$2,'GUEST',$3,'CANCEL_GUEST_REQUEST','OperationalTask',$4,'GUEST_OS','SUCCESS',
-                  jsonb_build_object('from_status','OPEN','status','CANCELLED'),now())
-                ''',
+                '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'GUEST',$3,'CANCEL_GUEST_REQUEST','OperationalTask',$4,'GUEST_OS','SUCCESS',
+                     jsonb_build_object('from_status','OPEN','status','CANCELLED'),now())''',
                 uuid.uuid4(), qr["propertyId"], str(stay["guestId"]), str(task_id),
             )
             await conn.execute(
-                '''
-                INSERT INTO guest_history_events (
-                  id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
-                ) VALUES ($1,$2,$3,$4,'GUEST_REQUEST_CANCELLED','GUEST_OS',
-                  jsonb_build_object('task_id',$5::text),now(),now())
-                ''',
+                '''INSERT INTO guest_history_events (id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt")
+                   VALUES ($1,$2,$3,$4,'GUEST_REQUEST_CANCELLED','GUEST_OS',jsonb_build_object('task_id',$5::text),now(),now())''',
                 uuid.uuid4(), qr["propertyId"], stay["guestId"], stay["stayId"], str(task_id),
             )
             row = await conn.fetchrow(TASK_SELECT + ' WHERE id=$1', task_id)
