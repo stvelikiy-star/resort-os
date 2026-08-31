@@ -1,0 +1,67 @@
+name: Public Browser Acceptance CI
+
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "scripts/public_browser_acceptance.mjs"
+      - ".github/workflows/public-browser-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "scripts/public_browser_acceptance.mjs"
+      - ".github/workflows/public-browser-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install and build public site
+        working-directory: apps/web
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-audit --no-fund --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Start production-mode public site
+        working-directory: apps/web
+        run: |
+          nohup npm run start > /tmp/public-web.log 2>&1 &
+          echo $! > /tmp/public-web.pid
+          for i in {1..45}; do
+            curl --fail --silent http://127.0.0.1:3000/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/public-web.log
+          exit 1
+
+      - name: Run SSR desktop mobile and booking UX acceptance
+        env:
+          PUBLIC_BASE_URL: http://127.0.0.1:3000
+        run: node scripts/public_browser_acceptance.mjs
+
+      - name: Show public-site logs on failure
+        if: failure()
+        run: cat /tmp/public-web.log || true
+
+      - name: Stop public site
+        if: always()
+        run: |
+          if [ -f /tmp/public-web.pid ]; then kill "$(cat /tmp/public-web.pid)" 2>/dev/null || true; fi

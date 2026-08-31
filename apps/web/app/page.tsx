@@ -3,15 +3,19 @@ import Link from "next/link";
 
 import BookingWidget from "../components/BookingWidget";
 import SiteHeader from "../components/SiteHeader";
+import { ownerApprovedGuestFacts, TWO_GIS_REVIEWS_URL } from "../lib/ownerApprovedGuestFacts";
 import { formatKgs, roomCategories } from "../lib/roomCatalog";
 
+const ownerFacts = ownerApprovedGuestFacts.ru;
+const VERIFIED_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
+
 const advantages = [
-  { index: "01", title: "Первая линия Иссык-Куля", text: "Отдых строится вокруг озера: берег, собственный пляж и длинный пирс находятся внутри курортного маршрута.", image: "/media/three-crowns/lake-night.webp" },
-  { index: "02", title: "Собственный пляж", text: "Не нужно планировать отдельную поездку к воде — пляж становится естественным продолжением территории.", image: "/media/three-crowns/hero-resort.webp" },
-  { index: "03", title: "Пирс 150 метров", text: "Одна из главных визуальных точек курорта: прогулки, воздух Иссык-Куля и открытая перспектива воды.", image: "/media/three-crowns/lake-night.webp" },
-  { index: "04", title: "SPA и массаж", text: "После активного дня можно переключиться на спокойный формат отдыха и восстановление.", image: "/media/three-crowns/hero-resort.webp" },
-  { index: "05", title: "Бассейн 15×8 м", text: "Открытый бассейн дополняет отдых у озера и подходит для дневного курортного ритма.", image: "/media/three-crowns/hero-resort.webp" },
-  { index: "06", title: "12 категорий размещения", text: "От компактных одноместных номеров до двухкомнатных категорий и апартаментов с кухней.", image: "/media/three-crowns/room-double.webp" },
+  { index: "01", title: "Первая линия Иссык-Куля", text: "Отдых строится вокруг озера: берег, собственный пляж и длинный пирс находятся внутри курортного маршрута.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "02", title: "Собственный пляж", text: "Не нужно планировать отдельную поездку к воде — пляж становится естественным продолжением территории.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "03", title: "Пирс 150 метров", text: "Одна из главных визуальных точек курорта: прогулки, воздух Иссык-Куля и открытая перспектива воды.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "04", title: "SPA и массаж", text: "После активного дня можно переключиться на спокойный формат отдыха и восстановление.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "05", title: "Бассейн 15×8 м", text: "Открытый бассейн дополняет отдых у озера и подходит для дневного курортного ритма.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "06", title: "12 категорий размещения", text: "От компактных одноместных номеров до двухкомнатных категорий и апартаментов с кухней.", image: VERIFIED_MEDIA_FALLBACK },
 ];
 
 const territoryJourney = [
@@ -29,22 +33,15 @@ const amenityCards = [
   ["Для семей", "Большой выбор категорий позволяет подобрать размещение для одного гостя, пары или семьи до четырёх человек."],
   ["Длинные заезды", "Апартаменты увеличенной площади и категория с кухней удобны, когда вы приезжаете не на одну-две ночи."],
   ["Связь с менеджером", "Если не хочется разбираться самостоятельно, менеджер поможет подобрать категорию, даты и дополнительные услуги."],
-  ["Гибкий сценарий", "Можно собрать спокойный пляжный отдых, активную программу по Иссык-Кулю или групповую поездку под вашу задачу."],
+  [ownerFacts.included.title, ownerFacts.included.text],
 ];
 
-const reviewThemes = [
-  { score: "01", title: "Локация у Иссык-Куля", text: "Гости особенно ценят возможность жить рядом с водой и не тратить отпуск на ежедневные переезды к пляжу." },
-  { score: "02", title: "Пляж и пирс", text: "Собственный берег и длинный пирс — одна из самых запоминающихся частей отдыха и фотографий из поездки." },
-  { score: "03", title: "Выбор формата проживания", text: "Разные категории помогают подобрать размещение под пару, семью, компанию или более длительный отпуск." },
-  { score: "04", title: "Курортный ритм", text: "Озеро, бассейн, SPA и территория позволяют чередовать активность и спокойный отдых в течение одного дня." },
-];
+const reviewThemes = ownerFacts.reviews.cards.map((review, index) => ({
+  score: String(index + 1).padStart(2, "0"),
+  ...review,
+}));
 
-const extraServices = [
-  ["Экскурсии и туры", "Поможем подобрать поездки и впечатления по Иссык-Кулю. Конкретная программа и доступность подтверждаются при обращении."],
-  ["Трансфер", "Можно заранее обсудить трансфер и маршрут до Чолпон-Аты, чтобы дорога до отеля была частью организованной поездки."],
-  ["Такси и поездки", "Для индивидуальных маршрутов менеджер поможет с транспортом по запросу."],
-  ["Водные активности", "По сезону можно уточнить доступные водные развлечения и прогулки непосредственно перед заездом."],
-];
+const extraServices = ownerFacts.services.cards;
 
 const groupFormats = [
   ["Корпоративные заезды", "Размещение команды, единая коммуникация с организатором и согласование программы пребывания."],
@@ -79,9 +76,7 @@ export default function HomePage() {
     <main className="landing-v3" id="top">
       <section className="v3-hero" aria-labelledby="hero-title">
         <div className="v3-hero-media" aria-hidden="true">
-          <video autoPlay muted loop playsInline preload="metadata" poster="/media/three-crowns/hero-resort.webp">
-            <source src="/media/three-crowns/hero-resort.mp4" type="video/mp4" />
-          </video>
+          <video autoPlay muted loop playsInline preload="metadata" poster={VERIFIED_MEDIA_FALLBACK} />
         </div>
         <div className="v3-hero-shade" aria-hidden="true" />
         <div className="wrap v3-hero-content">
@@ -106,13 +101,13 @@ export default function HomePage() {
 
       <section className="v3-rooms" id="rooms" aria-labelledby="rooms-title">
         <div className="wrap v3-section-head"><div><p className="eyebrow">Номерной фонд</p><h2 className="display-title" id="rooms-title">Все 12 категорий.<br />Выбирайте спокойно.</h2></div><div><p>От компактных одноместных вариантов до просторных двухкомнатных категорий и апартаментов. Сравните вместимость, площадь и сезонную стоимость, а затем откройте нужную категорию и проверьте даты.</p><Link className="text-link" href="/rooms">Открыть полный каталог →</Link></div></div>
-        <div className="wrap v3-room-grid">{roomCategories.map((room) => <Link className="v3-room-card" href={`/rooms/${room.slug}`} key={room.slug}><div className="v3-room-card-photo"><Image src="/media/three-crowns/room-double.webp" alt={room.name} fill sizes="(max-width: 760px) 88vw, (max-width: 1100px) 44vw, 31vw" /></div><div className="v3-room-card-body"><div className="v3-room-card-top"><span>{room.index}</span><span>{room.capacity} · {room.area}</span></div><h3>{room.name}</h3><p>{room.summary}</p><div className="v3-room-card-price"><small>Высокий сезон</small><strong>{formatKgs(room.rates.peak)} сом / сутки</strong></div><b>Смотреть категорию →</b></div></Link>)}</div>
+        <div className="wrap v3-room-grid">{roomCategories.map((room) => <Link className="v3-room-card" href={`/rooms/${room.slug}`} key={room.slug}><div className="v3-room-card-photo"><Image src={VERIFIED_MEDIA_FALLBACK} alt="Три Короны Resort & SPA" fill sizes="(max-width: 760px) 88vw, (max-width: 1100px) 44vw, 31vw" /></div><div className="v3-room-card-body"><div className="v3-room-card-top"><span>{room.index}</span><span>{room.capacity} · {room.area}</span></div><h3>{room.name}</h3><p>{room.summary}</p><div className="v3-room-card-price"><small>Высокий сезон</small><strong>{formatKgs(room.rates.peak)} сом / сутки</strong></div><b>Смотреть категорию →</b></div></Link>)}</div>
       </section>
 
       <section className="v3-territory" id="resort" aria-labelledby="territory-title">
         <div className="wrap v3-section-head light-head"><div><p className="eyebrow light">Территория курорта</p><h2 className="display-title light" id="territory-title">От первого шага<br />до конца пирса</h2></div><p>Пройдите весь маршрут курорта — от размещения и дневного отдыха до собственного пляжа и длинного пирса, который выходит в открытое пространство Иссык-Куля.</p></div>
         <div className="wrap v3-territory-film">
-          <video autoPlay muted loop playsInline preload="metadata" poster="/media/three-crowns/hero-resort.webp"><source src="/media/three-crowns/territory.mp4" type="video/mp4" /></video>
+          <video autoPlay muted loop playsInline preload="metadata" poster={VERIFIED_MEDIA_FALLBACK} />
           <div className="v3-film-caption"><span>Три Короны · территория</span><strong>Корпуса, зелень и внутренний маршрут курорта</strong></div>
         </div>
         <div className="wrap v3-territory-route">{territoryJourney.map(([index, title, text]) => <article key={index}><span>{index}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div>
@@ -122,7 +117,7 @@ export default function HomePage() {
         <div className="wrap v3-amenities-layout">
           <div className="v3-amenities-copy"><p className="eyebrow">Озеро и отдых у воды</p><h2 className="display-title" id="amenities-title">Иссык-Куль — часть<br />каждого дня.</h2><p className="lead">Собственный пляж, пирс длиной 150 метров и открытая вода задают ритм отдыха. Здесь можно провести спокойный день у берега или добавить больше движения и водных впечатлений.</p><div className="v3-water-tags"><span>Собственный пляж</span><span>Пирс 150 м</span><span>Открытый бассейн 15×8 м</span></div><a className="button button-dark" href="#booking">Проверить даты</a></div>
           <figure className="v3-amenities-photo v3-lake-film">
-            <video autoPlay muted loop playsInline preload="metadata" poster="/media/three-crowns/lake-night.webp"><source src="/media/three-crowns/lake.mp4" type="video/mp4" /></video>
+            <video autoPlay muted loop playsInline preload="metadata" poster={VERIFIED_MEDIA_FALLBACK} />
             <figcaption><span>Иссык-Куль</span><strong>Пляж · пирс · вода · летние впечатления</strong></figcaption>
           </figure>
         </div>
@@ -130,13 +125,14 @@ export default function HomePage() {
       </section>
 
       <section className="v3-reviews" id="reviews" aria-labelledby="reviews-title">
-        <div className="wrap v3-section-head"><div><p className="eyebrow">Отзывы гостей</p><h2 className="display-title" id="reviews-title">Что запоминается<br />после поездки</h2></div><p>В отзывах гости чаще всего отмечают расположение у озера, собственный пляж, пирс и возможность провести большую часть дня внутри одного курортного пространства.</p></div>
+        <div className="wrap v3-section-head"><div><p className="eyebrow">{ownerFacts.reviews.eyebrow}</p><h2 className="display-title" id="reviews-title">{ownerFacts.reviews.title}</h2></div><p>{ownerFacts.reviews.intro}</p></div>
         <div className="wrap v3-review-grid">{reviewThemes.map((review) => <article key={review.score}><span>{review.score}</span><h3>{review.title}</h3><p>{review.text}</p></article>)}</div>
-        <div className="wrap v3-extra-services"><div className="v3-extra-heading"><p className="eyebrow light">Дополнительно</p><h3>Отдых не заканчивается территорией</h3><p>Если хотите больше впечатлений или максимально простой маршрут, дополнительные услуги можно согласовать вместе с проживанием.</p></div><div className="v3-extra-grid">{extraServices.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h4>{title}</h4><p>{text}</p></article>)}</div></div>
+        <div className="wrap v3-hero-actions" data-owner-review-actions><a className="button button-dark" href={TWO_GIS_REVIEWS_URL} target="_blank" rel="noreferrer">{ownerFacts.reviews.readCta}</a><a className="button button-outline" href={TWO_GIS_REVIEWS_URL} target="_blank" rel="noreferrer">{ownerFacts.reviews.leaveCta}</a></div>
+        <div className="wrap v3-extra-services"><div className="v3-extra-heading"><p className="eyebrow light">{ownerFacts.services.eyebrow}</p><h3>{ownerFacts.services.title}</h3><p>{ownerFacts.services.intro}</p></div><div className="v3-extra-grid">{extraServices.map((service, index) => <article key={service.code} data-service-code={service.code}><span>{String(index + 1).padStart(2, "0")}</span><h4>{service.title}</h4><p>{service.text}</p>{service.cta && service.href ? <a className="text-link" href={service.href} target={service.href.startsWith("http") ? "_blank" : undefined} rel={service.href.startsWith("http") ? "noreferrer" : undefined}>{service.cta} →</a> : null}</article>)}</div></div>
       </section>
 
       <section className="v3-groups" id="groups" aria-labelledby="groups-title">
-        <div className="v3-groups-media" aria-hidden="true"><Image src="/media/three-crowns/hero-resort.webp" alt="" fill sizes="100vw" /></div><div className="v3-groups-shade" aria-hidden="true" />
+        <div className="v3-groups-media" aria-hidden="true"><Image src={VERIFIED_MEDIA_FALLBACK} alt="" fill sizes="100vw" /></div><div className="v3-groups-shade" aria-hidden="true" />
         <div className="wrap v3-groups-content"><div className="v3-groups-intro"><p className="eyebrow light">Групповые заезды</p><h2 className="display-title light" id="groups-title">Команды, сборы<br />и корпоративный отдых</h2><p>Для организованных групп важен не только номер. Нужно заранее собрать размещение, график, питание, транспорт и коммуникацию с одним ответственным менеджером. Именно так мы предлагаем строить групповой заезд.</p><a className="button button-accent" href="https://wa.me/996558085008" target="_blank" rel="noreferrer">Обсудить групповой заезд</a></div><div className="v3-group-grid">{groupFormats.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{text}</p></article>)}</div></div>
       </section>
 

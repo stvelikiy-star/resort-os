@@ -120,12 +120,21 @@ function applyOwnerApprovedFacts() {
   renderServices(locale);
 }
 
+function refreshOwnerApprovedFacts() {
+  applyOwnerApprovedFacts();
+  window.requestAnimationFrame(() => applyOwnerApprovedFacts());
+}
+
 export default function GuestServicesRuntime() {
   useEffect(() => {
-    applyOwnerApprovedFacts();
-    const handleReady = () => applyOwnerApprovedFacts();
+    refreshOwnerApprovedFacts();
+    const handleReady = () => refreshOwnerApprovedFacts();
     window.addEventListener("three-crowns:content-ready", handleReady);
-    return () => window.removeEventListener("three-crowns:content-ready", handleReady);
+    window.addEventListener("popstate", handleReady);
+    return () => {
+      window.removeEventListener("three-crowns:content-ready", handleReady);
+      window.removeEventListener("popstate", handleReady);
+    };
   }, []);
   return null;
 }
