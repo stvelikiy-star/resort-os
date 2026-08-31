@@ -9,6 +9,8 @@ import { roomCategories } from "../../lib/roomCatalog";
 
 type RoomsPageProps = { searchParams: Promise<{ lang?: string | string[] }> };
 
+const ROOM_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
+
 const COPY = {
   ru: {
     title: "Номера и апартаменты", description: "12 категорий размещения в Три Короны Resort & SPA: площадь, вместимость, сезонные цены и проверка свободных вариантов на выбранные даты.",
@@ -53,7 +55,7 @@ export async function generateMetadata({ searchParams }: RoomsPageProps): Promis
       description,
       url: locale === "ru" ? "/rooms" : `/rooms?lang=${locale}`,
       locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : "ru_RU",
-      images: [{ url: "/media/three-crowns/room-double.webp", alt: locale === "en" ? "Room at Three Crowns Resort & SPA" : locale === "kg" ? "Үч Таажы Resort & SPA номери" : "Номер в Три Короны Resort & SPA" }],
+      images: [{ url: ROOM_MEDIA_FALLBACK, alt: locale === "en" ? "Three Crowns Resort & SPA" : locale === "kg" ? "Үч Таажы Resort & SPA" : "Три Короны Resort & SPA" }],
     },
   };
 }
@@ -65,7 +67,7 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
     <SiteHeader />
     <main className="rooms-page" id="top">
       <section className="rooms-hero" aria-labelledby="rooms-page-title">
-        <div className="rooms-hero-media" aria-hidden="true"><Image src="/media/three-crowns/room-double.webp" alt="" fill priority sizes="100vw" /></div>
+        <div className="rooms-hero-media" aria-hidden="true"><Image src={ROOM_MEDIA_FALLBACK} alt="" fill priority sizes="100vw" /></div>
         <div className="rooms-hero-shade" aria-hidden="true" />
         <div className="wrap rooms-hero-content">
           <p className="eyebrow light">{String(copy.heroEyebrow)}</p>
