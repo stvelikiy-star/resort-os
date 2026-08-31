@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-detail"])
-manager_access = require_roles("OWNER", "MANAGER")
+reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 
 
 def _select_working_room(status: str, schedule, local_today):
@@ -35,7 +35,7 @@ def _select_working_room(status: str, schedule, local_today):
 async def reservation_detail(
     reservation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(reception_access),
 ):
     async with request.app.state.db.acquire() as conn:
         prop = await conn.fetchrow(

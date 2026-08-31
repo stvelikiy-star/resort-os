@@ -25,6 +25,12 @@ type User = {
 
 type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "GUESTS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "INBOX" | "OPS" | "STAFF";
 
+function initialTab(role?: string | null): Tab {
+  if (["OWNER", "MANAGER"].includes(role || "")) return "DASHBOARD";
+  if (role === "RECEPTION") return "RESERVATIONS";
+  return "OPS";
+}
+
 export default function AdminShell() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
@@ -42,7 +48,7 @@ export default function AdminShell() {
       })
       .then((payload) => {
         setUser(payload);
-        setTab(payload && ["OWNER", "MANAGER"].includes(payload.role) ? "DASHBOARD" : "OPS");
+        setTab(initialTab(payload?.role));
       })
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
@@ -64,7 +70,7 @@ export default function AdminShell() {
       }
       const payload = (await response.json()) as User;
       setUser(payload);
-      setTab(["OWNER", "MANAGER"].includes(payload.role) ? "DASHBOARD" : "OPS");
+      setTab(initialTab(payload.role));
       setPassword("");
     } catch {
       setError("Сервис входа недоступен. Проверьте Resort Core.");
@@ -103,6 +109,8 @@ export default function AdminShell() {
   }
 
   const isManager = ["OWNER", "MANAGER"].includes(user.role);
+  const isReception = user.role === "RECEPTION";
+  const canUseReception = isManager || isReception;
   const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
 
   return (
@@ -113,7 +121,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
-          {isManager && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
+          {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
           {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
           {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
@@ -129,7 +137,7 @@ export default function AdminShell() {
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "RESERVATIONS" && isManager && <ReceptionBoard />}
+      {tab === "RESERVATIONS" && canUseReception && <ReceptionBoard />}
       {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
       {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
       {tab === "GROWTH" && isManager && <GrowthControlBoard />}
