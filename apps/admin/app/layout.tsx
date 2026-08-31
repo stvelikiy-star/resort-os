@@ -32,6 +32,7 @@ import "./chessboard-v9.css";
 import "./chessboard-v9-bulk.css";
 import "./three-crowns-admin.css";
 import "./mobile-hardening.css";
+import "./my-stay/my-stay-admin.css";
 
 export const metadata: Metadata = {
   title: "Три Короны — Resort OS",
