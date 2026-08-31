@@ -14,6 +14,7 @@ from .hotel_finance import router as hotel_finance_router
 from .inbox import router as inbox_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
+from .my_stay import router as my_stay_router
 from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
@@ -32,6 +33,7 @@ from .reservation_detail import router as reservation_detail_router
 from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
 from .site_content import router as site_content_router
+from .smart_access import router as smart_access_router
 from .staff_control import router as staff_control_router
 from .staff_task_reports import router as staff_task_reports_router
 from .staff_voice import router as staff_voice_router
@@ -62,6 +64,8 @@ app.include_router(pms_chessboard_router)
 app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)
 app.include_router(guest_services_router)
+app.include_router(my_stay_router)
+app.include_router(smart_access_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
@@ -88,4 +92,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.39.0"
+app.version = "0.40.0-my-stay"
