@@ -29,6 +29,7 @@ from .pms_control_snapshot import router as pms_control_snapshot_router
 from .public_ai_admin import router as public_ai_admin_router
 from .realtime import router as realtime_router
 from .reception_reservations import router as reception_reservations_router
+from .reception_stays import router as reception_stays_router
 from .reservation_detail import router as reservation_detail_router
 from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
@@ -51,6 +52,7 @@ app.include_router(site_content_router)
 app.include_router(public_ai_admin_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
+app.include_router(reception_stays_router)
 app.include_router(reservation_detail_router)
 app.include_router(reservation_payments_router)
 app.include_router(room_detail_router)
@@ -94,4 +96,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.41.0-my-stay"
+app.version = "0.42.0-my-stay"
