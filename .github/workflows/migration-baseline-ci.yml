@@ -93,6 +93,7 @@ jobs:
           test -s packages/database/prisma/migrations/2_guest_service_tasks/migration.sql
           test -s packages/database/prisma/migrations/3_owner_analytics_snapshots/migration.sql
           test -s packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          test -s packages/database/prisma/migrations/5_my_stay/migration.sql
           grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'reservation_nonnegative_total' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'inventory_block_valid_dates' packages/database/prisma/migrations/0_init/migration.sql
@@ -111,6 +112,11 @@ jobs:
           grep -q 'guest_engagements_status_check' packages/database/prisma/migrations/4_guest_engagements/migration.sql
           grep -q 'guest_engagements_score_check' packages/database/prisma/migrations/4_guest_engagements/migration.sql
           grep -q 'guest_engagements_feedback_reservation_key' packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          grep -q 'guest_access_credentials' packages/database/prisma/migrations/5_my_stay/migration.sql
+          grep -q 'dining_menu_items' packages/database/prisma/migrations/5_my_stay/migration.sql
+          grep -q 'reservation_charges' packages/database/prisma/migrations/5_my_stay/migration.sql
+          grep -q 'smart_access_points' packages/database/prisma/migrations/5_my_stay/migration.sql
+          grep -q "ADD VALUE IF NOT EXISTS 'DINING'" packages/database/prisma/migrations/5_my_stay/migration.sql
           cd packages/database/prisma/migrations/0_init
           sha256sum -c migration.sql.sha256
 
@@ -147,8 +153,8 @@ jobs:
         run: |
           python scripts/production_preflight.py | tee /tmp/production-preflight.txt
           grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
-          grep -q '^FACT: applied_migrations=5$' /tmp/production-preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements'\]$" /tmp/production-preflight.txt
+          grep -q '^FACT: applied_migrations=6$' /tmp/production-preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_my_stay'\]$" /tmp/production-preflight.txt
           grep -q '^FACT: critical_constraint_count=24$' /tmp/production-preflight.txt
           grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
           grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
@@ -171,8 +177,10 @@ jobs:
           guest_engagement_table="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select to_regclass('public.guest_engagements')::text")"
           guest_engagement_constraints="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('guest_engagements_property_fkey','guest_engagements_guest_fkey','guest_engagements_reservation_fkey','guest_engagements_kind_check','guest_engagements_status_check','guest_engagements_score_check','guest_engagements_score_kind_check','guest_engagements_feedback_reservation_check')")"
           guest_engagement_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='guest_engagements' and indexname='guest_engagements_feedback_reservation_key'")"
-          test "$migration_count" = '5'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements'
+          my_stay_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_tables where schemaname='public' and tablename in ('guest_access_credentials','guest_sessions','reservation_meal_plans','dining_menu_items','dining_orders','dining_order_items','reservation_charges','smart_access_points','smart_access_grants')")"
+          my_stay_roles="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_enum e join pg_type t on t.oid=e.enumtypid where t.typname='StaffRole' and e.enumlabel in ('ADMIN','RECEPTION','DINING')")"
+          test "$migration_count" = '6'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay'
           test "$core_constraint_count" = '13'
           test "$site_content_table" = 'site_content_documents'
           test "$guest_service_columns" = '4'
@@ -183,6 +191,8 @@ jobs:
           test "$guest_engagement_table" = 'guest_engagements'
           test "$guest_engagement_constraints" = '8'
           test "$guest_engagement_unique" = '1'
+          test "$my_stay_tables" = '9'
+          test "$my_stay_roles" = '3'
 
       - name: Upload migration chain for explicit review
         uses: actions/upload-artifact@v4
