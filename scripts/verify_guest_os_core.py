@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
+import json
 import os
 import uuid
 from datetime import date, timedelta
@@ -162,6 +163,8 @@ async def prove_relocation(stay_id: str, old_assignment_id: uuid.UUID, from_room
         )
         assert event
         payload = event["payloadJson"]
+        if isinstance(payload, str):
+            payload = json.loads(payload)
         assert payload["from_room_id"] == str(from_room_id)
         assert payload["to_room_id"] == str(to_room_id)
         return current["id"]
