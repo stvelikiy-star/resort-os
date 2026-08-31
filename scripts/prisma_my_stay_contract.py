@@ -81,9 +81,12 @@ def main() -> int:
     migration5 = (ROOT / "packages/database/prisma/migrations/5_my_stay/migration.sql").read_text(encoding="utf-8")
     migration6 = (ROOT / "packages/database/prisma/migrations/6_public_access/migration.sql").read_text(encoding="utf-8")
     migration7 = (ROOT / "packages/database/prisma/migrations/7_in_stay_task_context/migration.sql").read_text(encoding="utf-8")
+    migration8 = (ROOT / "packages/database/prisma/migrations/8_public_access_unlock_claim/migration.sql").read_text(encoding="utf-8")
     assert "reservation_charges_source_unique_idx" in migration5
     assert "public_access_payment_intents_provider_ref_unique_idx" in migration6
     assert "HOUSEKEEPING" in migration7 and "MAINTENANCE" in migration7
+    assert "UNLOCKING" in migration8
+    assert "public_access_payment_intents_status_check" in migration8
 
     print("PRISMA_MY_STAY_CONTRACT=PASS")
     print(f"roles={len(REQUIRED_ROLES)} models={len(REQUIRED_MODELS)}")
