@@ -8,6 +8,7 @@ from .communication_ingest import router as communication_ingest_router
 from .crm_sync import router as crm_sync_router
 from .google_control import router as google_control_router
 from .growth_control import router as growth_control_router
+from .guest_security import install_guest_activation_guard
 from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
@@ -39,11 +40,11 @@ from .smart_access_current import router as smart_access_current_router
 from .staff_control import router as staff_control_router
 from .staff_task_reports import router as staff_task_reports_router
 from .staff_voice import router as staff_voice_router
-from .stays import router as stays_router
 from .telegram_auth import router as telegram_auth_router
 from .telegram_sales import router as telegram_sales_router
 
 install_observability(app)
+install_guest_activation_guard(app)
 
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
@@ -74,7 +75,6 @@ app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
 app.include_router(staff_task_reports_router)
-app.include_router(stays_router)
 app.include_router(telegram_auth_router)
 
 # Direct provider adapters are retained as optional/reference integrations.
@@ -96,4 +96,4 @@ app.include_router(manager_dashboard_router)
 
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.42.0-my-stay"
+app.version = "0.43.0-my-stay"
