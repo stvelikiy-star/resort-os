@@ -16,6 +16,7 @@ import "./reception.css";
 import "./inbox.css";
 import "./staff.css";
 import "./room-detail.css";
+import "./room-qr.css";
 import "./chessboard.css";
 import "./chessboard-lifecycle.css";
 import "./chessboard-payment.css";
