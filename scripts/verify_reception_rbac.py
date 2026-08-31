@@ -78,18 +78,19 @@ def login(username: str, password: str) -> httpx.Client:
 
 def main():
     today = asyncio.run(local_today())
+    booking_start = today - timedelta(days=1)
     checkout_day = today + timedelta(days=2)
     asyncio.run(ensure_reception_user())
 
     owner = login(OWNER_USERNAME, OWNER_PASSWORD)
-    grid = owner.get('/api/v1/pms/grid', params={"start": today.isoformat(), "end": checkout_day.isoformat()})
+    grid = owner.get('/api/v1/pms/grid', params={"start": booking_start.isoformat(), "end": checkout_day.isoformat()})
     grid.raise_for_status()
     chosen = None
     quote = None
     for room in grid.json()["rooms"]:
         preview = owner.post('/api/v1/admin/pms/reservations/new/preview', json={
             "room_id": room["id"],
-            "check_in": today.isoformat(),
+            "check_in": booking_start.isoformat(),
             "check_out": checkout_day.isoformat(),
             "adults": 2,
             "children": 0,
@@ -104,7 +105,7 @@ def main():
     suffix = uuid.uuid4().hex[:8]
     committed = owner.post('/api/v1/admin/pms/reservations/new/commit', json={
         "room_id": chosen["id"],
-        "check_in": today.isoformat(),
+        "check_in": booking_start.isoformat(),
         "check_out": checkout_day.isoformat(),
         "adults": 2,
         "children": 0,
@@ -188,17 +189,7 @@ def main():
     qr.raise_for_status()
     assert qr.json()["room_id"] == chosen["id"]
 
-    # Early checkout is allowed after check-in date only; make Stay appear started yesterday for this RBAC test
-    # while preserving the public reservation dates. This tests permission and lifecycle, not hotel-date policy.
-    conn = asyncio.run(asyncpg.connect(DATABASE_URL))
-    try:
-        asyncio.run(conn.execute(
-            '''UPDATE stays SET "actualCheckInAt"=(now() - interval '1 day') WHERE "reservationId"=$1''',
-            uuid.UUID(reservation_id),
-        ))
-    finally:
-        asyncio.run(conn.close())
-
+    # The booking began on the prior hotel night, so an early checkout today is a real non-zero-night stay.
     checkout = reception.post(f'/api/v1/admin/stays/reservations/{reservation_id}/check-out')
     checkout.raise_for_status()
     assert checkout.json()["status"] == "CHECKED_OUT"
