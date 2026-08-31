@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import DashboardBoard from "./DashboardBoard";
 import GrowthControlBoard from "./GrowthControlBoard";
 import GuestHistoryBoard from "./GuestHistoryBoard";
+import GuestServicesCenter from "./GuestServicesCenter";
 import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
@@ -23,7 +24,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "GUESTS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "GUESTS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "INBOX" | "OPS" | "STAFF";
 
 function initialTab(role?: string | null): Tab {
   if (["OWNER", "MANAGER"].includes(role || "")) return "DASHBOARD";
@@ -122,6 +123,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
+          {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
           {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
           {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
           {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
@@ -138,6 +140,7 @@ export default function AdminShell() {
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionBoard />}
+      {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
       {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
       {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
       {tab === "GROWTH" && isManager && <GrowthControlBoard />}
