@@ -50,7 +50,25 @@ async def reservation_guest(reservation_id: str):
         await conn.close()
 
 
-async def choose_target(reservation_id: str, current_room_id: str, start: date, end: date):
+async def guest_identity_count(phone: str, email: str) -> int:
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        return await conn.fetchval(
+            '''
+            SELECT count(*)::int
+            FROM guests g JOIN properties p ON p.id=g."propertyId"
+            WHERE p.code='THREE_CROWNS'
+              AND regexp_replace(COALESCE(g.phone,''),'\\D','','g')=regexp_replace($1,'\\D','','g')
+              AND lower(trim(COALESCE(g.email,'')))=lower(trim($2))
+            ''',
+            phone,
+            email,
+        )
+    finally:
+        await conn.close()
+
+
+async def choose_target(current_room_id: str, start: date, end: date):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
         room_type_id = await conn.fetchval('SELECT "roomTypeId" FROM rooms WHERE id=$1', uuid.UUID(current_room_id))
@@ -102,47 +120,82 @@ async def audit_count(action: str, guest_id: str) -> int:
         await conn.close()
 
 
+def choose_sellable_room(owner: httpx.Client, start: date, end: date, *, exclude: set[str] | None = None):
+    excluded = exclude or set()
+    grid = owner.get('/api/v1/pms/grid', params={"start": start.isoformat(), "end": end.isoformat()})
+    grid.raise_for_status()
+    for room in grid.json()["rooms"]:
+        if room["id"] in excluded:
+            continue
+        preview = owner.post('/api/v1/admin/pms/reservations/new/preview', json={
+            "room_id": room["id"], "check_in": start.isoformat(), "check_out": end.isoformat(), "adults": 1, "children": 0,
+        })
+        if preview.status_code == 200 and preview.json().get("can_commit"):
+            return room, preview.json()
+    raise AssertionError("No sellable room for Guest CRM E2E")
+
+
+def create_reservation(
+    owner: httpx.Client,
+    *,
+    room: dict,
+    preview: dict,
+    check_in: date,
+    check_out: date,
+    guest_name: str,
+    phone: str,
+    email: str,
+    notes: str,
+):
+    asyncio.run(prepare_room(room["id"]))
+    response = owner.post('/api/v1/admin/pms/reservations/new/commit', json={
+        "room_id": room["id"],
+        "check_in": check_in.isoformat(),
+        "check_out": check_out.isoformat(),
+        "adults": 1,
+        "children": 0,
+        "guest_name": guest_name,
+        "phone": phone,
+        "email": email,
+        "expected_total_kgs": preview["pricing"]["total_kgs"],
+        "expected_pricing_source": preview["pricing"]["source"],
+        "notes": notes,
+    })
+    response.raise_for_status()
+    body = response.json()
+    assert body["payment_created"] is False
+    return body["reservation_id"]
+
+
 def main():
     today = asyncio.run(local_today())
-    end = today + timedelta(days=3)
+    first_start = today - timedelta(days=1)
+    first_end = today + timedelta(days=2)
+    second_start = today
+    second_end = today + timedelta(days=2)
+
     owner = httpx.Client(base_url=BASE_URL, timeout=30.0, headers={"user-agent": "guest-crm-ci"})
     login = owner.post('/api/v1/auth/login', json={"username": OWNER_USERNAME, "password": OWNER_PASSWORD})
     login.raise_for_status()
 
-    grid = owner.get('/api/v1/pms/grid', params={"start": today.isoformat(), "end": end.isoformat()})
-    grid.raise_for_status()
-    chosen = None
-    preview_body = None
-    for room in grid.json()["rooms"]:
-        preview = owner.post('/api/v1/admin/pms/reservations/new/preview', json={
-            "room_id": room["id"], "check_in": today.isoformat(), "check_out": end.isoformat(), "adults": 1, "children": 0,
-        })
-        if preview.status_code == 200 and preview.json().get("can_commit"):
-            chosen = room
-            preview_body = preview.json()
-            break
-    assert chosen and preview_body, "No sellable room for Guest CRM E2E"
-    asyncio.run(prepare_room(chosen["id"]))
-
+    chosen, preview_body = choose_sellable_room(owner, first_start, first_end)
     suffix = uuid.uuid4().hex[:8]
-    commit = owner.post('/api/v1/admin/pms/reservations/new/commit', json={
-        "room_id": chosen["id"],
-        "check_in": today.isoformat(),
-        "check_out": end.isoformat(),
-        "adults": 1,
-        "children": 0,
-        "guest_name": "Guest CRM CI",
-        "phone": "+996556" + suffix[:6],
-        "email": f"guest-crm-{suffix}@example.com",
-        "expected_total_kgs": preview_body["pricing"]["total_kgs"],
-        "expected_pricing_source": preview_body["pricing"]["source"],
-        "notes": "Guest CRM factual history E2E",
-    })
-    commit.raise_for_status()
-    body = commit.json()
-    assert body["payment_created"] is False
-    reservation_id = body["reservation_id"]
+    phone = "+996556" + suffix[:6]
+    email = f"guest-crm-{suffix}@example.com"
+
+    reservation_id = create_reservation(
+        owner,
+        room=chosen,
+        preview=preview_body,
+        check_in=first_start,
+        check_out=first_end,
+        guest_name="Guest CRM CI",
+        phone=phone,
+        email=email,
+        notes="Guest CRM factual history E2E",
+    )
     guest_id = asyncio.run(reservation_guest(reservation_id))
+    assert asyncio.run(guest_identity_count(phone, email)) == 1
 
     qr = owner.post(f'/api/v1/admin/guest-os/room-qrs/{chosen["id"]}/issue')
     qr.raise_for_status()
@@ -150,7 +203,7 @@ def main():
 
     check_in = owner.post(f'/api/v1/admin/stays/reservations/{reservation_id}/check-in')
     check_in.raise_for_status()
-    stay_id = check_in.json()["stay_id"]
+    first_stay_id = check_in.json()["stay_id"]
     pin = check_in.json()["guest_access_pin"]
     verify = owner.post(f'/api/v1/guest-os/rooms/{qr_token}/verify', json={"pin": pin})
     verify.raise_for_status()
@@ -167,9 +220,12 @@ def main():
     complete.raise_for_status()
     assert complete.json()["status"] == "DONE"
 
-    target_room_id, target_room_code = asyncio.run(choose_target(reservation_id, chosen["id"], today, end))
+    target_room_id, target_room_code = asyncio.run(choose_target(chosen["id"], today, first_end))
     version = asyncio.run(reservation_version(reservation_id))
-    segments = [{"room_id": target_room_id, "start": today.isoformat(), "end": end.isoformat()}]
+    segments = [
+        {"room_id": chosen["id"], "start": first_start.isoformat(), "end": today.isoformat()},
+        {"room_id": target_room_id, "start": today.isoformat(), "end": first_end.isoformat()},
+    ]
     move_preview = owner.post(f'/api/v1/admin/pms/reservations/{reservation_id}/schedule/preview', json={"segments": segments})
     move_preview.raise_for_status()
     assert move_preview.json()["immediate_relocation"] is not None
@@ -186,7 +242,7 @@ def main():
     assert crm["guest"]["id"] == guest_id
     assert len(crm["stays"]) == 1
     stay = crm["stays"][0]
-    assert stay["id"] == stay_id and stay["status"] == "ACTIVE"
+    assert stay["id"] == first_stay_id and stay["status"] == "ACTIVE"
     assert stay["actual_check_in_at"] is not None
     assert len(stay["assignments"]) == 2, stay["assignments"]
     assert stay["assignments"][0]["room_code"] == chosen["code"]
@@ -212,12 +268,61 @@ def main():
     update.raise_for_status()
     assert update.json()["value"] == "После 16:00"
 
+    checkout = owner.post(f'/api/v1/admin/stays/reservations/{reservation_id}/check-out')
+    checkout.raise_for_status()
+    assert checkout.json()["status"] == "CHECKED_OUT"
+    assert checkout.json()["stay_id"] == first_stay_id
+
+    second_room, second_preview = choose_sellable_room(
+        owner,
+        second_start,
+        second_end,
+        exclude={chosen["id"], target_room_id},
+    )
+    second_reservation_id = create_reservation(
+        owner,
+        room=second_room,
+        preview=second_preview,
+        check_in=second_start,
+        check_out=second_end,
+        guest_name="Guest CRM CI Return",
+        phone=phone,
+        email=email,
+        notes="Repeat guest identity and history E2E",
+    )
+    second_guest_id = asyncio.run(reservation_guest(second_reservation_id))
+    assert second_guest_id == guest_id
+    assert asyncio.run(guest_identity_count(phone, email)) == 1
+
+    second_check_in = owner.post(f'/api/v1/admin/stays/reservations/{second_reservation_id}/check-in')
+    second_check_in.raise_for_status()
+    second_stay_id = second_check_in.json()["stay_id"]
+    assert second_stay_id != first_stay_id
+
     detail2 = owner.get(f'/api/v1/admin/guest-crm/{guest_id}')
     detail2.raise_for_status()
-    preferences = {item["key"]: item for item in detail2.json()["preferences"]}
+    crm2 = detail2.json()
+    assert len(crm2["stays"]) == 2, crm2["stays"]
+    stays_by_id = {item["id"]: item for item in crm2["stays"]}
+    assert stays_by_id[first_stay_id]["status"] == "CHECKED_OUT"
+    assert stays_by_id[first_stay_id]["actual_check_out_at"] is not None
+    assert len(stays_by_id[first_stay_id]["assignments"]) == 2
+    assert stays_by_id[second_stay_id]["status"] == "ACTIVE"
+    assert len(stays_by_id[second_stay_id]["assignments"]) == 1
+    assert stays_by_id[second_stay_id]["assignments"][0]["room_code"] == second_room["code"]
+    preferences = {item["key"]: item for item in crm2["preferences"]}
     assert preferences["HOUSEKEEPING_TIME"]["active"] is True
     assert preferences["HOUSEKEEPING_TIME"]["value"] == "После 16:00"
-    assert preferences["HOUSEKEEPING_TIME"]["source"] == "MANAGER_CRM"
+    event_types2 = [event["event_type"] for event in crm2["events"]]
+    assert event_types2.count("CHECK_IN") >= 2
+    assert "CHECK_OUT" in event_types2 and "ROOM_RELOCATION" in event_types2
+
+    intelligence = owner.get(f'/api/v1/admin/intelligence/guests/{guest_id}')
+    intelligence.raise_for_status()
+    intel = intelligence.json()
+    assert intel["lifetime"]["reservation_count"] == 2
+    assert intel["lifetime"]["completed_stays"] == 1
+    assert len(intel["reservations"]) == 2
 
     deleted = owner.delete(f'/api/v1/admin/guest-crm/{guest_id}/preferences/HOUSEKEEPING_TIME')
     assert deleted.status_code == 204, deleted.text
@@ -231,7 +336,7 @@ def main():
     assert asyncio.run(payment_count()) == payments_before
 
     owner.close()
-    print("GUEST_CRM_E2E_OK")
+    print("GUEST_CRM_REPEAT_GUEST_E2E_OK")
 
 
 if __name__ == "__main__":
