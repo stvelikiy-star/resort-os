@@ -3,7 +3,7 @@
 
 This guard is intentionally deterministic. It does not validate provider availability
 or calculate reservation prices; it protects only the public facts explicitly
-approved by the Three Crowns owner on 2026-08-28.
+approved by the Three Crowns owner and their authoritative public rendering path.
 """
 from __future__ import annotations
 
@@ -12,6 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FACTS = ROOT / "apps/web/lib/ownerApprovedGuestFacts.ts"
 RUNTIME = ROOT / "apps/web/components/GuestServicesRuntime.tsx"
+PUBLIC_I18N = ROOT / "apps/web/components/PublicUiI18nRuntime.tsx"
+HOME = ROOT / "apps/web/app/page.tsx"
 RULES = ROOT / "apps/web/app/rules/page.tsx"
 LAYOUT = ROOT / "apps/web/app/layout.tsx"
 
@@ -75,6 +77,8 @@ def main() -> int:
     errors: list[str] = []
     facts = read(FACTS, errors)
     runtime = read(RUNTIME, errors)
+    public_i18n = read(PUBLIC_I18N, errors)
+    home = read(HOME, errors)
     rules = read(RULES, errors)
     layout = read(LAYOUT, errors)
 
@@ -91,17 +95,67 @@ def main() -> int:
         if snippet not in rules:
             errors.append(f"rules page missing owner-provided rule snippet: {snippet!r}")
 
+    transfer_positions = []
+    excursions_positions = []
+    offset = 0
+    while True:
+        transfer = facts.find('code: "TRANSFER"', offset)
+        excursions = facts.find('code: "EXCURSIONS"', offset)
+        if transfer == -1 and excursions == -1:
+            break
+        if transfer == -1 or excursions == -1:
+            errors.append("owner guest facts must contain TRANSFER and EXCURSIONS in every locale block")
+            break
+        transfer_positions.append(transfer)
+        excursions_positions.append(excursions)
+        offset = excursions + 1
+    if len(transfer_positions) != 3 or len(excursions_positions) != 3:
+        errors.append(f"expected TRANSFER/EXCURSIONS ordering in 3 locales, found {len(transfer_positions)}/{len(excursions_positions)}")
+    elif any(transfer > excursions for transfer, excursions in zip(transfer_positions, excursions_positions)):
+        errors.append("TRANSFER must render before EXCURSIONS in every public locale")
+
     if "GuestServicesRuntime" not in layout:
         errors.append("GuestServicesRuntime is not mounted in public layout")
+    if "PublicUiI18nRuntime" not in layout:
+        errors.append("PublicUiI18nRuntime is not mounted in public layout")
+    public_i18n_mount = layout.find("<PublicUiI18nRuntime />")
+    guest_facts_mount = layout.find("<GuestServicesRuntime />")
+    if public_i18n_mount == -1 or guest_facts_mount == -1 or public_i18n_mount > guest_facts_mount:
+        errors.append("GuestServicesRuntime must mount after PublicUiI18nRuntime so canonical facts win hydration")
+
     if "ownerApprovedGuestFacts" not in runtime:
         errors.append("GuestServicesRuntime is not wired to owner-approved fact source")
     if "window.location.pathname !== \"/\"" not in runtime:
         errors.append("GuestServicesRuntime must remain scoped to the home page")
+    if "requestAnimationFrame" not in runtime:
+        errors.append("GuestServicesRuntime must re-apply canonical facts after sibling hydration")
+
+    if "ownerApprovedGuestFacts" not in home:
+        errors.append("home page initial HTML is not wired to owner-approved guest facts")
+    if "const ownerFacts = ownerApprovedGuestFacts.ru" not in home:
+        errors.append("home page must render Russian SSR guest facts from the canonical source")
+    if "const extraServices = ownerFacts.services.cards" not in home:
+        errors.append("home page services are not sourced from owner-approved facts")
+    if "const extraServices = [" in home:
+        errors.append("home page contains a duplicated static guest-service catalog")
+    if "ownerFacts.services.eyebrow" not in home or "data-service-code={service.code}" not in home:
+        errors.append("home page does not server-render canonical service heading/cards")
+    if "TWO_GIS_REVIEWS_URL" not in home or "ownerFacts.reviews.cards" not in home:
+        errors.append("home page does not server-render canonical review source/cards")
+    if "ownerFacts.included.title" not in home or "ownerFacts.included.text" not in home:
+        errors.append("home page included-amenities card is not sourced from owner-approved facts")
+
+    # General KG/EN copy may still be maintained by PublicUiI18nRuntime, but owner-approved
+    # review/service sections must have a later authoritative renderer.
+    if ".v3-extra-grid" not in public_i18n:
+        errors.append("public locale runtime no longer exposes expected home service surface")
 
     print("Three Crowns owner guest-facts guard")
     print(f"FACT: required_guest_fact_snippets={len(REQUIRED_FACT_SNIPPETS)}")
     print(f"FACT: forbidden_stale_amenities={len(FORBIDDEN_STALE_AMENITIES)}")
     print(f"FACT: required_rule_snippets={len(REQUIRED_RULE_SNIPPETS)}")
+    print(f"FACT: localized_transfer_before_tours={len(transfer_positions) == 3 and all(t < e for t, e in zip(transfer_positions, excursions_positions))}")
+    print(f"FACT: ssr_guest_facts={'ownerApprovedGuestFacts' in home}")
 
     if errors:
         for error in errors:
@@ -109,7 +163,7 @@ def main() -> int:
         print("RESULT: OWNER GUEST FACT DRIFT")
         return 1
 
-    print("PASS: owner-approved guest-service facts and hotel rules are protected")
+    print("PASS: owner-approved guest-service facts, SSR rendering and hydration authority are protected")
     return 0
 
 
