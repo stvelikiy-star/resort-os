@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'services/api/app/guest_services.py'
+      - 'services/api/app/guest_requests.py'
       - 'services/api/app/staff_guest_requests.py'
       - 'services/api/app/app_entry.py'
       - 'packages/database/prisma/schema.prisma'
@@ -11,6 +12,7 @@ on:
       - 'apps/admin/components/GuestServicesCenter.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/PMSGridV9.tsx'
+      - 'apps/web/components/GuestRequestsPanel.tsx'
       - 'scripts/verify_guest_services_center.py'
       - 'scripts/upsert_staff_user.py'
       - '.github/workflows/guest-services-ci.yml'
@@ -18,6 +20,7 @@ on:
     branches: [main]
     paths:
       - 'services/api/app/guest_services.py'
+      - 'services/api/app/guest_requests.py'
       - 'services/api/app/staff_guest_requests.py'
       - 'services/api/app/app_entry.py'
       - 'packages/database/prisma/schema.prisma'
@@ -25,6 +28,7 @@ on:
       - 'apps/admin/components/GuestServicesCenter.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/PMSGridV9.tsx'
+      - 'apps/web/components/GuestRequestsPanel.tsx'
       - 'scripts/verify_guest_services_center.py'
       - 'scripts/upsert_staff_user.py'
       - '.github/workflows/guest-services-ci.yml'
@@ -82,6 +86,13 @@ jobs:
 
       - name: Typecheck and build unified admin surface
         working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Guest OS public surface
+        working-directory: apps/web
         run: |
           npm ci --no-audit --no-fund
           npm run typecheck
