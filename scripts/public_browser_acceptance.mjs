@@ -130,7 +130,10 @@ async function verifyDesktop(browser) {
   await assertServiceOrderAndLocale(page, "kg", "ky");
   await assertServiceOrderAndLocale(page, "en", "en");
 
-  await page.goto(`${BASE_URL}/`, { waitUntil: "networkidle" });
+  // Run the booking lifecycle in an explicit RU context so previous locale checks
+  // cannot leak their persisted language into business-copy assertions.
+  await page.goto(`${BASE_URL}/?lang=ru`, { waitUntil: "networkidle" });
+  assert((await page.locator("html").getAttribute("lang")) === "ru", "Booking acceptance did not enter explicit RU context");
   await page.waitForFunction(() => {
     const input = document.querySelector('input[type="date"]');
     return Boolean(input && input.value);
@@ -145,8 +148,8 @@ async function verifyDesktop(browser) {
   await page.locator("button.request-submit").click();
   await page.waitForSelector(".booking-notice.success");
   const successText = await page.locator(".booking-notice.success").innerText();
-  assert(successText.includes("Заявка"), "Booking request success feedback is missing");
-  assert(successText.includes("не является подтверждённой бронью"), "Booking request must explicitly remain unconfirmed");
+  assert(successText.includes("Заявка"), `Booking request success feedback is missing: ${JSON.stringify(successText)}`);
+  assert(successText.includes("не является подтверждённой бронью"), `Booking request must explicitly remain unconfirmed: ${JSON.stringify(successText)}`);
   assert(mediaFailures.length === 0, `Desktop public media failures: ${mediaFailures.join(" | ")}`);
 
   await context.close();
