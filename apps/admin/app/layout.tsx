@@ -30,6 +30,7 @@ import "./chessboard-v7.css";
 import "./chessboard-v8.css";
 import "./chessboard-v9.css";
 import "./chessboard-v9-bulk.css";
+import "./chessboard-owner.css";
 import "./three-crowns-admin.css";
 import "./mobile-hardening.css";
 
