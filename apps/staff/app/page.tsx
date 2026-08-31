@@ -1,9 +1,5 @@
-import GuestRequestShiftPanel from "../components/GuestRequestShiftPanel";
-import StaffShiftV2 from "../components/StaffShiftV2";
+import StaffRoleGateway from "../components/StaffRoleGateway";
 
 export default function StaffPage() {
-  return <>
-    <StaffShiftV2 />
-    <GuestRequestShiftPanel />
-  </>;
+  return <StaffRoleGateway />;
 }
