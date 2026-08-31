@@ -3,7 +3,10 @@ import Link from "next/link";
 
 import BookingWidget from "../components/BookingWidget";
 import SiteHeader from "../components/SiteHeader";
+import { ownerApprovedGuestFacts, TWO_GIS_REVIEWS_URL } from "../lib/ownerApprovedGuestFacts";
 import { formatKgs, roomCategories } from "../lib/roomCatalog";
+
+const ownerFacts = ownerApprovedGuestFacts.ru;
 
 const advantages = [
   { index: "01", title: "Первая линия Иссык-Куля", text: "Отдых строится вокруг озера: берег, собственный пляж и длинный пирс находятся внутри курортного маршрута.", image: "/media/three-crowns/lake-night.webp" },
@@ -29,22 +32,15 @@ const amenityCards = [
   ["Для семей", "Большой выбор категорий позволяет подобрать размещение для одного гостя, пары или семьи до четырёх человек."],
   ["Длинные заезды", "Апартаменты увеличенной площади и категория с кухней удобны, когда вы приезжаете не на одну-две ночи."],
   ["Связь с менеджером", "Если не хочется разбираться самостоятельно, менеджер поможет подобрать категорию, даты и дополнительные услуги."],
-  ["Гибкий сценарий", "Можно собрать спокойный пляжный отдых, активную программу по Иссык-Кулю или групповую поездку под вашу задачу."],
+  [ownerFacts.included.title, ownerFacts.included.text],
 ];
 
-const reviewThemes = [
-  { score: "01", title: "Локация у Иссык-Куля", text: "Гости особенно ценят возможность жить рядом с водой и не тратить отпуск на ежедневные переезды к пляжу." },
-  { score: "02", title: "Пляж и пирс", text: "Собственный берег и длинный пирс — одна из самых запоминающихся частей отдыха и фотографий из поездки." },
-  { score: "03", title: "Выбор формата проживания", text: "Разные категории помогают подобрать размещение под пару, семью, компанию или более длительный отпуск." },
-  { score: "04", title: "Курортный ритм", text: "Озеро, бассейн, SPA и территория позволяют чередовать активность и спокойный отдых в течение одного дня." },
-];
+const reviewThemes = ownerFacts.reviews.cards.map((review, index) => ({
+  score: String(index + 1).padStart(2, "0"),
+  ...review,
+}));
 
-const extraServices = [
-  ["Экскурсии и туры", "Поможем подобрать поездки и впечатления по Иссык-Кулю. Конкретная программа и доступность подтверждаются при обращении."],
-  ["Трансфер", "Можно заранее обсудить трансфер и маршрут до Чолпон-Аты, чтобы дорога до отеля была частью организованной поездки."],
-  ["Такси и поездки", "Для индивидуальных маршрутов менеджер поможет с транспортом по запросу."],
-  ["Водные активности", "По сезону можно уточнить доступные водные развлечения и прогулки непосредственно перед заездом."],
-];
+const extraServices = ownerFacts.services.cards;
 
 const groupFormats = [
   ["Корпоративные заезды", "Размещение команды, единая коммуникация с организатором и согласование программы пребывания."],
@@ -130,9 +126,10 @@ export default function HomePage() {
       </section>
 
       <section className="v3-reviews" id="reviews" aria-labelledby="reviews-title">
-        <div className="wrap v3-section-head"><div><p className="eyebrow">Отзывы гостей</p><h2 className="display-title" id="reviews-title">Что запоминается<br />после поездки</h2></div><p>В отзывах гости чаще всего отмечают расположение у озера, собственный пляж, пирс и возможность провести большую часть дня внутри одного курортного пространства.</p></div>
+        <div className="wrap v3-section-head"><div><p className="eyebrow">{ownerFacts.reviews.eyebrow}</p><h2 className="display-title" id="reviews-title">{ownerFacts.reviews.title}</h2></div><p>{ownerFacts.reviews.intro}</p></div>
         <div className="wrap v3-review-grid">{reviewThemes.map((review) => <article key={review.score}><span>{review.score}</span><h3>{review.title}</h3><p>{review.text}</p></article>)}</div>
-        <div className="wrap v3-extra-services"><div className="v3-extra-heading"><p className="eyebrow light">Дополнительно</p><h3>Отдых не заканчивается территорией</h3><p>Если хотите больше впечатлений или максимально простой маршрут, дополнительные услуги можно согласовать вместе с проживанием.</p></div><div className="v3-extra-grid">{extraServices.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h4>{title}</h4><p>{text}</p></article>)}</div></div>
+        <div className="wrap v3-hero-actions" data-owner-review-actions><a className="button button-dark" href={TWO_GIS_REVIEWS_URL} target="_blank" rel="noreferrer">{ownerFacts.reviews.readCta}</a><a className="button button-outline" href={TWO_GIS_REVIEWS_URL} target="_blank" rel="noreferrer">{ownerFacts.reviews.leaveCta}</a></div>
+        <div className="wrap v3-extra-services"><div className="v3-extra-heading"><p className="eyebrow light">{ownerFacts.services.eyebrow}</p><h3>{ownerFacts.services.title}</h3><p>{ownerFacts.services.intro}</p></div><div className="v3-extra-grid">{extraServices.map((service, index) => <article key={service.code} data-service-code={service.code}><span>{String(index + 1).padStart(2, "0")}</span><h4>{service.title}</h4><p>{service.text}</p>{service.cta && service.href ? <a className="text-link" href={service.href} target={service.href.startsWith("http") ? "_blank" : undefined} rel={service.href.startsWith("http") ? "noreferrer" : undefined}>{service.cta} →</a> : null}</article>)}</div></div>
       </section>
 
       <section className="v3-groups" id="groups" aria-labelledby="groups-title">
