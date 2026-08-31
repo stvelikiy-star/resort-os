@@ -71,6 +71,7 @@ jobs:
               cd packages/database
               npm install --no-audit --no-fund
               npx prisma validate
+              npx prisma generate
             )
           else
             echo 'No committed baseline yet; generating review candidate for restore proof.'
@@ -81,6 +82,7 @@ jobs:
           test -s packages/database/prisma/migrations/5_my_stay/migration.sql
           test -s packages/database/prisma/migrations/6_public_access/migration.sql
           test -s packages/database/prisma/migrations/7_in_stay_task_context/migration.sql
+          test -s packages/database/prisma/migrations/8_public_access_unlock_claim/migration.sql
           (
             cd packages/database/prisma/migrations/0_init
             sha256sum -c migration.sql.sha256
@@ -98,8 +100,11 @@ jobs:
           cache: 'pip'
           cache-dependency-path: services/api/requirements.txt
 
-      - name: Install API dependencies
-        run: pip install -r services/api/requirements.txt
+      - name: Install API dependencies and verify release contract
+        run: |
+          pip install -r services/api/requirements.txt
+          python scripts/release_contract_test.py
+          python scripts/prisma_my_stay_contract.py
 
       - name: Ensure PostgreSQL client tools
         run: |
@@ -121,9 +126,9 @@ jobs:
           EXPECTED_ROOM_TYPE_COUNT: '12'
         run: |
           python scripts/production_preflight.py | tee /tmp/preflight.txt
-          grep -q '^FACT: applied_migrations=8$' /tmp/preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_my_stay', '6_public_access', '7_in_stay_task_context'\]$" /tmp/preflight.txt
-          grep -q '^FACT: critical_constraint_count=24$' /tmp/preflight.txt
+          grep -q '^FACT: applied_migrations=9$' /tmp/preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_my_stay', '6_public_access', '7_in_stay_task_context', '8_public_access_unlock_claim'\]$" /tmp/preflight.txt
+          grep -q '^FACT: critical_constraint_count=25$' /tmp/preflight.txt
           grep -q '^RESULT: READY FOR NEXT DEPLOYMENT GATE$' /tmp/preflight.txt
 
       - name: Create migration-aware backup artifact
@@ -135,8 +140,8 @@ jobs:
           BACKUP_MANIFEST=$(grep '^BACKUP_MANIFEST=' /tmp/backup-output.txt | cut -d= -f2-)
           test -s "$BACKUP_FILE"
           test -s "$BACKUP_MANIFEST"
-          grep -q '^BACKUP_MIGRATIONS=8$' /tmp/backup-output.txt
-          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=24$' /tmp/backup-output.txt
+          grep -q '^BACKUP_MIGRATIONS=9$' /tmp/backup-output.txt
+          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=25$' /tmp/backup-output.txt
           grep -q 'three-crowns-postgres-backup-v3' "$BACKUP_MANIFEST"
           echo "BACKUP_FILE=$BACKUP_FILE" >> "$GITHUB_ENV"
           echo "BACKUP_MANIFEST=$BACKUP_MANIFEST" >> "$GITHUB_ENV"
@@ -156,9 +161,9 @@ jobs:
           grep -q '^RESTORE_VERIFICATION=SUCCESS$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOMS=84$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOM_TYPES=12$' /tmp/restore-output.txt
-          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=24$' /tmp/restore-output.txt
+          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=25$' /tmp/restore-output.txt
           grep -q '^RESTORED_MIGRATION_HISTORY_PRESENT=True$' /tmp/restore-output.txt
-          grep -q '^RESTORED_APPLIED_MIGRATIONS=8$' /tmp/restore-output.txt
+          grep -q '^RESTORED_APPLIED_MIGRATIONS=9$' /tmp/restore-output.txt
           grep -q '^LAST_VERIFIED_BACKUP_AT=' /tmp/restore-output.txt
 
       - name: Verify restored migration ledger directly
