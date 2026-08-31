@@ -21,6 +21,15 @@ www.{$PUBLIC_HOST:3korony.com} {
 	redir https://{$PUBLIC_HOST:3korony.com}{uri} permanent
 }
 
+# MY STAY is an isolated route in the existing web application. The public
+# homepage and its design stay untouched; guest.3korony.com redirects only to it.
+{$GUEST_HOST:guest.3korony.com} {
+	encode zstd gzip
+	@root path /
+	redir @root /my-stay temporary
+	reverse_proxy web:3000
+}
+
 {$ADMIN_HOST:admin.3korony.com} {
 	encode zstd gzip
 	reverse_proxy admin:3001
