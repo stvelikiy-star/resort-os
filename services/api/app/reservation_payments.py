@@ -13,7 +13,7 @@ from .payment_idempotency import (
 )
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-payments"])
-manager_access = require_roles("OWNER", "MANAGER")
+payment_access = require_roles("OWNER", "ADMIN", "MANAGER", "RECEPTION")
 
 
 class ReservationPaymentPayload(BaseModel):
@@ -53,7 +53,7 @@ async def record_reservation_payment(
     reservation_id: uuid.UUID,
     payload: ReservationPaymentPayload,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(payment_access),
 ):
     method = normalize_required_text(payload.method)
     external_ref = normalize_optional_text(payload.external_ref)
@@ -138,7 +138,7 @@ async def record_reservation_payment(
                         status_code=409,
                         detail={
                             "code": "PAYMENT_EXTERNAL_REF_CONFLICT",
-                            "message": "This manager payment reference is already recorded.",
+                            "message": "This staff-recorded payment reference is already recorded.",
                             "payment_id": str(reference_payment["id"]),
                             "reservation_id": str(reference_payment["reservationId"]) if reference_payment["reservationId"] else None,
                             "amount_kgs": int(reference_payment["amountKgs"]),
@@ -154,7 +154,7 @@ async def record_reservation_payment(
                   id,"reservationId","amountKgs",method,status,provider,"externalRef",
                   "idempotencyKey",metadata,"paidAt","createdAt","updatedAt"
                 ) VALUES ($1,$2,$3,$4,'RECEIVED','MANAGER_MANUAL',$5,$6,
-                  jsonb_build_object('note',$7::text,'recorded_by_staff_id',$8::text,'source','PMS'),
+                  jsonb_build_object('note',$7::text,'recorded_by_staff_id',$8::text,'recorded_by_role',$9::text,'source','PMS'),
                   now(),now(),now())
                 ''',
                 payment_id,
@@ -165,6 +165,7 @@ async def record_reservation_payment(
                 payload.idempotency_key,
                 note,
                 user["id"],
+                user["role"],
             )
 
             totals = await _totals(conn, reservation_id)
@@ -182,7 +183,8 @@ async def record_reservation_payment(
                     'external_ref',$8::text,
                     'paid_kgs_after',$9::int,
                     'remaining_kgs_after',$10::int,
-                    'overpaid_kgs_after',$11::int
+                    'overpaid_kgs_after',$11::int,
+                    'recorded_by_role',$12::text
                   ),now())
                 ''',
                 uuid.uuid4(),
@@ -196,6 +198,7 @@ async def record_reservation_payment(
                 totals["paid_kgs"],
                 totals["remaining_kgs"],
                 totals["overpaid_kgs"],
+                user["role"],
             )
 
     return {
@@ -211,5 +214,5 @@ async def record_reservation_payment(
             "external_ref": external_ref,
         },
         "finance": totals,
-        "truth": "Internal manager-recorded payment fact only. No acquiring or automatic prepayment policy was applied.",
+        "truth": "Internal authorized staff-recorded payment fact only. No acquiring or automatic prepayment policy was applied.",
     }
