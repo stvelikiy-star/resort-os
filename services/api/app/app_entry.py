@@ -37,6 +37,7 @@ from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
 from .site_content import router as site_content_router
 from .staff_control import router as staff_control_router
+from .staff_guest_requests import router as staff_guest_requests_router
 from .staff_task_reports import router as staff_task_reports_router
 from .staff_voice import router as staff_voice_router
 from .stays import router as stays_router
@@ -73,6 +74,7 @@ app.include_router(guest_services_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
+app.include_router(staff_guest_requests_router)
 app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
 app.include_router(telegram_auth_router)
