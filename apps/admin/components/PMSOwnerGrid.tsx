@@ -256,6 +256,16 @@ export default function PMSOwnerGrid() {
     setSelection(next);
   }
 
+  function moveSelection(event: React.PointerEvent<HTMLButtonElement>) {
+    if (!selectingRef.current || !selectionRef.current) return;
+    const hit = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(".owner-night-cell");
+    const day = hit?.dataset.night;
+    const roomCode = hit?.dataset.roomCode;
+    const room = roomById.get(selectionRef.current.roomId);
+    if (!room || !day || room.code !== roomCode) return;
+    extendSelection(room, day);
+  }
+
   const finishSelection = useCallback(() => {
     if (!selectingRef.current || !selectionRef.current) return;
     selectingRef.current = false;
@@ -364,6 +374,7 @@ export default function PMSOwnerGrid() {
                       className={`owner-night-cell ${key === today ? "today" : ""} ${[0, 6].includes(day.getDay()) ? "weekend" : ""} ${free ? "free" : "occupied"} ${isSelected(room.id, key) ? "selected" : ""}`}
                       style={{ gridColumn: `${3 + index} / ${4 + index}`, gridRow: 1 }}
                       onPointerDown={(event) => beginSelection(room, key, event)}
+                      onPointerMove={moveSelection}
                       onPointerEnter={() => extendSelection(room, key)}
                     />
                   );
