@@ -70,7 +70,7 @@ async def complete_task_with_report(
             pid = await _property_id(conn, user["property_code"])
             task = await conn.fetchrow(
                 '''
-                SELECT t.id,t.type::text AS type,t.status::text AS status,t."roomId",t."assignedToId",
+                SELECT t.id,t.type::text AS type,t.status::text AS status,t."roomId",t."assignedToId",t.source,
                        room.code AS room_code
                 FROM operational_tasks t
                 LEFT JOIN rooms room ON room.id=t."roomId"
@@ -89,8 +89,6 @@ async def complete_task_with_report(
             if task["status"] != "IN_PROGRESS":
                 raise HTTPException(status_code=409, detail={"code": "TASK_NOT_IN_PROGRESS", "status": task["status"]})
 
-            # All operational flows use task -> room lock order. Locking the room here
-            # serializes concurrent housekeeping/maintenance completions on one room.
             current_room_state = None
             if task["roomId"]:
                 current_room_state = await conn.fetchval(
@@ -111,8 +109,17 @@ async def complete_task_with_report(
             housekeeping_task_id = None
             remaining_maintenance_tasks = 0
             resulting_room_state = current_room_state
+            in_stay_request = task["source"] == "GUEST_PORTAL_IN_STAY"
 
-            if expected_type == "HOUSEKEEPING":
+            # In-stay service requests are fulfilment inside an occupied room. They are
+            # not turnover/readiness events and must not mutate the PMS room state.
+            if in_stay_request:
+                next_status = "DONE"
+                await conn.execute(
+                    '''UPDATE operational_tasks SET status='DONE',"completedAt"=now(),"updatedAt"=now() WHERE id=$1''',
+                    task_id,
+                )
+            elif expected_type == "HOUSEKEEPING":
                 next_status = "IN_INSPECTION"
                 await conn.execute(
                     '''UPDATE operational_tasks SET status='IN_INSPECTION',"updatedAt"=now() WHERE id=$1''',
@@ -129,22 +136,16 @@ async def complete_task_with_report(
             else:
                 next_status = "DONE"
                 await conn.execute(
-                    '''
-                    UPDATE operational_tasks
-                    SET status='DONE',"completedAt"=now(),"updatedAt"=now()
-                    WHERE id=$1
-                    ''',
+                    '''UPDATE operational_tasks SET status='DONE',"completedAt"=now(),"updatedAt"=now() WHERE id=$1''',
                     task_id,
                 )
                 if task["roomId"]:
                     remaining_maintenance_tasks = int(
                         await conn.fetchval(
                             '''
-                            SELECT count(*)::int
-                            FROM operational_tasks
+                            SELECT count(*)::int FROM operational_tasks
                             WHERE "propertyId"=$1 AND "roomId"=$2 AND type='MAINTENANCE'
-                              AND id<>$3
-                              AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+                              AND id<>$3 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
                             ''',
                             pid,
                             task["roomId"],
@@ -152,7 +153,6 @@ async def complete_task_with_report(
                         )
                         or 0
                     )
-
                     if remaining_maintenance_tasks > 0:
                         await conn.execute(
                             '''UPDATE rooms SET "operationalState"='TECH_BLOCK',"updatedAt"=now() WHERE id=$1''',
@@ -197,6 +197,7 @@ async def complete_task_with_report(
                 "from_status": "IN_PROGRESS",
                 "status": next_status,
                 "room_state": resulting_room_state,
+                "in_stay_service": in_stay_request,
                 "report": report_json,
                 "remaining_maintenance_tasks": remaining_maintenance_tasks,
                 "housekeeping_task_id": str(housekeeping_task_id) if housekeeping_task_id else None,
@@ -208,11 +209,7 @@ async def complete_task_with_report(
                   "afterJson","createdAt"
                 ) VALUES ($1,$2,'STAFF',$3,'COMPLETE_WITH_REPORT','OperationalTask',$4,'STAFF_PWA','SUCCESS',$5::jsonb,now())
                 ''',
-                uuid.uuid4(),
-                pid,
-                str(actor_id),
-                str(task_id),
-                json.dumps(audit_after, ensure_ascii=False),
+                uuid.uuid4(), pid, str(actor_id), str(task_id), json.dumps(audit_after, ensure_ascii=False),
             )
 
     return {
