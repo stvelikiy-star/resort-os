@@ -10,7 +10,7 @@ USERNAME = os.environ.get("STAFF_USERNAME")
 PASSWORD = os.environ.get("STAFF_PASSWORD")
 DISPLAY_NAME = os.environ.get("STAFF_DISPLAY_NAME", "Staff")
 ROLE = os.environ.get("STAFF_ROLE", "MAID").upper()
-ALLOWED_ROLES = {"OWNER", "MANAGER", "MAID", "TECHNICIAN", "BEACH_PARTNER"}
+ALLOWED_ROLES = {"OWNER", "ADMIN", "MANAGER", "RECEPTION", "DINING", "MAID", "TECHNICIAN", "BEACH_PARTNER"}
 
 password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
 
