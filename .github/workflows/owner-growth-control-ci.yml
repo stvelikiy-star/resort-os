@@ -9,6 +9,7 @@ on:
       - 'packages/database/prisma/migrations/4_guest_engagements/**'
       - 'packages/database/prisma/migrations/5_my_stay/**'
       - 'packages/database/prisma/migrations/6_public_access/**'
+      - 'packages/database/prisma/migrations/7_in_stay_task_context/**'
       - 'apps/admin/components/GrowthControlBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/growth-control.css'
@@ -24,6 +25,7 @@ on:
       - 'packages/database/prisma/migrations/4_guest_engagements/**'
       - 'packages/database/prisma/migrations/5_my_stay/**'
       - 'packages/database/prisma/migrations/6_public_access/**'
+      - 'packages/database/prisma/migrations/7_in_stay_task_context/**'
       - 'apps/admin/components/GrowthControlBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/growth-control.css'
@@ -84,6 +86,7 @@ jobs:
           test -s prisma/migrations/4_guest_engagements/migration.sql
           test -s prisma/migrations/5_my_stay/migration.sql
           test -s prisma/migrations/6_public_access/migration.sql
+          test -s prisma/migrations/7_in_stay_task_context/migration.sql
 
       - name: Verify Growth persistence invariants
         env:
@@ -94,8 +97,8 @@ jobs:
           table_name="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select to_regclass('public.guest_engagements')::text")"
           constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_constraint where conname in ('guest_engagements_property_fkey','guest_engagements_guest_fkey','guest_engagements_reservation_fkey','guest_engagements_kind_check','guest_engagements_status_check','guest_engagements_score_check','guest_engagements_score_kind_check','guest_engagements_feedback_reservation_check')")"
           feedback_unique="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='guest_engagements' and indexname='guest_engagements_feedback_reservation_key'")"
-          test "$migration_count" = '7'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay,6_public_access'
+          test "$migration_count" = '8'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_my_stay,6_public_access,7_in_stay_task_context'
           test "$table_name" = 'guest_engagements'
           test "$constraint_count" = '8'
           test "$feedback_unique" = '1'
