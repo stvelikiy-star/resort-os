@@ -112,6 +112,23 @@ CREATE TABLE "guest_preferences" (
 -- Tie operational requests to the exact stay while preserving current reservation/room links.
 ALTER TABLE "operational_tasks" ADD COLUMN "stayId" UUID;
 
+-- Migration 2 allowed Reservation/service context only on GUEST_REQUEST tasks.
+-- Guest OS needs factual reservation history on housekeeping/maintenance that are tied
+-- to an actual stay, without opening service fields to those task types.
+ALTER TABLE "operational_tasks"
+    DROP CONSTRAINT IF EXISTS operational_tasks_service_context_type_check;
+ALTER TABLE "operational_tasks"
+    ADD CONSTRAINT operational_tasks_service_context_type_check
+    CHECK (
+        type = 'GUEST_REQUEST'
+        OR (
+            "serviceCode" IS NULL
+            AND "serviceDate" IS NULL
+            AND "serviceTime" IS NULL
+            AND ("reservationId" IS NULL OR "stayId" IS NOT NULL)
+        )
+    );
+
 -- Uniques.
 CREATE UNIQUE INDEX "stays_reservationId_key" ON "stays"("reservationId");
 CREATE UNIQUE INDEX "room_qrs_tokenHash_key" ON "room_qrs"("tokenHash");
