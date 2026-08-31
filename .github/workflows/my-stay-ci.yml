@@ -7,6 +7,7 @@ on:
       - 'services/api/app/my_stay_qr.py'
       - 'services/api/app/smart_access.py'
       - 'services/api/app/smart_access_current.py'
+      - 'services/api/app/public_access.py'
       - 'services/api/app/guest_security.py'
       - 'services/api/app/reception_stays.py'
       - 'services/api/app/operations.py'
@@ -17,14 +18,18 @@ on:
       - 'services/api/app/reservation_payments.py'
       - 'services/api/requirements.txt'
       - 'packages/database/prisma/migrations/5_my_stay/**'
+      - 'packages/database/prisma/migrations/6_public_access/**'
       - 'apps/web/app/my-stay/**'
+      - 'apps/web/app/access/**'
       - 'apps/web/components/MyStayClient.tsx'
+      - 'apps/web/components/PublicAccessClient.tsx'
       - 'apps/admin/app/my-stay/**'
       - 'apps/admin/components/MyStayAdminBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/staff/app/dining/**'
       - 'apps/staff/components/DiningConsole.tsx'
       - 'scripts/my_stay_e2e.py'
+      - 'scripts/public_access_e2e.py'
       - '.github/workflows/my-stay-ci.yml'
   workflow_dispatch:
 
@@ -64,8 +69,14 @@ jobs:
       GUEST_HOST: guest.test.local
       GUEST_SESSION_SECRET: MY_STAY_CI_GUEST_SESSION_SECRET_2026_AT_LEAST_64_CHARACTERS_LONG_123456
       GUEST_SESSION_HOURS: '24'
-      SMART_ACCESS_CONTROLLER_URL: ''
-      SMART_ACCESS_HMAC_SECRET: ''
+      SMART_ACCESS_CONTROLLER_URL: http://127.0.0.1:18081
+      SMART_ACCESS_HMAC_SECRET: MY_STAY_CI_SMART_ACCESS_HMAC_SECRET_2026_AT_LEAST_64_CHARACTERS_LONG
+      PUBLIC_ACCESS_TOKEN_SECRET: MY_STAY_CI_PUBLIC_ACCESS_TOKEN_SECRET_2026_AT_LEAST_64_CHARACTERS_LONG
+      PUBLIC_ACCESS_CHECKOUT_URL: https://payments.example.invalid/checkout
+      PUBLIC_ACCESS_INTENT_MINUTES: '10'
+      AUTOMATION_SERVICE_KEY: MY_STAY_CI_AUTOMATION_SERVICE_KEY_2026_AT_LEAST_64_CHARACTERS_LONG
+      AUTOMATION_SERVICE_NAME: my-stay-ci
+      REQUIRE_AUTOMATION_SERVICE: 'true'
       CORS_ORIGINS: ''
       REQUIRE_MIGRATION_HISTORY: 'false'
       REQUIRE_RECENT_BACKUP: 'false'
@@ -93,22 +104,22 @@ jobs:
       - name: Install Core and compile all Python
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall -q services/api/app scripts/my_stay_e2e.py
+          python -m compileall -q services/api/app scripts/my_stay_e2e.py scripts/public_access_e2e.py
 
-      - name: Verify MY STAY migration and RBAC at database level
+      - name: Verify MY STAY and public-access migrations at database level
         run: |
           python - <<'PY'
           import asyncio, asyncpg, os
           async def main():
               c=await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               tables={r['tablename'] for r in await c.fetch("SELECT tablename FROM pg_tables WHERE schemaname='public'")}
-              required={'guest_access_credentials','guest_sessions','reservation_meal_plans','dining_menu_items','dining_orders','dining_order_items','reservation_charges','smart_access_points','smart_access_grants'}
+              required={'guest_access_credentials','guest_sessions','reservation_meal_plans','dining_menu_items','dining_orders','dining_order_items','reservation_charges','smart_access_points','smart_access_grants','public_access_payment_intents'}
               missing=required-tables
-              assert not missing, f'Missing MY STAY tables: {sorted(missing)}'
+              assert not missing, f'Missing MY STAY/public access tables: {sorted(missing)}'
               roles={r['enumlabel'] for r in await c.fetch("SELECT enumlabel FROM pg_enum e JOIN pg_type t ON t.oid=e.enumtypid WHERE t.typname='StaffRole'")}
               assert {'OWNER','MANAGER','ADMIN','RECEPTION','DINING','MAID','TECHNICIAN','BEACH_PARTNER'} <= roles, roles
               applied=await c.fetchval('SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL')
-              assert applied >= 6, applied
+              assert applied >= 7, applied
               await c.close()
           asyncio.run(main())
           PY
@@ -146,6 +157,9 @@ jobs:
 
       - name: Run MY STAY end-to-end chain
         run: python scripts/my_stay_e2e.py
+
+      - name: Run paid public QR access end-to-end chain
+        run: python scripts/public_access_e2e.py
 
       - name: Run public truth regression guards
         run: |
