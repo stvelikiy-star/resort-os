@@ -3,7 +3,7 @@ import hmac
 import os
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
@@ -123,13 +123,13 @@ class GuestActivation(BaseModel):
 
 
 class MealPlanPatch(BaseModel):
-    service_date: str
+    service_date: date
     meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"]
     included: bool
 
 
 class MenuItemCreate(BaseModel):
-    service_date: str
+    service_date: date
     meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"]
     name: str = Field(min_length=2, max_length=160)
     description: str | None = Field(default=None, max_length=1000)
@@ -155,7 +155,7 @@ class DiningOrderLine(BaseModel):
 
 
 class DiningOrderCreate(BaseModel):
-    service_date: str
+    service_date: date
     meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"]
     items: list[DiningOrderLine] = Field(min_length=1, max_length=30)
     notes: str | None = Field(default=None, max_length=1000)
@@ -172,7 +172,7 @@ class GuestRequestCreate(BaseModel):
     kind: Literal["HOUSEKEEPING", "MAINTENANCE", "TRANSFER", "EXCURSIONS"]
     description: str = Field(min_length=2, max_length=2000)
     priority: Literal["NORMAL", "HIGH", "URGENT"] = "NORMAL"
-    service_date: str | None = None
+    service_date: date | None = None
     service_time: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 
 
@@ -306,7 +306,7 @@ async def guest_me(request: Request, resort_guest_session: str | None = Cookie(d
 
 
 @router.get("/api/v1/guest/menu")
-async def guest_menu(request: Request, service_date: str, meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"], resort_guest_session: str | None = Cookie(default=None)):
+async def guest_menu(request: Request, service_date: date, meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"], resort_guest_session: str | None = Cookie(default=None)):
     ctx = await _guest_context(request, resort_guest_session)
     async with request.app.state.db.acquire() as conn:
         included = bool(await conn.fetchval(
@@ -449,7 +449,7 @@ async def set_meal_plan(reservation_id: uuid.UUID, payload: MealPlanPatch, reque
 
 
 @router.get("/api/v1/dining/menu")
-async def dining_menu(request: Request, service_date: str, meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"], user=Depends(dining_access)):
+async def dining_menu(request: Request, service_date: date, meal_type: Literal["BREAKFAST", "LUNCH", "DINNER"], user=Depends(dining_access)):
     async with request.app.state.db.acquire() as conn:
         prop = await _property(conn, user["property_code"])
         rows = await conn.fetch(
