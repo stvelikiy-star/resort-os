@@ -18,6 +18,7 @@ EXPECTED_MIGRATIONS = (
     "5_my_stay",
     "6_public_access",
     "7_in_stay_task_context",
+    "8_public_access_unlock_claim",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -50,6 +51,7 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_engagements_score_check",
         "guest_engagements_score_kind_check",
         "guest_engagements_feedback_reservation_check",
+        "public_access_payment_intents_status_check",
     }
 )
 
