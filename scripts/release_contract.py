@@ -17,6 +17,7 @@ EXPECTED_MIGRATIONS = (
     "4_guest_engagements",
     "5_my_stay",
     "6_public_access",
+    "7_in_stay_task_context",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
