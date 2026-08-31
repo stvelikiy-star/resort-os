@@ -9,7 +9,8 @@ It proves:
 - unpaid access cannot unlock;
 - a confirmed payment is consumed only after the physical controller confirms;
 - controller failure is fail-closed and preserves PAID for a safe retry;
-- a successful grant is one-time and cannot be replayed.
+- a successful grant is one-time and cannot be replayed;
+- concurrent unlock requests serialize to one physical UNLOCK command.
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ import hmac
 import json
 import os
 import threading
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
@@ -60,7 +62,12 @@ class ControllerHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         ControllerState.requests.append(payload)
-        if str(payload.get("access_point_code", "")).endswith("_FAIL"):
+        code = str(payload.get("access_point_code", ""))
+        if code.endswith("_RACE"):
+            # Hold the first physical command open long enough for a concurrent
+            # HTTP request to prove the database UNLOCKING claim is exclusive.
+            time.sleep(0.35)
+        if code.endswith("_FAIL"):
             self.send_response(503)
             self.end_headers()
             return
@@ -127,6 +134,15 @@ async def status_for(client: httpx.AsyncClient, intent: dict) -> str:
     return response.json()["status"]
 
 
+async def paid_callback(client: httpx.AsyncClient, intent: dict, expected_price: int, external_ref: str) -> httpx.Response:
+    endpoint = f"{CORE_API_URL}/api/v1/automation/public-access/{intent['intent_id']}/paid"
+    return await client.post(
+        endpoint,
+        headers={"X-Resort-Service-Key": SERVICE_KEY},
+        json={"amount_kgs": expected_price, "provider": "CI_PROVIDER", "external_ref": external_ref},
+    )
+
+
 async def confirm_paid(client: httpx.AsyncClient, intent: dict, expected_price: int, external_ref: str) -> None:
     endpoint = f"{CORE_API_URL}/api/v1/automation/public-access/{intent['intent_id']}/paid"
     payload = {"amount_kgs": expected_price, "provider": "CI_PROVIDER", "external_ref": external_ref}
@@ -159,11 +175,14 @@ async def main() -> int:
         suffix = uuid.uuid4().hex[:10].upper()
         ok_code = f"CI_TOILET_{suffix}"
         fail_code = f"CI_TOILET_{suffix}_FAIL"
+        race_code = f"CI_TOILET_{suffix}_RACE"
         price = 75
         point_ids.append(await insert_point(conn, ok_code, price))
         point_ids.append(await insert_point(conn, fail_code, price))
+        point_ids.append(await insert_point(conn, race_code, price))
 
         async with httpx.AsyncClient(timeout=8.0) as client:
+            ok_ref = f"CI-PAID-{suffix}"
             ok_intent = await checkout(client, ok_code, price)
             assert await status_for(client, ok_intent) == "PENDING"
 
@@ -174,7 +193,7 @@ async def main() -> int:
             assert unpaid_unlock.status_code == 409, unpaid_unlock.text
             assert ControllerState.requests == [], "Unpaid request reached physical controller"
 
-            await confirm_paid(client, ok_intent, price, f"CI-PAID-{suffix}")
+            await confirm_paid(client, ok_intent, price, ok_ref)
             assert await status_for(client, ok_intent) == "PAID"
 
             unlocked = await client.post(
@@ -195,12 +214,18 @@ async def main() -> int:
             assert replay.status_code == 409, replay.text
             assert len(ControllerState.requests) == 1, "Used payment was replayed to controller"
 
+            # Payment-provider retries remain idempotent even after the access was consumed.
+            callback_after_used = await paid_callback(client, ok_intent, price, ok_ref)
+            assert callback_after_used.status_code == 200, callback_after_used.text
+            assert callback_after_used.json()["idempotent"] is True
+            assert callback_after_used.json()["status"] == "USED"
+
             ok_row = await conn.fetchrow(
                 '''SELECT status,provider,"externalRef","usedAt" FROM public_access_payment_intents WHERE id=$1''',
                 uuid.UUID(ok_intent["intent_id"]),
             )
             assert ok_row and ok_row["status"] == "USED" and ok_row["usedAt"] is not None
-            assert ok_row["provider"] == "CI_PROVIDER" and ok_row["externalRef"] == f"CI-PAID-{suffix}"
+            assert ok_row["provider"] == "CI_PROVIDER" and ok_row["externalRef"] == ok_ref
             ok_grants = await conn.fetch(
                 '''SELECT status,"usedAt" FROM smart_access_grants WHERE "accessPointId"=$1 ORDER BY "createdAt"''',
                 point_ids[0],
@@ -229,11 +254,36 @@ async def main() -> int:
             )
             assert len(failed_grants) == 1 and failed_grants[0]["status"] == "REVOKED" and failed_grants[0]["usedAt"] is None
 
+            # Two concurrent HTTP requests for one PAID intent must produce exactly
+            # one controller command. The loser observes UNLOCKING and fails closed.
+            race_ref = f"CI-RACE-{suffix}"
+            race_intent = await checkout(client, race_code, price)
+            await confirm_paid(client, race_intent, price, race_ref)
+            before_race = len(ControllerState.requests)
+
+            async def race_unlock() -> httpx.Response:
+                return await client.post(
+                    f"{CORE_API_URL}/api/v1/public/access/intents/{race_intent['intent_id']}/unlock",
+                    json={"token": race_intent["token"]},
+                )
+
+            first, second = await asyncio.gather(race_unlock(), race_unlock())
+            assert sorted([first.status_code, second.status_code]) == [200, 409], (first.text, second.text)
+            assert len(ControllerState.requests) == before_race + 1, "Concurrent unlock emitted duplicate controller commands"
+            assert ControllerState.requests[-1]["access_point_code"] == race_code
+            assert await status_for(client, race_intent) == "USED"
+            race_grants = await conn.fetch(
+                '''SELECT status,"usedAt" FROM smart_access_grants WHERE "accessPointId"=$1 ORDER BY "createdAt"''',
+                point_ids[2],
+            )
+            assert len(race_grants) == 1 and race_grants[0]["status"] == "USED"
+
         print("PASS: public QR quote and checkout preserve the configured price")
         print("PASS: unauthenticated/underpaid callbacks and unpaid unlock are rejected")
-        print("PASS: authenticated provider callback is idempotent and establishes PAID truth")
+        print("PASS: authenticated provider callback remains idempotent through USED")
         print("PASS: successful physical confirmation consumes payment exactly once")
         print("PASS: controller failure is fail-closed and preserves PAID for retry")
+        print("PASS: concurrent unlock attempts serialize to one physical controller command")
         return 0
     finally:
         if point_ids:
