@@ -117,7 +117,7 @@ async def prove_database_state(feedback_id: str, return_id: str, return_guest_id
         pid = await conn.fetchval("SELECT id FROM properties WHERE code='THREE_CROWNS'")
         migrations = await conn.fetch("SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY started_at")
         names = [row["migration_name"] for row in migrations]
-        assert names == ["0_init", "1_site_content", "2_guest_service_tasks", "3_owner_analytics_snapshots", "4_guest_engagements"]
+        assert names == ["0_init", "1_site_content", "2_guest_service_tasks", "3_owner_analytics_snapshots", "4_guest_engagements", "5_guest_os_core"]
 
         table = await conn.fetchval("SELECT to_regclass('public.guest_engagements')::text")
         assert table == "guest_engagements"

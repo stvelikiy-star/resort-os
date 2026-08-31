@@ -56,8 +56,12 @@ enum InventoryBlockType {
 enum StaffRole {
   OWNER
   MANAGER
+  RECEPTION
   MAID
   TECHNICIAN
+  STORE_STAFF
+  DINING_STAFF
+  CONTENT_MANAGER
   BEACH_PARTNER
 }
 
@@ -80,6 +84,24 @@ enum OperationalTaskPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+enum StayStatus {
+  PENDING
+  ACTIVE
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum RoomQrStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum GuestSessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
 }
 
 enum NfcWalletStatus {
@@ -144,6 +166,12 @@ model Property {
   guests                Guest[]
   requests              ReservationRequest[]
   reservations          Reservation[]
+  stays                 Stay[]
+  roomAssignments       RoomAssignment[]
+  roomQrs               RoomQr[]
+  guestSessions         GuestSession[]
+  guestHistoryEvents    GuestHistoryEvent[]
+  guestPreferences      GuestPreference[]
   auditLogs             AuditLog[]
   staffUsers            StaffUser[]
   tasks                 OperationalTask[]
@@ -196,6 +224,8 @@ model Room {
   operationalState RoomOperationalState @default(UNKNOWN)
   notes            String?
   inventoryBlocks  InventoryBlock[]
+  roomAssignments  RoomAssignment[]
+  roomQrs          RoomQr[]
   tasks            OperationalTask[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -242,18 +272,22 @@ model RatePeriod {
 }
 
 model Guest {
-  id           String            @id @default(uuid()) @db.Uuid
-  propertyId   String            @db.Uuid
-  property     Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  firstName    String?
-  lastName     String?
-  phone        String?
-  email        String?
-  reservations Reservation[]
-  nfcWallets   NfcWallet[]
-  engagements  GuestEngagement[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id            String              @id @default(uuid()) @db.Uuid
+  propertyId    String              @db.Uuid
+  property      Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  firstName     String?
+  lastName      String?
+  phone         String?
+  email         String?
+  reservations  Reservation[]
+  stays         Stay[]
+  guestSessions GuestSession[]
+  historyEvents GuestHistoryEvent[]
+  preferences   GuestPreference[]
+  nfcWallets    NfcWallet[]
+  engagements   GuestEngagement[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([propertyId, phone])
   @@map("guests")
@@ -308,12 +342,141 @@ model Reservation {
   payments       Payment[]
   serviceTasks   OperationalTask[]   @relation("ReservationGuestServices")
   engagements    GuestEngagement[]
+  stay           Stay?
   nfcWallet      NfcWallet?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   @@index([propertyId, checkIn, checkOut])
   @@map("reservations")
+}
+
+model Stay {
+  id                      String             @id @default(uuid()) @db.Uuid
+  propertyId              String             @db.Uuid
+  property                Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId           String             @unique @db.Uuid
+  reservation             Reservation        @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  guestId                 String             @db.Uuid
+  guest                   Guest              @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  status                  StayStatus         @default(PENDING)
+  actualCheckInAt         DateTime?
+  actualCheckOutAt        DateTime?
+  guestAccessPinHash      String?
+  guestAccessPinIssuedAt  DateTime?
+  guestAccessPinExpiresAt DateTime?
+  roomAssignments         RoomAssignment[]
+  guestSessions           GuestSession[]
+  tasks                   OperationalTask[]
+  historyEvents           GuestHistoryEvent[]
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  @@index([propertyId, status])
+  @@index([guestId, createdAt])
+  @@map("stays")
+}
+
+model RoomAssignment {
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @db.Uuid
+  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stayId     String    @db.Uuid
+  stay       Stay      @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  roomId     String    @db.Uuid
+  room       Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  startedAt  DateTime
+  endedAt    DateTime?
+  source     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([propertyId, roomId, startedAt, endedAt])
+  @@index([stayId, startedAt])
+  @@map("room_assignments")
+}
+
+model RoomQr {
+  id         String       @id @default(uuid()) @db.Uuid
+  propertyId String       @db.Uuid
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomId     String       @db.Uuid
+  room       Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokenHash  String       @unique
+  status     RoomQrStatus @default(ACTIVE)
+  label      String?
+  issuedAt   DateTime     @default(now())
+  revokedAt  DateTime?
+  sessions   GuestSession[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([propertyId, roomId, status])
+  @@map("room_qrs")
+}
+
+model GuestSession {
+  id                 String             @id @default(uuid()) @db.Uuid
+  propertyId         String             @db.Uuid
+  property           Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stayId             String             @db.Uuid
+  stay               Stay               @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  guestId            String             @db.Uuid
+  guest              Guest              @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  roomQrId           String?            @db.Uuid
+  roomQr             RoomQr?            @relation(fields: [roomQrId], references: [id], onDelete: SetNull)
+  tokenHash          String             @unique
+  status             GuestSessionStatus @default(ACTIVE)
+  verificationMethod String             @default("PIN")
+  verifiedAt         DateTime            @default(now())
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  lastSeenAt         DateTime            @default(now())
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([propertyId, stayId, status])
+  @@index([guestId, createdAt])
+  @@index([expiresAt, status])
+  @@map("guest_sessions")
+}
+
+model GuestHistoryEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  propertyId  String    @db.Uuid
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guestId     String    @db.Uuid
+  guest       Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  stayId      String?   @db.Uuid
+  stay        Stay?     @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  eventType   String
+  source      String?
+  payloadJson Json?
+  occurredAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([propertyId, guestId, occurredAt])
+  @@index([stayId, occurredAt])
+  @@map("guest_history_events")
+}
+
+model GuestPreference {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @db.Uuid
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guestId    String   @db.Uuid
+  guest      Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  key        String
+  valueText  String?
+  metadata   Json?
+  source     String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([guestId, key])
+  @@index([propertyId, guestId, isActive])
+  @@map("guest_preferences")
 }
 
 model InventoryBlock {
@@ -373,8 +536,8 @@ model StaffUser {
   assignedTasks         OperationalTask[] @relation("TaskAssignee")
   assignedConversations Conversation[]    @relation("ConversationAssignee")
   beachTransactions     NfcTransaction[]  @relation("BeachPartnerTransactions")
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   @@unique([propertyId, username])
   @@unique([propertyId, telegramUserId])
@@ -405,6 +568,8 @@ model OperationalTask {
   room          Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
   reservationId String?                 @db.Uuid
   reservation   Reservation?            @relation("ReservationGuestServices", fields: [reservationId], references: [id], onDelete: SetNull)
+  stayId        String?                 @db.Uuid
+  stay          Stay?                   @relation(fields: [stayId], references: [id], onDelete: SetNull)
   serviceCode   String?
   serviceDate   DateTime?               @db.Date
   serviceTime   String?
@@ -425,6 +590,7 @@ model OperationalTask {
   @@index([propertyId, status, type])
   @@index([roomId, status])
   @@index([reservationId, status])
+  @@index([stayId, status])
   @@index([propertyId, serviceCode, status, serviceDate])
   @@index([assignedToId, status])
   @@map("operational_tasks")
@@ -488,8 +654,8 @@ model Conversation {
   firstResponseAt        DateTime?
   resolvedAt             DateTime?
   messages               ConversationMessage[]
-  createdAt              DateTime              @default(now())
-  updatedAt              DateTime              @updatedAt
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   @@unique([channelId, externalConversationId])
   @@index([propertyId, status, updatedAt])

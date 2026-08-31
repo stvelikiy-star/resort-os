@@ -15,11 +15,13 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 5
+    assert len(EXPECTED_MIGRATIONS) == 6
+    assert EXPECTED_MIGRATIONS[-1] == "5_guest_os_core"
     assert len(CRITICAL_CONSTRAINTS) == 24
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact five-migration release ledger is fail-closed")
+    print("PASS: exact six-migration release ledger is fail-closed")
+    print("PASS: Guest OS core migration is part of the canonical release boundary")
     print("PASS: current critical constraint fingerprint contains 24 constraints")
     return 0
 
