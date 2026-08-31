@@ -11,7 +11,7 @@ ROLE_CODES: dict[str, set[str]] = {
     "MAID": {"HOUSEKEEPING", "TOWELS", "LINEN"},
     "TECHNICIAN": {"MAINTENANCE"},
     "DINING_STAFF": {"MEALS"},
-    "RECEPTION": {"TRANSFER", "SAUNA", "BILLIARDS", "EXCURSIONS", "ADMIN"},
+    "RECEPTION": {"TRANSFER", "PARKING", "SAUNA", "BILLIARDS", "EXCURSIONS", "ADMIN"},
     "OWNER": {"*"},
     "MANAGER": {"*"},
 }
@@ -48,6 +48,9 @@ def row_to_item(row) -> dict[str, Any]:
         "service_time": row["serviceTime"],
         "assigned_to_id": str(row["assignedToId"]) if row["assignedToId"] else None,
         "assigned_to_name": row["assigned_to_name"],
+        "source": row["source"],
+        "stay_id": str(row["stayId"]) if row["stayId"] else None,
+        "reservation_id": str(row["reservationId"]) if row["reservationId"] else None,
         "created_at": row["createdAt"],
         "updated_at": row["updatedAt"],
         "completed_at": row["completedAt"],
@@ -56,14 +59,26 @@ def row_to_item(row) -> dict[str, Any]:
 
 BASE_SELECT = '''
 SELECT t.id,t.status::text AS status,t.priority::text AS priority,t.title,t.description,
-       t."serviceCode",t."serviceDate",t."serviceTime",t."assignedToId",t."createdAt",t."updatedAt",t."completedAt",
-       room.code AS room_code,g."firstName",res."bookingNumber",assignee."displayName" AS assigned_to_name
+       t."serviceCode",t."serviceDate",t."serviceTime",t."assignedToId",t."stayId",t."reservationId",t.source,
+       t."createdAt",t."updatedAt",t."completedAt",
+       COALESCE(room.code,current_room.code) AS room_code,
+       COALESCE(stay_guest."firstName",reservation_guest."firstName") AS "firstName",
+       res."bookingNumber",assignee."displayName" AS assigned_to_name
 FROM operational_tasks t
 LEFT JOIN rooms room ON room.id=t."roomId"
 LEFT JOIN stays stay ON stay.id=t."stayId"
-LEFT JOIN guests g ON g.id=stay."guestId"
+LEFT JOIN guests stay_guest ON stay_guest.id=stay."guestId"
 LEFT JOIN reservations res ON res.id=t."reservationId"
+LEFT JOIN guests reservation_guest ON reservation_guest.id=res."primaryGuestId"
 LEFT JOIN staff_users assignee ON assignee.id=t."assignedToId"
+LEFT JOIN LATERAL (
+  SELECT r.code
+  FROM room_assignments ra
+  JOIN rooms r ON r.id=ra."roomId"
+  WHERE ra."stayId"=t."stayId" AND ra."endedAt" IS NULL
+  ORDER BY ra."startedAt" DESC
+  LIMIT 1
+) current_room ON true
 '''
 
 
@@ -84,7 +99,7 @@ async def list_staff_guest_requests(
         pid = await property_id(conn, user["property_code"])
         rows = await conn.fetch(
             BASE_SELECT + '''
-            WHERE t."propertyId"=$1 AND t.type='GUEST_REQUEST' AND t.source LIKE 'GUEST_OS_%'
+            WHERE t."propertyId"=$1 AND t.type='GUEST_REQUEST' AND t."serviceCode" IS NOT NULL
               AND ($2::boolean OR t."serviceCode"=ANY($3::text[]))
               AND (
                 $4='ALL' OR ($4='ACTIVE' AND t.status IN ('OPEN','IN_PROGRESS')) OR t.status::text=$4
@@ -96,7 +111,11 @@ async def list_staff_guest_requests(
             ''',
             pid, "*" in allowed, list(allowed - {"*"}), task_status, limit,
         )
-    return {"items": [row_to_item(row) for row in rows], "allowed_request_codes": sorted(allowed)}
+    return {
+        "items": [row_to_item(row) for row in rows],
+        "allowed_request_codes": sorted(allowed),
+        "truth": "Role routing is based on canonical OperationalTask.serviceCode, not on the channel that created the request.",
+    }
 
 
 @router.post("/{task_id}/claim")
@@ -109,8 +128,9 @@ async def claim_guest_request(task_id: uuid.UUID, request: Request, user: dict[s
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             task = await conn.fetchrow(
-                '''SELECT id,"serviceCode",status::text AS status,"assignedToId","stayId" FROM operational_tasks
-                   WHERE id=$1 AND "propertyId"=$2 AND type='GUEST_REQUEST' AND source LIKE 'GUEST_OS_%' FOR UPDATE''',
+                '''SELECT id,"serviceCode",status::text AS status,"assignedToId","stayId",source
+                   FROM operational_tasks
+                   WHERE id=$1 AND "propertyId"=$2 AND type='GUEST_REQUEST' AND "serviceCode" IS NOT NULL FOR UPDATE''',
                 task_id, pid,
             )
             if not task:
@@ -121,12 +141,16 @@ async def claim_guest_request(task_id: uuid.UUID, request: Request, user: dict[s
                 raise HTTPException(status_code=409, detail="Request already assigned to another employee")
             if task["status"] not in {"OPEN", "IN_PROGRESS"}:
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_NOT_CLAIMABLE", "status": task["status"]})
-            await conn.execute('UPDATE operational_tasks SET "assignedToId"=$1,status=\'IN_PROGRESS\',"updatedAt"=now() WHERE id=$2', actor_id, task_id)
+            await conn.execute(
+                'UPDATE operational_tasks SET "assignedToId"=$1,status=\'IN_PROGRESS\',"updatedAt"=now() WHERE id=$2',
+                actor_id,
+                task_id,
+            )
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES ($1,$2,'STAFF',$3,'CLAIM_GUEST_REQUEST','OperationalTask',$4,'STAFF_GUEST_REQUESTS','SUCCESS',
-                     jsonb_build_object('request_code',$5::text,'status','IN_PROGRESS'),now())''',
-                uuid.uuid4(), pid, str(actor_id), str(task_id), task["serviceCode"],
+                     jsonb_build_object('request_code',$5::text,'request_source',$6::text,'status','IN_PROGRESS'),now())''',
+                uuid.uuid4(), pid, str(actor_id), str(task_id), task["serviceCode"], task["source"],
             )
     return {"id": str(task_id), "status": "IN_PROGRESS", "assigned_to_id": str(actor_id)}
 
@@ -141,8 +165,9 @@ async def complete_guest_request(task_id: uuid.UUID, request: Request, user: dic
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             task = await conn.fetchrow(
-                '''SELECT id,"serviceCode",status::text AS status,"assignedToId","stayId" FROM operational_tasks
-                   WHERE id=$1 AND "propertyId"=$2 AND type='GUEST_REQUEST' AND source LIKE 'GUEST_OS_%' FOR UPDATE''',
+                '''SELECT id,"serviceCode",status::text AS status,"assignedToId","stayId",source
+                   FROM operational_tasks
+                   WHERE id=$1 AND "propertyId"=$2 AND type='GUEST_REQUEST' AND "serviceCode" IS NOT NULL FOR UPDATE''',
                 task_id, pid,
             )
             if not task:
@@ -153,20 +178,32 @@ async def complete_guest_request(task_id: uuid.UUID, request: Request, user: dic
                 raise HTTPException(status_code=403, detail="Claim the request before completing it")
             if task["status"] != "IN_PROGRESS":
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_NOT_IN_PROGRESS", "status": task["status"]})
-            await conn.execute('UPDATE operational_tasks SET status=\'DONE\',"completedAt"=now(),"updatedAt"=now() WHERE id=$1', task_id)
+            await conn.execute(
+                'UPDATE operational_tasks SET status=\'DONE\',"completedAt"=now(),"updatedAt"=now() WHERE id=$1',
+                task_id,
+            )
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES ($1,$2,'STAFF',$3,'COMPLETE_GUEST_REQUEST','OperationalTask',$4,'STAFF_GUEST_REQUESTS','SUCCESS',
-                     jsonb_build_object('request_code',$5::text,'status','DONE','financial_effect','NONE_AUTOMATIC','room_state_effect','NONE_AUTOMATIC'),now())''',
-                uuid.uuid4(), pid, str(actor_id), str(task_id), task["serviceCode"],
+                     jsonb_build_object('request_code',$5::text,'request_source',$6::text,'status','DONE',
+                       'financial_effect','NONE_AUTOMATIC','room_state_effect','NONE_AUTOMATIC'),now())''',
+                uuid.uuid4(), pid, str(actor_id), str(task_id), task["serviceCode"], task["source"],
             )
             if task["stayId"]:
                 guest_id = await conn.fetchval('SELECT "guestId" FROM stays WHERE id=$1', task["stayId"])
                 if guest_id:
-                    await conn.execute(
-                        '''INSERT INTO guest_history_events (id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt")
-                           VALUES ($1,$2,$3,$4,'GUEST_REQUEST_COMPLETED','STAFF_GUEST_REQUESTS',
-                             jsonb_build_object('task_id',$5::text,'request_code',$6::text),now(),now())''',
-                        uuid.uuid4(), pid, guest_id, task["stayId"], str(task_id), task["serviceCode"],
+                    already_recorded = await conn.fetchval(
+                        '''SELECT 1 FROM guest_history_events
+                           WHERE "stayId"=$1 AND "eventType"='GUEST_REQUEST_COMPLETED'
+                             AND "payloadJson"->>'task_id'=$2 LIMIT 1''',
+                        task["stayId"],
+                        str(task_id),
                     )
+                    if not already_recorded:
+                        await conn.execute(
+                            '''INSERT INTO guest_history_events (id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt")
+                               VALUES ($1,$2,$3,$4,'GUEST_REQUEST_COMPLETED','STAFF_GUEST_REQUESTS',
+                                 jsonb_build_object('task_id',$5::text,'request_code',$6::text,'request_source',$7::text),now(),now())''',
+                            uuid.uuid4(), pid, guest_id, task["stayId"], str(task_id), task["serviceCode"], task["source"],
+                        )
     return {"id": str(task_id), "status": "DONE"}
