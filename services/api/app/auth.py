@@ -83,8 +83,18 @@ async def current_user(request: Request) -> dict[str, Any]:
 
 
 def require_roles(*allowed_roles: str) -> Callable:
+    """Server-side RBAC dependency.
+
+    ADMIN intentionally inherits MANAGER-authorized endpoints, but never OWNER-only
+    endpoints. Narrow roles such as RECEPTION/DINING do not inherit permissions and
+    must be named explicitly by each domain router.
+    """
+    allowed = set(allowed_roles)
+
     async def dependency(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
-        if user["role"] not in allowed_roles:
+        role = user["role"]
+        permitted = role in allowed or (role == "ADMIN" and "MANAGER" in allowed)
+        if not permitted:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permission")
         return user
 
