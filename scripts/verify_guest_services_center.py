@@ -87,6 +87,50 @@ async def ensure_staff(username: str, role: str) -> str:
         await conn.close()
 
 
+async def create_checked_in_reservation_without_stay(today: date) -> str:
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        pid = await conn.fetchval("SELECT id FROM properties WHERE code='THREE_CROWNS'")
+        assert pid
+        guest_id = uuid.uuid4()
+        reservation_id = uuid.uuid4()
+        suffix = uuid.uuid4().hex[:8]
+        await conn.execute(
+            '''INSERT INTO guests (id,"propertyId","firstName",phone,"createdAt","updatedAt")
+               VALUES ($1,$2,$3,$4,now(),now())''',
+            guest_id,
+            pid,
+            "Orphan Stay CI",
+            "+996711" + suffix[:6],
+        )
+        await conn.execute(
+            '''INSERT INTO reservations (
+                 id,"propertyId","bookingNumber","primaryGuestId",status,"checkIn","checkOut",adults,children,"totalKgs","createdAt","updatedAt"
+               ) VALUES ($1,$2,$3,$4,'CHECKED_IN',$5,$6,1,0,1,now(),now())''',
+            reservation_id,
+            pid,
+            f"ORPHAN-{suffix}",
+            guest_id,
+            today,
+            today + timedelta(days=1),
+        )
+        return str(reservation_id)
+    finally:
+        await conn.close()
+
+
+async def task_count_for_reservation(reservation_id: str) -> int:
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        return await conn.fetchval(
+            '''SELECT count(*)::int FROM operational_tasks
+               WHERE "reservationId"=$1 AND type='GUEST_REQUEST' ''',
+            uuid.UUID(reservation_id),
+        )
+    finally:
+        await conn.close()
+
+
 async def task_row(task_id: str):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
@@ -153,14 +197,25 @@ def login(username: str, password: str) -> httpx.Client:
     return client
 
 
-def create_service(client: httpx.Client, reservation_id: str, code: str, *, service_date: date, description: str):
-    response = client.post('/api/v1/admin/guest-services', json={
+def create_service(
+    client: httpx.Client,
+    reservation_id: str,
+    code: str,
+    *,
+    service_date: date,
+    description: str,
+    service_time: str | None = None,
+):
+    payload = {
         "reservation_id": reservation_id,
         "service_code": code,
         "service_date": service_date.isoformat(),
         "priority": "HIGH" if code in {"MAINTENANCE", "TRANSFER"} else "NORMAL",
         "description": description,
-    })
+    }
+    if service_time:
+        payload["service_time"] = service_time
+    response = client.post('/api/v1/admin/guest-services', json=payload)
     response.raise_for_status()
     body = response.json()
     assert body["service_code"] == code and body["status"] == "OPEN", body
@@ -249,15 +304,45 @@ def main():
     tech = login(tech_username, STAFF_PASSWORD)
     dining = login(dining_username, STAFF_PASSWORD)
 
-    # Reception can see the unified center and create requests for any routed department.
+    # Reception can see the unified center.
     center = reception.get('/api/v1/admin/guest-services', params={"status": "ACTIVE"})
     center.raise_for_status()
     assert "Unified Guest Services Center" in center.json()["truth"]
 
+    # Fail closed: a CHECKED_IN reservation without a factual active Stay is inconsistent
+    # and must never generate an orphan operational request.
+    orphan_reservation_id = asyncio.run(create_checked_in_reservation_without_stay(today))
+    orphan = reception.post('/api/v1/admin/guest-services', json={
+        "reservation_id": orphan_reservation_id,
+        "service_code": "ADMIN",
+        "service_date": today.isoformat(),
+        "description": "Must fail closed",
+    })
+    assert orphan.status_code == 409, orphan.text
+    assert orphan.json()["detail"]["code"] == "GUEST_SERVICE_ACTIVE_STAY_REQUIRED", orphan.text
+    assert asyncio.run(task_count_for_reservation(orphan_reservation_id)) == 0
+
+    # Service date is bounded by the reservation/stay period.
+    outside = reception.post('/api/v1/admin/guest-services', json={
+        "reservation_id": reservation_id,
+        "service_code": "ADMIN",
+        "service_date": (end + timedelta(days=1)).isoformat(),
+        "description": "Outside stay",
+    })
+    assert outside.status_code == 422, outside.text
+    assert outside.json()["detail"]["code"] == "GUEST_SERVICE_DATE_OUTSIDE_RESERVATION", outside.text
+
     towels = create_service(reception, reservation_id, "TOWELS", service_date=today, description="2 полотенца")
     maintenance = create_service(reception, reservation_id, "MAINTENANCE", service_date=today, description="Не работает лампа")
     meals = create_service(reception, reservation_id, "MEALS", service_date=today, description="Дополнительный завтрак")
-    transfer = create_service(reception, reservation_id, "TRANSFER", service_date=today + timedelta(days=1), description="Трансфер до аэропорта")
+    transfer = create_service(
+        reception,
+        reservation_id,
+        "TRANSFER",
+        service_date=today + timedelta(days=1),
+        service_time="12:30",
+        description="Трансфер до аэропорта",
+    )
     parking = create_service(reception, reservation_id, "PARKING", service_date=today, description="Место для автомобиля")
 
     pms_task_ids = [towels["id"], maintenance["id"], meals["id"], transfer["id"], parking["id"]]
@@ -272,42 +357,33 @@ def main():
         assert row["createdByType"] == "STAFF"
         assert asyncio.run(audit_count("CREATE_GUEST_SERVICE", body["id"])) == 1
 
-    # Same table, same queue, channel-independent routing.
-    maid_codes = routed_codes(maid)
-    tech_codes = routed_codes(tech)
-    dining_codes = routed_codes(dining)
-    reception_codes = routed_codes(reception)
-    assert "TOWELS" in maid_codes and "MAINTENANCE" not in maid_codes and "MEALS" not in maid_codes
-    assert "MAINTENANCE" in tech_codes and "TOWELS" not in tech_codes
-    assert "MEALS" in dining_codes and "TRANSFER" not in dining_codes
-    assert {"TRANSFER", "PARKING"}.issubset(reception_codes)
-    assert "TOWELS" not in reception_codes and "MEALS" not in reception_codes and "MAINTENANCE" not in reception_codes
-
-    # Wrong department cannot take another department's request.
-    wrong = reception.post(f'/api/v1/ops/guest-requests/{towels["id"]}/claim')
-    assert wrong.status_code == 403, wrong.text
-    wrong = maid.post(f'/api/v1/ops/guest-requests/{maintenance["id"]}/claim')
-    assert wrong.status_code == 403, wrong.text
-
-    # Correct roles execute PMS-created requests.
-    claim_complete(maid, towels["id"])
-    claim_complete(tech, maintenance["id"])
-    claim_complete(dining, meals["id"])
-    claim_complete(reception, transfer["id"])
-
-    # Reception can cancel its own unassigned routed request.
-    cancelled = reception.post(f'/api/v1/ops/guest-requests/{parking["id"]}/cancel')
-    cancelled.raise_for_status()
-    assert cancelled.json()["status"] == "CANCELLED"
-
-    # Guest OS request must appear in the exact same admin center, not a parallel queue.
+    # Establish a real Guest OS session on the same Stay.
     issue = owner.post(f'/api/v1/admin/guest-os/room-qrs/{chosen["id"]}/issue')
     issue.raise_for_status()
     qr_token = issue.json()["token"]
     guest = httpx.Client(base_url=BASE_URL, timeout=30.0, headers={"user-agent": "guest-services-center-guest"})
     verified = guest.post(f'/api/v1/guest-os/rooms/{qr_token}/verify', json={"pin": pin})
     verified.raise_for_status()
-    guest_admin = guest.post(f'/api/v1/guest-os/rooms/{qr_token}/requests', json={"request_code": "ADMIN", "description": "Позвоните в номер"})
+
+    # Cross-channel duplicate protection: Reception/PMS already created TRANSFER,
+    # so Guest OS cannot create a second active task for the same factual service.
+    guest_duplicate = guest.post(f'/api/v1/guest-os/rooms/{qr_token}/requests', json={
+        "request_code": "TRANSFER",
+        "description": "Duplicate must be rejected",
+        "service_date": (today + timedelta(days=1)).isoformat(),
+        "service_time": "12:30",
+    })
+    assert guest_duplicate.status_code == 409, guest_duplicate.text
+    duplicate_detail = guest_duplicate.json()["detail"]
+    assert duplicate_detail["code"] == "GUEST_REQUEST_DUPLICATE_ACTIVE", duplicate_detail
+    assert duplicate_detail["task_id"] == transfer["id"], duplicate_detail
+    assert duplicate_detail["existing_source"] == "PMS_GUEST_SERVICE", duplicate_detail
+
+    # Guest-created request appears in the exact same admin Center, not a parallel queue.
+    guest_admin = guest.post(f'/api/v1/guest-os/rooms/{qr_token}/requests', json={
+        "request_code": "ADMIN",
+        "description": "Позвоните в номер",
+    })
     guest_admin.raise_for_status()
     guest_admin_id = guest_admin.json()["id"]
 
@@ -316,10 +392,34 @@ def main():
     by_id = {item["id"]: item for item in unified.json()["items"]}
     assert guest_admin_id in by_id and by_id[guest_admin_id]["source"] == "GUEST_OS_ADMIN"
 
-    reception_route = reception.get('/api/v1/ops/guest-requests', params={"status": "ACTIVE"})
-    reception_route.raise_for_status()
-    assert guest_admin_id in {item["id"] for item in reception_route.json()["items"]}
+    # Same table, same queue, channel-independent routing.
+    maid_codes = routed_codes(maid)
+    tech_codes = routed_codes(tech)
+    dining_codes = routed_codes(dining)
+    reception_codes = routed_codes(reception)
+    assert "TOWELS" in maid_codes and "MAINTENANCE" not in maid_codes and "MEALS" not in maid_codes
+    assert "MAINTENANCE" in tech_codes and "TOWELS" not in tech_codes
+    assert "MEALS" in dining_codes and "TRANSFER" not in dining_codes
+    assert {"TRANSFER", "PARKING", "ADMIN"}.issubset(reception_codes)
+    assert "TOWELS" not in reception_codes and "MEALS" not in reception_codes and "MAINTENANCE" not in reception_codes
+
+    # Wrong department cannot take another department's request.
+    wrong = reception.post(f'/api/v1/ops/guest-requests/{towels["id"]}/claim')
+    assert wrong.status_code == 403, wrong.text
+    wrong = maid.post(f'/api/v1/ops/guest-requests/{maintenance["id"]}/claim')
+    assert wrong.status_code == 403, wrong.text
+
+    # Correct roles execute PMS-created requests and the Guest OS request.
+    claim_complete(maid, towels["id"])
+    claim_complete(tech, maintenance["id"])
+    claim_complete(dining, meals["id"])
+    claim_complete(reception, transfer["id"])
     claim_complete(reception, guest_admin_id)
+
+    # Reception can cancel its own unassigned routed request.
+    cancelled = reception.post(f'/api/v1/ops/guest-requests/{parking["id"]}/cancel')
+    cancelled.raise_for_status()
+    assert cancelled.json()["status"] == "CANCELLED"
 
     # Financial and room-state invariants: requests are operational facts only.
     finance_after = asyncio.run(snapshot_finance_and_room(reservation_id, chosen["id"]))
