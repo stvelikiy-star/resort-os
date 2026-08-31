@@ -11,6 +11,10 @@ on:
       - 'apps/web/app/guest-os.css'
       - 'apps/web/components/GuestOsRuntime.tsx'
       - 'apps/web/lib/ownerApprovedGuestFacts.ts'
+      - 'apps/admin/components/RoomQrBoard.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/admin/app/room-qr.css'
+      - 'apps/admin/app/layout.tsx'
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/5_guest_os_core/**'
       - 'scripts/verify_guest_os_access.py'
@@ -27,7 +31,7 @@ concurrency:
 jobs:
   guest-os-access:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16-alpine
@@ -64,6 +68,7 @@ jobs:
           cache-dependency-path: |
             packages/database/package-lock.json
             apps/web/package-lock.json
+            apps/admin/package-lock.json
 
       - name: Apply canonical database migration chain
         working-directory: packages/database
@@ -91,6 +96,13 @@ jobs:
 
       - name: Typecheck and build public Guest OS route
         working-directory: apps/web
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build QR administration
+        working-directory: apps/admin
         run: |
           npm install --no-audit --no-fund
           npm run typecheck
