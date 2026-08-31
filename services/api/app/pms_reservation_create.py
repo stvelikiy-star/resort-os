@@ -89,8 +89,8 @@ async def find_conflicts(conn, room_id: uuid.UUID, check_in: date, check_out: da
         {
             "inventory_block_id": str(row["id"]),
             "block_type": row["block_type"],
-            "start": row["startDate"],
-            "end": row["endDate"],
+            "start": row["startDate"].isoformat(),
+            "end": row["endDate"].isoformat(),
             "booking_number": row["bookingNumber"],
             "reason": row["reason"],
         }
