@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import GuestCrmEnrichmentPanel from "./GuestCrmEnrichmentPanel";
 
 type GuestSummary = {
   id: string;
@@ -108,12 +109,17 @@ const statusLabels: Record<string, string> = {
 };
 
 const serviceLabels: Record<string, string> = {
+  HOUSEKEEPING: "Уборка по просьбе гостя",
+  TOWELS: "Полотенца",
+  LINEN: "Замена белья",
+  MAINTENANCE: "Ремонт",
   TRANSFER: "Трансфер",
   MEALS: "Питание",
   PARKING: "Парковка",
   SAUNA: "Сауна",
   BILLIARDS: "Бильярд",
   EXCURSIONS: "Экскурсии",
+  ADMIN: "Администратор",
 };
 
 export default function GuestHistoryBoard() {
@@ -201,7 +207,7 @@ export default function GuestHistoryBoard() {
         <div>
           <p className="eyebrow">OWNER CRM · RESORT CORE</p>
           <h1>Гости и история</h1>
-          <p>Единая клиентская база: повторные визиты, брони, комнаты, платежи, услуги и история коммуникаций.</p>
+          <p>Единая клиентская база: повторные визиты, план брони, фактические проживания, переселения, платежи, услуги и история коммуникаций.</p>
         </div>
         <form className="guest-search" onSubmit={submitSearch}>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Имя, телефон или email" aria-label="Поиск гостя" />
@@ -276,7 +282,9 @@ export default function GuestHistoryBoard() {
                 <article><span>Фактически получено</span><strong>{money(detail.lifetime.received_kgs)}</strong></article>
               </div>
 
-              <div className="guest-section-title"><div><span>История проживания</span><h3>Брони и комнаты</h3></div><b>{detail.reservations.length}</b></div>
+              <GuestCrmEnrichmentPanel guestId={detail.guest.id} />
+
+              <div className="guest-section-title"><div><span>План / коммерческий контур</span><h3>Брони и плановые комнаты</h3></div><b>{detail.reservations.length}</b></div>
               <div className="guest-reservation-history">
                 {detail.reservations.map((reservation) => (
                   <article key={reservation.id}>
@@ -297,7 +305,7 @@ export default function GuestHistoryBoard() {
                           <b>№ {segment.room_code}</b><span>{segment.room_type_name}</span><em>{dateText(segment.start)} → {dateText(segment.end)}</em>
                         </div>
                       ))}
-                      {!reservation.schedule.length && <span className="guest-muted">Сегменты размещения не найдены.</span>}
+                      {!reservation.schedule.length && <span className="guest-muted">Плановые сегменты размещения не найдены.</span>}
                     </div>
                     {reservation.services.length > 0 && (
                       <div className="guest-service-row">

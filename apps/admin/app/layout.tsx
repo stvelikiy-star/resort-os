@@ -11,6 +11,7 @@ import "./owner-control-v2.css";
 import "./owner-executive.css";
 import "./growth-control.css";
 import "./guest-history.css";
+import "./guest-crm.css";
 import "./dashboard.css";
 import "./reception.css";
 import "./inbox.css";
