@@ -160,9 +160,13 @@ async def finance_summary(
             raise HTTPException(status_code=503, detail="Property not loaded")
         pid = prop["id"]
 
+        # Prisma DateTime columns in the current PostgreSQL baseline are TIMESTAMP(3)
+        # without timezone and are treated as UTC-naive storage by Resort Core.
+        # Convert property-local midnight to the matching UTC-naive timestamp before
+        # sending it back through asyncpg; this avoids aware/naive binding drift.
         bounds = await conn.fetchrow(
-            '''SELECT ($1::date::timestamp AT TIME ZONE $3) AS from_ts,
-                      ($2::date::timestamp AT TIME ZONE $3) AS to_ts''',
+            '''SELECT (($1::date::timestamp AT TIME ZONE $3) AT TIME ZONE 'UTC') AS from_ts,
+                      (($2::date::timestamp AT TIME ZONE $3) AT TIME ZONE 'UTC') AS to_ts''',
             from_date,
             end_exclusive_date,
             prop["timezone"],
@@ -213,7 +217,7 @@ async def finance_summary(
 
         daily = await conn.fetch(
             '''
-            SELECT (COALESCE(p."paidAt",p."createdAt") AT TIME ZONE $4)::date AS local_date,
+            SELECT ((COALESCE(p."paidAt",p."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE $4)::date AS local_date,
                    COALESCE(SUM(p."amountKgs"),0)::bigint AS amount_kgs,
                    COUNT(*)::int AS payment_count
             FROM payments p
@@ -402,6 +406,7 @@ async def finance_summary(
             "to": to_date,
             "timezone": prop["timezone"],
             "currency": prop["currency"],
+            "storage_timezone": "UTC",
             "from_timestamp": from_ts,
             "to_timestamp_exclusive": to_ts,
         },
@@ -440,7 +445,7 @@ async def finance_summary(
             for row in recent
         ],
         "truth": {
-            "received": "Period received totals include only stored Payment.status=RECEIVED facts, bounded by the property's local calendar dates.",
+            "received": "Period received totals include only stored Payment.status=RECEIVED facts. Property-local calendar boundaries are converted to UTC-naive timestamps because the committed PostgreSQL baseline stores Prisma DateTime values as TIMESTAMP(3) without timezone.",
             "pending": "Pending total is an internal payment-record snapshot; it is not recognized revenue and does not mean automation is collecting payment.",
             "active_reservations": "Active reservation totals are a current internal snapshot of GUARANTEED/CHECKED_IN reservation values and stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
             "receivables": "Debtor counts and amounts are calculated over the complete GUARANTEED/CHECKED_IN/CHECKED_OUT reservation ledger. A CHECKED_OUT balance remains visible for operational follow-up regardless of historical ledger size.",
