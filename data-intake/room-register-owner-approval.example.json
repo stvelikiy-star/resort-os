@@ -6,5 +6,6 @@
   "approved_at": null,
   "evidence_ref": null,
   "reviewed_issue_ids": [],
-  "note": "Template only. Do not change status to OWNER_APPROVED until BLOCKER issues are corrected in rooms.csv and the owner has explicitly reviewed the exact current register checksum and every remaining REVIEW item."
+  "resolved_question_ids": [],
+  "note": "Template only. OWNER_APPROVED requires corrected BLOCKER rows in canonical rooms.csv, exact checksum, explicit acknowledgement of all current grouped REVIEW/POLICY_REVIEW issues, and resolution of all 13 captured Drive OWNER_CHECKLIST P0/P1 questions."
 }
