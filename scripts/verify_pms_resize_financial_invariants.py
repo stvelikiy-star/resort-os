@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import uuid
 from datetime import datetime, timedelta
@@ -69,6 +70,10 @@ async def verify_audit(reservation_id: str, original_total: int, suggested_total
         assert row, "PMS schedule mutation audit is missing"
         before = row["beforeJson"]
         after = row["afterJson"]
+        if isinstance(before, str):
+            before = json.loads(before)
+        if isinstance(after, str):
+            after = json.loads(after)
         assert int(before["stored_total_kgs"]) == original_total, before
         assert int(after["stored_total_kgs"]) == original_total, after
         assert int(after["suggested_total_kgs"]) == suggested_total, after
