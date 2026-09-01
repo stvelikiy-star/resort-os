@@ -1,0 +1,39 @@
+name: Site Content Runtime CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'apps/web/components/SiteContentRuntime.tsx'
+      - 'apps/web/components/PublicUiI18nRuntime.tsx'
+      - 'apps/web/lib/siteContent.ts'
+      - 'scripts/site_content_runtime_contract.py'
+      - '.github/workflows/site-content-runtime-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  site-content-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify CMS locale ownership and fallback contract
+        run: python scripts/site_content_runtime_contract.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Typecheck and build public site
+        working-directory: apps/web
+        env:
+          CORE_API_URL: http://127.0.0.1:8000
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
