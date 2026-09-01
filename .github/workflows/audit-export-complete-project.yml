@@ -11,7 +11,7 @@ permissions:
 jobs:
   audit-and-export:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout exact frozen integration commit
         uses: actions/checkout@v4
@@ -39,14 +39,36 @@ jobs:
       - name: Verify Beget deployment topology contract
         run: python3 scripts/beget_deployment_guard.py
 
-      - name: Verify public and authority truth guards
+      - name: Run full local Resort OS release-candidate chain
+        shell: bash
+        env:
+          APP_ENV: staging
+        run: |
+          set -Eeuo pipefail
+          bash scripts/release_candidate_check.sh
+
+      - name: Re-run authority and runtime truth guards with installed runtime dependencies
         shell: bash
         run: |
           set -Eeuo pipefail
-          python3 scripts/release_scope_guard.py
-          python3 scripts/public_site_truth_guard.py
-          python3 scripts/guest_os_truth_guard.py
-          python3 scripts/admin_runtime_truth_guard.py
+          PY=.venv/bin/python
+          "$PY" scripts/release_scope_guard.py
+          "$PY" scripts/public_site_truth_guard.py
+          "$PY" scripts/guest_os_truth_guard.py
+          "$PY" scripts/admin_runtime_truth_guard.py
+          "$PY" scripts/public_i18n_guard.py
+          "$PY" scripts/public_media_integrity_guard.py
+
+      - name: Run release safety contract tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PY=.venv/bin/python
+          "$PY" scripts/verify_launch_acceptance_test.py
+          "$PY" scripts/deployment_release_linkage_contract_test.py
+          "$PY" scripts/external_staging_acceptance_contract_test.py
+          "$PY" scripts/production_monitoring_contract_test.py
+          "$PY" scripts/legacy_rollback_contract_test.py
 
       - name: Build exact-source delivery ZIP
         shell: bash
@@ -65,11 +87,19 @@ jobs:
 
           This bundle is an exact `git archive` of the integration source above plus this export note.
 
-          Before this ZIP was produced, the export workflow re-ran the repository-level RC truth, launch-acceptance, Beget topology, release-scope, public-site, Guest OS and admin runtime truth guards against the exact source SHA.
+          Immediately before this ZIP was produced, GitHub Actions checked out the exact source SHA and re-ran:
 
-          The broader executable product tree had already completed the full CI/staging acceptance chain before this export. External Beget/production evidence remains a separate launch gate and is not represented as completed by this local/demo bundle.
+          - Python compilation for repository scripts;
+          - frozen RC truth guard;
+          - repository launch-acceptance verifier;
+          - Beget deployment topology guard;
+          - the complete local `scripts/release_candidate_check.sh` chain, including PostgreSQL, Prisma/schema, evidence-backed 84-room seed, Admin/Web/Staff builds, Core health/readiness, authentication, 84-room PMS grid, availability, ReservationRequest boundary, manager quote/payment conversion and reservation/chessboard lifecycle;
+          - release/public/Guest OS/admin/i18n/media truth guards;
+          - launch acceptance, deployment-linkage, external-staging orchestration, monitoring and rollback contract tests.
 
-          Start with the repository README and production/staging documentation. Do not use stale `main` as the release source.
+          External Beget/production evidence remains a separate launch gate and is not represented as completed by this local/demo bundle.
+
+          Start with the repository README and `knowledge/09_LAUNCH_ACCEPTANCE.md`. Do not use stale `main` as the release source.
           EOF
           (
             cd "$OUT"
@@ -87,3 +117,8 @@ jobs:
             ${{ runner.temp }}/three-crowns-export/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 7
+
+      - name: Clean local audit services
+        if: always()
+        shell: bash
+        run: docker compose down -v --remove-orphans || true
