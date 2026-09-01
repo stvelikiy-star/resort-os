@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.5
+Version: 3.6
 Date: 2026-09-02
-Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING UNDER FINAL REGRESSION / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
+Status: INTERNAL RC FROZEN / REPOSITORY+CI VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
 Authority: factual implementation reality only
 
@@ -12,12 +12,16 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
+Accepted executable head: `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c`.
+Observed integration merge: `a6c7ff603ad829a82f9d6c80d46425f0f58b50ec`.
+
+The exact PR #98 executable head completed **43/43 non-RC product, acceptance, security, migration, backup/restore, staging and packaging workflows successfully, 0 failures**. The separate RC Truth workflow intentionally failed on the pre-merge product head because the previous RC was still frozen; this refreeze binds the new accepted head only after the real integration merge existed.
+
+The observed integration merge has **0 changed files** versus the tested executable head. Therefore the merged executable tree is identical to the exact tree that passed the 43 successful contours.
 
 The canonical integration branch is the only release integration source. `main` is not a production source and must not be used for Beget deployment or cutover while stale relative to integration.
 
-Earlier accepted product heads retain their exact-head CI evidence. The current Kitchen/Admin extension is accepted only after its own exact-head regression is fully green and merged tree-equivalent into integration.
-
-The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`. It must be refrozen after the current product merge; an older RC pointer must not be presented as the latest release.
+The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
 The database toolchain remains deterministic and separately security-gated: `prisma` and `@prisma/client` are exactly pinned to `6.12.0`, `packages/database/package-lock.json` is committed, clean `npm ci` is required, and the database npm audit must have zero HIGH/CRITICAL findings before acceptance.
 
@@ -27,7 +31,7 @@ Repository/CI evidence is not evidence of external production deployment.
 
 ## Authority
 
-`PUBLIC SITE / PMS / STAFF / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
+`PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
 `ReservationRequest != Reservation`.
 
@@ -95,15 +99,16 @@ Implemented and regression-gated:
 - Guest OS service requests;
 - factual Guest CRM history across repeated stays and relocations;
 - safe manager-confirmed guest preferences;
-- GuestHistoryEvent and AuditLog trails.
+- GuestHistoryEvent and AuditLog trails;
+- Guest OS Kitchen menu/order API through existing GuestSession authority.
 
 Room QR / GuestSession is separate from anonymous Service Point QR.
 
 ## Kitchen / Dining
 
-Current Kitchen domain is an extension of Resort Core/PostgreSQL, not a parallel accounting system.
+Kitchen is now part of the accepted, tree-equivalent integration release and remains an extension of Resort Core/PostgreSQL, not a parallel accounting system.
 
-Implemented in the current Kitchen release candidate and subject to exact-head regression before merge:
+Verified on exact accepted head `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c`:
 
 - dedicated Kitchen Admin surface for `DINING_STAFF`, OWNER and MANAGER;
 - editable RU/KG/EN draft menu with server-side prices and active/draft controls;
@@ -115,7 +120,8 @@ Implemented in the current Kitchen release candidate and subject to exact-head r
 - successful PMS check-in creates an idempotent Dining arrival card in the same PostgreSQL transaction, with repair sync as a fallback;
 - Dining arrival card excludes sensitive guest/payment data;
 - Kitchen totals are isolated operational amounts: **no automatic Hotel Payment creation and no automatic Reservation.totalKgs mutation**;
-- Kitchen order actions and check-in routing are audited.
+- Kitchen order actions and check-in routing are audited;
+- Kitchen Operations CI and CI-local Full Staging both passed on the exact accepted head.
 
 The provisional menu is intentionally replaceable from Kitchen Admin. Real table layout/count is entered operationally and is not guessed in code.
 
@@ -176,22 +182,25 @@ Real provider credentials/live provider E2E remain external evidence and are not
 
 ## Deployment state
 
-Repository/CI release gates include:
+Verified on the exact accepted executable head and tree-equivalent merge:
 
 - migration baseline;
-- backup -> restore;
-- frontend/backend dependency security inspection;
+- exact eight-migration database ledger;
+- backup -> clean restore;
+- frontend/backend/database dependency security inspection;
 - deterministic Prisma dependency/lockfile checks;
 - production package build;
 - CI-local Full Staging;
-- Beget hardening logic;
+- Beget hardening contract;
 - exact Git SHA -> deployed application image linkage contract;
 - staging mutation safety guard;
 - unified external staging acceptance orchestration contract;
 - physical room import gate #38;
-- fail-closed launch verifier.
+- fail-closed launch verifier;
+- Kitchen Operations E2E;
+- PMS/Guest OS/Finance/Staff/AI/automation regression contours.
 
-All of these must be green at the final exact release head before internal RC freeze. The RC truth guard must then bind `release/current-rc.json` to that exact integration SHA.
+The new RC refreeze binds tested head `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c` to tree-equivalent integration merge `a6c7ff603ad829a82f9d6c80d46425f0f58b50ec`.
 
 External/production remains separate:
 
@@ -200,7 +209,7 @@ External/production remains separate:
 - external HTTPS/WSS staging: NOT VERIFIED;
 - external rendered public-truth probe: NOT VERIFIED;
 - real staging room reconciliation against canonical 84-room register: NOT VERIFIED;
-- real iPhone/Android/desktop/Telegram acceptance: NOT VERIFIED;
+- real iPhone/Android/desktop/Telegram/Kitchen acceptance: NOT VERIFIED;
 - launch-enabled provider E2E: NOT VERIFIED or NOT REQUIRED if providers stay disabled;
 - real monitoring/alerting evidence: NOT VERIFIED;
 - fresh pre-cutover backup/DNS rollback evidence: NOT VERIFIED;
