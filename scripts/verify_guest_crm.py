@@ -180,7 +180,8 @@ def main():
 
     chosen, preview_body = choose_sellable_room(owner, first_start, first_end)
     suffix = uuid.uuid4().hex[:8]
-    phone = "+996556" + suffix[:6]
+    numeric_suffix = f"{uuid.uuid4().int % 1_000_000:06d}"
+    phone = "+996556" + numeric_suffix
     email = f"guest-crm-{suffix}@example.com"
 
     reservation_id = create_reservation(
