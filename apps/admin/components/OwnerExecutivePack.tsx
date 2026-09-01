@@ -16,6 +16,11 @@ type Report = {
   crm: { conversion_percent: number; leads: number; converted: number };
 };
 
+type FinancePeriod = {
+  period_payments: { received_kgs: number; received_count: number };
+  receivables_snapshot: { outstanding_kgs: number; debtor_count: number };
+};
+
 type Brief = {
   property: { local_date: string; name: string; timezone: string };
   forward: {
@@ -110,6 +115,8 @@ export default function OwnerExecutivePack() {
   const [growth, setGrowth] = useState<Growth | null>(null);
   const [current, setCurrent] = useState<Report | null>(null);
   const [previous, setPrevious] = useState<Report | null>(null);
+  const [currentFinance, setCurrentFinance] = useState<FinancePeriod | null>(null);
+  const [previousFinance, setPreviousFinance] = useState<FinancePeriod | null>(null);
   const [pickup, setPickup] = useState<Pickup | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -124,15 +131,21 @@ export default function OwnerExecutivePack() {
       ]);
       const ranges = monthRanges(ownerBrief.property.local_date);
       const next30 = next30Range(ownerBrief.property.local_date);
-      const [currentReport, previousReport, pickupBody] = await Promise.all([
-        getJson<Report>(`/core/api/v1/admin/reports/overview?${new URLSearchParams({ from_date: ranges.current.from, to_date: ranges.current.to })}`),
-        getJson<Report>(`/core/api/v1/admin/reports/overview?${new URLSearchParams({ from_date: ranges.previous.from, to_date: ranges.previous.to })}`),
+      const currentParams = new URLSearchParams({ from_date: ranges.current.from, to_date: ranges.current.to });
+      const previousParams = new URLSearchParams({ from_date: ranges.previous.from, to_date: ranges.previous.to });
+      const [currentReport, previousReport, currentFinanceBody, previousFinanceBody, pickupBody] = await Promise.all([
+        getJson<Report>(`/core/api/v1/admin/reports/overview?${currentParams}`),
+        getJson<Report>(`/core/api/v1/admin/reports/overview?${previousParams}`),
+        getJson<FinancePeriod>(`/core/api/v1/admin/finance/summary?${currentParams}`),
+        getJson<FinancePeriod>(`/core/api/v1/admin/finance/summary?${previousParams}`),
         getJson<Pickup>(`/core/api/v1/admin/intelligence/pickup?${new URLSearchParams({ from_date: next30.from, to_date: next30.to })}`),
       ]);
       setBrief(ownerBrief);
       setGrowth(growthSummary);
       setCurrent(currentReport);
       setPrevious(previousReport);
+      setCurrentFinance(currentFinanceBody);
+      setPreviousFinance(previousFinanceBody);
       setPickup(pickupBody);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка Owner Executive Pack");
@@ -154,7 +167,7 @@ export default function OwnerExecutivePack() {
 
   if (loading && !brief) return <section className="owner-executive loading">Формирую Owner Executive Pack…</section>;
   if (error && !brief) return <section className="owner-executive"><div className="error-box">{error}</div><button className="btn" onClick={load}>Повторить</button></section>;
-  if (!brief || !growth || !current || !previous) return null;
+  if (!brief || !growth || !current || !previous || !currentFinance || !previousFinance) return null;
 
   const forward = brief.forward.next_30_days;
   const pickupReady = pickup?.status === "READY" && pickup.summary;
@@ -178,9 +191,9 @@ export default function OwnerExecutivePack() {
         <article><span>Загрузка · MTD</span><strong>{pct(current.kpi.occupancy_percent)}</strong><small>{delta(current.kpi.occupancy_percent, previous.kpi.occupancy_percent, "pct")} · {comparisonNote}</small></article>
         <article><span>ADR · MTD</span><strong>{money(current.kpi.adr_kgs)}</strong><small>{delta(current.kpi.adr_kgs, previous.kpi.adr_kgs, "money")} · {comparisonNote}</small></article>
         <article><span>RevPAR · MTD</span><strong>{money(current.kpi.revpar_kgs)}</strong><small>{delta(current.kpi.revpar_kgs, previous.kpi.revpar_kgs, "money")} · {comparisonNote}</small></article>
-        <article><span>Получено оплат · MTD</span><strong>{money(current.kpi.received_payments_kgs)}</strong><small>{delta(current.kpi.received_payments_kgs, previous.kpi.received_payments_kgs, "money")} · {comparisonNote}</small></article>
+        <article><span>Получено оплат · MTD</span><strong>{money(currentFinance.period_payments.received_kgs)}</strong><small>{delta(currentFinance.period_payments.received_kgs, previousFinance.period_payments.received_kgs, "money")} · canonical Finance Core</small></article>
         <article><span>CRM-конверсия · MTD</span><strong>{pct(current.crm.conversion_percent)}</strong><small>{current.crm.converted} из {current.crm.leads} лидов · Δ {delta(current.crm.conversion_percent, previous.crm.conversion_percent, "pct")}</small></article>
-        <article className={current.kpi.active_outstanding_kgs > 0 ? "executive-attention" : ""}><span>Дебиторка сейчас</span><strong>{money(current.kpi.active_outstanding_kgs)}</strong><small>{current.kpi.active_debtor_count || 0} активных броней</small></article>
+        <article className={currentFinance.receivables_snapshot.outstanding_kgs > 0 ? "executive-attention" : ""}><span>Дебиторка сейчас</span><strong>{money(currentFinance.receivables_snapshot.outstanding_kgs)}</strong><small>{currentFinance.receivables_snapshot.debtor_count || 0} броней с остатком, включая CHECKED_OUT</small></article>
         <article><span>Загрузка · 30 дней вперёд</span><strong>{pct(forward.occupancy_on_books_percent)}</strong><small>{forward.booked_room_nights} / {forward.available_room_nights} номеро-ночей</small></article>
         <article><span>Стоимость on-books · 30 дней</span><strong>{money(forward.allocated_booked_value_kgs)}</strong><small>{forward.arrivals} заездов · {forward.departures} выездов</small></article>
         <article><span>Booking pickup</span><strong>{pickupReady ? delta(pickup.summary!.room_night_pickup, 0, "number") : "—"}</strong><small>{pickupReady ? `${delta(pickup.summary!.booked_value_pickup_kgs, 0, "money")} с ${pickup.baseline?.snapshot_date}` : `статус: ${pickup?.status || brief.pickup_readiness.status}`}</small></article>
@@ -200,6 +213,7 @@ export default function OwnerExecutivePack() {
           <h3>Что означают цифры</h3>
           <p>MTD сравнивается с сопоставимым началом прошлого месяца; если прошлый месяц короче, сравнение ограничено его последним днём.</p>
           <p>ADR/RevPAR/стоимость броней — управленческие метрики Resort Core, не бухгалтерская выручка.</p>
+          <p>Полученные оплаты и текущая дебиторка берутся из canonical Finance Core, включая остатки после CHECKED_OUT.</p>
           <p>30 дней вперёд — текущие on-books брони и доступность, не статистический прогноз спроса.</p>
           <p>Pickup показывается только при наличии сохранённого исторического snapshot; иначе остаётся «—».</p>
           <p>NPS считается только по фактически записанным оценкам и всегда показывает размер выборки.</p>
