@@ -34,6 +34,10 @@ def main() -> int:
         'user.role',
         'isManager',
         'isReception',
+        'const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);',
+        '{canUseOps && <button className={tab === "OPS"',
+        '{tab === "OPS" && canUseOps && <OperationsBoard user={user} />}',
+        'if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";',
     )
     require(GRID_V9, 'import PMSOwnerGrid from "./PMSOwnerGrid"', "<PMSOwnerGrid />")
     require(
@@ -67,7 +71,7 @@ def main() -> int:
         if "/demo" in page_text or "/demo" in shell_text or "app/demo" in page_text or "app/demo" in shell_text:
             raise AssertionError("normal admin runtime references the historical /demo route")
 
-    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; demo markers are absent from the working runtime")
+    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; demo markers are absent and operations UI follows staff RBAC")
     return 0
 
 
