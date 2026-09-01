@@ -17,6 +17,7 @@ from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
 from .inbox import router as inbox_router
+from .kitchen_arrivals import router as kitchen_arrivals_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
 from .observability import install_observability
@@ -84,6 +85,7 @@ app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
 app.include_router(staff_guest_requests_router)
+app.include_router(kitchen_arrivals_router)
 app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
 app.include_router(guest_pin_admin_router)
@@ -110,4 +112,4 @@ app.include_router(manager_dashboard_router)
 # from the dormant NFC wallet/acquiring code below.
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.46.0"
+app.version = "0.47.0"
