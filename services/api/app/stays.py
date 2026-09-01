@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .auth import require_roles
+from .kitchen_arrivals import create_arrival_notification
 
 router = APIRouter(prefix="/api/v1/admin/stays", tags=["stays"])
 manager_access = require_roles("OWNER", "MANAGER", "RECEPTION")
@@ -320,7 +321,7 @@ async def check_in(
             )
             reservation = await conn.fetchrow(
                 '''
-                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut","primaryGuestId"
+                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut","primaryGuestId",adults,children
                 FROM reservations
                 WHERE id=$1 AND "propertyId"=$2
                 FOR UPDATE
@@ -367,6 +368,20 @@ async def check_in(
                 '''UPDATE reservations SET status='CHECKED_IN', "updatedAt"=now() WHERE id=$1''',
                 reservation_id,
             )
+            kitchen_arrival_task_id = await create_arrival_notification(
+                conn,
+                property_id=pid,
+                reservation_id=reservation_id,
+                stay_id=stay_id,
+                room_id=room["id"],
+                room_code=room["code"],
+                booking_number=reservation["bookingNumber"],
+                check_in=reservation["checkIn"],
+                check_out=reservation["checkOut"],
+                adults=reservation["adults"],
+                children=reservation["children"],
+                actor_id=user["id"],
+            )
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (
@@ -380,7 +395,8 @@ async def check_in(
                     'actual_local_date',$8::text,
                     'stay_id',$9::text,
                     'room_assignment_id',$10::text,
-                    'guest_pin_issued',true
+                    'guest_pin_issued',true,
+                    'kitchen_arrival_task_id',$11::text
                   ),now())
                 ''',
                 uuid.uuid4(),
@@ -393,6 +409,7 @@ async def check_in(
                 str(local_today),
                 str(stay_id),
                 str(room_assignment_id),
+                str(kitchen_arrival_task_id) if kitchen_arrival_task_id else None,
             )
     return {
         "reservation_id": str(reservation_id),
@@ -405,6 +422,7 @@ async def check_in(
         "guest_access_pin": guest_access_pin,
         "guest_access_pin_valid_for_hours": 24,
         "guest_access_pin_display_once": True,
+        "kitchen_arrival_task_id": str(kitchen_arrival_task_id) if kitchen_arrival_task_id else None,
     }
 
 
