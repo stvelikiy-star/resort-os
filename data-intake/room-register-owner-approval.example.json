@@ -1,0 +1,10 @@
+{
+  "status": "NOT_APPROVED",
+  "rooms_sha256": null,
+  "room_count": 84,
+  "approved_by": null,
+  "approved_at": null,
+  "evidence_ref": null,
+  "reviewed_issue_ids": [],
+  "note": "Template only. Do not change status to OWNER_APPROVED until BLOCKER issues are corrected in rooms.csv and the owner has explicitly reviewed the exact current register checksum and every remaining REVIEW item."
+}
