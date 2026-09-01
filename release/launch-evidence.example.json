@@ -1,0 +1,83 @@
+{
+  "release": {
+    "candidate_sha": "0000000000000000000000000000000000000000",
+    "migrations": [
+      "0_init",
+      "1_site_content",
+      "2_guest_service_tasks",
+      "3_owner_analytics_snapshots",
+      "4_guest_engagements",
+      "5_guest_os_core",
+      "6_service_point_qr_operations"
+    ]
+  },
+  "external_evidence": {
+    "owner_room_register": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Owner-approved physical 84-room production register is still required. Development seed count is not owner approval."
+    },
+    "beget_host_preflight": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Run non-destructive host preflight on the actual target host/account."
+    },
+    "legacy_rollback_backup": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Require archive/dump/config/DNS evidence and checksum for the currently live site."
+    },
+    "external_https_wss_staging": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Real external staging must prove HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL."
+    },
+    "external_public_truth_probe": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Run external_public_truth_probe.py against the real staging URL."
+    },
+    "real_device_acceptance": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Require iPhone, Android, desktop and Telegram/staff acceptance on real devices."
+    },
+    "provider_acceptance": {
+      "enabled": false,
+      "status": "NOT_REQUIRED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "If WhatsApp/API Green/ManyChat or another provider is launch-enabled, change enabled=true and attach VERIFIED provider E2E evidence."
+    },
+    "monitoring_alerting": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Require real health/readiness, 5xx, container, DB/storage and backup-failure visibility."
+    },
+    "pre_cutover_backup": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Fresh backup immediately before cutover with timestamp/checksum/restore owner."
+    },
+    "dns_rollback_capture": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Capture current DNS and exact rollback target before any switch."
+    },
+    "owner_cutover_approval": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Final production/DNS switch requires explicit owner approval after all other gates are complete."
+    }
+  }
+}
