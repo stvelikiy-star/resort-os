@@ -57,6 +57,73 @@ def normalized_message_time(value: datetime | None) -> datetime:
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def _json_value(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
+
+
+async def _stable_channel(conn, pid: uuid.UUID, code: str, payload: NormalizedChannelMessage):
+    existing = await conn.fetchrow(
+        '''SELECT id,kind::text AS kind,"displayName","externalAccountId"
+           FROM communication_channels WHERE "propertyId"=$1 AND code=$2 FOR UPDATE''',
+        pid,
+        code,
+    )
+    if existing:
+        if existing["kind"] != payload.channel_kind:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "CHANNEL_IDENTITY_KIND_MISMATCH",
+                    "channel_code": code,
+                    "existing_kind": existing["kind"],
+                    "requested_kind": payload.channel_kind,
+                },
+            )
+        if (
+            existing["externalAccountId"]
+            and payload.external_account_id
+            and existing["externalAccountId"] != payload.external_account_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "CHANNEL_IDENTITY_ACCOUNT_MISMATCH",
+                    "channel_code": code,
+                },
+            )
+        await conn.execute(
+            '''UPDATE communication_channels
+               SET "displayName"=$1,
+                   "externalAccountId"=COALESCE("externalAccountId",$2),
+                   "isActive"=true,"updatedAt"=now()
+               WHERE id=$3''',
+            payload.channel_display_name,
+            payload.external_account_id,
+            existing["id"],
+        )
+        return existing["id"]
+
+    return await conn.fetchval(
+        '''
+        INSERT INTO communication_channels (
+          id,"propertyId",code,kind,"displayName","externalAccountId","isActive",metadata,"createdAt","updatedAt"
+        ) VALUES ($1,$2,$3,$4::"CommunicationChannelKind",$5,$6,true,NULL,now(),now())
+        RETURNING id
+        ''',
+        uuid.uuid4(),
+        pid,
+        code,
+        payload.channel_kind,
+        payload.channel_display_name,
+        payload.external_account_id,
+    )
+
+
 async def ingest_normalized_channel_message(
     payload: NormalizedChannelMessage,
     request: Request,
@@ -71,6 +138,7 @@ async def ingest_normalized_channel_message(
     code = normalized_channel_code(payload.channel_code)
     source = f"INBOX_{code}"[:60]
     message_time = normalized_message_time(payload.sent_at)
+    payload_json = payload.model_dump_json()
     is_inbound = payload.direction == "INBOUND"
     is_confirmed_outbound = (
         payload.direction == "OUTBOUND"
@@ -85,7 +153,7 @@ async def ingest_normalized_channel_message(
 
             existing_event = await conn.fetchrow(
                 '''
-                SELECT "resultResource","resultResourceId"
+                SELECT "eventType","payloadJson","resultResource","resultResourceId"
                 FROM automation_inbound_events
                 WHERE "propertyId"=$1 AND source=$2 AND "idempotencyKey"=$3
                 ''',
@@ -94,11 +162,53 @@ async def ingest_normalized_channel_message(
                 payload.idempotency_key,
             )
             if existing_event:
+                if (
+                    existing_event["eventType"] != "COMMUNICATION_MESSAGE"
+                    or _json_value(existing_event["payloadJson"]) != _json_value(payload_json)
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "INBOX_IDEMPOTENCY_PAYLOAD_MISMATCH",
+                            "channel_code": code,
+                            "idempotency_key": payload.idempotency_key,
+                        },
+                    )
                 return {
                     "idempotent_replay": True,
                     "resource": existing_event["resultResource"],
                     "id": existing_event["resultResourceId"],
                 }
+
+            channel_id = await _stable_channel(conn, pid, code, payload)
+
+            existing_conversation = await conn.fetchrow(
+                '''SELECT id FROM conversations
+                   WHERE "channelId"=$1 AND "externalConversationId"=$2''',
+                channel_id,
+                payload.external_conversation_id,
+            )
+            if existing_conversation and payload.external_message_id:
+                duplicate = await conn.fetchval(
+                    'SELECT id FROM conversation_messages WHERE "conversationId"=$1 AND "externalMessageId"=$2',
+                    existing_conversation["id"],
+                    payload.external_message_id,
+                )
+                if duplicate:
+                    await conn.execute(
+                        '''
+                        INSERT INTO automation_inbound_events (
+                          id,"propertyId",source,"idempotencyKey","eventType","payloadJson","resultResource","resultResourceId","createdAt","updatedAt"
+                        ) VALUES ($1,$2,$3,$4,'COMMUNICATION_MESSAGE',$5::jsonb,'ConversationMessage',$6,now(),now())
+                        ''',
+                        uuid.uuid4(), pid, source, payload.idempotency_key, payload_json, str(duplicate),
+                    )
+                    return {
+                        "idempotent_replay": True,
+                        "resource": "ConversationMessage",
+                        "id": str(duplicate),
+                        "conversation_id": str(existing_conversation["id"]),
+                    }
 
             event_id = uuid.uuid4()
             await conn.execute(
@@ -111,28 +221,7 @@ async def ingest_normalized_channel_message(
                 pid,
                 source,
                 payload.idempotency_key,
-                payload.model_dump_json(),
-            )
-
-            channel = await conn.fetchrow(
-                '''
-                INSERT INTO communication_channels (
-                  id,"propertyId",code,kind,"displayName","externalAccountId","isActive",metadata,"createdAt","updatedAt"
-                ) VALUES ($1,$2,$3,$4::"CommunicationChannelKind",$5,$6,true,NULL,now(),now())
-                ON CONFLICT ("propertyId",code) DO UPDATE SET
-                  kind=EXCLUDED.kind,
-                  "displayName"=EXCLUDED."displayName",
-                  "externalAccountId"=COALESCE(EXCLUDED."externalAccountId",communication_channels."externalAccountId"),
-                  "isActive"=true,
-                  "updatedAt"=now()
-                RETURNING id
-                ''',
-                uuid.uuid4(),
-                pid,
-                code,
-                payload.channel_kind,
-                payload.channel_display_name,
-                payload.external_account_id,
+                payload_json,
             )
 
             conversation = await conn.fetchrow(
@@ -166,41 +255,43 @@ async def ingest_normalized_channel_message(
                   "updatedAt"=now()
                 RETURNING id
                 ''',
-                uuid.uuid4(), pid, channel["id"], payload.external_conversation_id,
+                uuid.uuid4(), pid, channel_id, payload.external_conversation_id,
                 payload.external_contact_id, payload.contact_name, payload.contact_phone,
                 payload.contact_username, is_inbound, is_confirmed_outbound, message_time,
             )
 
-            if payload.external_message_id:
-                duplicate = await conn.fetchval(
-                    'SELECT id FROM conversation_messages WHERE "conversationId"=$1 AND "externalMessageId"=$2',
-                    conversation["id"], payload.external_message_id,
-                )
-                if duplicate:
-                    await conn.execute(
-                        '''UPDATE automation_inbound_events SET "resultResource"='ConversationMessage',"resultResourceId"=$1,"updatedAt"=now() WHERE id=$2''',
-                        str(duplicate), event_id,
-                    )
-                    return {
-                        "idempotent_replay": True,
-                        "resource": "ConversationMessage",
-                        "id": str(duplicate),
-                        "conversation_id": str(conversation["id"]),
-                    }
-
             message_id = uuid.uuid4()
-            await conn.execute(
+            inserted_message = await conn.fetchval(
                 '''
                 INSERT INTO conversation_messages (
                   id,"conversationId",direction,"externalMessageId","senderType","senderExternalId",text,
                   "contentType","deliveryStatus","rawPayload","sentAt","createdAt"
                 ) VALUES ($1,$2,$3::"MessageDirection",$4,$5,$6,$7,$8,$9::"MessageDeliveryStatus",$10::jsonb,$11,now())
+                ON CONFLICT ("conversationId","externalMessageId") DO NOTHING
+                RETURNING id
                 ''',
                 message_id, conversation["id"], payload.direction, payload.external_message_id,
                 payload.sender_type, payload.sender_external_id, payload.text, payload.content_type,
                 payload.delivery_status, json.dumps(payload.raw_payload) if payload.raw_payload is not None else None,
                 message_time,
             )
+            if inserted_message is None:
+                duplicate = await conn.fetchval(
+                    'SELECT id FROM conversation_messages WHERE "conversationId"=$1 AND "externalMessageId"=$2',
+                    conversation["id"], payload.external_message_id,
+                )
+                if not duplicate:
+                    raise HTTPException(status_code=409, detail={"code": "INBOX_MESSAGE_RECONCILIATION_REQUIRED"})
+                await conn.execute(
+                    '''UPDATE automation_inbound_events SET "resultResource"='ConversationMessage',"resultResourceId"=$1,"updatedAt"=now() WHERE id=$2''',
+                    str(duplicate), event_id,
+                )
+                return {
+                    "idempotent_replay": True,
+                    "resource": "ConversationMessage",
+                    "id": str(duplicate),
+                    "conversation_id": str(conversation["id"]),
+                }
 
             await conn.execute(
                 '''UPDATE automation_inbound_events SET "resultResource"='ConversationMessage',"resultResourceId"=$1,"updatedAt"=now() WHERE id=$2''',
