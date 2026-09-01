@@ -3,6 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = (ROOT / "apps/admin/components/AdminExperienceRuntime.tsx").read_text(encoding="utf-8")
+SANITIZER = (ROOT / "apps/admin/components/AdminLocaleSanitizer.tsx").read_text(encoding="utf-8")
 STYLE = (ROOT / "apps/admin/app/admin-experience.css").read_text(encoding="utf-8")
 LAYOUT = (ROOT / "apps/admin/app/layout.tsx").read_text(encoding="utf-8")
 PIN_API = (ROOT / "services/api/app/guest_pin_admin.py").read_text(encoding="utf-8")
@@ -18,7 +19,7 @@ def require(condition: bool, message: str) -> None:
 # The check-in response must be observed from a clone so ReceptionBoard still
 # receives the original body/response unchanged.
 require("response.clone().json()" in RUNTIME, "PIN runtime must inspect a cloned response")
-require("/check-in" in RUNTIME or "check-in" in RUNTIME, "check-in response interception missing")
+require("check-in" in RUNTIME, "check-in response interception missing")
 require("guest_access_pin" in RUNTIME, "one-time PIN field not rendered")
 require("guest_access_pin_display_once" in STAYS, "Core check-in one-time PIN contract missing")
 
@@ -42,6 +43,7 @@ require("localStorage" in RUNTIME and "three-crowns-admin-locale" in RUNTIME, "l
 require("MutationObserver" in RUNTIME, "dynamic React content must be translated")
 require("placeholder" in RUNTIME and "aria-label" in RUNTIME, "form/accessibility text localization missing")
 require("AdminExperienceRuntime" in LAYOUT, "global admin runtime not mounted")
+require("AdminLocaleSanitizer" in LAYOUT, "locale sanitizer not mounted")
 require('import "./admin-experience.css"' in LAYOUT, "final contrast layer not imported")
 
 # Raw machine labels seen during manual acceptance must have locale-aware display mappings.
@@ -67,7 +69,8 @@ require("--tc-admin-white:#fff" in STYLE, "white text token missing")
 require(".dashboard-shell" in STYLE, "dashboard contrast override missing")
 require("color:var(--tc-admin-white)!important" in STYLE, "dashboard white text enforcement missing")
 
-# Guard against the accidental mixed-script typo that would leak into Kyrgyz UI.
-require("КОНok" not in RUNTIME, "mixed Cyrillic/Latin Kyrgyz label leaked")
+# Mixed-script artifacts are actively removed from dynamic locale content.
+require("КОНok" in SANITIZER and "КОНОК" in SANITIZER, "mixed-script Kyrgyz sanitizer missing")
+require("MutationObserver" in SANITIZER, "mixed-script sanitizer must cover dynamic content")
 
 print("PASS: admin Guest OS PIN, locale runtime, and contrast contracts")
