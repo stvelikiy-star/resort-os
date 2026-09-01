@@ -156,7 +156,7 @@ try {
   const bookingBar = page.locator(".owner-booking-bar", { hasText: guestName }).first();
   const bookingText = (await bookingBar.innerText()).replace(/\s+/g, " ").trim();
   assert(bookingText.includes("Опл. 5 000"), `booking bar must show the actual 5000 payment fact, not only the remaining balance: ${JSON.stringify(bookingText)}`);
-  const bookingTitle = await bookingBar.getAttribute("title");
+  const bookingTitle = (await bookingBar.getAttribute("title"))?.replace(/\s+/g, " ").trim();
   assert(bookingTitle?.includes("Оплачено 5 000 сом"), `booking tooltip must preserve paid amount: ${JSON.stringify(bookingTitle)}`);
   assert(bookingTitle?.includes("Остаток"), `booking tooltip must show remaining balance separately: ${JSON.stringify(bookingTitle)}`);
 
