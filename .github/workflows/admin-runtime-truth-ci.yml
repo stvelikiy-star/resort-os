@@ -1,0 +1,42 @@
+name: Admin Runtime Truth CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'scripts/admin_runtime_truth_guard.py'
+      - '.github/workflows/admin-runtime-truth-ci.yml'
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'apps/admin/**'
+      - 'scripts/admin_runtime_truth_guard.py'
+      - '.github/workflows/admin-runtime-truth-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prove normal admin root is authenticated Core-backed PMS
+        run: python scripts/admin_runtime_truth_guard.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - name: Typecheck and build the real admin application
+        working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
