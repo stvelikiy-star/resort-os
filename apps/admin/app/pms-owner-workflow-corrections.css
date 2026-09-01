@@ -106,41 +106,6 @@
   font-size:12px;
 }
 
-/* Presentation labels follow the owner's working grid. Room codes/DB identity are untouched. */
-.owner-room-row:has(.owner-night-cell[data-room-code="101"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="102"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="103"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="104"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="201"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="202"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="302"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="303"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="304"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="305"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="501"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="502"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="311"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="314"]) .owner-room-label strong,
-.owner-room-row:has(.owner-night-cell[data-room-code="421"]) .owner-room-label strong{
-  font-size:0;
-}
-
-.owner-room-row:has(.owner-night-cell[data-room-code="101"]) .owner-room-label strong::after{content:"101-цоколь (1сп+1сп+д)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="102"]) .owner-room-label strong::after{content:"102-цоколь";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="103"]) .owner-room-label strong::after{content:"103-цоколь (1сп+1сп+кр)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="104"]) .owner-room-label strong::after{content:"104-цоколь (1сп+1сп)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="201"]) .owner-room-label strong::after{content:"201-цоколь (2сп+кр)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="202"]) .owner-room-label strong::after{content:"202-цоколь (2сп+д+к) — доп. кровать";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="302"]) .owner-room-label strong::after{content:"302-цоколь (1сп+1сп)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="303"]) .owner-room-label strong::after{content:"303-цоколь (1сп+1сп)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="304"]) .owner-room-label strong::after{content:"304-цоколь (1сп+1сп)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="305"]) .owner-room-label strong::after{content:"305-цоколь (1сп+1сп)";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="501"]) .owner-room-label strong::after{content:"501-(1сп+1сп+крк) прачка мансарда";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="502"]) .owner-room-label strong::after{content:"502-(1сп+1сп+крк) прачка мансарда";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="311"]) .owner-room-label strong::after{content:"311 (2сп+1сп) + кухня";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="314"]) .owner-room-label strong::after{content:"314 (2сп+1сп+д) + кухня";font-size:11px}
-.owner-room-row:has(.owner-night-cell[data-room-code="421"]) .owner-room-label strong::after{content:"421 sea view (2сп+1сп+1сп+д+кр+кр+кр)";font-size:11px}
-
 @media (max-height:800px){
   .owner-grid-scroll{
     max-height:calc(100svh - 205px);
