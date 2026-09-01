@@ -1,6 +1,6 @@
 # THREE CROWNS RESORT OS — LAUNCH ACCEPTANCE
 
-Date: 2026-09-01
+Date: 2026-09-02
 Status: INTERNAL RELEASE CANDIDATE / EXTERNAL CUTOVER STOP
 Canonical: YES
 
@@ -9,12 +9,12 @@ This document separates repository/CI evidence from external production evidence
 ## 1. Current repository boundary
 
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `a99adec0c19af884cace460fcb5866043912e7e1`.
-Observed integration merge: `2e29825feeb3bfc19c0ccd8844ac05359f8fe9eb`.
+Accepted executable head: `3787e8729b84e1ecc41133ab846a909943458306`.
+Observed integration merge: `102a46ef721ee880647ecd6f81024bd744458170`.
 
-The accepted executable head is the exact PR #93 product head after database dependency hardening and completed **21/21 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally failed on that product head because the previous release was frozen; this document and `release/current-rc.json` perform the controlled refreeze after the actual tree-equivalent integration merge existed.
+The accepted executable head is the exact PR #95 product head after Guest OS PIN presentation/reissue and admin RU/KG/EN/contrast hardening and completed **35/35 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally failed on that product head because the previous release was frozen; this document and `release/current-rc.json` perform the controlled refreeze after the actual tree-equivalent integration merge existed.
 
-The successful product contours include Resort Core, Full Staging, Production Package, PMS Final Acceptance, PMS grid/mutation, general frontend/backend dependency security, the dedicated Database Dependency Security CI, realtime, operations, payment idempotency, backup/restore, Staff Auth, AI/n8n and communications contracts.
+The successful product contours include Resort Core, Full Staging, Production Package, PMS Final Acceptance, PMS grid/mutation, Guest OS Core/Access/Requests, Admin Runtime Truth, the dedicated Admin Guest PIN and i18n build/contract gate, frontend/backend/database dependency security, realtime, operations, payment idempotency, backup/restore, AI/n8n and communications contracts.
 
 The observed integration merge has **0 changed files** versus the tested executable head. The machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
@@ -51,6 +51,8 @@ The repository contains and CI exercises:
 - Reception/Admin RBAC;
 - canonical Stay and RoomAssignment lifecycle;
 - Room QR / PIN / GuestSession access;
+- one-time Guest OS PIN surfaced at check-in and secure PIN reissue for active checked-in stays;
+- global Admin RU/KG/EN locale runtime for operational labels/status/audit presentation and high-contrast dashboard override;
 - Guest OS requests and Staff role routing;
 - Guest CRM factual Stay/relocation/history/preferences;
 - Guest Services Center;
