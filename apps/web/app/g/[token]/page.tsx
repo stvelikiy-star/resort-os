@@ -13,5 +13,8 @@ export const metadata: Metadata = {
 
 export default async function GuestOsPage({ params }: GuestOsPageProps) {
   const { token } = await params;
-  return <GuestConciergeRuntime token={token} />;
+  return <>
+    <GuestConciergeRuntime token={token} />
+    <style>{`.concierge-page ~ .ai-admin-root{display:none!important}`}</style>
+  </>;
 }
