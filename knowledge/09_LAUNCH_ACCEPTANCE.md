@@ -9,10 +9,12 @@ This document separates repository/CI evidence from external production evidence
 ## 1. Current repository boundary
 
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `7f0c5c56e2dae4809d4c4996221f99fe2a0a82a9`.
-Observed integration merge: `79fe6fef880f60f7abb1ff0a70f1afefe3aa26f3`.
+Accepted executable head: `a99adec0c19af884cace460fcb5866043912e7e1`.
+Observed integration merge: `2e29825feeb3bfc19c0ccd8844ac05359f8fe9eb`.
 
-The accepted executable head is the exact PR #89 head and completed **17/17 triggered workflow contours successfully, 0 failures**, including Resort Core, Full Staging, Production Package, dependency security, realtime, operations, backup/restore and External Staging Acceptance Contract CI.
+The accepted executable head is the exact PR #93 product head after database dependency hardening and completed **21/21 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally failed on that product head because the previous release was frozen; this document and `release/current-rc.json` perform the controlled refreeze after the actual tree-equivalent integration merge existed.
+
+The successful product contours include Resort Core, Full Staging, Production Package, PMS Final Acceptance, PMS grid/mutation, general frontend/backend dependency security, the dedicated Database Dependency Security CI, realtime, operations, payment idempotency, backup/restore, Staff Auth, AI/n8n and communications contracts.
 
 The observed integration merge has **0 changed files** versus the tested executable head. The machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
@@ -36,6 +38,8 @@ Production migration mechanism: `npx prisma migrate deploy`.
 
 Critical PostgreSQL constraint fingerprint is maintained in `scripts/release_contract.py` and currently contains 27 constraints.
 
+The database Node toolchain is also part of the release security boundary: `prisma` and `@prisma/client` are pinned exactly to `6.12.0`, `packages/database/package-lock.json` is committed, deterministic `npm ci` is required, and `Database Dependency Security CI` gates HIGH/CRITICAL npm findings plus Prisma schema validation/client generation.
+
 ## 3. What is repository/CI verified
 
 The repository contains and CI exercises:
@@ -55,7 +59,8 @@ The repository contains and CI exercises:
 - unified inbox, AI draft authority boundary and n8n contracts;
 - anonymous Service Point QR operations;
 - migration baseline and backup -> clean restore;
-- dependency/security inspections;
+- frontend/backend dependency security inspections;
+- database Prisma dependency security, exact pins and deterministic lockfile;
 - single-server production package and CI-local Full Staging;
 - exact Git SHA -> deployed image linkage contract;
 - mutating staging acceptance production-safety guard;
