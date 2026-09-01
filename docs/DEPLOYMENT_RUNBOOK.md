@@ -17,10 +17,12 @@ Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md`.
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Integration head after Block 11 merge: `91699f70f774726eb61a9882ccbdfe5944471856`.
-Audited feature head: `7e8193447fc09dff2c375b5aa63ce4573e8210a8`.
+Current integration release candidate before this documentation-only launch-gate audit: `42798b3fd360b5f5a6a4eb2124b1231702c99eea`.
+Tested PR #84 exact head: `da3cc80f3c13973f799c01ddd8ad64ed79c17f6f`.
 
-The audited feature head completed **37/37 pull-request workflow contours successfully** before merge. The merge commit contains the reviewed tree but does not itself constitute external acceptance.
+The integration merge commit has **0 changed files** versus that tested exact head. PR #84 completed **20/20 triggered workflows successfully**, including Resort Core, Full Staging Gate, Public Browser Acceptance, Public Site Truth, Single Server Production Package, security, realtime, operations, backup/restore and the dedicated Site Content Runtime regression. Earlier closed product gates retain their own exact-head CI evidence.
+
+This repository evidence does not constitute external Beget staging or production acceptance.
 
 Key verified contours include:
 
@@ -123,9 +125,11 @@ Growth outbound authority remains `NONE_AUTOMATIC`.
 
 ## 5. Hard external production blockers
 
-Production cutover remains **STOP** while any required evidence is missing:
+Issue #38 physical room truth/import safety is already **CLOSED / COMPLETED**. The canonical 84-room / 12-category register and fail-closed importer contract are no longer an owner-questionnaire blocker.
 
-1. owner-approved physical 84-room production register;
+Production cutover remains **STOP** while any required external evidence is missing:
+
+1. real staging database reconciliation against the closed #38 canonical 84-room register, with importer dry-run and diff review before apply;
 2. actual Beget host/account non-destructive preflight;
 3. verified full rollback backup of currently live `3korony.com` target;
 4. isolated external HTTPS/WSS staging on real infrastructure;
@@ -137,7 +141,7 @@ Production cutover remains **STOP** while any required evidence is missing:
 10. exact DNS rollback capture;
 11. explicit final owner cutover approval.
 
-The 84-room development seed is not owner approval of the physical production register.
+Do not ask for or reconstruct a new room register. External reconciliation must use the canonical closed #38 evidence and must fail closed on drift.
 
 No GitHub CI result by itself authorizes production DNS switch or provider activation.
 
@@ -219,12 +223,13 @@ Sequence:
 4. provision persistent storage/volumes;
 5. start private PostgreSQL;
 6. apply all seven committed migrations;
-7. load only approved/evidence-backed production data;
-8. bootstrap authorized users out-of-band;
-9. build/pull the exact accepted release;
-10. start Caddy + web/admin/staff/Core + n8n as required;
-11. keep PostgreSQL private;
-12. verify readiness, HTTPS, WSS, cookies, CORS and persistence externally.
+7. run the canonical physical-room importer against the staging database in dry-run mode, review the exact diff against the closed #38 84-room register, then apply only the reviewed reconciliation;
+8. load other approved/evidence-backed production data;
+9. bootstrap authorized users out-of-band;
+10. build/pull the exact accepted release;
+11. start Caddy + web/admin/staff/Core + n8n as required;
+12. keep PostgreSQL private;
+13. verify readiness, HTTPS, WSS, cookies, CORS and persistence externally.
 
 ---
 
@@ -368,7 +373,7 @@ Rollback is not available merely because older code exists in Git.
 
 ### GO — repository release-candidate engineering
 
-Current repository has a reviewed Block 11 tree with 37/37 PR workflow contours successful and a verified seven-migration/27-constraint release contract.
+Current repository has a CI-verified internal release-candidate tree, a verified seven-migration/27-constraint release contract, closed Security #42 and closed physical room import gate #38. This documentation-only launch-gate audit must still pass its own exact-head CI before merge.
 
 ### STOP — external production cutover
 
