@@ -1,0 +1,52 @@
+name: Staging Acceptance Safety CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'scripts/staging_acceptance.py'
+      - 'scripts/staging_acceptance_impl.py'
+      - 'scripts/staging_acceptance_safety_contract_test.py'
+      - '.github/workflows/staging-acceptance-safety-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-acceptance-safety:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile wrapper and preserved staging implementation
+        run: python -m py_compile scripts/staging_acceptance.py scripts/staging_acceptance_impl.py scripts/staging_acceptance_safety_contract_test.py
+
+      - name: Run adversarial mutation safety contract
+        run: PYTHONPATH=scripts python scripts/staging_acceptance_safety_contract_test.py
+
+      - name: Verify production target remains fail closed before network writes
+        shell: bash
+        run: |
+          set +e
+          APP_ENV=production \
+          CORE_API_URL=https://api.3korony.com \
+          STAGING_ACCEPTANCE_MUTATIONS=I_UNDERSTAND_SYNTHETIC_WRITES \
+          python scripts/staging_acceptance.py >/tmp/staging-safety.out 2>/tmp/staging-safety.err
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          grep -q 'Unsafe staging acceptance target' /tmp/staging-safety.err
+          grep -q 'APP_ENV must be exactly staging' /tmp/staging-safety.err
+          grep -q 'hostname must explicitly contain staging' /tmp/staging-safety.err
+
+      - name: Verify wrapper delegates only after safety gate
+        shell: bash
+        run: |
+          grep -F 'require_safe_staging_target(base_url)' scripts/staging_acceptance.py >/dev/null
+          grep -F 'from staging_acceptance_impl import main as smoke_main' scripts/staging_acceptance.py >/dev/null
