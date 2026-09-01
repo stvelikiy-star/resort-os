@@ -23,8 +23,6 @@ EOF
 cat > "$TMP/bin/docker" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-# The backup script redirects this stdout to postgres.dump in both compose and
-# external-URL modes.
 printf 'FAKE-POSTGRES-CUSTOM-DUMP\n'
 EOF
 chmod +x "$TMP/bin/docker"
@@ -64,16 +62,21 @@ grep -q '^OFFSITE_BACKUP=VERIFIED_UPLOAD$' "$OUTPUT"
 grep -q 'three-crowns-backups/production/' "$TMP/curl.log"
 grep -q -- '--upload-file' "$TMP/curl.log"
 grep -q -- '--head' "$TMP/curl.log"
-if grep -q 'TESTSECRETKEY' "$OUTPUT"; then
-  echo 'Secret leaked to backup stdout' >&2
+test -s "$TMP/backups/last-success.env"
+grep -q '^OFFSITE_STATUS=VERIFIED_UPLOAD$' "$TMP/backups/last-success.env"
+grep -q "^TARGET=$TARGET$" "$TMP/backups/last-success.env"
+grep -Eq '^COMPLETED_AT=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$' "$TMP/backups/last-success.env"
+if grep -q 'TESTSECRETKEY' "$OUTPUT" "$TMP/backups/last-success.env"; then
+  echo 'Secret leaked to backup output/receipt' >&2
   exit 1
 fi
-if find "$TMP/backups" -type f -name '*env*' | grep -q .; then
+if find "$TMP/backups" -type f -name '*env*' ! -name 'last-success.env' | grep -q .; then
   echo 'Environment file leaked into backup directory' >&2
   exit 1
 fi
 
-# The pre-existing single-server Compose mode must remain functional.
+# The pre-existing single-server Compose mode must remain functional and must
+# record LOCAL_ONLY rather than pretending an off-site copy exists.
 cat > "$TMP/root/.env.production.compose" <<'EOF'
 DB_BACKUP_MODE=compose
 POSTGRES_DB=resort_os
@@ -90,8 +93,10 @@ bash "$ROOT/scripts/production_backup.sh" > "$TMP/compose-output.txt"
 COMPOSE_TARGET="$(find "$TMP/backups-compose" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
 test -s "$COMPOSE_TARGET/postgres.dump"
 grep -q 'WARN: off-site S3 backup not configured' "$TMP/compose-output.txt"
+grep -q '^OFFSITE_STATUS=LOCAL_ONLY$' "$TMP/backups-compose/last-success.env"
 
-# Required off-site mode must fail closed when S3 settings are incomplete.
+# Required off-site mode must fail closed when S3 settings are incomplete and
+# must not create a false success receipt.
 cat > "$TMP/root/.env.production.missing-s3" <<'EOF'
 DB_BACKUP_MODE=url
 PG_DUMP_DATABASE_URL=postgresql://resort:secret@db.example.invalid:5432/resort_os?sslmode=require
@@ -102,9 +107,10 @@ if PATH="$TMP/bin:$PATH" ROOT_DIR="$TMP/root" ENV_FILE="$TMP/root/.env.productio
   exit 1
 fi
 grep -q 'OFFSITE_BACKUP_REQUIRED=true' /tmp/three-crowns-backup-missing.err
+test ! -e "$TMP/backups-missing/last-success.env"
 
 # pg_dump URL must reject Prisma-only schema= in DBaaS mode instead of silently
-# passing an invalid libpq URL to pg_dump.
+# passing an invalid libpq URL to pg_dump, and must not advance the receipt.
 cat > "$TMP/root/.env.production.bad-url" <<'EOF'
 DB_BACKUP_MODE=url
 PG_DUMP_DATABASE_URL=postgresql://resort:secret@db.example.invalid:5432/resort_os?schema=public&sslmode=require
@@ -115,5 +121,6 @@ if PATH="$TMP/bin:$PATH" ROOT_DIR="$TMP/root" ENV_FILE="$TMP/root/.env.productio
   exit 1
 fi
 grep -q 'must not contain Prisma-only schema=' /tmp/three-crowns-backup-bad.err
+test ! -e "$TMP/backups-bad-url/last-success.env"
 
-echo 'PASS: production backup supports DBaaS + required S3, preserves compose mode and fails closed on unsafe configuration'
+echo 'PASS: production backup persists truthful success receipt, supports DBaaS + required S3, preserves compose mode and fails closed on unsafe configuration'
