@@ -1,0 +1,42 @@
+name: Release RC Truth CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-rc-truth:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile RC truth guard
+        run: python -m py_compile scripts/release_rc_truth_guard.py
+
+      - name: Verify frozen release candidate truth
+        run: python scripts/release_rc_truth_guard.py
+
+      - name: Verify main is not declared as production source
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          rc = json.load(open('release/current-rc.json', encoding='utf-8'))
+          assert rc['production_source_branch'] == 'integration/site-pms-cms-20260827'
+          assert rc['main_allowed_as_production_source'] is False
+          print('PASS: main is not production source')
+          PY
