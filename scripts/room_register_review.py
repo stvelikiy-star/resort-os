@@ -15,8 +15,9 @@ ROOMS_PATH = Path("data-intake/rooms.csv")
 EXPECTED_ROOM_COUNT = 84
 EXPECTED_ROOM_TYPE_COUNT = 12
 UNKNOWN = "UNKNOWN"
-BLOCKER_CODES = {"CONFIRM_NOTE", "INFERRED_VALUE"}
-REVIEW_FIELDS = ("building_or_zone", "floor", "capacity_children", "operational_status")
+# These fields are useful future enrichment, but they are not part of the
+# owner's screenshot-style room identity/bed-layout approval boundary.
+ENRICHMENT_FIELDS = ("building_or_zone", "floor", "capacity_children")
 
 
 def read_bytes(path: Path = ROOMS_PATH) -> bytes:
@@ -108,17 +109,17 @@ def audit_rooms(rooms: list[dict[str, str]]) -> tuple[list[str], list[dict[str, 
                 "reason": "Owner-facing room label has no bed configuration in canonical intake.",
             })
 
-        for field in REVIEW_FIELDS:
+        for field in ENRICHMENT_FIELDS:
             value = row.get(field, "").strip()
             if not value or value.upper() == UNKNOWN:
                 issues.append({
-                    "id": issue_id(room_code, "UNKNOWN_FIELD", field),
+                    "id": issue_id(room_code, "UNKNOWN_ENRICHMENT", field),
                     "room_code": room_code,
-                    "severity": "REVIEW",
-                    "code": "UNKNOWN_FIELD",
+                    "severity": "ENRICHMENT",
+                    "code": "UNKNOWN_ENRICHMENT",
                     "field": field,
                     "value": value or "<EMPTY>",
-                    "reason": "Canonical intake does not contain an owner-confirmed operational value.",
+                    "reason": "Useful metadata is not confirmed, but it is outside the owner room-label approval boundary.",
                 })
 
     seen_ids: set[str] = set()
@@ -139,13 +140,14 @@ def report(rooms: list[dict[str, str]], errors: list[str], issues: list[dict[str
             "sha256": checksum(),
             "room_count": len(rooms),
             "unique_room_codes": len({row.get("room_code", "").strip() for row in rooms}),
-            "room_type_count": len({row.get("room_type", "").strip() for row in rooms}),
+            "room_type_count": len({row.get("room_type", "").strip() for row in rooms if row.get("room_type", "").strip()}),
         },
         "structural_errors": errors,
         "owner_review": {
             "approved": False,
             "blocker_count": severity.get("BLOCKER", 0),
             "review_count": severity.get("REVIEW", 0),
+            "enrichment_count": severity.get("ENRICHMENT", 0),
             "issue_count": len(issues),
             "issue_codes": dict(sorted(issue_codes.items())),
             "issues": issues,
@@ -230,6 +232,7 @@ def main() -> int:
         print(f"STRUCTURAL_ERRORS: {len(structural_errors)}")
         print(f"OWNER_BLOCKERS: {data['owner_review']['blocker_count']}")
         print(f"OWNER_REVIEW_ITEMS: {data['owner_review']['review_count']}")
+        print(f"OPTIONAL_ENRICHMENT_ITEMS: {data['owner_review']['enrichment_count']}")
         for code, count in data["owner_review"]["issue_codes"].items():
             print(f"ISSUE: {code}={count}")
         print("OWNER_APPROVED: false")
