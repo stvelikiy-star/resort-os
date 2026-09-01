@@ -1,0 +1,51 @@
+name: Audit Database Dependencies
+
+on:
+  push:
+    branches:
+      - audit/export-complete-project-20260901
+
+permissions:
+  contents: read
+
+jobs:
+  database-npm-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact frozen integration commit
+        uses: actions/checkout@v4
+        with:
+          ref: b44ddd2baf413727dfc72f19bc1b4f189518a188
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install exact database lockfile
+        working-directory: packages/database
+        run: npm ci
+      - name: Capture npm audit JSON
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > /tmp/database-audit.json
+          rc=$?
+          set -e
+          python3 - <<'PY'
+          import json
+          p='/tmp/database-audit.json'
+          data=json.load(open(p,encoding='utf-8'))
+          print('metadata=', json.dumps(data.get('metadata',{}), sort_keys=True))
+          vulns=data.get('vulnerabilities',{}) or {}
+          for name,spec in sorted(vulns.items()):
+              sev=spec.get('severity')
+              if sev in {'high','critical'}:
+                  print('VULNERABILITY', name, 'severity='+str(sev), 'isDirect='+str(spec.get('isDirect')), 'range='+str(spec.get('range')), 'fixAvailable='+json.dumps(spec.get('fixAvailable'), sort_keys=True))
+                  for via in spec.get('via',[]):
+                      if isinstance(via,dict):
+                          print('ADVISORY', via.get('source'), via.get('name'), via.get('severity'), via.get('title'), via.get('range'), via.get('url'))
+                      else:
+                          print('VIA', via)
+          PY
+          exit 0
