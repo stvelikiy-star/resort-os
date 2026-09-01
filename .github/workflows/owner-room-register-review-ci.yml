@@ -1,0 +1,51 @@
+name: Owner Room Register Review CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'data-intake/rooms.csv'
+      - 'data-intake/OWNER_ROOM_REGISTER_REVIEW.md'
+      - 'data-intake/room-register-owner-approval.example.json'
+      - 'scripts/room_register_review.py'
+      - 'scripts/room_register_review_test.py'
+      - '.github/workflows/owner-room-register-review-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-room-register-review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile review tooling
+        run: python -m compileall scripts/room_register_review.py scripts/room_register_review_test.py
+
+      - name: Validate canonical 84-room review state
+        run: python scripts/room_register_review.py --format summary
+
+      - name: Run owner-review verifier tests
+        run: python scripts/room_register_review_test.py
+
+      - name: Prove committed approval template remains fail-closed
+        shell: bash
+        run: |
+          set +e
+          output="$(python scripts/room_register_review.py \
+            --require-owner-approved \
+            --approval data-intake/room-register-owner-approval.example.json 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo 'FAIL: committed example unexpectedly approved physical room register'
+            exit 1
+          fi
+          grep -q 'RESULT: OWNER ROOM REGISTER NOT APPROVED' <<<"$output"
