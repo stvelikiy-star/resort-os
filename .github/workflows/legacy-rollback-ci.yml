@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/legacy_rollback_capture.py'
       - 'scripts/legacy_rollback_verify.py'
+      - 'scripts/legacy_rollback_gate.py'
       - 'scripts/legacy_rollback_contract_test.py'
       - '.github/workflows/legacy-rollback-ci.yml'
   workflow_dispatch:
@@ -32,11 +33,12 @@ jobs:
           python -m compileall \
             scripts/legacy_rollback_capture.py \
             scripts/legacy_rollback_verify.py \
+            scripts/legacy_rollback_gate.py \
             scripts/legacy_rollback_contract_test.py
       - name: Run fail-closed rollback contract
         run: |
           python scripts/legacy_rollback_contract_test.py | tee /tmp/legacy-rollback-contract.txt
-          grep -F 'PASS: legacy rollback capture is non-destructive' /tmp/legacy-rollback-contract.txt
+          grep -F 'PASS: legacy rollback capture/verify/final gate' /tmp/legacy-rollback-contract.txt
       - name: Upload rollback contract evidence
         if: always()
         uses: actions/upload-artifact@v4
