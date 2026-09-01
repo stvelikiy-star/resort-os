@@ -184,6 +184,7 @@ jobs:
           sha256sum -c migration.sql.sha256
           cd ../../..
           test -s prisma/migrations/5_guest_os_core/migration.sql
+          test -s prisma/migrations/6_service_point_qr_operations/migration.sql
           npx prisma migrate deploy
           npx prisma migrate status
 
@@ -211,8 +212,11 @@ jobs:
           guest_engagement_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.guest_engagements')::text")"
           guest_engagement_constraints="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname in ('guest_engagements_property_fkey','guest_engagements_guest_fkey','guest_engagements_reservation_fkey','guest_engagements_kind_check','guest_engagements_status_check','guest_engagements_score_check','guest_engagements_score_kind_check','guest_engagements_feedback_reservation_check')")"
           guest_os_tables="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('stays','room_assignments','room_qrs','guest_sessions','guest_history_events','guest_preferences')")"
-          test "$migration_count" = '6'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core'
+          service_point_tables="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('service_points','service_point_request_options','service_point_qrs')")"
+          service_point_checks="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname in ('service_points_category_check','service_point_qrs_revocation_check','operational_tasks_service_point_context_check')")"
+          service_point_active_qr_unique="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_qrs' and indexname='service_point_qrs_one_active_per_point'")"
+          test "$migration_count" = '7'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations'
           test "$constraint_count" = '13'
           test "$room_count" = '84'
           test "$room_type_count" = '12'
@@ -223,6 +227,9 @@ jobs:
           test "$guest_engagement_table" = 'guest_engagements'
           test "$guest_engagement_constraints" = '8'
           test "$guest_os_tables" = '6'
+          test "$service_point_tables" = '3'
+          test "$service_point_checks" = '3'
+          test "$service_point_active_qr_unique" = '1'
 
       - name: Enforce release scope and public truth guards
         run: |
