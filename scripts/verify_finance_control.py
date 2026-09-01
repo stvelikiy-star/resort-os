@@ -284,7 +284,7 @@ def main() -> None:
     req_id, quoted_total = create_and_quote(owner, f"require-{suffix}", today + timedelta(days=3), today + timedelta(days=5))
     before = asyncio.run(request_side_effects(req_id))
     assert before["payment_count"] == 0 and before["reservation_count"] == 0
-    required_amount = max(1, quoted_total // 3)
+    required_amount = max(2, quoted_total // 3)
     status, requirement = call(
         "POST",
         f"/api/v1/admin/finance/requests/{req_id}/payment-requirement",
@@ -320,6 +320,38 @@ def main() -> None:
         422,
         "PAYMENT_REQUIREMENT_EXCEEDS_QUOTE",
     )
+
+    # A manager-set requirement is a real gate: lower payment cannot silently convert the request.
+    assert_error(
+        confirm_request_payment(
+            owner,
+            req_id,
+            amount=required_amount - 1,
+            key=f"finance-require-low-{suffix}",
+            external_ref=f"FIN-REQUIRE-LOW-{suffix}",
+        ),
+        409,
+        "PAYMENT_BELOW_MANAGER_REQUIREMENT",
+    )
+    unchanged = asyncio.run(request_side_effects(req_id))
+    assert unchanged["status"] == "AWAITING_PREPAYMENT"
+    assert int(unchanged["requiredPrepaymentKgs"]) == required_amount
+    assert unchanged["payment_count"] == 0 and unchanged["reservation_count"] == 0
+
+    status, requirement_conversion = confirm_request_payment(
+        owner,
+        req_id,
+        amount=required_amount,
+        key=f"finance-require-ok-{suffix}",
+        external_ref=f"FIN-REQUIRE-OK-{suffix}",
+    )
+    assert status == 201, (status, requirement_conversion)
+    assert requirement_conversion["required_prepayment_kgs"] == required_amount
+    assert requirement_conversion["manager_requirement_applied"] is True
+    converted_requirement = asyncio.run(request_side_effects(req_id))
+    assert converted_requirement["status"] == "CONVERTED"
+    assert int(converted_requirement["requiredPrepaymentKgs"]) == required_amount
+    assert converted_requirement["payment_count"] == 1 and converted_requirement["reservation_count"] == 1
 
     # 2. Partial payments + idempotency + external-ref conflict.
     debt_request, debt_quote = create_and_quote(owner, f"debt-{suffix}", today, today + timedelta(days=2))
@@ -483,8 +515,8 @@ def main() -> None:
     assert recent["recorded_by_staff_id"]
 
     print(
-        "PASS: finance control reconciles manager terms, idempotent payments, debtors, "
-        "checked-out balances, exceptions and Asia/Bishkek reporting boundaries"
+        "PASS: finance control reconciles manager terms, enforced payment requirements, idempotent payments, "
+        "debtors, checked-out balances, exceptions and Asia/Bishkek reporting boundaries"
     )
 
 
