@@ -108,13 +108,20 @@ def repository_checks(root: Path) -> list[str]:
     errors: list[str] = []
     current_state = (root / "knowledge" / "04_CURRENT_STATE.md").read_text(encoding="utf-8")
     runbook = (root / "docs" / "DEPLOYMENT_RUNBOOK.md").read_text(encoding="utf-8")
+    migration_doc = (root / "docs" / "PRODUCTION_DATABASE_MIGRATIONS.md").read_text(encoding="utf-8")
     example = json.loads((root / "release" / "launch-evidence.example.json").read_text(encoding="utf-8"))
 
-    joined = current_state + "\n" + runbook
+    canonical_docs = {
+        "knowledge/04_CURRENT_STATE.md": current_state,
+        "docs/DEPLOYMENT_RUNBOOK.md": runbook,
+        "docs/PRODUCTION_DATABASE_MIGRATIONS.md": migration_doc,
+    }
+    joined = "\n".join(canonical_docs.values())
     stale_fragments = (
         "exact five-migration ledger",
         "all five migrations",
         "apply all five committed migrations",
+        "baseline SQL itself is **not yet committed/executed/verified**",
         "Persisted canonical Stay, generic tenancy",
         "PR #37",
         "1be110c35e1e7d5876cae40a1b58cef42bd10a22",
@@ -123,13 +130,15 @@ def repository_checks(root: Path) -> list[str]:
         if fragment in joined:
             errors.append(f"stale release statement remains in canonical docs: {fragment}")
 
-    for migration in EXPECTED_MIGRATIONS:
-        if migration not in current_state or migration not in runbook:
-            errors.append(f"canonical docs must include migration {migration}")
+    for path, content in canonical_docs.items():
+        for migration in EXPECTED_MIGRATIONS:
+            if migration not in content:
+                errors.append(f"{path} must include migration {migration}")
+
+    if "27" not in migration_doc or "scripts/release_contract.py" not in migration_doc:
+        errors.append("production migration documentation must reference the current shared 27-constraint release contract")
 
     manifest_errors = validate_manifest(example)
-    # The committed example must be structurally valid but deliberately fail the
-    # cutover gate because external evidence is absent.
     structural_errors = [
         item
         for item in manifest_errors
