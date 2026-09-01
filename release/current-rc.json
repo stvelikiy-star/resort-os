@@ -2,12 +2,12 @@
   "schema_version": 1,
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
   "source_branch": "integration/site-pms-cms-20260827",
-  "accepted_executable_head": "3787e8729b84e1ecc41133ab846a909943458306",
-  "observed_integration_merge": "102a46ef721ee880647ecd6f81024bd744458170",
+  "accepted_executable_head": "0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c",
+  "observed_integration_merge": "a6c7ff603ad829a82f9d6c80d46425f0f58b50ec",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 35,
-    "success": 35,
+    "triggered": 43,
+    "success": 43,
     "failures": 0
   },
   "production_source_branch": "integration/site-pms-cms-20260827",
@@ -16,10 +16,12 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "The accepted executable head is the exact PR #95 product head adding one-time Guest OS PIN presentation/reissue, global admin RU/KG/EN runtime localization and dashboard contrast hardening. It passed 35/35 executable acceptance/security/regression contours; the RC truth workflow intentionally failed on that product head because the previous RC was frozen until a real tree-equivalent integration merge existed.",
+    "The accepted executable head is the exact PR #98 product/release head adding the Core-backed Kitchen domain, Kitchen Admin, editable draft menu, factual table register, Kitchen order workflow, Guest OS ordering and transactional check-in arrival routing while preserving accommodation finance authority boundaries.",
+    "The exact accepted head completed 43/43 non-RC product, acceptance, security, migration, backup/restore, staging and packaging workflows successfully with zero failures. Release RC Truth intentionally failed before merge because the previous RC was still frozen.",
     "The observed integration merge has zero file differences versus the tested executable head.",
-    "Guest PIN reissue is restricted to OWNER/MANAGER/RECEPTION, requires CHECKED_IN plus ACTIVE stay, stores only the PBKDF2 hash, returns plaintext once and writes an audit event.",
-    "Admin build/typecheck and the dedicated PIN/i18n/contrast contract passed on the exact accepted executable head.",
+    "The canonical database release ledger now contains exactly eight migrations ending in 7_kitchen_operations.",
+    "KitchenOrder totals are operational amounts only: no automatic Hotel Payment creation and no automatic Reservation.totalKgs mutation.",
+    "The provisional Kitchen menu is intentionally editable/replaceable from Kitchen Admin; physical table inventory is entered factually and is not fabricated in code.",
     "Release-hygiene files may change without changing executable product truth.",
     "CI success does not constitute external Beget or production evidence."
   ]
