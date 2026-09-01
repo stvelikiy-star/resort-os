@@ -207,10 +207,13 @@ def report(
             "source_sheet": checklist["source"]["sheet"],
             "question_count": len(questions),
             "question_ids": [item["id"] for item in questions],
-            "captured_status": "OPEN / owner_confirmed=NO for all 84 rows",
+            "captured_status": (
+                "HISTORICAL DRIVE SNAPSHOT: ROOMS_IMPORT owner_confirmed=NO and OWNER_CHECKLIST answers blank at capture time; "
+                "production authority is the later checksum-bound approval when its verifier passes"
+            ),
         },
         "owner_review": {
-            "approved": False,
+            "approved": None,
             "blocker_count": severity.get("BLOCKER", 0),
             "review_group_count": severity.get("REVIEW", 0),
             "policy_review_group_count": severity.get("POLICY_REVIEW", 0),
@@ -218,7 +221,10 @@ def report(
             "issue_codes": dict(sorted(issue_codes.items())),
             "issues": issues,
         },
-        "truth_boundary": "84 unique development rows != owner-approved physical production register",
+        "truth_boundary": (
+            "Canonical 84-room data requires checksum-bound owner-approval verification before production reconciliation; "
+            "acknowledged optional UNKNOWN values are not inferred."
+        ),
     }
 
 
@@ -299,6 +305,31 @@ def main() -> int:
     structural_errors.extend(audit_checklist(checklist))
     data = report(rooms, structural_errors, issues, checklist)
 
+    approval: dict[str, Any] | None = None
+    approval_errors: list[str] = []
+    approval_verified = False
+    if args.require_owner_approved:
+        if not args.approval:
+            approval_errors = ["--approval is required with --require-owner-approved"]
+        else:
+            try:
+                approval = json.loads(Path(args.approval).read_text(encoding="utf-8"))
+                approval_errors = validate_owner_approval(approval, rooms, structural_errors, issues, checklist)
+                approval_verified = not approval_errors
+            except (OSError, json.JSONDecodeError) as exc:
+                approval_errors = [f"approval evidence could not be loaded: {exc}"]
+
+    data["owner_review"]["approved"] = approval_verified if args.require_owner_approved else None
+    if approval is not None:
+        data["owner_review"]["approval_evidence"] = {
+            "status": approval.get("status"),
+            "rooms_sha256": approval.get("rooms_sha256"),
+            "room_count": approval.get("room_count"),
+            "approved_by": approval.get("approved_by"),
+            "approved_at": approval.get("approved_at"),
+            "evidence_ref": approval.get("evidence_ref"),
+        }
+
     if args.format == "json":
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -311,9 +342,18 @@ def main() -> int:
         print(f"OWNER_POLICY_REVIEW_GROUPS: {data['owner_review']['policy_review_group_count']}")
         for code, count in data["owner_review"]["issue_codes"].items():
             print(f"ISSUE: {code}={count}")
-        print("OWNER_APPROVED: false")
-        print("DRIVE_CAPTURE: all 84 ROOMS_IMPORT rows owner_confirmed=NO; P0/P1 answers blank")
-        print("TRUTH: 84 unique development rows do not equal owner-approved physical production register")
+        if args.require_owner_approved:
+            print(f"OWNER_APPROVED: {'true' if approval_verified else 'false'}")
+            print("DRIVE_CAPTURE: historical provenance retained; checksum-bound approval is current V1 authority")
+            print(
+                "TRUTH: canonical 84-room register is owner-approved for V1; acknowledged optional UNKNOWN values remain unfilled"
+                if approval_verified
+                else "TRUTH: canonical production authority has not passed checksum-bound approval verification"
+            )
+        else:
+            print("OWNER_APPROVED: unverified (no approval evidence was required for this report)")
+            print("DRIVE_CAPTURE: historical provenance retained; this report alone does not authorize production")
+            print("TRUTH: checksum-bound approval must be verified before production reconciliation")
 
     if structural_errors:
         for item in structural_errors:
@@ -321,11 +361,6 @@ def main() -> int:
         return 1
 
     if args.require_owner_approved:
-        if not args.approval:
-            print("FAIL: --approval is required with --require-owner-approved", file=sys.stderr)
-            return 1
-        approval = json.loads(Path(args.approval).read_text(encoding="utf-8"))
-        approval_errors = validate_owner_approval(approval, rooms, structural_errors, issues, checklist)
         if approval_errors:
             for item in approval_errors:
                 print(f"FAIL: {item}", file=sys.stderr)
