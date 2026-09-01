@@ -198,7 +198,7 @@ def main() -> None:
         code=wa_code,
         conversation=f"whatsapp-conversation-{suffix}",
         message=f"whatsapp-outbound-{suffix}-queued",
-        text="Queued draft",
+        text="Queued provider reply",
         direction="OUTBOUND",
         delivery="QUEUED",
     )
@@ -206,21 +206,35 @@ def main() -> None:
     assert queued_result["counts_as_response"] is False
     assert conversation(owner, wa_conversation_id)["conversation"]["needs_reply"] is True
 
-    # SENT provider evidence clears needs_reply.
-    sent = normalized_message(
-        kind="WHATSAPP",
-        code=wa_code,
-        conversation=f"whatsapp-conversation-{suffix}",
-        message=f"whatsapp-outbound-{suffix}-sent",
-        text="Provider-confirmed reply",
-        direction="OUTBOUND",
-        delivery="SENT",
-    )
-    sent_result = ingest(service, sent)
-    assert sent_result["counts_as_response"] is True
-    after_sent = conversation(owner, wa_conversation_id)
-    assert after_sent["conversation"]["needs_reply"] is False
-    assert after_sent["conversation"]["first_response_at"] is not None
+    # The provider message id is immutable: a new idempotency key cannot rewrite message content.
+    provider_collision = dict(queued)
+    provider_collision["idempotency_key"] = f"block10:{wa_code}:provider-collision:{suffix}"
+    provider_collision["text"] = "Different content behind same provider message id"
+    collision = service.post("/api/v1/automation/inbox/messages", json=provider_collision)
+    assert collision.status_code == 409, collision.text
+    assert detail_code(collision) == "PROVIDER_MESSAGE_IDENTITY_MISMATCH", collision.text
+
+    # A legitimate delivery receipt may upgrade the same provider message from QUEUED -> SENT.
+    delivered = dict(queued)
+    delivered["idempotency_key"] = f"block10:{wa_code}:delivery-receipt:{suffix}"
+    delivered["delivery_status"] = "SENT"
+    delivered["raw_payload"] = {"block": 10, "receipt": "provider-sent"}
+    delivered_result = ingest(service, delivered)
+    assert delivered_result["reconciled_existing_message"] is True
+    assert delivered_result["idempotent_replay"] is False
+    assert delivered_result["counts_as_response"] is True
+    assert delivered_result["delivery_status"] == "SENT"
+    after_delivery = conversation(owner, wa_conversation_id)
+    assert after_delivery["conversation"]["needs_reply"] is False
+    assert after_delivery["conversation"]["first_response_at"] is not None
+
+    # A delivery regression for the same provider message is rejected.
+    regression = dict(delivered)
+    regression["idempotency_key"] = f"block10:{wa_code}:delivery-regression:{suffix}"
+    regression["delivery_status"] = "QUEUED"
+    delivery_regression = service.post("/api/v1/automation/inbox/messages", json=regression)
+    assert delivery_regression.status_code == 409, delivery_regression.text
+    assert detail_code(delivery_regression) == "PROVIDER_MESSAGE_STATUS_REGRESSION", delivery_regression.text
 
     # A newer inbound message makes the same conversation need a reply again.
     next_inbound = normalized_message(
@@ -231,6 +245,32 @@ def main() -> None:
         text="Guest replied again",
     )
     ingest(service, next_inbound)
+    assert conversation(owner, wa_conversation_id)["conversation"]["needs_reply"] is True
+
+    # A separate provider-confirmed SENT message also clears needs_reply.
+    sent = normalized_message(
+        kind="WHATSAPP",
+        code=wa_code,
+        conversation=f"whatsapp-conversation-{suffix}",
+        message=f"whatsapp-outbound-{suffix}-sent",
+        text="Second provider-confirmed reply",
+        direction="OUTBOUND",
+        delivery="SENT",
+    )
+    sent_result = ingest(service, sent)
+    assert sent_result["counts_as_response"] is True
+    after_sent = conversation(owner, wa_conversation_id)
+    assert after_sent["conversation"]["needs_reply"] is False
+
+    # Another guest reply restores the needs-reply fact.
+    final_inbound = normalized_message(
+        kind="WHATSAPP",
+        code=wa_code,
+        conversation=f"whatsapp-conversation-{suffix}",
+        message=f"whatsapp-message-{suffix}-4",
+        text="Guest asks one more question",
+    )
+    ingest(service, final_inbound)
     assert conversation(owner, wa_conversation_id)["conversation"]["needs_reply"] is True
 
     # Website remains direct Core booking contract, not an n8n/service-key path.
@@ -304,7 +344,8 @@ def main() -> None:
     owner.close()
     print(
         "PASS: Block 10 unifies WhatsApp/Instagram/Telegram audit, payload-safe idempotency, "
-        "linked ReservationRequest handoff, provider-evidenced response state and website direct-Core authority boundary"
+        "provider-message identity/delivery reconciliation, linked ReservationRequest handoff, "
+        "provider-evidenced response state and website direct-Core authority boundary"
     )
 
 
