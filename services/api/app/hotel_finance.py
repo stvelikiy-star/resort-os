@@ -9,6 +9,7 @@ from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/finance", tags=["admin-hotel-finance"])
 manager_access = require_roles("OWNER", "MANAGER")
+LEDGER_PREVIEW_LIMIT = 500
 
 
 class PaymentRequirementPayload(BaseModel):
@@ -280,6 +281,8 @@ async def finance_summary(
             pid,
         )
 
+        # IMPORTANT: no SQL row limit is applied before receivable/exception calculation.
+        # Operational snapshots must be complete even after years of reservation history.
         ledger_rows = await conn.fetch(
             '''
             WITH payment_stats AS (
@@ -320,7 +323,6 @@ async def finance_summary(
             WHERE r."propertyId"=$1
               AND r.status IN ('GUARANTEED','CHECKED_IN','CHECKED_OUT','CANCELLED')
             ORDER BY r."checkOut" DESC,r."createdAt" DESC
-            LIMIT 500
             ''',
             pid,
         )
@@ -355,6 +357,14 @@ async def finance_summary(
             "overpaid_kgs": sum(item["overpaid_kgs"] for item in overpaid_items),
             "cancelled_with_received_count": len(cancelled_with_received),
             "cancelled_with_received_kgs": sum(item["received_kgs"] for item in cancelled_with_received),
+        }
+        ledger_preview = reservation_ledger[:LEDGER_PREVIEW_LIMIT]
+        ledger_meta = {
+            "total_count": len(reservation_ledger),
+            "returned_count": len(ledger_preview),
+            "preview_limit": LEDGER_PREVIEW_LIMIT,
+            "truncated": len(reservation_ledger) > LEDGER_PREVIEW_LIMIT,
+            "snapshot_calculation_complete": True,
         }
 
         recent = await conn.fetch(
@@ -400,12 +410,13 @@ async def finance_summary(
         "received_by_day": [dict(row) for row in daily],
         "active_reservations_snapshot": dict(active_reservations),
         "receivables_snapshot": receivables_snapshot,
-        "debtors": debtors[:250],
-        "reservation_ledger": reservation_ledger,
+        "debtors": debtors,
+        "reservation_ledger": ledger_preview,
+        "reservation_ledger_meta": ledger_meta,
         "finance_exceptions": {
             "snapshot": exception_snapshot,
-            "overpaid_reservations": overpaid_items[:100],
-            "cancelled_with_received": cancelled_with_received[:100],
+            "overpaid_reservations": overpaid_items,
+            "cancelled_with_received": cancelled_with_received,
         },
         "awaiting_prepayment_snapshot": dict(awaiting_requests),
         "refunded_snapshot_all_time": dict(refund_snapshot),
@@ -432,8 +443,9 @@ async def finance_summary(
             "received": "Period received totals include only stored Payment.status=RECEIVED facts, bounded by the property's local calendar dates.",
             "pending": "Pending total is an internal payment-record snapshot; it is not recognized revenue and does not mean automation is collecting payment.",
             "active_reservations": "Active reservation totals are a current internal snapshot of GUARANTEED/CHECKED_IN reservation values and stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
-            "receivables": "Debtors are reservation balances from GUARANTEED, CHECKED_IN and CHECKED_OUT records. A CHECKED_OUT balance is surfaced for operational follow-up instead of disappearing from the active-booking snapshot.",
-            "exceptions": "Overpayment and cancelled-reservation-with-received-payment flags are operational reconciliation exceptions, not automatic refund decisions.",
+            "receivables": "Debtor counts and amounts are calculated over the complete GUARANTEED/CHECKED_IN/CHECKED_OUT reservation ledger. A CHECKED_OUT balance remains visible for operational follow-up regardless of historical ledger size.",
+            "ledger": "The reservation_ledger response is a newest-first preview capped for payload size; reservation_ledger_meta declares truncation. Receivable and exception snapshots are calculated before that preview cap.",
+            "exceptions": "Overpayment and cancelled-reservation-with-received-payment flags are complete operational reconciliation exceptions, not automatic refund decisions.",
             "refunds": "Current Payment model has REFUNDED status but no normalized refund timestamp, so refunded amount is shown only as an all-time snapshot, not attributed to the selected period.",
             "collection": "Prepayment amount and payment method remain manager-owned. Setting a requirement does not create a Payment or Reservation; AI/n8n have no payment-confirmation authority.",
         },
