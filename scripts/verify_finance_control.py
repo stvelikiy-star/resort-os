@@ -183,7 +183,7 @@ async def move_payment_to_local_time(payment_id: str, local_date: date, local_ti
         await conn.execute(
             '''
             UPDATE payments p
-            SET "paidAt"=(($2::date + $3::time) AT TIME ZONE prop.timezone),"updatedAt"=now()
+            SET "paidAt"=((($2::date + $3::text::time) AT TIME ZONE prop.timezone) AT TIME ZONE 'UTC'),"updatedAt"=now()
             FROM reservations r
             JOIN properties prop ON prop.id=r."propertyId"
             WHERE p.id=$1::uuid AND r.id=p."reservationId"
