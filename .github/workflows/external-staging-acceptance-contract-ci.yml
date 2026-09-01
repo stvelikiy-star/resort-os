@@ -1,0 +1,50 @@
+name: External Staging Acceptance Contract CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'scripts/external_staging_acceptance.py'
+      - 'scripts/external_staging_acceptance_contract_test.py'
+      - 'scripts/legacy_rollback_gate.py'
+      - 'scripts/deployment_release_linkage.py'
+      - 'scripts/external_public_truth_probe.py'
+      - 'scripts/staging_acceptance.py'
+      - 'scripts/production_monitoring_check.py'
+      - '.github/workflows/external-staging-acceptance-contract-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  external-staging-acceptance-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile external acceptance runner
+        run: python -m py_compile scripts/external_staging_acceptance.py scripts/external_staging_acceptance_contract_test.py
+
+      - name: Run adversarial orchestration contract
+        run: PYTHONPATH=scripts python scripts/external_staging_acceptance_contract_test.py
+
+      - name: Verify orchestration remains attached to all required gates
+        shell: bash
+        run: |
+          for gate in \
+            scripts/legacy_rollback_gate.py \
+            scripts/deployment_release_linkage.py \
+            scripts/external_public_truth_probe.py \
+            scripts/staging_acceptance.py \
+            scripts/production_monitoring_check.py; do
+            grep -F "$gate" scripts/external_staging_acceptance.py >/dev/null
+          done
+          grep -F 'RESULT: EXTERNAL STAGING ACCEPTANCE GREEN' scripts/external_staging_acceptance.py >/dev/null
+          grep -F 'mutates_staging_business_data": True' scripts/external_staging_acceptance.py >/dev/null
+          grep -F 'production_target_allowed": False' scripts/external_staging_acceptance.py >/dev/null
