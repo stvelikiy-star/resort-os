@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PMSNewReservationModal from "./PMSNewReservationModal";
+import { pmsOwnerRoomDisplayLabel } from "./PMSRoomDisplayLabel";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
 import RoomDetailModal from "./RoomDetailModal";
 
@@ -306,8 +307,8 @@ export default function PMSOwnerGrid() {
     setBuilder({ reservationId: block.reservation_id, intent: { kind: "OPEN", segmentBlockId: block.id } });
   }
 
-  const dayWidth = windowDays >= 31 ? 30 : 42;
-  const template = `220px 66px repeat(${windowDays}, ${dayWidth}px)`;
+  const dayWidth = windowDays >= 31 ? 26 : 34;
+  const template = `300px 58px repeat(${windowDays}, ${dayWidth}px)`;
 
   return (
     <section className="owner-grid-shell">
@@ -359,8 +360,7 @@ export default function PMSOwnerGrid() {
             {group.rooms.map((room) => (
               <div key={room.id} className={`owner-room-row state-${room.operational_state}`} style={{ gridTemplateColumns: template }}>
                 <button className="owner-room-label" onClick={() => setRoomId(room.id)} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
-                  <strong>{room.code}{room.beds_raw ? ` (${room.beds_raw})` : ""}</strong>
-                  {!room.beds_raw && <span>{room.room_type_name}</span>}
+                  <strong>{pmsOwnerRoomDisplayLabel(room)}</strong>
                 </button>
                 <div className={`owner-room-state ${room.operational_state}`}>{ROOM_STATE[room.operational_state]}</div>
 

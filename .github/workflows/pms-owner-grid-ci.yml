@@ -6,7 +6,9 @@ on:
       - 'services/api/**'
       - 'apps/admin/**'
       - 'scripts/verify_pms_owner_grid.py'
+      - 'scripts/verify_reception_rbac.py'
       - 'scripts/pms_owner_grid_browser.mjs'
+      - 'scripts/pms_room_labels_contract.mjs'
       - 'data-intake/**'
       - 'packages/database/**'
       - '.github/workflows/pms-owner-grid-ci.yml'
@@ -22,7 +24,7 @@ concurrency:
 jobs:
   owner-grid:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16-alpine
@@ -47,6 +49,7 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
       CORE_API_URL: http://127.0.0.1:8000
+      RESORT_CORE_TEST_URL: http://127.0.0.1:8000
       ADMIN_BASE_URL: http://127.0.0.1:3001
 
     steps:
@@ -76,7 +79,7 @@ jobs:
       - name: Install Core and enforce DB constraints
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts/verify_pms_owner_grid.py
+          python -m compileall services/api/app scripts/verify_pms_owner_grid.py scripts/verify_reception_rbac.py
           python scripts/apply_core_constraints.py
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
@@ -87,6 +90,9 @@ jobs:
           npm install --no-audit --no-fund
           npm run typecheck
           npm run build
+
+      - name: Contract — real owner labels and compact cells
+        run: node --experimental-strip-types scripts/pms_room_labels_contract.mjs
 
       - name: Install Playwright Chromium
         working-directory: apps/admin
@@ -115,6 +121,9 @@ jobs:
 
       - name: Core E2E — pricing, conflicts, audit and no fake payment
         run: python scripts/verify_pms_owner_grid.py
+
+      - name: RBAC E2E — Reception operational rights and manager-only commercial rights
+        run: python scripts/verify_reception_rbac.py
 
       - name: Show diagnostics on failure
         if: failure()
