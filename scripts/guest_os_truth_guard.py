@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
-"""Protect Guest OS public copy from drifting behind the live Resort Core workflow."""
+"""Protect Guest Concierge public copy from drifting behind the live Resort Core workflow."""
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RUNTIME = ROOT / "apps/web/components/GuestOsRuntime.tsx"
+RUNTIME = ROOT / "apps/web/components/GuestConciergeRuntime.tsx"
 PAGE = ROOT / "apps/web/app/g/[token]/page.tsx"
-REQUESTS = ROOT / "apps/web/components/GuestRequestsPanel.tsx"
 
 REQUIRED_RUNTIME = [
-    "Заявки из Guest OS уже передаются через Resort Core ответственному сотруднику",
-    "Статус выполнения можно отслеживать ниже в разделе «Мои заявки»",
-    "Guest OS requests are already routed through Resort Core to the responsible team",
-    "Guest OS аркылуу түзүлгөн өтүнмөлөр Resort Core аркылуу жооптуу кызматкерге дароо жөнөтүлөт",
+    "Заявка отправлена. Статус появится в разделе «Мои заявки».",
+    "Өтүнмө жөнөтүлдү. Абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
+    "Request sent. Its status will appear under My requests.",
 ]
 
 FORBIDDEN_FUTURE_COPY = [
@@ -23,38 +21,47 @@ FORBIDDEN_FUTURE_COPY = [
 
 def main() -> int:
     errors: list[str] = []
-    for path in (RUNTIME, PAGE, REQUESTS):
+    for path in (RUNTIME, PAGE):
         if not path.exists():
-            errors.append(f"missing Guest OS file: {path.relative_to(ROOT)}")
+            errors.append(f"missing Guest Concierge file: {path.relative_to(ROOT)}")
 
     runtime = RUNTIME.read_text(encoding="utf-8") if RUNTIME.exists() else ""
     page = PAGE.read_text(encoding="utf-8") if PAGE.exists() else ""
-    requests = REQUESTS.read_text(encoding="utf-8") if REQUESTS.exists() else ""
 
     for snippet in REQUIRED_RUNTIME:
         if snippet not in runtime:
-            errors.append(f"GuestOsRuntime missing live-request truth: {snippet!r}")
+            errors.append(f"GuestConciergeRuntime missing live-request truth: {snippet!r}")
     for stale in FORBIDDEN_FUTURE_COPY:
         if stale in runtime:
-            errors.append(f"GuestOsRuntime still presents implemented request routing as future work: {stale!r}")
+            errors.append(f"GuestConciergeRuntime still presents implemented request routing as future work: {stale!r}")
 
-    if "<GuestRequestsPanel token={token} />" not in page:
-        errors.append("Guest OS route no longer mounts My Requests / request creation panel")
-    if "/core/api/v1/guest-os/rooms/${encodeURIComponent(token)}/requests" not in requests:
-        errors.append("GuestRequestsPanel no longer uses the canonical Resort Core guest-request endpoint")
-    if "credentials: \"include\"" not in requests:
-        errors.append("GuestRequestsPanel must preserve authenticated GuestSession credentials")
+    if "<GuestConciergeRuntime token={token} />" not in page:
+        errors.append("Guest room QR route no longer mounts the unified concierge")
+    if "GuestRequestsPanel" in page or "GuestOsRuntime" in page:
+        errors.append("Guest room QR route still mounts duplicate legacy Guest OS surfaces")
 
-    print("Three Crowns Guest OS truth guard")
+    canonical_requests = "/core/api/v1/guest-os/rooms/${encodeURIComponent(token)}/requests"
+    if canonical_requests not in runtime:
+        errors.append("GuestConciergeRuntime no longer uses the canonical Resort Core guest-request endpoint")
+    if 'credentials: "include"' not in runtime:
+        errors.append("GuestConciergeRuntime must preserve authenticated GuestSession credentials")
+    if "setInterval(() => void loadRequests(), 15000)" not in runtime:
+        errors.append("GuestConciergeRuntime must keep request-status refresh/polling")
+    for commercial_path in ("/payments", "/reservation-payments", "/beach/charge", "/nfc"):
+        if commercial_path in runtime:
+            errors.append(f"Guest concierge must not introduce commercial/deferred mutation route: {commercial_path}")
+
+    print("Three Crowns Guest Concierge truth guard")
     print(f"FACT: live_request_copy={len(REQUIRED_RUNTIME)}")
     print(f"FACT: future_copy_forbidden={len(FORBIDDEN_FUTURE_COPY)}")
-    print(f"FACT: request_panel_mounted={'<GuestRequestsPanel token={token} />' in page}")
+    print(f"FACT: unified_concierge_mounted={'<GuestConciergeRuntime token={token} />' in page}")
+    print(f"FACT: canonical_request_endpoint={canonical_requests in runtime}")
 
     if errors:
         for error in errors:
             print(f"FAIL: {error}")
         return 1
-    print("PASS: Guest OS describes the request workflow that is actually implemented")
+    print("PASS: Guest Concierge describes and uses the request workflow that is actually implemented")
     return 0
 
 
