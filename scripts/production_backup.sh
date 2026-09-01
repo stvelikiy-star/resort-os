@@ -9,6 +9,7 @@ RETENTION_DAYS="${RETENTION_DAYS:-14}"
 POSTGRES_CLIENT_IMAGE="${POSTGRES_CLIENT_IMAGE:-postgres:16-alpine}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 TARGET="${BACKUP_DIR}/${STAMP}"
+RECEIPT_PATH="${BACKUP_DIR}/last-success.env"
 
 read_env_value() {
   local key="$1"
@@ -54,14 +55,11 @@ cd "${ROOT_DIR}"
 DB_BACKUP_MODE="$(setting DB_BACKUP_MODE compose)"
 case "${DB_BACKUP_MODE}" in
   compose)
-    # CI-verified legacy/single-server mode. PostgreSQL remains private to Compose.
     docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T postgres \
       sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl -Fc' \
       > "${TARGET}/postgres.dump"
     ;;
   url)
-    # Managed PostgreSQL / DBaaS mode. Prefer a pg_dump-safe URL without Prisma's
-    # schema= query parameter; sslmode and other managed-DB transport settings stay.
     PG_DUMP_DATABASE_URL="$(setting PG_DUMP_DATABASE_URL)"
     if [[ -z "${PG_DUMP_DATABASE_URL}" ]]; then
       PG_DUMP_DATABASE_URL="$(setting DATABASE_URL)"
@@ -91,19 +89,16 @@ if [[ ! -s "${TARGET}/postgres.dump" ]]; then
   exit 1
 fi
 
-# Back up operational media without following external symlinks.
 if [[ -d "${ROOT_DIR}/data/media" ]]; then
   tar -C "${ROOT_DIR}/data" -czf "${TARGET}/media.tar.gz" media
 fi
 
-# n8n persistent state is operational automation state, never hotel booking truth.
 if [[ -d "${ROOT_DIR}/data/n8n" ]]; then
   tar -C "${ROOT_DIR}/data" -czf "${TARGET}/n8n.tar.gz" n8n
 fi
 
 sha256sum "${TARGET}"/* > "${TARGET}/SHA256SUMS"
 
-# Never copy .env.production into backup archives.
 find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" -exec rm -rf {} +
 
 OFFSITE_REQUIRED="$(setting OFFSITE_BACKUP_REQUIRED false)"
@@ -113,6 +108,8 @@ S3_BUCKET="$(setting S3_BACKUP_BUCKET)"
 S3_PREFIX="$(setting S3_BACKUP_PREFIX three-crowns)"
 S3_ACCESS_KEY_ID="$(setting S3_ACCESS_KEY_ID)"
 S3_SECRET_ACCESS_KEY="$(setting S3_SECRET_ACCESS_KEY)"
+OFFSITE_STATUS="LOCAL_ONLY"
+OFFSITE_PREFIX=""
 
 S3_CONFIGURED=true
 for value in "${S3_ENDPOINT_URL}" "${S3_REGION}" "${S3_BUCKET}" "${S3_ACCESS_KEY_ID}" "${S3_SECRET_ACCESS_KEY}"; do
@@ -155,14 +152,28 @@ EOF
     name="$(basename "${file}")"
     object_url="${S3_ENDPOINT_URL}/${S3_BUCKET}/${S3_PREFIX}/${STAMP}/${name}"
     curl --config "${CURL_CONFIG}" --upload-file "${file}" "${object_url}"
-    # A signed HEAD proves the object is readable with the configured credentials.
     curl --config "${CURL_CONFIG}" --head "${object_url}" >/dev/null
   done
   rm -f "${CURL_CONFIG}"
   trap - EXIT
-  echo "OFFSITE_BACKUP=VERIFIED_UPLOAD"
-  echo "OFFSITE_PREFIX=s3://${S3_BUCKET}/${S3_PREFIX}/${STAMP}/"
+  OFFSITE_STATUS="VERIFIED_UPLOAD"
+  OFFSITE_PREFIX="s3://${S3_BUCKET}/${S3_PREFIX}/${STAMP}/"
+  echo "OFFSITE_BACKUP=${OFFSITE_STATUS}"
+  echo "OFFSITE_PREFIX=${OFFSITE_PREFIX}"
 fi
+
+# Persist only non-secret evidence after every required backup step has succeeded.
+# A failed run never advances this receipt, so monitoring detects the stale last success.
+RECEIPT_TMP="${BACKUP_DIR}/.last-success.$$.tmp"
+{
+  printf 'COMPLETED_AT=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'TARGET=%s\n' "${TARGET}"
+  printf 'OFFSITE_STATUS=%s\n' "${OFFSITE_STATUS}"
+  printf 'OFFSITE_PREFIX=%s\n' "${OFFSITE_PREFIX}"
+} > "${RECEIPT_TMP}"
+chmod 600 "${RECEIPT_TMP}"
+mv -f "${RECEIPT_TMP}" "${RECEIPT_PATH}"
 
 echo "Backup complete: ${TARGET}"
 echo "BACKUP_SHA256_FILE=${TARGET}/SHA256SUMS"
+echo "BACKUP_SUCCESS_RECEIPT=${RECEIPT_PATH}"
