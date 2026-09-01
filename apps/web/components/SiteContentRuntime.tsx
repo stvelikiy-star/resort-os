@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { SiteContent, SiteLocale } from "../lib/siteContent";
+import { fallbackSiteContent, type SiteContent, type SiteLocale } from "../lib/siteContent";
 
 type Payload = { locale: SiteLocale; content: SiteContent; published_version: number };
 
@@ -101,25 +101,32 @@ function applyContent(content: SiteContent, locale: SiteLocale) {
   }
 
   preserveInternalLanguage(locale);
+}
+
+function commitContent(content: SiteContent, locale: SiteLocale) {
+  applyContent(content, locale);
   dispatchReady(locale);
+  // content-ready listeners localize non-CMS UI synchronously. Re-apply only the
+  // CMS-owned selectors afterwards so published content stays authoritative.
+  queueMicrotask(() => applyContent(content, locale));
 }
 
 export default function SiteContentRuntime() {
   useEffect(() => {
     const locale = localeFromLocation();
     window.localStorage.setItem("three-crowns-site-language", locale);
-    document.documentElement.lang = locale === "kg" ? "ky" : locale;
-    preserveInternalLanguage(locale);
-    dispatchReady(locale);
+
+    // Fail soft without falling back to Russian: every locale has an approved
+    // local fallback and is replaced by the published Core payload when available.
+    commitContent(fallbackSiteContent[locale], locale);
 
     const controller = new AbortController();
     fetch(`/core/api/v1/site/content?locale=${locale}`, { cache: "no-store", signal: controller.signal })
       .then(async (response) => response.ok ? (await response.json()) as Payload : null)
       .then((payload) => {
-        if (payload?.content) applyContent(payload.content, locale);
-        else dispatchReady(locale);
+        if (payload?.content) commitContent(payload.content, locale);
       })
-      .catch(() => dispatchReady(locale));
+      .catch(() => undefined);
     return () => controller.abort();
   }, []);
   return null;
