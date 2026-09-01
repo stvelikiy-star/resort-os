@@ -1,0 +1,44 @@
+:root{--tc-admin-blue:#123d73;--tc-admin-blue-2:#184b87;--tc-admin-blue-3:#0d2d57;--tc-admin-white:#fff;--tc-admin-soft:#dbeafe}
+
+/* Final contrast layer: the operational dashboard is intentionally blue with
+   white typography. Imported last so legacy theme fragments cannot make text
+   unreadable on dark surfaces. */
+.dashboard-shell .work-head,
+.dashboard-shell .command-kpis article,
+.dashboard-shell .command-panel,
+.dashboard-shell .command-list>div,
+.dashboard-shell .attention-row,
+.dashboard-shell .command-money div,
+.dashboard-shell .stay-row,
+.dashboard-shell .room-state-grid>div:not(.state-clean):not(.state-dirty):not(.state-inspection):not(.state-tech){background:var(--tc-admin-blue)!important;border-color:rgba(255,255,255,.18)!important;color:var(--tc-admin-white)!important}
+.dashboard-shell .command-panel:nth-of-type(even),
+.dashboard-shell .command-kpis article:nth-child(even){background:var(--tc-admin-blue-2)!important}
+.dashboard-shell h1,.dashboard-shell h2,.dashboard-shell h3,.dashboard-shell strong,.dashboard-shell b,.dashboard-shell .eyebrow,.dashboard-shell .subtitle,.dashboard-shell span,.dashboard-shell small,.dashboard-shell p,.dashboard-shell a{color:var(--tc-admin-white)!important}
+.dashboard-shell .command-note,.dashboard-shell .command-list span,.dashboard-shell .command-kpis span,.dashboard-shell .command-kpis small,.dashboard-shell .room-state-grid span,.dashboard-shell .stay-row span,.dashboard-shell .attention-row small,.dashboard-shell .attention-row>span:not(.priority-pill){color:var(--tc-admin-soft)!important}
+.dashboard-shell .command-drill{background:var(--tc-admin-white)!important;color:var(--tc-admin-blue-3)!important;border-color:rgba(255,255,255,.45)!important}
+.dashboard-shell .command-drill span{color:var(--tc-admin-blue-3)!important}
+
+/* Locale control stays available in every admin module without changing the
+   existing navigation structure. */
+.admin-locale-switcher{position:fixed;right:18px;bottom:18px;z-index:2400;display:flex;align-items:center;gap:5px;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:#0d2d57;color:#fff;box-shadow:0 12px 32px rgba(6,24,48,.24);font:700 12px/1 system-ui,sans-serif}
+.admin-locale-switcher>span{padding:0 6px;color:#dbeafe}
+.admin-locale-switcher button{min-width:34px;height:30px;border:0;border-radius:999px;background:transparent;color:#dbeafe;font:800 11px/1 system-ui,sans-serif;cursor:pointer}
+.admin-locale-switcher button.active{background:#fff;color:#123d73}
+.admin-locale-switcher button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+.guest-pin-reissue{position:fixed;right:18px;bottom:72px;z-index:2390;border:0;border-radius:12px;padding:11px 15px;background:#123d73;color:#fff;box-shadow:0 12px 28px rgba(6,24,48,.25);font:800 13px/1.2 system-ui,sans-serif;cursor:pointer}
+.guest-pin-reissue:disabled{opacity:.55;cursor:wait}
+.guest-pin-runtime-error{position:fixed;right:18px;bottom:122px;z-index:2410;max-width:360px;padding:10px 14px;border-radius:10px;background:#7f1d1d;color:#fff;font:700 12px/1.4 system-ui,sans-serif}
+
+.guest-pin-backdrop{position:fixed;inset:0;z-index:5000;display:grid;place-items:center;padding:24px;background:rgba(3,15,30,.66);backdrop-filter:blur(5px)}
+.guest-pin-modal{width:min(520px,100%);border:1px solid rgba(255,255,255,.18);border-radius:24px;padding:28px;background:#0d2d57;color:#fff;box-shadow:0 30px 80px rgba(0,0,0,.38);text-align:center}
+.guest-pin-modal p{margin:0 0 8px;color:#bfdbfe;font-size:12px;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+.guest-pin-modal h2{margin:0 0 18px;color:#fff;font-size:22px}
+.guest-pin-value{margin:10px 0 16px;padding:18px;border-radius:16px;background:#fff;color:#0d2d57;font:900 42px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.18em}
+.guest-pin-modal strong,.guest-pin-modal small{display:block;color:#fff}
+.guest-pin-modal small{margin-top:8px;color:#dbeafe;line-height:1.45}
+.guest-pin-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px}
+.guest-pin-actions button{min-height:44px;border:1px solid rgba(255,255,255,.3);border-radius:12px;background:#184b87;color:#fff;font-weight:800;cursor:pointer}
+.guest-pin-actions button:first-child{background:#fff;color:#123d73}
+
+@media(max-width:720px){.admin-locale-switcher{right:10px;bottom:10px}.guest-pin-reissue{right:10px;bottom:64px}.guest-pin-backdrop{padding:12px}.guest-pin-modal{padding:22px 16px}.guest-pin-value{font-size:34px}.guest-pin-actions{grid-template-columns:1fr}}
