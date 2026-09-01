@@ -9,13 +9,16 @@ This document separates repository/CI evidence from external production evidence
 ## 1. Current repository boundary
 
 Integration branch: `integration/site-pms-cms-20260827`.
+Accepted executable head: `7f0c5c56e2dae4809d4c4996221f99fe2a0a82a9`.
+Observed integration merge: `79fe6fef880f60f7abb1ff0a70f1afefe3aa26f3`.
 
-Current integration head: `42798b3fd360b5f5a6a4eb2124b1231702c99eea`.
-Latest tested exact PR head: `da3cc80f3c13973f799c01ddd8ad64ed79c17f6f`.
+The accepted executable head is the exact PR #89 head and completed **17/17 triggered workflow contours successfully, 0 failures**, including Resort Core, Full Staging, Production Package, dependency security, realtime, operations, backup/restore and External Staging Acceptance Contract CI.
 
-The merge commit has **0 changed files** versus the tested PR head. That exact PR head completed **20/20 triggered workflow contours successfully**, including Resort Core, Full Staging, Production Package, Public Browser, Public Truth, dependency security, realtime, operations, backup/restore and the Site Content Runtime regression.
+The observed integration merge has **0 changed files** versus the tested executable head. The machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
-Earlier closed product gates retain their own exact-head evidence. A merge commit containing the same reviewed tree is not a substitute for independent external acceptance.
+`main` is not a production source. It is stale relative to the accepted integration RC and must not be used for Beget deployment or DNS cutover.
+
+Earlier closed product gates retain their own exact-head evidence. A tree-equivalent merge commit is not a substitute for independent external acceptance.
 
 ## 2. Canonical database release contract
 
@@ -54,6 +57,9 @@ The repository contains and CI exercises:
 - migration baseline and backup -> clean restore;
 - dependency/security inspections;
 - single-server production package and CI-local Full Staging;
+- exact Git SHA -> deployed image linkage contract;
+- mutating staging acceptance production-safety guard;
+- unified external staging acceptance orchestration contract;
 - NFC deferred scope: NFC payment routes remain outside active V1 composition.
 
 Physical room import gate #38 is **CLOSED / COMPLETED** for the canonical 84-room / 12-category register and safe importer contract. This is not external staging reconciliation evidence.
@@ -81,13 +87,15 @@ Do **not** reopen room-data collection as a launch requirement. The remaining ro
 ## 5. Fail-closed launch evidence
 
 Template: `release/launch-evidence.example.json`.
-
 Verifier: `scripts/verify_launch_acceptance.py`.
+Unified external staging runner: `scripts/external_staging_acceptance.py`.
+RC truth manifest: `release/current-rc.json`.
 
 Repository check:
 
 ```bash
 python scripts/verify_launch_acceptance.py --mode repository
+python scripts/release_rc_truth_guard.py
 ```
 
 Cutover check after real evidence has been collected into a separate non-secret manifest:
