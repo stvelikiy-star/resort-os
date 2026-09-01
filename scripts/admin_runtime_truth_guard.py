@@ -7,6 +7,7 @@ PAGE = ROOT / "apps/admin/app/page.tsx"
 SHELL = ROOT / "apps/admin/components/AdminShell.tsx"
 GRID_V9 = ROOT / "apps/admin/components/PMSGridV9.tsx"
 OWNER_GRID = ROOT / "apps/admin/components/PMSOwnerGrid.tsx"
+STAFF_BOARD = ROOT / "apps/admin/components/StaffBoard.tsx"
 
 
 def require(path: Path, *needles: str) -> None:
@@ -47,6 +48,14 @@ def main() -> int:
         '/ws/pms/grid?',
         'PMS · рабочая шахматка',
     )
+    require(
+        STAFF_BOARD,
+        'RECEPTION: "Ресепшен"',
+        '<option value="RECEPTION">Ресепшен</option>',
+        'BEACH_PARTNER: "Пляжный партнёр"',
+        '<option value="BEACH_PARTNER">Пляжные партнёры</option>',
+        'fetch("/core/api/v1/admin/staff/overview"',
+    )
 
     # These markers belong to the historical one-file owner-review/demo surface and
     # must never become the normal authenticated PMS runtime.
@@ -71,7 +80,7 @@ def main() -> int:
         if "/demo" in page_text or "/demo" in shell_text or "app/demo" in page_text or "app/demo" in shell_text:
             raise AssertionError("normal admin runtime references the historical /demo route")
 
-    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; demo markers are absent and operations UI follows staff RBAC")
+    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; demo markers are absent, operations UI follows staff RBAC, and existing staff roles are visible")
     return 0
 
 
