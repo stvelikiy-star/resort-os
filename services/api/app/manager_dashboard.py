@@ -105,8 +105,8 @@ async def manager_dashboard(
             JOIN reservations r ON r.id=p."reservationId"
             WHERE r."propertyId"=$1
               AND p.status='RECEIVED'
-              AND p."paidAt" IS NOT NULL
-              AND (p."paidAt" AT TIME ZONE $2)::date=$3
+              AND COALESCE(p."paidAt",p."createdAt") IS NOT NULL
+              AND (((COALESCE(p."paidAt",p."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE $2)::date)=$3
             ''',
             pid,
             prop["timezone"],
@@ -232,7 +232,7 @@ async def manager_dashboard(
             "active_reservations_total_kgs": int(active_balance["booked_total_kgs"] or 0),
             "active_reservations_paid_kgs": int(active_balance["paid_kgs"] or 0),
             "active_reservations_remaining_kgs": int(active_balance["remaining_kgs"] or 0),
-            "scope_note": "Only hotel reservation payments recorded in Resort Core are included.",
+            "scope_note": "Only hotel reservation payments recorded in Resort Core are included. Calendar classification uses the property timezone over UTC-stored timestamps.",
         },
         "today": {
             "arrivals": [reservation_summary(row) for row in arrivals],
