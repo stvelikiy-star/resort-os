@@ -77,13 +77,7 @@ def resolve_dns(domain: str) -> dict[str, Any]:
     result: dict[str, Any] = {"domain": domain, "captured_at": utc_now(), "records": {}}
     if shutil.which("dig"):
         for record_type in ("A", "AAAA", "CNAME", "NS", "MX", "TXT", "SOA"):
-            proc = subprocess.run(
-                ["dig", "+noall", "+answer", domain, record_type],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=False,
-            )
+            proc = subprocess.run(["dig", "+noall", "+answer", domain, record_type], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
             result["records"][record_type] = [line.strip() for line in proc.stdout.splitlines() if line.strip()]
     else:
         addresses: list[str] = []
@@ -111,12 +105,16 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Non-destructive legacy 3korony.com rollback capture")
     parser.add_argument("--web-root", required=True, help="Current live web root to archive; required and read-only")
     parser.add_argument("--uploads", action="append", default=[], help="Additional upload/media directory; repeatable")
+    parser.add_argument("--uploads-absent-confirmed", action="store_true", help="Explicitly confirm legacy site has no separate uploads/media path")
     parser.add_argument("--config", action="append", default=[], help="Web/vhost/runtime config file or directory; repeatable")
-    parser.add_argument("--output-dir", required=True, help="New evidence directory; must not already contain a completed manifest")
+    parser.add_argument("--config-absent-confirmed", action="store_true", help="Explicitly confirm no accessible separate vhost/runtime config exists")
+    parser.add_argument("--output-dir", required=True, help="New evidence directory; must be empty")
     parser.add_argument("--domain", default=DEFAULT_DOMAIN)
-    parser.add_argument("--dns-snapshot-file", help="Use pre-captured DNS JSON instead of network lookup (for controlled/offline runs)")
-    parser.add_argument("--database-url-env", help="Environment variable containing legacy DB URL; omit when legacy site has no DB")
-    parser.add_argument("--offsite-dir", help="Optional mounted/off-site destination; copy completed evidence directory there")
+    parser.add_argument("--dns-snapshot-file", help="Use pre-captured authoritative DNS JSON instead of network lookup")
+    parser.add_argument("--authoritative-dns-reviewed", action="store_true", help="Confirm DNS snapshot includes reviewed DNS/mail records and TTL evidence")
+    parser.add_argument("--database-url-env", help="Environment variable containing legacy DB URL")
+    parser.add_argument("--database-absent-confirmed", action="store_true", help="Explicitly confirm legacy site does not use a database")
+    parser.add_argument("--offsite-dir", help="Mounted/off-site destination; copy completed evidence directory there")
     parser.add_argument("--rollback-owner", required=True, help="Named person/role responsible for rollback execution")
     args = parser.parse_args()
 
@@ -124,6 +122,13 @@ def main() -> int:
         rollback_owner = args.rollback_owner.strip()
         if not rollback_owner:
             raise ValueError("rollback owner cannot be empty")
+        if args.database_url_env and args.database_absent_confirmed:
+            raise ValueError("database dump and database-absent confirmation are mutually exclusive")
+        if args.uploads and args.uploads_absent_confirmed:
+            raise ValueError("uploads paths and uploads-absent confirmation are mutually exclusive")
+        if args.config and args.config_absent_confirmed:
+            raise ValueError("config paths and config-absent confirmation are mutually exclusive")
+
         web_root = require_readable(Path(args.web_root), "web root", directory=True)
         uploads = [require_readable(Path(item), "uploads/media path") for item in args.uploads]
         configs = [require_readable(Path(item), "config path") for item in args.config]
@@ -143,14 +148,14 @@ def main() -> int:
         inputs.extend((f"config-{index+1}", path) for index, path in enumerate(configs))
         archive_paths(archive, inputs)
 
-        artifacts: dict[str, Any] = {
-            "site_archive": {"path": archive.name, "size_bytes": archive.stat().st_size, "sha256": sha256(archive)}
-        }
+        artifacts: dict[str, Any] = {"site_archive": {"path": archive.name, "size_bytes": archive.stat().st_size, "sha256": sha256(archive)}}
         if args.database_url_env:
             db_dump = output_root / f"legacy-db-{timestamp}.dump"
             artifacts["database_dump"] = capture_database(db_dump, args.database_url_env)
+        elif args.database_absent_confirmed:
+            artifacts["database_dump"] = {"status": "ABSENT_CONFIRMED"}
         else:
-            artifacts["database_dump"] = {"status": "NOT_REQUESTED", "reason": "legacy DB presence must be explicitly determined"}
+            artifacts["database_dump"] = {"status": "UNDETERMINED", "reason": "legacy DB presence must be explicitly determined before cutover"}
 
         dns_path = output_root / "dns-snapshot.json"
         dns_path.write_text(json.dumps(dns, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -166,6 +171,12 @@ def main() -> int:
                 "web_root": str(web_root),
                 "uploads": [str(path) for path in uploads],
                 "configs": [str(path) for path in configs],
+            },
+            "evidence_decisions": {
+                "database_absent_confirmed": bool(args.database_absent_confirmed),
+                "uploads_absent_confirmed": bool(args.uploads_absent_confirmed),
+                "config_absent_confirmed": bool(args.config_absent_confirmed),
+                "authoritative_dns_reviewed": bool(args.authoritative_dns_reviewed),
             },
             "artifacts": artifacts,
             "restore_rehearsal": {"status": "NOT_RUN"},
@@ -205,7 +216,7 @@ def main() -> int:
         print(f"ROLLBACK_CAPTURE_OK output={output_root}")
         print(f"site_archive_sha256={artifacts['site_archive']['sha256']}")
         print(f"dns_snapshot_sha256={artifacts['dns_snapshot']['sha256']}")
-        print("RESULT: CAPTURED_NOT_RESTORED — restore rehearsal is still mandatory before cutover")
+        print("RESULT: CAPTURED_NOT_RESTORED — final gate remains blocked until restore rehearsal and all evidence decisions are explicit")
         return 0
     except Exception as exc:
         print(f"ROLLBACK_CAPTURE_FAILED: {exc}", file=sys.stderr)
