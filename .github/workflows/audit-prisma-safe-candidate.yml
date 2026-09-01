@@ -1,0 +1,71 @@
+name: Audit Prisma Safe Candidate
+
+on:
+  push:
+    branches:
+      - audit/export-complete-project-20260901
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact frozen integration commit
+        uses: actions/checkout@v4
+        with:
+          ref: b44ddd2baf413727dfc72f19bc1b4f189518a188
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Pin candidate pair and generate lockfile
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npm pkg set 'devDependencies.prisma=6.12.0'
+          npm pkg set 'dependencies.@prisma/client=6.12.0'
+          npm install --ignore-scripts
+          node -e "const p=require('./package.json'); if(p.devDependencies.prisma!=='6.12.0'||p.dependencies['@prisma/client']!=='6.12.0') process.exit(1)"
+          test -s package-lock.json
+      - name: Gate candidate high and critical vulnerabilities
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          audit_rc=$?
+          set -e
+          node - <<'NODE'
+          const r=require('./npm-audit.json');
+          const c=r.metadata?.vulnerabilities||{};
+          console.log('audit_counts='+JSON.stringify(c));
+          if ((c.high||0)>0 || (c.critical||0)>0) process.exit(1);
+          NODE
+      - name: Validate Prisma schema and client generation
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          npx prisma validate
+          npx prisma generate
+      - name: Prove deterministic clean install
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          rm -rf node_modules
+          npm ci --ignore-scripts --no-audit
+          npx prisma validate
+      - name: Upload candidate lockfile evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: prisma-6.12.0-safe-candidate
+          path: |
+            packages/database/package.json
+            packages/database/package-lock.json
+            packages/database/npm-audit.json
+          retention-days: 7
