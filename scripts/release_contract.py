@@ -16,6 +16,7 @@ EXPECTED_MIGRATIONS = (
     "3_owner_analytics_snapshots",
     "4_guest_engagements",
     "5_guest_os_core",
+    "6_service_point_qr_operations",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -48,6 +49,9 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_engagements_score_check",
         "guest_engagements_score_kind_check",
         "guest_engagements_feedback_reservation_check",
+        "service_points_category_check",
+        "service_point_qrs_revocation_check",
+        "operational_tasks_service_point_context_check",
     }
 )
 

@@ -98,6 +98,11 @@ enum RoomQrStatus {
   REVOKED
 }
 
+enum ServicePointQrStatus {
+  ACTIVE
+  REVOKED
+}
+
 enum GuestSessionStatus {
   ACTIVE
   REVOKED
@@ -169,6 +174,8 @@ model Property {
   stays                 Stay[]
   roomAssignments       RoomAssignment[]
   roomQrs               RoomQr[]
+  servicePoints         ServicePoint[]
+  servicePointQrs       ServicePointQr[]
   guestSessions         GuestSession[]
   guestHistoryEvents    GuestHistoryEvent[]
   guestPreferences      GuestPreference[]
@@ -479,6 +486,61 @@ model GuestPreference {
   @@map("guest_preferences")
 }
 
+model ServicePoint {
+  id             String                      @id @default(uuid()) @db.Uuid
+  propertyId     String                      @db.Uuid
+  property       Property                    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  category       String
+  zoneLabel      String?
+  isActive       Boolean                     @default(true)
+  requestOptions ServicePointRequestOption[]
+  qrs            ServicePointQr[]
+  tasks          OperationalTask[]
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([propertyId, code])
+  @@index([propertyId, category, isActive])
+  @@map("service_points")
+}
+
+model ServicePointRequestOption {
+  id             String                  @id @default(uuid()) @db.Uuid
+  servicePointId String                  @db.Uuid
+  servicePoint   ServicePoint            @relation(fields: [servicePointId], references: [id], onDelete: Cascade)
+  code           String
+  label          String
+  taskType       OperationalTaskType
+  priority       OperationalTaskPriority @default(NORMAL)
+  isActive       Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([servicePointId, code])
+  @@index([servicePointId, isActive])
+  @@map("service_point_request_options")
+}
+
+model ServicePointQr {
+  id             String               @id @default(uuid()) @db.Uuid
+  propertyId     String               @db.Uuid
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  servicePointId String               @db.Uuid
+  servicePoint   ServicePoint         @relation(fields: [servicePointId], references: [id], onDelete: Cascade)
+  tokenHash      String               @unique
+  status         ServicePointQrStatus @default(ACTIVE)
+  label          String?
+  issuedAt       DateTime             @default(now())
+  revokedAt      DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([propertyId, servicePointId, status])
+  @@map("service_point_qrs")
+}
+
 model InventoryBlock {
   id            String             @id @default(uuid()) @db.Uuid
   roomId        String             @db.Uuid
@@ -561,36 +623,39 @@ model AuthSession {
 }
 
 model OperationalTask {
-  id            String                  @id @default(uuid()) @db.Uuid
-  propertyId    String                  @db.Uuid
-  property      Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomId        String?                 @db.Uuid
-  room          Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  reservationId String?                 @db.Uuid
-  reservation   Reservation?            @relation("ReservationGuestServices", fields: [reservationId], references: [id], onDelete: SetNull)
-  stayId        String?                 @db.Uuid
-  stay          Stay?                   @relation(fields: [stayId], references: [id], onDelete: SetNull)
-  serviceCode   String?
-  serviceDate   DateTime?               @db.Date
-  serviceTime   String?
-  type          OperationalTaskType
-  status        OperationalTaskStatus   @default(OPEN)
-  priority      OperationalTaskPriority @default(NORMAL)
-  title         String
-  description   String?
-  assignedToId  String?                 @db.Uuid
-  assignedTo    StaffUser?              @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdByType String
-  createdById   String?
-  source        String?
-  completedAt   DateTime?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  id             String                  @id @default(uuid()) @db.Uuid
+  propertyId     String                  @db.Uuid
+  property       Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomId         String?                 @db.Uuid
+  room           Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  reservationId  String?                 @db.Uuid
+  reservation    Reservation?            @relation("ReservationGuestServices", fields: [reservationId], references: [id], onDelete: SetNull)
+  stayId         String?                 @db.Uuid
+  stay           Stay?                   @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  servicePointId String?                 @db.Uuid
+  servicePoint   ServicePoint?           @relation(fields: [servicePointId], references: [id], onDelete: SetNull)
+  serviceCode    String?
+  serviceDate    DateTime?               @db.Date
+  serviceTime    String?
+  type           OperationalTaskType
+  status         OperationalTaskStatus   @default(OPEN)
+  priority       OperationalTaskPriority @default(NORMAL)
+  title          String
+  description    String?
+  assignedToId   String?                 @db.Uuid
+  assignedTo     StaffUser?              @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdByType  String
+  createdById    String?
+  source         String?
+  completedAt    DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([propertyId, status, type])
   @@index([roomId, status])
   @@index([reservationId, status])
   @@index([stayId, status])
+  @@index([servicePointId, status])
   @@index([propertyId, serviceCode, status, serviceDate])
   @@index([assignedToId, status])
   @@map("operational_tasks")

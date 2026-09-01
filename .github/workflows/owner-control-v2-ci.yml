@@ -8,11 +8,13 @@ on:
       - 'services/api/app/service_auth.py'
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/3_owner_analytics_snapshots/**'
+      - 'packages/database/prisma/migrations/6_service_point_qr_operations/**'
       - 'apps/admin/components/OwnerControlV2.tsx'
       - 'apps/admin/components/DashboardBoard.tsx'
       - 'apps/admin/app/owner-control-v2.css'
       - 'apps/admin/app/layout.tsx'
       - 'automation/n8n/owner-analytics-daily-snapshot.json'
+      - 'scripts/release_contract.py'
       - 'scripts/verify_owner_control_v2.py'
       - '.github/workflows/owner-control-v2-ci.yml'
   push:
@@ -22,8 +24,10 @@ on:
       - 'services/api/app/app_entry.py'
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/3_owner_analytics_snapshots/**'
+      - 'packages/database/prisma/migrations/6_service_point_qr_operations/**'
       - 'apps/admin/components/OwnerControlV2.tsx'
       - 'automation/n8n/owner-analytics-daily-snapshot.json'
+      - 'scripts/release_contract.py'
       - 'scripts/verify_owner_control_v2.py'
       - '.github/workflows/owner-control-v2-ci.yml'
   workflow_dispatch:
@@ -72,12 +76,14 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Validate four-migration database chain
+      - name: Validate canonical database chain
         working-directory: packages/database
         run: |
           npm install --no-audit --no-fund
           npx prisma validate
           npx prisma migrate deploy
+          npx prisma migrate status
+          test -s prisma/migrations/6_service_point_qr_operations/migration.sql
 
       - name: Typecheck and build Owner Control UI
         working-directory: apps/admin

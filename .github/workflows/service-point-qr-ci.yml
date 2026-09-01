@@ -1,0 +1,153 @@
+name: Service Point QR CI
+
+on:
+  pull_request:
+    paths:
+      - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/prisma/migrations/**'
+      - 'services/api/app/service_points.py'
+      - 'services/api/app/app_entry.py'
+      - 'services/api/app/operations.py'
+      - 'apps/web/app/p/**'
+      - 'apps/web/app/service-point.css'
+      - 'apps/web/components/ServicePointRuntime.tsx'
+      - 'apps/admin/components/ServicePointsBoard.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/admin/app/service-points.css'
+      - 'apps/admin/app/layout.tsx'
+      - 'scripts/verify_service_point_qr.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - '.github/workflows/migration-baseline-ci.yml'
+      - '.github/workflows/service-point-qr-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/prisma/migrations/**'
+      - 'services/api/app/service_points.py'
+      - 'services/api/app/app_entry.py'
+      - 'services/api/app/operations.py'
+      - 'apps/web/app/p/**'
+      - 'apps/web/app/service-point.css'
+      - 'apps/web/components/ServicePointRuntime.tsx'
+      - 'apps/admin/components/ServicePointsBoard.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/admin/app/service-points.css'
+      - 'apps/admin/app/layout.tsx'
+      - 'scripts/verify_service_point_qr.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - '.github/workflows/migration-baseline-ci.yml'
+      - '.github/workflows/service-point-qr-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  service-point-qr:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      COOKIE_SECURE: false
+      GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:3000
+      SERVICE_POINT_PUBLIC_BASE_URL: http://127.0.0.1:3000
+      RESORT_CORE_TEST_URL: http://127.0.0.1:8000
+      BOOTSTRAP_OWNER_USERNAME: service-point-owner
+      BOOTSTRAP_OWNER_PASSWORD: Service-Point-Owner-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: Service Point Owner
+      SERVICE_POINT_TECH_USERNAME: service-point-tech
+      SERVICE_POINT_TECH_PASSWORD: Service-Point-Tech-2026
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate and deploy canonical Prisma migration chain
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+
+      - name: Verify release ledger includes Service Point migration
+        run: python scripts/release_contract_test.py
+
+      - name: Typecheck and build public Service Point QR surface
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Resort OS Service Point manager surface
+        working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install and compile Resort Core and verifier
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts/verify_service_point_qr.py scripts/upsert_staff_user.py
+
+      - name: Seed hotel and Service Point test roles
+        run: |
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+          STAFF_USERNAME="$SERVICE_POINT_TECH_USERNAME" STAFF_PASSWORD="$SERVICE_POINT_TECH_PASSWORD" STAFF_DISPLAY_NAME='Service Point Technician' STAFF_ROLE=TECHNICIAN python scripts/upsert_staff_user.py
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/service-point-api.log 2>&1 &
+          echo $! > /tmp/service-point-api.pid
+          for i in {1..30}; do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/service-point-ready.json 2>/dev/null; then break; fi
+            if [ "$i" = "30" ]; then cat /tmp/service-point-api.log; exit 1; fi
+            sleep 1
+          done
+
+      - name: Run Service Point QR lifecycle E2E
+        run: python scripts/verify_service_point_qr.py
+
+      - name: Show Resort Core logs on failure
+        if: failure()
+        run: cat /tmp/service-point-api.log || true
+
+      - name: Stop Resort Core
+        if: always()
+        run: |
+          if [ -f /tmp/service-point-api.pid ]; then kill "$(cat /tmp/service-point-api.pid)" || true; fi
