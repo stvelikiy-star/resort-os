@@ -49,6 +49,9 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_engagements_score_check",
         "guest_engagements_score_kind_check",
         "guest_engagements_feedback_reservation_check",
+        "service_points_category_check",
+        "service_point_qrs_revocation_check",
+        "operational_tasks_service_point_context_check",
     }
 )
 
