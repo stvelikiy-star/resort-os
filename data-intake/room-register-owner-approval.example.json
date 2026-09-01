@@ -1,0 +1,11 @@
+{
+  "status": "NOT_APPROVED",
+  "rooms_sha256": null,
+  "room_count": 84,
+  "approved_by": null,
+  "approved_at": null,
+  "evidence_ref": null,
+  "reviewed_issue_ids": [],
+  "resolved_question_ids": [],
+  "note": "Template only. OWNER_APPROVED requires corrected BLOCKER rows in canonical rooms.csv, exact checksum, explicit acknowledgement of all current grouped REVIEW/POLICY_REVIEW issues, and resolution of all 13 captured Drive OWNER_CHECKLIST P0/P1 questions."
+}
