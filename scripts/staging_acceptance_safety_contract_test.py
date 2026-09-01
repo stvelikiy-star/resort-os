@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from staging_acceptance import MUTATION_ACK, validate_staging_mutation_target
+from staging_acceptance import MUTATION_ACK, runtime_mutation_ack, validate_staging_mutation_target
 
 
 def expect_green(label: str, *, app_env: str, url: str, ack: str):
@@ -73,11 +73,12 @@ def main() -> int:
         ack=MUTATION_ACK,
     )
 
-    # The pure validator must never inherit CI state implicitly. Trusted CI
-    # bypass, if any, belongs to the outer runtime guard and only for loopback.
-    old = os.environ.get("GITHUB_ACTIONS")
+    old_actions = os.environ.get("GITHUB_ACTIONS")
+    old_ack = os.environ.get("STAGING_ACCEPTANCE_MUTATIONS")
+    os.environ.pop("STAGING_ACCEPTANCE_MUTATIONS", None)
     os.environ["GITHUB_ACTIONS"] = "true"
     try:
+        # Pure validation never inherits CI state.
         expect_red(
             "validator still requires explicit ack under CI",
             "explicit opt-in is missing",
@@ -85,11 +86,28 @@ def main() -> int:
             url="http://127.0.0.1:18000",
             ack="",
         )
+        assert runtime_mutation_ack("http://127.0.0.1:18000") == MUTATION_ACK
+        assert runtime_mutation_ack("http://localhost:18000") == MUTATION_ACK
+        assert runtime_mutation_ack("https://api-staging.3korony.com") == ""
+        assert runtime_mutation_ack("https://api.3korony.com") == ""
     finally:
-        if old is None:
+        if old_actions is None:
             os.environ.pop("GITHUB_ACTIONS", None)
         else:
-            os.environ["GITHUB_ACTIONS"] = old
+            os.environ["GITHUB_ACTIONS"] = old_actions
+        if old_ack is None:
+            os.environ.pop("STAGING_ACCEPTANCE_MUTATIONS", None)
+        else:
+            os.environ["STAGING_ACCEPTANCE_MUTATIONS"] = old_ack
+
+    os.environ["STAGING_ACCEPTANCE_MUTATIONS"] = MUTATION_ACK
+    try:
+        assert runtime_mutation_ack("https://api-staging.3korony.com") == MUTATION_ACK
+    finally:
+        if old_ack is None:
+            os.environ.pop("STAGING_ACCEPTANCE_MUTATIONS", None)
+        else:
+            os.environ["STAGING_ACCEPTANCE_MUTATIONS"] = old_ack
 
     print("PASS: staging acceptance mutation safety adversarial contract")
     return 0
