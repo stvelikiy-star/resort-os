@@ -1,4 +1,5 @@
 import hashlib
+import ipaddress
 import os
 import secrets
 import uuid
@@ -15,6 +16,13 @@ PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "12"))
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
 COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN") or None
+AUTH_TRUST_PROXY_HEADERS = os.environ.get("AUTH_TRUST_PROXY_HEADERS", "false").lower() in {"1", "true", "yes"}
+AUTH_LOGIN_WINDOW_SECONDS = max(30, int(os.environ.get("AUTH_LOGIN_WINDOW_SECONDS", "900")))
+AUTH_LOGIN_PAIR_MAX_FAILURES = max(2, int(os.environ.get("AUTH_LOGIN_PAIR_MAX_FAILURES", "5")))
+AUTH_LOGIN_IP_MAX_FAILURES = max(
+    AUTH_LOGIN_PAIR_MAX_FAILURES + 1,
+    int(os.environ.get("AUTH_LOGIN_IP_MAX_FAILURES", "30")),
+)
 
 password_hasher = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -35,6 +43,115 @@ class AuthUser(BaseModel):
 
 def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _invalid_login() -> HTTPException:
+    # Keep the same response for an unknown user, bad password and throttled request.
+    # Do not expose whether a username exists or whether a throttle threshold was hit.
+    return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+
+
+def _client_ip(request: Request) -> str:
+    direct = request.client.host if request.client and request.client.host else "unknown"
+    if not AUTH_TRUST_PROXY_HEADERS:
+        return direct
+
+    # X-Forwarded-For is trusted only when explicitly enabled for a deployment where
+    # Resort Core is reachable exclusively through the controlled reverse proxy.
+    forwarded = request.headers.get("x-forwarded-for", "")
+    candidate = forwarded.split(",", 1)[0].strip() if forwarded else ""
+    if not candidate:
+        return direct
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return direct
+
+
+def _throttle_key(kind: str, *parts: str) -> str:
+    digest = hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
+    return f"{kind}:{digest}"
+
+
+def _throttle_keys(username: str, client_ip: str) -> tuple[str, str]:
+    pair_key = _throttle_key("PAIR", PROPERTY_CODE, username, client_ip)
+    ip_key = _throttle_key("IP", PROPERTY_CODE, client_ip)
+    return pair_key, ip_key
+
+
+async def _login_is_throttled(conn, property_id: uuid.UUID, pair_key: str, ip_key: str) -> bool:
+    window_start = datetime.utcnow() - timedelta(seconds=AUTH_LOGIN_WINDOW_SECONDS)
+    pair_reset = await conn.fetchval(
+        '''
+        SELECT max("createdAt")
+        FROM audit_logs
+        WHERE "propertyId"=$1
+          AND action='LOGIN_THROTTLE_RESET'
+          AND resource='AuthThrottle'
+          AND "resourceId"=$2
+        ''',
+        property_id,
+        pair_key,
+    )
+    pair_since = max(window_start, pair_reset) if pair_reset else window_start
+    pair_failures = await conn.fetchval(
+        '''
+        SELECT count(*)::int
+        FROM audit_logs
+        WHERE "propertyId"=$1
+          AND action='LOGIN_FAILED'
+          AND resource='AuthThrottle'
+          AND "resourceId"=$2
+          AND "createdAt">=$3
+        ''',
+        property_id,
+        pair_key,
+        pair_since,
+    )
+    ip_failures = await conn.fetchval(
+        '''
+        SELECT count(*)::int
+        FROM audit_logs
+        WHERE "propertyId"=$1
+          AND action='LOGIN_FAILED'
+          AND resource='AuthThrottle'
+          AND "resourceId"=$2
+          AND "createdAt">=$3
+        ''',
+        property_id,
+        ip_key,
+        window_start,
+    )
+    return pair_failures >= AUTH_LOGIN_PAIR_MAX_FAILURES or ip_failures >= AUTH_LOGIN_IP_MAX_FAILURES
+
+
+async def _record_login_failure(conn, property_id: uuid.UUID, pair_key: str, ip_key: str) -> None:
+    # Only one-way fingerprints are persisted. Raw usernames, IPs, passwords and tokens
+    # are deliberately excluded from throttle evidence.
+    await conn.executemany(
+        '''
+        INSERT INTO audit_logs (
+            id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt"
+        ) VALUES ($1,$2,'SYSTEM',NULL,'LOGIN_FAILED','AuthThrottle',$3,'AUTH_THROTTLE','FAILURE',now())
+        ''',
+        [
+            (uuid.uuid4(), property_id, pair_key),
+            (uuid.uuid4(), property_id, ip_key),
+        ],
+    )
+
+
+async def _record_pair_reset(conn, property_id: uuid.UUID, pair_key: str) -> None:
+    await conn.execute(
+        '''
+        INSERT INTO audit_logs (
+            id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt"
+        ) VALUES ($1,$2,'SYSTEM',NULL,'LOGIN_THROTTLE_RESET','AuthThrottle',$3,'AUTH_THROTTLE','SUCCESS',now())
+        ''',
+        uuid.uuid4(),
+        property_id,
+        pair_key,
+    )
 
 
 async def current_user(request: Request) -> dict[str, Any]:
@@ -94,7 +211,17 @@ def require_roles(*allowed_roles: str) -> Callable:
 @router.post("/login", response_model=AuthUser)
 async def login(payload: LoginPayload, request: Request, response: Response):
     username = payload.username.strip().lower()
+    client_ip = _client_ip(request)
+    pair_key, ip_key = _throttle_keys(username, client_ip)
+
     async with request.app.state.db.acquire() as conn:
+        property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', PROPERTY_CODE)
+        if not property_id:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Property not loaded")
+
+        if await _login_is_throttled(conn, property_id, pair_key, ip_key):
+            raise _invalid_login()
+
         row = await conn.fetchrow(
             '''
             SELECT u.id, u.username, u."displayName", u."passwordHash", u.role::text AS role,
@@ -108,12 +235,14 @@ async def login(payload: LoginPayload, request: Request, response: Response):
         )
 
         if not row or not row["isActive"]:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+            await _record_login_failure(conn, property_id, pair_key, ip_key)
+            raise _invalid_login()
 
         try:
             password_hasher.verify(row["passwordHash"], payload.password)
         except VerificationError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+            await _record_login_failure(conn, property_id, pair_key, ip_key)
+            raise _invalid_login()
 
         if password_hasher.check_needs_rehash(row["passwordHash"]):
             await conn.execute(
@@ -148,6 +277,7 @@ async def login(payload: LoginPayload, request: Request, response: Response):
             str(row["id"]),
             str(session_id),
         )
+        await _record_pair_reset(conn, property_id, pair_key)
 
     response.set_cookie(
         SESSION_COOKIE,
