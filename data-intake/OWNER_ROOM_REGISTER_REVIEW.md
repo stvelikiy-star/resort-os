@@ -28,8 +28,9 @@ The tool reads only the canonical CSV and reports:
 - exact CSV SHA-256;
 - room count / unique codes / room-type count;
 - structural errors;
-- `BLOCKER` issues;
-- `REVIEW` issues.
+- `BLOCKER` owner issues;
+- `REVIEW` owner-label issues;
+- optional `ENRICHMENT` gaps.
 
 ### BLOCKER
 
@@ -39,16 +40,20 @@ A register cannot be marked OWNER_APPROVED while any BLOCKER remains. The correc
 
 ### REVIEW
 
-A REVIEW item means an operational field is not confirmed or a label needs explicit owner acknowledgement. Examples:
+A REVIEW item is limited to the physical room-label information the owner actually works with in the chessboard:
 
-- `building_or_zone=UNKNOWN`;
-- `floor=UNKNOWN`;
-- `capacity_children=UNKNOWN`;
-- `operational_status=UNKNOWN`;
 - empty `bed_configuration`;
-- preserved bed abbreviations with an unresolved legend.
+- preserved bed abbreviations whose semantic legend is explicitly marked as requiring confirmation.
 
-A REVIEW item may remain only if the owner explicitly reviewed the exact register revision and acknowledged it as acceptable for production. The approval manifest must list every current REVIEW issue ID exactly.
+A REVIEW item may remain only if the owner explicitly reviewed the exact register revision and acknowledged it as acceptable. The approval manifest must list every current REVIEW issue ID exactly.
+
+### ENRICHMENT
+
+`building_or_zone`, `floor` and `capacity_children` UNKNOWN values are reported separately as useful metadata enrichment. They do **not** by themselves block approval of the screenshot-style physical room register.
+
+`operational_status` is deliberately excluded from permanent owner-register approval because room operational state is runtime PMS truth (`CLEAN`, `DIRTY`, `IN_INSPECTION`, `TECH_BLOCK`), not a static physical-room attribute.
+
+This separation prevents a 300+ item pseudo-review from obscuring the smaller set of facts the owner actually needs to confirm.
 
 ## Owner approval evidence
 
@@ -84,6 +89,7 @@ Do not commit private credentials or secrets in approval evidence.
 - Do not infer what red/black text meant in the screenshots.
 - Do not silently correct odd source text such as the current room 223 bed label.
 - Do not turn the development count of 84 into an owner-approval claim.
+- Do not treat runtime `operational_status` as a permanent room-register fact.
 - Do not create a second spreadsheet/JSON inventory that can drift from `rooms.csv`.
 
 ## Launch relationship
