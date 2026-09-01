@@ -7,6 +7,7 @@ on:
       - 'apps/admin/**'
       - 'scripts/verify_pms_owner_grid.py'
       - 'scripts/pms_owner_grid_browser.mjs'
+      - 'scripts/pms_room_labels_contract.mjs'
       - 'data-intake/**'
       - 'packages/database/**'
       - '.github/workflows/pms-owner-grid-ci.yml'
@@ -87,6 +88,9 @@ jobs:
           npm install --no-audit --no-fund
           npm run typecheck
           npm run build
+
+      - name: Contract — real owner labels and compact cells
+        run: node --experimental-strip-types scripts/pms_room_labels_contract.mjs
 
       - name: Install Playwright Chromium
         working-directory: apps/admin
