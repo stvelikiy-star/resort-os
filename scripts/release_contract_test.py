@@ -15,8 +15,8 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 7
-    assert EXPECTED_MIGRATIONS[-1] == "6_service_point_qr_operations"
+    assert len(EXPECTED_MIGRATIONS) == 8
+    assert EXPECTED_MIGRATIONS[-1] == "7_kitchen_operations"
     assert len(CRITICAL_CONSTRAINTS) == 27
     assert {
         "service_points_category_check",
@@ -25,8 +25,8 @@ def main() -> int:
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact seven-migration release ledger is fail-closed")
-    print("PASS: Service Point QR operations migration is part of the canonical release boundary")
+    print("PASS: exact eight-migration release ledger is fail-closed")
+    print("PASS: Kitchen operations migration is part of the canonical release boundary")
     print("PASS: current critical constraint fingerprint contains 27 constraints")
     return 0
 
