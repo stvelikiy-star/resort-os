@@ -12,11 +12,11 @@
     ]
   },
   "external_evidence": {
-    "owner_room_register": {
+    "room_reconciliation": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Owner-approved physical 84-room production register is still required. Development seed count is not owner approval."
+      "note": "Physical room import gate #38 is closed. On the real external staging database, run the approved importer dry-run, review the diff against the canonical 84-room register, then record safe reconciliation evidence."
     },
     "beget_host_preflight": {
       "status": "NOT_VERIFIED",
