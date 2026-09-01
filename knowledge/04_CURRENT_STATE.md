@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.0
+Version: 3.1
 Date: 2026-09-01
-Status: INTEGRATION RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
+Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
 Authority: factual implementation reality only
 
@@ -12,13 +12,14 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
+Current integration head: `42798b3fd360b5f5a6a4eb2124b1231702c99eea`.
+Latest tested exact PR head: `da3cc80f3c13973f799c01ddd8ad64ed79c17f6f`.
 
-Block 11 merged integration head: `91699f70f774726eb61a9882ccbdfe5944471856`.
-Audited PR feature head: `7e8193447fc09dff2c375b5aa63ce4573e8210a8`.
+The current merge commit has **0 changed files** versus that tested PR head. The exact PR head completed **20/20 triggered workflow contours successfully**, including Resort Core, Full Staging Gate, Single Server Production Package, Public Browser Acceptance, Public Site Truth, dependency security, realtime, operations, backup/restore and the dedicated Site Content Runtime regression.
 
-The audited feature head completed **37/37 pull-request workflow contours successfully** before merge. Evidence includes Service Point QR, Resort Core, PMS, Guest OS, Guest CRM, Guest Services, Finance, Owner analytics/control, Public Browser/Public Truth, migration baseline, backup/restore, dependency security, Beget hardening, production package and Full Staging.
+Earlier closed gates retain their own exact-head CI evidence, including canonical 84-room PMS acceptance, Security #42 and physical room import gate #38.
 
-The merge commit contains the reviewed tree; it is not evidence of external production deployment.
+The current merge commit contains the reviewed tree; it is not evidence of external production deployment.
 
 ## Authority
 
@@ -38,7 +39,7 @@ Verified committed migration chain:
 
 Exact seven-migration ledger, 27 critical domain constraints, clean migration deployment and backup -> clean restore are CI-verified.
 
-The development intake currently seeds 84 rooms / 12 room types. This count is **not** equivalent to final owner approval of the physical production register.
+Canonical room intake/import gate #38 is **CLOSED / COMPLETED** at 84 rooms / 12 mapped categories with fail-closed importer, drift protection and reviewed import contract. No new owner room questionnaire is required. On a real external staging database, reconciliation must still be run as dry-run -> diff review -> safe apply evidence.
 
 ## Public site
 
@@ -50,7 +51,9 @@ Verified in repository/CI:
 - Core availability/pricing and ReservationRequest boundary;
 - no fixed 30% prepayment claim;
 - no automatic reservation/payment confirmation;
-- current approved contact/service facts.
+- current approved contact/service facts;
+- CMS -> Core -> public runtime linkage;
+- locale-safe CMS fallback and CMS ownership after RU/KG/EN localization.
 
 External rendered production truth is not yet verified on a real staging/production host.
 
@@ -68,9 +71,10 @@ Canonical PMS includes:
 - realtime/audit;
 - factual RoomAssignment relocation;
 - checkout -> DIRTY/housekeeping lifecycle;
-- Reception read/check-in/check-out/QR authority without financial/commercial mutation authority.
+- Reception read/check-in/check-out/QR authority without financial/commercial mutation authority;
+- Admin fail-closed role boundary: only OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN enter Admin/PMS; other operational roles remain in Staff PWA.
 
-The current 84-row development intake largely reflects owner-provided room labels, but the final physical owner-approved register remains an external launch blocker.
+The canonical 84-room import contract is closed. External target reconciliation remains a deployment evidence step, not a data-collection blocker.
 
 ## Stay / Guest OS / CRM
 
@@ -150,7 +154,9 @@ Repository/CI:
 - dependency security inspection: VERIFIED;
 - production package build: VERIFIED IN CI;
 - CI-local Full Staging: VERIFIED;
-- Beget hardening logic: VERIFIED IN CI only.
+- Beget hardening logic: VERIFIED IN CI only;
+- physical room import gate #38: CLOSED / VERIFIED by its own exact-head evidence;
+- launch verifier: fail-closed and requires real target room reconciliation rather than repeating room-data approval.
 
 External/production:
 
@@ -158,7 +164,7 @@ External/production:
 - full rollback backup of currently live legacy site: NOT VERIFIED;
 - external HTTPS/WSS staging: NOT VERIFIED;
 - external rendered public-truth probe: NOT VERIFIED;
-- final owner-approved physical 84-room register: NOT VERIFIED;
+- real staging room reconciliation against canonical 84-room register: NOT VERIFIED;
 - real iPhone/Android/desktop/Telegram acceptance: NOT VERIFIED;
 - launch-enabled provider E2E: NOT VERIFIED or NOT REQUIRED if providers stay disabled;
 - real monitoring/alerting evidence: NOT VERIFIED;
@@ -170,7 +176,7 @@ External/production:
 
 Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md` and `scripts/verify_launch_acceptance.py`.
 
-Production remains **STOP** until every required external evidence gate is VERIFIED. CI success alone does not authorize DNS switch, provider activation or production declaration.
+Production remains **STOP** until every required external evidence gate is VERIFIED. The room-register approval gate itself is already closed; the external manifest requires target reconciliation evidence instead. CI success alone does not authorize DNS switch, provider activation or production declaration.
 
 ## Extension rule
 
