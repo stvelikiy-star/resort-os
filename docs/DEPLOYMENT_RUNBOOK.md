@@ -1,51 +1,27 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 3.0
-Date: 2026-09-01
-Status: RELEASE-CANDIDATE HANDOFF / CI-LOCAL VERIFIED / EXTERNAL CUTOVER STOP
+Version: 3.1
+Date: 2026-09-02
+Status: RELEASE-CANDIDATE HANDOFF / CI-LOCAL VERIFICATION REQUIRED / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment and cutover. It is **not evidence that production deployment has happened**.
 
 Canonical implementation state: `knowledge/04_CURRENT_STATE.md`.
 Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md`.
+Canonical release manifest: `release/current-rc.json`.
 
 **CI VERIFIED != EXTERNAL VERIFIED != PRODUCTION VERIFIED.**
 
 ---
 
-## 1. Current release boundary
+## 1. Release authority
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Current integration release candidate before this documentation-only launch-gate audit: `42798b3fd360b5f5a6a4eb2124b1231702c99eea`.
-Tested PR #84 exact head: `da3cc80f3c13973f799c01ddd8ad64ed79c17f6f`.
 
-The integration merge commit has **0 changed files** versus that tested exact head. PR #84 completed **20/20 triggered workflows successfully**, including Resort Core, Full Staging Gate, Public Browser Acceptance, Public Site Truth, Single Server Production Package, security, realtime, operations, backup/restore and the dedicated Site Content Runtime regression. Earlier closed product gates retain their own exact-head CI evidence.
+Only an exact integration SHA whose full applicable regression and release gates are green may be frozen as the internal RC. Historical Vercel previews and stale `main` are not release authority.
 
-This repository evidence does not constitute external Beget staging or production acceptance.
-
-Key verified contours include:
-
-- Resort Core;
-- Full Staging Gate;
-- Single Server Production Package;
-- Production Migration Baseline;
-- PostgreSQL Backup Restore;
-- Dependency Security Inspection;
-- PMS Owner Grid and PMS Chessboard Mutation;
-- Realtime PMS;
-- Reception RBAC;
-- Guest OS Core / Access / Requests;
-- Guest CRM;
-- Guest Services Center;
-- Finance Control;
-- Owner Intelligence / Control V2 / Growth / Dashboard Analytics;
-- Public Site Truth and Public Browser Acceptance;
-- Unified Inbox / AI Unified Communications / AI Sales / AI Administrator;
-- n8n Resort Core and Automation contracts;
-- Staff Voice / Hotel Operations;
-- Service Point QR;
-- NFC Deferred Scope.
+The merge tree must be compared against the exact tested PR head. A non-empty tested-head -> merge diff invalidates the evidence and requires another regression cycle.
 
 ---
 
@@ -58,14 +34,14 @@ Approved V1 topology:
 - FastAPI Resort Core;
 - public Next.js site;
 - Resort OS admin/PMS;
-- staff PWA;
+- staff PWA, including Kitchen Admin;
 - pinned n8n runtime when automation is enabled;
 - persistent PostgreSQL/media/n8n state;
-- local backup directory plus off-site copy.
+- local backup directory plus verified off-site copy.
 
 Canonical authority:
 
-`PUBLIC SITE / PMS / STAFF / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`.
+`PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`.
 
 NFC acquiring/wallet remains outside active V1 runtime.
 
@@ -82,8 +58,9 @@ Committed migration chain:
 5. `4_guest_engagements`
 6. `5_guest_os_core`
 7. `6_service_point_qr_operations`
+8. `7_kitchen_operations`
 
-Production migration mechanism:
+Production/staging migration mechanism:
 
 ```bash
 npx prisma migrate deploy
@@ -91,14 +68,14 @@ npx prisma migrate deploy
 
 Do **not** use `prisma db push` for production migration.
 
-Current critical PostgreSQL domain fingerprint: **27 constraints**, defined canonically in `scripts/release_contract.py`.
+The shared release contract maintains 27 critical hotel/payment domain constraints. Kitchen migration/domain gates additionally verify menu/table/order/item constraints and the unique GuestTask -> KitchenOrder link.
 
 Production evidence must capture:
 
 - exact release SHA/image set;
 - backup before migration;
 - migration command/result;
-- exact seven-migration ledger;
+- exact eight-migration ledger;
 - readiness/smoke result;
 - tested restore path.
 
@@ -108,16 +85,11 @@ Production evidence must capture:
 
 `ReservationRequest != Reservation`.
 
-Human OWNER/MANAGER retains reservation confirmation and payment fact authority.
+OWNER/MANAGER retain reservation confirmation and payment fact authority.
 
-AI/n8n must not:
+AI/n8n must not guarantee a Reservation, confirm payment, invent a fixed prepayment percentage/payment route, bypass Core pricing/availability or write generic business state directly to PostgreSQL.
 
-- guarantee a Reservation;
-- confirm payment;
-- invent a fixed prepayment percentage;
-- invent payment QR/link/instructions;
-- bypass Core availability/pricing;
-- write PostgreSQL directly as a generic business interface.
+Kitchen is also Core-backed. `KitchenOrder.totalKgs` is an operational amount and does **not** automatically create `Payment` or change `Reservation.totalKgs`.
 
 Growth outbound authority remains `NONE_AUTOMATIC`.
 
@@ -125,23 +97,21 @@ Growth outbound authority remains `NONE_AUTOMATIC`.
 
 ## 5. Hard external production blockers
 
-Issue #38 physical room truth/import safety is already **CLOSED / COMPLETED**. The canonical 84-room / 12-category register and fail-closed importer contract are no longer an owner-questionnaire blocker.
+Physical room import gate #38 is already closed at the canonical 84-room / 12-category register. Do not collect the room register again.
 
 Production cutover remains **STOP** while any required external evidence is missing:
 
-1. real staging database reconciliation against the closed #38 canonical 84-room register, with importer dry-run and diff review before apply;
+1. real target room reconciliation against the canonical register;
 2. actual Beget host/account non-destructive preflight;
-3. verified full rollback backup of currently live `3korony.com` target;
-4. isolated external HTTPS/WSS staging on real infrastructure;
-5. external public-truth probe against that staging;
-6. real iPhone/Android/desktop/Telegram/staff acceptance;
-7. real provider E2E for every provider enabled at launch;
+3. verified rollback backup of the currently live legacy target;
+4. isolated external HTTPS/WSS staging;
+5. external public-truth probe;
+6. real iPhone/Android/desktop/Telegram/staff/Kitchen acceptance;
+7. provider E2E for every provider enabled at launch;
 8. real monitoring/alerting evidence;
-9. fresh pre-cutover backup evidence;
+9. fresh pre-cutover database backup and off-site copy;
 10. exact DNS rollback capture;
 11. explicit final owner cutover approval.
-
-Do not ask for or reconstruct a new room register. External reconciliation must use the canonical closed #38 evidence and must fail closed on drift.
 
 No GitHub CI result by itself authorizes production DNS switch or provider activation.
 
@@ -149,17 +119,15 @@ No GitHub CI result by itself authorizes production DNS switch or provider activ
 
 ## 6. Fail-closed launch evidence
 
-Template:
+Template: `release/launch-evidence.example.json`.
 
-`release/launch-evidence.example.json`
-
-Repository verifier:
+Repository gate:
 
 ```bash
 python scripts/verify_launch_acceptance.py --mode repository
 ```
 
-Final structural cutover verifier after real evidence is collected outside secrets storage:
+Final structural evidence gate:
 
 ```bash
 python scripts/verify_launch_acceptance.py \
@@ -168,213 +136,141 @@ python scripts/verify_launch_acceptance.py \
   --release-sha <exact-accepted-release-sha>
 ```
 
-The verifier validates supplied evidence metadata. It does not manufacture or independently observe external evidence.
+The verifier validates evidence metadata. It does not manufacture external evidence.
 
 ---
 
-## 7. Non-destructive host gate
+## 7. Preserve the current live target first
 
-Before installing, stopping, replacing or reconfiguring anything on the actual target host:
-
-```bash
-bash scripts/host_preflight.sh
-```
-
-Interpretation:
-
-- `RESULT: PASS` — host capability checks passed;
-- `RESULT: PASS WITH WARNINGS` — warnings require review;
-- `RESULT: BLOCKED` — stop deployment.
-
-Host capability does not prove application correctness over public HTTPS/WSS.
-
----
-
-## 8. Preserve the current live site first
-
-Do not overwrite the existing public target and do not switch DNS until rollback evidence exists.
-
-Minimum rollback package:
+Before replacing anything on the actual host, require the fail-closed legacy rollback package:
 
 - provider/account identified;
-- current DNS records captured;
-- current web root/app source archived;
-- current legacy DB dumped if applicable;
+- current DNS captured;
+- live source/web root archived;
+- legacy DB dumped if applicable;
 - uploads/media archived;
-- web-server/vhost config captured where accessible;
-- runtime/config captured where applicable;
-- backup checksum, size and timestamp recorded;
-- restore target/procedure identified;
-- rollback owner recorded.
+- reverse-proxy/runtime configuration captured;
+- checksum/size/timestamp recorded;
+- restore target/procedure and rollback owner recorded;
+- off-site copy verified.
 
-A public HTML crawl is not a full rollback backup.
+A public HTML crawl is not a rollback backup.
 
 ---
 
-## 9. External staging deployment
+## 8. External staging sequence
 
-Use an isolated staging hostname. Do not point the live apex to the new stack.
-
-Sequence:
+Use an isolated staging hostname; never point the live apex at an unaccepted release.
 
 1. verify legacy rollback package;
 2. run actual-host preflight;
-3. prepare secrets out-of-band;
-4. provision persistent storage/volumes;
+3. provision secrets out-of-band;
+4. provision persistent storage;
 5. start private PostgreSQL;
-6. apply all seven committed migrations;
-7. run the canonical physical-room importer against the staging database in dry-run mode, review the exact diff against the closed #38 84-room register, then apply only the reviewed reconciliation;
-8. load other approved/evidence-backed production data;
+6. apply all eight committed migrations;
+7. run canonical room importer dry-run against staging, review the exact diff, then safely reconcile;
+8. load only approved factual data;
 9. bootstrap authorized users out-of-band;
-10. build/pull the exact accepted release;
-11. start Caddy + web/admin/staff/Core + n8n as required;
-12. keep PostgreSQL private;
-13. verify readiness, HTTPS, WSS, cookies, CORS and persistence externally.
+10. build/deploy the exact accepted release SHA;
+11. verify image revision labels match that SHA;
+12. start edge, Core, public, Admin, Staff/Kitchen and required n8n services;
+13. verify HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL;
+14. run the unified external staging acceptance runner and retain its checksum-backed evidence manifest.
 
 ---
 
-## 10. External acceptance matrix
+## 9. Acceptance matrix
 
-### Infrastructure
+### Public / Booking
 
-Verify:
-
-- valid public HTTPS;
-- intended HTTP -> HTTPS redirect;
-- API readiness;
-- real-browser WSS upgrade;
-- PostgreSQL not publicly exposed;
-- persistence survives restart;
-- logs accessible;
-- backup path writable;
-- monitoring/alerting active.
-
-### Public site
-
-Verify real rendered RU/KG/EN pages, rooms, approved facts, availability/pricing through Core and `ReservationRequest` creation without automatic Reservation/Payment confirmation.
-
-Run:
-
-```bash
-python3 scripts/external_public_truth_probe.py https://<staging-host>/
-```
+Verify RU/KG/EN rendered truth, availability/pricing through Core and `ReservationRequest` creation without automatic Reservation/Payment confirmation.
 
 ### PMS / Reception
 
-Verify with isolated dates:
+Verify:
 
-`ReservationRequest -> manager decision/payment fact -> Reservation -> chessboard -> check-in -> optional move/Split Stay -> optional Guest Service -> check-out -> housekeeping`.
+`ReservationRequest -> manager decision/payment fact -> Reservation -> chessboard -> CLEAN check-in -> Stay/RoomAssignment -> optional move/Split Stay -> checkout -> DIRTY -> housekeeping`.
 
-Also verify stale/conflict rejection, realtime, TECH_BLOCK, CLEAN check-in gate, AuditLog and Reception RBAC.
+Also verify stale/conflict rejection, realtime, TECH_BLOCK and RBAC.
 
 ### Guest OS / CRM
 
+Verify Room QR, PIN/session, requests, relocation, repeated guest history, checkout session revocation and factual room assignment.
+
+### Kitchen
+
 Verify:
 
-- Room QR resolve;
-- PIN/session on real device;
-- Guest request -> staff -> DONE -> My Requests;
-- relocation changes factual RoomAssignment;
-- checkout revokes GuestSession;
-- repeated Guest history remains one fail-closed identity.
+- Dining Staff opens Kitchen Admin;
+- factual tables can be created/edited without code changes;
+- draft menu can be edited/disabled/repriced;
+- table order and room/Stay order use server-derived totals;
+- Guest OS order reaches Kitchen;
+- `NEW -> ACCEPTED -> COOKING -> READY -> SERVED` works;
+- successful check-in creates exactly one Dining arrival card;
+- repair sync does not duplicate it;
+- Kitchen order does not create Hotel `Payment` or alter `Reservation.totalKgs`;
+- completed table orders free the table when no other active order remains.
 
 ### Service Point QR
 
-Verify at least one real printed/displayed common-area QR:
-
-`scan -> safe point metadata -> anonymous request -> correct OperationalTask role -> DONE`.
-
-Verify old QR after rotation/revoke no longer resolves. This QR must not expose Guest/Reservation/Payment data and must not activate NFC.
+Verify anonymous point QR routing without Guest/Stay/Reservation/Payment leakage. NFC must remain absent.
 
 ### Finance / Owner
 
-Verify debt/paid facts, checked-out debt, timezone boundary, owner dashboards, Action Center, history, Growth/NPS sample size and no fabricated forecast/automatic outbound authority.
+Verify factual Payment ledger, remaining/overpaid/debt including checked-out debt, owner dashboards and no automatic Kitchen posting into accommodation finance.
 
-### Staff
+### Staff / AI / messaging
 
-Verify MAID/TECHNICIAN mobile flows, Reception role, housekeeping inspection/rework and technician flow on real devices.
-
-### AI / messaging
-
-Website remains direct-Core for booking. Messaging providers, if launch-enabled, must prove real webhook authenticity, duplicate/idempotency handling, provider delivery evidence, unavailable-date behavior and ReservationRequest-only authority.
-
-If a provider is disabled at launch, mark it `NOT_REQUIRED`; do not simulate provider success.
+Verify real mobile MAID/TECHNICIAN/DINING flows and provider authenticity/idempotency for any messaging provider actually enabled at launch.
 
 ---
 
-## 11. Production preflight
+## 10. Production preflight and observability
 
-Production environment must pass `scripts/production_preflight.py` with actual secrets/env and database. Important checks include:
+The actual target must pass `scripts/production_preflight.py` with real target environment/database evidence.
 
-- `APP_ENV=production`;
-- secure cookies;
-- exact HTTPS CORS origins;
-- no test/bootstrap passwords;
-- production automation service key when required;
-- exact migrations/critical constraints;
-- unique physical room codes;
-- rates loaded;
-- recent verified backup marker.
+Before cutover require real evidence for:
 
-A synthetic CI pass of Beget hardening does not replace actual-host evidence.
-
----
-
-## 12. Observability minimum
-
-Before production approval require real evidence for:
-
-- API/app logs with timestamps/request context;
-- container restart visibility;
 - health/readiness monitoring;
-- PostgreSQL disk/storage monitoring;
-- backup-failure alerting;
 - HTTP 5xx visibility;
+- container restart visibility;
+- PostgreSQL disk/storage monitoring;
+- backup age/checksum/off-site presence;
+- backup-failure alerting;
+- TLS expiry monitoring;
 - AuditLog retention;
-- exact deployed commit/image identification.
+- exact deployed Git SHA/image identity.
 
 ---
 
-## 13. Controlled cutover
+## 11. Controlled cutover
 
-Only after every required launch-evidence gate is VERIFIED:
+Only after all required launch-evidence gates are VERIFIED:
 
-1. freeze accepted release SHA/images;
-2. take fresh pre-cutover backup;
-3. verify legacy rollback and DNS rollback target;
+1. freeze exact accepted SHA;
+2. take fresh pre-cutover backup and verify off-site copy;
+3. verify legacy rollback/DNS rollback target;
 4. rerun host and production preflight;
-5. confirm external staging/device/provider evidence;
+5. confirm staging/device/provider evidence;
 6. obtain explicit owner approval;
-7. deploy exact accepted release;
+7. deploy exact accepted image set;
 8. run readiness/smoke before public switch;
-9. switch DNS/routing in controlled window;
-10. run external public-truth and booking smoke;
-11. verify PMS/Guest OS/Staff/WSS;
-12. monitor errors/database/containers;
-13. roll back if acceptance criteria fail.
+9. switch DNS/routing in a controlled window;
+10. rerun external public/booking/PMS/Guest OS/Staff/Kitchen smoke;
+11. monitor errors/database/containers;
+12. roll back if acceptance criteria fail.
 
-Final DNS switch is a high-impact production action and requires explicit owner approval.
-
----
-
-## 14. Rollback
-
-Application rollback: redeploy the previously accepted image/release.
-
-Database rollback: use rehearsed backup/restore; do not improvise destructive reverse SQL.
-
-Public/DNS rollback: restore captured previous DNS/routing and rerun public smoke checks.
-
-Rollback is not available merely because older code exists in Git.
+Database rollback uses the rehearsed backup/restore path; do not improvise destructive reverse SQL.
 
 ---
 
-## 15. Current GO / STOP
+## 12. Current GO / STOP
 
-### GO — repository release-candidate engineering
+### GO — internal release engineering
 
-Current repository has a CI-verified internal release-candidate tree, a verified seven-migration/27-constraint release contract, closed Security #42 and closed physical room import gate #38. This documentation-only launch-gate audit must still pass its own exact-head CI before merge.
+The repository has a mature Core/PMS/Guest OS/Finance/Staff/Kitchen stack and fail-closed release tooling. The final internal RC is valid only after the current exact-head full regression is green and the RC truth manifest is refrozen to the resulting integration SHA.
 
-### STOP — external production cutover
+### STOP — external production declaration
 
-Production remains blocked by external evidence listed in section 5. Do not claim `PRODUCTION READY`, `LIVE` or `VERIFIED IN PRODUCTION` until those gates are supported by real evidence and the owner explicitly authorizes cutover.
+External Beget/production remains **NOT VERIFIED** until the real evidence in section 5 is collected. Do not claim `PRODUCTION READY`, `LIVE` or `VERIFIED IN PRODUCTION` solely from repository/CI success.
