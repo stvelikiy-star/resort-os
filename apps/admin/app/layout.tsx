@@ -18,6 +18,7 @@ import "./inbox.css";
 import "./staff.css";
 import "./room-detail.css";
 import "./room-qr.css";
+import "./service-points.css";
 import "./chessboard.css";
 import "./chessboard-lifecycle.css";
 import "./chessboard-payment.css";
