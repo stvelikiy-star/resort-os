@@ -10,7 +10,6 @@ import socket
 import subprocess
 import sys
 import tarfile
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -54,12 +53,11 @@ def archive_paths(output: Path, paths: list[tuple[str, Path]]) -> None:
 
 
 def run_checked(command: list[str], *, env: dict[str, str] | None = None, stdout_path: Path | None = None) -> None:
-    kwargs: dict[str, Any] = {"env": env, "stderr": subprocess.PIPE, "text": stdout_path is None}
     if stdout_path is not None:
         with stdout_path.open("wb") as handle:
             proc = subprocess.run(command, stdout=handle, stderr=subprocess.PIPE, check=False, env=env)
     else:
-        proc = subprocess.run(command, stdout=subprocess.PIPE, check=False, **kwargs)
+        proc = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False, env=env)
     if proc.returncode != 0:
         stderr = proc.stderr.decode("utf-8", "replace") if isinstance(proc.stderr, bytes) else (proc.stderr or "")
         raise RuntimeError(f"command failed ({command[0]}): {stderr.strip()[:500]}")
@@ -71,8 +69,7 @@ def capture_database(target: Path, env_name: str) -> dict[str, Any]:
         raise ValueError(f"database backup requested but environment variable {env_name} is empty")
     if shutil.which("pg_dump") is None:
         raise ValueError("pg_dump is required when database backup is requested")
-    env = os.environ.copy()
-    run_checked(["pg_dump", "--format=custom", "--no-owner", "--no-acl", database_url], env=env, stdout_path=target)
+    run_checked(["pg_dump", "--format=custom", "--no-owner", "--no-acl", database_url], env=os.environ.copy(), stdout_path=target)
     return {"path": target.name, "size_bytes": target.stat().st_size, "sha256": sha256(target), "format": "pg_dump_custom"}
 
 
@@ -106,6 +103,10 @@ def load_dns_snapshot(path: Path) -> dict[str, Any]:
     return data
 
 
+def write_manifest(path: Path, manifest: dict[str, Any]) -> None:
+    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Non-destructive legacy 3korony.com rollback capture")
     parser.add_argument("--web-root", required=True, help="Current live web root to archive; required and read-only")
@@ -120,13 +121,16 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        rollback_owner = args.rollback_owner.strip()
+        if not rollback_owner:
+            raise ValueError("rollback owner cannot be empty")
         web_root = require_readable(Path(args.web_root), "web root", directory=True)
         uploads = [require_readable(Path(item), "uploads/media path") for item in args.uploads]
         configs = [require_readable(Path(item), "config path") for item in args.config]
         output_root = Path(args.output_dir).expanduser().resolve()
         output_root.mkdir(parents=True, exist_ok=True)
-        if (output_root / "manifest.json").exists():
-            raise ValueError(f"refusing to overwrite completed rollback evidence: {output_root}")
+        if any(output_root.iterdir()):
+            raise ValueError(f"output directory must be empty to avoid mixing rollback evidence: {output_root}")
 
         dns = load_dns_snapshot(require_readable(Path(args.dns_snapshot_file), "DNS snapshot", directory=False)) if args.dns_snapshot_file else resolve_dns(args.domain)
         if dns.get("domain") != args.domain:
@@ -157,7 +161,7 @@ def main() -> int:
             "status": "CAPTURED_NOT_RESTORED",
             "domain": args.domain,
             "captured_at": utc_now(),
-            "rollback_owner": args.rollback_owner.strip(),
+            "rollback_owner": rollback_owner,
             "source": {
                 "web_root": str(web_root),
                 "uploads": [str(path) for path in uploads],
@@ -165,7 +169,7 @@ def main() -> int:
             },
             "artifacts": artifacts,
             "restore_rehearsal": {"status": "NOT_RUN"},
-            "offsite_copy": {"status": "NOT_REQUESTED" if not args.offsite_dir else "PENDING"},
+            "offsite_copy": {"status": "NOT_REQUESTED"},
             "safety": {
                 "mutates_live_site": False,
                 "changes_dns": False,
@@ -174,17 +178,29 @@ def main() -> int:
             },
         }
         manifest_path = output_root / "manifest.json"
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
+        destination: Path | None = None
         if args.offsite_dir:
             offsite_root = Path(args.offsite_dir).expanduser().resolve()
             offsite_root.mkdir(parents=True, exist_ok=True)
             destination = offsite_root / output_root.name
             if destination.exists():
                 raise ValueError(f"refusing to overwrite existing off-site rollback copy: {destination}")
+            manifest["offsite_copy"] = {"status": "COPIED", "path": str(destination)}
+
+        write_manifest(manifest_path, manifest)
+
+        if destination is not None:
             shutil.copytree(output_root, destination)
-            manifest["offsite_copy"] = {"status": "COPIED", "path": str(destination), "manifest_sha256": sha256(destination / "manifest.json")}
-            manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            copied_manifest = destination / "manifest.json"
+            if sha256(copied_manifest) != sha256(manifest_path):
+                raise RuntimeError("off-site manifest checksum differs from local manifest")
+            for name, spec in artifacts.items():
+                if isinstance(spec, dict) and spec.get("path"):
+                    local = output_root / spec["path"]
+                    remote = destination / spec["path"]
+                    if not remote.is_file() or sha256(remote) != sha256(local):
+                        raise RuntimeError(f"off-site artifact checksum mismatch: {name}")
 
         print(f"ROLLBACK_CAPTURE_OK output={output_root}")
         print(f"site_archive_sha256={artifacts['site_archive']['sha256']}")
