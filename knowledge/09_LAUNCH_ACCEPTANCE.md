@@ -113,6 +113,96 @@ The verifier validates supplied evidence metadata and fails closed on missing ga
 
 Do not commit credentials, provider tokens, database passwords or other production secrets into the evidence manifest.
 
+### 5A. External Beget operator sequence — mandatory order
+
+This is the approved fail-closed execution order after authorized Beget/SSH access exists. Stop immediately on any non-zero exit code. Do not skip forward and do not treat warnings as production approval.
+
+**Phase 0 — source boundary.** Work only from the accepted integration RC. Never deploy stale `main`.
+
+```bash
+python scripts/release_rc_truth_guard.py
+python scripts/beget_deployment_guard.py
+```
+
+**Phase 1 — non-destructive host and managed-infrastructure preflight.** These checks must run before changing the live site, DNS or application services.
+
+```bash
+bash scripts/host_preflight.sh
+python scripts/beget_env_preflight.py \
+  --env-file /secure/path/.env.staging \
+  --allow-staging \
+  --network
+```
+
+A host preflight `FAIL` blocks deployment. A host preflight warning must be explicitly resolved/accepted before production cutover; it is not equivalent to production readiness.
+
+**Phase 2 — legacy rollback capture and restore proof.** Use the actual live web root and actual evidence decisions. Do not invent paths or declare DB/uploads/config absent unless that absence has been verified. Secrets stay in environment variables or protected files, never command history/evidence manifests.
+
+Example shape when those real facts have been established:
+
+```bash
+python scripts/legacy_rollback_capture.py \
+  --web-root <ACTUAL_LIVE_WEB_ROOT> \
+  --output-dir <NEW_EMPTY_LOCAL_EVIDENCE_DIR> \
+  --domain 3korony.com \
+  --dns-snapshot-file <AUTHORITATIVE_DNS_JSON> \
+  --authoritative-dns-reviewed \
+  --offsite-dir <MOUNTED_OR_OFFSITE_DESTINATION> \
+  --rollback-owner <RESPONSIBLE_ROLE_OR_PERSON> \
+  <REAL_DB_OPTION> \
+  <REAL_UPLOADS_OPTION> \
+  <REAL_CONFIG_OPTION>
+```
+
+For the three decision placeholders above, use exactly one factual branch where required: `--database-url-env <ENV_NAME>` **or** `--database-absent-confirmed`; repeat `--uploads <PATH>` **or** use `--uploads-absent-confirmed`; repeat `--config <PATH>` **or** use `--config-absent-confirmed`.
+
+Then rehearse and verify the captured rollback package using the committed verifier, and only after the rehearsal is marked verified run the final rollback gate:
+
+```bash
+python scripts/legacy_rollback_verify.py <ROLLBACK_EVIDENCE_DIR> --mark-verified
+python scripts/legacy_rollback_gate.py <ROLLBACK_EVIDENCE_DIR>
+```
+
+`legacy_rollback_gate.py` must return `RESULT: CUTOVER_ROLLBACK_PREREQUISITE_GREEN`. Until then, **STOP: do not deploy external staging on any topology that risks the legacy live target and do not switch DNS/routing**.
+
+**Phase 3 — isolated external staging deployment.** Deploy the exact accepted release to staging-only hostnames/configuration. Apply the committed seven migrations with `prisma migrate deploy`, then reconcile the real staging database against the canonical 84-room register with importer dry-run/diff review before any safe apply. This phase must not route public production traffic.
+
+After application containers are running, prove that source checkout and all application images match the exact accepted release:
+
+```bash
+python scripts/deployment_release_linkage.py \
+  --expected-sha <EXACT_ACCEPTED_RELEASE_SHA> \
+  --compose-file compose.beget.yaml \
+  --env-file /secure/path/.env.staging \
+  --output <NON_SECRET_RELEASE_LINKAGE_JSON>
+```
+
+**Phase 4 — one atomic external acceptance run.** Use staging-only HTTPS/WSS URLs. This runner is fail-fast and writes one checksum-bound evidence manifest/log set.
+
+```bash
+STAGING_ACCEPTANCE_MUTATIONS=I_UNDERSTAND_SYNTHETIC_WRITES \
+APP_ENV=staging \
+python scripts/external_staging_acceptance.py \
+  --expected-sha <EXACT_ACCEPTED_RELEASE_SHA> \
+  --rollback-evidence-dir <ROLLBACK_EVIDENCE_DIR> \
+  --public-url https://<PUBLIC_STAGING_HOST>/ \
+  --core-url https://<API_STAGING_HOST> \
+  --admin-url https://<ADMIN_STAGING_HOST>/ \
+  --staff-url https://<STAFF_STAGING_HOST>/ \
+  --ws-url wss://<API_STAGING_HOST> \
+  --compose-file compose.beget.yaml \
+  --env-file /secure/path/.env.staging \
+  --backup-dir <REAL_BACKUP_DIR> \
+  --disk-path <REAL_APP_DISK_PATH> \
+  --output-dir <NEW_EMPTY_EXTERNAL_ACCEPTANCE_DIR>
+```
+
+The required result is `RESULT: EXTERNAL STAGING ACCEPTANCE GREEN`. A RED result blocks further launch work and its evidence directory must be retained for diagnosis.
+
+**Phase 5 — external-only acceptance not replaced by scripts.** After Phase 4 is green, perform and record real iPhone Safari, Android Chrome, desktop and launch-enabled Telegram/provider tests, real monitoring/alert delivery and required restore evidence. These are not inferred from CI.
+
+**Phase 6 — final launch gate.** Only after #8, #28, branch protection #91, required device/provider evidence and explicit owner GO are all green, create the final non-secret launch evidence manifest and run `verify_launch_acceptance.py --mode cutover`. DNS/public routing changes remain forbidden before this point.
+
 ## 6. Production authority boundary
 
 `ReservationRequest != Reservation`.
