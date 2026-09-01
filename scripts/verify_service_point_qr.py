@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 import uuid
 
@@ -30,6 +31,13 @@ def code(response: httpx.Response) -> str | None:
     except Exception:
         return None
     return detail.get("code") if isinstance(detail, dict) else None
+
+
+def json_object(value):
+    if isinstance(value, str):
+        value = json.loads(value)
+    assert isinstance(value, dict), type(value)
+    return value
 
 
 async def database_truth(task_id: str, point_id: str, raw_tokens: list[str]) -> None:
@@ -81,7 +89,7 @@ async def database_truth(task_id: str, point_id: str, raw_tokens: list[str]) -> 
             task_id,
         )
         assert event is not None
-        payload = event["payloadJson"]
+        payload = json_object(event["payloadJson"])
         assert payload["service_point_id"] == point_id
         assert payload["request_code"] == "TECHNICAL"
         assert event["resultResource"] == "OperationalTask"
@@ -93,9 +101,10 @@ async def database_truth(task_id: str, point_id: str, raw_tokens: list[str]) -> 
             task_id,
         )
         assert audit is not None
-        assert audit["afterJson"]["request_code"] == "TECHNICAL"
-        assert audit["afterJson"]["financial_effect"] == "NONE_AUTOMATIC"
-        assert audit["afterJson"]["room_state_effect"] == "NONE_AUTOMATIC"
+        audit_payload = json_object(audit["afterJson"])
+        assert audit_payload["request_code"] == "TECHNICAL"
+        assert audit_payload["financial_effect"] == "NONE_AUTOMATIC"
+        assert audit_payload["room_state_effect"] == "NONE_AUTOMATIC"
 
         payments = await conn.fetchval("SELECT count(*)::int FROM payments")
         guest_sessions = await conn.fetchval("SELECT count(*)::int FROM guest_sessions")
