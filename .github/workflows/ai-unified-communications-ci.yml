@@ -1,0 +1,125 @@
+name: AI Unified Communications CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/automation.py'
+      - 'services/api/app/automation_read.py'
+      - 'services/api/app/communication_ingest.py'
+      - 'services/api/app/channel_outbound.py'
+      - 'services/api/app/ai_sales.py'
+      - 'services/api/app/inbox.py'
+      - 'services/api/app/telegram_sales.py'
+      - 'automation/n8n/**'
+      - 'docs/INBOX_CONTRACT.md'
+      - 'scripts/verify_ai_unified_communications.py'
+      - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/prisma/migrations/**'
+      - '.github/workflows/ai-unified-communications-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/api/app/automation.py'
+      - 'services/api/app/communication_ingest.py'
+      - 'services/api/app/channel_outbound.py'
+      - 'automation/n8n/**'
+      - 'scripts/verify_ai_unified_communications.py'
+      - '.github/workflows/ai-unified-communications-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-unified-communications:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      RESORT_CORE_TEST_URL: http://127.0.0.1:8000
+      AUTOMATION_SERVICE_KEY: BLOCK10-AUTOMATION-SERVICE-KEY-2026
+      AUTOMATION_SERVICE_NAME: block10-unified-channel-ci
+      BOOTSTRAP_OWNER_USERNAME: block10-owner
+      BOOTSTRAP_OWNER_PASSWORD: Block10-Owner-Strong-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: Block 10 Owner
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate Prisma schema and canonical migration chain
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install and compile Resort Core and Block 10 verifier
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall services/api/app scripts/verify_ai_unified_communications.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in Path('automation/n8n').glob('*.json'):
+              json.loads(path.read_text(encoding='utf-8'))
+          print('n8n JSON templates parse successfully')
+          PY
+
+      - name: Seed canonical hotel and bootstrap owner
+        run: |
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/block10-api.log 2>&1 &
+          echo $! > /tmp/block10-api.pid
+          for i in {1..30}; do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/block10-ready.json 2>/dev/null; then break; fi
+            if [ "$i" = "30" ]; then cat /tmp/block10-api.log; exit 1; fi
+            sleep 1
+          done
+
+      - name: Run AI / unified communications reconciliation E2E
+        run: python scripts/verify_ai_unified_communications.py
+
+      - name: Show Resort Core logs on failure
+        if: failure()
+        run: cat /tmp/block10-api.log || true
+
+      - name: Stop Resort Core
+        if: always()
+        run: |
+          if [ -f /tmp/block10-api.pid ]; then kill "$(cat /tmp/block10-api.pid)" || true; fi

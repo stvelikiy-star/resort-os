@@ -35,6 +35,15 @@ def _validate_idempotency_key(value: str | None) -> str:
     return key
 
 
+def _json_value(value: Any) -> Any:
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
+
+
 async def _property_id(conn, property_code: str) -> uuid.UUID:
     pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
     if not pid:
@@ -53,9 +62,19 @@ async def outbound_capabilities(
             "outbound_configured": telegram_sales_outbound_configured(),
             "max_text_length": 4096,
         },
-        "whatsapp": {"configured": False},
-        "instagram": {"configured": False},
-        "truth": "Only provider-confirmed SENT/DELIVERED clears needs_reply.",
+        "whatsapp": {
+            "configured": False,
+            "configured_in_core": False,
+            "delivery_owner": "n8n/provider adapter",
+            "evidence_endpoint": "/api/v1/automation/inbox/messages",
+        },
+        "instagram": {
+            "configured": False,
+            "configured_in_core": False,
+            "delivery_owner": "n8n/provider adapter",
+            "evidence_endpoint": "/api/v1/automation/inbox/messages",
+        },
+        "truth": "Only provider-confirmed SENT/DELIVERED clears needs_reply. Resort Core does not claim WhatsApp/Instagram delivery without provider evidence.",
     }
 
 
@@ -94,6 +113,12 @@ async def send_text_message(
                 raise HTTPException(status_code=503, detail="Telegram Sales outbound is not configured")
 
             source = f"OUTBOX_{row['channel_code']}"[:60]
+            dispatch_payload = {
+                "conversation_id": str(conversation_id),
+                "channel_code": row["channel_code"],
+                "actor_id": user["id"],
+                "text": payload.text,
+            }
             event_id = uuid.uuid4()
             inserted = await conn.fetchval(
                 '''
@@ -107,18 +132,13 @@ async def send_text_message(
                 pid,
                 source,
                 idempotency_key,
-                json.dumps({
-                    "conversation_id": str(conversation_id),
-                    "channel_code": row["channel_code"],
-                    "actor_id": user["id"],
-                    "text": payload.text,
-                }),
+                json.dumps(dispatch_payload),
             )
 
             if inserted is None:
                 existing = await conn.fetchrow(
                     '''
-                    SELECT "resultResource","resultResourceId"
+                    SELECT "eventType","payloadJson","resultResource","resultResourceId"
                     FROM automation_inbound_events
                     WHERE "propertyId"=$1 AND source=$2 AND "idempotencyKey"=$3
                     ''',
@@ -126,7 +146,21 @@ async def send_text_message(
                     source,
                     idempotency_key,
                 )
-                if existing and existing["resultResource"] == "ConversationMessage" and existing["resultResourceId"]:
+                if not existing:
+                    raise HTTPException(status_code=409, detail={"code": "OUTBOX_IDEMPOTENCY_RECONCILIATION_REQUIRED"})
+                if (
+                    existing["eventType"] != "COMMUNICATION_OUTBOUND_DISPATCH"
+                    or _json_value(existing["payloadJson"]) != dispatch_payload
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "OUTBOX_IDEMPOTENCY_PAYLOAD_MISMATCH",
+                            "conversation_id": str(conversation_id),
+                            "idempotency_key": idempotency_key,
+                        },
+                    )
+                if existing["resultResource"] == "ConversationMessage" and existing["resultResourceId"]:
                     previous = await conn.fetchrow(
                         '''SELECT id,"deliveryStatus"::text AS delivery_status
                            FROM conversation_messages WHERE id=$1::uuid''',
@@ -138,9 +172,24 @@ async def send_text_message(
                         "message_id": str(previous["id"]) if previous else existing["resultResourceId"],
                         "delivery_status": previous["delivery_status"] if previous else "UNKNOWN",
                     }
+                if existing["resultResource"] == "OutboundReconciliationRequired":
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "OUTBOX_RECONCILIATION_REQUIRED",
+                            "conversation_id": str(conversation_id),
+                            "idempotency_key": idempotency_key,
+                            "automatic_retry_safe": False,
+                        },
+                    )
                 raise HTTPException(
                     status_code=409,
-                    detail="Outbound dispatch with this Idempotency-Key is already in progress or requires reconciliation; do not retry automatically",
+                    detail={
+                        "code": "OUTBOX_DISPATCH_IN_PROGRESS",
+                        "conversation_id": str(conversation_id),
+                        "idempotency_key": idempotency_key,
+                        "automatic_retry_safe": False,
+                    },
                 )
 
     provider_result = await send_telegram_text(str(row["externalConversationId"]), payload.text)

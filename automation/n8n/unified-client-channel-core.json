@@ -1,0 +1,248 @@
+{
+  "name": "Three Crowns - Unified Client Channel Core",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "three-crowns/unified-client-channel",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9c100000-0000-4000-8000-000000000001",
+      "name": "Normalized Provider Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1180, 0],
+      "webhookId": "three-crowns-unified-client-channel"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b=$json.body??$json; const allowed=new Set(['WHATSAPP','INSTAGRAM','TELEGRAM','OTHER']); const kind=String(b.channel_kind||'').toUpperCase(); if(!allowed.has(kind)) throw new Error('Unsupported messaging channel_kind'); const required=['channel_code','channel_display_name','external_conversation_id','message_id','text']; for(const k of required){ if(b[k]===undefined||b[k]===null||String(b[k]).trim()==='') throw new Error(`Missing required field: ${k}`); } const code=String(b.channel_code).trim().toUpperCase(); const messageId=String(b.message_id).trim(); return [{json:{channel_kind:kind,channel_code:code,channel_display_name:String(b.channel_display_name).trim(),external_account_id:b.external_account_id||null,external_conversation_id:String(b.external_conversation_id),external_contact_id:b.external_contact_id?String(b.external_contact_id):null,contact_name:b.contact_name||null,contact_phone:b.contact_phone||null,contact_username:b.contact_username||null,message_id:messageId,text:String(b.text).trim(),sent_at:b.sent_at||null,inbox_idempotency_key:`${code}:in:${messageId}`}}];"
+      },
+      "id": "9c100000-0000-4000-8000-000000000002",
+      "name": "Normalize Provider Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/inbox/messages'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters":[
+          {"name":"X-Resort-Service-Key","value":"={{$env.AUTOMATION_SERVICE_KEY}}"},
+          {"name":"Content-Type","value":"application/json"}
+        ]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ idempotency_key:$json.inbox_idempotency_key, channel_code:$json.channel_code, channel_kind:$json.channel_kind, channel_display_name:$json.channel_display_name, external_account_id:$json.external_account_id, external_conversation_id:$json.external_conversation_id, external_contact_id:$json.external_contact_id, contact_name:$json.contact_name, contact_phone:$json.contact_phone, contact_username:$json.contact_username, direction:'INBOUND', external_message_id:$json.message_id, sender_type:'GUEST', sender_external_id:$json.external_contact_id, text:$json.text, content_type:'TEXT', delivery_status:'RECEIVED', sent_at:$json.sent_at, raw_payload:{normalized_by:'n8n-unified-client-channel'} }) }}",
+        "options": {"timeout":15000}
+      },
+      "id": "9c100000-0000-4000-8000-000000000003",
+      "name": "Core Ingest Inbound",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-720, -120]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/read/hotel-facts'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters":[{"name":"X-Resort-Service-Key","value":"={{$env.AUTOMATION_SERVICE_KEY}}"}]},
+        "options": {"timeout":15000}
+      },
+      "id": "9c100000-0000-4000-8000-000000000004",
+      "name": "Core Verified Hotel Facts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-480, -120]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\\/$/,'') + '/responses'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters":[
+          {"name":"Authorization","value":"={{'Bearer ' + $env.OPENAI_API_KEY}}"},
+          {"name":"Content-Type","value":"application/json"}
+        ]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model:$env.OPENAI_SALES_MODEL, input:`Extract facts from this Three Crowns guest message. Return ONLY JSON: intent (AVAILABILITY|HOTEL_QUESTION|BOOKING_INTENT|MANAGER|OTHER), check_in (YYYY-MM-DD|null), check_out (YYYY-MM-DD|null), adults (integer|null), children (integer|null), room_type_code (string|null), guest_name (string|null only if explicit), language (ru|kg|en), summary (short string). Never invent missing values. Hotel timezone Asia/Bishkek. Message: ${$('Normalize Provider Event').item.json.text}` }) }}",
+        "options": {"timeout":30000}
+      },
+      "id": "9c100000-0000-4000-8000-000000000005",
+      "name": "Extract Guest Facts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-240, -120]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$json; let text=p.output_text; if(!text&&Array.isArray(p.output)){const a=[];for(const i of p.output){for(const c of(i.content||[])){if(c.type==='output_text'&&c.text)a.push(c.text)}}text=a.join('\\n')} if(!text) throw new Error('AI extractor returned no text'); text=String(text).trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim(); const intent=JSON.parse(text); const src=$('Normalize Provider Event').item.json; const inbox=$('Core Ingest Inbound').item.json; const complete=Boolean(intent.check_in&&intent.check_out&&Number(intent.adults)>0); const guestName=String(intent.guest_name||src.contact_name||'').trim(); return [{json:{...src,conversation_id:inbox.conversation_id,intent,complete_search:complete,guest_name:guestName}}];"
+      },
+      "id": "9c100000-0000-4000-8000-000000000006",
+      "name": "Parse Guest Facts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -120]
+    },
+    {
+      "parameters": {
+        "conditions": {"options":{"caseSensitive":true,"leftValue":"","typeValidation":"strict"},"conditions":[{"id":"complete","leftValue":"={{$json.complete_search}}","rightValue":true,"operator":{"type":"boolean","operation":"true","singleValue":true}}],"combinator":"and"},
+        "options": {}
+      },
+      "id": "9c100000-0000-4000-8000-000000000007",
+      "name": "Complete Search?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [220, -120]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/booking/check-availability'}}",
+        "sendQuery": true,
+        "queryParameters": {"parameters":[
+          {"name":"check_in","value":"={{$json.intent.check_in}}"},
+          {"name":"check_out","value":"={{$json.intent.check_out}}"},
+          {"name":"adults","value":"={{Number($json.intent.adults)}}"},
+          {"name":"children","value":"={{Number($json.intent.children||0)}}"},
+          {"name":"room_type_code","value":"={{$json.intent.room_type_code||''}}"}
+        ]},
+        "options": {"timeout":15000}
+      },
+      "id": "9c100000-0000-4000-8000-000000000008",
+      "name": "Core Check Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, -240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src=$('Parse Guest Facts').item.json; const facts=$('Core Verified Hotel Facts').item.json; const availability=$json; const options=(availability.results||[]).filter(x=>x.pricing?.sellable===true&&Number.isFinite(x.pricing?.total_kgs)).slice(0,8).map(x=>({room_type_code:x.room_type_code,room_type_name:x.room_type_name,available_count:x.available_count,total_kgs:x.pricing.total_kgs,nights:availability.nights})); const canLead=src.intent.intent==='BOOKING_INTENT'&&options.length>0&&src.guest_name.length>=2&&String(src.contact_phone||'').length>=5; return [{json:{...src,verified_context:{hotel_facts:facts,current_availability:{check_in:availability.check_in,check_out:availability.check_out,nights:availability.nights,options},reservation_request:null},should_create_request:canLead}}];"
+      },
+      "id": "9c100000-0000-4000-8000-000000000009",
+      "name": "Build Verified Availability Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, -240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src=$('Parse Guest Facts').item.json; const facts=$('Core Verified Hotel Facts').item.json; return [{json:{...src,verified_context:{hotel_facts:facts,current_availability:null,reservation_request:null},should_create_request:false}}];"
+      },
+      "id": "9c100000-0000-4000-8000-000000000010",
+      "name": "Build Facts Only Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {"options":{"caseSensitive":true,"leftValue":"","typeValidation":"strict"},"conditions":[{"id":"hot","leftValue":"={{$json.should_create_request}}","rightValue":true,"operator":{"type":"boolean","operation":"true","singleValue":true}}],"combinator":"and"},
+        "options": {}
+      },
+      "id": "9c100000-0000-4000-8000-000000000011",
+      "name": "Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [940, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/reservation-requests'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters":[
+          {"name":"X-Resort-Service-Key","value":"={{$env.AUTOMATION_SERVICE_KEY}}"},
+          {"name":"Content-Type","value":"application/json"}
+        ]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ idempotency_key:$json.channel_code + ':lead:' + $json.message_id, channel:$json.channel_code, guest_name:$json.guest_name, phone:$json.contact_phone, email:null, check_in:$json.intent.check_in, check_out:$json.intent.check_out, adults:Number($json.intent.adults), children:Number($json.intent.children||0), room_type_code:$json.intent.room_type_code||null, notes:`Unified channel hot lead. ${$json.intent.summary||''} Original: ${$json.text}`.slice(0,3900), external_message_id:$json.message_id, conversation_id:$json.conversation_id }) }}",
+        "options": {"timeout":15000}
+      },
+      "id": "9c100000-0000-4000-8000-000000000012",
+      "name": "Core Create Linked ReservationRequest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, -200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src=$('Build Verified Availability Context').item.json; const rr=$json; if(rr.is_reservation!==false) throw new Error('Core authority violation: automation created reservation'); return [{json:{...src,verified_context:{...src.verified_context,reservation_request:{id:rr.id,is_reservation:false,conversation_linked:Boolean(rr.conversation_linked)}}}}];"
+      },
+      "id": "9c100000-0000-4000-8000-000000000013",
+      "name": "Attach Linked Request Fact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, -200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\\/$/,'') + '/responses'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters":[
+          {"name":"Authorization","value":"={{'Bearer ' + $env.OPENAI_API_KEY}}"},
+          {"name":"Content-Type","value":"application/json"}
+        ]},
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model:$env.OPENAI_SALES_MODEL, input:`Draft a concise guest reply for Three Crowns. Use ONLY VERIFIED_CONTEXT. Never invent availability, price, discount, policy, payment status, prepayment amount/method/link or reservation status. ReservationRequest is NOT a reservation. If current_availability is null and availability/price is requested, ask for exact dates and guest count. If reservation_request exists, say the request was passed to a manager and is not yet a confirmed booking. Reply in the guest language. Guest: ${$json.text}\nIntent: ${JSON.stringify($json.intent)}\nVERIFIED_CONTEXT: ${JSON.stringify($json.verified_context)}` }) }}",
+        "options": {"timeout":30000}
+      },
+      "id": "9c100000-0000-4000-8000-000000000014",
+      "name": "Compose Verified Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1620, -40]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$json; let text=p.output_text; if(!text&&Array.isArray(p.output)){const a=[];for(const i of p.output){for(const c of(i.content||[])){if(c.type==='output_text'&&c.text)a.push(c.text)}}text=a.join('\\n')} if(!text) throw new Error('AI composer returned no text'); const src=$('Parse Guest Facts').item.json; return [{json:{ok:true,conversation_id:src.conversation_id,channel_kind:src.channel_kind,channel_code:src.channel_code,draft_reply:String(text).trim().slice(0,4096),auto_sent:false,provider_send_required:true,outbound_evidence_endpoint:'/api/v1/automation/inbox/messages',truth:'DRAFT_ONLY_PROVIDER_MUST_SEND_AND_REPORT_EVIDENCE'}}];"
+      },
+      "id": "9c100000-0000-4000-8000-000000000015",
+      "name": "Build Safe Provider Handoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1840, -40]
+    },
+    {
+      "parameters": {"respondWith":"json","responseBody":"={{$json}}","options":{}},
+      "id": "9c100000-0000-4000-8000-000000000016",
+      "name": "Respond To Provider Adapter",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [2060, -40]
+    }
+  ],
+  "connections": {
+    "Normalized Provider Webhook": {"main":[[{"node":"Normalize Provider Event","type":"main","index":0}]]},
+    "Normalize Provider Event": {"main":[[{"node":"Core Ingest Inbound","type":"main","index":0}]]},
+    "Core Ingest Inbound": {"main":[[{"node":"Core Verified Hotel Facts","type":"main","index":0}]]},
+    "Core Verified Hotel Facts": {"main":[[{"node":"Extract Guest Facts","type":"main","index":0}]]},
+    "Extract Guest Facts": {"main":[[{"node":"Parse Guest Facts","type":"main","index":0}]]},
+    "Parse Guest Facts": {"main":[[{"node":"Complete Search?","type":"main","index":0}]]},
+    "Complete Search?": {"main":[[{"node":"Core Check Availability","type":"main","index":0}],[{"node":"Build Facts Only Context","type":"main","index":0}]]},
+    "Core Check Availability": {"main":[[{"node":"Build Verified Availability Context","type":"main","index":0}]]},
+    "Build Verified Availability Context": {"main":[[{"node":"Hot Lead?","type":"main","index":0}]]},
+    "Build Facts Only Context": {"main":[[{"node":"Hot Lead?","type":"main","index":0}]]},
+    "Hot Lead?": {"main":[[{"node":"Core Create Linked ReservationRequest","type":"main","index":0}],[{"node":"Compose Verified Draft","type":"main","index":0}]]},
+    "Core Create Linked ReservationRequest": {"main":[[{"node":"Attach Linked Request Fact","type":"main","index":0}]]},
+    "Attach Linked Request Fact": {"main":[[{"node":"Compose Verified Draft","type":"main","index":0}]]},
+    "Compose Verified Draft": {"main":[[{"node":"Build Safe Provider Handoff","type":"main","index":0}]]},
+    "Build Safe Provider Handoff": {"main":[[{"node":"Respond To Provider Adapter","type":"main","index":0}]]}
+  },
+  "pinData": {},
+  "settings": {"executionOrder":"v1"},
+  "active": false,
+  "versionId": "9c100000-0000-4000-8000-000000000099",
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}
