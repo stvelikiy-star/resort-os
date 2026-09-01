@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
+  "source_branch": "integration/site-pms-cms-20260827",
+  "accepted_executable_head": "7f0c5c56e2dae4809d4c4996221f99fe2a0a82a9",
+  "observed_integration_merge": "79fe6fef880f60f7abb1ff0a70f1afefe3aa26f3",
+  "observed_merge_tree_equivalent": true,
+  "accepted_head_workflows": {
+    "triggered": 17,
+    "success": 17,
+    "failures": 0
+  },
+  "production_source_branch": "integration/site-pms-cms-20260827",
+  "main_allowed_as_production_source": false,
+  "external_beget_staging_verified": false,
+  "legacy_live_rollback_verified": false,
+  "production_cutover_authorized": false,
+  "notes": [
+    "The accepted executable head is the exact PR #89 head that passed 17/17 triggered workflows.",
+    "The observed integration merge had zero file differences versus that tested head.",
+    "Release-hygiene files may change without changing executable product truth.",
+    "CI success does not constitute external Beget or production evidence."
+  ]
+}
