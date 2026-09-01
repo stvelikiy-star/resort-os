@@ -30,7 +30,8 @@ type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "GUE
 function initialTab(role?: string | null): Tab {
   if (["OWNER", "MANAGER"].includes(role || "")) return "DASHBOARD";
   if (role === "RECEPTION") return "RESERVATIONS";
-  return "OPS";
+  if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";
+  return "DASHBOARD";
 }
 
 export default function AdminShell() {
@@ -114,6 +115,7 @@ export default function AdminShell() {
   const isReception = user.role === "RECEPTION";
   const canUseReception = isManager || isReception;
   const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
+  const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);
 
   return (
     <>
@@ -132,7 +134,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
           {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
-          <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>
+          {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
           {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
           {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
         </nav>
@@ -150,7 +152,7 @@ export default function AdminShell() {
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
       {tab === "REPORTS" && isManager && <ReportsBoard />}
       {tab === "CONTENT" && isManager && <SiteContentBoard />}
-      {tab === "OPS" && <OperationsBoard user={user} />}
+      {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard />}
       {tab === "INBOX" && isManager && <InboxBoard />}
     </>
