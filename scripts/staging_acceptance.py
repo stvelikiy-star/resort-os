@@ -28,6 +28,7 @@ MAID = os.environ.get("SMOKE_MAID_USERNAME")
 MAID_PASSWORD = os.environ.get("SMOKE_MAID_PASSWORD")
 TECH = os.environ.get("SMOKE_TECHNICIAN_USERNAME")
 TECH_PASSWORD = os.environ.get("SMOKE_TECHNICIAN_PASSWORD")
+MUTATION_ACK = "I_UNDERSTAND_SYNTHETIC_WRITES"
 
 
 class Client:
@@ -70,6 +71,36 @@ def check(condition: bool, message: str):
     if not condition:
         raise AssertionError(message)
     print(f"PASS: {message}")
+
+
+def validate_staging_mutation_target(*, app_env: str, base_url: str, mutation_ack: str) -> list[str]:
+    errors: list[str] = []
+    if app_env.strip().lower() != "staging":
+        errors.append("APP_ENV must be exactly staging")
+
+    parsed = urllib.parse.urlparse(base_url)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme not in {"http", "https"} or not hostname:
+        errors.append("CORE_API_URL must be an http/https URL with a hostname")
+    else:
+        loopback = hostname in {"127.0.0.1", "localhost", "::1"}
+        if not loopback and "staging" not in hostname:
+            errors.append("non-loopback CORE_API_URL hostname must explicitly contain staging")
+
+    if mutation_ack != MUTATION_ACK:
+        errors.append("STAGING_ACCEPTANCE_MUTATIONS explicit opt-in is missing")
+    return errors
+
+
+def require_safe_staging_target() -> None:
+    errors = validate_staging_mutation_target(
+        app_env=os.environ.get("APP_ENV", ""),
+        base_url=BASE,
+        mutation_ack=os.environ.get("STAGING_ACCEPTANCE_MUTATIONS", ""),
+    )
+    if errors:
+        raise RuntimeError("Unsafe staging acceptance target: " + "; ".join(errors))
+    print(f"PASS: staging mutation safety guard · target={BASE}")
 
 
 def required_env():
@@ -210,6 +241,7 @@ def claim(client: Client, task_id: str, label: str):
 
 
 def main() -> int:
+    require_safe_staging_target()
     required_env()
 
     env = dict(os.environ)
