@@ -79,18 +79,26 @@ def _throttle_keys(username: str, client_ip: str) -> tuple[str, str]:
     return pair_key, ip_key
 
 
-async def _acquire_login_locks(conn, pair_key: str, ip_key: str) -> list[str]:
-    keys = sorted({pair_key, ip_key})
-    for key in keys:
-        # Session-level PostgreSQL advisory locks serialize attempts sharing a pair or
-        # source IP across all API workers. They are released explicitly in finally.
-        await conn.execute("SELECT pg_advisory_lock(hashtextextended($1, 0))", key)
-    return keys
-
-
 async def _release_login_locks(conn, keys: list[str]) -> None:
     for key in reversed(keys):
         await conn.execute("SELECT pg_advisory_unlock(hashtextextended($1, 0))", key)
+
+
+async def _acquire_login_locks(conn, pair_key: str, ip_key: str) -> list[str]:
+    keys = sorted({pair_key, ip_key})
+    acquired: list[str] = []
+    try:
+        for key in keys:
+            # Session-level PostgreSQL advisory locks serialize attempts sharing a pair
+            # or source IP across all API workers. Explicit cleanup is required because
+            # asyncpg connections are pooled and therefore outlive one request.
+            await conn.execute("SELECT pg_advisory_lock(hashtextextended($1, 0))", key)
+            acquired.append(key)
+        return acquired
+    except BaseException:
+        # Never return a pooled connection carrying a partially-acquired session lock.
+        await _release_login_locks(conn, acquired)
+        raise
 
 
 async def _login_is_throttled(conn, property_id: uuid.UUID, pair_key: str, ip_key: str) -> bool:
