@@ -12,6 +12,8 @@ jobs:
   candidate:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://audit:audit@127.0.0.1:5432/audit?schema=public
     steps:
       - name: Checkout exact frozen integration commit
         uses: actions/checkout@v4
@@ -39,6 +41,7 @@ jobs:
           npm audit --json > npm-audit.json
           audit_rc=$?
           set -e
+          echo "audit_exit=$audit_rc"
           node - <<'NODE'
           const r=require('./npm-audit.json');
           const c=r.metadata?.vulnerabilities||{};
