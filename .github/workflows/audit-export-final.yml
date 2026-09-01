@@ -1,0 +1,163 @@
+name: Audit Export Final Resort OS
+
+on:
+  push:
+    branches:
+      - audit/export-final-20260901
+
+permissions:
+  contents: read
+
+jobs:
+  full-audit-and-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      EXACT_SHA: 50f94ffc36530568a7e9cfd10fc253860604c2f6
+      DATABASE_URL: postgresql://resort:resort@127.0.0.1:5432/resort_os?schema=public
+    steps:
+      - name: Checkout exact canonical integration SHA
+        uses: actions/checkout@v4
+        with:
+          ref: 50f94ffc36530568a7e9cfd10fc253860604c2f6
+          fetch-depth: 0
+
+      - name: Prove exact source and clean tree
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "$EXACT_SHA"
+          test -z "$(git status --porcelain)"
+          echo "EXACT_SOURCE=$EXACT_SHA"
+
+      - name: Compile repository audit scripts
+        run: python3 -m compileall scripts
+
+      - name: Verify frozen RC and launch repository boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/release_rc_truth_guard.py
+          python3 scripts/verify_launch_acceptance.py --mode repository
+          python3 scripts/beget_deployment_guard.py
+
+      - name: Re-prove deterministic database dependency security
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -s package-lock.json
+          npm ci --ignore-scripts --no-audit
+          npm audit --json > npm-audit-final.json || audit_rc=$?
+          audit_rc="${audit_rc:-0}"
+          node - <<'NODE'
+          const fs=require('fs');
+          const p=require('./package.json');
+          const r=JSON.parse(fs.readFileSync('npm-audit-final.json','utf8'));
+          const c=r.metadata?.vulnerabilities || {};
+          if (p.devDependencies?.prisma !== '6.12.0') throw new Error('unexpected prisma pin');
+          if (p.dependencies?.['@prisma/client'] !== '6.12.0') throw new Error('unexpected @prisma/client pin');
+          if ((c.high||0)>0 || (c.critical||0)>0) throw new Error('database HIGH/CRITICAL npm vulnerability detected');
+          console.log('DATABASE_AUDIT_COUNTS='+JSON.stringify(c));
+          NODE
+          npx prisma validate
+          npx prisma generate
+
+      - name: Run complete local Resort OS release candidate chain
+        shell: bash
+        env:
+          APP_ENV: staging
+        run: |
+          set -Eeuo pipefail
+          bash scripts/release_candidate_check.sh
+
+      - name: Run truth and authority guards after runtime install
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PY=.venv/bin/python
+          "$PY" scripts/release_scope_guard.py
+          "$PY" scripts/public_site_truth_guard.py
+          "$PY" scripts/public_i18n_guard.py
+          "$PY" scripts/public_media_integrity_guard.py
+          "$PY" scripts/guest_os_truth_guard.py
+          "$PY" scripts/admin_runtime_truth_guard.py
+          "$PY" scripts/owner_guest_facts_guard.py
+
+      - name: Run release safety contract tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PY=.venv/bin/python
+          "$PY" scripts/verify_launch_acceptance_test.py
+          "$PY" scripts/deployment_release_linkage_contract_test.py
+          "$PY" scripts/external_staging_acceptance_contract_test.py
+          "$PY" scripts/production_monitoring_contract_test.py
+          "$PY" scripts/legacy_rollback_contract_test.py
+          "$PY" scripts/staging_acceptance_safety_contract_test.py
+
+      - name: Build exact-source final delivery ZIP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SHORT="${EXACT_SHA:0:8}"
+          OUT="$RUNNER_TEMP/three-crowns-final"
+          ROOT="$OUT/Three_Crowns_Resort_OS_READY_FINAL_${SHORT}"
+          mkdir -p "$ROOT"
+          git archive --format=tar "$EXACT_SHA" | tar -x -C "$ROOT"
+          cat > "$ROOT/START_HERE_AUDITED_EXPORT.md" <<EOF
+          # Three Crowns Resort OS — audited ready project
+
+          Canonical source SHA: \`$EXACT_SHA\`
+          Integration branch: \`integration/site-pms-cms-20260827\`
+          Export date: 2026-09-01
+
+          This package contains the connected Resort OS source: public site, Admin/PMS chessboard, Staff PWA, FastAPI Core, PostgreSQL/Prisma database package, realtime contracts, automation/n8n contracts, production/staging compose files, migrations, audit scripts and launch documentation.
+
+          Immediately before this ZIP was created, the exact canonical source was freshly audited through the complete local release-candidate chain: PostgreSQL/schema, canonical 84-room/12-category seed, Admin/Web/Staff builds, Core health/readiness, availability, ReservationRequest, authenticated PMS, Site/CMS/CRM/PMS contour, manager quote and manual Payment -> guaranteed Reservation, payment idempotency, chessboard visibility, check-in/out and housekeeping lifecycle. It also re-ran RC truth, launch repository acceptance, database dependency audit, public/authority guards and release safety contract tests.
+
+          Database toolchain is pinned to Prisma 6.12.0 / @prisma/client 6.12.0 with committed lockfile and zero HIGH/CRITICAL findings in the final audit.
+
+          ## Quick full-stack test
+
+          Requirements: Docker Engine with Docker Compose, Node.js 20+, Python 3.12+.
+
+          From the project root run:
+
+          \`APP_ENV=staging bash scripts/release_candidate_check.sh\`
+
+          This is the safest self-contained acceptance command because it starts the local PostgreSQL dependency, prepares the schema/seed, builds all three frontends, starts Core and verifies the connected booking/PMS/operations chain.
+
+          For deployment/runbook details read:
+          - \`knowledge/04_CURRENT_STATE.md\`
+          - \`knowledge/09_LAUNCH_ACCEPTANCE.md\`
+          - \`README.md\`
+
+          Important: this is an audited local/staging-ready release package, not proof that the external Beget production host is already configured. Real Beget rollback evidence, external HTTPS/WSS staging, branch protection, real devices/providers and owner production GO remain separate launch gates. Do not switch DNS based only on this ZIP.
+          EOF
+          PROJECT_ZIP="$OUT/Three_Crowns_Resort_OS_READY_FINAL_${SHORT}.zip"
+          (
+            cd "$OUT"
+            zip -qr "$PROJECT_ZIP" "Three_Crowns_Resort_OS_READY_FINAL_${SHORT}"
+          )
+          sha256sum "$PROJECT_ZIP" > "$OUT/SHA256SUMS.txt"
+          unzip -t "$PROJECT_ZIP"
+          unzip -l "$PROJECT_ZIP" | grep -E 'apps/(web|admin|staff)/|services/api/|packages/database/package-lock.json|compose\.production\.yaml|knowledge/09_LAUNCH_ACCEPTANCE\.md' >/dev/null
+          echo "FINAL_PROJECT_ZIP=$PROJECT_ZIP"
+          cat "$OUT/SHA256SUMS.txt"
+          ls -lh "$PROJECT_ZIP"
+
+      - name: Upload final audited project
+        uses: actions/upload-artifact@v4
+        with:
+          name: Three_Crowns_Resort_OS_READY_FINAL_50f94ffc
+          path: |
+            ${{ runner.temp }}/three-crowns-final/Three_Crowns_Resort_OS_READY_FINAL_50f94ffc.zip
+            ${{ runner.temp }}/three-crowns-final/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Clean audit services
+        if: always()
+        shell: bash
+        run: docker compose down -v --remove-orphans || true
