@@ -8,6 +8,7 @@ on:
       - 'data-intake/rooms.csv'
       - 'data-intake/OWNER_ROOM_REGISTER_REVIEW.md'
       - 'data-intake/owner-room-checklist.json'
+      - 'data-intake/room-register-owner-approval.json'
       - 'data-intake/room-register-owner-approval.example.json'
       - 'scripts/room_register_review.py'
       - 'scripts/room_register_review_test.py'
@@ -34,6 +35,12 @@ jobs:
 
       - name: Run owner-review verifier tests
         run: python scripts/room_register_review_test.py
+
+      - name: Validate committed owner approval evidence
+        run: |
+          python scripts/room_register_review.py \
+            --require-owner-approved \
+            --approval data-intake/room-register-owner-approval.json
 
       - name: Prove committed approval template remains fail-closed
         shell: bash
