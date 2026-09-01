@@ -1,0 +1,89 @@
+name: Audit Export Complete Project
+
+on:
+  push:
+    branches:
+      - audit/export-complete-project-20260901
+
+permissions:
+  contents: read
+
+jobs:
+  audit-and-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact frozen integration commit
+        uses: actions/checkout@v4
+        with:
+          ref: b44ddd2baf413727dfc72f19bc1b4f189518a188
+          fetch-depth: 0
+
+      - name: Prove exact source SHA
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$(git rev-parse HEAD)" = "b44ddd2baf413727dfc72f19bc1b4f189518a188"
+          git status --porcelain
+          test -z "$(git status --porcelain)"
+
+      - name: Compile audit and release scripts
+        run: python3 -m compileall scripts
+
+      - name: Verify frozen RC truth
+        run: python3 scripts/release_rc_truth_guard.py
+
+      - name: Verify repository launch acceptance contract
+        run: python3 scripts/verify_launch_acceptance.py --mode repository
+
+      - name: Verify Beget deployment topology contract
+        run: python3 scripts/beget_deployment_guard.py
+
+      - name: Verify public and authority truth guards
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/release_scope_guard.py
+          python3 scripts/public_site_truth_guard.py
+          python3 scripts/guest_os_truth_guard.py
+          python3 scripts/admin_runtime_truth_guard.py
+
+      - name: Build exact-source delivery ZIP
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          OUT="$RUNNER_TEMP/three-crowns-export"
+          ROOT="$OUT/Three_Crowns_Resort_OS_READY"
+          mkdir -p "$ROOT"
+          git archive --format=tar b44ddd2baf413727dfc72f19bc1b4f189518a188 | tar -x -C "$ROOT"
+          cat > "$ROOT/START_HERE_AUDITED_EXPORT.md" <<'EOF'
+          # Three Crowns Resort OS — audited project export
+
+          Source repository: `stvelikiy-star/resort-os`
+          Integration source SHA: `b44ddd2baf413727dfc72f19bc1b4f189518a188`
+          Export date: 2026-09-01
+
+          This bundle is an exact `git archive` of the integration source above plus this export note.
+
+          Before this ZIP was produced, the export workflow re-ran the repository-level RC truth, launch-acceptance, Beget topology, release-scope, public-site, Guest OS and admin runtime truth guards against the exact source SHA.
+
+          The broader executable product tree had already completed the full CI/staging acceptance chain before this export. External Beget/production evidence remains a separate launch gate and is not represented as completed by this local/demo bundle.
+
+          Start with the repository README and production/staging documentation. Do not use stale `main` as the release source.
+          EOF
+          (
+            cd "$OUT"
+            zip -qr "Three_Crowns_Resort_OS_READY_b44ddd2.zip" "Three_Crowns_Resort_OS_READY"
+          )
+          sha256sum "$OUT/Three_Crowns_Resort_OS_READY_b44ddd2.zip" | tee "$OUT/SHA256SUMS.txt"
+          ls -lh "$OUT/Three_Crowns_Resort_OS_READY_b44ddd2.zip"
+
+      - name: Upload ready project ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Three_Crowns_Resort_OS_READY_b44ddd2
+          path: |
+            ${{ runner.temp }}/three-crowns-export/Three_Crowns_Resort_OS_READY_b44ddd2.zip
+            ${{ runner.temp }}/three-crowns-export/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
