@@ -19,103 +19,129 @@ async def property_id(conn, property_code: str) -> uuid.UUID:
     return value
 
 
+async def create_arrival_notification(
+    conn,
+    *,
+    property_id: uuid.UUID,
+    reservation_id: uuid.UUID,
+    stay_id: uuid.UUID,
+    room_id: uuid.UUID,
+    room_code: str,
+    booking_number: str,
+    check_in,
+    check_out,
+    adults: int,
+    children: int,
+    actor_id: str | None,
+) -> uuid.UUID | None:
+    """Create exactly one kitchen arrival card for a successful check-in."""
+    await conn.execute(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+        f"kitchen-arrival:{reservation_id}",
+    )
+    exists = await conn.fetchval(
+        '''SELECT id FROM operational_tasks
+           WHERE "propertyId"=$1 AND "reservationId"=$2
+             AND "serviceCode"=$3 AND source=$4
+           LIMIT 1''',
+        property_id,
+        reservation_id,
+        ARRIVAL_CODE,
+        ARRIVAL_SOURCE,
+    )
+    if exists:
+        return None
+
+    task_id = uuid.uuid4()
+    description = (
+        f"Номер {room_code} · взрослых: {adults} · детей: {children} · "
+        f"проживание {check_in} — {check_out}. "
+        "Питание по брони не предполагается автоматически: при необходимости уточнить на ресепшене."
+    )
+    await conn.execute(
+        '''INSERT INTO operational_tasks (
+             id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,
+             description,"createdByType","createdById",source,"serviceCode","createdAt","updatedAt"
+           ) VALUES ($1,$2,$3,$4,$5,'GUEST_REQUEST','OPEN','HIGH',$6,$7,'SYSTEM',$8,$9,$10,now(),now())''',
+        task_id,
+        property_id,
+        room_id,
+        reservation_id,
+        stay_id,
+        f"Новый заезд · номер {room_code}",
+        description,
+        actor_id,
+        ARRIVAL_SOURCE,
+        ARRIVAL_CODE,
+    )
+    await conn.execute(
+        '''INSERT INTO audit_logs (
+             id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,
+             "afterJson","createdAt"
+           ) VALUES ($1,$2,'SYSTEM',$3,'KITCHEN_ARRIVAL_NOTIFICATION','OperationalTask',$4,$5,'SUCCESS',
+             jsonb_build_object(
+               'reservation_id',$6::text,'stay_id',$7::text,'room_code',$8::text,'booking_number',$9::text,
+               'adults',$10::int,'children',$11::int,
+               'financial_effect','NONE','sensitive_guest_data','EXCLUDED'
+             ),now())''',
+        uuid.uuid4(),
+        property_id,
+        actor_id,
+        str(task_id),
+        ARRIVAL_SOURCE,
+        str(reservation_id),
+        str(stay_id),
+        room_code,
+        booking_number,
+        adults,
+        children,
+    )
+    return task_id
+
+
 @router.post("/sync-arrivals")
 async def sync_recent_arrivals(
     request: Request,
     user: dict[str, Any] = Depends(kitchen_access),
 ):
-    """Materialize one kitchen queue notification per recent successful check-in.
-
-    The operation is idempotent and deliberately carries no payment, passport,
-    phone or other unnecessary guest data. It exists so an open Dining Staff
-    shift receives a new-arrival card automatically on its normal queue poll.
-    """
-    actor_id = uuid.UUID(user["id"])
+    """Repair missed arrival cards for successful check-ins from the last 24 hours."""
     created: list[str] = []
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             arrivals = await conn.fetch(
-                '''
-                SELECT res.id AS reservation_id,res."bookingNumber",res."checkIn",res."checkOut",
-                       res.adults,res.children,stay.id AS stay_id,room.id AS room_id,room.code AS room_code
-                FROM reservations res
-                JOIN stays stay ON stay."reservationId"=res.id
-                  AND stay."propertyId"=res."propertyId" AND stay.status='ACTIVE'
-                JOIN room_assignments ra ON ra."stayId"=stay.id AND ra."endedAt" IS NULL
-                JOIN rooms room ON room.id=ra."roomId"
-                WHERE res."propertyId"=$1 AND res.status='CHECKED_IN'
-                  AND stay."actualCheckInAt" >= now() - interval '24 hours'
-                ORDER BY stay."actualCheckInAt" ASC
-                ''',
+                '''SELECT res.id AS reservation_id,res."bookingNumber",res."checkIn",res."checkOut",
+                          res.adults,res.children,stay.id AS stay_id,room.id AS room_id,room.code AS room_code
+                   FROM reservations res
+                   JOIN stays stay ON stay."reservationId"=res.id
+                     AND stay."propertyId"=res."propertyId" AND stay.status='ACTIVE'
+                   JOIN room_assignments ra ON ra."stayId"=stay.id AND ra."endedAt" IS NULL
+                   JOIN rooms room ON room.id=ra."roomId"
+                   WHERE res."propertyId"=$1 AND res.status='CHECKED_IN'
+                     AND stay."actualCheckInAt" >= now() - interval '24 hours'
+                   ORDER BY stay."actualCheckInAt" ASC''',
                 pid,
             )
             for row in arrivals:
-                exists = await conn.fetchval(
-                    '''
-                    SELECT id FROM operational_tasks
-                    WHERE "propertyId"=$1 AND "reservationId"=$2
-                      AND "serviceCode"=$3 AND source=$4
-                    LIMIT 1
-                    ''',
-                    pid,
-                    row["reservation_id"],
-                    ARRIVAL_CODE,
-                    ARRIVAL_SOURCE,
+                task_id = await create_arrival_notification(
+                    conn,
+                    property_id=pid,
+                    reservation_id=row["reservation_id"],
+                    stay_id=row["stay_id"],
+                    room_id=row["room_id"],
+                    room_code=row["room_code"],
+                    booking_number=row["bookingNumber"],
+                    check_in=row["checkIn"],
+                    check_out=row["checkOut"],
+                    adults=row["adults"],
+                    children=row["children"],
+                    actor_id=user["id"],
                 )
-                if exists:
-                    continue
-                task_id = uuid.uuid4()
-                description = (
-                    f"Номер {row['room_code']} · взрослых: {row['adults']} · детей: {row['children']} · "
-                    f"проживание {row['checkIn']} — {row['checkOut']}. "
-                    "Питание по брони не предполагается автоматически: при необходимости уточнить на ресепшене."
-                )
-                await conn.execute(
-                    '''
-                    INSERT INTO operational_tasks (
-                      id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,
-                      description,"createdByType","createdById",source,"serviceCode","createdAt","updatedAt"
-                    ) VALUES ($1,$2,$3,$4,$5,'GUEST_REQUEST','OPEN','HIGH',$6,$7,'SYSTEM',$8,$9,$10,now(),now())
-                    ''',
-                    task_id,
-                    pid,
-                    row["room_id"],
-                    row["reservation_id"],
-                    row["stay_id"],
-                    f"Новый заезд · номер {row['room_code']}",
-                    description,
-                    str(actor_id),
-                    ARRIVAL_SOURCE,
-                    ARRIVAL_CODE,
-                )
-                await conn.execute(
-                    '''
-                    INSERT INTO audit_logs (
-                      id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,
-                      "afterJson","createdAt"
-                    ) VALUES ($1,$2,'SYSTEM',$3,'KITCHEN_ARRIVAL_NOTIFICATION','OperationalTask',$4,$5,'SUCCESS',
-                      jsonb_build_object(
-                        'reservation_id',$6::text,'stay_id',$7::text,'room_code',$8::text,
-                        'adults',$9::int,'children',$10::int,
-                        'financial_effect','NONE','sensitive_guest_data','EXCLUDED'
-                      ),now())
-                    ''',
-                    uuid.uuid4(),
-                    pid,
-                    str(actor_id),
-                    str(task_id),
-                    ARRIVAL_SOURCE,
-                    str(row["reservation_id"]),
-                    str(row["stay_id"]),
-                    row["room_code"],
-                    row["adults"],
-                    row["children"],
-                )
-                created.append(str(task_id))
+                if task_id:
+                    created.append(str(task_id))
     return {
         "created": len(created),
         "task_ids": created,
         "request_code": ARRIVAL_CODE,
-        "truth": "Recent successful check-ins are surfaced to Dining Staff without payment or sensitive guest data.",
+        "truth": "Successful check-ins are surfaced to Dining Staff without payment or sensitive guest data.",
     }
