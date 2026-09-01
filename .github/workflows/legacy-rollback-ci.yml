@@ -1,0 +1,46 @@
+name: Legacy Rollback CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'scripts/legacy_rollback_capture.py'
+      - 'scripts/legacy_rollback_verify.py'
+      - 'scripts/legacy_rollback_contract_test.py'
+      - '.github/workflows/legacy-rollback-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  legacy-rollback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile rollback tooling
+        run: |
+          python -m compileall \
+            scripts/legacy_rollback_capture.py \
+            scripts/legacy_rollback_verify.py \
+            scripts/legacy_rollback_contract_test.py
+      - name: Run fail-closed rollback contract
+        run: |
+          python scripts/legacy_rollback_contract_test.py | tee /tmp/legacy-rollback-contract.txt
+          grep -F 'PASS: legacy rollback capture is non-destructive' /tmp/legacy-rollback-contract.txt
+      - name: Upload rollback contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-legacy-rollback-contract
+          path: /tmp/legacy-rollback-contract.txt
+          retention-days: 14
