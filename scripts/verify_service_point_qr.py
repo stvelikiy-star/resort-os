@@ -108,14 +108,37 @@ def main() -> None:
     public = httpx.get(f"{BASE}/api/v1/service-points/{raw_one}", timeout=30.0)
     public.raise_for_status()
     public_body = public.json()
+    assert set(public_body) == {
+        "qr_valid",
+        "point",
+        "request_options",
+        "privacy",
+        "financial_effect",
+        "room_state_effect",
+    }
+    assert set(public_body["point"]) == {"code", "name", "category", "zone_label"}
+    assert all(set(item) == {"code", "label"} for item in public_body["request_options"])
     assert public_body["privacy"] == "ANONYMOUS_LOCATION_QR_NO_GUEST_DATA"
     assert public_body["financial_effect"] == "NONE_AUTOMATIC"
     assert public_body["room_state_effect"] == "NONE_AUTOMATIC"
     assert public_body["point"]["category"] == "RESTROOM"
     assert {x["code"] for x in public_body["request_options"]} == {"CLEANLINESS", "TECHNICAL"}
-    raw_public = str(public_body).lower()
-    for forbidden in ("guest", "reservation", "stay", "phone", "email", "payment"):
-        assert forbidden not in raw_public, forbidden
+    sensitive_keys = {
+        "guest",
+        "guest_id",
+        "reservation",
+        "reservation_id",
+        "stay",
+        "stay_id",
+        "phone",
+        "email",
+        "payment",
+        "payment_id",
+    }
+    exposed_keys = set(public_body) | set(public_body["point"])
+    for item in public_body["request_options"]:
+        exposed_keys.update(item)
+    assert exposed_keys.isdisjoint(sensitive_keys), exposed_keys & sensitive_keys
 
     client_request_id = f"service-point-ci-{suffix.lower()}"
     payload = {
