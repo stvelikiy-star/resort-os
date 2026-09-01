@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import AdminExperienceRuntime from "../components/AdminExperienceRuntime";
 import "./globals.css";
 import "./auth.css";
 import "./admin-nav-polish.css";
@@ -37,6 +38,7 @@ import "./chessboard-owner.css";
 import "./pms-owner-workflow-corrections.css";
 import "./three-crowns-admin.css";
 import "./mobile-hardening.css";
+import "./admin-experience.css";
 
 export const metadata: Metadata = {
   title: "Три Короны — Resort OS",
@@ -46,7 +48,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body><AdminExperienceRuntime />{children}</body>
     </html>
   );
 }
