@@ -14,7 +14,7 @@ on:
       - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
       - 'docs/DEPLOYMENT_RUNBOOK.md'
       - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
-      - 'prisma/migrations/**'
+      - 'packages/database/prisma/migrations/**'
       - '.github/workflows/launch-acceptance-ci.yml'
   workflow_dispatch:
 

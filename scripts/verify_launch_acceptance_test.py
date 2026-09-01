@@ -40,14 +40,19 @@ def main() -> None:
     wrong_sha = deepcopy(valid)
     assert any("candidate_sha mismatch" in item for item in validate_manifest(wrong_sha, expected_sha="b" * 40))
 
-    missing_room_truth = deepcopy(valid)
-    missing_room_truth["external_evidence"]["owner_room_register"] = {
+    missing_room_reconciliation = deepcopy(valid)
+    missing_room_reconciliation["external_evidence"]["room_reconciliation"] = {
         "status": "NOT_VERIFIED",
         "evidence_ref": None,
         "verified_at": None,
     }
-    errors = validate_manifest(missing_room_truth, expected_sha="a" * 40)
-    assert any("owner_room_register: production cutover remains STOP" in item for item in errors)
+    errors = validate_manifest(missing_room_reconciliation, expected_sha="a" * 40)
+    assert any("room_reconciliation: production cutover remains STOP" in item for item in errors)
+
+    obsolete_room_questionnaire_gate = deepcopy(valid)
+    obsolete_room_questionnaire_gate["external_evidence"]["owner_room_register"] = verified_gate()
+    errors = validate_manifest(obsolete_room_questionnaire_gate, expected_sha="a" * 40)
+    assert any("owner_room_register is obsolete" in item for item in errors)
 
     provider_enabled_without_evidence = deepcopy(valid)
     provider_enabled_without_evidence["external_evidence"]["provider_acceptance"] = {

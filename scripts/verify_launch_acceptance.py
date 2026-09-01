@@ -14,7 +14,7 @@ from release_contract import EXPECTED_MIGRATIONS
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_STATUS = {"VERIFIED", "NOT_VERIFIED", "NOT_REQUIRED"}
 REQUIRED_EXTERNAL_GATES = (
-    "owner_room_register",
+    "room_reconciliation",
     "beget_host_preflight",
     "legacy_rollback_backup",
     "external_https_wss_staging",
@@ -81,6 +81,11 @@ def validate_manifest(manifest: dict[str, Any], expected_sha: str | None = None)
     if not isinstance(external, dict):
         return errors + ["external_evidence must be an object"]
 
+    if "owner_room_register" in external:
+        errors.append(
+            "external_evidence.owner_room_register is obsolete: physical room import gate #38 is closed; use room_reconciliation for real target evidence"
+        )
+
     for name in REQUIRED_EXTERNAL_GATES + OPTIONAL_EXTERNAL_GATES:
         if name not in external:
             errors.append(f"external_evidence.{name} is required")
@@ -125,6 +130,9 @@ def repository_checks(root: Path) -> list[str]:
         "Persisted canonical Stay, generic tenancy",
         "PR #37",
         "1be110c35e1e7d5876cae40a1b58cef42bd10a22",
+        "91699f70f774726eb61a9882ccbdfe5944471856",
+        "owner-approved physical 84-room production register",
+        "final owner-approved physical 84-room register",
     )
     for fragment in stale_fragments:
         if fragment in joined:
@@ -169,6 +177,7 @@ def main() -> int:
             print("RESULT: RELEASE REPOSITORY NOT READY")
             return 1
         print(f"FACT: migrations={len(EXPECTED_MIGRATIONS)}")
+        print("FACT: physical_room_import_gate_38=closed")
         print("FACT: launch_example_is_fail_closed=true")
         print("RESULT: RELEASE REPOSITORY READY; EXTERNAL CUTOVER NOT AUTHORIZED")
         return 0
