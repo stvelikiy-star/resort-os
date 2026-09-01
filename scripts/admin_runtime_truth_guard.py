@@ -35,6 +35,10 @@ def main() -> int:
         'user.role',
         'isManager',
         'isReception',
+        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);',
+        'if (payload && !canEnterAdmin(payload.role))',
+        'if (!canEnterAdmin(payload.role))',
+        'Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.',
         'const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);',
         '{canUseOps && <button className={tab === "OPS"',
         '{tab === "OPS" && canUseOps && <OperationsBoard user={user} />}',
@@ -80,7 +84,7 @@ def main() -> int:
         if "/demo" in page_text or "/demo" in shell_text or "app/demo" in page_text or "app/demo" in shell_text:
             raise AssertionError("normal admin runtime references the historical /demo route")
 
-    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; demo markers are absent, operations UI follows staff RBAC, and existing staff roles are visible")
+    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; non-admin staff roles fail closed, demo markers are absent, operations UI follows staff RBAC, and existing staff roles are visible")
     return 0
 
 
