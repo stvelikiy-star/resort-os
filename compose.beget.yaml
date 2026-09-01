@@ -41,6 +41,8 @@ services:
     build:
       context: .
       dockerfile: services/api/Dockerfile
+      args:
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA must identify the exact accepted git commit}
     restart: unless-stopped
     init: true
     environment:
@@ -97,6 +99,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         CORE_API_URL: http://api:8000
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA must identify the exact accepted git commit}
     restart: unless-stopped
     init: true
     depends_on:
@@ -118,6 +121,7 @@ services:
       args:
         CORE_API_URL: http://api:8000
         NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA must identify the exact accepted git commit}
     restart: unless-stopped
     init: true
     depends_on:
@@ -138,6 +142,7 @@ services:
       dockerfile: apps/staff/Dockerfile
       args:
         CORE_API_URL: http://api:8000
+        RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA must identify the exact accepted git commit}
     restart: unless-stopped
     init: true
     depends_on:
