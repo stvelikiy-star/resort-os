@@ -1,0 +1,58 @@
+name: Launch Acceptance CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'scripts/verify_launch_acceptance.py'
+      - 'scripts/verify_launch_acceptance_test.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - 'release/launch-evidence.example.json'
+      - 'knowledge/04_CURRENT_STATE.md'
+      - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
+      - 'prisma/migrations/**'
+      - '.github/workflows/launch-acceptance-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  launch-acceptance:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify canonical database release contract
+        run: python scripts/release_contract_test.py
+
+      - name: Verify release repository boundary
+        run: python scripts/verify_launch_acceptance.py --mode repository
+
+      - name: Verify launch evidence validator behavior
+        run: python scripts/verify_launch_acceptance_test.py
+
+      - name: Prove committed example remains production fail-closed
+        shell: bash
+        run: |
+          set +e
+          output="$(python scripts/verify_launch_acceptance.py \
+            --mode cutover \
+            --manifest release/launch-evidence.example.json \
+            --release-sha 0000000000000000000000000000000000000000 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$output"
+          if [ "$status" -eq 0 ]; then
+            echo 'FAIL: example manifest unexpectedly authorized production cutover'
+            exit 1
+          fi
+          grep -q 'RESULT: PRODUCTION CUTOVER STOP' <<<"$output"
