@@ -27,6 +27,12 @@ type User = {
 
 type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "GUESTS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
 
+const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
+
+function canEnterAdmin(role?: string | null): boolean {
+  return Boolean(role && ADMIN_ROLES.has(role));
+}
+
 function initialTab(role?: string | null): Tab {
   if (["OWNER", "MANAGER"].includes(role || "")) return "DASHBOARD";
   if (role === "RECEPTION") return "RESERVATIONS";
@@ -50,6 +56,11 @@ export default function AdminShell() {
         return (await response.json()) as User;
       })
       .then((payload) => {
+        if (payload && !canEnterAdmin(payload.role)) {
+          void fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+          setUser(null);
+          return;
+        }
         setUser(payload);
         setTab(initialTab(payload?.role));
       })
@@ -72,6 +83,12 @@ export default function AdminShell() {
         return;
       }
       const payload = (await response.json()) as User;
+      if (!canEnterAdmin(payload.role)) {
+        await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+        setUser(null);
+        setError("Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.");
+        return;
+      }
       setUser(payload);
       setTab(initialTab(payload.role));
       setPassword("");
