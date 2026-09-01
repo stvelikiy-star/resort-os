@@ -63,11 +63,13 @@ async def outbound_capabilities(
             "max_text_length": 4096,
         },
         "whatsapp": {
+            "configured": False,
             "configured_in_core": False,
             "delivery_owner": "n8n/provider adapter",
             "evidence_endpoint": "/api/v1/automation/inbox/messages",
         },
         "instagram": {
+            "configured": False,
             "configured_in_core": False,
             "delivery_owner": "n8n/provider adapter",
             "evidence_endpoint": "/api/v1/automation/inbox/messages",
