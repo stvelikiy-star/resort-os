@@ -334,6 +334,20 @@ async def confirm_payment_and_reserve(
             if rr["desiredRoomTypeId"] is None or rr["quotedTotalKgs"] is None:
                 raise HTTPException(status_code=409, detail="Request has no complete quote")
 
+            manager_required_payment_kgs = (
+                int(rr["requiredPrepaymentKgs"]) if rr["requiredPrepaymentKgs"] is not None else None
+            )
+            if manager_required_payment_kgs is not None and payload.amount_kgs < manager_required_payment_kgs:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "PAYMENT_BELOW_MANAGER_REQUIREMENT",
+                        "message": "Recorded payment is below the manager-set required prepayment. Change the requirement first if an exception is approved.",
+                        "required_prepayment_kgs": manager_required_payment_kgs,
+                        "received_kgs": payload.amount_kgs,
+                    },
+                )
+
             candidates = await conn.fetch(
                 '''
                 SELECT id,code FROM rooms
@@ -400,19 +414,29 @@ async def confirm_payment_and_reserve(
                 MANUAL_PAYMENT_PROVIDER,external_ref,payload.idempotency_key,
             )
             await conn.execute(
-                '''UPDATE reservation_requests SET status='CONVERTED',"requiredPrepaymentKgs"=$2,"updatedAt"=now() WHERE id=$1''',
-                request_id,payload.amount_kgs,
+                '''
+                UPDATE reservation_requests
+                SET status='CONVERTED',
+                    "requiredPrepaymentKgs"=COALESCE("requiredPrepaymentKgs",$2),
+                    "updatedAt"=now()
+                WHERE id=$1
+                ''',
+                request_id,
+                payload.amount_kgs,
             )
+            effective_requirement = manager_required_payment_kgs or payload.amount_kgs
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                 VALUES ($1,$2,'STAFF',$3,'MANAGER_CONFIRM_PAYMENT_AND_RESERVE','Reservation',$4,'PMS','SUCCESS',
                   jsonb_build_object('booking_number',$5::text,'room_code',$6::text,'payment_id',$7::text,
-                    'manager_confirmed_payment_kgs',$8::integer,'payment_provider',$9::text,
-                    'guest_id',$10::text,'guest_identity_created',$11::boolean,'guest_identity_match',$12::text),now())
+                    'manager_confirmed_payment_kgs',$8::integer,'required_prepayment_kgs',$9::integer,
+                    'payment_provider',$10::text,'guest_id',$11::text,'guest_identity_created',$12::boolean,
+                    'guest_identity_match',$13::text),now())
                 ''',
                 uuid.uuid4(),pid,user["id"],str(reservation_id),booking_number,chosen["code"],str(payment_id),
-                payload.amount_kgs,MANUAL_PAYMENT_PROVIDER,str(guest_id),identity["created"],identity["matched_by"],
+                payload.amount_kgs,effective_requirement,MANUAL_PAYMENT_PROVIDER,str(guest_id),
+                identity["created"],identity["matched_by"],
             )
 
     return {
@@ -423,6 +447,8 @@ async def confirm_payment_and_reserve(
         "room_code": chosen["code"],
         "payment_id": str(payment_id),
         "manager_confirmed_payment_kgs": payload.amount_kgs,
+        "required_prepayment_kgs": effective_requirement,
+        "manager_requirement_applied": manager_required_payment_kgs is not None,
         "payment_collection": "MANAGER_MANUAL",
         "guest_id": str(guest_id),
         "guest_identity_created": identity["created"],

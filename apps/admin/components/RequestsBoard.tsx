@@ -52,8 +52,23 @@ function paymentErrorMessage(body: any) {
     const amount = typeof body.detail.amount_kgs === "number" ? ` · ${fmt(body.detail.amount_kgs)}` : "";
     return `Этот номер операции уже записан${amount}. Проверьте существующий платёж перед созданием брони.`;
   }
+  if (body?.detail?.code === "PAYMENT_BELOW_MANAGER_REQUIREMENT") {
+    return `Получено меньше установленной менеджером предоплаты ${fmt(body.detail.required_prepayment_kgs)}. Если согласовано исключение — сначала измените требуемую сумму, затем повторите подтверждение.`;
+  }
   if (body?.detail?.code === "IDEMPOTENCY_CONFLICT") return "Запрос подтверждения уже использован для другой заявки. Обновите список и повторите.";
+  if (body?.detail?.code === "IDEMPOTENCY_PAYLOAD_MISMATCH") return "Этот ключ операции уже был использован с другими реквизитами платежа.";
   return "Не удалось зафиксировать оплату и создать бронь";
+}
+
+function paymentRequirementError(body: any) {
+  if (typeof body?.detail === "string") return body.detail;
+  if (body?.detail?.code === "PAYMENT_REQUIREMENT_EXCEEDS_QUOTE") {
+    return `Требуемая сумма не может превышать стоимость проживания ${fmt(body.detail.quoted_total_kgs)}.`;
+  }
+  if (body?.detail?.code === "PAYMENT_REQUIREMENT_REQUEST_NOT_QUOTED" || body?.detail?.code === "PAYMENT_REQUIREMENT_QUOTE_REQUIRED") {
+    return "Сначала рассчитайте заявку и зафиксируйте стоимость проживания.";
+  }
+  return "Не удалось сохранить требуемую сумму предоплаты.";
 }
 
 function csvCell(value: unknown) {
@@ -181,8 +196,43 @@ export default function RequestsBoard() {
     }
   }
 
+  async function setPaymentRequirement(item: RequestItem) {
+    if (!item.quoted_total_kgs) {
+      setError("Сначала рассчитайте стоимость проживания.");
+      return;
+    }
+    const current = item.required_prepayment_kgs ? String(item.required_prepayment_kgs) : "";
+    const amountText = window.prompt(
+      `Какую сумму предоплаты требует менеджер? Максимум ${fmt(item.quoted_total_kgs)}. Процент автоматически не применяется.`,
+      current,
+    );
+    if (amountText === null) return;
+    const amount = Number(amountText.replace(/\s/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0 || amount > item.quoted_total_kgs) {
+      setError(`Укажите положительную сумму не больше ${fmt(item.quoted_total_kgs)}.`);
+      return;
+    }
+    setBusy(item.id);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/finance/requests/${item.id}/payment-requirement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_kgs: Math.trunc(amount) }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(paymentRequirementError(body));
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка сохранения требуемой предоплаты");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function confirmPayment(item: RequestItem) {
-    const amountText = window.prompt("Сумма, которую менеджер фактически получил, сом", "");
+    const hint = item.required_prepayment_kgs ? String(item.required_prepayment_kgs) : "";
+    const amountText = window.prompt("Сумма, которую менеджер фактически получил, сом", hint);
     if (!amountText) return;
     const amount = Number(amountText.replace(/\s/g, ""));
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -249,11 +299,12 @@ export default function RequestsBoard() {
               <div className="request-money">
                 <div><span>Категория</span><b>{item.room_type_name || "не выбрана"}</b></div>
                 <div><span>Стоимость проживания</span><b>{fmt(item.quoted_total_kgs)}</b></div>
-                <div><span>Предоплата</span><b>{item.required_prepayment_kgs ? fmt(item.required_prepayment_kgs) : "решает менеджер"}</b></div>
+                <div><span>Требуемая предоплата</span><b>{item.required_prepayment_kgs ? fmt(item.required_prepayment_kgs) : "решает менеджер"}</b></div>
                 {item.reservation && <div><span>Бронь</span><b>{item.reservation.booking_number}</b></div>}
               </div>
               {!item.reservation && <div className="request-actions">
                 <button className="btn" disabled={busy === item.id} onClick={() => findOptions(item)}>Проверить варианты</button>
+                {["QUOTED", "AWAITING_PREPAYMENT"].includes(item.status) && <button className="btn" disabled={busy === item.id} onClick={() => setPaymentRequirement(item)}>{item.required_prepayment_kgs ? "Изменить требуемую предоплату" : "Задать требуемую предоплату"}</button>}
                 {["QUOTED", "AWAITING_PREPAYMENT"].includes(item.status) && <button className="btn primary" disabled={busy === item.id} onClick={() => confirmPayment(item)}>Оплата получена менеджером → создать бронь</button>}
               </div>}
               {options[item.id] && <div className="option-row">
