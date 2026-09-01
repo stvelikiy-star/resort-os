@@ -13,6 +13,7 @@ on:
       - 'knowledge/04_CURRENT_STATE.md'
       - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
       - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
       - 'prisma/migrations/**'
       - '.github/workflows/launch-acceptance-ci.yml'
   workflow_dispatch:
