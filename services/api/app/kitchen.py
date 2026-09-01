@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import Any, Literal
 
@@ -176,7 +177,7 @@ async def audit(conn, pid, actor_type: str, actor_id: str | None, action: str, r
         '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
            VALUES ($1,$2,$3,$4,$5,'KitchenOrder',$6,'KITCHEN','SUCCESS',$7::jsonb,now())''',
         uuid.uuid4(), pid, actor_type, actor_id, action, resource_id,
-        __import__("json").dumps({**payload, "financial_effect": "NONE_AUTOMATIC", "reservation_total_effect": "NONE"}),
+        json.dumps({**payload, "financial_effect": "NONE_AUTOMATIC", "reservation_total_effect": "NONE"}),
     )
 
 
@@ -294,11 +295,13 @@ LEFT JOIN kitchen_menu_items m ON m.id=i."menuItemId"
 
 
 def order_json(row) -> dict[str, Any]:
+    raw_items = row["items"]
+    items = json.loads(raw_items) if isinstance(raw_items, str) else raw_items
     return {
         "id": str(row["id"]), "order_number": row["orderNumber"], "status": row["status"], "source": row["source"],
         "guest_count": row["guestCount"], "meal_type": row["mealType"], "notes": row["notes"], "total_kgs": row["totalKgs"],
         "table_code": row["table_code"], "table_name": row["table_name"], "room_code": row["room_code"],
-        "opened_at": row["openedAt"], "completed_at": row["completedAt"], "items": row["items"],
+        "opened_at": row["openedAt"], "completed_at": row["completedAt"], "items": items,
         "financial_posting": "NONE_AUTOMATIC",
     }
 
