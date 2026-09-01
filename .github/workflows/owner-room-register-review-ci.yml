@@ -7,6 +7,7 @@ on:
     paths:
       - 'data-intake/rooms.csv'
       - 'data-intake/OWNER_ROOM_REGISTER_REVIEW.md'
+      - 'data-intake/owner-room-checklist.json'
       - 'data-intake/room-register-owner-approval.example.json'
       - 'scripts/room_register_review.py'
       - 'scripts/room_register_review_test.py'
