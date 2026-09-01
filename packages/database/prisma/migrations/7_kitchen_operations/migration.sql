@@ -1,5 +1,6 @@
 -- Kitchen operations are an operational sales/service domain.
 -- They never mutate Reservation.totalKgs or create hotel Payment records automatically.
+-- Kitchen totals are isolated operational amounts: there is no automatic financial posting to hotel payments.
 
 CREATE TABLE kitchen_menu_items (
     id uuid PRIMARY KEY,
