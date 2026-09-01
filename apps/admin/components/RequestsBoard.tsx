@@ -52,6 +52,9 @@ function paymentErrorMessage(body: any) {
     const amount = typeof body.detail.amount_kgs === "number" ? ` · ${fmt(body.detail.amount_kgs)}` : "";
     return `Этот номер операции уже записан${amount}. Проверьте существующий платёж перед созданием брони.`;
   }
+  if (body?.detail?.code === "PAYMENT_BELOW_MANAGER_REQUIREMENT") {
+    return `Получено меньше установленной менеджером предоплаты ${fmt(body.detail.required_prepayment_kgs)}. Если согласовано исключение — сначала измените требуемую сумму, затем повторите подтверждение.`;
+  }
   if (body?.detail?.code === "IDEMPOTENCY_CONFLICT") return "Запрос подтверждения уже использован для другой заявки. Обновите список и повторите.";
   if (body?.detail?.code === "IDEMPOTENCY_PAYLOAD_MISMATCH") return "Этот ключ операции уже был использован с другими реквизитами платежа.";
   return "Не удалось зафиксировать оплату и создать бронь";
