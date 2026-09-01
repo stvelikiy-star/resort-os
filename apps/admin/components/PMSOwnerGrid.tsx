@@ -114,6 +114,10 @@ function naturalRoomCode(left: Room, right: Room) {
   return left.code.localeCompare(right.code, "ru", { numeric: true, sensitivity: "base" });
 }
 
+function compactMoney(value: number) {
+  return new Intl.NumberFormat("ru-RU").format(value);
+}
+
 export default function PMSOwnerGrid() {
   const [start, setStart] = useState(() => {
     const now = new Date();
@@ -302,7 +306,7 @@ export default function PMSOwnerGrid() {
     setBuilder({ reservationId: block.reservation_id, intent: { kind: "OPEN", segmentBlockId: block.id } });
   }
 
-  const dayWidth = windowDays >= 31 ? 36 : 42;
+  const dayWidth = windowDays >= 31 ? 30 : 42;
   const template = `220px 66px repeat(${windowDays}, ${dayWidth}px)`;
 
   return (
@@ -328,9 +332,9 @@ export default function PMSOwnerGrid() {
           <button onClick={() => setStart(addDays(start, windowDays))}>›</button>
         </div>
         <div className="owner-window-switch">
-          {[14, 31].map((value) => <button key={value} className={windowDays === value ? "active" : ""} onClick={() => setWindowDays(value)}>{value} дн.</button>)}
+          {[14, 31].map((value) => <button key={value} aria-label={`Показать ${value} дней`} className={windowDays === value ? "active" : ""} onClick={() => setWindowDays(value)}>{value} дн.</button>)}
         </div>
-        <button className="owner-refresh" onClick={() => void load()}>↻</button>
+        <button className="owner-refresh" onClick={() => void load()} aria-label="Обновить шахматку">↻</button>
       </div>
 
       <div className="owner-selection-help">
@@ -339,7 +343,7 @@ export default function PMSOwnerGrid() {
       {notice && <div className="owner-grid-notice" onClick={() => setNotice(null)}>{notice}</div>}
       {error && <div className="owner-grid-error">{error}</div>}
 
-      <div className="owner-grid-scroll">
+      <div className="owner-grid-scroll" data-window-days={windowDays}>
         <div className="owner-grid-head" style={{ gridTemplateColumns: template }}>
           <div className="owner-room-head">Номер / спальные места</div>
           <div className="owner-state-head">Статус</div>
@@ -354,9 +358,9 @@ export default function PMSOwnerGrid() {
             <div className="owner-group-label"><strong>{group.label}</strong><span>{group.rooms.length}</span></div>
             {group.rooms.map((room) => (
               <div key={room.id} className={`owner-room-row state-${room.operational_state}`} style={{ gridTemplateColumns: template }}>
-                <button className="owner-room-label" onClick={() => setRoomId(room.id)} title={room.room_type_name}>
-                  <strong>{room.code}</strong>
-                  <span>{room.beds_raw || room.room_type_name}</span>
+                <button className="owner-room-label" onClick={() => setRoomId(room.id)} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
+                  <strong>{room.code}{room.beds_raw ? ` (${room.beds_raw})` : ""}</strong>
+                  {!room.beds_raw && <span>{room.room_type_name}</span>}
                 </button>
                 <div className={`owner-room-state ${room.operational_state}`}>{ROOM_STATE[room.operational_state]}</div>
 
@@ -388,18 +392,23 @@ export default function PMSOwnerGrid() {
                   if (endIndex <= 0 || startIndex >= windowDays || endIndex <= startIndex) return null;
                   const financeItem = block.reservation_id ? financeById.get(block.reservation_id) : undefined;
                   const payment = financeItem ? financeItem.remainingKgs <= 0 ? "paid" : financeItem.paidKgs > 0 ? "partial" : "unpaid" : "unknown";
+                  const financeTitle = financeItem
+                    ? ` · Оплачено ${compactMoney(financeItem.paidKgs)} сом · Остаток ${compactMoney(financeItem.remainingKgs)} сом`
+                    : "";
                   return (
                     <button
                       key={block.id}
                       type="button"
                       className={`owner-booking-bar type-${block.type.toLowerCase()} status-${(block.reservation_status || "").toLowerCase()} payment-${payment}`}
+                      data-paid-kgs={financeItem?.paidKgs}
+                      data-remaining-kgs={financeItem?.remainingKgs}
                       style={{ gridColumn: `${3 + startIndex} / ${3 + endIndex}`, gridRow: 1 }}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => { event.stopPropagation(); openReservation(block); }}
-                      title={`${block.guest_name || block.reason || block.type} · ${block.start} → ${block.end}`}
+                      title={`${block.guest_name || block.reason || block.type} · ${block.start} → ${block.end}${financeTitle}`}
                     >
                       <strong>{block.guest_name || block.booking_number || block.reason || block.type}</strong>
-                      {financeItem && <span>{financeItem.remainingKgs <= 0 ? "Оплачено" : `Ост. ${new Intl.NumberFormat("ru-RU").format(financeItem.remainingKgs)}`}</span>}
+                      {financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>}
                     </button>
                   );
                 })}

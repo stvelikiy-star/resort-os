@@ -1,0 +1,46 @@
+.owner-grid-scroll{
+  max-height:calc(100svh - 220px);
+  min-height:560px;
+}
+
+.owner-room-label{
+  grid-template-columns:minmax(0,1fr);
+  gap:0;
+}
+
+.owner-room-label strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:12px;
+}
+
+.owner-room-label span{
+  display:none;
+}
+
+.owner-grid-title h1{
+  font-size:22px;
+}
+
+.owner-grid-title p{
+  font-size:12px;
+}
+
+@media (max-height:800px){
+  .owner-grid-scroll{
+    max-height:calc(100svh - 205px);
+    min-height:470px;
+  }
+  .owner-grid-title p{
+    display:none;
+  }
+}
+
+@media (max-width:900px){
+  .owner-grid-scroll{
+    max-height:68svh;
+    min-height:420px;
+  }
+}
