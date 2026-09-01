@@ -1,0 +1,47 @@
+name: Deployment Release Linkage CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'services/api/Dockerfile'
+      - 'apps/web/Dockerfile'
+      - 'apps/admin/Dockerfile'
+      - 'apps/staff/Dockerfile'
+      - 'compose.beget.yaml'
+      - '.env.beget.example'
+      - 'scripts/deployment_release_linkage.py'
+      - 'scripts/deployment_release_linkage_contract_test.py'
+      - '.github/workflows/deployment-release-linkage-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-linkage-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile release linkage verifier
+        run: python -m py_compile scripts/deployment_release_linkage.py scripts/deployment_release_linkage_contract_test.py
+
+      - name: Run adversarial release linkage contract
+        run: python scripts/deployment_release_linkage_contract_test.py
+
+      - name: Verify all Resort OS application images bake OCI revision
+        shell: bash
+        run: |
+          for dockerfile in services/api/Dockerfile apps/web/Dockerfile apps/admin/Dockerfile apps/staff/Dockerfile; do
+            grep -F 'ARG RELEASE_SHA=UNSET' "$dockerfile" >/dev/null
+            grep -F 'LABEL org.opencontainers.image.revision="${RELEASE_SHA}"' "$dockerfile" >/dev/null
+          done
+          test "$(grep -c 'RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA must identify the exact accepted git commit}' compose.beget.yaml)" -eq 4
+          grep -F 'RELEASE_SHA=CHANGE_ME_EXACT_40_CHAR_GIT_SHA' .env.beget.example >/dev/null
+          grep -F 'RESULT: DEPLOYMENT RELEASE LINKAGE GREEN' scripts/deployment_release_linkage.py >/dev/null
