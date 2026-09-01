@@ -17,12 +17,17 @@ def main() -> int:
 
     assert len(EXPECTED_MIGRATIONS) == 7
     assert EXPECTED_MIGRATIONS[-1] == "6_service_point_qr_operations"
-    assert len(CRITICAL_CONSTRAINTS) == 24
+    assert len(CRITICAL_CONSTRAINTS) == 27
+    assert {
+        "service_points_category_check",
+        "service_point_qrs_revocation_check",
+        "operational_tasks_service_point_context_check",
+    }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
     print("PASS: exact seven-migration release ledger is fail-closed")
     print("PASS: Service Point QR operations migration is part of the canonical release boundary")
-    print("PASS: current critical constraint fingerprint contains 24 constraints")
+    print("PASS: current critical constraint fingerprint contains 27 constraints")
     return 0
 
 
