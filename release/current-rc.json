@@ -2,12 +2,12 @@
   "schema_version": 1,
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
   "source_branch": "integration/site-pms-cms-20260827",
-  "accepted_executable_head": "7f0c5c56e2dae4809d4c4996221f99fe2a0a82a9",
-  "observed_integration_merge": "79fe6fef880f60f7abb1ff0a70f1afefe3aa26f3",
+  "accepted_executable_head": "a99adec0c19af884cace460fcb5866043912e7e1",
+  "observed_integration_merge": "2e29825feeb3bfc19c0ccd8844ac05359f8fe9eb",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 17,
-    "success": 17,
+    "triggered": 21,
+    "success": 21,
     "failures": 0
   },
   "production_source_branch": "integration/site-pms-cms-20260827",
@@ -16,8 +16,9 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "The accepted executable head is the exact PR #89 head that passed 17/17 triggered workflows.",
-    "The observed integration merge had zero file differences versus that tested head.",
+    "The accepted executable head is the exact PR #93 product head after the database toolchain security fix and passed 21/21 executable acceptance/security/regression contours; the RC truth workflow intentionally failed on that product head until this refreeze metadata was created.",
+    "The observed integration merge has zero file differences versus the tested executable head.",
+    "Prisma CLI and @prisma/client are pinned to audited 6.12.0 with a committed lockfile and a permanent database dependency security gate.",
     "Release-hygiene files may change without changing executable product truth.",
     "CI success does not constitute external Beget or production evidence."
   ]

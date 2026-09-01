@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.2
+Version: 3.3
 Date: 2026-09-01
 Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
@@ -12,12 +12,14 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `7f0c5c56e2dae4809d4c4996221f99fe2a0a82a9`.
-Observed integration merge: `79fe6fef880f60f7abb1ff0a70f1afefe3aa26f3`.
+Accepted executable head: `a99adec0c19af884cace460fcb5866043912e7e1`.
+Observed integration merge: `2e29825feeb3bfc19c0ccd8844ac05359f8fe9eb`.
 
-The accepted executable head is the exact PR #89 head and completed **17/17 triggered workflow contours successfully, 0 failures**, including Resort Core, Full Staging Gate, Single Server Production Package, dependency security, realtime, operations, backup/restore and the dedicated External Staging Acceptance Contract CI.
+The accepted executable head is the exact PR #93 product head after the database dependency hardening and completed **21/21 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally blocked that product head until this refreeze metadata was created. The successful contours include Resort Core, Full Staging Gate, PMS Final Acceptance, PMS mutation/grid tests, Single Server Production Package, frontend/backend dependency security, the new Database Dependency Security CI, realtime, operations, payment idempotency, backup/restore, auth/security and AI/n8n contracts.
 
 The observed integration merge has **0 changed files** versus that accepted executable head. The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
+
+The database toolchain is now deterministic and separately security-gated: `prisma` and `@prisma/client` are exactly pinned to `6.12.0`, `packages/database/package-lock.json` is committed, clean `npm ci` is required, and the database npm audit must have zero HIGH/CRITICAL findings before acceptance.
 
 `main` is not a production source. The current `main` branch is stale relative to the accepted integration RC and must not be used for Beget deployment or cutover.
 
@@ -155,7 +157,8 @@ Repository/CI:
 
 - migration baseline: VERIFIED;
 - backup -> restore: VERIFIED;
-- dependency security inspection: VERIFIED;
+- frontend/backend dependency security inspection: VERIFIED;
+- database Prisma dependency security + deterministic lockfile: VERIFIED;
 - production package build: VERIFIED IN CI;
 - CI-local Full Staging: VERIFIED;
 - Beget hardening logic: VERIFIED IN CI only;

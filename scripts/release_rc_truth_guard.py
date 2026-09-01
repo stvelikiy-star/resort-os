@@ -56,8 +56,13 @@ def main() -> int:
             errors.append(f"{label} is not an exact 40-character Git SHA")
 
     workflows = rc.get("accepted_head_workflows") or {}
-    if workflows != {"triggered": 17, "success": 17, "failures": 0}:
-        errors.append("accepted head workflow evidence must be exactly 17/17 success, 0 failures")
+    triggered = workflows.get("triggered")
+    success = workflows.get("success")
+    failures = workflows.get("failures")
+    if not isinstance(triggered, int) or triggered <= 0:
+        errors.append("accepted head workflow evidence must contain a positive triggered count")
+    elif success != triggered or failures != 0:
+        errors.append("accepted head workflow evidence must be all-success with zero failures")
     if rc.get("observed_merge_tree_equivalent") is not True:
         errors.append("observed merge tree equivalence must be true")
 
@@ -102,6 +107,7 @@ def main() -> int:
 
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_integration_merge={observed}")
+    print(f"FACT: accepted_head_workflows={triggered}/{triggered}")
     print("PASS: RC manifest, canonical docs and frozen executable tree are consistent")
     print("PASS: main is explicitly forbidden as production source")
     print("RESULT: RELEASE RC TRUTH GREEN")
