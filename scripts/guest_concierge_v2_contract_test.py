@@ -18,6 +18,7 @@ require("GuestConciergeRuntime" in PAGE, "room QR route must use GuestConciergeR
 require("GuestOsRuntime" not in PAGE, "legacy GuestOsRuntime must not render beside concierge")
 require("GuestRequestsPanel" not in PAGE, "legacy duplicate request panel must not render")
 require("guest-concierge.css" in PAGE, "concierge stylesheet not wired")
+require(".concierge-page ~ .ai-admin-root{display:none!important}" in PAGE, "RU-only public AI widget must not leak into localized concierge")
 
 # Guest-visible localization must be explicit and compact.
 for locale in ('ru:', 'kg:', 'en:'):
