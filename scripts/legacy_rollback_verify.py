@@ -49,6 +49,22 @@ def safe_extract(archive: tarfile.TarFile, destination: Path) -> None:
     archive.extractall(destination)
 
 
+def sync_verified_manifest(manifest_path: Path, manifest: dict[str, Any]) -> str:
+    offsite = manifest.get("offsite_copy") or {}
+    if offsite.get("status") != "COPIED":
+        return "NOT_COPIED"
+    destination = Path(str(offsite.get("path") or "")).expanduser().resolve()
+    if not destination.is_dir():
+        raise ValueError(f"off-site evidence directory is missing: {destination}")
+    copied_manifest = destination / "manifest.json"
+    if not copied_manifest.is_file():
+        raise ValueError(f"off-site manifest is missing: {copied_manifest}")
+    shutil.copy2(manifest_path, copied_manifest)
+    if sha256(copied_manifest) != sha256(manifest_path):
+        raise ValueError("off-site verified manifest checksum differs from local manifest")
+    return "VERIFIED_MANIFEST_SYNCED"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Verify Three Crowns legacy rollback evidence and rehearse non-destructive restore")
     parser.add_argument("evidence_dir")
@@ -84,8 +100,10 @@ def main() -> int:
                 raise ValueError("site archive restore rehearsal produced no files")
 
         db_spec = artifacts.get("database_dump") or {}
-        if db_spec.get("status") == "NOT_REQUESTED":
-            db_result = "NOT_REQUESTED"
+        if db_spec.get("status") == "ABSENT_CONFIRMED":
+            db_result = "ABSENT_CONFIRMED"
+        elif db_spec.get("status") in {"UNDETERMINED", "NOT_REQUESTED"}:
+            db_result = "UNDETERMINED"
         else:
             db_dump = assert_artifact(root, db_spec, "database dump")
             if shutil.which("pg_restore") is None:
@@ -95,6 +113,7 @@ def main() -> int:
                 raise ValueError(f"pg_restore --list failed: {proc.stderr.strip()[:500]}")
             db_result = "ARCHIVE_READABLE"
 
+        offsite_result = "UNCHANGED"
         if args.mark_verified:
             manifest["status"] = "RESTORE_VERIFIED"
             manifest["restore_rehearsal"] = {
@@ -103,13 +122,15 @@ def main() -> int:
                 "site_archive": "EXTRACTED_TO_TEMPORARY_LOCATION",
                 "database_dump": db_result,
                 "dns_snapshot": "CHECKSUM_AND_SCHEMA_VERIFIED",
-                "note": "This rehearsal is non-destructive and does not overwrite live paths or DNS.",
+                "note": "Non-destructive rehearsal; live paths and DNS were not modified.",
             }
             manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            offsite_result = sync_verified_manifest(manifest_path, manifest)
 
         print(f"ROLLBACK_VERIFY_OK evidence={root}")
         print(f"site_archive_sha256={sha256(site_archive)}")
         print(f"database={db_result}")
+        print(f"offsite={offsite_result}")
         print("RESULT: RESTORE_REHEARSAL_VERIFIED" if args.mark_verified else "RESULT: EVIDENCE_VERIFIED_NOT_MARKED")
         return 0
     except Exception as exc:
