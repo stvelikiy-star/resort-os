@@ -1,7 +1,7 @@
 # THREE CROWNS RESORT OS — LAUNCH ACCEPTANCE
 
 Date: 2026-09-01
-Status: RELEASE-CANDIDATE PREPARATION / EXTERNAL CUTOVER STOP
+Status: INTERNAL RELEASE CANDIDATE / EXTERNAL CUTOVER STOP
 Canonical: YES
 
 This document separates repository/CI evidence from external production evidence. It must not be used to imply that the system is live.
@@ -10,11 +10,12 @@ This document separates repository/CI evidence from external production evidence
 
 Integration branch: `integration/site-pms-cms-20260827`.
 
-Block 11 Service Point QR was merged at `91699f70f774726eb61a9882ccbdfe5944471856` from audited feature head `7e8193447fc09dff2c375b5aa63ce4573e8210a8`.
+Current integration head: `42798b3fd360b5f5a6a4eb2124b1231702c99eea`.
+Latest tested exact PR head: `da3cc80f3c13973f799c01ddd8ad64ed79c17f6f`.
 
-The audited feature head completed 37/37 pull-request workflow contours successfully, including Service Point QR lifecycle, Resort Core, PMS, Guest OS, Guest CRM, Finance, Guest Services, Owner surfaces, Public Browser, Public Truth, migration baseline, backup/restore, dependency security, Beget hardening, production package and Full Staging.
+The merge commit has **0 changed files** versus the tested PR head. That exact PR head completed **20/20 triggered workflow contours successfully**, including Resort Core, Full Staging, Production Package, Public Browser, Public Truth, dependency security, realtime, operations, backup/restore and the Site Content Runtime regression.
 
-A merge commit containing the same reviewed tree is not a substitute for a new independent external acceptance run.
+Earlier closed product gates retain their own exact-head evidence. A merge commit containing the same reviewed tree is not a substitute for independent external acceptance.
 
 ## 2. Canonical database release contract
 
@@ -37,9 +38,10 @@ Critical PostgreSQL constraint fingerprint is maintained in `scripts/release_con
 The repository contains and CI exercises:
 
 - public site truth and RU/KG/EN browser acceptance;
+- CMS -> Core -> public runtime with locale-safe fallback/ownership;
 - ReservationRequest/Core boundary;
 - compact owner PMS grid and full PMS mutation lifecycle;
-- Reception RBAC;
+- Reception/Admin RBAC;
 - canonical Stay and RoomAssignment lifecycle;
 - Room QR / PIN / GuestSession access;
 - Guest OS requests and Staff role routing;
@@ -54,13 +56,15 @@ The repository contains and CI exercises:
 - single-server production package and CI-local Full Staging;
 - NFC deferred scope: NFC payment routes remain outside active V1 composition.
 
+Physical room import gate #38 is **CLOSED / COMPLETED** for the canonical 84-room / 12-category register and safe importer contract. This is not external staging reconciliation evidence.
+
 CI verification is not external production evidence.
 
 ## 4. External hard blockers
 
 Production cutover remains STOP until all required items below have real evidence:
 
-- owner-approved physical 84-room production register;
+- room reconciliation on the actual external staging database against the closed #38 canonical register: importer dry-run -> diff review -> safe apply/result evidence;
 - non-destructive preflight on the actual Beget host/account/network;
 - verified rollback backup of the currently live `3korony.com` target, including DNS/config/data/media where applicable;
 - isolated external HTTPS/WSS staging on the real network;
@@ -72,7 +76,7 @@ Production cutover remains STOP until all required items below have real evidenc
 - exact DNS rollback capture;
 - explicit final owner approval for the production/DNS switch.
 
-The development database count of 84 rooms is not equivalent to owner approval of the physical production register.
+Do **not** reopen room-data collection as a launch requirement. The remaining room gate is real-target reconciliation only.
 
 ## 5. Fail-closed launch evidence
 
@@ -95,6 +99,8 @@ python scripts/verify_launch_acceptance.py \
   --release-sha <exact-accepted-release-sha>
 ```
 
+Required external room evidence key is `room_reconciliation`. Historical `owner_room_register` is obsolete and rejected by the verifier because #38 is already closed.
+
 The verifier validates supplied evidence metadata and fails closed on missing gates. It does not manufacture, infer or independently observe external evidence.
 
 Do not commit credentials, provider tokens, database passwords or other production secrets into the evidence manifest.
@@ -115,7 +121,7 @@ After all external blockers are VERIFIED:
 2. take fresh pre-cutover backup;
 3. confirm legacy rollback package and DNS rollback target;
 4. rerun host/preflight and production preflight;
-5. confirm external staging and device/provider evidence;
+5. confirm external staging, room reconciliation and device/provider evidence;
 6. obtain explicit owner cutover approval;
 7. deploy exact accepted release;
 8. run readiness/smoke before public switch;
