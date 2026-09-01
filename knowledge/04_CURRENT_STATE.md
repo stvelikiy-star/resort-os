@@ -1,7 +1,7 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.3
-Date: 2026-09-01
+Version: 3.4
+Date: 2026-09-02
 Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
 Authority: factual implementation reality only
@@ -12,14 +12,14 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `a99adec0c19af884cace460fcb5866043912e7e1`.
-Observed integration merge: `2e29825feeb3bfc19c0ccd8844ac05359f8fe9eb`.
+Accepted executable head: `3787e8729b84e1ecc41133ab846a909943458306`.
+Observed integration merge: `102a46ef721ee880647ecd6f81024bd744458170`.
 
-The accepted executable head is the exact PR #93 product head after the database dependency hardening and completed **21/21 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally blocked that product head until this refreeze metadata was created. The successful contours include Resort Core, Full Staging Gate, PMS Final Acceptance, PMS mutation/grid tests, Single Server Production Package, frontend/backend dependency security, the new Database Dependency Security CI, realtime, operations, payment idempotency, backup/restore, auth/security and AI/n8n contracts.
+The accepted executable head is the exact PR #95 product head after Guest OS PIN presentation/reissue and admin locale/contrast hardening and completed **35/35 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally blocked that product head because the prior RC was frozen; this refreeze follows the actual tree-equivalent integration merge. The successful contours include Resort Core, Full Staging Gate, PMS Final Acceptance, Guest OS Core/Access/Requests, PMS mutation/grid tests, Single Server Production Package, frontend/backend/database dependency security, the dedicated Admin Guest PIN and i18n CI, Admin Runtime Truth, realtime, operations, payment idempotency, backup/restore and AI/n8n contracts.
 
 The observed integration merge has **0 changed files** versus that accepted executable head. The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
-The database toolchain is now deterministic and separately security-gated: `prisma` and `@prisma/client` are exactly pinned to `6.12.0`, `packages/database/package-lock.json` is committed, clean `npm ci` is required, and the database npm audit must have zero HIGH/CRITICAL findings before acceptance.
+The database toolchain remains deterministic and separately security-gated: `prisma` and `@prisma/client` are exactly pinned to `6.12.0`, `packages/database/package-lock.json` is committed, clean `npm ci` is required, and the database npm audit must have zero HIGH/CRITICAL findings before acceptance.
 
 `main` is not a production source. The current `main` branch is stale relative to the accepted integration RC and must not be used for Beget deployment or cutover.
 
@@ -78,7 +78,10 @@ Canonical PMS includes:
 - factual RoomAssignment relocation;
 - checkout -> DIRTY/housekeeping lifecycle;
 - Reception read/check-in/check-out/QR authority without financial/commercial mutation authority;
-- Admin fail-closed role boundary: only OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN enter Admin/PMS; other operational roles remain in Staff PWA.
+- successful check-in surfaces the one-time six-digit Guest OS PIN without changing the Core response contract;
+- OWNER/MANAGER/RECEPTION can reissue a lost/expired Guest OS PIN only for a CHECKED_IN reservation with an ACTIVE stay; plaintext is returned once, only the PBKDF2 hash is persisted and the action is audited;
+- Admin fail-closed role boundary: only OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN enter Admin/PMS; other operational roles remain in Staff PWA;
+- global admin locale selector for RU/KG/EN, dynamic rendering translation for operational labels/statuses/audit codes and a final high-contrast blue/white dashboard layer.
 
 The canonical 84-room import contract is closed. External target reconciliation remains a deployment evidence step, not a data-collection blocker.
 
@@ -89,6 +92,7 @@ Implemented and CI-verified:
 - canonical `Stay` and `RoomAssignment` lifecycle;
 - permanent Room QR using server-side token hash;
 - PIN verification and HttpOnly GuestSession;
+- one-time six-digit PIN issuance at check-in and fail-closed reissue for active stays;
 - session revocation at checkout;
 - Guest OS service requests;
 - factual Guest CRM history across repeated stays and relocations;
