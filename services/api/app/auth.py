@@ -79,6 +79,20 @@ def _throttle_keys(username: str, client_ip: str) -> tuple[str, str]:
     return pair_key, ip_key
 
 
+async def _acquire_login_locks(conn, pair_key: str, ip_key: str) -> list[str]:
+    keys = sorted({pair_key, ip_key})
+    for key in keys:
+        # Session-level PostgreSQL advisory locks serialize attempts sharing a pair or
+        # source IP across all API workers. They are released explicitly in finally.
+        await conn.execute("SELECT pg_advisory_lock(hashtextextended($1, 0))", key)
+    return keys
+
+
+async def _release_login_locks(conn, keys: list[str]) -> None:
+    for key in reversed(keys):
+        await conn.execute("SELECT pg_advisory_unlock(hashtextextended($1, 0))", key)
+
+
 async def _login_is_throttled(conn, property_id: uuid.UUID, pair_key: str, ip_key: str) -> bool:
     window_start = datetime.utcnow() - timedelta(seconds=AUTH_LOGIN_WINDOW_SECONDS)
     pair_reset = await conn.fetchval(
@@ -215,69 +229,73 @@ async def login(payload: LoginPayload, request: Request, response: Response):
     pair_key, ip_key = _throttle_keys(username, client_ip)
 
     async with request.app.state.db.acquire() as conn:
-        property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', PROPERTY_CODE)
-        if not property_id:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Property not loaded")
-
-        if await _login_is_throttled(conn, property_id, pair_key, ip_key):
-            raise _invalid_login()
-
-        row = await conn.fetchrow(
-            '''
-            SELECT u.id, u.username, u."displayName", u."passwordHash", u.role::text AS role,
-                   u."isActive", u."propertyId", p.code AS property_code
-            FROM staff_users u
-            JOIN properties p ON p.id = u."propertyId"
-            WHERE p.code = $1 AND lower(u.username) = $2
-            ''',
-            PROPERTY_CODE,
-            username,
-        )
-
-        if not row or not row["isActive"]:
-            await _record_login_failure(conn, property_id, pair_key, ip_key)
-            raise _invalid_login()
-
+        lock_keys = await _acquire_login_locks(conn, pair_key, ip_key)
         try:
-            password_hasher.verify(row["passwordHash"], payload.password)
-        except VerificationError:
-            await _record_login_failure(conn, property_id, pair_key, ip_key)
-            raise _invalid_login()
+            property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', PROPERTY_CODE)
+            if not property_id:
+                raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Property not loaded")
 
-        if password_hasher.check_needs_rehash(row["passwordHash"]):
-            await conn.execute(
-                'UPDATE staff_users SET "passwordHash" = $1, "updatedAt" = now() WHERE id = $2',
-                password_hasher.hash(payload.password),
-                row["id"],
+            if await _login_is_throttled(conn, property_id, pair_key, ip_key):
+                raise _invalid_login()
+
+            row = await conn.fetchrow(
+                '''
+                SELECT u.id, u.username, u."displayName", u."passwordHash", u.role::text AS role,
+                       u."isActive", u."propertyId", p.code AS property_code
+                FROM staff_users u
+                JOIN properties p ON p.id = u."propertyId"
+                WHERE p.code = $1 AND lower(u.username) = $2
+                ''',
+                PROPERTY_CODE,
+                username,
             )
 
-        raw_token = secrets.token_urlsafe(48)
-        token_hash = hash_session_token(raw_token)
-        expires_at = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
-        session_id = uuid.uuid4()
+            if not row or not row["isActive"]:
+                await _record_login_failure(conn, property_id, pair_key, ip_key)
+                raise _invalid_login()
 
-        await conn.execute(
-            '''
-            INSERT INTO auth_sessions (id, "userId", "tokenHash", "expiresAt", "lastSeenAt", "createdAt")
-            VALUES ($1, $2, $3, $4, now(), now())
-            ''',
-            session_id,
-            row["id"],
-            token_hash,
-            expires_at,
-        )
-        await conn.execute(
-            '''
-            INSERT INTO audit_logs (
-                id, "propertyId", "actorType", "actorId", action, resource, "resourceId", source, result, "createdAt"
-            ) VALUES ($1, $2, 'STAFF', $3, 'LOGIN', 'AuthSession', $4, 'WEB_ADMIN', 'SUCCESS', now())
-            ''',
-            uuid.uuid4(),
-            row["propertyId"],
-            str(row["id"]),
-            str(session_id),
-        )
-        await _record_pair_reset(conn, property_id, pair_key)
+            try:
+                password_hasher.verify(row["passwordHash"], payload.password)
+            except VerificationError:
+                await _record_login_failure(conn, property_id, pair_key, ip_key)
+                raise _invalid_login()
+
+            if password_hasher.check_needs_rehash(row["passwordHash"]):
+                await conn.execute(
+                    'UPDATE staff_users SET "passwordHash" = $1, "updatedAt" = now() WHERE id = $2',
+                    password_hasher.hash(payload.password),
+                    row["id"],
+                )
+
+            raw_token = secrets.token_urlsafe(48)
+            token_hash = hash_session_token(raw_token)
+            expires_at = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
+            session_id = uuid.uuid4()
+
+            await conn.execute(
+                '''
+                INSERT INTO auth_sessions (id, "userId", "tokenHash", "expiresAt", "lastSeenAt", "createdAt")
+                VALUES ($1, $2, $3, $4, now(), now())
+                ''',
+                session_id,
+                row["id"],
+                token_hash,
+                expires_at,
+            )
+            await conn.execute(
+                '''
+                INSERT INTO audit_logs (
+                    id, "propertyId", "actorType", "actorId", action, resource, "resourceId", source, result, "createdAt"
+                ) VALUES ($1, $2, 'STAFF', $3, 'LOGIN', 'AuthSession', $4, 'WEB_ADMIN', 'SUCCESS', now())
+                ''',
+                uuid.uuid4(),
+                row["propertyId"],
+                str(row["id"]),
+                str(session_id),
+            )
+            await _record_pair_reset(conn, property_id, pair_key)
+        finally:
+            await _release_login_locks(conn, lock_keys)
 
     response.set_cookie(
         SESSION_COOKIE,
