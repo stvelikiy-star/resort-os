@@ -1,135 +1,94 @@
 # Three Crowns — production database migration gate
 
-Status: **PROCESS + GENERATOR DEFINED / BASELINE SQL NOT YET EXECUTED OR VERIFIED**
+Date: 2026-09-01
+Status: **COMMITTED / CLEAN-DEPLOY VERIFIED / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
 
-This document replaces any idea of using `prisma db push` as the permanent production deployment strategy.
+This document defines the database migration boundary for Three Crowns Resort OS. It does not prove that migrations were run against a real production database.
 
-The repository currently uses Prisma 6.x and custom PostgreSQL constraints under `packages/database/sql/`.
+## Canonical migration ledger
+
+Production/staging schema changes are represented only by committed Prisma migrations.
+
+Exact current ledger:
+
+1. `0_init`
+2. `1_site_content`
+3. `2_guest_service_tasks`
+4. `3_owner_analytics_snapshots`
+5. `4_guest_engagements`
+6. `5_guest_os_core`
+7. `6_service_point_qr_operations`
+
+The exact ledger is maintained in `scripts/release_contract.py` and verified fail-closed by CI.
 
 ## Rules
 
 1. `prisma db push` is allowed only for disposable development/test databases.
-2. Production/staging schema changes must be represented by committed Prisma migrations.
-3. The initial migration must be generated from the current canonical schema and reviewed before it is accepted.
-4. Custom PostgreSQL features not represented by Prisma Schema Language must be included in migration history as reviewed SQL.
-5. Never mark a baseline migration as applied on an existing database until schema equivalence has been checked.
-6. Never run destructive reset commands against production.
-7. Backup -> clean restore verification is required before production migration/cutover.
+2. Production/staging uses `npx prisma migrate deploy`.
+3. Never use `migrate resolve` to hide schema drift.
+4. Never run destructive reset commands against production.
+5. Custom PostgreSQL constraints must remain in committed migration history.
+6. Any new forward migration must update the shared release contract and all release/backup verification in the same change.
+7. Backup -> isolated restore verification is required before cutover.
+8. Production requires a fresh real backup even though repository backup/restore is CI-verified.
 
-## Repository helper
+## Current verified repository state
 
-A development-only generator is available:
+CI verifies:
 
-```bash
-bash scripts/generate_migration_baseline.sh
-```
+- Prisma schema validation;
+- clean PostgreSQL migration deploy from empty database;
+- exact seven-migration ledger;
+- 27 critical domain constraints from the shared release contract;
+- 84-room / 12-room-type development intake integrity;
+- Resort Core/PMS/business invariant regressions;
+- backup creation and clean restore with the current migration/constraint fingerprint;
+- Full Staging migration/application startup path.
 
-Safety behavior:
-- refuses `APP_ENV=production`;
-- refuses to overwrite an existing `prisma/migrations` directory by default;
-- runs Prisma format/validate;
-- generates `prisma/migrations/0_init/migration.sql` from empty -> current canonical schema;
-- appends `packages/database/sql/001_core_constraints.sql` so critical PostgreSQL invariants are not silently left outside migration history;
-- asserts required hotel constraints are present in the generated SQL;
-- writes a SHA-256 file;
-- **does not** run `migrate resolve`, production deploy or modify a production database.
+The development room count is not final owner approval of the physical production register.
 
-Generated output is still only `GENERATED / NOT VERIFIED` until the clean-database procedure below succeeds.
+## Critical database boundary
 
-## Equivalent manual baseline command
+The canonical constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains 27 constraints, including:
 
-From `packages/database/` with the repository's current Prisma 6.x CLI:
+- valid rate/request/reservation/inventory dates;
+- nonnegative/positive financial bounds;
+- `no_overlapping_active_room_blocks`;
+- Guest Services context/time guards;
+- Owner analytics/Growth guards;
+- Service Point category/QR/context guards.
 
-```bash
-npm install
-npx prisma format
-npx prisma validate
-mkdir -p prisma/migrations/0_init
-npx prisma migrate diff \
-  --from-empty \
-  --to-schema-datamodel prisma/schema.prisma \
-  --script \
-  > prisma/migrations/0_init/migration.sql
-```
+Foreign keys and uniqueness are additionally checked by migration/domain tests.
 
-Then review/append custom PostgreSQL SQL before accepting the migration.
+## Fresh staging / production database
 
-The current critical hotel constraints in `packages/database/sql/001_core_constraints.sql` include at minimum:
-- `btree_gist`;
-- valid rate/request/reservation/inventory date checks;
-- nonnegative reservation total;
-- positive payment amount and payment context;
-- `no_overlapping_active_room_blocks` exclusion constraint.
-
-NFC is deferred. Dormant NFC schema may still exist in the canonical Prisma data model for backward compatibility, but NFC must not determine active V1 business behavior or cutover acceptance.
-
-## Clean database verification
-
-After generating/reviewing the baseline, use an isolated clean PostgreSQL database:
-
-```bash
-DATABASE_URL=postgresql://.../resort_os_migration_test \
-  npx prisma migrate deploy
-```
-
-Then from repository root with the same isolated database URL:
-
-```bash
-python scripts/seed_from_intake.py
-python scripts/production_preflight.py
-```
-
-For a development/staging verification environment, also run the Resort Core release acceptance path and prove:
-- 84 rooms / 12 categories;
-- availability/pricing;
-- no overlapping room inventory;
-- ReservationRequest != Reservation;
-- manager-controlled Reservation creation;
-- PMS chessboard schedule reads/mutations;
-- auth/RBAC;
-- internal payments.
-
-Do not set `REQUIRE_MIGRATION_HISTORY=false` merely to make production preflight pass.
-
-## Existing database baseline
-
-For an existing staging/database previously created using `db push`:
-
-1. create and verify a backup;
-2. generate/review the baseline;
-3. compare the real database schema to the migration-defined schema;
-4. fix any drift first;
-5. only after equivalence is proven, mark the baseline as applied:
-
-```bash
-npx prisma migrate resolve --applied 0_init
-```
-
-6. run:
-
-```bash
-npx prisma migrate status
-```
-
-7. confirm no pending/failed migrations.
-
-`migrate resolve` is bookkeeping, not schema repair. Never use it to hide drift.
-
-## New staging / production databases
-
-For a fresh database after the migration history is committed and verified:
+Use the exact accepted release and run:
 
 ```bash
 npx prisma migrate deploy
 ```
 
-Then run:
+Then run production preflight with real target environment/database evidence:
 
 ```bash
 python scripts/production_preflight.py
 ```
 
-Production preflight must confirm migration history exists and critical constraints are present.
+Do not disable migration-history verification merely to make preflight pass.
+
+## Existing database previously created outside migrations
+
+If an existing external database was historically created with `db push` or manual SQL:
+
+1. take and verify a backup;
+2. compare real schema against the exact committed migration-defined schema;
+3. fix drift explicitly;
+4. only if baseline equivalence is actually proven, use `migrate resolve` for bookkeeping where appropriate;
+5. run `npx prisma migrate status`;
+6. run production preflight;
+7. preserve evidence of comparison/migration result.
+
+`migrate resolve` never repairs schema.
 
 ## Backup / restore gate
 
@@ -148,10 +107,20 @@ RESTORE_DATABASE_URL=postgresql://.../resort_os_restore \
 python scripts/database_restore_verify.py
 ```
 
-Only a successful restore verification may supply `LAST_VERIFIED_BACKUP_AT` to the production preflight gate.
+Repository CI proves this mechanism against the current release contract. Production still needs a new backup from the actual target database with checksum/timestamp/restore ownership evidence.
 
-## Current blocker
+## Production boundary
 
-The baseline SQL itself is **not yet committed/executed/verified** because the repository still needs a successful clean-PostgreSQL generation/apply/preflight proof and explicit SQL review.
+Current state is **migration-engineering ready, external production evidence incomplete**.
 
-Until generation, review and clean-database verification are captured as evidence, migration status remains `NOT READY FOR PRODUCTION`.
+Do not claim production migration success until the actual target database has:
+
+- fresh backup evidence;
+- exact accepted release SHA/image set;
+- `migrate deploy` result;
+- exact seven-migration ledger;
+- critical constraint fingerprint;
+- readiness/smoke result;
+- tested rollback/restore path.
+
+See `knowledge/09_LAUNCH_ACCEPTANCE.md` for the full cutover gate.
