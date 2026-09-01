@@ -17,6 +17,7 @@ EXPECTED_MIGRATIONS = (
     "4_guest_engagements",
     "5_guest_os_core",
     "6_service_point_qr_operations",
+    "7_kitchen_operations",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
