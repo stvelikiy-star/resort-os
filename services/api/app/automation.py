@@ -165,7 +165,7 @@ async def automation_capabilities(_service: dict[str, Any] = Depends(service_acc
             "instagram": "ManyChat -> n8n -> Resort Core unified inbox",
             "whatsapp": "API Green -> n8n -> Resort Core unified inbox",
             "telegram": "Telegram/n8n or direct adapter -> Resort Core unified inbox",
-            "website": "Website -> Resort Core directly -> Resort Core unified inbox for WEB booking requests",
+            "website": "Website -> Resort Core /api/v1/booking/requests directly; ReservationRequest is the controlled website artifact",
         },
         "allowed": [
             "GET /api/v1/booking/check-availability",
@@ -188,7 +188,8 @@ async def automation_capabilities(_service: dict[str, Any] = Depends(service_acc
         ],
         "truth_rule": "Tool failure or unknown result must never be described as success.",
         "reservation_rule": "Automation creates ReservationRequest only; a valid reservation requires the controlled Resort Core payment/management flow.",
-        "channel_rule": "Every client-channel inbound event must be written to the unified inbox before AI/handoff. Provider delivery evidence must be written back as outbound communication evidence; only SENT/DELIVERED counts as a response.",
+        "channel_rule": "Every automated messaging-channel inbound event must be written to the unified inbox before AI/handoff. Provider delivery evidence must be written back as outbound communication evidence; only SENT/DELIVERED counts as a response.",
+        "website_rule": "Public website booking stays on the direct Resort Core ReservationRequest contract and must not receive the automation service credential.",
         "idempotency_rule": "Reusing an automation idempotency key with a different payload is a conflict, never a replay.",
         "handoff_rule": "When a hot lead originates from a unified inbox conversation, conversation_id must be supplied so ReservationRequest and Conversation are linked atomically.",
         "database_rule": "n8n must never connect directly to Resort OS PostgreSQL.",
