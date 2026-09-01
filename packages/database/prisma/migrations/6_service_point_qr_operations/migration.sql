@@ -10,7 +10,9 @@ CREATE TABLE "service_points" (
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "service_points_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "service_points_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "service_points_category_check"
+        CHECK ("category" IN ('POOL','BEACH','RESTROOM','CORRIDOR','DINING','SAUNA','OTHER'))
 );
 
 CREATE TABLE "service_point_request_options" (
@@ -37,10 +39,29 @@ CREATE TABLE "service_point_qrs" (
     "revokedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "service_point_qrs_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "service_point_qrs_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "service_point_qrs_revocation_check"
+        CHECK (
+            ("status"='ACTIVE' AND "revokedAt" IS NULL)
+            OR ("status"='REVOKED' AND "revokedAt" IS NOT NULL)
+        )
 );
 
 ALTER TABLE "operational_tasks" ADD COLUMN "servicePointId" UUID;
+
+ALTER TABLE "operational_tasks"
+    ADD CONSTRAINT "operational_tasks_service_point_context_check"
+    CHECK (
+        "servicePointId" IS NULL
+        OR (
+            "roomId" IS NULL
+            AND "reservationId" IS NULL
+            AND "stayId" IS NULL
+            AND "serviceCode" IS NULL
+            AND "serviceDate" IS NULL
+            AND "serviceTime" IS NULL
+        )
+    );
 
 CREATE UNIQUE INDEX "service_points_propertyId_code_key" ON "service_points"("propertyId", "code");
 CREATE INDEX "service_points_propertyId_category_isActive_idx" ON "service_points"("propertyId", "category", "isActive");
