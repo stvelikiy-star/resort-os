@@ -1,0 +1,48 @@
+name: Production Monitoring Contract CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'scripts/production_monitoring_check.py'
+      - 'scripts/production_monitoring_contract_test.py'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
+      - 'docs/PRODUCTION_MONITORING.md'
+      - 'compose.beget.yaml'
+      - 'services/api/app/observability.py'
+      - '.github/workflows/production-monitoring-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-monitoring-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile monitoring checker
+        run: python -m py_compile scripts/production_monitoring_check.py scripts/production_monitoring_contract_test.py
+
+      - name: Verify adversarial monitoring contract
+        run: python scripts/production_monitoring_contract_test.py
+
+      - name: Verify production backup receipt and off-site semantics
+        run: bash scripts/production_backup_test.sh
+
+      - name: Verify monitoring contract stays attached to production topology
+        shell: bash
+        run: |
+          grep -q 'restart: unless-stopped' compose.beget.yaml
+          grep -q '/health/ready' compose.beget.yaml
+          grep -q 'max-size: "20m"' compose.beget.yaml
+          grep -q 'event.*http_request' services/api/app/observability.py
+          grep -q 'RESULT: PRODUCTION MONITORING GREEN' scripts/production_monitoring_check.py
+          grep -q 'REAL BEGET EVIDENCE REQUIRED' docs/PRODUCTION_MONITORING.md
