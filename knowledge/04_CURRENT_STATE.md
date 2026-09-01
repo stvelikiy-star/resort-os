@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.1
+Version: 3.2
 Date: 2026-09-01
 Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
@@ -12,14 +12,18 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Current integration head: `42798b3fd360b5f5a6a4eb2124b1231702c99eea`.
-Latest tested exact PR head: `da3cc80f3c13973f799c01ddd8ad64ed79c17f6f`.
+Accepted executable head: `7f0c5c56e2dae4809d4c4996221f99fe2a0a82a9`.
+Observed integration merge: `79fe6fef880f60f7abb1ff0a70f1afefe3aa26f3`.
 
-The current merge commit has **0 changed files** versus that tested PR head. The exact PR head completed **20/20 triggered workflow contours successfully**, including Resort Core, Full Staging Gate, Single Server Production Package, Public Browser Acceptance, Public Site Truth, dependency security, realtime, operations, backup/restore and the dedicated Site Content Runtime regression.
+The accepted executable head is the exact PR #89 head and completed **17/17 triggered workflow contours successfully, 0 failures**, including Resort Core, Full Staging Gate, Single Server Production Package, dependency security, realtime, operations, backup/restore and the dedicated External Staging Acceptance Contract CI.
+
+The observed integration merge has **0 changed files** versus that accepted executable head. The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
+
+`main` is not a production source. The current `main` branch is stale relative to the accepted integration RC and must not be used for Beget deployment or cutover.
 
 Earlier closed gates retain their own exact-head CI evidence, including canonical 84-room PMS acceptance, Security #42 and physical room import gate #38.
 
-The current merge commit contains the reviewed tree; it is not evidence of external production deployment.
+The accepted repository tree is not evidence of external production deployment.
 
 ## Authority
 
@@ -155,6 +159,9 @@ Repository/CI:
 - production package build: VERIFIED IN CI;
 - CI-local Full Staging: VERIFIED;
 - Beget hardening logic: VERIFIED IN CI only;
+- exact Git SHA -> deployed application image linkage contract: VERIFIED IN CI;
+- staging mutation safety guard: VERIFIED IN CI;
+- unified external staging acceptance orchestration contract: VERIFIED IN CI;
 - physical room import gate #38: CLOSED / VERIFIED by its own exact-head evidence;
 - launch verifier: fail-closed and requires real target room reconciliation rather than repeating room-data approval.
 
@@ -175,6 +182,7 @@ External/production:
 ## Launch rule
 
 Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md` and `scripts/verify_launch_acceptance.py`.
+Canonical RC manifest: `release/current-rc.json`.
 
 Production remains **STOP** until every required external evidence gate is VERIFIED. The room-register approval gate itself is already closed; the external manifest requires target reconciliation evidence instead. CI success alone does not authorize DNS switch, provider activation or production declaration.
 
