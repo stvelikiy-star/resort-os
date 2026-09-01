@@ -68,7 +68,7 @@ export default function SiteContentBoard() {
       for (const entry of payload.items) next[entry.locale] = cloneContent(entry.draft);
       setDrafts(next);
     } catch {
-      setError("Контент API недоступен. Проверьте Core и миграцию 004_site_content.sql.");
+      setError("Контент API недоступен. Проверьте Resort Core и Prisma-миграцию 1_site_content.");
     } finally {
       setLoading(false);
     }
