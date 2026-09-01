@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.4
+Version: 3.5
 Date: 2026-09-02
-Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
+Status: INTERNAL RELEASE CANDIDATE / CI-LOCAL STAGING UNDER FINAL REGRESSION / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
 Authority: factual implementation reality only
 
@@ -12,20 +12,18 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `3787e8729b84e1ecc41133ab846a909943458306`.
-Observed integration merge: `102a46ef721ee880647ecd6f81024bd744458170`.
 
-The accepted executable head is the exact PR #95 product head after Guest OS PIN presentation/reissue and admin locale/contrast hardening and completed **35/35 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally blocked that product head because the prior RC was frozen; this refreeze follows the actual tree-equivalent integration merge. The successful contours include Resort Core, Full Staging Gate, PMS Final Acceptance, Guest OS Core/Access/Requests, PMS mutation/grid tests, Single Server Production Package, frontend/backend/database dependency security, the dedicated Admin Guest PIN and i18n CI, Admin Runtime Truth, realtime, operations, payment idempotency, backup/restore and AI/n8n contracts.
+The canonical integration branch is the only release integration source. `main` is not a production source and must not be used for Beget deployment or cutover while stale relative to integration.
 
-The observed integration merge has **0 changed files** versus that accepted executable head. The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
+Earlier accepted product heads retain their exact-head CI evidence. The current Kitchen/Admin extension is accepted only after its own exact-head regression is fully green and merged tree-equivalent into integration.
+
+The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`. It must be refrozen after the current product merge; an older RC pointer must not be presented as the latest release.
 
 The database toolchain remains deterministic and separately security-gated: `prisma` and `@prisma/client` are exactly pinned to `6.12.0`, `packages/database/package-lock.json` is committed, clean `npm ci` is required, and the database npm audit must have zero HIGH/CRITICAL findings before acceptance.
 
-`main` is not a production source. The current `main` branch is stale relative to the accepted integration RC and must not be used for Beget deployment or cutover.
-
 Earlier closed gates retain their own exact-head CI evidence, including canonical 84-room PMS acceptance, Security #42 and physical room import gate #38.
 
-The accepted repository tree is not evidence of external production deployment.
+Repository/CI evidence is not evidence of external production deployment.
 
 ## Authority
 
@@ -39,11 +37,11 @@ NFC acquiring/wallet remains deferred and outside active V1 composition.
 
 ## Database release contract
 
-Verified committed migration chain:
+Committed migration chain:
 
-`0_init -> 1_site_content -> 2_guest_service_tasks -> 3_owner_analytics_snapshots -> 4_guest_engagements -> 5_guest_os_core -> 6_service_point_qr_operations`.
+`0_init -> 1_site_content -> 2_guest_service_tasks -> 3_owner_analytics_snapshots -> 4_guest_engagements -> 5_guest_os_core -> 6_service_point_qr_operations -> 7_kitchen_operations`.
 
-Exact seven-migration ledger, 27 critical domain constraints, clean migration deployment and backup -> clean restore are CI-verified.
+Exact eight-migration ledger, 27 critical hotel/payment domain constraints, clean migration deployment and backup -> clean restore are release gates. Kitchen-specific constraints are additionally checked by the migration and Kitchen Operations contours.
 
 Canonical room intake/import gate #38 is **CLOSED / COMPLETED** at 84 rooms / 12 mapped categories with fail-closed importer, drift protection and reviewed import contract. No new owner room questionnaire is required. On a real external staging database, reconciliation must still be run as dry-run -> diff review -> safe apply evidence.
 
@@ -81,13 +79,13 @@ Canonical PMS includes:
 - successful check-in surfaces the one-time six-digit Guest OS PIN without changing the Core response contract;
 - OWNER/MANAGER/RECEPTION can reissue a lost/expired Guest OS PIN only for a CHECKED_IN reservation with an ACTIVE stay; plaintext is returned once, only the PBKDF2 hash is persisted and the action is audited;
 - Admin fail-closed role boundary: only OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN enter Admin/PMS; other operational roles remain in Staff PWA;
-- global admin locale selector for RU/KG/EN, dynamic rendering translation for operational labels/statuses/audit codes and a final high-contrast blue/white dashboard layer.
+- global admin locale selector for RU/KG/EN and operational label/status/audit rendering.
 
 The canonical 84-room import contract is closed. External target reconciliation remains a deployment evidence step, not a data-collection blocker.
 
 ## Stay / Guest OS / CRM
 
-Implemented and CI-verified:
+Implemented and regression-gated:
 
 - canonical `Stay` and `RoomAssignment` lifecycle;
 - permanent Room QR using server-side token hash;
@@ -101,9 +99,29 @@ Implemented and CI-verified:
 
 Room QR / GuestSession is separate from anonymous Service Point QR.
 
+## Kitchen / Dining
+
+Current Kitchen domain is an extension of Resort Core/PostgreSQL, not a parallel accounting system.
+
+Implemented in the current Kitchen release candidate and subject to exact-head regression before merge:
+
+- dedicated Kitchen Admin surface for `DINING_STAFF`, OWNER and MANAGER;
+- editable RU/KG/EN draft menu with server-side prices and active/draft controls;
+- factual table register managed from Kitchen Admin rather than fabricated room data;
+- table states `AVAILABLE / RESERVED / OCCUPIED / CLEANING / OUT_OF_SERVICE`;
+- KitchenOrder + KitchenOrderItem lifecycle `NEW -> ACCEPTED -> COOKING -> READY -> SERVED/CANCELLED`;
+- table, room, Stay and Reservation context where appropriate;
+- Guest OS Kitchen order API through existing GuestSession authority;
+- successful PMS check-in creates an idempotent Dining arrival card in the same PostgreSQL transaction, with repair sync as a fallback;
+- Dining arrival card excludes sensitive guest/payment data;
+- Kitchen totals are isolated operational amounts: **no automatic Hotel Payment creation and no automatic Reservation.totalKgs mutation**;
+- Kitchen order actions and check-in routing are audited.
+
+The provisional menu is intentionally replaceable from Kitchen Admin. Real table layout/count is entered operationally and is not guessed in code.
+
 ## Staff / Guest Services
 
-Implemented and CI-verified:
+Implemented and regression-gated:
 
 - MAID / TECHNICIAN workflows;
 - Reception and Dining role access where defined;
@@ -128,7 +146,7 @@ Implemented and CI-verified:
 
 ## Finance / Owner management
 
-Implemented and CI-verified:
+Implemented and regression-gated:
 
 - Payment fact/idempotency controls;
 - Reservation ledger, remaining/overpaid and debtors including checked-out debt;
@@ -137,7 +155,8 @@ Implemented and CI-verified:
 - Owner Intelligence / Control / Growth / Dashboard analytics;
 - factual operational KPIs and recurring-fault views;
 - no statistical forecast claim where history is insufficient;
-- Growth outbound authority remains `NONE_AUTOMATIC`.
+- Growth outbound authority remains `NONE_AUTOMATIC`;
+- Kitchen operational totals do not silently post to Hotel Payment or accommodation total.
 
 These are operational/management metrics, not statutory accounting.
 
@@ -157,22 +176,24 @@ Real provider credentials/live provider E2E remain external evidence and are not
 
 ## Deployment state
 
-Repository/CI:
+Repository/CI release gates include:
 
-- migration baseline: VERIFIED;
-- backup -> restore: VERIFIED;
-- frontend/backend dependency security inspection: VERIFIED;
-- database Prisma dependency security + deterministic lockfile: VERIFIED;
-- production package build: VERIFIED IN CI;
-- CI-local Full Staging: VERIFIED;
-- Beget hardening logic: VERIFIED IN CI only;
-- exact Git SHA -> deployed application image linkage contract: VERIFIED IN CI;
-- staging mutation safety guard: VERIFIED IN CI;
-- unified external staging acceptance orchestration contract: VERIFIED IN CI;
-- physical room import gate #38: CLOSED / VERIFIED by its own exact-head evidence;
-- launch verifier: fail-closed and requires real target room reconciliation rather than repeating room-data approval.
+- migration baseline;
+- backup -> restore;
+- frontend/backend dependency security inspection;
+- deterministic Prisma dependency/lockfile checks;
+- production package build;
+- CI-local Full Staging;
+- Beget hardening logic;
+- exact Git SHA -> deployed application image linkage contract;
+- staging mutation safety guard;
+- unified external staging acceptance orchestration contract;
+- physical room import gate #38;
+- fail-closed launch verifier.
 
-External/production:
+All of these must be green at the final exact release head before internal RC freeze. The RC truth guard must then bind `release/current-rc.json` to that exact integration SHA.
+
+External/production remains separate:
 
 - actual Beget host/account preflight: NOT VERIFIED;
 - full rollback backup of currently live legacy site: NOT VERIFIED;
@@ -195,4 +216,4 @@ Production remains **STOP** until every required external evidence gate is VERIF
 
 ## Extension rule
 
-Extend rather than rewrite the verified Resort Core/PostgreSQL/PMS/Stay/Guest OS/Guest CRM/OperationalTask/Finance/Owner analytics/Inbox/Audit/RBAC boundaries. Do not activate NFC or automatic commercial/payment authority as a side effect of launch work.
+Extend rather than rewrite the verified Resort Core/PostgreSQL/PMS/Stay/Guest OS/Guest CRM/OperationalTask/Finance/Owner analytics/Inbox/Audit/RBAC boundaries. Kitchen remains a Core-backed operational domain. Do not activate NFC or automatic commercial/payment authority as a side effect of launch work.

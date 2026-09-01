@@ -9,6 +9,7 @@ on:
       - 'packages/database/prisma/migrations/4_guest_engagements/**'
       - 'packages/database/prisma/migrations/5_guest_os_core/**'
       - 'packages/database/prisma/migrations/6_service_point_qr_operations/**'
+      - 'packages/database/prisma/migrations/7_kitchen_operations/**'
       - 'apps/admin/components/GrowthControlBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/growth-control.css'
@@ -24,6 +25,7 @@ on:
       - 'packages/database/prisma/migrations/4_guest_engagements/**'
       - 'packages/database/prisma/migrations/5_guest_os_core/**'
       - 'packages/database/prisma/migrations/6_service_point_qr_operations/**'
+      - 'packages/database/prisma/migrations/7_kitchen_operations/**'
       - 'apps/admin/components/GrowthControlBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/growth-control.css'
@@ -74,7 +76,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Validate seven-migration database chain
+      - name: Validate eight-migration database chain
         working-directory: packages/database
         run: |
           npm install --no-audit --no-fund
@@ -84,6 +86,7 @@ jobs:
           test -s prisma/migrations/4_guest_engagements/migration.sql
           test -s prisma/migrations/5_guest_os_core/migration.sql
           test -s prisma/migrations/6_service_point_qr_operations/migration.sql
+          test -s prisma/migrations/7_kitchen_operations/migration.sql
 
       - name: Verify Growth persistence invariants
         env:
@@ -95,12 +98,14 @@ jobs:
           constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_constraint where conname in ('guest_engagements_property_fkey','guest_engagements_guest_fkey','guest_engagements_reservation_fkey','guest_engagements_kind_check','guest_engagements_status_check','guest_engagements_score_check','guest_engagements_score_kind_check','guest_engagements_feedback_reservation_check')")"
           feedback_unique="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='guest_engagements' and indexname='guest_engagements_feedback_reservation_key'")"
           guest_os_tables="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('stays','room_assignments','room_qrs','guest_sessions','guest_history_events','guest_preferences')")"
-          test "$migration_count" = '7'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations'
+          kitchen_tables="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
+          test "$migration_count" = '8'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations'
           test "$table_name" = 'guest_engagements'
           test "$constraint_count" = '8'
           test "$feedback_unique" = '1'
           test "$guest_os_tables" = '6'
+          test "$kitchen_tables" = '4'
 
       - name: Typecheck and build Growth admin UI
         working-directory: apps/admin

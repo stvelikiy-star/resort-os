@@ -1,6 +1,6 @@
 # Three Crowns — production database migration gate
 
-Date: 2026-09-01
+Date: 2026-09-02
 Status: **COMMITTED / CLEAN-DEPLOY VERIFIED / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
 
 This document defines the database migration boundary for Three Crowns Resort OS. It does not prove that migrations were run against a real production database.
@@ -18,6 +18,7 @@ Exact current ledger:
 5. `4_guest_engagements`
 6. `5_guest_os_core`
 7. `6_service_point_qr_operations`
+8. `7_kitchen_operations`
 
 The exact ledger is maintained in `scripts/release_contract.py` and verified fail-closed by CI.
 
@@ -38,18 +39,19 @@ CI verifies:
 
 - Prisma schema validation;
 - clean PostgreSQL migration deploy from empty database;
-- exact seven-migration ledger;
-- 27 critical domain constraints from the shared release contract;
+- exact eight-migration ledger;
+- 27 critical hotel/payment domain constraints from the shared release contract;
+- Kitchen migration-specific table, status, price and idempotent task-link constraints;
 - 84-room / 12-room-type development intake integrity;
 - Resort Core/PMS/business invariant regressions;
 - backup creation and clean restore with the current migration/constraint fingerprint;
 - Full Staging migration/application startup path.
 
-The development room count is not final owner approval of the physical production register.
+The canonical room register is 84 rooms / 12 mapped categories. Real target reconciliation remains an external deployment evidence step.
 
 ## Critical database boundary
 
-The canonical constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains 27 constraints, including:
+The canonical hotel/payment constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains 27 constraints, including:
 
 - valid rate/request/reservation/inventory dates;
 - nonnegative/positive financial bounds;
@@ -57,6 +59,8 @@ The canonical constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `sc
 - Guest Services context/time guards;
 - Owner analytics/Growth guards;
 - Service Point category/QR/context guards.
+
+Kitchen constraints are additionally checked by migration/domain tests, including menu prices/categories, table state/seats, order status/source/count/total/meal type, item quantity/price/status and the unique GuestTask-to-KitchenOrder link.
 
 Foreign keys and uniqueness are additionally checked by migration/domain tests.
 
@@ -118,8 +122,8 @@ Do not claim production migration success until the actual target database has:
 - fresh backup evidence;
 - exact accepted release SHA/image set;
 - `migrate deploy` result;
-- exact seven-migration ledger;
-- critical constraint fingerprint;
+- exact eight-migration ledger;
+- critical constraint fingerprint plus Kitchen migration-specific invariants;
 - readiness/smoke result;
 - tested rollback/restore path.
 
