@@ -145,3 +145,69 @@ async def sync_recent_arrivals(
         "request_code": ARRIVAL_CODE,
         "truth": "Successful check-ins are surfaced to Dining Staff without payment or sensitive guest data.",
     }
+
+
+@router.get("/arrivals")
+async def list_arrivals(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+    async with request.app.state.db.acquire() as conn:
+        pid = await property_id(conn, user["property_code"])
+        rows = await conn.fetch(
+            '''SELECT t.id,t.status::text AS status,t.title,t.description,t."createdAt",
+                      r.code AS room_code,res."bookingNumber"
+               FROM operational_tasks t
+               LEFT JOIN rooms r ON r.id=t."roomId"
+               LEFT JOIN reservations res ON res.id=t."reservationId"
+               WHERE t."propertyId"=$1 AND t."serviceCode"=$2 AND t.source=$3
+                 AND t.status IN ('OPEN','IN_PROGRESS')
+               ORDER BY t."createdAt" ASC LIMIT 200''',
+            pid,
+            ARRIVAL_CODE,
+            ARRIVAL_SOURCE,
+        )
+    return {
+        "items": [
+            {
+                "id": str(row["id"]),
+                "status": row["status"],
+                "title": row["title"],
+                "description": row["description"],
+                "room_code": row["room_code"],
+                "booking_number": row["bookingNumber"],
+                "created_at": row["createdAt"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.post("/arrivals/{task_id}/ack")
+async def acknowledge_arrival(task_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn, user["property_code"])
+            row = await conn.fetchrow(
+                '''SELECT id,status::text AS status FROM operational_tasks
+                   WHERE id=$1 AND "propertyId"=$2 AND "serviceCode"=$3 AND source=$4 FOR UPDATE''',
+                task_id,
+                pid,
+                ARRIVAL_CODE,
+                ARRIVAL_SOURCE,
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="Kitchen arrival notification not found")
+            if row["status"] not in {"OPEN", "IN_PROGRESS"}:
+                raise HTTPException(status_code=409, detail={"code": "ARRIVAL_ALREADY_CLOSED", "status": row["status"]})
+            await conn.execute(
+                '''UPDATE operational_tasks SET status='DONE',"completedAt"=now(),"updatedAt"=now() WHERE id=$1''',
+                task_id,
+            )
+            await conn.execute(
+                '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'ACK_KITCHEN_ARRIVAL','OperationalTask',$4,'KITCHEN','SUCCESS',
+                     jsonb_build_object('status','DONE','financial_effect','NONE'),now())''',
+                uuid.uuid4(),
+                pid,
+                user["id"],
+                str(task_id),
+            )
+    return {"id": str(task_id), "status": "DONE"}
