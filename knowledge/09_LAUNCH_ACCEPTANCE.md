@@ -1,7 +1,7 @@
 # THREE CROWNS RESORT OS — LAUNCH ACCEPTANCE
 
 Date: 2026-09-02
-Status: INTERNAL RELEASE CANDIDATE / EXTERNAL CUTOVER STOP
+Status: INTERNAL RC FROZEN / EXTERNAL CUTOVER STOP
 Canonical: YES
 
 This document separates repository/CI evidence from external production evidence. It must not be used to imply that the system is live.
@@ -9,16 +9,16 @@ This document separates repository/CI evidence from external production evidence
 ## 1. Current repository boundary
 
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `3787e8729b84e1ecc41133ab846a909943458306`.
-Observed integration merge: `102a46ef721ee880647ecd6f81024bd744458170`.
+Accepted executable head: `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c`.
+Observed integration merge: `a6c7ff603ad829a82f9d6c80d46425f0f58b50ec`.
 
-The accepted executable head is the exact PR #95 product head after Guest OS PIN presentation/reissue and admin RU/KG/EN/contrast hardening and completed **35/35 executable acceptance/security/regression contours successfully, 0 failures**. The separate RC-truth workflow intentionally failed on that product head because the previous release was frozen; this document and `release/current-rc.json` perform the controlled refreeze after the actual tree-equivalent integration merge existed.
+The accepted executable head is the exact PR #98 product/release head after the Core-backed Kitchen/Admin integration and completed **43/43 non-RC product, acceptance, security, migration, backup/restore, staging and packaging contours successfully, 0 failures**. The separate RC-truth workflow intentionally failed on that pre-merge product head because the previous release was frozen; this document and `release/current-rc.json` perform the controlled refreeze only after the actual tree-equivalent integration merge existed.
 
-The successful product contours include Resort Core, Full Staging, Production Package, PMS Final Acceptance, PMS grid/mutation, Guest OS Core/Access/Requests, Admin Runtime Truth, the dedicated Admin Guest PIN and i18n build/contract gate, frontend/backend/database dependency security, realtime, operations, payment idempotency, backup/restore, AI/n8n and communications contracts.
+The successful contours include Resort Core, Full Staging, Production Package, Kitchen Operations, PMS Final Acceptance, PMS grid/mutation, Reception RBAC, Guest OS Core/Access/Requests, Guest CRM, Finance, Staff Roles/Voice, Service Point QR, frontend/backend/database dependency security, realtime, payment idempotency, backup/restore, AI/n8n, inbox/communications, launch acceptance and Beget hardening contracts.
 
 The observed integration merge has **0 changed files** versus the tested executable head. The machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
-`main` is not a production source. It is stale relative to the accepted integration RC and must not be used for Beget deployment or DNS cutover.
+`main` is not a production source. It must not be used for Beget deployment or DNS cutover while stale relative to the accepted integration RC.
 
 Earlier closed product gates retain their own exact-head evidence. A tree-equivalent merge commit is not a substitute for independent external acceptance.
 
@@ -33,16 +33,17 @@ Exact committed migration ledger:
 5. `4_guest_engagements`
 6. `5_guest_os_core`
 7. `6_service_point_qr_operations`
+8. `7_kitchen_operations`
 
 Production migration mechanism: `npx prisma migrate deploy`.
 
-Critical PostgreSQL constraint fingerprint is maintained in `scripts/release_contract.py` and currently contains 27 constraints.
+Critical hotel/payment PostgreSQL constraint fingerprint is maintained in `scripts/release_contract.py` and currently contains 27 constraints. Kitchen migration/domain tests additionally verify menu prices/categories, table states/seats, order/item status and amount guards and the unique GuestTask-to-KitchenOrder link.
 
-The database Node toolchain is also part of the release security boundary: `prisma` and `@prisma/client` are pinned exactly to `6.12.0`, `packages/database/package-lock.json` is committed, deterministic `npm ci` is required, and `Database Dependency Security CI` gates HIGH/CRITICAL npm findings plus Prisma schema validation/client generation.
+The database Node toolchain is part of the release security boundary: `prisma` and `@prisma/client` are pinned exactly to `6.12.0`, `packages/database/package-lock.json` is committed, deterministic `npm ci` is required, and `Database Dependency Security CI` gates HIGH/CRITICAL npm findings plus Prisma schema validation/client generation.
 
 ## 3. What is repository/CI verified
 
-The repository contains and CI exercises:
+The exact accepted head and its tree-equivalent integration merge contain and CI exercise:
 
 - public site truth and RU/KG/EN browser acceptance;
 - CMS -> Core -> public runtime with locale-safe fallback/ownership;
@@ -52,15 +53,19 @@ The repository contains and CI exercises:
 - canonical Stay and RoomAssignment lifecycle;
 - Room QR / PIN / GuestSession access;
 - one-time Guest OS PIN surfaced at check-in and secure PIN reissue for active checked-in stays;
-- global Admin RU/KG/EN locale runtime for operational labels/status/audit presentation and high-contrast dashboard override;
-- Guest OS requests and Staff role routing;
-- Guest CRM factual Stay/relocation/history/preferences;
+- Guest OS requests and Guest CRM factual Stay/relocation/history/preferences;
 - Guest Services Center;
+- Kitchen Admin for OWNER/MANAGER/DINING_STAFF;
+- editable provisional RU/KG/EN menu and factual table register;
+- KitchenOrder/KitchenOrderItem lifecycle and server-derived totals;
+- Guest OS Kitchen ordering through existing GuestSession authority;
+- transactional check-in -> Dining arrival card plus idempotent repair sync;
+- explicit Kitchen finance isolation: no automatic Hotel Payment and no automatic Reservation.totalKgs mutation;
 - Finance & operational control;
 - Owner Intelligence / Control / Growth / Dashboard analytics;
 - unified inbox, AI draft authority boundary and n8n contracts;
 - anonymous Service Point QR operations;
-- migration baseline and backup -> clean restore;
+- exact eight-migration baseline and backup -> clean restore;
 - frontend/backend dependency security inspections;
 - database Prisma dependency security, exact pins and deterministic lockfile;
 - single-server production package and CI-local Full Staging;
@@ -82,7 +87,7 @@ Production cutover remains STOP until all required items below have real evidenc
 - verified rollback backup of the currently live `3korony.com` target, including DNS/config/data/media where applicable;
 - isolated external HTTPS/WSS staging on the real network;
 - external public-truth probe against that staging deployment;
-- real-device acceptance on iPhone, Android, desktop and Telegram/staff surfaces;
+- real-device acceptance on iPhone, Android, desktop and Telegram/staff/Kitchen surfaces;
 - real provider E2E for every messaging provider that will be enabled at launch;
 - monitoring/alerting evidence on real infrastructure;
 - fresh pre-cutover backup evidence;
@@ -172,7 +177,7 @@ python scripts/legacy_rollback_gate.py <ROLLBACK_EVIDENCE_DIR>
 
 `legacy_rollback_gate.py` must return `RESULT: CUTOVER_ROLLBACK_PREREQUISITE_GREEN`. Until then, **STOP: do not deploy external staging on any topology that risks the legacy live target and do not switch DNS/routing**.
 
-**Phase 3 — isolated external staging deployment.** Deploy the exact accepted release to staging-only hostnames/configuration. Apply the committed seven migrations with `prisma migrate deploy`, then reconcile the real staging database against the canonical 84-room register with importer dry-run/diff review before any safe apply. This phase must not route public production traffic.
+**Phase 3 — isolated external staging deployment.** Deploy the exact accepted release to staging-only hostnames/configuration. Apply the committed eight migrations with `prisma migrate deploy`, then reconcile the real staging database against the canonical 84-room register with importer dry-run/diff review before any safe apply. This phase must not route public production traffic.
 
 After application containers are running, prove that source checkout and all application images match the exact accepted release:
 
@@ -206,15 +211,17 @@ python scripts/external_staging_acceptance.py \
 
 The required result is `RESULT: EXTERNAL STAGING ACCEPTANCE GREEN`. A RED result blocks further launch work and its evidence directory must be retained for diagnosis.
 
-**Phase 5 — external-only acceptance not replaced by scripts.** After Phase 4 is green, perform and record real iPhone Safari, Android Chrome, desktop and launch-enabled Telegram/provider tests, real monitoring/alert delivery and required restore evidence. These are not inferred from CI.
+**Phase 5 — external-only acceptance not replaced by scripts.** After Phase 4 is green, perform and record real iPhone Safari, Android Chrome, desktop and launch-enabled Telegram/provider tests, including Kitchen/Admin on real devices, plus real monitoring/alert delivery and required restore evidence. These are not inferred from CI.
 
-**Phase 6 — final launch gate.** Only after #8, #28, branch protection #91, required device/provider evidence and explicit owner GO are all green, create the final non-secret launch evidence manifest and run `verify_launch_acceptance.py --mode cutover`. DNS/public routing changes remain forbidden before this point.
+**Phase 6 — final launch gate.** Only after the live rollback gate, external staging, required device/provider evidence, repository release hygiene/branch protection and explicit owner GO are all green, create the final non-secret launch evidence manifest and run `verify_launch_acceptance.py --mode cutover`. DNS/public routing changes remain forbidden before this point.
 
 ## 6. Production authority boundary
 
 `ReservationRequest != Reservation`.
 
 OWNER/MANAGER retain reservation and payment authority. AI/n8n cannot guarantee a Reservation, confirm payment, invent a fixed prepayment percentage or bypass Core availability/pricing.
+
+Kitchen order totals are operational amounts and do not automatically create Hotel Payment or change Reservation.totalKgs.
 
 NFC acquiring/wallet remains deferred and must not be activated as a side effect of launch acceptance.
 
@@ -231,7 +238,7 @@ After all external blockers are VERIFIED:
 7. deploy exact accepted release;
 8. run readiness/smoke before public switch;
 9. switch routing/DNS in the approved window;
-10. run public truth, booking, PMS, Guest OS, Staff and WSS smoke checks;
+10. run public truth, booking, PMS, Guest OS, Staff, Kitchen and WSS smoke checks;
 11. monitor errors, database and containers;
 12. roll back immediately if acceptance criteria fail.
 
