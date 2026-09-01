@@ -49,10 +49,20 @@ async def database_truth(task_id: str, point_id: str, raw_tokens: list[str]) -> 
         assert task["status"] == "DONE"
         assert task["createdByType"] == "ANONYMOUS"
         assert task["source"] == "SERVICE_POINT_QR"
-        assert task["serviceCode"] == "TECHNICAL"
+        # serviceCode belongs to the older structured Guest Services contract.
+        # Location QR routing is represented by servicePointId + event/audit request_code.
+        assert task["serviceCode"] is None
+
+        point_task_count = await conn.fetchval(
+            '''SELECT count(*)::int FROM operational_tasks
+               WHERE "servicePointId"=$1::uuid AND source='SERVICE_POINT_QR' ''',
+            point_id,
+        )
+        assert point_task_count == 1
 
         qrs = await conn.fetch(
-            '''SELECT "tokenHash",status::text AS status FROM service_point_qrs WHERE "servicePointId"=$1::uuid ORDER BY "issuedAt"''',
+            '''SELECT "tokenHash",status::text AS status FROM service_point_qrs
+               WHERE "servicePointId"=$1::uuid ORDER BY "issuedAt"''',
             point_id,
         )
         assert len(qrs) == 2
@@ -61,6 +71,31 @@ async def database_truth(task_id: str, point_id: str, raw_tokens: list[str]) -> 
             assert raw not in stored
             assert "sha256:" + hashlib.sha256(raw.encode()).hexdigest() in stored
         assert all(row["status"] == "REVOKED" for row in qrs)
+
+        event = await conn.fetchrow(
+            '''SELECT "payloadJson","resultResource","resultResourceId" FROM automation_inbound_events
+               WHERE "propertyId"=(SELECT "propertyId" FROM service_points WHERE id=$1::uuid)
+                 AND "eventType"='SERVICE_POINT_REQUEST'
+                 AND "resultResourceId"=$2''',
+            point_id,
+            task_id,
+        )
+        assert event is not None
+        payload = event["payloadJson"]
+        assert payload["service_point_id"] == point_id
+        assert payload["request_code"] == "TECHNICAL"
+        assert event["resultResource"] == "OperationalTask"
+
+        audit = await conn.fetchrow(
+            '''SELECT "afterJson" FROM audit_logs
+               WHERE resource='OperationalTask' AND "resourceId"=$1
+                 AND action='CREATE_SERVICE_POINT_REQUEST' ''',
+            task_id,
+        )
+        assert audit is not None
+        assert audit["afterJson"]["request_code"] == "TECHNICAL"
+        assert audit["afterJson"]["financial_effect"] == "NONE_AUTOMATIC"
+        assert audit["afterJson"]["room_state_effect"] == "NONE_AUTOMATIC"
 
         payments = await conn.fetchval("SELECT count(*)::int FROM payments")
         guest_sessions = await conn.fetchval("SELECT count(*)::int FROM guest_sessions")
@@ -134,6 +169,8 @@ def main() -> None:
         "email",
         "payment",
         "payment_id",
+        "task_type",
+        "priority",
     }
     exposed_keys = set(public_body) | set(public_body["point"])
     for item in public_body["request_options"]:
@@ -146,7 +183,11 @@ def main() -> None:
         "request_code": "TECHNICAL",
         "description": "Не работает смеситель",
     }
-    submitted = httpx.post(f"{BASE}/api/v1/service-points/{raw_one}/requests", json=payload, timeout=30.0)
+    submitted = httpx.post(
+        f"{BASE}/api/v1/service-points/{raw_one}/requests",
+        json=payload,
+        timeout=30.0,
+    )
     submitted.raise_for_status()
     task = submitted.json()
     task_id = task["task_id"]
@@ -156,14 +197,22 @@ def main() -> None:
     assert task["financial_effect"] == "NONE_AUTOMATIC"
     assert task["room_state_effect"] == "NONE_AUTOMATIC"
 
-    replay = httpx.post(f"{BASE}/api/v1/service-points/{raw_one}/requests", json=payload, timeout=30.0)
+    replay = httpx.post(
+        f"{BASE}/api/v1/service-points/{raw_one}/requests",
+        json=payload,
+        timeout=30.0,
+    )
     replay.raise_for_status()
     assert replay.json()["idempotent_replay"] is True
     assert replay.json()["task_id"] == task_id
 
     changed = dict(payload)
     changed["description"] = "Другое содержание с тем же ключом"
-    mismatch = httpx.post(f"{BASE}/api/v1/service-points/{raw_one}/requests", json=changed, timeout=30.0)
+    mismatch = httpx.post(
+        f"{BASE}/api/v1/service-points/{raw_one}/requests",
+        json=changed,
+        timeout=30.0,
+    )
     assert mismatch.status_code == 409, mismatch.text
     assert code(mismatch) == "SERVICE_POINT_IDEMPOTENCY_PAYLOAD_MISMATCH"
 
