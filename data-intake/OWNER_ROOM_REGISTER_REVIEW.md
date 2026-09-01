@@ -1,100 +1,61 @@
 # THREE CROWNS — OWNER ROOM REGISTER REVIEW
 
 Date: 2026-09-01
-Status: DEVELOPMENT REGISTER PRESENT / DRIVE OWNER CHECKLIST OPEN / OWNER APPROVAL NOT YET EVIDENCED
+Status: OWNER APPROVAL EVIDENCE COMMITTED / CI VERIFICATION REQUIRED BEFORE MERGE
 Canonical room data: `data-intake/rooms.csv`
-Owner-question snapshot: `data-intake/owner-room-checklist.json`
-
-This review layer does **not** create a second room inventory and does not rewrite owner data by inference.
+Approval evidence: `data-intake/room-register-owner-approval.json`
+Historical owner-question snapshot: `data-intake/owner-room-checklist.json`
 
 ## Current truth boundary
 
-`data-intake/rooms.csv` currently contains exactly 84 unique room codes across 12 canonical room types and passes Data Intake Integrity CI.
+`data-intake/rooms.csv` contains exactly 84 unique room codes across 12 canonical room types. The owner has explicitly accepted the existing 84-room register and the exact PMS room labels as sufficient for V1.
 
-The project Google Sheet `НОМЕРНОЙ ФОНД — Три Короны — Production Import 84` was checked on 2026-09-01. Its `OWNER_CHECKLIST` contains 13 P0/P1 questions with blank owner answers. In `ROOMS_IMPORT`, all 84 rows currently have `owner_confirmed=NO`.
+This approval does **not** authorize invention of optional metadata. Unknown `building_or_zone`, `floor`, and `capacity_children` values remain `UNKNOWN` where no factual value is recorded. Raw bed shorthand is preserved verbatim and is not semantically expanded by the system. Runtime `operational_status` remains PMS truth and is not part of the permanent physical register.
 
-Therefore the physical production register is **not owner-approved yet**. The existence of the spreadsheet or the 84-row count is not approval evidence.
+The stale `CONFIRM` / `inferred` provenance text on rooms 501/502 has been removed without changing their room codes, category, capacity, floor marker, raw bed label, or area. The approval evidence binds to the exact SHA-256 of the canonical CSV.
 
-The exact captured questions and Drive provenance are stored in `owner-room-checklist.json` as review metadata only. Canonical room values remain in `rooms.csv`.
+## Deterministic approval gate
 
-## Deterministic review
-
-Run:
-
-```bash
-python scripts/room_register_review.py --format summary
-python scripts/room_register_review.py --format json > /tmp/room-register-review.json
-```
-
-The tool reports:
-
-- exact CSV SHA-256;
-- 84/unique/12 structural invariants;
-- `BLOCKER` source contradictions/inferences;
-- grouped `REVIEW` facts for physical location/bed configuration;
-- grouped `POLICY_REVIEW` facts such as child/additional-place policy;
-- exact 13-question Drive OWNER_CHECKLIST snapshot.
-
-Repeated UNKNOWN values are grouped by room type/field instead of forcing the owner to confirm hundreds of identical cells one by one.
-
-### BLOCKER
-
-A BLOCKER means canonical intake itself contains `CONFIRM` or `inferred`. These values cannot be approved as-is merely by ticking a box. Owner evidence must first be applied to `rooms.csv`.
-
-Current Drive checklist explicitly identifies rooms 501/502 as critical because their guest-room/category status was reconstructed and still requires confirmation.
-
-### REVIEW
-
-REVIEW groups cover owner-controlled physical facts such as:
-
-- `building_or_zone` / `floor` where the Drive checklist requires P0 location confirmation;
-- empty bed configurations grouped by room type;
-- one global bed-abbreviation legend review rather than repeated per-room questions.
-
-### POLICY_REVIEW
-
-`capacity_children=UNKNOWN` is grouped by category. The owner may explicitly answer that there is no official public limit and that extra places/children are manager-confirmed; the system must not invent a number.
-
-### SYSTEM / runtime state
-
-`operational_status` is deliberately excluded. The Drive OWNER_CHECKLIST marks start-state as SYSTEM: before cutover reception/manager inspects rooms and sets `CLEAN / DIRTY / TECH_BLOCK`. Runtime state is not a permanent room-register attribute.
-
-## Owner approval evidence
-
-Template:
-
-`data-intake/room-register-owner-approval.example.json`
-
-Final `OWNER_APPROVED` evidence requires:
-
-- SHA-256 of the exact current `rooms.csv`;
-- exact 84-room count;
-- approver, timestamp and non-secret evidence reference;
-- zero current BLOCKER issues;
-- exact acknowledgement of every current grouped REVIEW/POLICY_REVIEW issue;
-- resolution of all 13 captured Drive OWNER_CHECKLIST P0/P1 question IDs.
-
-Validation:
+The block is approved only when this command succeeds on the exact PR head:
 
 ```bash
 python scripts/room_register_review.py \
   --require-owner-approved \
-  --approval /secure/path/room-register-owner-approval.json
+  --approval data-intake/room-register-owner-approval.json
 ```
 
-The committed example remains `NOT_APPROVED` and CI must prove it cannot authorize production.
+CI additionally proves:
+
+- exactly 84 rows and 84 unique room codes;
+- exactly 12 canonical room types;
+- zero structural errors;
+- zero `BLOCKER` issues (`CONFIRM_NOTE` / `INFERRED_VALUE`);
+- exact CSV SHA-256 binding;
+- exact acknowledgement of every current `REVIEW` / `POLICY_REVIEW` group;
+- exact coverage of all 13 historical OWNER_CHECKLIST question IDs;
+- bad checksum fails closed;
+- missing review acknowledgement fails closed;
+- missing checklist resolution fails closed;
+- downgraded `NOT_APPROVED` status fails closed;
+- the example approval template remains unable to authorize production.
+
+## Accepted review semantics
+
+Remaining review groups are acknowledged decisions, not missing launch facts:
+
+- unknown building/floor metadata stays unknown rather than being guessed;
+- child/additional-place numeric limits are not publicly promised unless later configured;
+- empty raw bed labels remain empty where the source did not provide a label;
+- bed abbreviations stay verbatim (`1сп`, `2сп`, `д`, `кр`, `крк`, variants) without an invented legend.
 
 ## What must not happen
 
-- Do not infer the meaning of `1сп`, `2сп`, `д`, `кр`, `крк`, `к` without owner evidence.
-- Do not infer what red/black text meant in screenshots.
-- Do not silently correct room 223 or other odd source labels.
-- Do not treat 84 development rows or the Drive Production Import file as approval when `owner_confirmed=NO`.
-- Do not treat runtime operational state as a permanent room-register fact.
+- Do not infer building, floor, child capacity, or bed semantics.
+- Do not infer meaning from legacy chessboard colors.
+- Do not silently normalize odd source labels such as room 223.
 - Do not create a second inventory that can drift from `rooms.csv`.
+- Do not treat runtime `CLEAN / DIRTY / TECH_BLOCK` as permanent room metadata.
 
-## Launch relationship
+## PMS relationship
 
-Block 12 keeps `owner_room_register=NOT_VERIFIED` until this exact-register approval evidence exists.
-
-Only after canonical BLOCKERs are corrected and the owner approval verifier passes may launch evidence reference the physical room register as VERIFIED.
+PMS Owner Grid CI is required to seed the canonical 84-room intake because `data-intake/**` is in its PR trigger. PMS Chessboard Mutation CI is also expected on this PR because the verifier test under `scripts/**` changes. The room-register block is not reported as complete until the exact PR head is green and merged into `integration/site-pms-cms-20260827`.
