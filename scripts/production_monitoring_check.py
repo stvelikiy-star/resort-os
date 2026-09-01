@@ -38,6 +38,14 @@ def parse_receipt(path: Path) -> dict[str, str]:
     return values
 
 
+def file_sha256(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 def verify_sha256sums(target: Path) -> list[str]:
     errors: list[str] = []
     sums = target / "SHA256SUMS"
@@ -56,7 +64,7 @@ def verify_sha256sums(target: Path) -> list[str]:
         if not artifact.is_file():
             errors.append(f"backup artifact missing: {name}")
             continue
-        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+        digest = file_sha256(artifact)
         if digest != expected:
             errors.append(f"backup checksum mismatch: {name}")
     return errors
@@ -219,7 +227,7 @@ def check_endpoint(name: str, url: str, timeout: float) -> str | None:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             if not 200 <= response.status < 300:
                 return f"endpoint {name} returned HTTP {response.status}"
-    except Exception as exc:  # network errors are operational evidence
+    except Exception as exc:
         return f"endpoint {name} failed: {type(exc).__name__}: {exc}"
     return None
 
