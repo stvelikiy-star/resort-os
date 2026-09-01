@@ -21,9 +21,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install exact database lockfile
+      - name: Confirm database package reproducibility state
         working-directory: packages/database
-        run: npm ci
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if test -f package-lock.json; then
+            echo 'FACT: database_lockfile=present'
+          else
+            echo 'FACT: database_lockfile=absent'
+          fi
+      - name: Install database dependency tree as current RC script does
+        working-directory: packages/database
+        run: npm install --ignore-scripts
       - name: Capture npm audit JSON
         working-directory: packages/database
         shell: bash
@@ -32,6 +42,7 @@ jobs:
           npm audit --json > /tmp/database-audit.json
           rc=$?
           set -e
+          echo "FACT: npm_audit_exit=$rc"
           python3 - <<'PY'
           import json
           p='/tmp/database-audit.json'
@@ -40,7 +51,7 @@ jobs:
           vulns=data.get('vulnerabilities',{}) or {}
           for name,spec in sorted(vulns.items()):
               sev=spec.get('severity')
-              if sev in {'high','critical'}:
+              if sev in {'moderate','high','critical'}:
                   print('VULNERABILITY', name, 'severity='+str(sev), 'isDirect='+str(spec.get('isDirect')), 'range='+str(spec.get('range')), 'fixAvailable='+json.dumps(spec.get('fixAvailable'), sort_keys=True))
                   for via in spec.get('via',[]):
                       if isinstance(via,dict):
