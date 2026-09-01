@@ -16,6 +16,9 @@ on:
       - 'apps/admin/app/service-points.css'
       - 'apps/admin/app/layout.tsx'
       - 'scripts/verify_service_point_qr.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - '.github/workflows/migration-baseline-ci.yml'
       - '.github/workflows/service-point-qr-ci.yml'
   push:
     branches: [main]
@@ -33,6 +36,9 @@ on:
       - 'apps/admin/app/service-points.css'
       - 'apps/admin/app/layout.tsx'
       - 'scripts/verify_service_point_qr.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - '.github/workflows/migration-baseline-ci.yml'
       - '.github/workflows/service-point-qr-ci.yml'
   workflow_dispatch:
 
@@ -89,6 +95,9 @@ jobs:
           npm install --no-audit --no-fund
           npx prisma validate
           npx prisma migrate deploy
+
+      - name: Verify release ledger includes Service Point migration
+        run: python scripts/release_contract_test.py
 
       - name: Typecheck and build public Service Point QR surface
         working-directory: apps/web
