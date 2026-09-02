@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 import asyncpg
 
+from provider_env_security import validate_provider_env
 from release_contract import CRITICAL_CONSTRAINTS, EXPECTED_MIGRATIONS, clean_postgres_url, migration_names_match_exactly
 
 
@@ -25,9 +26,6 @@ def database_dsn() -> str:
     value = os.environ.get("DATABASE_URL", "").strip()
     if not value:
         raise RuntimeError("DATABASE_URL is required")
-    # Remove only Prisma's schema= query parameter. Preserve DBaaS/TLS options
-    # such as sslmode=require; stripping the entire query can silently downgrade
-    # or break managed PostgreSQL connections.
     return clean_postgres_url(value)
 
 
@@ -112,8 +110,7 @@ def static_checks() -> tuple[list[str], list[str]]:
     if service_key and ("change_me" in service_key.lower() or "staging" in service_key.lower() or "ci-only" in service_key.lower()):
         errors.append("AUTOMATION_SERVICE_KEY appears to be a placeholder/test key")
 
-    if os.environ.get("TELEGRAM_SALES_BOT_TOKEN") and not os.environ.get("TELEGRAM_SALES_WEBHOOK_SECRET"):
-        errors.append("Telegram Sales token is set but TELEGRAM_SALES_WEBHOOK_SECRET is missing")
+    errors.extend(validate_provider_env(dict(os.environ)))
 
     if os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("OPENAI_TRANSCRIBE_MODEL") and not os.environ.get("TELEGRAM_STAFF_WEBHOOK_SECRET"):
         errors.append("Staff voice transcription is configured but TELEGRAM_STAFF_WEBHOOK_SECRET is missing")

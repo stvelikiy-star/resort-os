@@ -16,6 +16,8 @@ import urllib.request
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+from provider_env_security import validate_provider_env
+
 TRUE_VALUES = {"1", "true", "yes", "on"}
 PLACEHOLDER_MARKERS = ("change_me", "example.invalid", "example.com")
 TLS_SSLMODES = {"require", "verify-ca", "verify-full"}
@@ -155,13 +157,7 @@ def validate(values: dict[str, str], allow_staging: bool = False) -> tuple[list[
     if service_key and encryption_key and service_key == encryption_key:
         errors.append("AUTOMATION_SERVICE_KEY and N8N_ENCRYPTION_KEY must be different secrets")
 
-    if values.get("TELEGRAM_SALES_BOT_TOKEN") and not values.get("TELEGRAM_SALES_WEBHOOK_SECRET"):
-        errors.append("Telegram Sales is enabled without TELEGRAM_SALES_WEBHOOK_SECRET")
-    if values.get("GREEN_API_ID_INSTANCE") or values.get("GREEN_API_TOKEN_INSTANCE"):
-        if not values.get("GREEN_API_ID_INSTANCE") or not values.get("GREEN_API_TOKEN_INSTANCE"):
-            errors.append("GREEN API credentials are partially configured")
-        if not values.get("GREEN_API_WEBHOOK_SECRET"):
-            errors.append("GREEN API is enabled without GREEN_API_WEBHOOK_SECRET")
+    errors.extend(validate_provider_env(values))
 
     if not values.get("LAST_VERIFIED_BACKUP_AT", "").strip():
         warnings.append("LAST_VERIFIED_BACKUP_AT is empty; expected before final production GO, but may be empty before first staging restore rehearsal")
@@ -188,7 +184,6 @@ def network_checks(values: dict[str, str]) -> tuple[list[str], dict[str, str]]:
         with urllib.request.urlopen(request, timeout=10) as response:
             facts["s3_https"] = f"reachable_http_{response.status}"
     except urllib.error.HTTPError as exc:
-        # 401/403/404 from an unauthenticated HEAD still proves DNS/TLS/HTTP reachability.
         if exc.code < 500:
             facts["s3_https"] = f"reachable_http_{exc.code}"
         else:
