@@ -1,6 +1,20 @@
 from __future__ import annotations
 
-PLACEHOLDER_MARKERS = ("change_me", "example.invalid", "example.com")
+PLACEHOLDER_MARKERS = (
+    "change_me",
+    "changeme",
+    "replace_me",
+    "replace-with",
+    "placeholder",
+    "example.invalid",
+    "example.com",
+    "your_",
+    "your-",
+    "not_set",
+    "not-set",
+    "todo_",
+    "todo-",
+)
 MIN_WEBHOOK_SECRET_LENGTH = 24
 
 
@@ -13,7 +27,9 @@ def validate_provider_env(values: dict[str, str]) -> list[str]:
     """Return fail-closed provider credential/secret configuration errors.
 
     Providers remain optional. Validation becomes mandatory only when the
-    corresponding provider/model path is configured.
+    corresponding provider/model path is configured. This validator proves only
+    configuration hygiene; real provider availability/authenticity remains an
+    external launch-E2E gate.
     """
     errors: list[str] = []
 
