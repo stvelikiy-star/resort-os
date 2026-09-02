@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.7
+Version: 3.8
 Date: 2026-09-02
 Status: INTERNAL RC FROZEN / REPOSITORY+CI VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
@@ -12,22 +12,23 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `ce2d8ecde43c294162a782f7912425ced5258f99`.
-Observed integration merge: `05777f3371bd42b4c4cc9a8d6d68fa9b482b238c`.
+Accepted executable head: `ab6b649d91df5e9698253d43788cc657ca7040c9`.
+Observed integration merge: `c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4`.
 
-The exact PR #102 product head completed **17/17 applicable non-RC workflows successfully, 0 failures**. The separate RC Truth workflow intentionally failed on the pre-refreeze product head because the previous RC was still frozen. PR #102 changed only the customer-facing automation guest-facts source and the n8n Resort Core contract assertions.
+The exact PR #107 product/security head completed **20/20 applicable non-RC workflows successfully, 0 failures**. `Release RC Truth CI` intentionally failed before refreeze because the previous RC manifest still pointed to the prior accepted executable boundary.
 
-The prior PR #98 Kitchen/Core release baseline retains its **43/43 non-RC** product, acceptance, security, migration, backup/restore, staging and packaging evidence. PR #102 is a narrow truth-hardening delta on top of that accepted baseline.
+The observed PR #107 integration merge has **0 changed files** versus the tested PR head. Therefore the merged product tree is identical to the exact tree that passed the applicable PR #107 regression contours.
 
-The observed PR #102 integration merge has **0 changed files** versus the tested PR head. Therefore the merged product tree is identical to the exact tree that passed the applicable PR #102 regression contours.
+PR #107 is a narrow release-security/governance delta on top of the accepted product stack. It does not change PMS/Kitchen business logic, room inventory, pricing, payment authority, database schema, NFC scope or provider enablement.
+
+Earlier accepted product evidence remains part of the same tree:
+
+- PR #102 customer-facing automation truth hardening: **17/17 applicable non-RC workflows SUCCESS**;
+- PR #98 Kitchen/Core release baseline: **43/43 non-RC workflows SUCCESS**.
 
 The canonical integration branch is the only release integration source. `main` is not a production source and must not be used for Beget deployment or cutover while stale relative to integration.
 
 The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
-
-The database toolchain remains deterministic and separately security-gated: `prisma` and `@prisma/client` are exactly pinned to `6.12.0`, `packages/database/package-lock.json` is committed, clean `npm ci` is required, and the database npm audit must have zero HIGH/CRITICAL findings before acceptance.
-
-Earlier closed gates retain their own exact-head CI evidence, including canonical 84-room PMS acceptance, Security #42 and physical room import gate #38.
 
 Repository/CI evidence is not evidence of external production deployment.
 
@@ -47,9 +48,11 @@ Committed migration chain:
 
 `0_init -> 1_site_content -> 2_guest_service_tasks -> 3_owner_analytics_snapshots -> 4_guest_engagements -> 5_guest_os_core -> 6_service_point_qr_operations -> 7_kitchen_operations`.
 
-Exact eight-migration ledger, 27 critical hotel/payment domain constraints, clean migration deployment and backup -> clean restore are release gates. Kitchen-specific constraints are additionally checked by the migration and Kitchen Operations contours.
+Exact eight-migration ledger, 27 critical hotel/payment domain constraints, clean migration deployment and backup -> clean restore are release gates. External staging/production migration uses `npx prisma migrate deploy`.
 
-Canonical room intake/import gate #38 is **CLOSED / COMPLETED** at 84 rooms / 12 mapped categories with fail-closed importer, drift protection and reviewed import contract. No new owner room questionnaire is required. On a real external staging database, reconciliation must still be run as dry-run -> diff review -> safe apply evidence.
+`prisma` and `@prisma/client` remain exactly pinned to `6.12.0`; deterministic lockfile install and zero HIGH/CRITICAL database dependency findings are release gates.
+
+Canonical room intake/import gate #38 is **CLOSED / COMPLETED** at 84 rooms / 12 mapped categories with checksum-bound owner approval, fail-closed importer, drift protection and reviewed import contract. No new owner room questionnaire is required. On a real external staging database, reconciliation still requires dry-run -> exact diff review -> safe apply -> final zero-diff evidence.
 
 ## Public site
 
@@ -82,10 +85,10 @@ Canonical PMS includes:
 - factual RoomAssignment relocation;
 - checkout -> DIRTY/housekeeping lifecycle;
 - Reception read/check-in/check-out/QR authority without financial/commercial mutation authority;
-- successful check-in surfaces the one-time six-digit Guest OS PIN without changing the Core response contract;
-- OWNER/MANAGER/RECEPTION can reissue a lost/expired Guest OS PIN only for a CHECKED_IN reservation with an ACTIVE stay; plaintext is returned once, only the PBKDF2 hash is persisted and the action is audited;
-- Admin fail-closed role boundary: only OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN enter Admin/PMS; other operational roles remain in Staff PWA;
-- global admin locale selector for RU/KG/EN and operational label/status/audit rendering.
+- one-time six-digit Guest OS PIN on successful check-in;
+- audited PIN reissue only for CHECKED_IN reservation with ACTIVE stay; plaintext returned once, PBKDF2 hash persisted;
+- Admin fail-closed role boundary for OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN;
+- RU/KG/EN admin locale selector and operational rendering.
 
 The canonical 84-room import contract is closed. External target reconciliation remains a deployment evidence step, not a data-collection blocker.
 
@@ -96,7 +99,6 @@ Implemented and regression-gated:
 - canonical `Stay` and `RoomAssignment` lifecycle;
 - permanent Room QR using server-side token hash;
 - PIN verification and HttpOnly GuestSession;
-- one-time six-digit PIN issuance at check-in and fail-closed reissue for active stays;
 - session revocation at checkout;
 - Guest OS service requests;
 - factual Guest CRM history across repeated stays and relocations;
@@ -104,28 +106,27 @@ Implemented and regression-gated:
 - GuestHistoryEvent and AuditLog trails;
 - Guest OS Kitchen menu/order API through existing GuestSession authority.
 
-Room QR / GuestSession is separate from anonymous Service Point QR.
+Room QR / GuestSession remains separate from anonymous Service Point QR.
 
 ## Kitchen / Dining
 
-Kitchen is part of the accepted integration release and remains an extension of Resort Core/PostgreSQL, not a parallel accounting system.
+Kitchen remains a Resort Core/PostgreSQL operational domain, not a parallel accounting system.
 
-The Kitchen/Core implementation was fully regression-gated on the prior exact accepted baseline `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c` and was not modified by PR #102:
+Accepted implementation includes:
 
-- dedicated Kitchen Admin surface for `DINING_STAFF`, OWNER and MANAGER;
-- editable RU/KG/EN draft menu with server-side prices and active/draft controls;
-- factual table register managed from Kitchen Admin rather than fabricated room data;
+- Kitchen Admin for `DINING_STAFF`, OWNER and MANAGER;
+- editable RU/KG/EN provisional menu with server-side prices and active/draft controls;
+- factual table register;
 - table states `AVAILABLE / RESERVED / OCCUPIED / CLEANING / OUT_OF_SERVICE`;
-- KitchenOrder + KitchenOrderItem lifecycle `NEW -> ACCEPTED -> COOKING -> READY -> SERVED/CANCELLED`;
+- `KitchenOrder` lifecycle `NEW -> ACCEPTED -> COOKING -> READY -> SERVED/CANCELLED`;
 - table, room, Stay and Reservation context where appropriate;
-- Guest OS Kitchen order API through existing GuestSession authority;
-- successful PMS check-in creates an idempotent Dining arrival card in the same PostgreSQL transaction, with repair sync as a fallback;
-- Dining arrival card excludes sensitive guest/payment data;
-- Kitchen totals are isolated operational amounts: **no automatic Hotel Payment creation and no automatic Reservation.totalKgs mutation**;
-- Kitchen order actions and check-in routing are audited;
-- Kitchen Operations CI and CI-local Full Staging passed on the prior exact Kitchen release baseline.
+- Guest OS Kitchen orders through GuestSession authority;
+- idempotent Dining arrival card created transactionally on successful PMS check-in, with repair sync fallback;
+- no sensitive payment data in the Dining arrival card;
+- Kitchen totals isolated from Hotel `Payment` and `Reservation.totalKgs`;
+- audited Kitchen/check-in routing.
 
-The provisional menu is intentionally replaceable from Kitchen Admin. Real table layout/count is entered operationally and is not guessed in code.
+The provisional menu and real table layout/count remain operationally editable and are not fabricated in code.
 
 ## Staff / Guest Services
 
@@ -146,9 +147,9 @@ Implemented and CI-verified:
 - separate `ServicePoint`, request options and QR lifecycle;
 - opaque display-once QR token, SHA-256 hash stored server-side;
 - issue / rotate / revoke;
-- public `/p/{token}` surface without Guest/Stay/Reservation/Payment data;
+- public `/p/{token}` without Guest/Stay/Reservation/Payment data;
 - payload-safe idempotency and replay mismatch rejection;
-- ServicePoint-linked OperationalTask with no room/stay/reservation context;
+- ServicePoint-linked OperationalTask without room/stay/reservation context;
 - PostgreSQL constraints preventing context mixing;
 - NFC endpoint remains absent.
 
@@ -180,51 +181,78 @@ Implemented and CI-verified contracts:
 - n8n Resort Core contract;
 - website direct-Core booking boundary.
 
-PR #102 additionally synchronizes the customer-facing Core guest-facts source used by `/api/v1/automation/read/hotel-facts` and n8n/AI context:
+Customer-facing Core guest facts remain synchronized with owner-approved truth:
 
-- check-in `14:00` and checkout `12:00` are owner-confirmed;
-- gym and sports grounds are explicitly absent;
-- laundry and conference halls are `UNKNOWN_DO_NOT_PROMOTE`;
-- sauna is winter-only, 5,000 KGS/hour, approximately 4–5 people;
-- billiards is 500 KGS/hour;
-- table tennis is free for staying guests;
-- parking is approximately 20–30 cars and free for staying guests;
-- unverified payment-method enumeration is removed from customer-facing AI context;
+- check-in `14:00`, checkout `12:00`;
+- gym and sports grounds absent;
+- laundry and conference halls `UNKNOWN_DO_NOT_PROMOTE`;
+- sauna winter-only, 5,000 KGS/hour, approximately 4–5 people;
+- billiards 500 KGS/hour;
+- table tennis free for staying guests;
+- parking approximately 20–30 cars, free for staying guests;
+- no unverified payment-method enumeration in customer-facing AI context;
 - public launch payment methods/providers remain `NOT_VERIFIED_FOR_LAUNCH` until real manager/provider launch evidence exists.
 
-Real provider credentials/live provider E2E remain external evidence and are not inferred from CI.
+PR #107 adds shared fail-closed provider environment validation used by Beget and production preflight:
+
+- Telegram Sales token may not be an obvious placeholder and its webhook secret must be real/non-placeholder and at least 24 characters when enabled;
+- GREEN API ID/token must both be real/non-placeholder and webhook secret must be real/non-placeholder and at least 24 characters when enabled;
+- any configured Resort OS OpenAI model requires a real/non-placeholder `OPENAI_API_KEY`;
+- Staff Voice Telegram/transcription configuration requires a real bot token and real/non-placeholder staff webhook secret at least 24 characters;
+- obvious placeholder forms such as `CHANGE_ME`, `REPLACE_ME`, `PLACEHOLDER`, `YOUR_*`, `NOT_SET` and similar are rejected;
+- deterministic provider-security matrix and Beget integration checks passed on the exact accepted head.
+
+No provider is enabled or proven live by this static validation. Real launch-enabled provider E2E remains external evidence.
+
+## Release governance hardening
+
+PR #107 makes two already-real P0 gates structurally mandatory in the final `verify_launch_acceptance.py --mode cutover` manifest:
+
+1. `github_branch_protection` must be VERIFIED;
+2. `drive_launch_control_permissions` must be VERIFIED.
+
+Current factual status:
+
+- integration branch protection: **NOT VERIFIED / currently `protected:false`, required-check enforcement off**; issue #91 OPEN;
+- Google Drive permission audit: **13/13 top-level project folders expose `anyone with link -> writer`**; issue #100 OPEN;
+- the connected tools cannot safely mutate either control, so neither is claimed fixed.
+
+The final cutover verifier now fails closed while either governance gate remains unverified.
 
 ## Deployment state
 
 Repository release engineering now has:
 
-- the prior 43/43 Kitchen/Core release baseline;
-- the PR #102 AI truth-hardening delta with 17/17 applicable non-RC workflow success;
+- prior 43/43 Kitchen/Core release baseline;
+- PR #102 AI truth-hardening delta with 17/17 applicable non-RC success;
+- PR #107 provider/governance security delta with 20/20 applicable non-RC success;
 - exact eight-migration database ledger;
 - backup -> clean restore contract;
 - frontend/backend/database dependency security inspection;
 - deterministic Prisma dependency/lockfile checks;
 - production package build;
 - CI-local Full Staging;
-- Beget hardening contract;
+- Beget hardening contract and provider-secret security matrix;
 - exact Git SHA -> deployed application image linkage contract;
 - staging mutation safety guard;
 - unified external staging acceptance orchestration contract;
 - physical room import gate #38;
-- fail-closed launch verifier;
+- fail-closed launch verifier with GitHub/Drive governance gates;
 - Kitchen/PMS/Guest OS/Finance/Staff/AI/automation regression contours.
 
-The current RC refreeze binds tested PR #102 head `ce2d8ecde43c294162a782f7912425ced5258f99` to tree-equivalent integration merge `05777f3371bd42b4c4cc9a8d6d68fa9b482b238c`.
+The current RC refreeze binds tested PR #107 head `ab6b649d91df5e9698253d43788cc657ca7040c9` to tree-equivalent integration merge `c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4`.
 
 External/production remains separate:
 
+- GitHub branch protection / required-check enforcement: NOT VERIFIED;
+- Google Drive launch-control permissions: NOT VERIFIED; 13/13 top-level folders currently public-writer;
 - actual Beget host/account preflight: NOT VERIFIED;
 - full rollback backup of currently live legacy site: NOT VERIFIED;
 - external HTTPS/WSS staging: NOT VERIFIED;
 - external rendered public-truth probe: NOT VERIFIED;
 - real staging room reconciliation against canonical 84-room register: NOT VERIFIED;
 - real iPhone/Android/desktop/Telegram/Kitchen acceptance: NOT VERIFIED;
-- launch-enabled provider E2E: NOT VERIFIED or NOT REQUIRED if providers stay disabled;
+- launch-enabled provider E2E: NOT VERIFIED or NOT_REQUIRED if providers remain disabled;
 - real monitoring/alerting evidence: NOT VERIFIED;
 - fresh pre-cutover backup/DNS rollback evidence: NOT VERIFIED;
 - explicit owner cutover approval: NOT GIVEN;
@@ -235,7 +263,7 @@ External/production remains separate:
 Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md` and `scripts/verify_launch_acceptance.py`.
 Canonical RC manifest: `release/current-rc.json`.
 
-Production remains **STOP** until every required external evidence gate is VERIFIED. The room-register approval gate itself is already closed; the external manifest requires target reconciliation evidence instead. CI success alone does not authorize DNS switch, provider activation or production declaration.
+Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until every required external/governance evidence gate is VERIFIED. CI success alone does not authorize DNS switch, provider activation or production declaration.
 
 ## Extension rule
 
