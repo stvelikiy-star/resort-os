@@ -1,156 +1,92 @@
-# Three Crowns Resort OS — Staging Runbook
+# Three Crowns Resort OS — Staging Runbook (2026-08-28 reference)
 
-Status: **deployment contract / not yet externally deployed**.
+Status: **HISTORICAL LOCAL-STAGING REFERENCE / SUPERSEDED FOR EXTERNAL RELEASE**  
+Reviewed: **2026-09-02**
 
-This runbook creates an isolated full-stack staging environment for the current integration branch. It must never point at the production database or reuse production provider secrets.
+> Do not use this dated file as release authority. Current external staging/cutover authority is `release/current-rc.json`, `knowledge/04_CURRENT_STATE.md`, `knowledge/09_LAUNCH_ACCEPTANCE.md`, `docs/DEPLOYMENT_RUNBOOK.md`, and GitHub launch board #39.
 
-## Topology
+The original 2026-08-28 runbook was useful for building a disposable localhost staging stack. Since then, the room register, migration ledger, Guest OS, Service Point QR, Kitchen and release-gate architecture have advanced. The old claims that the 84-room register still awaited owner confirmation and that a Google room sheet would later become production authority are **superseded**.
 
-- PostgreSQL 16: `127.0.0.1:15432`
-- Resort Core FastAPI: `127.0.0.1:18000`
-- Public site: `127.0.0.1:13000`
-- PMS/admin: `127.0.0.1:13001`
-- Staff PWA: `127.0.0.1:13002`
+## 1. What remains valid from the original local staging mechanics
 
-Recommended staging hostnames:
+A disposable local stack may still use isolated loopback ports such as:
 
-- `staging.3korony.com` -> web
-- `pms-staging.3korony.com` -> admin
-- `staff-staging.3korony.com` -> staff
-- `/core/*` on each UI host -> the same Resort Core, with `/core` stripped;
-- `/ws/*` on the PMS host -> Resort Core with WebSocket Upgrade preserved.
+- PostgreSQL: `127.0.0.1:15432`;
+- Resort Core: `127.0.0.1:18000`;
+- public web: `127.0.0.1:13000`;
+- admin/PMS: `127.0.0.1:13001`;
+- staff PWA: `127.0.0.1:13002`.
 
-A ready Caddy template is committed as `deploy/Caddyfile.staging.example`.
+Local/disposable staging must:
 
-## Safety rules
+1. use a separate test database/volume;
+2. never reuse production provider credentials;
+3. never copy synthetic test data to production;
+4. keep Google Sheets as mirror/control only;
+5. run the canonical staging acceptance scripts rather than treating a rendered UI as proof;
+6. keep NFC acquiring/wallet absent from active V1 runtime.
 
-1. Use a separate staging PostgreSQL volume/database.
-2. Never reuse production DB, session, n8n, Telegram or provider credentials.
-3. Keep direct Telegram/OpenAI/provider credentials empty until a dedicated staging bot/provider account is explicitly connected.
-4. Staging synthetic guest/task data must never be copied into production.
-5. Google Sheets remain a mirror/control surface; they do not create guaranteed reservations or mutate inventory.
-6. A green UI is not sufficient: `scripts/staging_acceptance.py` must pass.
-7. Staging schema creation via `prisma db push` is allowed only because the database is disposable. Production still requires a reviewed migration baseline + `prisma migrate deploy`.
-8. Localhost acceptance may use `COOKIE_SECURE=false` only because every port is bound to `127.0.0.1`. Any externally reachable HTTPS staging environment must use `COOKIE_SECURE=true`.
-9. V9 realtime is mandatory acceptance, not an optional enhancement.
+`prisma db push` may be used only for an explicitly disposable local mechanics test. It is **not** acceptable external release evidence.
 
-## 1. Checkout the exact integration head
+## 2. Current source checkout rule
+
+Use the canonical integration branch or an explicitly accepted successor, and record the exact SHA:
 
 ```bash
 git fetch origin
 git checkout integration/site-pms-cms-20260827
 git pull --ff-only
-```
-
-Record the SHA before deployment:
-
-```bash
 git rev-parse HEAD
 ```
 
-## 2. Environment
+Before any external acceptance, the exact checkout SHA must match the accepted release boundary and deployed application image revision labels. Stale `main` is not a production source.
 
-```bash
-cp .env.staging.example .env.staging
-chmod 600 .env.staging
+## 3. Current room-register rule
+
+The canonical room authority is already repository-controlled:
+
+- `data-intake/rooms.csv` — exact 84-room / 12-category target;
+- `data-intake/room-register-owner-approval.json` — checksum-bound `OWNER_APPROVED` evidence;
+- `data-intake/owner-room-checklist.json` — historical provenance only.
+
+Do **not** collect the room questionnaire again and do not promote an old Google import/sheet into a second mutable production authority.
+
+For a real staging/target database the remaining task is:
+
+```text
+canonical register -> dry-run -> exact diff review -> safe apply -> zero diff
 ```
 
-Replace every `CHANGE_ME_*` value with staging-only secrets.
+Use the current physical-room import/reconciliation tooling and preserve runtime state protections. Active guaranteed/check-in facts must not be overwritten by a metadata reconciliation.
 
-For the first localhost-only gate keep:
+## 4. Current migration rule
 
-```dotenv
-COOKIE_SECURE=false
-NEXT_PUBLIC_CORE_WS_URL=ws://127.0.0.1:18000
-```
+The release ledger is exactly eight migrations:
 
-Then load environment:
+1. `0_init`
+2. `1_site_content`
+3. `2_guest_service_tasks`
+4. `3_owner_analytics_snapshots`
+5. `4_guest_engagements`
+6. `5_guest_os_core`
+7. `6_service_point_qr_operations`
+8. `7_kitchen_operations`
 
-```bash
-set -a
-source .env.staging
-set +a
-```
-
-Set a deployment-host database URL for migration/seed scripts:
-
-```bash
-export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:15432/${POSTGRES_DB}?schema=public"
-```
-
-## 3. Start only PostgreSQL
-
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml up -d postgres
-```
-
-Verify:
-
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml ps postgres
-```
-
-## 4. Build staging schema on the disposable database
+External staging and production must use:
 
 ```bash
 cd packages/database
-npm install
+npm ci
 npx prisma validate
-npx prisma db push
+npx prisma migrate deploy
 cd ../..
 ```
 
-Apply PostgreSQL invariants:
+The target `_prisma_migrations` ledger must match the committed eight-migration sequence exactly. `scripts/production_preflight.py` and the shared `scripts/release_contract.py` enforce this fail-closed contract.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r services/api/requirements.txt
-python scripts/apply_core_constraints.py
-```
+## 5. Local disposable acceptance
 
-## 5. Seed Three Crowns canonical intake
-
-```bash
-python scripts/seed_from_intake.py
-```
-
-Seed must stop unless it sees exactly **84 rooms / 12 room types**.
-
-The current `data-intake/rooms.csv` is a reconstructed baseline and still contains owner-confirmation gaps (`UNKNOWN`, explicit `CONFIRM`). It is acceptable for staging mechanics but is **not** owner-approved production physical-room truth. Production physical-room reconciliation must use `scripts/import_physical_rooms.py` after the owner-confirmed 84-room sheet is complete.
-
-## 6. Bootstrap synthetic staging users
-
-```bash
-python scripts/bootstrap_owner.py
-APP_ENV=staging python scripts/bootstrap_staging_staff.py
-```
-
-This creates/rotates only the environment-defined staging OWNER, MAID and TECHNICIAN accounts and revokes their previous sessions.
-
-## 7. Start full stack
-
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml up -d --build api web admin staff
-```
-
-`NEXT_PUBLIC_CORE_WS_URL` is a browser-visible build-time value for the admin bundle. When that value changes, rebuild `admin`; a container restart alone is not enough.
-
-Check containers:
-
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml ps
-```
-
-Core readiness:
-
-```bash
-curl -fsS http://127.0.0.1:18000/health/ready
-```
-
-Expected invariant: room count 84 and room type count 12.
-
-## 8. Run localhost full staging acceptance
+For a localhost-only mechanics test, environment may use loopback URLs and test-only credentials. Start isolated PostgreSQL/Core/UI services and run:
 
 ```bash
 export CORE_API_URL=http://127.0.0.1:18000
@@ -158,122 +94,80 @@ export CORE_WS_URL=ws://127.0.0.1:18000
 python scripts/staging_acceptance.py
 ```
 
-The gate includes:
+The current acceptance contour covers Core readiness, canonical inventory, CMS/runtime truth, availability, `ReservationRequest` boundary, PMS/realtime, staff operations and audited room-state transitions. Newer domain-specific CI additionally covers Guest OS, Service Point QR, Kitchen, finance, AI/inbox and release safety.
 
-1. Core readiness and canonical 84/12.
-2. CMS RU/KG/EN draft/publish isolation and restore.
-3. Public availability.
-4. Website request -> CRM `ReservationRequest`, not automatic reservation.
-5. PMS reads the same Core inventory.
-6. Authenticated RFC6455 handshake to `/ws/pms/grid`.
-7. First realtime message is `pms.grid.snapshot` containing 84 rooms.
-8. V9 `control-snapshot` completeness.
-9. Analytics report reads 84 rooms / 12 categories from Resort Core.
-10. Synthetic MAID login and assigned housekeeping claim.
-11. Mandatory housekeeping checklist + audited completion report -> `IN_INSPECTION`.
-12. Manager accepts inspection -> room becomes `CLEAN` through canonical operations transition.
-13. Synthetic TECHNICIAN login and maintenance claim.
-14. Audited maintenance report -> `DONE`.
-15. Last active repair releases the room to `DIRTY` and creates/reuses housekeeping.
-16. Multiple active repair protection retains `TECH_BLOCK` until the final maintenance task terminates.
-17. Audit history contains `COMPLETE_WITH_REPORT`.
+A localhost pass proves application mechanics only. It does **not** prove external HTTPS/WSS, provider delivery, mobile devices, backup/restore, monitoring or production networking.
 
-If any step fails, staging is rejected.
+## 6. External HTTPS/WSS staging — current mandatory sequence
 
-## 9. Reverse proxy / TLS
+Do not infer external acceptance from this historical file. Follow `docs/DEPLOYMENT_RUNBOOK.md` and `knowledge/09_LAUNCH_ACCEPTANCE.md`.
 
-Only after localhost acceptance is green, point staging-only DNS names and use the committed Caddy template:
+At minimum the real external sequence is:
 
-```bash
-sudo cp deploy/Caddyfile.staging.example /etc/caddy/Caddyfile
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
-```
+1. verify the legacy rollback package first;
+2. verify the exact accepted SHA and clean checkout;
+3. provision isolated staging storage/database/secrets;
+4. apply the exact eight migrations with `prisma migrate deploy`;
+5. reconcile the canonical 84-room register against the staging target;
+6. build/deploy the exact accepted SHA;
+7. verify deployed image revision labels;
+8. verify HTTPS, WSS, cookies, CORS, persistence and private DB topology;
+9. run `scripts/external_staging_acceptance.py` and retain its checksum-backed evidence directory;
+10. run real-device acceptance;
+11. run E2E only for messaging/payment providers actually intended to be enabled at launch;
+12. verify real monitoring, backup age, off-site copy and restore evidence.
 
-Before rebuilding externally exposed staging, change `.env.staging` to:
+The external acceptance runner deliberately refuses non-staging hostnames and does not switch production DNS.
 
-```dotenv
-COOKIE_SECURE=true
-NEXT_PUBLIC_CORE_WS_URL=
-CORS_ORIGINS=https://staging.3korony.com,https://pms-staging.3korony.com,https://staff-staging.3korony.com
-```
+## 7. Realtime / device acceptance
 
-An empty `NEXT_PUBLIC_CORE_WS_URL` intentionally makes V9 use same-origin `wss://pms-staging.3korony.com/ws/...`, which Caddy proxies to Resort Core. This keeps the management session cookie and websocket on the same browser origin.
+For external staging, verify at minimum:
 
-Then rebuild/restart at minimum API + admin:
+- iPhone Safari;
+- Android Chrome;
+- desktop browser;
+- Telegram Mini App on supported devices;
+- PMS realtime `live` state and reconnect;
+- Staff MAID/TECHNICIAN flows;
+- Kitchen Admin/DINING_STAFF flow;
+- no horizontal/mobile layout breakage in required operational surfaces.
 
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml up -d --build api admin
-```
+REST success does not prove WSS/session behaviour.
 
-Run acceptance again through HTTPS. For the direct Core check, either temporarily expose a protected staging Core origin or run the script locally on the host with the localhost Core URL; in addition, manually verify the PMS browser shows realtime `live` through the public PMS hostname.
+## 8. Provider rule
 
-Do not attach production `3korony.com` DNS during staging.
+Provider templates and credentials are separate from Core truth.
 
-## 10. Vercel role
+- Instagram: provider/ManyChat -> n8n -> Core unified inbox;
+- WhatsApp: provider/API Green -> n8n -> Core unified inbox;
+- Telegram: controlled direct adapter or n8n path;
+- website booking: public website -> Resort Core directly.
 
-Vercel can host the public site and staff/admin previews, but V9 PMS realtime requires special care: HTTP rewrites alone are not treated as a WebSocket guarantee.
+n8n/AI may qualify and create a `ReservationRequest`; it must not confirm payment, create guaranteed Reservation, invent a payment route, or write PostgreSQL directly.
 
-Preferred PMS staging shape is the same-origin Caddy/container deployment above. If admin is later hosted on Vercel, use a dedicated Core staging hostname plus a deliberately shared `.3korony.com` cookie policy and verify cross-host WebSocket authentication; do not assume it works because REST `/core` works.
+Provider `SENT`/`DELIVERED` evidence must come back from the provider path. A timeout/UNKNOWN/QUEUED state is not delivery success.
 
-The old `three-crowns-v3-preview` project is not the current full-stack staging environment.
+## 9. Vercel role
 
-## 11. Mobile acceptance
+Vercel review deployments are DEMO/REVIEW only unless separately accepted under the current release process. A Vercel project/deployment target named `production` does not make it production `3korony.com`.
 
-After HTTPS is available test at minimum:
+Historical `three-crowns-v3-preview` / `three-crowns-full-current` surfaces must not override the canonical integration RC. Review deployments should remain `noindex` and should be rebuilt from the canonical RC/successor when a new owner review is needed.
 
-- iPhone Safari current iOS;
-- Android Chrome current;
-- Telegram Mini App Android;
-- Telegram Mini App iOS where available;
-- 360px, 390px, 430px widths;
-- landscape once for PMS/staff edge cases.
+## 10. Current production STOP gates
 
-Mandatory staff checks:
+Production cutover remains blocked until required evidence is real and current, including:
 
-- login/autologin;
-- `Мои / Можно взять / Завершено`;
-- claim race handling;
-- housekeeping checklist;
-- report modal keyboard/scroll behavior;
-- offline/retry messaging;
-- safe-area insets;
-- no horizontal page scroll.
+- GitHub branch protection/required checks;
+- Drive launch-control permissions no longer exposing public writer access;
+- target room reconciliation to zero diff;
+- actual host/account preflight;
+- verified legacy rollback package;
+- isolated external HTTPS/WSS staging acceptance;
+- real-device acceptance;
+- E2E for providers enabled at launch;
+- monitoring/alerting, backup/off-site/restore evidence;
+- fresh pre-cutover backup;
+- exact DNS rollback capture;
+- explicit OWNER GO.
 
-Mandatory PMS checks:
-
-- realtime indicator reaches `live`;
-- websocket reconnect after Wi-Fi toggle;
-- horizontal tape scrolling;
-- sticky room/status columns;
-- drag/preview/commit never bypasses confirmation;
-- 14/30-day views remain usable at tablet widths.
-
-## 12. Rollback / reset
-
-Stop UI/API:
-
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml stop api web admin staff
-```
-
-A fully disposable staging reset:
-
-```bash
-docker compose --env-file .env.staging -f compose.staging.yaml down -v
-```
-
-Then repeat from PostgreSQL/schema/seed.
-
-Never run `down -v` against production compose/volumes.
-
-## Production cutover remains blocked until
-
-- owner-approved physical 84-room register is imported/verified;
-- migration baseline is generated, reviewed and clean-db verified;
-- backup -> clean restore is verified;
-- staging acceptance is green on deployed HTTPS origins;
-- mobile acceptance is green;
-- provider credentials are connected separately and tested;
-- production preflight is green;
-- rollback point is recorded immediately before cutover.
+Do not claim `LIVE`, `PRODUCTION READY` or `EXTERNAL VERIFIED` from this local/historical runbook, CI, a Vercel preview, or a template.
