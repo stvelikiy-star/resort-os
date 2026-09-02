@@ -1,6 +1,6 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.6
+Version: 3.7
 Date: 2026-09-02
 Status: INTERNAL RC FROZEN / REPOSITORY+CI VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
@@ -12,12 +12,14 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c`.
-Observed integration merge: `a6c7ff603ad829a82f9d6c80d46425f0f58b50ec`.
+Accepted executable head: `ce2d8ecde43c294162a782f7912425ced5258f99`.
+Observed integration merge: `05777f3371bd42b4c4cc9a8d6d68fa9b482b238c`.
 
-The exact PR #98 executable head completed **43/43 non-RC product, acceptance, security, migration, backup/restore, staging and packaging workflows successfully, 0 failures**. The separate RC Truth workflow intentionally failed on the pre-merge product head because the previous RC was still frozen; this refreeze binds the new accepted head only after the real integration merge existed.
+The exact PR #102 product head completed **17/17 applicable non-RC workflows successfully, 0 failures**. The separate RC Truth workflow intentionally failed on the pre-refreeze product head because the previous RC was still frozen. PR #102 changed only the customer-facing automation guest-facts source and the n8n Resort Core contract assertions.
 
-The observed integration merge has **0 changed files** versus the tested executable head. Therefore the merged executable tree is identical to the exact tree that passed the 43 successful contours.
+The prior PR #98 Kitchen/Core release baseline retains its **43/43 non-RC** product, acceptance, security, migration, backup/restore, staging and packaging evidence. PR #102 is a narrow truth-hardening delta on top of that accepted baseline.
+
+The observed PR #102 integration merge has **0 changed files** versus the tested PR head. Therefore the merged product tree is identical to the exact tree that passed the applicable PR #102 regression contours.
 
 The canonical integration branch is the only release integration source. `main` is not a production source and must not be used for Beget deployment or cutover while stale relative to integration.
 
@@ -106,9 +108,9 @@ Room QR / GuestSession is separate from anonymous Service Point QR.
 
 ## Kitchen / Dining
 
-Kitchen is now part of the accepted, tree-equivalent integration release and remains an extension of Resort Core/PostgreSQL, not a parallel accounting system.
+Kitchen is part of the accepted integration release and remains an extension of Resort Core/PostgreSQL, not a parallel accounting system.
 
-Verified on exact accepted head `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c`:
+The Kitchen/Core implementation was fully regression-gated on the prior exact accepted baseline `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c` and was not modified by PR #102:
 
 - dedicated Kitchen Admin surface for `DINING_STAFF`, OWNER and MANAGER;
 - editable RU/KG/EN draft menu with server-side prices and active/draft controls;
@@ -121,7 +123,7 @@ Verified on exact accepted head `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c`:
 - Dining arrival card excludes sensitive guest/payment data;
 - Kitchen totals are isolated operational amounts: **no automatic Hotel Payment creation and no automatic Reservation.totalKgs mutation**;
 - Kitchen order actions and check-in routing are audited;
-- Kitchen Operations CI and CI-local Full Staging both passed on the exact accepted head.
+- Kitchen Operations CI and CI-local Full Staging passed on the prior exact Kitchen release baseline.
 
 The provisional menu is intentionally replaceable from Kitchen Admin. Real table layout/count is entered operationally and is not guessed in code.
 
@@ -178,15 +180,28 @@ Implemented and CI-verified contracts:
 - n8n Resort Core contract;
 - website direct-Core booking boundary.
 
+PR #102 additionally synchronizes the customer-facing Core guest-facts source used by `/api/v1/automation/read/hotel-facts` and n8n/AI context:
+
+- check-in `14:00` and checkout `12:00` are owner-confirmed;
+- gym and sports grounds are explicitly absent;
+- laundry and conference halls are `UNKNOWN_DO_NOT_PROMOTE`;
+- sauna is winter-only, 5,000 KGS/hour, approximately 4–5 people;
+- billiards is 500 KGS/hour;
+- table tennis is free for staying guests;
+- parking is approximately 20–30 cars and free for staying guests;
+- unverified payment-method enumeration is removed from customer-facing AI context;
+- public launch payment methods/providers remain `NOT_VERIFIED_FOR_LAUNCH` until real manager/provider launch evidence exists.
+
 Real provider credentials/live provider E2E remain external evidence and are not inferred from CI.
 
 ## Deployment state
 
-Verified on the exact accepted executable head and tree-equivalent merge:
+Repository release engineering now has:
 
-- migration baseline;
+- the prior 43/43 Kitchen/Core release baseline;
+- the PR #102 AI truth-hardening delta with 17/17 applicable non-RC workflow success;
 - exact eight-migration database ledger;
-- backup -> clean restore;
+- backup -> clean restore contract;
 - frontend/backend/database dependency security inspection;
 - deterministic Prisma dependency/lockfile checks;
 - production package build;
@@ -197,10 +212,9 @@ Verified on the exact accepted executable head and tree-equivalent merge:
 - unified external staging acceptance orchestration contract;
 - physical room import gate #38;
 - fail-closed launch verifier;
-- Kitchen Operations E2E;
-- PMS/Guest OS/Finance/Staff/AI/automation regression contours.
+- Kitchen/PMS/Guest OS/Finance/Staff/AI/automation regression contours.
 
-The new RC refreeze binds tested head `0c3ea5bdcbd6f9dd2d7dd460112cef3edea2152c` to tree-equivalent integration merge `a6c7ff603ad829a82f9d6c80d46425f0f58b50ec`.
+The current RC refreeze binds tested PR #102 head `ce2d8ecde43c294162a782f7912425ced5258f99` to tree-equivalent integration merge `05777f3371bd42b4c4cc9a8d6d68fa9b482b238c`.
 
 External/production remains separate:
 

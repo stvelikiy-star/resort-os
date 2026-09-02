@@ -13,6 +13,8 @@ ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
     "knowledge/04_CURRENT_STATE.md",
     "knowledge/09_LAUNCH_ACCEPTANCE.md",
+    "docs/README.md",
+    "docs/STAGING_RUNBOOK_2026-08-28.md",
     "scripts/release_rc_truth_guard.py",
     ".github/workflows/release-rc-truth-ci.yml",
 }
