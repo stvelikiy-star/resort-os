@@ -15,6 +15,8 @@ ALLOWED_HYGIENE_PATHS = {
     "knowledge/09_LAUNCH_ACCEPTANCE.md",
     "scripts/release_rc_truth_guard.py",
     ".github/workflows/release-rc-truth-ci.yml",
+    "docs/README.md",
+    "docs/STAGING_RUNBOOK_2026-08-28.md",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
