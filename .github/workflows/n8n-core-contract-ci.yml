@@ -136,8 +136,11 @@ jobs:
           assert facts['public_contacts']['manager_phone']['value']=='+996 558 08 50 08'
           assert facts['public_contacts']['instagram_handle']['status']=='UNKNOWN'
           assert facts['booking_truth']['old_two_day_unpaid_rule']['status']=='STALE_DO_NOT_USE'
-          assert facts['payment_methods_2026']['status']=='REFERENCE_PRICE_LIST_NOT_LAUNCH_EVIDENCE'
+          assert facts['payment_methods_2026']['status']=='NOT_VERIFIED_FOR_LAUNCH'
+          assert 'items' not in facts['payment_methods_2026']
+          assert facts['payment_methods_2026']['public_launch_methods']['value'] is None
           assert facts['payment_methods_2026']['public_launch_methods']['status']=='NOT_VERIFIED_FOR_LAUNCH'
+          assert facts['payment_methods_2026']['online_provider']['value'] is None
           assert facts['payment_methods_2026']['online_provider']['status']=='NOT_VERIFIED_FOR_LAUNCH'
           assert facts['operational_times']['check_in']=={'value':'14:00','status':'CONFIRMED_OWNER_RULE'}
           assert facts['operational_times']['check_out']=={'value':'12:00','status':'CONFIRMED_OWNER_RULE'}
