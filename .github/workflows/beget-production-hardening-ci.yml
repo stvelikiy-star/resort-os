@@ -14,6 +14,7 @@ on:
       - 'scripts/beget_deployment_guard.py'
       - 'scripts/beget_env_preflight.py'
       - 'scripts/provider_env_security.py'
+      - 'scripts/provider_env_security_test.py'
       - 'scripts/public_site_truth_guard.py'
       - 'apps/web/app/layout.tsx'
       - '.github/workflows/beget-production-hardening-ci.yml'
@@ -33,6 +34,7 @@ on:
       - 'scripts/beget_deployment_guard.py'
       - 'scripts/beget_env_preflight.py'
       - 'scripts/provider_env_security.py'
+      - 'scripts/provider_env_security_test.py'
       - 'scripts/public_site_truth_guard.py'
       - 'apps/web/app/layout.tsx'
       - '.github/workflows/beget-production-hardening-ci.yml'
@@ -58,6 +60,9 @@ jobs:
 
       - name: Verify database release contract and DBaaS URL handling
         run: python scripts/release_contract_test.py
+
+      - name: Verify provider environment security matrix
+        run: python scripts/provider_env_security_test.py
 
       - name: Verify Beget target topology contract
         run: python scripts/beget_deployment_guard.py
@@ -91,7 +96,7 @@ jobs:
           python scripts/beget_env_preflight.py --env-file /tmp/beget.ci.env | tee /tmp/beget-env-preflight.txt
           grep -q '^RESULT: PASS STATIC$' /tmp/beget-env-preflight.txt
 
-      - name: Verify provider webhook secrets fail closed
+      - name: Verify provider webhook secrets fail closed through Beget preflight
         run: |
           python - <<'PY'
           from pathlib import Path
