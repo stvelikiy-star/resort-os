@@ -14,6 +14,8 @@ from release_contract import EXPECTED_MIGRATIONS
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_STATUS = {"VERIFIED", "NOT_VERIFIED", "NOT_REQUIRED"}
 REQUIRED_EXTERNAL_GATES = (
+    "github_branch_protection",
+    "drive_launch_control_permissions",
     "room_reconciliation",
     "beget_host_preflight",
     "legacy_rollback_backup",
@@ -178,6 +180,7 @@ def main() -> int:
             return 1
         print(f"FACT: migrations={len(EXPECTED_MIGRATIONS)}")
         print("FACT: physical_room_import_gate_38=closed")
+        print("FACT: launch_governance_gates=github_branch_protection,drive_launch_control_permissions")
         print("FACT: launch_example_is_fail_closed=true")
         print("RESULT: RELEASE REPOSITORY READY; EXTERNAL CUTOVER NOT AUTHORIZED")
         return 0

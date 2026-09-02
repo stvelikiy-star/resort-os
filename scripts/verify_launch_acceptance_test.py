@@ -40,6 +40,24 @@ def main() -> None:
     wrong_sha = deepcopy(valid)
     assert any("candidate_sha mismatch" in item for item in validate_manifest(wrong_sha, expected_sha="b" * 40))
 
+    missing_branch_protection = deepcopy(valid)
+    missing_branch_protection["external_evidence"]["github_branch_protection"] = {
+        "status": "NOT_VERIFIED",
+        "evidence_ref": None,
+        "verified_at": None,
+    }
+    errors = validate_manifest(missing_branch_protection, expected_sha="a" * 40)
+    assert any("github_branch_protection: production cutover remains STOP" in item for item in errors)
+
+    missing_drive_permissions = deepcopy(valid)
+    missing_drive_permissions["external_evidence"]["drive_launch_control_permissions"] = {
+        "status": "NOT_VERIFIED",
+        "evidence_ref": None,
+        "verified_at": None,
+    }
+    errors = validate_manifest(missing_drive_permissions, expected_sha="a" * 40)
+    assert any("drive_launch_control_permissions: production cutover remains STOP" in item for item in errors)
+
     missing_room_reconciliation = deepcopy(valid)
     missing_room_reconciliation["external_evidence"]["room_reconciliation"] = {
         "status": "NOT_VERIFIED",

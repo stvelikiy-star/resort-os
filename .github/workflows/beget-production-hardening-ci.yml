@@ -13,6 +13,7 @@ on:
       - 'scripts/release_contract_test.py'
       - 'scripts/beget_deployment_guard.py'
       - 'scripts/beget_env_preflight.py'
+      - 'scripts/provider_env_security.py'
       - 'scripts/public_site_truth_guard.py'
       - 'apps/web/app/layout.tsx'
       - '.github/workflows/beget-production-hardening-ci.yml'
@@ -31,6 +32,7 @@ on:
       - 'scripts/release_contract_test.py'
       - 'scripts/beget_deployment_guard.py'
       - 'scripts/beget_env_preflight.py'
+      - 'scripts/provider_env_security.py'
       - 'scripts/public_site_truth_guard.py'
       - 'apps/web/app/layout.tsx'
       - '.github/workflows/beget-production-hardening-ci.yml'
@@ -88,6 +90,74 @@ jobs:
           PY
           python scripts/beget_env_preflight.py --env-file /tmp/beget.ci.env | tee /tmp/beget-env-preflight.txt
           grep -q '^RESULT: PASS STATIC$' /tmp/beget-env-preflight.txt
+
+      - name: Verify provider webhook secrets fail closed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          base = Path('/tmp/beget.ci.env').read_text(encoding='utf-8')
+
+          def replace(text: str, key: str, value: str) -> str:
+              lines = []
+              found = False
+              for line in text.splitlines():
+                  if line.startswith(key + '='):
+                      line = f'{key}={value}'
+                      found = True
+                  lines.append(line)
+              if not found:
+                  lines.append(f'{key}={value}')
+              return '\n'.join(lines) + '\n'
+
+          green_bad = replace(base, 'GREEN_API_ID_INSTANCE', '1234567890')
+          green_bad = replace(green_bad, 'GREEN_API_TOKEN_INSTANCE', 'real-looking-token-value')
+          green_bad = replace(green_bad, 'GREEN_API_WEBHOOK_SECRET', 'CHANGE_ME_WEBHOOK_SECRET')
+          Path('/tmp/beget.green-placeholder.env').write_text(green_bad, encoding='utf-8')
+
+          green_short = replace(base, 'GREEN_API_ID_INSTANCE', '1234567890')
+          green_short = replace(green_short, 'GREEN_API_TOKEN_INSTANCE', 'real-looking-token-value')
+          green_short = replace(green_short, 'GREEN_API_WEBHOOK_SECRET', 'too-short')
+          Path('/tmp/beget.green-short.env').write_text(green_short, encoding='utf-8')
+
+          green_good = replace(base, 'GREEN_API_ID_INSTANCE', '1234567890')
+          green_good = replace(green_good, 'GREEN_API_TOKEN_INSTANCE', 'real-looking-token-value')
+          green_good = replace(green_good, 'GREEN_API_WEBHOOK_SECRET', 'ci-green-webhook-secret-abcdefghijklmnopqrstuvwxyz')
+          Path('/tmp/beget.green-good.env').write_text(green_good, encoding='utf-8')
+
+          telegram_bad = replace(base, 'TELEGRAM_SALES_BOT_TOKEN', '123456:real-looking-token')
+          telegram_bad = replace(telegram_bad, 'TELEGRAM_SALES_WEBHOOK_SECRET', 'CHANGE_ME_TELEGRAM_SECRET')
+          Path('/tmp/beget.telegram-placeholder.env').write_text(telegram_bad, encoding='utf-8')
+
+          telegram_good = replace(base, 'TELEGRAM_SALES_BOT_TOKEN', '123456:real-looking-token')
+          telegram_good = replace(telegram_good, 'TELEGRAM_SALES_WEBHOOK_SECRET', 'ci-telegram-webhook-secret-abcdefghijklmnopqrstuvwxyz')
+          Path('/tmp/beget.telegram-good.env').write_text(telegram_good, encoding='utf-8')
+          PY
+
+          if python scripts/beget_env_preflight.py --env-file /tmp/beget.green-placeholder.env >/tmp/green-placeholder.txt 2>&1; then
+            echo 'GREEN API placeholder webhook secret unexpectedly passed' >&2
+            cat /tmp/green-placeholder.txt
+            exit 1
+          fi
+          grep -q 'GREEN API is enabled without a real GREEN_API_WEBHOOK_SECRET' /tmp/green-placeholder.txt
+
+          if python scripts/beget_env_preflight.py --env-file /tmp/beget.green-short.env >/tmp/green-short.txt 2>&1; then
+            echo 'GREEN API short webhook secret unexpectedly passed' >&2
+            cat /tmp/green-short.txt
+            exit 1
+          fi
+          grep -q 'GREEN_API_WEBHOOK_SECRET must be at least 24 characters' /tmp/green-short.txt
+
+          python scripts/beget_env_preflight.py --env-file /tmp/beget.green-good.env | grep -q '^RESULT: PASS STATIC$'
+
+          if python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-placeholder.env >/tmp/telegram-placeholder.txt 2>&1; then
+            echo 'Telegram placeholder webhook secret unexpectedly passed' >&2
+            cat /tmp/telegram-placeholder.txt
+            exit 1
+          fi
+          grep -q 'Telegram Sales is enabled without a real TELEGRAM_SALES_WEBHOOK_SECRET' /tmp/telegram-placeholder.txt
+
+          python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-good.env | grep -q '^RESULT: PASS STATIC$'
 
       - name: Verify public truth still blocks rejected sports/payment drift
         run: python scripts/public_site_truth_guard.py

@@ -13,6 +13,18 @@
     ]
   },
   "external_evidence": {
+    "github_branch_protection": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Before production GO, attach evidence that the canonical integration/main branch policy is protected with the required PR/check/force-push controls. Current issue #91 remains the tracking gate until verified."
+    },
+    "drive_launch_control_permissions": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Before production GO, attach Drive permission metadata proving public writer access has been removed from the project launch-control surface and named-editor/read-only policy is in place. Current issue #100 remains the tracking gate until verified."
+    },
     "room_reconciliation": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
