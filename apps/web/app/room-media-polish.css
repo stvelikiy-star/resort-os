@@ -1,0 +1,20 @@
+.room-catalog-card{padding:0!important;min-height:0!important}
+.room-catalog-media{position:relative;aspect-ratio:4/3;overflow:hidden;background:linear-gradient(145deg,#11253e,#081526);border-bottom:1px solid var(--luxury-line)}
+.room-catalog-media img{object-fit:cover;transition:transform .7s var(--luxury-ease),filter .4s ease;filter:saturate(.95) contrast(1.025)}
+.room-catalog-card:hover .room-catalog-media img{transform:scale(1.045)}
+.room-catalog-body{display:flex;flex:1;flex-direction:column;padding:26px 28px 28px}
+.room-catalog-body h2{margin:34px 0 12px}
+.room-catalog-body>p{position:relative;z-index:1;max-width:390px;margin:0;color:#a8b4c2;font-size:.79rem;line-height:1.65}
+.room-catalog-body .room-catalog-price{margin:auto 0 18px}
+.room-media-status{position:absolute;left:16px;bottom:16px;z-index:2;padding:8px 11px;border:1px solid rgba(255,255,255,.2);border-radius:999px;background:rgba(5,14,27,.66);color:#f5f7fa;font-size:.58rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;backdrop-filter:blur(14px)}
+.room-media-pending-panel{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:24px;background:radial-gradient(circle at 82% 18%,rgba(139,190,229,.18),transparent 28%),linear-gradient(145deg,#11243c,#081626);color:#d6e0eb}
+.room-media-pending-panel span{font-size:.65rem;font-weight:850;letter-spacing:.16em;color:#91a5b9}
+.room-media-pending-panel strong{max-width:210px;font-size:1.02rem;line-height:1.25;letter-spacing:-.02em}
+.room-catalog-card.media-pending .room-media-status{display:none}
+.room-catalog-card.has-approved-media{border-color:rgba(214,229,241,.30)!important}
+
+@media(max-width:620px){
+  .room-catalog-card{flex-basis:88vw!important}
+  .room-catalog-body{padding:22px 22px 25px}
+  .room-catalog-body h2{margin-top:28px}
+}
