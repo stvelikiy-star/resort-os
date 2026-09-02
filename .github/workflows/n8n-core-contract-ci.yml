@@ -118,12 +118,29 @@ jobs:
           assert d['reservation_rules']['unpaid_request_creates_inventory_hold'] is False
           assert d['reservation_rules']['old_two_day_unpaid_booking_rule_active'] is False
           facts=d['guest_facts']
+          assert facts['version']=='2026-09-02'
           assert facts['facilities']['own_beach']['value'] is True
           assert facts['facilities']['pier_meters']['value']==150
+          assert facts['facilities']['gym']=={'value': False, 'status': 'CONFIRMED_OWNER_RULE'}
+          assert facts['facilities']['sports_grounds']=={'value': False, 'status': 'CONFIRMED_OWNER_RULE'}
+          assert facts['facilities']['laundry']['value'] is None
+          assert facts['facilities']['laundry']['status']=='UNKNOWN_DO_NOT_PROMOTE'
+          assert facts['facilities']['conference_halls']['value'] is None
+          assert facts['facilities']['conference_halls']['status']=='UNKNOWN_DO_NOT_PROMOTE'
+          assert facts['facilities']['parking']['status']=='CONFIRMED_OWNER_RULE'
+          assert facts['facilities']['sauna']['season']=='WINTER_ONLY'
+          assert facts['facilities']['sauna']['price_kgs_per_hour']==5000
+          assert facts['facilities']['billiards']['price_kgs_per_hour']==500
+          assert facts['facilities']['table_tennis']['price_kgs']==0
           assert facts['public_contacts']['reservation_phone']['value']=='+996 558 08 50 02'
+          assert facts['public_contacts']['manager_phone']['value']=='+996 558 08 50 08'
           assert facts['public_contacts']['instagram_handle']['status']=='UNKNOWN'
           assert facts['booking_truth']['old_two_day_unpaid_rule']['status']=='STALE_DO_NOT_USE'
-          assert facts['operational_times']['check_out']['status']=='UNKNOWN_CONFLICTING_PUBLIC_SOURCES'
+          assert facts['payment_methods_2026']['status']=='REFERENCE_PRICE_LIST_NOT_LAUNCH_EVIDENCE'
+          assert facts['payment_methods_2026']['public_launch_methods']['status']=='NOT_VERIFIED_FOR_LAUNCH'
+          assert facts['payment_methods_2026']['online_provider']['status']=='NOT_VERIFIED_FOR_LAUNCH'
+          assert facts['operational_times']['check_in']=={'value':'14:00','status':'CONFIRMED_OWNER_RULE'}
+          assert facts['operational_times']['check_out']=={'value':'12:00','status':'CONFIRMED_OWNER_RULE'}
           PY
 
       - name: Verify deterministic availability
