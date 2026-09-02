@@ -2,12 +2,12 @@
   "schema_version": 1,
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
   "source_branch": "integration/site-pms-cms-20260827",
-  "accepted_executable_head": "ce2d8ecde43c294162a782f7912425ced5258f99",
-  "observed_integration_merge": "05777f3371bd42b4c4cc9a8d6d68fa9b482b238c",
+  "accepted_executable_head": "ab6b649d91df5e9698253d43788cc657ca7040c9",
+  "observed_integration_merge": "c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 17,
-    "success": 17,
+    "triggered": 20,
+    "success": 20,
     "failures": 0
   },
   "production_source_branch": "integration/site-pms-cms-20260827",
@@ -16,14 +16,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "The accepted executable head is the exact PR #102 product head that aligned customer-facing automation guest truth with current owner-approved facts and strengthened the n8n Resort Core contract guard.",
-    "The exact accepted PR #102 head completed all 17 applicable non-RC workflows successfully with zero failures; Release RC Truth intentionally failed before refreeze because the previous RC was still frozen.",
-    "The observed integration merge has zero file differences versus the tested PR #102 head.",
-    "The previous PR #98 Kitchen/Core baseline retained its 43/43 non-RC release evidence; PR #102 changed only the automation guest-facts source and its CI contract.",
-    "Customer-facing automation now exposes owner-confirmed check-in 14:00 and checkout 12:00, confirmed absence of gym/sports grounds, fail-closed laundry/conference claims, and no unverified payment-method enumeration.",
-    "Public launch payment methods/providers remain NOT_VERIFIED_FOR_LAUNCH until real manager/provider launch evidence exists.",
+    "The accepted executable head is the exact PR #107 product/security head built from the previously frozen RC integration head.",
+    "The exact PR #107 head completed all 20 applicable non-RC workflows successfully with zero failures; Release RC Truth intentionally failed before refreeze because the previous RC remained frozen.",
+    "The observed integration merge has zero file differences versus the tested PR #107 head.",
+    "PR #107 adds fail-closed provider environment validation for Telegram Sales, GREEN API, OpenAI model paths and Staff Voice without enabling any provider or committing real credentials.",
+    "The final structural launch verifier now requires VERIFIED GitHub branch-protection evidence and VERIFIED Google Drive launch-control permission evidence before production cutover can pass.",
+    "Google Drive permission audit currently shows anyone-with-link writer access on all 13 top-level project folders; issue #100 remains open until owner/admin remediation is independently re-verified.",
+    "GitHub integration branch protection remains disabled; issue #91 remains open until protected:true and required-check enforcement are independently re-verified.",
+    "The prior PR #102 customer-facing AI guest-truth hardening and PR #98 Kitchen/Core release baseline remain part of this accepted product tree.",
     "The canonical database release ledger remains exactly eight migrations ending in 7_kitchen_operations.",
-    "Release-hygiene files may change without changing executable product truth.",
-    "CI success does not constitute external Beget or production evidence."
+    "All external Beget/staging/rollback/device/provider/monitoring/backup/DNS/owner-GO evidence remains separate and production cutover remains STOP."
   ]
 }
