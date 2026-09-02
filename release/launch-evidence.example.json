@@ -23,7 +23,7 @@
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Before production GO, attach Drive permission metadata proving public writer access has been removed from the project launch-control surface and named-editor/read-only policy is in place. Current issue #100 remains the tracking gate until verified."
+      "note": "Before production GO, attach Drive permission metadata proving that anyone-with-link writer access has been removed from all 13 top-level Three Crowns project folders and current launch-control Docs/Sheets, with named-editor/read-only policy in place. Current issue #100 remains the tracking gate until verified."
     },
     "room_reconciliation": {
       "status": "NOT_VERIFIED",
