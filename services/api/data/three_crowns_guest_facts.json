@@ -150,18 +150,16 @@
     }
   },
   "payment_methods_2026": {
-    "items": ["Visa", "MasterCard", "QR", "cash", "bank transfer"],
-    "status": "REFERENCE_PRICE_LIST_NOT_LAUNCH_EVIDENCE",
+    "status": "NOT_VERIFIED_FOR_LAUNCH",
     "public_launch_methods": {
       "value": null,
-      "status": "NOT_VERIFIED_FOR_LAUNCH",
-      "rule": "Do not tell a guest that a payment route is currently available unless the manager or launch-enabled provider evidence confirms it."
+      "status": "NOT_VERIFIED_FOR_LAUNCH"
     },
     "online_provider": {
       "value": null,
-      "status": "NOT_VERIFIED_FOR_LAUNCH",
-      "rule": "Do not promise a specific online payment provider until it is connected and launch E2E is verified."
-    }
+      "status": "NOT_VERIFIED_FOR_LAUNCH"
+    },
+    "rule": "Do not enumerate or promise payment methods/providers to a guest until the manager or launch-enabled provider evidence confirms the current route."
   },
   "meals_2026": {
     "summer_room_rate": {
