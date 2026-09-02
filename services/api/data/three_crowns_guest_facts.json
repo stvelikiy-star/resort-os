@@ -1,6 +1,6 @@
 {
-  "version": "2026-08-25",
-  "usage": "Customer-facing automation may use CONFIRMED facts. PARTIAL/UNKNOWN facts must not be stated as certain. STALE facts must not be used.",
+  "version": "2026-09-02",
+  "usage": "Customer-facing automation may use CONFIRMED facts. PARTIAL/UNKNOWN/REFERENCE facts must not be stated as certain. STALE facts must not be used.",
   "property": {
     "name": "Три Короны Resort & SPA",
     "city": "Чолпон-Ата",
@@ -85,28 +85,45 @@
     },
     "sauna": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "status": "CONFIRMED_OWNER_RULE",
+      "season": "WINTER_ONLY",
+      "price_kgs_per_hour": 5000,
+      "capacity_note": "approximately 4–5 people"
     },
     "billiards": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "status": "CONFIRMED_OWNER_RULE",
+      "price_kgs_per_hour": 500
+    },
+    "table_tennis": {
+      "value": true,
+      "status": "CONFIRMED_OWNER_RULE",
+      "price_kgs": 0,
+      "rule": "Free for staying guests."
     },
     "laundry": {
-      "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "value": null,
+      "status": "UNKNOWN_DO_NOT_PROMOTE",
+      "rule": "Do not advertise laundry until it is normalized in current owner-approved public truth."
     },
     "parking": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "status": "CONFIRMED_OWNER_RULE",
+      "capacity_note": "approximately 20–30 cars",
+      "rule": "Free for staying guests."
     },
     "conference_halls": {
-      "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE",
-      "capacity": {
-        "value": null,
-        "status": "UNKNOWN_CONFLICTING_PUBLIC_SOURCES",
-        "rule": "Do not quote conference capacity until normalized."
-      }
+      "value": null,
+      "status": "UNKNOWN_DO_NOT_PROMOTE",
+      "rule": "Do not advertise conference halls or quote capacity until current owner-approved public truth is established."
+    },
+    "gym": {
+      "value": false,
+      "status": "CONFIRMED_OWNER_RULE"
+    },
+    "sports_grounds": {
+      "value": false,
+      "status": "CONFIRMED_OWNER_RULE"
     }
   },
   "booking_truth": {
@@ -129,16 +146,21 @@
     "prepayment_amount": {
       "value": null,
       "status": "READ_FROM_CURRENT_REQUEST",
-      "rule": "Use required_prepayment_kgs returned by Resort Core. Do not independently assume a global percentage in client messaging."
+      "rule": "Use required_prepayment_kgs returned by Resort Core only as a manager-entered/internal fact. Do not independently assume, negotiate or advertise a global percentage."
     }
   },
   "payment_methods_2026": {
     "items": ["Visa", "MasterCard", "QR", "cash", "bank transfer"],
-    "status": "CONFIRMED_2026_PRICE_LIST",
+    "status": "REFERENCE_PRICE_LIST_NOT_LAUNCH_EVIDENCE",
+    "public_launch_methods": {
+      "value": null,
+      "status": "NOT_VERIFIED_FOR_LAUNCH",
+      "rule": "Do not tell a guest that a payment route is currently available unless the manager or launch-enabled provider evidence confirms it."
+    },
     "online_provider": {
       "value": null,
-      "status": "NOT_CONFIGURED",
-      "rule": "Do not promise a specific online payment provider until it is connected."
+      "status": "NOT_VERIFIED_FOR_LAUNCH",
+      "rule": "Do not promise a specific online payment provider until it is connected and launch E2E is verified."
     }
   },
   "meals_2026": {
@@ -180,13 +202,11 @@
   "operational_times": {
     "check_in": {
       "value": "14:00",
-      "status": "PARTIAL_SOURCE_SUPPORTED",
-      "rule": "May be shown only after current owner rule is normalized for production."
+      "status": "CONFIRMED_OWNER_RULE"
     },
     "check_out": {
-      "value": null,
-      "status": "UNKNOWN_CONFLICTING_PUBLIC_SOURCES",
-      "rule": "Public sources conflict between 11:00 and 12:00; do not state a definitive checkout time from automation yet."
+      "value": "12:00",
+      "status": "CONFIRMED_OWNER_RULE"
     }
   }
 }
