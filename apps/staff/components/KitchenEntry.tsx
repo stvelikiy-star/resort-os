@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import ChefProduction from "./ChefProduction";
 import KitchenAdmin from "./KitchenAdmin";
 import styles from "./KitchenEntry.module.css";
 
@@ -136,7 +137,7 @@ export default function KitchenEntry() {
         <div className={styles.mark}>III</div>
         <p>Три Короны · отдельный вход</p>
         <h1>Кухня</h1>
-        <span>Заказы кухни, меню, стоп-лист, новые заезды и публикация меню гостю — в одном рабочем контуре.</span>
+        <span>План порций, заказы кухни, меню, стоп-лист и новые заезды — в одном рабочем контуре.</span>
         <label>Логин<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required autoFocus /></label>
         <label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={8} required /></label>
         {error && <div className={styles.error}>{error}</div>}
@@ -162,9 +163,10 @@ export default function KitchenEntry() {
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Kitchen Admin ведёт приготовление NEW → ACCEPTED → COOKING → READY. «Меню сегодня» отдельно публикует конкретные блюда на дату и приём пищи, управляет стоп-листом. Официант работает со столами, бронями и выдачей READY → SERVED. Гостю показываются только активные, утверждённые и опубликованные на текущую дату позиции.</span>
+        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. «Меню сегодня» публикует блюда и стоп-лист. Официант ведёт столы/выдачу READY → SERVED. Гостю показываются только активные, утверждённые и опубликованные позиции.</span>
       </div>
     </section>
+    <ChefProduction />
     <KitchenAdmin />
   </>;
 }
