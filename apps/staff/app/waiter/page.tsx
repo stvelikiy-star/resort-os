@@ -1,5 +1,5 @@
-import WaiterEntry from "../../components/WaiterEntry";
+import WaiterWorkspace from "../../components/WaiterWorkspace";
 
 export default function WaiterPage() {
-  return <WaiterEntry />;
+  return <WaiterWorkspace />;
 }
