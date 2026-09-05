@@ -16,6 +16,7 @@ import "./guest-history.css";
 import "./guest-crm.css";
 import "./dashboard.css";
 import "./reception.css";
+import "./reception-readiness.css";
 import "./inbox.css";
 import "./staff.css";
 import "./room-detail.css";
