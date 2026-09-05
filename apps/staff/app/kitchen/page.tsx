@@ -1,5 +1,5 @@
-import KitchenAdmin from "../../components/KitchenAdmin";
+import KitchenEntry from "../../components/KitchenEntry";
 
 export default function KitchenPage() {
-  return <KitchenAdmin />;
+  return <KitchenEntry />;
 }
