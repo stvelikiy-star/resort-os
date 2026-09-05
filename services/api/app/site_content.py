@@ -34,7 +34,6 @@ FORBIDDEN_PUBLIC_CONTENT = {
         r"(?:(?:предоплат|prepay|prepayment|алдын\s+ала\s+төл)[^\n]{0,100}(?:перв[^\n]{0,20}(?:ноч|сут)|first\s+night|биринчи\s+түн)|(?:перв[^\n]{0,20}(?:ноч|сут)|first\s+night|биринчи\s+түн)[^\n]{0,100}(?:предоплат|prepay|prepayment|алдын\s+ала\s+төл))",
         re.I,
     ),
-    "uncanonicalized conference claim": re.compile(r"конференц(?:-?зал|ия)|conference\s+(?:hall|room)|конференция", re.I),
     "uncanonicalized billiards claim": re.compile(r"бильярд|billiards?", re.I),
     "uncanonicalized laundry claim": re.compile(r"прачечн|laundry|кир\s+жуучу", re.I),
     "uncanonicalized sauna claim": re.compile(r"саун|sauna", re.I),
