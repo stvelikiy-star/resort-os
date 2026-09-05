@@ -45,6 +45,9 @@ from .reception_reservations import router as reception_reservations_router
 from .reservation_detail import router as reservation_detail_router
 from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
+from .service_point_payments import admin_router as service_point_payments_admin_router
+from .service_point_payments import integration_router as service_point_payments_integration_router
+from .service_point_payments import public_router as service_point_payments_public_router
 from .service_points import admin_router as service_points_admin_router
 from .service_points import public_router as service_points_public_router
 from .site_content import router as site_content_router
@@ -72,6 +75,10 @@ app.include_router(guest_marketplace_router)
 # confirm price, availability, payment or provider execution on their own.
 app.include_router(guest_offers_guest_router)
 app.include_router(service_points_public_router)
+# Paid service-point access is separate from room finance and dormant NFC code.
+# It may unlock a configured TTLock only after a provider-confirmed payment event.
+app.include_router(service_point_payments_public_router)
+app.include_router(service_point_payments_integration_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reception_readiness_router)
@@ -94,6 +101,7 @@ app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)
 app.include_router(guest_os_admin_router)
 app.include_router(service_points_admin_router)
+app.include_router(service_point_payments_admin_router)
 app.include_router(guest_services_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
@@ -124,8 +132,7 @@ app.include_router(ai_sales_router)
 app.include_router(realtime_router)
 app.include_router(manager_dashboard_router)
 
-# Service Point QR is a location/request feature and is deliberately separate
-# from the dormant NFC wallet/acquiring code below.
-# NFC implementation remains dormant in source and is intentionally not composed
-# into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.52.0"
+# Legacy NFC wallet/acquiring implementation remains dormant in source and is
+# intentionally not composed into the active application. Paid Service Point QR
+# does not reactivate NFC and cannot mutate accommodation payment truth.
+app.version = "0.53.0"
