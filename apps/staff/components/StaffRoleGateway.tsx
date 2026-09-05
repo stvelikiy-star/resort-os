@@ -22,6 +22,7 @@ declare global {
 
 const OPERATIONAL_ROLES = new Set<Role>(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN", "DINING_STAFF", "STORE_STAFF"]);
 const LEGACY_SHIFT_ROLES = new Set<Role>(["OWNER", "MANAGER", "MAID", "TECHNICIAN"]);
+const HOUSEKEEPING_SYNC_ROLES = new Set<Role>(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const roleLabel: Record<Role, string> = {
   OWNER: "Владелец",
   MANAGER: "Менеджер",
@@ -92,6 +93,11 @@ export default function StaffRoleGateway() {
     void bootstrap();
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!user || !HOUSEKEEPING_SYNC_ROLES.has(user.role)) return;
+    void fetch("/core/api/v1/ops/housekeeping/schedule/ensure", { method: "POST" }).catch(() => undefined);
+  }, [user?.id, user?.role]);
 
   async function login(event: FormEvent) {
     event.preventDefault();
