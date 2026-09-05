@@ -1,0 +1,192 @@
+name: Resort OS Release Gate
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'apps/**'
+      - 'scripts/**'
+      - '.github/workflows/release-gate-ci.yml'
+  pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'apps/**'
+      - 'scripts/**'
+      - '.github/workflows/release-gate-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+      CORE_API_URL: http://127.0.0.1:8000
+      BOOTSTRAP_OWNER_USERNAME: ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      SMOKE_OWNER_USERNAME: ci-owner
+      SMOKE_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      COOKIE_SECURE: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            packages/database/package-lock.json
+            apps/admin/package-lock.json
+            apps/web/package-lock.json
+            apps/staff/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Resolve hotel-local release dates
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+          today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'D0={today.isoformat()}\n')
+              f.write(f'D2={(today + timedelta(days=2)).isoformat()}\n')
+              f.write(f'D5={(today + timedelta(days=5)).isoformat()}\n')
+          PY
+
+      - name: Install database toolchain and validate Prisma schema
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+
+      - name: Apply every committed migration to clean PostgreSQL
+        working-directory: packages/database
+        run: |
+          npx prisma migrate deploy
+          npx prisma migrate status
+
+      - name: Install and compile Resort Core
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall -q services/api/app scripts
+
+      - name: Verify migrated release schema
+        run: |
+          python - <<'PY'
+          import asyncio, os
+          import asyncpg
+
+          async def main():
+              conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
+              try:
+                  expected_tables = [
+                      'kitchen_tables', 'dining_table_sessions', 'dining_entitlements',
+                      'guest_folio_charges', 'booking_groups', 'site_media_assets', 'site_media_slots',
+                  ]
+                  for table in expected_tables:
+                      exists = await conn.fetchval('SELECT to_regclass($1)', f'public.{table}')
+                      assert exists, f'missing migrated table: {table}'
+                  columns = {
+                      row['column_name'] for row in await conn.fetch(
+                          "SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='kitchen_tables'"
+                      )
+                  }
+                  assert {'zoneLabel','floorX','floorY','floorShape'} <= columns, columns
+                  trigger = await conn.fetchval(
+                      "SELECT count(*)::int FROM pg_trigger WHERE tgname='kitchen_tables_active_session_guard' AND NOT tgisinternal"
+                  )
+                  assert trigger == 1, 'dining table status guard missing'
+                  migration_count = await conn.fetchval('SELECT count(*)::int FROM _prisma_migrations WHERE finished_at IS NOT NULL')
+                  assert migration_count >= 20, migration_count
+                  print('Migrated schema verified:', migration_count, 'migrations')
+              finally:
+                  await conn.close()
+
+          asyncio.run(main())
+          PY
+
+      - name: Seed Three Crowns and bootstrap owner
+        run: |
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+
+      - name: Typecheck and build Admin
+        working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Public Web
+        working-directory: apps/web
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Staff PWA
+        working-directory: apps/staff
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-release-api.log 2>&1 &
+          echo $! > /tmp/resort-release-api.pid
+          for i in $(seq 1 20); do
+            if curl --fail -sS http://127.0.0.1:8000/ready > /tmp/release-ready.json; then break; fi
+            sleep 1
+          done
+          curl --fail -sS http://127.0.0.1:8000/ready
+
+      - name: Existing Site / PMS / CMS smoke
+        run: python scripts/site_pms_cms_smoke.py
+
+      - name: Release 0.60 full-domain E2E
+        run: python scripts/release_060_e2e.py
+
+      - name: Root control-center verification
+        run: npm test
+
+      - name: Show API logs on failure
+        if: failure()
+        run: cat /tmp/resort-release-api.log || true
