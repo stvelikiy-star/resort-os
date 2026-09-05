@@ -1,1 +1,0 @@
-Management/Kitchen/Guest OS implementation branch. Review through PR only; no production cutover.
