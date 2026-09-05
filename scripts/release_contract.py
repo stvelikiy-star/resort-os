@@ -18,6 +18,8 @@ EXPECTED_MIGRATIONS = (
     "5_guest_os_core",
     "6_service_point_qr_operations",
     "7_kitchen_operations",
+    "8_dining_service_control",
+    "9_guest_offer_campaigns",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -53,6 +55,16 @@ CRITICAL_CONSTRAINTS = frozenset(
         "service_points_category_check",
         "service_point_qrs_revocation_check",
         "operational_tasks_service_point_context_check",
+        "kitchen_menu_availability_meal_check",
+        "kitchen_table_reservations_party_check",
+        "kitchen_table_reservations_time_check",
+        "kitchen_table_reservations_status_check",
+        "guest_offer_campaigns_action_check",
+        "guest_offer_campaigns_request_code_check",
+        "guest_offer_campaigns_external_url_check",
+        "guest_offer_campaigns_window_check",
+        "guest_offer_campaigns_audience_check",
+        "guest_offer_events_type_check",
     }
 )
 
