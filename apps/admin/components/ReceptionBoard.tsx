@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import ReservationFolioPanel from "./ReservationFolioPanel";
+
 type Reservation = {
   id: string;
   bookingNumber: string;
@@ -151,7 +153,7 @@ export default function ReceptionBoard() {
 
   return <main className="work-shell reception-shell">
     <div className="work-head">
-      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, внутренние оплаты и история размещения берутся из Resort Core.</p></div>
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, оплаты, folio и история размещения берутся из Resort Core.</p></div>
       <button className="btn" onClick={load}>Обновить</button>
     </div>
 
@@ -177,7 +179,7 @@ export default function ReceptionBoard() {
         <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
         <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small>{item.room_state && <small>{roomStateLabel[item.room_state] || item.room_state}</small>}</div>
         <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
-        <div className="reception-finance"><span className="field-label">Оплата</span><b>{money(item.paidKgs)} / {money(item.totalKgs)}</b><small className={item.remainingKgs > 0 ? "balance-due" : "balance-ok"}>{item.remainingKgs > 0 ? `Остаток ${money(item.remainingKgs)}` : "Оплачено полностью"}</small></div>
+        <div className="reception-finance"><span className="field-label">Оплата проживания</span><b>{money(item.paidKgs)} / {money(item.totalKgs)}</b><small className={item.remainingKgs > 0 ? "balance-due" : "balance-ok"}>{item.remainingKgs > 0 ? `Без доп. услуг: остаток ${money(item.remainingKgs)}` : "Проживание оплачено"}</small></div>
         <div className="reception-actions">
           <button className="btn" onClick={() => openDetail(item.id)} disabled={detailLoading}>Карточка</button>
           {item.status === "GUARANTEED" && <button className="btn primary" onClick={() => transition(item, "check-in")} disabled={busy === item.id}>Заезд</button>}
@@ -199,9 +201,7 @@ export default function ReceptionBoard() {
 
         <section className="detail-section"><h3>График проживания</h3>{detail.schedule.length === 0 ? <p className="detail-muted">У брони нет активного графика размещения.</p> : <div className="stay-schedule-list">{detail.schedule.map((segment) => <div key={segment.inventory_block_id} className={segment.is_working_room ? "working-room-segment" : ""}><strong>№ {segment.room_code}{segment.is_working_room ? " · сейчас" : ""}</strong><span>{segment.start} → {segment.end}</span><small>{segment.room_type_name}{segment.room_state ? ` · ${roomStateLabel[segment.room_state] || segment.room_state}` : ""}</small></div>)}</div>}</section>
 
-        <section className="detail-section"><h3>Внутренние платежи по брони</h3><div className="detail-money"><div><span>Стоимость</span><strong>{money(detail.finance.total_kgs)}</strong></div><div><span>Подтверждено менеджером</span><strong>{money(detail.finance.paid_kgs)}</strong></div><div><span>Остаток</span><strong>{money(detail.finance.remaining_kgs)}</strong></div></div>
-          {detail.finance.payments.length > 0 && <div className="detail-rows">{detail.finance.payments.map((payment) => <div key={payment.id}><strong>{money(payment.amount_kgs)}</strong><span>{payment.method} · {payment.provider || "—"}</span><span>{payment.status}</span><small>{payment.paid_at || payment.created_at}</small></div>)}</div>}
-        </section>
+        <section className="detail-section"><ReservationFolioPanel reservationId={detail.reservation.id} onChanged={async () => { await load(); await openDetail(detail.reservation.id); }} /></section>
 
         <section className="detail-section"><h3>Задачи по номерам проживания</h3>{detail.room_tasks.length === 0 ? <p className="detail-muted">Задач по номерам этой брони нет.</p> : <div className="detail-rows">{detail.room_tasks.map((task) => <div key={task.id}><strong>№ {task.room_code} · {task.title}</strong><span>{task.type} · {task.priority}</span><span>{task.status}</span><small>{task.assigned_to_name || "Не назначено"}</small></div>)}</div>}</section>
 
