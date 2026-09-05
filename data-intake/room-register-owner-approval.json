@@ -1,10 +1,10 @@
 {
   "status": "OWNER_APPROVED",
-  "rooms_sha256": "3b7baa59f3b3e08e4ce0c803c9ef694ec1b5b317aba5b510d6839ca7586f245d",
+  "rooms_sha256": "12aca93f51a79662feac25efb36b4c0854f42881208b51e22d8e1e0c93196959",
   "room_count": 84,
   "approved_by": "PROJECT_OWNER",
-  "approved_at": "2026-09-01T07:30:00Z",
-  "evidence_ref": "project-chat:2026-09-01:owner-accepted-84-room-register-and-exact-pms-labels",
+  "approved_at": "2026-09-05",
+  "evidence_ref": "project-chat:2026-09-05:owner-correction-501-502-basement-two-person",
   "reviewed_issue_ids": [
     "GLOBAL:BED_LEGEND_REQUIRED:bed_configuration",
     "GROUP:EMPTY_BED_CONFIGURATION:bed_configuration:Двухместный стандарт в коттеджном доме",
@@ -44,7 +44,7 @@
   ],
   "resolved_question_ids": [
     "P0_BASEMENT_BUILDING",
-    "P0_MANSARD_501_502",
+    "P0_501_502_BASEMENT_CORRECTION",
     "P0_COTTAGE_UNITS",
     "P0_DOUBLE_IMPROVED_LOCATION",
     "P0_JUNIOR_SUITE_LOCATION",
@@ -57,5 +57,5 @@
     "P1_BED_LEGEND",
     "P1_CHILD_CAPACITY"
   ],
-  "note": "Owner accepted the existing 84-room register and exact PMS room labels as sufficient for V1. Optional location/floor/child-capacity UNKNOWN values remain intentionally unfilled and must not be invented. Raw bed shorthand is retained verbatim without semantic expansion; operational_status remains runtime PMS truth."
+  "note": "Owner correction on 2026-09-05 supersedes the earlier 501/502 mansard/single-room assumption. Rooms 501/502 are operational two-person basement rooms above the laundry and map to the existing 'Двухместный стандарт, цоколь' category. Unspecified building/child-capacity fields remain UNKNOWN; raw bed and area facts are retained without invention; operational_status remains runtime PMS truth."
 }
