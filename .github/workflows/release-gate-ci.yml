@@ -143,7 +143,8 @@ jobs:
 
       - name: Seed Three Crowns and bootstrap owner
         run: |
-          python scripts/apply_core_constraints.py
+          # Production-like path: committed migrations already contain the baseline
+          # PostgreSQL constraints. Do not run apply_core_constraints.py again.
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
 
