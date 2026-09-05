@@ -1,5 +1,7 @@
 import uuid
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Cookie, HTTPException, Request, status
 
@@ -10,13 +12,26 @@ from .kitchen import GuestOrderCreate, audit, insert_order
 router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-marketplace"])
 
 
-async def _published_menu_rows(conn, property_id: uuid.UUID):
+async def _hotel_local_date(conn, property_id: uuid.UUID):
+    timezone_name = await conn.fetchval('SELECT timezone FROM properties WHERE id=$1', property_id)
+    try:
+        tz = ZoneInfo(timezone_name or "Asia/Bishkek")
+    except Exception:
+        tz = ZoneInfo("Asia/Bishkek")
+    return datetime.now(tz).date()
+
+
+async def _published_menu_rows(conn, property_id: uuid.UUID, service_date):
     return await conn.fetch(
-        '''SELECT id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"
-           FROM kitchen_menu_items
-           WHERE "propertyId"=$1 AND "isActive"=true AND "isDraft"=false
-           ORDER BY "sortOrder",category,"nameRu"''',
-        property_id,
+        '''SELECT m.id,m.code,m.category,m."nameRu",m."nameKg",m."nameEn",m."priceKgs",m."isActive",m."isDraft",m."sortOrder",
+                  array_agg(DISTINCT a."mealType" ORDER BY a."mealType") AS meal_types
+           FROM kitchen_menu_items m
+           JOIN kitchen_menu_availability a ON a."menuItemId"=m.id AND a."propertyId"=m."propertyId"
+           WHERE m."propertyId"=$1 AND m."isActive"=true AND m."isDraft"=false
+             AND a."serviceDate"=$2 AND a."isAvailable"=true AND a."soldOut"=false
+           GROUP BY m.id
+           ORDER BY m."sortOrder",m.category,m."nameRu"''',
+        property_id, service_date,
     )
 
 
@@ -32,6 +47,7 @@ def _menu_item(row) -> dict[str, Any]:
         "is_active": row["isActive"],
         "is_draft": row["isDraft"],
         "sort_order": row["sortOrder"],
+        "meal_types": list(row["meal_types"] or []),
     }
 
 
@@ -43,11 +59,22 @@ async def guest_marketplace_menu(
 ):
     async with request.app.state.db.acquire() as conn:
         qr, _, _ = await authorized_context(conn, token, tc_guest_session)
-        rows = await _published_menu_rows(conn, qr["propertyId"])
+        service_date = await _hotel_local_date(conn, qr["propertyId"])
+        configured = int(
+            await conn.fetchval(
+                '''SELECT count(*)::int FROM kitchen_menu_availability
+                   WHERE "propertyId"=$1 AND "serviceDate"=$2''',
+                qr["propertyId"], service_date,
+            )
+            or 0
+        ) > 0
+        rows = await _published_menu_rows(conn, qr["propertyId"], service_date)
     return {
+        "service_date": service_date,
+        "schedule_configured": configured,
         "items": [_menu_item(row) for row in rows],
         "currency": "KGS",
-        "truth": "Only active non-draft Kitchen menu items are guest-visible.",
+        "truth": "Guest menu is hotel-local-day specific: active + non-draft + explicitly published + available + not sold out.",
     }
 
 
@@ -61,21 +88,47 @@ async def create_guest_marketplace_order(
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             qr, stay, session = await authorized_context(conn, token, tc_guest_session)
+            service_date = await _hotel_local_date(conn, qr["propertyId"])
+
+            schedule_count = int(
+                await conn.fetchval(
+                    '''SELECT count(*)::int FROM kitchen_menu_availability
+                       WHERE "propertyId"=$1 AND "serviceDate"=$2''',
+                    qr["propertyId"], service_date,
+                )
+                or 0
+            )
+            if schedule_count == 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "GUEST_MARKETPLACE_MENU_NOT_PUBLISHED_TODAY",
+                        "service_date": str(service_date),
+                        "message": "The hotel has not published today's guest menu yet.",
+                    },
+                )
 
             requested_ids = {item.menu_item_id for item in payload.items}
             published_rows = await conn.fetch(
-                '''SELECT id FROM kitchen_menu_items
-                   WHERE "propertyId"=$1 AND "isActive"=true AND "isDraft"=false
-                     AND id=ANY($2::uuid[])''',
-                qr["propertyId"], list(requested_ids),
+                '''SELECT m.id,a."mealType"
+                   FROM kitchen_menu_items m
+                   JOIN kitchen_menu_availability a ON a."menuItemId"=m.id AND a."propertyId"=m."propertyId"
+                   WHERE m."propertyId"=$1 AND m."isActive"=true AND m."isDraft"=false
+                     AND a."serviceDate"=$2 AND a."isAvailable"=true AND a."soldOut"=false
+                     AND m.id=ANY($3::uuid[])
+                     AND ($4::text IS NULL OR a."mealType"=$4)
+                   FOR SHARE OF m,a''',
+                qr["propertyId"], service_date, list(requested_ids), payload.meal_type,
             )
             published_ids = {row["id"] for row in published_rows}
             if requested_ids != published_ids:
                 raise HTTPException(
                     status_code=409,
                     detail={
-                        "code": "GUEST_MARKETPLACE_ITEM_NOT_PUBLISHED",
-                        "message": "One or more menu items are draft, inactive or unavailable to guests.",
+                        "code": "GUEST_MARKETPLACE_ITEM_NOT_AVAILABLE_TODAY",
+                        "service_date": str(service_date),
+                        "meal_type": payload.meal_type,
+                        "message": "One or more menu items are not published, are sold out or are unavailable for this service day.",
                     },
                 )
 
@@ -114,7 +167,7 @@ async def create_guest_marketplace_order(
             await conn.execute(
                 'UPDATE operational_tasks SET description=$2 WHERE id=$1',
                 task_id,
-                f"{order_number} · {len(payload.items)} позиций · {total} KGS",
+                f"{order_number} · {len(payload.items)} позиций · {total} KGS · меню {service_date}",
             )
             await audit(
                 conn,
@@ -127,14 +180,15 @@ async def create_guest_marketplace_order(
                     "order_number": order_number,
                     "total_kgs": total,
                     "guest_session_id": str(session["id"]),
-                    "published_menu_only": True,
+                    "service_date": str(service_date),
+                    "day_published_menu_only": True,
                 },
             )
             await conn.execute(
                 '''INSERT INTO guest_history_events (
                      id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
                    ) VALUES ($1,$2,$3,$4,'KITCHEN_ORDER_CREATED','GUEST_MARKETPLACE',
-                     jsonb_build_object('order_id',$5::text,'order_number',$6::text,'task_id',$7::text,'total_kgs',$8::int),now(),now())''',
+                     jsonb_build_object('order_id',$5::text,'order_number',$6::text,'task_id',$7::text,'total_kgs',$8::int,'service_date',$9::text),now(),now())''',
                 uuid.uuid4(),
                 qr["propertyId"],
                 stay["guestId"],
@@ -143,6 +197,7 @@ async def create_guest_marketplace_order(
                 order_number,
                 str(task_id),
                 total,
+                str(service_date),
             )
 
     return {
@@ -150,7 +205,8 @@ async def create_guest_marketplace_order(
         "order_number": order_number,
         "task_id": str(task_id),
         "status": "NEW",
+        "service_date": service_date,
         "total_kgs": total,
         "financial_posting": "NONE_AUTOMATIC",
-        "published_menu_only": True,
+        "day_published_menu_only": True,
     }
