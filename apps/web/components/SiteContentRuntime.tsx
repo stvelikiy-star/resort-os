@@ -43,6 +43,57 @@ function dispatchReady(locale: SiteLocale) {
   window.dispatchEvent(new CustomEvent("three-crowns:content-ready", { detail: { locale } }));
 }
 
+function ensureConferenceBlock(content: SiteContent, locale: SiteLocale) {
+  const conference = content.conference;
+  if (!conference?.title) return;
+
+  let section = document.querySelector<HTMLElement>("#conference");
+  if (!section) {
+    const target = document.querySelector<HTMLElement>(".v3-groups");
+    if (!target?.parentNode) return;
+    section = document.createElement("section");
+    section.id = "conference";
+    section.className = "owner-conference";
+    section.innerHTML = `
+      <div class="wrap owner-conference-grid">
+        <div class="owner-conference-copy">
+          <p class="eyebrow" data-conference="eyebrow"></p>
+          <h2 class="display-title" data-conference="title"></h2>
+          <p class="owner-conference-lead" data-conference="copy"></p>
+          <div class="owner-conference-facts">
+            <article><small>${locale === "en" ? "Capacity" : locale === "kg" ? "Сыйымдуулук" : "Вместимость"}</small><strong data-conference="capacity"></strong></article>
+            <article><small>${locale === "en" ? "Banquet" : locale === "kg" ? "Банкет" : "Банкет"}</small><strong data-conference="banquet"></strong></article>
+            <article><small>${locale === "en" ? "Menu" : locale === "kg" ? "Меню" : "Меню"}</small><strong data-conference="menu"></strong></article>
+          </div>
+          <a class="button button-accent owner-conference-cta" data-conference="cta" target="_blank" rel="noreferrer"></a>
+        </div>
+        <div class="owner-conference-visual" aria-hidden="true">
+          <span class="owner-conference-number">20</span>
+          <div><strong>—</strong><span class="owner-conference-number">120</span></div>
+          <p>${locale === "en" ? "conference · event · banquet" : locale === "kg" ? "конференция · иш-чара · банкет" : "конференция · событие · банкет"}</p>
+        </div>
+      </div>`;
+    target.parentNode.insertBefore(section, target);
+  }
+
+  const set = (key: string, value?: string) => {
+    if (!value) return;
+    const node = section?.querySelector<HTMLElement>(`[data-conference="${key}"]`);
+    if (node) node.textContent = value;
+  };
+  set("eyebrow", conference.eyebrow);
+  set("title", conference.title);
+  set("copy", conference.copy);
+  set("capacity", conference.capacity);
+  set("banquet", conference.banquet);
+  set("menu", conference.menu);
+  set("cta", conference.cta);
+
+  const button = section.querySelector<HTMLAnchorElement>('[data-conference="cta"]');
+  const digits = (content.contacts?.whatsapp || content.contacts?.phone || "+996 558 08 50 02").replace(/\D/g, "");
+  if (button) button.href = `https://wa.me/${digits}`;
+}
+
 function applyContent(content: SiteContent, locale: SiteLocale) {
   document.documentElement.lang = locale === "kg" ? "ky" : locale;
 
@@ -60,6 +111,8 @@ function applyContent(content: SiteContent, locale: SiteLocale) {
     text(".v3-advantages .v3-section-head .eyebrow", content.advantages?.eyebrow);
     text("#advantages-title", content.advantages?.title);
     text(".v3-advantages .v3-section-head > p", content.advantages?.intro);
+
+    ensureConferenceBlock(content, locale);
 
     text(".v3-groups-intro .eyebrow", content.groups?.eyebrow);
     text("#groups-title", content.groups?.title);
