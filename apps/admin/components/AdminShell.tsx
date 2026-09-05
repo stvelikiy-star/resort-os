@@ -9,7 +9,7 @@ import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV9";
-import ReceptionBoard from "./ReceptionBoard";
+import ReceptionWorkspace from "./ReceptionWorkspace";
 import ReportsBoard from "./ReportsBoard";
 import RequestsBoard from "./RequestsBoard";
 import RoomQrBoard from "./RoomQrBoard";
@@ -160,7 +160,7 @@ export default function AdminShell() {
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "RESERVATIONS" && canUseReception && <ReceptionBoard />}
+      {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
       {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
       {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
