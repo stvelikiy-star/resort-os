@@ -3,9 +3,11 @@ name: Release RC Truth CI
 on:
   pull_request:
     branches:
+      - main
       - integration/site-pms-cms-20260827
   push:
     branches:
+      - main
       - integration/site-pms-cms-20260827
   workflow_dispatch:
 
@@ -30,13 +32,17 @@ jobs:
       - name: Verify frozen release candidate truth
         run: python scripts/release_rc_truth_guard.py
 
-      - name: Verify main is not declared as production source
+      - name: Verify main production-source boundary remains fail-closed
         shell: bash
         run: |
           python - <<'PY'
           import json
           rc = json.load(open('release/current-rc.json', encoding='utf-8'))
-          assert rc['production_source_branch'] == 'integration/site-pms-cms-20260827'
-          assert rc['main_allowed_as_production_source'] is False
-          print('PASS: main is not production source')
+          assert rc['release_version'] == '0.60.0'
+          assert rc['production_source_branch'] == 'main'
+          assert rc['main_allowed_as_production_source'] is True
+          assert rc['production_cutover_authorized'] is False
+          assert rc['external_beget_staging_verified'] is False
+          assert rc['legacy_live_rollback_verified'] is False
+          print('PASS: main is the frozen source branch while external production cutover remains STOP')
           PY
