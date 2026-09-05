@@ -9,7 +9,9 @@
       "4_guest_engagements",
       "5_guest_os_core",
       "6_service_point_qr_operations",
-      "7_kitchen_operations"
+      "7_kitchen_operations",
+      "8_dining_service_control",
+      "9_guest_offer_campaigns"
     ]
   },
   "external_evidence": {
