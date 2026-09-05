@@ -200,6 +200,7 @@ jobs:
           test -s prisma/migrations/7_kitchen_operations/migration.sql
           test -s prisma/migrations/8_dining_service_control/migration.sql
           test -s prisma/migrations/9_guest_offer_campaigns/migration.sql
+          test -s prisma/migrations/z10_service_point_paid_access/migration.sql
           npx prisma migrate deploy
           npx prisma migrate status
 
@@ -232,8 +233,8 @@ jobs:
           service_point_active_qr_unique="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_qrs' and indexname='service_point_qrs_one_active_per_point'")"
           kitchen_table_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
           kitchen_guest_task_unique="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='kitchen_orders' and indexname='kitchen_orders_guest_task_key'")"
-          test "$migration_count" = '10'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns'
+          test "$migration_count" = '11'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns,z10_service_point_paid_access'
           test "$constraint_count" = '13'
           test "$room_count" = '84'
           test "$room_type_count" = '12'
