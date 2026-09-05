@@ -6,6 +6,7 @@ from fastapi import APIRouter, Cookie, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from .guest_os import GUEST_COOKIE, current_stay_for_room, resolve_room_qr, valid_guest_session
+from .guest_service_settings import load_settings
 
 router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-requests"])
 
@@ -21,6 +22,11 @@ REQUEST_LABELS: dict[str, str] = {
     "BILLIARDS": "Бильярд",
     "EXCURSIONS": "Экскурсии / туры",
     "ADMIN": "Администратор",
+}
+
+PAID_ON_DEMAND = {
+    "HOUSEKEEPING": "on_demand_housekeeping_price_kgs",
+    "LINEN": "on_demand_linen_price_kgs",
 }
 
 
@@ -64,6 +70,9 @@ def row_to_guest_item(row) -> dict[str, Any]:
         "description": row["description"],
         "service_date": row["serviceDate"],
         "service_time": row["serviceTime"],
+        "charge_kgs": row["chargeKgs"],
+        "charge_status": row["chargeStatus"],
+        "charge_source": row["chargeSource"],
         "created_at": row["createdAt"],
         "updated_at": row["updatedAt"],
         "completed_at": row["completedAt"],
@@ -73,9 +82,25 @@ def row_to_guest_item(row) -> dict[str, Any]:
 TASK_SELECT = '''
 SELECT id,type::text AS type,status::text AS status,priority::text AS priority,
        title,description,"serviceCode","serviceDate","serviceTime",source,
-       "createdAt","updatedAt","completedAt"
+       "chargeKgs","chargeStatus","chargeSource","createdAt","updatedAt","completedAt"
 FROM operational_tasks
 '''
+
+
+@router.get("/rooms/{token}/service-policy")
+async def guest_service_policy(token: str, request: Request, tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE)):
+    async with request.app.state.db.acquire() as conn:
+        qr, _, _ = await authorized_context(conn, token, tc_guest_session)
+        settings = await load_settings(conn, qr["propertyId"])
+    return {
+        "scheduled_housekeeping_interval_days": settings["scheduled_housekeeping_interval_days"],
+        "scheduled_linen_change_included": settings["scheduled_linen_change_included"],
+        "on_demand_housekeeping_price_kgs": settings["on_demand_housekeeping_price_kgs"],
+        "on_demand_linen_price_kgs": settings["on_demand_linen_price_kgs"],
+        "on_demand_housekeeping_paid": True,
+        "on_demand_linen_paid": True,
+        "truth": "Scheduled housekeeping is included by policy; guest-requested extra housekeeping and linen change are paid services and are never treated as free when price is unconfigured.",
+    }
 
 
 @router.get("/rooms/{token}/requests")
@@ -103,6 +128,26 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
             qr, stay, session = await authorized_context(conn, token, tc_guest_session)
             if payload.service_date and not (stay["checkIn"] <= payload.service_date <= stay["checkOut"]):
                 raise HTTPException(status_code=422, detail={"code": "SERVICE_DATE_OUTSIDE_STAY", "check_in": str(stay["checkIn"]), "check_out": str(stay["checkOut"])})
+
+            settings = await load_settings(conn, qr["propertyId"])
+            charge_kgs: int | None = None
+            charge_status = "NONE"
+            charge_source: str | None = None
+            if code in PAID_ON_DEMAND:
+                price_key = PAID_ON_DEMAND[code]
+                configured_price = settings[price_key]
+                if configured_price is None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "GUEST_SERVICE_PRICE_NOT_CONFIGURED",
+                            "request_code": code,
+                            "message": "Management must configure this paid service price before Guest OS can accept the request.",
+                        },
+                    )
+                charge_kgs = int(configured_price)
+                charge_status = "PENDING"
+                charge_source = "GUEST_OS_OWNER_CONFIGURED_PRICE"
 
             # Dedupe is a business fact, not a channel fact. A request created by
             # Reception/PMS must block the same active Guest OS request and vice versa.
@@ -132,11 +177,14 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
                 '''
                 INSERT INTO operational_tasks (
                   id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,description,
-                  "serviceCode","serviceDate","serviceTime","createdByType","createdById",source,"createdAt","updatedAt"
-                ) VALUES ($1,$2,$3,$4,$5,'GUEST_REQUEST','OPEN','NORMAL',$6,$7,$8,$9,$10,'GUEST',$11,$12,now(),now())
+                  "serviceCode","serviceDate","serviceTime","createdByType","createdById",source,
+                  "chargeKgs","chargeStatus","chargeSource","createdAt","updatedAt"
+                ) VALUES ($1,$2,$3,$4,$5,'GUEST_REQUEST','OPEN','NORMAL',$6,$7,$8,$9,$10,'GUEST',$11,$12,
+                  $13,$14,$15,now(),now())
                 ''',
                 task_id, qr["propertyId"], qr["roomId"], stay["reservation_id"], stay["stayId"],
                 title, description, code, payload.service_date, payload.service_time, str(stay["guestId"]), source,
+                charge_kgs, charge_status, charge_source,
             )
             await conn.execute(
                 '''
@@ -144,19 +192,22 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
                   id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
                 ) VALUES ($1,$2,'GUEST',$3,'CREATE_GUEST_REQUEST','OperationalTask',$4,'GUEST_OS','SUCCESS',
                   jsonb_build_object('request_code',$5::text,'task_type','GUEST_REQUEST','stay_id',$6::text,'room_id',$7::text,
-                    'guest_session_id',$8::text,'financial_effect','NONE_AUTOMATIC','room_state_effect','NONE_AUTOMATIC'),now())
+                    'guest_session_id',$8::text,'charge_kgs',$9::int,'charge_status',$10::text,
+                    'financial_effect',CASE WHEN $9::int IS NULL THEN 'NONE_AUTOMATIC' ELSE 'PENDING_SERVICE_CHARGE_NOT_PAYMENT' END,
+                    'room_state_effect','NONE_AUTOMATIC'),now())
                 ''',
                 uuid.uuid4(), qr["propertyId"], str(stay["guestId"]), str(task_id), code,
-                str(stay["stayId"]), str(qr["roomId"]), str(session["id"]),
+                str(stay["stayId"]), str(qr["roomId"]), str(session["id"]), charge_kgs, charge_status,
             )
             await conn.execute(
                 '''
                 INSERT INTO guest_history_events (
                   id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
                 ) VALUES ($1,$2,$3,$4,'GUEST_REQUEST_CREATED','GUEST_OS',
-                  jsonb_build_object('task_id',$5::text,'request_code',$6::text,'room_id',$7::text),now(),now())
+                  jsonb_build_object('task_id',$5::text,'request_code',$6::text,'room_id',$7::text,
+                    'charge_kgs',$8::int,'charge_status',$9::text),now(),now())
                 ''',
-                uuid.uuid4(), qr["propertyId"], stay["guestId"], stay["stayId"], str(task_id), code, str(qr["roomId"]),
+                uuid.uuid4(), qr["propertyId"], stay["guestId"], stay["stayId"], str(task_id), code, str(qr["roomId"]), charge_kgs, charge_status,
             )
             row = await conn.fetchrow(TASK_SELECT + ' WHERE id=$1', task_id)
     return row_to_guest_item(row)
@@ -168,7 +219,7 @@ async def cancel_guest_request(token: str, task_id: uuid.UUID, request: Request,
         async with conn.transaction():
             qr, stay, _ = await authorized_context(conn, token, tc_guest_session)
             task = await conn.fetchrow(
-                '''SELECT id,status::text AS status FROM operational_tasks
+                '''SELECT id,status::text AS status,"chargeStatus" FROM operational_tasks
                    WHERE id=$1 AND "stayId"=$2 AND "createdByType"='GUEST' AND source LIKE 'GUEST_OS_%' FOR UPDATE''',
                 task_id, stay["stayId"],
             )
@@ -176,12 +227,17 @@ async def cancel_guest_request(token: str, task_id: uuid.UUID, request: Request,
                 raise HTTPException(status_code=404, detail={"code": "GUEST_REQUEST_NOT_FOUND"})
             if task["status"] != "OPEN":
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_CANNOT_CANCEL", "status": task["status"]})
-            await conn.execute('UPDATE operational_tasks SET status=\'CANCELLED\',"updatedAt"=now(),"completedAt"=now() WHERE id=$1', task_id)
+            next_charge_status = "CANCELLED" if task["chargeStatus"] == "PENDING" else task["chargeStatus"]
+            await conn.execute(
+                '''UPDATE operational_tasks SET status='CANCELLED',"chargeStatus"=$2,
+                   "updatedAt"=now(),"completedAt"=now() WHERE id=$1''',
+                task_id, next_charge_status,
+            )
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
                    VALUES ($1,$2,'GUEST',$3,'CANCEL_GUEST_REQUEST','OperationalTask',$4,'GUEST_OS','SUCCESS',
-                     jsonb_build_object('from_status','OPEN','status','CANCELLED'),now())''',
-                uuid.uuid4(), qr["propertyId"], str(stay["guestId"]), str(task_id),
+                     jsonb_build_object('from_status','OPEN','status','CANCELLED','charge_status',$5::text),now())''',
+                uuid.uuid4(), qr["propertyId"], str(stay["guestId"]), str(task_id), next_charge_status,
             )
             await conn.execute(
                 '''INSERT INTO guest_history_events (id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt")
