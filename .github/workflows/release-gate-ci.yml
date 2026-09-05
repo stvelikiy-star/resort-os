@@ -142,7 +142,24 @@ jobs:
           PY
 
       - name: Seed Three Crowns inventory and rates
-        run: python scripts/seed_from_intake.py
+        id: seed
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/seed_from_intake.py 2>&1 | tee /tmp/seed-from-intake.log
+
+      - name: Capture seed diagnostics
+        if: steps.seed.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: seed-diagnostics-${{ github.run_id }}
+          path: /tmp/seed-from-intake.log
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Stop release if seed failed
+        if: steps.seed.outcome == 'failure'
+        run: exit 1
 
       - name: Bootstrap release OWNER
         run: python scripts/bootstrap_owner.py
