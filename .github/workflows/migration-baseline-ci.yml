@@ -98,6 +98,7 @@ jobs:
           test -s packages/database/prisma/migrations/7_kitchen_operations/migration.sql
           test -s packages/database/prisma/migrations/8_dining_service_control/migration.sql
           test -s packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          test -s packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
           grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'reservation_nonnegative_total' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'inventory_block_valid_dates' packages/database/prisma/migrations/0_init/migration.sql
@@ -142,6 +143,12 @@ jobs:
           grep -q 'CREATE TABLE guest_offer_campaigns' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
           grep -q 'CREATE TABLE guest_offer_events' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
           grep -q 'guest_offer_campaigns_action_check' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          grep -q 'CREATE TABLE "service_point_access_profiles"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'CREATE TABLE "service_point_payment_intents"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'CREATE TABLE "service_point_payment_events"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'CREATE TABLE "service_point_lock_actions"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'service_point_payment_intents_lock_snapshot_check' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'service_point_payment_events_provider_event_key' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
           cd packages/database/prisma/migrations/0_init
           sha256sum -c migration.sql.sha256
 
@@ -178,9 +185,9 @@ jobs:
         run: |
           python scripts/production_preflight.py | tee /tmp/production-preflight.txt
           grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
-          grep -q '^FACT: applied_migrations=10$' /tmp/production-preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations', '8_dining_service_control', '9_guest_offer_campaigns'\]$" /tmp/production-preflight.txt
-          grep -q '^FACT: critical_constraint_count=37$' /tmp/production-preflight.txt
+          grep -q '^FACT: applied_migrations=11$' /tmp/production-preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations', '8_dining_service_control', '9_guest_offer_campaigns', 'z10_service_point_paid_access'\]$" /tmp/production-preflight.txt
+          grep -q '^FACT: critical_constraint_count=48$' /tmp/production-preflight.txt
           grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
           grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
           grep -q '^FACT: distinct_room_codes=84$' /tmp/production-preflight.txt
@@ -212,8 +219,11 @@ jobs:
           service_point_active_qr_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_qrs' and indexname='service_point_qrs_one_active_per_point'")"
           kitchen_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
           kitchen_guest_task_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='kitchen_orders' and indexname='kitchen_orders_guest_task_key'")"
-          test "$migration_count" = '10'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns'
+          paid_access_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('service_point_access_profiles','service_point_payment_intents','service_point_payment_events','service_point_lock_actions')")"
+          paid_access_checks="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('service_point_access_profiles_currency_check','service_point_access_profiles_paid_config_check','service_point_payment_intents_amount_check','service_point_payment_intents_currency_check','service_point_payment_intents_lock_snapshot_check','service_point_payment_intents_expiry_check','service_point_payment_intents_paid_state_check','service_point_payment_intents_unlocked_state_check','service_point_payment_events_payload_check','service_point_lock_actions_attempts_check','service_point_lock_actions_result_check')")"
+          paid_event_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_payment_events' and indexname='service_point_payment_events_provider_event_key'")"
+          test "$migration_count" = '11'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns,z10_service_point_paid_access'
           test "$core_constraint_count" = '13'
           test "$site_content_table" = 'site_content_documents'
           test "$guest_service_columns" = '4'
@@ -234,6 +244,9 @@ jobs:
           test "$service_point_active_qr_unique" = '1'
           test "$kitchen_tables" = '4'
           test "$kitchen_guest_task_unique" = '1'
+          test "$paid_access_tables" = '4'
+          test "$paid_access_checks" = '11'
+          test "$paid_event_unique" = '1'
 
       - name: Upload migration chain for explicit review
         uses: actions/upload-artifact@v4
