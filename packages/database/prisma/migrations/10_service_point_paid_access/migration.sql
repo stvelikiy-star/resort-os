@@ -43,6 +43,8 @@ CREATE TABLE "service_point_payment_intents" (
     "reference" TEXT NOT NULL,
     "providerCode" TEXT NOT NULL,
     "providerPaymentId" TEXT,
+    "lockProviderCode" TEXT NOT NULL,
+    "lockExternalId" TEXT NOT NULL,
     "amountKgs" INTEGER NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'KGS',
     "status" "ServicePointPaymentIntentStatus" NOT NULL DEFAULT 'CREATED',
@@ -58,6 +60,9 @@ CREATE TABLE "service_point_payment_intents" (
     CONSTRAINT "service_point_payment_intents_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "service_point_payment_intents_amount_check" CHECK ("amountKgs">0),
     CONSTRAINT "service_point_payment_intents_currency_check" CHECK ("currency"='KGS'),
+    CONSTRAINT "service_point_payment_intents_lock_snapshot_check" CHECK (
+        length(btrim("lockProviderCode"))>=2 AND length(btrim("lockExternalId"))>=1
+    ),
     CONSTRAINT "service_point_payment_intents_expiry_check" CHECK ("expiresAt">"createdAt"),
     CONSTRAINT "service_point_payment_intents_paid_state_check" CHECK (
         ("status" IN ('PAID','UNLOCK_PENDING','UNLOCKED','UNLOCK_FAILED') AND "paidAt" IS NOT NULL)
@@ -75,6 +80,7 @@ CREATE TABLE "service_point_payment_events" (
     "propertyId" UUID NOT NULL,
     "intentId" UUID NOT NULL,
     "providerCode" TEXT NOT NULL,
+    "providerEventId" TEXT,
     "eventType" TEXT NOT NULL,
     "providerPaymentId" TEXT,
     "payloadJson" JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -106,6 +112,7 @@ CREATE UNIQUE INDEX "service_point_payment_intents_point_client_key" ON "service
 CREATE UNIQUE INDEX "service_point_payment_intents_provider_payment_key" ON "service_point_payment_intents"("providerCode","providerPaymentId") WHERE "providerPaymentId" IS NOT NULL;
 CREATE INDEX "service_point_payment_intents_point_status_created_idx" ON "service_point_payment_intents"("servicePointId","status","createdAt");
 CREATE INDEX "service_point_payment_intents_property_status_created_idx" ON "service_point_payment_intents"("propertyId","status","createdAt");
+CREATE UNIQUE INDEX "service_point_payment_events_provider_event_key" ON "service_point_payment_events"("providerCode","providerEventId") WHERE "providerEventId" IS NOT NULL;
 CREATE INDEX "service_point_payment_events_intent_created_idx" ON "service_point_payment_events"("intentId","createdAt");
 CREATE UNIQUE INDEX "service_point_lock_actions_intent_key" ON "service_point_lock_actions"("intentId");
 CREATE INDEX "service_point_lock_actions_status_created_idx" ON "service_point_lock_actions"("status","createdAt");
