@@ -7,7 +7,7 @@ import os
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from http.cookiejar import CookieJar
 
 import asyncpg
@@ -110,17 +110,21 @@ def add_payment(
     external_ref: str,
     note: str,
     key: str,
+    paid_at: str | None = None,
 ) -> tuple[int, dict]:
+    payload = {
+        "amount_kgs": amount,
+        "method": method,
+        "external_ref": external_ref,
+        "note": note,
+        "idempotency_key": key,
+    }
+    if paid_at is not None:
+        payload["paid_at"] = paid_at
     return call(
         "POST",
         f"/api/v1/admin/booking/reservations/{reservation_id}/payments",
-        {
-            "amount_kgs": amount,
-            "method": method,
-            "external_ref": external_ref,
-            "note": note,
-            "idempotency_key": key,
-        },
+        payload,
         cookie,
     )
 
@@ -256,9 +260,11 @@ def main() -> None:
     assert second_status == 201, (second_status, second)
     reservation2 = second["reservation_id"]
 
-    # Additional reservation-payment contract, including note binding.
+    # Additional reservation-payment contract, including note and explicit paid_at binding.
     extra_key = "ci-extra-idempotency-payload-001"
     extra_ref = "ci-extra-external-ref-001"
+    payment_event = (datetime.now(timezone.utc) - timedelta(minutes=10)).replace(microsecond=123000)
+    payment_event_iso = payment_event.isoformat()
     extra_status, extra = add_payment(
         cookie,
         reservation1,
@@ -267,6 +273,7 @@ def main() -> None:
         external_ref=extra_ref,
         note="front desk receipt",
         key=extra_key,
+        paid_at=payment_event_iso,
     )
     assert extra_status == 201, (extra_status, extra)
     assert extra["idempotent_replay"] is False
@@ -279,10 +286,26 @@ def main() -> None:
         external_ref=f"  {extra_ref}  ",
         note="  front desk receipt  ",
         key=extra_key,
+        paid_at=payment_event_iso,
     )
     assert extra_replay_status == 201, (extra_replay_status, extra_replay)
     assert extra_replay["idempotent_replay"] is True
     assert extra_replay["payment_id"] == extra["payment_id"]
+
+    # Older/retrying clients that omit paid_at do not accidentally replace or conflict
+    # with the stored event time; the existing payment is simply replayed.
+    omitted_time_status, omitted_time = add_payment(
+        cookie,
+        reservation1,
+        amount=500,
+        method="CASH",
+        external_ref=extra_ref,
+        note="front desk receipt",
+        key=extra_key,
+    )
+    assert omitted_time_status == 201, (omitted_time_status, omitted_time)
+    assert omitted_time["idempotent_replay"] is True
+    assert omitted_time["payment_id"] == extra["payment_id"]
 
     detail = assert_error(
         add_payment(
@@ -293,6 +316,7 @@ def main() -> None:
             external_ref=extra_ref,
             note="front desk receipt",
             key=extra_key,
+            paid_at=payment_event_iso,
         ),
         "IDEMPOTENCY_PAYLOAD_MISMATCH",
     )
@@ -307,10 +331,26 @@ def main() -> None:
             external_ref=extra_ref,
             note="changed note",
             key=extra_key,
+            paid_at=payment_event_iso,
         ),
         "IDEMPOTENCY_PAYLOAD_MISMATCH",
     )
     assert "note" in detail["mismatched_fields"]
+
+    detail = assert_error(
+        add_payment(
+            cookie,
+            reservation1,
+            amount=500,
+            method="CASH",
+            external_ref=extra_ref,
+            note="front desk receipt",
+            key=extra_key,
+            paid_at=(payment_event + timedelta(minutes=1)).isoformat(),
+        ),
+        "IDEMPOTENCY_PAYLOAD_MISMATCH",
+    )
+    assert "paid_at" in detail["mismatched_fields"]
 
     assert_error(
         add_payment(
@@ -393,7 +433,7 @@ def main() -> None:
         )
     ) == 1
 
-    print("PASS: payment idempotency is payload-bound, scope-bound, and concurrency-safe")
+    print("PASS: payment idempotency is payload/time-bound, scope-bound, and concurrency-safe")
 
 
 if __name__ == "__main__":
