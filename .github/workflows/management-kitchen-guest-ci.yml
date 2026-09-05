@@ -11,11 +11,18 @@ on:
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/ReceptionWorkspace.tsx'
       - 'apps/staff/app/kitchen/**'
+      - 'apps/staff/app/waiter/**'
       - 'apps/staff/components/KitchenEntry.tsx'
       - 'apps/staff/components/KitchenEntry.module.css'
+      - 'apps/staff/components/DiningDayPlanner.tsx'
+      - 'apps/staff/components/DiningDayPlanner.module.css'
+      - 'apps/staff/components/WaiterEntry.tsx'
+      - 'apps/staff/components/WaiterEntry.module.css'
       - 'apps/web/app/g/**'
       - 'apps/web/app/guest-marketplace.css'
       - 'apps/web/components/GuestMarketplace.tsx'
+      - 'packages/database/prisma/migrations/8_dining_service_control/**'
+      - 'services/api/app/dining_control.py'
       - 'services/api/app/guest_marketplace.py'
       - 'services/api/app/reception_readiness.py'
       - 'services/api/app/app_entry.py'
@@ -43,7 +50,7 @@ jobs:
 
       - name: Compile Core extensions and run contract guard
         run: |
-          python -m compileall services/api/app/guest_marketplace.py services/api/app/reception_readiness.py
+          python -m compileall services/api/app/dining_control.py services/api/app/guest_marketplace.py services/api/app/reception_readiness.py
           python scripts/guest_marketplace_contract_test.py
 
       - uses: actions/setup-node@v4
@@ -62,7 +69,7 @@ jobs:
           npm run typecheck
           npm run build
 
-      - name: Typecheck and build Staff / Kitchen
+      - name: Typecheck and build Staff / Kitchen / Waiter
         working-directory: apps/staff
         run: |
           npm ci
