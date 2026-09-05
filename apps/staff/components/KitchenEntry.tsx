@@ -135,12 +135,13 @@ export default function KitchenEntry() {
       <form className={styles.loginCard} onSubmit={login}>
         <div className={styles.mark}>III</div>
         <p>Три Короны · отдельный вход</p>
-        <h1>Кухня и зал</h1>
-        <span>Заказы, столы, меню для гостя и новые заезды — в одном рабочем окне.</span>
+        <h1>Кухня</h1>
+        <span>Заказы кухни, меню, стоп-лист, новые заезды и публикация меню гостю — в одном рабочем контуре.</span>
         <label>Логин<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required autoFocus /></label>
         <label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={8} required /></label>
         {error && <div className={styles.error}>{error}</div>}
         <button className={styles.primary} disabled={submitting}>{submitting ? "Входим…" : "Войти в кухню"}</button>
+        <a href="/waiter">Отдельный вход «Официант / зал»</a>
         <a href="/">Открыть общий вход «Моя смена»</a>
       </form>
     </main>;
@@ -150,18 +151,18 @@ export default function KitchenEntry() {
     <section className={styles.pulse}>
       <div className={styles.pulseHead}>
         <div><p>Кухня · сегодня</p><h2>Рабочая сводка</h2><span>{user.display_name} · {user.role}</span></div>
-        <div className={styles.pulseActions}><button onClick={() => void loadPulse()}>Обновить</button><button onClick={() => void logout()}>Выйти</button></div>
+        <div className={styles.pulseActions}><a href="/kitchen/today">Меню сегодня</a><a href="/waiter">Официант / зал</a><button onClick={() => void loadPulse()}>Обновить</button><button onClick={() => void logout()}>Выйти</button></div>
       </div>
       {pulseError && <div className={styles.error}>{pulseError}</div>}
       <div className={styles.metrics}>
         <article><strong>{facts.activeOrders}</strong><span>активных заказов</span><small>{facts.readyOrders} готовы к выдаче</small></article>
         <article><strong>{facts.occupiedTables}</strong><span>занятых столов</span><small>{facts.availableTables} свободно</small></article>
-        <article><strong>{facts.published}</strong><span>блюд готовы для гостя</span><small>активно · не черновик</small></article>
+        <article><strong>{facts.published}</strong><span>блюд подтверждены</span><small>активно · не черновик</small></article>
         <article className={facts.drafts ? styles.attention : ""}><strong>{facts.drafts}</strong><span>черновиков меню</span><small>нужно проверить перед публикацией</small></article>
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Официант/питание создаёт заказ и привязывает его к столу → кухня ведёт NEW → ACCEPTED → COOKING → READY → SERVED → после выдачи стол освобождается. Меню гостя должно содержать только подтверждённые активные позиции.</span>
+        <b>Логика работы:</b><span>Kitchen Admin ведёт приготовление NEW → ACCEPTED → COOKING → READY. «Меню сегодня» отдельно публикует конкретные блюда на дату и приём пищи, управляет стоп-листом. Официант работает со столами, бронями и выдачей READY → SERVED. Гостю показываются только активные, утверждённые и опубликованные на текущую дату позиции.</span>
       </div>
     </section>
     <KitchenAdmin />
