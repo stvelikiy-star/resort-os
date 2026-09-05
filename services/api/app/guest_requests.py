@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Cookie, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from .folio_service_charges import ensure_guest_service_charge, void_guest_service_charge
 from .guest_os import GUEST_COOKIE, current_stay_for_room, resolve_room_qr, valid_guest_session
 from .guest_service_settings import load_settings
 
@@ -149,8 +150,6 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
                 charge_status = "PENDING"
                 charge_source = "GUEST_OS_OWNER_CONFIGURED_PRICE"
 
-            # Dedupe is a business fact, not a channel fact. A request created by
-            # Reception/PMS must block the same active Guest OS request and vice versa.
             await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', f'{stay["stayId"]}:{code}')
             duplicate = await conn.fetchrow(
                 '''
@@ -186,18 +185,28 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
                 title, description, code, payload.service_date, payload.service_time, str(stay["guestId"]), source,
                 charge_kgs, charge_status, charge_source,
             )
+            folio_charge_id = None
+            if charge_kgs is not None:
+                folio_charge_id = await ensure_guest_service_charge(
+                    conn, task_id, actor_type="GUEST", actor_id=str(stay["guestId"]),
+                )
+                if folio_charge_id:
+                    charge_status = "POSTED"
+                    charge_source = "FOLIO"
+
             await conn.execute(
                 '''
                 INSERT INTO audit_logs (
                   id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
                 ) VALUES ($1,$2,'GUEST',$3,'CREATE_GUEST_REQUEST','OperationalTask',$4,'GUEST_OS','SUCCESS',
                   jsonb_build_object('request_code',$5::text,'task_type','GUEST_REQUEST','stay_id',$6::text,'room_id',$7::text,
-                    'guest_session_id',$8::text,'charge_kgs',$9::int,'charge_status',$10::text,
-                    'financial_effect',CASE WHEN $9::int IS NULL THEN 'NONE_AUTOMATIC' ELSE 'PENDING_SERVICE_CHARGE_NOT_PAYMENT' END,
+                    'guest_session_id',$8::text,'charge_kgs',$9::int,'charge_status',$10::text,'folio_charge_id',$11::text,
+                    'financial_effect',CASE WHEN $9::int IS NULL THEN 'NONE_AUTOMATIC' ELSE 'OPEN_FOLIO_CHARGE_NOT_PAYMENT' END,
                     'room_state_effect','NONE_AUTOMATIC'),now())
                 ''',
                 uuid.uuid4(), qr["propertyId"], str(stay["guestId"]), str(task_id), code,
                 str(stay["stayId"]), str(qr["roomId"]), str(session["id"]), charge_kgs, charge_status,
+                str(folio_charge_id) if folio_charge_id else None,
             )
             await conn.execute(
                 '''
@@ -205,9 +214,10 @@ async def create_guest_request(token: str, payload: GuestRequestCreate, request:
                   id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
                 ) VALUES ($1,$2,$3,$4,'GUEST_REQUEST_CREATED','GUEST_OS',
                   jsonb_build_object('task_id',$5::text,'request_code',$6::text,'room_id',$7::text,
-                    'charge_kgs',$8::int,'charge_status',$9::text),now(),now())
+                    'charge_kgs',$8::int,'charge_status',$9::text,'folio_charge_id',$10::text),now(),now())
                 ''',
-                uuid.uuid4(), qr["propertyId"], stay["guestId"], stay["stayId"], str(task_id), code, str(qr["roomId"]), charge_kgs, charge_status,
+                uuid.uuid4(), qr["propertyId"], stay["guestId"], stay["stayId"], str(task_id), code, str(qr["roomId"]),
+                charge_kgs, charge_status, str(folio_charge_id) if folio_charge_id else None,
             )
             row = await conn.fetchrow(TASK_SELECT + ' WHERE id=$1', task_id)
     return row_to_guest_item(row)
@@ -227,7 +237,13 @@ async def cancel_guest_request(token: str, task_id: uuid.UUID, request: Request,
                 raise HTTPException(status_code=404, detail={"code": "GUEST_REQUEST_NOT_FOUND"})
             if task["status"] != "OPEN":
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_CANNOT_CANCEL", "status": task["status"]})
-            next_charge_status = "CANCELLED" if task["chargeStatus"] == "PENDING" else task["chargeStatus"]
+            if task["chargeStatus"] in {"PENDING", "POSTED"}:
+                await void_guest_service_charge(
+                    conn, task_id, actor_type="GUEST", actor_id=str(stay["guestId"]), reason="Guest cancelled request before work started",
+                )
+                next_charge_status = "CANCELLED"
+            else:
+                next_charge_status = task["chargeStatus"]
             await conn.execute(
                 '''UPDATE operational_tasks SET status='CANCELLED',"chargeStatus"=$2,
                    "updatedAt"=now(),"completedAt"=now() WHERE id=$1''',
