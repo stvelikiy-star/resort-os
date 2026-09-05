@@ -35,7 +35,7 @@ def _menu_item(row) -> dict[str, Any]:
     }
 
 
-@router.get("/rooms/{token}/marketplace/menu")
+@router.get("/rooms/{token}/kitchen/menu")
 async def guest_marketplace_menu(
     token: str,
     request: Request,
@@ -51,7 +51,7 @@ async def guest_marketplace_menu(
     }
 
 
-@router.post("/rooms/{token}/marketplace/orders", status_code=status.HTTP_201_CREATED)
+@router.post("/rooms/{token}/kitchen/orders", status_code=status.HTTP_201_CREATED)
 async def create_guest_marketplace_order(
     token: str,
     payload: GuestOrderCreate,
