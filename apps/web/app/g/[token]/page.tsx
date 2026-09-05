@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import GuestConciergeRuntime from "../../../components/GuestConciergeRuntime";
+import GuestHousekeepingPolicy from "../../../components/GuestHousekeepingPolicy";
 import GuestMarketplace from "../../../components/GuestMarketplace";
 import "../../guest-concierge.css";
 import "../../guest-marketplace.css";
@@ -18,6 +19,7 @@ export default async function GuestOsPage({ params }: GuestOsPageProps) {
   const { token } = await params;
   return <>
     <GuestConciergeRuntime token={token} />
+    <div className="concierge-page guest-marketplace-host"><GuestHousekeepingPolicy token={token} /></div>
     <div className="concierge-page guest-marketplace-host"><GuestMarketplace token={token} /></div>
     <style>{`.concierge-page ~ .ai-admin-root{display:none!important}`}</style>
   </>;
