@@ -1,6 +1,6 @@
 # Three Crowns — production database migration gate
 
-Date: 2026-09-02
+Date: 2026-09-05
 Status: **COMMITTED / CLEAN-DEPLOY VERIFIED / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
 
 This document defines the database migration boundary for Three Crowns Resort OS. It does not prove that migrations were run against a real production database.
@@ -19,6 +19,8 @@ Exact current ledger:
 6. `5_guest_os_core`
 7. `6_service_point_qr_operations`
 8. `7_kitchen_operations`
+9. `8_dining_service_control`
+10. `9_guest_offer_campaigns`
 
 The exact ledger is maintained in `scripts/release_contract.py` and verified fail-closed by CI.
 
@@ -39,26 +41,30 @@ CI verifies:
 
 - Prisma schema validation;
 - clean PostgreSQL migration deploy from empty database;
-- exact eight-migration ledger;
-- 27 critical hotel/payment domain constraints from the shared release contract;
+- exact ten-migration ledger;
+- 37 critical hotel/payment/operations domain constraints from the shared release contract;
 - Kitchen migration-specific table, status, price and idempotent task-link constraints;
+- Dining daily-menu, table-reservation and waiter-assignment constraints;
+- Guest Offer campaign action, targeting, URL/window and event constraints;
 - 84-room / 12-room-type development intake integrity;
 - Resort Core/PMS/business invariant regressions;
 - backup creation and clean restore with the current migration/constraint fingerprint;
-- Full Staging migration/application startup path.
+- Full Staging migration/application startup path once its workflow ledger matches this contract.
 
 The canonical room register is 84 rooms / 12 mapped categories. Real target reconciliation remains an external deployment evidence step.
 
 ## Critical database boundary
 
-The canonical hotel/payment constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains 27 constraints, including:
+The canonical hotel/payment/operations constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains 37 constraints, including:
 
 - valid rate/request/reservation/inventory dates;
 - nonnegative/positive financial bounds;
 - `no_overlapping_active_room_blocks`;
 - Guest Services context/time guards;
 - Owner analytics/Growth guards;
-- Service Point category/QR/context guards.
+- Service Point category/QR/context guards;
+- Dining menu-publication and table-reservation guards;
+- Guest Offer action, URL, targeting/window and event guards.
 
 Kitchen constraints are additionally checked by migration/domain tests, including menu prices/categories, table state/seats, order status/source/count/total/meal type, item quantity/price/status and the unique GuestTask-to-KitchenOrder link.
 
@@ -122,8 +128,8 @@ Do not claim production migration success until the actual target database has:
 - fresh backup evidence;
 - exact accepted release SHA/image set;
 - `migrate deploy` result;
-- exact eight-migration ledger;
-- critical constraint fingerprint plus Kitchen migration-specific invariants;
+- exact ten-migration ledger;
+- critical constraint fingerprint plus Kitchen/Dining/Guest Offer migration-specific invariants;
 - readiness/smoke result;
 - tested rollback/restore path.
 
