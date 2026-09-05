@@ -1,22 +1,96 @@
 :root{--tc-admin-blue:#123d73;--tc-admin-blue-2:#184b87;--tc-admin-blue-3:#0d2d57;--tc-admin-white:#fff;--tc-admin-soft:#dbeafe}
 
-/* Final contrast layer: the operational dashboard is intentionally blue with
-   white typography. Imported last so legacy theme fragments cannot make text
-   unreadable on dark surfaces. */
-.dashboard-shell .work-head,
-.dashboard-shell .command-kpis article,
-.dashboard-shell .command-panel,
-.dashboard-shell .command-list>div,
-.dashboard-shell .attention-row,
-.dashboard-shell .command-money div,
-.dashboard-shell .stay-row,
-.dashboard-shell .room-state-grid>div:not(.state-clean):not(.state-dirty):not(.state-inspection):not(.state-tech){background:var(--tc-admin-blue)!important;border-color:rgba(255,255,255,.18)!important;color:var(--tc-admin-white)!important}
-.dashboard-shell .command-panel:nth-of-type(even),
-.dashboard-shell .command-kpis article:nth-child(even){background:var(--tc-admin-blue-2)!important}
-.dashboard-shell h1,.dashboard-shell h2,.dashboard-shell h3,.dashboard-shell strong,.dashboard-shell b,.dashboard-shell .eyebrow,.dashboard-shell .subtitle,.dashboard-shell span,.dashboard-shell small,.dashboard-shell p,.dashboard-shell a{color:var(--tc-admin-white)!important}
-.dashboard-shell .command-note,.dashboard-shell .command-list span,.dashboard-shell .command-kpis span,.dashboard-shell .command-kpis small,.dashboard-shell .room-state-grid span,.dashboard-shell .stay-row span,.dashboard-shell .attention-row small,.dashboard-shell .attention-row>span:not(.priority-pill){color:var(--tc-admin-soft)!important}
+/* Final contrast layer for the compact Command Center surfaces only.
+   IMPORTANT: do not blanket-force all descendants of .dashboard-shell to white.
+   Owner Executive / Owner Control have their own light/dark palettes and were
+   becoming visually empty when this late stylesheet overrode their text colors. */
+.dashboard-shell>.work-head,
+.dashboard-shell>.command-kpis article,
+.dashboard-shell>.command-grid>.command-panel,
+.dashboard-shell>.command-grid.two>.command-panel,
+.dashboard-shell>.command-panel.attention-panel,
+.dashboard-shell>.command-grid .command-list>div,
+.dashboard-shell>.command-panel .attention-row,
+.dashboard-shell>.command-grid .command-money div,
+.dashboard-shell>.command-grid.two .stay-row,
+.dashboard-shell>.command-grid .room-state-grid>div:not(.state-clean):not(.state-dirty):not(.state-inspection):not(.state-tech){background:var(--tc-admin-blue)!important;border-color:rgba(255,255,255,.18)!important;color:var(--tc-admin-white)!important}
+.dashboard-shell>.command-kpis article:nth-child(even),
+.dashboard-shell>.command-grid>.command-panel:nth-child(even),
+.dashboard-shell>.command-grid.two>.command-panel:nth-child(even){background:var(--tc-admin-blue-2)!important}
+
+.dashboard-shell>.work-head h1,
+.dashboard-shell>.work-head .eyebrow,
+.dashboard-shell>.work-head .subtitle,
+.dashboard-shell>.command-kpis article strong,
+.dashboard-shell>.command-grid>.command-panel h2,
+.dashboard-shell>.command-grid>.command-panel h3,
+.dashboard-shell>.command-grid>.command-panel strong,
+.dashboard-shell>.command-grid>.command-panel b,
+.dashboard-shell>.command-grid.two>.command-panel h2,
+.dashboard-shell>.command-grid.two>.command-panel h3,
+.dashboard-shell>.command-grid.two>.command-panel strong,
+.dashboard-shell>.command-grid.two>.command-panel b,
+.dashboard-shell>.command-panel.attention-panel h2,
+.dashboard-shell>.command-panel.attention-panel strong{color:var(--tc-admin-white)!important}
+
+.dashboard-shell>.command-kpis article span,
+.dashboard-shell>.command-kpis article small,
+.dashboard-shell>.command-grid>.command-panel .command-note,
+.dashboard-shell>.command-grid>.command-panel .command-list span,
+.dashboard-shell>.command-grid.two>.command-panel .stay-row span,
+.dashboard-shell>.command-panel.attention-panel .attention-row small,
+.dashboard-shell>.command-panel.attention-panel .attention-row>span:not(.priority-pill){color:var(--tc-admin-soft)!important}
+
 .dashboard-shell .command-drill{background:var(--tc-admin-white)!important;color:var(--tc-admin-blue-3)!important;border-color:rgba(255,255,255,.45)!important}
 .dashboard-shell .command-drill span{color:var(--tc-admin-blue-3)!important}
+
+/* Operational room-state cards intentionally keep their semantic light colors.
+   Explicit dark text prevents the former white-on-pale "silhouette" effect. */
+.dashboard-shell .room-state-grid>div.state-clean,
+.dashboard-shell .room-state-grid>div.state-dirty,
+.dashboard-shell .room-state-grid>div.state-inspection,
+.dashboard-shell .room-state-grid>div.state-tech{color:#17324d!important;border:1px solid rgba(16,47,75,.08)!important}
+.dashboard-shell .room-state-grid>div.state-clean strong,
+.dashboard-shell .room-state-grid>div.state-dirty strong,
+.dashboard-shell .room-state-grid>div.state-inspection strong,
+.dashboard-shell .room-state-grid>div.state-tech strong{color:#17324d!important}
+.dashboard-shell .room-state-grid>div.state-clean span,
+.dashboard-shell .room-state-grid>div.state-dirty span,
+.dashboard-shell .room-state-grid>div.state-inspection span,
+.dashboard-shell .room-state-grid>div.state-tech span{color:#4f6579!important}
+
+/* Owner analytics modules own their palettes. This guard intentionally wins over
+   legacy late contrast selectors without changing module-specific semantics. */
+.dashboard-shell .owner-v2{color:#132943!important}
+.dashboard-shell .owner-v2 .owner-forward-kpis strong,
+.dashboard-shell .owner-v2 .owner-panel-title h3,
+.dashboard-shell .owner-v2 .owner-panel-title>strong,
+.dashboard-shell .owner-v2 .owner-segment-strip strong{color:#12335a!important}
+.dashboard-shell .owner-v2 .owner-forward-kpis span,
+.dashboard-shell .owner-v2 .owner-forward-kpis small,
+.dashboard-shell .owner-v2 .owner-panel-title span,
+.dashboard-shell .owner-v2 .owner-panel-title>small,
+.dashboard-shell .owner-v2 .owner-segment-strip span,
+.dashboard-shell .owner-v2 .owner-segment-strip p,
+.dashboard-shell .owner-v2 .owner-note,
+.dashboard-shell .owner-v2 .pickup-waiting p,
+.dashboard-shell .owner-v2 .owner-empty{color:#73849b!important}
+.dashboard-shell .owner-v2 .owner-v2-head,
+.dashboard-shell .owner-v2 .owner-v2-head h2,
+.dashboard-shell .owner-v2 .owner-v2-head .eyebrow{color:#fff!important}
+.dashboard-shell .owner-v2 .owner-v2-head p:last-child{color:rgba(255,255,255,.72)!important}
+
+.dashboard-shell .owner-executive{color:#f4f7fb!important}
+.dashboard-shell .owner-executive h2,
+.dashboard-shell .owner-executive h3,
+.dashboard-shell .owner-executive strong,
+.dashboard-shell .owner-executive b,
+.dashboard-shell .owner-executive .eyebrow{color:#f4f7fb!important}
+.dashboard-shell .owner-executive-grid article>span,
+.dashboard-shell .owner-executive-grid article>small,
+.dashboard-shell .owner-executive-head p:last-child,
+.dashboard-shell .owner-executive-truth p,
+.dashboard-shell .owner-executive .executive-muted{color:#9eacc0!important}
 
 /* Locale control stays available in every admin module without changing the
    existing navigation structure. */
