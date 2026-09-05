@@ -19,7 +19,6 @@ from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
 from .inbox import router as inbox_router
 from .kitchen import admin_router as kitchen_admin_router
-from .kitchen import guest_router as kitchen_guest_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
@@ -62,7 +61,9 @@ app.include_router(site_content_router)
 app.include_router(public_ai_admin_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
-app.include_router(kitchen_guest_router)
+# Guest Marketplace now owns the guest Kitchen menu/order contract and keeps
+# the existing /guest-os/rooms/{token}/kitchen/* URLs while failing closed on
+# draft/inactive menu items. Admin Kitchen routes remain in kitchen.py.
 app.include_router(guest_marketplace_router)
 app.include_router(service_points_public_router)
 app.include_router(booking_admin_router)
