@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Cookie, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from .folio import ensure_kitchen_order_charge
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
 from .guest_service_settings import load_settings
@@ -262,11 +263,15 @@ async def create_guest_marketplace_order(
                      "totalKgs"=$5,"updatedAt"=now() WHERE id=$1''',
                 order_id, subtotal, delivery_fee, payload.delivery_to_room, total,
             )
+            folio_charge_id = await ensure_kitchen_order_charge(
+                conn, order_id, actor_type="GUEST", actor_id=str(stay["guestId"]),
+            )
             delivery_label = f"доставка в номер +{delivery_fee} KGS" if payload.delivery_to_room else "без доставки"
             await conn.execute(
-                'UPDATE operational_tasks SET description=$2 WHERE id=$1',
+                'UPDATE operational_tasks SET description=$2,"chargeKgs"=$3,"chargeStatus"=\'POSTED\',"chargeSource"=\'FOLIO\' WHERE id=$1',
                 task_id,
                 f"{order_number} · {payload.meal_type} · {len(payload.items)} позиций · {subtotal} KGS + {delivery_label} · итог {total} KGS · меню {service_date}",
+                total,
             )
             await audit(
                 conn,
@@ -281,6 +286,7 @@ async def create_guest_marketplace_order(
                     "delivery_fee_kgs": delivery_fee,
                     "delivery_to_room": payload.delivery_to_room,
                     "total_kgs": total,
+                    "folio_charge_id": str(folio_charge_id) if folio_charge_id else None,
                     "guest_session_id": str(session["id"]),
                     "service_date": str(service_date),
                     "meal_type": payload.meal_type,
@@ -294,7 +300,8 @@ async def create_guest_marketplace_order(
                    ) VALUES ($1,$2,$3,$4,'KITCHEN_ORDER_CREATED','GUEST_MARKETPLACE',
                      jsonb_build_object('order_id',$5::text,'order_number',$6::text,'task_id',$7::text,
                        'subtotal_kgs',$8::int,'delivery_fee_kgs',$9::int,'total_kgs',$10::int,
-                       'delivery_to_room',$11::boolean,'service_date',$12::text,'meal_type',$13::text),now(),now())''',
+                       'delivery_to_room',$11::boolean,'service_date',$12::text,'meal_type',$13::text,
+                       'folio_charge_id',$14::text),now(),now())''',
                 uuid.uuid4(),
                 qr["propertyId"],
                 stay["guestId"],
@@ -308,12 +315,14 @@ async def create_guest_marketplace_order(
                 payload.delivery_to_room,
                 str(service_date),
                 payload.meal_type,
+                str(folio_charge_id) if folio_charge_id else None,
             )
 
     return {
         "id": str(order_id),
         "order_number": order_number,
         "task_id": str(task_id),
+        "folio_charge_id": str(folio_charge_id) if folio_charge_id else None,
         "status": "NEW",
         "service_date": service_date,
         "meal_type": payload.meal_type,
@@ -321,7 +330,7 @@ async def create_guest_marketplace_order(
         "delivery_to_room": payload.delivery_to_room,
         "delivery_fee_kgs": delivery_fee,
         "total_kgs": total,
-        "financial_posting": "KITCHEN_ORDER_ONLY_NOT_RESERVATION_PAYMENT",
+        "financial_posting": "OPEN_FOLIO_CHARGE_NOT_PAYMENT",
         "day_published_menu_only": True,
         "meal_order_cutoff": meal_window,
     }
