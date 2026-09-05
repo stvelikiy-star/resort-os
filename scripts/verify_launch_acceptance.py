@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from release_contract import EXPECTED_MIGRATIONS
+from release_contract import CRITICAL_CONSTRAINTS, EXPECTED_MIGRATIONS
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_STATUS = {"VERIFIED", "NOT_VERIFIED", "NOT_REQUIRED"}
@@ -145,8 +145,11 @@ def repository_checks(root: Path) -> list[str]:
             if migration not in content:
                 errors.append(f"{path} must include migration {migration}")
 
-    if "27" not in migration_doc or "scripts/release_contract.py" not in migration_doc:
-        errors.append("production migration documentation must reference the current shared 27-constraint release contract")
+    constraint_count = str(len(CRITICAL_CONSTRAINTS))
+    if constraint_count not in migration_doc or "scripts/release_contract.py" not in migration_doc:
+        errors.append(
+            f"production migration documentation must reference the current shared {constraint_count}-constraint release contract"
+        )
 
     manifest_errors = validate_manifest(example)
     structural_errors = [
