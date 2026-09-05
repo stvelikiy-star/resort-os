@@ -3,18 +3,42 @@ name: Launch Acceptance CI
 on:
   pull_request:
     branches:
+      - main
       - integration/site-pms-cms-20260827
     paths:
       - 'scripts/verify_launch_acceptance.py'
       - 'scripts/verify_launch_acceptance_test.py'
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
+      - 'scripts/release_rc_truth_guard.py'
+      - 'release/current-rc.json'
       - 'release/launch-evidence.example.json'
       - 'knowledge/04_CURRENT_STATE.md'
       - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
       - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - 'docs/RELEASE_0.60.0_2026-09-05.md'
       - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
       - 'packages/database/prisma/migrations/**'
+      - '.github/workflows/release-rc-truth-ci.yml'
+      - '.github/workflows/launch-acceptance-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/verify_launch_acceptance.py'
+      - 'scripts/verify_launch_acceptance_test.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - 'scripts/release_rc_truth_guard.py'
+      - 'release/current-rc.json'
+      - 'release/launch-evidence.example.json'
+      - 'knowledge/04_CURRENT_STATE.md'
+      - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - 'docs/RELEASE_0.60.0_2026-09-05.md'
+      - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
+      - 'packages/database/prisma/migrations/**'
+      - '.github/workflows/release-rc-truth-ci.yml'
       - '.github/workflows/launch-acceptance-ci.yml'
   workflow_dispatch:
 
@@ -26,10 +50,15 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Verify frozen release truth
+        run: python scripts/release_rc_truth_guard.py
 
       - name: Verify canonical database release contract
         run: python scripts/release_contract_test.py
