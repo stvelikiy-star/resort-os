@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 
 import GuestConciergeRuntime from "../../../components/GuestConciergeRuntime";
+import GuestMarketplace from "../../../components/GuestMarketplace";
 import "../../guest-concierge.css";
+import "../../guest-marketplace.css";
 
 type GuestOsPageProps = { params: Promise<{ token: string }> };
 
@@ -15,6 +17,7 @@ export default async function GuestOsPage({ params }: GuestOsPageProps) {
   const { token } = await params;
   return <>
     <GuestConciergeRuntime token={token} />
+    <div className="concierge-page guest-marketplace-host"><GuestMarketplace token={token} /></div>
     <style>{`.concierge-page ~ .ai-admin-root{display:none!important}`}</style>
   </>;
 }
