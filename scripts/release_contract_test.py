@@ -15,13 +15,13 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 11
+    assert len(EXPECTED_MIGRATIONS) == 20
     assert EXPECTED_MIGRATIONS[-3:] == (
-        "8_dining_service_control",
-        "9_guest_offer_campaigns",
-        "z10_service_point_paid_access",
+        "z17_dining_floor_layout_20260905",
+        "z18_site_media_slots_20260905",
+        "z19_dining_table_status_guard_20260905",
     )
-    assert len(CRITICAL_CONSTRAINTS) == 48
+    assert len(CRITICAL_CONSTRAINTS) == 81
     assert {
         "service_points_category_check",
         "service_point_qrs_revocation_check",
@@ -47,12 +47,21 @@ def main() -> int:
         "service_point_payment_events_payload_check",
         "service_point_lock_actions_attempts_check",
         "service_point_lock_actions_result_check",
+        "property_guest_service_settings_cutoff_check",
+        "operational_tasks_charge_status_check",
+        "dining_entitlements_status_check",
+        "dining_table_sessions_party_sum_check",
+        "guest_folio_charges_source_check",
+        "booking_groups_dates_check",
+        "site_media_assets_mime_check",
+        "kitchen_tables_floor_shape_check",
+        "site_media_slots_versions_check",
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact eleven-migration release ledger is fail-closed")
-    print("PASS: Dining, Guest Offers and paid Service Point access are in the canonical development boundary")
-    print("PASS: current critical constraint fingerprint contains 48 constraints")
+    print("PASS: exact twenty-migration Resort OS 0.60 release ledger is fail-closed")
+    print("PASS: current 0.60 Dining, Guest, CMS, Group Booking and Service Point boundaries are canonical")
+    print("PASS: current critical constraint fingerprint contains 81 constraints")
     return 0
 
 
