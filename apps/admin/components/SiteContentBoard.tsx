@@ -32,6 +32,10 @@ const FIELDS = [
   { section: "advantages", label: "Преимущества", fields: [
     ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"],
   ] },
+  { section: "conference", label: "Конференции / банкет", fields: [
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["copy", "Основное описание"],
+    ["capacity", "Вместимость"], ["banquet", "Банкетный формат"], ["menu", "Меню / условия"], ["cta", "Текст кнопки"],
+  ] },
   { section: "groups", label: "Групповые заезды", fields: [
     ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["copy", "Описание"],
   ] },
@@ -158,7 +162,7 @@ export default function SiteContentBoard() {
         <div>
           <p className="eyebrow">Сайт / Контент</p>
           <h1>Редактор публичного сайта</h1>
-          <p>Тексты и SEO хранятся в Core. Доступность, цены и брони остаются отдельной доменной правдой PMS.</p>
+          <p>Тексты, конференц-блок, контакты и SEO хранятся в Core. Доступность, цены и брони остаются отдельной доменной правдой PMS.</p>
         </div>
         <div className="content-head-actions">
           <button className="btn" onClick={exportJson}>Экспорт JSON</button>
@@ -183,7 +187,7 @@ export default function SiteContentBoard() {
           <section className="content-card" key={group.section}>
             <div className="content-card-head"><h2>{group.label}</h2><span>{group.section}</span></div>
             {group.fields.map(([key, label]) => {
-              const multiline = ["copy", "intro", "description", "address"].includes(key);
+              const multiline = ["copy", "intro", "description", "address", "banquet", "menu"].includes(key);
               return <label className="content-field" key={key}><span>{label}</span>{multiline ? <textarea rows={3} value={current[group.section]?.[key] || ""} onChange={(event) => change(group.section, key, event)} /> : <input value={current[group.section]?.[key] || ""} onChange={(event) => change(group.section, key, event)} />}</label>;
             })}
           </section>
@@ -191,7 +195,7 @@ export default function SiteContentBoard() {
       </div>
 
       <footer className="content-savebar">
-        <div><strong>Публикация безопасна для броней</strong><span>CMS меняет только тексты/SEO. Номерной фонд, цены, inventory и заявки остаются в Core.</span></div>
+        <div><strong>Публикация безопасна для броней</strong><span>CMS меняет публичный контент. Номерной фонд, цены, inventory и заявки остаются в Core.</span></div>
         <div><button className="btn" disabled={saving} onClick={() => void saveDraft()}>Сохранить черновик</button><button className="btn primary" disabled={saving} onClick={() => void publish()}>{saving ? "Сохраняю…" : "Опубликовать на сайте"}</button></div>
       </footer>
     </main>
