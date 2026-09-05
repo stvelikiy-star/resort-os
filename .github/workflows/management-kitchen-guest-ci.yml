@@ -1,0 +1,74 @@
+name: Management Kitchen Guest CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'apps/admin/app/admin-experience.css'
+      - 'apps/staff/app/kitchen/**'
+      - 'apps/staff/components/KitchenEntry.tsx'
+      - 'apps/staff/components/KitchenEntry.module.css'
+      - 'apps/web/app/g/**'
+      - 'apps/web/app/guest-marketplace.css'
+      - 'apps/web/components/GuestMarketplace.tsx'
+      - 'services/api/app/guest_marketplace.py'
+      - 'services/api/app/app_entry.py'
+      - 'scripts/guest_marketplace_contract_test.py'
+      - '.github/workflows/management-kitchen-guest-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile Core extension and run contract guard
+        run: |
+          python -m compileall services/api/app/guest_marketplace.py
+          python scripts/guest_marketplace_contract_test.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/web/package-lock.json
+            apps/staff/package-lock.json
+            apps/admin/package-lock.json
+
+      - name: Typecheck and build Admin
+        working-directory: apps/admin
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Staff / Kitchen
+        working-directory: apps/staff
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Guest OS / Public Web
+        working-directory: apps/web
+        env:
+          CORE_API_URL: http://127.0.0.1:8000
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
