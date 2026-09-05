@@ -6,6 +6,7 @@ from .booking_admin import router as booking_admin_router
 from .channel_outbound import router as channel_outbound_router
 from .communication_ingest import router as communication_ingest_router
 from .crm_sync import router as crm_sync_router
+from .dining_control import router as dining_control_router
 from .google_control import router as google_control_router
 from .growth_control import router as growth_control_router
 from .guest_crm import router as guest_crm_router
@@ -62,9 +63,8 @@ app.include_router(site_content_router)
 app.include_router(public_ai_admin_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
-# Guest Marketplace now owns the guest Kitchen menu/order contract and keeps
-# the existing /guest-os/rooms/{token}/kitchen/* URLs while failing closed on
-# draft/inactive menu items. Admin Kitchen routes remain in kitchen.py.
+# Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
+# on draft/inactive or non-published-for-today menu items.
 app.include_router(guest_marketplace_router)
 app.include_router(service_points_public_router)
 app.include_router(booking_admin_router)
@@ -95,6 +95,7 @@ app.include_router(operations_history_router)
 app.include_router(staff_guest_requests_router)
 app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
+app.include_router(dining_control_router)
 app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
 app.include_router(guest_pin_admin_router)
@@ -121,4 +122,4 @@ app.include_router(manager_dashboard_router)
 # from the dormant NFC wallet/acquiring code below.
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.50.0"
+app.version = "0.51.0"
