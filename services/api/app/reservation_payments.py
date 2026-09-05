@@ -14,7 +14,7 @@ from .payment_idempotency import (
 )
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-payments"])
-payment_access = require_roles("OWNER", "MANAGER", "RECEPTION")
+payment_access = require_roles("OWNER", "MANAGER")
 
 
 class ReservationPaymentPayload(BaseModel):
