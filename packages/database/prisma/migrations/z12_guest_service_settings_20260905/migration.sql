@@ -39,12 +39,11 @@ ON CONFLICT ("propertyId") DO UPDATE SET
     "scheduledLinenChangeIncluded"=true,
     "updatedAt"=now();
 
--- Keep the food subtotal and delivery fee explicit. This makes the +200 KGS
--- surcharge visible to kitchen/finance instead of hiding it in menu item prices.
+-- Keep the food subtotal and delivery fee explicit. Existing/staff order writers are
+-- backward compatible: subtotal may be NULL and readers fall back to totalKgs.
 ALTER TABLE kitchen_orders ADD COLUMN "subtotalKgs" integer;
 ALTER TABLE kitchen_orders ADD COLUMN "deliveryFeeKgs" integer NOT NULL DEFAULT 0;
 ALTER TABLE kitchen_orders ADD COLUMN "deliveryToRoom" boolean NOT NULL DEFAULT false;
 UPDATE kitchen_orders SET "subtotalKgs"="totalKgs" WHERE "subtotalKgs" IS NULL;
-ALTER TABLE kitchen_orders ALTER COLUMN "subtotalKgs" SET NOT NULL;
-ALTER TABLE kitchen_orders ADD CONSTRAINT kitchen_orders_subtotal_nonnegative CHECK ("subtotalKgs" >= 0);
+ALTER TABLE kitchen_orders ADD CONSTRAINT kitchen_orders_subtotal_nonnegative CHECK ("subtotalKgs" IS NULL OR "subtotalKgs" >= 0);
 ALTER TABLE kitchen_orders ADD CONSTRAINT kitchen_orders_delivery_fee_nonnegative CHECK ("deliveryFeeKgs" >= 0);
