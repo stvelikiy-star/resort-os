@@ -30,6 +30,7 @@ type User = {
 type Tab = "DASHBOARD" | "PMS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
+const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 
 function canEnterAdmin(role?: string | null): boolean {
   return Boolean(role && ADMIN_ROLES.has(role));
@@ -69,6 +70,11 @@ export default function AdminShell() {
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (!user || !HOUSEKEEPING_SYNC_ROLES.has(user.role)) return;
+    void fetch("/core/api/v1/ops/housekeeping/schedule/ensure", { method: "POST" }).catch(() => undefined);
+  }, [user?.id, user?.role]);
 
   async function login(event: FormEvent) {
     event.preventDefault();
