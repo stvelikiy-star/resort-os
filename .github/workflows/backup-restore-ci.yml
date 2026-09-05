@@ -83,6 +83,7 @@ jobs:
           test -s packages/database/prisma/migrations/7_kitchen_operations/migration.sql
           test -s packages/database/prisma/migrations/8_dining_service_control/migration.sql
           test -s packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          test -s packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
           (
             cd packages/database/prisma/migrations/0_init
             sha256sum -c migration.sql.sha256
@@ -123,9 +124,9 @@ jobs:
           EXPECTED_ROOM_TYPE_COUNT: '12'
         run: |
           python scripts/production_preflight.py | tee /tmp/preflight.txt
-          grep -q '^FACT: applied_migrations=10$' /tmp/preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations', '8_dining_service_control', '9_guest_offer_campaigns'\]$" /tmp/preflight.txt
-          grep -q '^FACT: critical_constraint_count=37$' /tmp/preflight.txt
+          grep -q '^FACT: applied_migrations=11$' /tmp/preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations', '8_dining_service_control', '9_guest_offer_campaigns', 'z10_service_point_paid_access'\]$" /tmp/preflight.txt
+          grep -q '^FACT: critical_constraint_count=48$' /tmp/preflight.txt
           grep -q '^RESULT: READY FOR NEXT DEPLOYMENT GATE$' /tmp/preflight.txt
 
       - name: Create migration-aware backup artifact
@@ -137,8 +138,8 @@ jobs:
           BACKUP_MANIFEST=$(grep '^BACKUP_MANIFEST=' /tmp/backup-output.txt | cut -d= -f2-)
           test -s "$BACKUP_FILE"
           test -s "$BACKUP_MANIFEST"
-          grep -q '^BACKUP_MIGRATIONS=10$' /tmp/backup-output.txt
-          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=37$' /tmp/backup-output.txt
+          grep -q '^BACKUP_MIGRATIONS=11$' /tmp/backup-output.txt
+          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=48$' /tmp/backup-output.txt
           grep -q 'three-crowns-postgres-backup-v3' "$BACKUP_MANIFEST"
           echo "BACKUP_FILE=$BACKUP_FILE" >> "$GITHUB_ENV"
           echo "BACKUP_MANIFEST=$BACKUP_MANIFEST" >> "$GITHUB_ENV"
@@ -158,9 +159,9 @@ jobs:
           grep -q '^RESTORE_VERIFICATION=SUCCESS$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOMS=84$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOM_TYPES=12$' /tmp/restore-output.txt
-          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=37$' /tmp/restore-output.txt
+          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=48$' /tmp/restore-output.txt
           grep -q '^RESTORED_MIGRATION_HISTORY_PRESENT=True$' /tmp/restore-output.txt
-          grep -q '^RESTORED_APPLIED_MIGRATIONS=10$' /tmp/restore-output.txt
+          grep -q '^RESTORED_APPLIED_MIGRATIONS=11$' /tmp/restore-output.txt
           grep -q '^LAST_VERIFIED_BACKUP_AT=' /tmp/restore-output.txt
 
       - name: Verify restored migration ledger directly
@@ -170,5 +171,5 @@ jobs:
           source_migrations="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select migration_name || ':' || checksum from _prisma_migrations where finished_at is not null and rolled_back_at is null order by started_at,migration_name")"
           restored_migrations="$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select migration_name || ':' || checksum from _prisma_migrations where finished_at is not null and rolled_back_at is null order by started_at,migration_name")"
           test "$source_migrations" = "$restored_migrations"
-          test "$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = '10'
-          test "$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns'
+          test "$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = '11'
+          test "$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns,z10_service_point_paid_access'
