@@ -20,7 +20,7 @@ EXPECTED_MIGRATIONS = (
     "7_kitchen_operations",
     "8_dining_service_control",
     "9_guest_offer_campaigns",
-    "10_service_point_paid_access",
+    "z10_service_point_paid_access",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
