@@ -6,6 +6,7 @@ import json
 import os
 import uuid
 from pathlib import Path
+from xml.etree import ElementTree
 
 import asyncpg
 import httpx
@@ -22,6 +23,16 @@ def check(value: bool, message: str) -> None:
     if not value:
         raise AssertionError(message)
     print(f"PASS: {message}")
+
+
+def is_svg_document(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        root = ElementTree.fromstring(value)
+    except ElementTree.ParseError:
+        return False
+    return root.tag.rsplit("}", 1)[-1].lower() == "svg"
 
 
 async def db_value(sql: str, *args):
@@ -129,7 +140,7 @@ def main() -> None:
     check(intent.status_code == 201, f"payment intent created: {intent.text}")
     intent_body = intent.json()
     check(intent_body["status"] == "AWAITING_PAYMENT", "payment intent waits for provider confirmation")
-    check(intent_body.get("payment_qr_svg", "").startswith("<svg"), "bank QR is generated from provider bridge payload")
+    check(is_svg_document(intent_body.get("payment_qr_svg")), "bank QR is generated from provider bridge payload")
     check(intent_body["amount_kgs"] == 50, "payment intent amount is immutable server truth")
 
     payments_mid = asyncio.run(db_value("SELECT count(*)::int FROM payments"))
