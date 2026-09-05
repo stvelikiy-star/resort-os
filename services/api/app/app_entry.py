@@ -11,6 +11,8 @@ from .google_control import router as google_control_router
 from .growth_control import router as growth_control_router
 from .guest_crm import router as guest_crm_router
 from .guest_marketplace import router as guest_marketplace_router
+from .guest_offers import admin_router as guest_offers_admin_router
+from .guest_offers import guest_router as guest_offers_guest_router
 from .guest_os import admin_router as guest_os_admin_router
 from .guest_os import public_router as guest_os_public_router
 from .guest_pin_admin import router as guest_pin_admin_router
@@ -66,6 +68,9 @@ app.include_router(guest_requests_router)
 # Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
 # on draft/inactive or non-published-for-today menu items.
 app.include_router(guest_marketplace_router)
+# Guest offers are authenticated in-stay marketing handoffs. Campaigns never
+# confirm price, availability, payment or provider execution on their own.
+app.include_router(guest_offers_guest_router)
 app.include_router(service_points_public_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
@@ -81,6 +86,7 @@ app.include_router(owner_operations_analytics_router)
 app.include_router(guest_crm_router)
 app.include_router(owner_pace_admin_router)
 app.include_router(growth_control_router)
+app.include_router(guest_offers_admin_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)
@@ -122,4 +128,4 @@ app.include_router(manager_dashboard_router)
 # from the dormant NFC wallet/acquiring code below.
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.51.0"
+app.version = "0.52.0"
