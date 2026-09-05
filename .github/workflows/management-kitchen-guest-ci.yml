@@ -3,6 +3,7 @@ name: Management Kitchen Guest CI
 on:
   pull_request:
     branches:
+      - main
       - integration/site-pms-cms-20260827
     paths:
       - 'apps/admin/app/admin-experience.css'
