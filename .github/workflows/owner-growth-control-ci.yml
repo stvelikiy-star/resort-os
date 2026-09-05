@@ -6,16 +6,12 @@ on:
       - 'services/api/app/growth_control.py'
       - 'services/api/app/app_entry.py'
       - 'packages/database/prisma/schema.prisma'
-      - 'packages/database/prisma/migrations/4_guest_engagements/**'
-      - 'packages/database/prisma/migrations/5_guest_os_core/**'
-      - 'packages/database/prisma/migrations/6_service_point_qr_operations/**'
-      - 'packages/database/prisma/migrations/7_kitchen_operations/**'
-      - 'packages/database/prisma/migrations/8_dining_service_control/**'
-      - 'packages/database/prisma/migrations/9_guest_offer_campaigns/**'
+      - 'packages/database/prisma/migrations/**'
       - 'apps/admin/components/GrowthControlBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/growth-control.css'
       - 'apps/admin/app/layout.tsx'
+      - 'scripts/release_contract.py'
       - 'scripts/verify_owner_growth_control.py'
       - '.github/workflows/owner-growth-control-ci.yml'
   push:
@@ -24,16 +20,12 @@ on:
       - 'services/api/app/growth_control.py'
       - 'services/api/app/app_entry.py'
       - 'packages/database/prisma/schema.prisma'
-      - 'packages/database/prisma/migrations/4_guest_engagements/**'
-      - 'packages/database/prisma/migrations/5_guest_os_core/**'
-      - 'packages/database/prisma/migrations/6_service_point_qr_operations/**'
-      - 'packages/database/prisma/migrations/7_kitchen_operations/**'
-      - 'packages/database/prisma/migrations/8_dining_service_control/**'
-      - 'packages/database/prisma/migrations/9_guest_offer_campaigns/**'
+      - 'packages/database/prisma/migrations/**'
       - 'apps/admin/components/GrowthControlBoard.tsx'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/growth-control.css'
       - 'apps/admin/app/layout.tsx'
+      - 'scripts/release_contract.py'
       - 'scripts/verify_owner_growth_control.py'
       - '.github/workflows/owner-growth-control-ci.yml'
   workflow_dispatch:
@@ -80,24 +72,28 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Validate ten-migration database chain
+      - name: Validate current Resort OS migration chain
         working-directory: packages/database
         run: |
           npm install --no-audit --no-fund
           npx prisma validate
+          PYTHONPATH=../../scripts python - <<'PY'
+          from pathlib import Path
+          from release_contract import EXPECTED_MIGRATIONS
+          root = Path('prisma/migrations')
+          missing = [name for name in EXPECTED_MIGRATIONS if not (root / name / 'migration.sql').is_file()]
+          assert not missing, f'missing committed migrations: {missing}'
+          print(f'PASS: committed migration files={len(EXPECTED_MIGRATIONS)}')
+          PY
           npx prisma migrate deploy
           npx prisma migrate status
-          test -s prisma/migrations/4_guest_engagements/migration.sql
-          test -s prisma/migrations/5_guest_os_core/migration.sql
-          test -s prisma/migrations/6_service_point_qr_operations/migration.sql
-          test -s prisma/migrations/7_kitchen_operations/migration.sql
-          test -s prisma/migrations/8_dining_service_control/migration.sql
-          test -s prisma/migrations/9_guest_offer_campaigns/migration.sql
 
       - name: Verify Growth persistence invariants
         env:
           PGPASSWORD: resort
         run: |
+          expected_count="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_names="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(",".join(EXPECTED_MIGRATIONS))')"
           migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
           migration_names="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
           table_name="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select to_regclass('public.guest_engagements')::text")"
@@ -105,8 +101,8 @@ jobs:
           feedback_unique="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='guest_engagements' and indexname='guest_engagements_feedback_reservation_key'")"
           guest_os_tables="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('stays','room_assignments','room_qrs','guest_sessions','guest_history_events','guest_preferences')")"
           kitchen_tables="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
-          test "$migration_count" = '10'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns'
+          test "$migration_count" = "$expected_count"
+          test "$migration_names" = "$expected_names"
           test "$table_name" = 'guest_engagements'
           test "$constraint_count" = '8'
           test "$feedback_unique" = '1'
