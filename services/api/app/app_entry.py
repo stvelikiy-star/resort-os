@@ -9,6 +9,7 @@ from .crm_sync import router as crm_sync_router
 from .google_control import router as google_control_router
 from .growth_control import router as growth_control_router
 from .guest_crm import router as guest_crm_router
+from .guest_marketplace import router as guest_marketplace_router
 from .guest_os import admin_router as guest_os_admin_router
 from .guest_os import public_router as guest_os_public_router
 from .guest_pin_admin import router as guest_pin_admin_router
@@ -62,6 +63,7 @@ app.include_router(public_ai_admin_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
 app.include_router(kitchen_guest_router)
+app.include_router(guest_marketplace_router)
 app.include_router(service_points_public_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
@@ -116,4 +118,4 @@ app.include_router(manager_dashboard_router)
 # from the dormant NFC wallet/acquiring code below.
 # NFC implementation remains dormant in source and is intentionally not composed
 # into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.48.0"
+app.version = "0.49.0"
