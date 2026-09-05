@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 3.8
-Date: 2026-09-02
-Status: INTERNAL RC FROZEN / REPOSITORY+CI VERIFIED / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
+Version: 3.9-working
+Date: 2026-09-05
+Status: WORKING PR #110 / ACCEPTED RC STILL FROZEN / EXTERNAL PRODUCTION EVIDENCE INCOMPLETE / NOT LIVE
 Canonical: YES
 Authority: factual implementation reality only
 
@@ -26,6 +26,8 @@ Earlier accepted product evidence remains part of the same tree:
 - PR #102 customer-facing automation truth hardening: **17/17 applicable non-RC workflows SUCCESS**;
 - PR #98 Kitchen/Core release baseline: **43/43 non-RC workflows SUCCESS**.
 
+The current working delta is draft PR #110 on `ux/management-kitchen-guest-v1-20260905`. It extends management UX, Reception readiness, Kitchen/Dining, Guest Marketplace and manager-controlled Guest Offer campaigns. It is **not** the accepted RC and must not be treated as merged, refrozen or production-authorized until its required regression/acceptance gates are complete.
+
 The canonical integration branch is the only release integration source. `main` is not a production source and must not be used for Beget deployment or cutover while stale relative to integration.
 
 The canonical machine-readable RC boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
@@ -44,11 +46,11 @@ NFC acquiring/wallet remains deferred and outside active V1 composition.
 
 ## Database release contract
 
-Committed migration chain:
+Committed migration chain on the current working branch:
 
-`0_init -> 1_site_content -> 2_guest_service_tasks -> 3_owner_analytics_snapshots -> 4_guest_engagements -> 5_guest_os_core -> 6_service_point_qr_operations -> 7_kitchen_operations`.
+`0_init -> 1_site_content -> 2_guest_service_tasks -> 3_owner_analytics_snapshots -> 4_guest_engagements -> 5_guest_os_core -> 6_service_point_qr_operations -> 7_kitchen_operations -> 8_dining_service_control -> 9_guest_offer_campaigns`.
 
-Exact eight-migration ledger, 27 critical hotel/payment domain constraints, clean migration deployment and backup -> clean restore are release gates. External staging/production migration uses `npx prisma migrate deploy`.
+Exact ten-migration ledger, 37 critical hotel/payment/operations domain constraints, clean migration deployment and backup -> clean restore are release gates. External staging/production migration uses `npx prisma migrate deploy`.
 
 `prisma` and `@prisma/client` remain exactly pinned to `6.12.0`; deterministic lockfile install and zero HIGH/CRITICAL database dependency findings are release gates.
 
@@ -90,11 +92,13 @@ Canonical PMS includes:
 - Admin fail-closed role boundary for OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN;
 - RU/KG/EN admin locale selector and operational rendering.
 
+PR #110 adds a narrow audited Reception -> Housekeeping readiness handoff for guaranteed arrivals without weakening the Core `CLEAN` check-in gate and without granting RECEPTION unrestricted Operations authority.
+
 The canonical 84-room import contract is closed. External target reconciliation remains a deployment evidence step, not a data-collection blocker.
 
 ## Stay / Guest OS / CRM
 
-Implemented and regression-gated:
+Implemented and regression-gated baseline:
 
 - canonical `Stay` and `RoomAssignment` lifecycle;
 - permanent Room QR using server-side token hash;
@@ -106,13 +110,15 @@ Implemented and regression-gated:
 - GuestHistoryEvent and AuditLog trails;
 - Guest OS Kitchen menu/order API through existing GuestSession authority.
 
+PR #110 adds an authenticated in-stay Marketplace, fail-closed current-day Kitchen menu exposure, verified-facts AI concierge integration and dynamic manager-controlled Guest Offer campaigns. Offer actions remain bounded to real Guest Requests, configured HTTPS destinations or AI prompts and do not create payment/commercial truth automatically.
+
 Room QR / GuestSession remains separate from anonymous Service Point QR.
 
 ## Kitchen / Dining
 
 Kitchen remains a Resort Core/PostgreSQL operational domain, not a parallel accounting system.
 
-Accepted implementation includes:
+Accepted baseline implementation includes:
 
 - Kitchen Admin for `DINING_STAFF`, OWNER and MANAGER;
 - editable RU/KG/EN provisional menu with server-side prices and active/draft controls;
@@ -125,6 +131,15 @@ Accepted implementation includes:
 - no sensitive payment data in the Dining arrival card;
 - Kitchen totals isolated from Hotel `Payment` and `Reservation.totalKgs`;
 - audited Kitchen/check-in routing.
+
+PR #110 working delta adds:
+
+- dedicated `/kitchen` entry and `/waiter` floor surface using existing `DINING_STAFF` authority;
+- hotel-local daily menu publication by meal type;
+- stop-list / restore;
+- table reservations with capacity/time-conflict guards;
+- waiter assignment and READY -> SERVED handoff;
+- Guest OS visibility only for active, non-draft, explicitly published, available and not-sold-out items.
 
 The provisional menu and real table layout/count remain operationally editable and are not fabricated in code.
 
@@ -221,17 +236,18 @@ The final cutover verifier now fails closed while either governance gate remains
 
 ## Deployment state
 
-Repository release engineering now has:
+Repository release engineering on the current working branch has:
 
 - prior 43/43 Kitchen/Core release baseline;
 - PR #102 AI truth-hardening delta with 17/17 applicable non-RC success;
 - PR #107 provider/governance security delta with 20/20 applicable non-RC success;
-- exact eight-migration database ledger;
-- backup -> clean restore contract;
+- exact ten-migration database ledger through `8_dining_service_control` and `9_guest_offer_campaigns`;
+- 37-constraint shared release fingerprint;
+- backup -> clean restore contract verified against the ten-migration boundary;
 - frontend/backend/database dependency security inspection;
 - deterministic Prisma dependency/lockfile checks;
-- production package build;
-- CI-local Full Staging;
+- production package build contract;
+- CI-local Full Staging contract, with the current PR gate required to pass before acceptance;
 - Beget hardening contract and provider-secret security matrix;
 - exact Git SHA -> deployed application image linkage contract;
 - staging mutation safety guard;
@@ -240,7 +256,7 @@ Repository release engineering now has:
 - fail-closed launch verifier with GitHub/Drive governance gates;
 - Kitchen/PMS/Guest OS/Finance/Staff/AI/automation regression contours.
 
-The current RC refreeze binds tested PR #107 head `ab6b649d91df5e9698253d43788cc657ca7040c9` to tree-equivalent integration merge `c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4`.
+The accepted RC remains the PR #107 boundary: tested head `ab6b649d91df5e9698253d43788cc657ca7040c9` bound to tree-equivalent integration merge `c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4`. PR #110 must not replace that RC until its exact-head acceptance is complete and a deliberate refreeze occurs.
 
 External/production remains separate:
 
