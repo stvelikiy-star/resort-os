@@ -17,6 +17,7 @@ from .guest_os import admin_router as guest_os_admin_router
 from .guest_os import public_router as guest_os_public_router
 from .guest_pin_admin import router as guest_pin_admin_router
 from .guest_requests import router as guest_requests_router
+from .guest_service_settings import router as guest_service_settings_router
 from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
@@ -102,6 +103,7 @@ app.include_router(pms_bulk_tasks_router)
 app.include_router(guest_os_admin_router)
 app.include_router(service_points_admin_router)
 app.include_router(service_point_payments_admin_router)
+app.include_router(guest_service_settings_router)
 app.include_router(guest_services_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
@@ -135,4 +137,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Paid Service Point QR
 # does not reactivate NFC and cannot mutate accommodation payment truth.
-app.version = "0.53.0"
+app.version = "0.54.0"
