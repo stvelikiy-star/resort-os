@@ -15,19 +15,29 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 8
-    assert EXPECTED_MIGRATIONS[-1] == "7_kitchen_operations"
-    assert len(CRITICAL_CONSTRAINTS) == 27
+    assert len(EXPECTED_MIGRATIONS) == 10
+    assert EXPECTED_MIGRATIONS[-2:] == ("8_dining_service_control", "9_guest_offer_campaigns")
+    assert len(CRITICAL_CONSTRAINTS) == 37
     assert {
         "service_points_category_check",
         "service_point_qrs_revocation_check",
         "operational_tasks_service_point_context_check",
+        "kitchen_menu_availability_meal_check",
+        "kitchen_table_reservations_party_check",
+        "kitchen_table_reservations_time_check",
+        "kitchen_table_reservations_status_check",
+        "guest_offer_campaigns_action_check",
+        "guest_offer_campaigns_request_code_check",
+        "guest_offer_campaigns_external_url_check",
+        "guest_offer_campaigns_window_check",
+        "guest_offer_campaigns_audience_check",
+        "guest_offer_events_type_check",
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact eight-migration release ledger is fail-closed")
-    print("PASS: Kitchen operations migration is part of the canonical release boundary")
-    print("PASS: current critical constraint fingerprint contains 27 constraints")
+    print("PASS: exact ten-migration release ledger is fail-closed")
+    print("PASS: Dining control and Guest Offer migrations are part of the canonical release boundary")
+    print("PASS: current critical constraint fingerprint contains 37 constraints")
     return 0
 
 
