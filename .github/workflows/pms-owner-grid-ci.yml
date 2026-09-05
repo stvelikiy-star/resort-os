@@ -69,18 +69,18 @@ jobs:
           cache: pip
           cache-dependency-path: services/api/requirements.txt
 
-      - name: Build clean database and seed 84-room intake
+      - name: Build clean database from committed migrations
         working-directory: packages/database
         run: |
           npm install --no-audit --no-fund
           npx prisma validate
-          npx prisma db push
+          npx prisma migrate deploy
+          npx prisma migrate status
 
-      - name: Install Core and enforce DB constraints
+      - name: Install Core and seed 84-room intake
         run: |
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_pms_owner_grid.py scripts/verify_reception_rbac.py
-          python scripts/apply_core_constraints.py
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
 
