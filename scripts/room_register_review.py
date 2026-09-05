@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 ROOMS_PATH = Path("data-intake/rooms.csv")
+RATES_PATH = Path("data-intake/rates.csv")
 CHECKLIST_PATH = Path("data-intake/owner-room-checklist.json")
 EXPECTED_ROOM_COUNT = 84
 EXPECTED_ROOM_TYPE_COUNT = 12
@@ -27,9 +28,17 @@ def checksum(path: Path = ROOMS_PATH) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def load_rooms(path: Path = ROOMS_PATH) -> list[dict[str, str]]:
+def load_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def load_rooms(path: Path = ROOMS_PATH) -> list[dict[str, str]]:
+    return load_csv(path)
+
+
+def load_rates(path: Path = RATES_PATH) -> list[dict[str, str]]:
+    return load_csv(path)
 
 
 def load_checklist(path: Path = CHECKLIST_PATH) -> dict[str, Any]:
@@ -68,7 +77,7 @@ def audit_checklist(checklist: dict[str, Any]) -> list[str]:
     return errors
 
 
-def audit_rooms(rooms: list[dict[str, str]]) -> tuple[list[str], list[dict[str, Any]]]:
+def audit_rooms(rooms: list[dict[str, str]], rates: list[dict[str, str]]) -> tuple[list[str], list[dict[str, Any]]]:
     structural_errors: list[str] = []
     issues: list[dict[str, Any]] = []
 
@@ -82,11 +91,19 @@ def audit_rooms(rooms: list[dict[str, str]]) -> tuple[list[str], list[dict[str, 
     if duplicates:
         structural_errors.append("duplicate room_code: " + ", ".join(duplicates))
 
-    room_types = {row.get("room_type", "").strip() for row in rooms if row.get("room_type", "").strip()}
-    if len(room_types) != EXPECTED_ROOM_TYPE_COUNT:
+    # Category truth has two layers: physical inventory and the tariff catalogue.
+    # The 2026-09-05 owner correction moved 501/502 out of SINGLE_IMPROVED, so that
+    # sellable/tariff category can legitimately have zero currently assigned rooms.
+    # Do not invent a room just to keep twelve distinct labels in rooms.csv.
+    inventory_room_types = {row.get("room_type", "").strip() for row in rooms if row.get("room_type", "").strip()}
+    catalog_room_types = {row.get("room_type", "").strip() for row in rates if row.get("room_type", "").strip()}
+    if len(catalog_room_types) != EXPECTED_ROOM_TYPE_COUNT:
         structural_errors.append(
-            f"room type count mismatch: expected {EXPECTED_ROOM_TYPE_COUNT}, found {len(room_types)}"
+            f"tariff catalogue room type count mismatch: expected {EXPECTED_ROOM_TYPE_COUNT}, found {len(catalog_room_types)}"
         )
+    unknown_inventory_types = sorted(inventory_room_types - catalog_room_types)
+    if unknown_inventory_types:
+        structural_errors.append("physical room type(s) missing from tariff catalogue: " + ", ".join(unknown_inventory_types))
 
     empty_beds: dict[str, list[str]] = defaultdict(list)
     bed_legend_rooms: list[str] = []
@@ -186,6 +203,7 @@ def audit_rooms(rooms: list[dict[str, str]]) -> tuple[list[str], list[dict[str, 
 
 def report(
     rooms: list[dict[str, str]],
+    rates: list[dict[str, str]],
     errors: list[str],
     issues: list[dict[str, Any]],
     checklist: dict[str, Any],
@@ -193,13 +211,18 @@ def report(
     severity = Counter(item["severity"] for item in issues)
     issue_codes = Counter(item["code"] for item in issues)
     questions = checklist["questions"]
+    inventory_types = {row.get("room_type", "").strip() for row in rooms if row.get("room_type", "").strip()}
+    catalog_types = {row.get("room_type", "").strip() for row in rates if row.get("room_type", "").strip()}
     return {
         "register": {
             "path": str(ROOMS_PATH),
             "sha256": checksum(),
             "room_count": len(rooms),
             "unique_room_codes": len({row.get("room_code", "").strip() for row in rooms}),
-            "room_type_count": len({row.get("room_type", "").strip() for row in rooms if row.get("room_type", "").strip()}),
+            "room_type_count": len(catalog_types),
+            "inventory_room_type_count": len(inventory_types),
+            "catalog_room_type_count": len(catalog_types),
+            "catalog_types_without_inventory": sorted(catalog_types - inventory_types),
         },
         "structural_errors": errors,
         "owner_checklist": {
@@ -222,8 +245,9 @@ def report(
             "issues": issues,
         },
         "truth_boundary": (
-            "Canonical 84-room data requires checksum-bound owner-approval verification before production reconciliation; "
-            "acknowledged optional UNKNOWN values are not inferred."
+            "Canonical 84-room physical inventory is validated against the 12-category tariff catalogue. "
+            "A tariff category may have zero currently assigned rooms after an explicit owner correction; no synthetic inventory is created. "
+            "Checksum-bound owner approval remains required before production reconciliation."
         ),
     }
 
@@ -300,10 +324,11 @@ def main() -> int:
     args = parser.parse_args()
 
     rooms = load_rooms()
+    rates = load_rates()
     checklist = load_checklist()
-    structural_errors, issues = audit_rooms(rooms)
+    structural_errors, issues = audit_rooms(rooms, rates)
     structural_errors.extend(audit_checklist(checklist))
-    data = report(rooms, structural_errors, issues, checklist)
+    data = report(rooms, rates, structural_errors, issues, checklist)
 
     approval: dict[str, Any] | None = None
     approval_errors: list[str] = []
@@ -333,7 +358,12 @@ def main() -> int:
     if args.format == "json":
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
-        print(f"REGISTER: rooms={data['register']['room_count']} unique={data['register']['unique_room_codes']} room_types={data['register']['room_type_count']}")
+        print(
+            f"REGISTER: rooms={data['register']['room_count']} unique={data['register']['unique_room_codes']} "
+            f"room_types={data['register']['room_type_count']} inventory_room_types={data['register']['inventory_room_type_count']}"
+        )
+        if data["register"]["catalog_types_without_inventory"]:
+            print("CATALOG_WITHOUT_INVENTORY: " + ", ".join(data["register"]["catalog_types_without_inventory"]))
         print(f"SHA256: {data['register']['sha256']}")
         print(f"STRUCTURAL_ERRORS: {len(structural_errors)}")
         print(f"DRIVE_OWNER_QUESTIONS: {data['owner_checklist']['question_count']}")
