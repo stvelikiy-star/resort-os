@@ -56,7 +56,7 @@ async def ensure_kitchen_order_charge(conn, order_id: uuid.UUID, *, actor_type: 
                   s."guestId"
            FROM kitchen_orders o
            LEFT JOIN stays s ON s.id=o."stayId"
-           WHERE o.id=$1 FOR UPDATE''', order_id,
+           WHERE o.id=$1 FOR UPDATE OF o''', order_id,
     )
     if not order or not order["reservationId"]:
         return None
@@ -198,7 +198,7 @@ async def create_manual_charge(
             reservation = await conn.fetchrow(
                 '''SELECT r.id,r."primaryGuestId",s.id AS stay_id FROM reservations r
                    LEFT JOIN stays s ON s."reservationId"=r.id
-                   WHERE r.id=$1 AND r."propertyId"=$2 FOR UPDATE''', reservation_id, pid,
+                   WHERE r.id=$1 AND r."propertyId"=$2 FOR UPDATE OF r''', reservation_id, pid,
             )
             if not reservation:
                 raise HTTPException(status_code=404, detail="Reservation not found")
