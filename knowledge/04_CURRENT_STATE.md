@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 4.0
+Version: 4.1
 Date: 2026-09-05
-Status: RESORT OS 0.60.0 MERGED TO MAIN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP
+Status: RESORT OS 0.60.0 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP
 Canonical: YES
 Authority: factual implementation reality only
 
@@ -12,14 +12,21 @@ Authority: factual implementation reality only
 
 Repository: `stvelikiy-star/resort-os`.
 Release PR: `#112` — `feature/owner-corrections-20260905 -> main`.
-Exact tested PR head: `c8db446d367284465853850136c31274c8e39370`.
-Main merge commit: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
+Exact accepted executable head: `c8db446d367284465853850136c31274c8e39370`.
+Observed tree-equivalent main merge: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
+Post-merge truth-only main head: `00fdb8d1b583cf418e1c39709fb79ca248e462e4`.
 
-PR #112 completed **46/46 checks successfully, 0 failures** on the exact tested head before merge. The PR was merged with an expected-head SHA guard, so GitHub would have rejected the merge if the head moved.
+Evidence:
 
-After merge, the resulting `main` commit completed **35/35 triggered main checks successfully, 0 failures**.
+- PR #112 exact tested head: **46/46 checks SUCCESS, 0 failures**;
+- accepted executable head and observed main merge have **0 changed files** between them;
+- observed main merge: **35/35 triggered checks SUCCESS, 0 failures**;
+- post-merge truth-only head: **4/4 triggered checks SUCCESS, 0 failures**;
+- the post-merge truth delta changed canonical documentation only.
 
-The repository release baseline is therefore merged and regression-green. This is still **not evidence of an external Beget/staging/production deployment**.
+The machine-readable release manifest `release/current-rc.json` is deliberately refrozen to Resort OS `0.60.0` and the exact accepted executable boundary above.
+
+The production source branch is now `main` because the accepted executable release is merged there. This does **not** authorize external deployment or DNS cutover while governance and real-world launch evidence remain incomplete.
 
 ## Architecture authority
 
@@ -44,7 +51,7 @@ NFC acquiring/wallet remains deferred and outside active V1 composition.
 
 ## Database release contract
 
-The current committed migration chain contains **20 migrations**:
+The frozen 0.60.0 committed migration chain contains **20 migrations**:
 
 1. `0_init`
 2. `1_site_content`
@@ -67,7 +74,7 @@ The current committed migration chain contains **20 migrations**:
 19. `z18_site_media_slots_20260905`
 20. `z19_dining_table_status_guard_20260905`
 
-Shared release tooling currently fingerprints **81 critical domain constraints** through `scripts/release_contract.py`.
+Shared release tooling fingerprints **81 critical domain constraints** through `scripts/release_contract.py`.
 
 Production/staging migration mechanism is only:
 
@@ -210,30 +217,31 @@ No provider is considered live merely because repository validation is green. Re
 
 Repository result:
 
-- PR #112 exact tested head: **46/46 SUCCESS**;
-- merged `main` commit: **35/35 SUCCESS**;
-- main SHA: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
+- exact accepted executable head: `c8db446d367284465853850136c31274c8e39370` — **46/46 SUCCESS**;
+- tree-equivalent main merge: `e5efe074abb4a277c032b017ae5fb02c5d0d5039` — **35/35 SUCCESS**;
+- truth-only main head: `00fdb8d1b583cf418e1c39709fb79ca248e462e4` — **4/4 SUCCESS**;
+- frozen external-production manifest: `release/current-rc.json` now points to Resort OS 0.60.0.
 
-However, production governance remains fail-closed:
+Production governance remains fail-closed:
 
-- GitHub `main` branch is currently observed as **not protected** and required-check enforcement is off;
-- the frozen machine-readable RC manifest still represents the earlier explicitly frozen external-production candidate and has **not** been refrozen to the new main merge;
-- external Beget/staging/rollback/device/provider/monitoring/backup/DNS evidence is still incomplete;
+- GitHub `main` branch protection / required-check enforcement is **NOT VERIFIED**;
+- Google Drive launch-control permissions are **NOT VERIFIED** and prior audit found public writer exposure;
+- external Beget/staging/rollback/device/provider/monitoring/backup/DNS evidence is incomplete;
 - explicit final owner cutover approval has not been given.
 
-Therefore `main` being green does **not** authorize DNS switch or external production declaration.
+Therefore the refrozen RC does **not** authorize DNS switch or external production declaration.
 
 ## Deployment state
 
 ### GO — repository release engineering
 
-Resort OS 0.60.0 is merged to `main` and current triggered repository checks are green.
+Resort OS 0.60.0 is merged, regression-green and deliberately frozen as the internal external-production candidate.
 
 ### STOP — external production cutover
 
 External production remains **NOT VERIFIED / CUTOVER STOP** until the launch evidence gate is closed, including:
 
-1. GitHub branch protection / required checks;
+1. GitHub branch protection / required checks on `main`;
 2. Google Drive launch-control permission remediation/verification;
 3. actual Beget host/account preflight;
 4. verified legacy rollback package;
@@ -244,8 +252,7 @@ External production remains **NOT VERIFIED / CUTOVER STOP** until the launch evi
 9. monitoring/alerting evidence;
 10. fresh pre-cutover DB backup and off-site copy;
 11. DNS rollback capture;
-12. deliberate RC refreeze to the exact accepted release boundary;
-13. explicit owner cutover approval.
+12. explicit owner cutover approval.
 
 ## Launch rule
 
