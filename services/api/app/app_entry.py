@@ -8,6 +8,7 @@ from .communication_ingest import router as communication_ingest_router
 from .crm_sync import router as crm_sync_router
 from .dining_control import router as dining_control_router
 from .dining_entitlements import router as dining_entitlements_router
+from .dining_floor_layout import router as dining_floor_layout_router
 from .dining_seating import router as dining_seating_router
 from .dining_stays import router as dining_stays_router
 from .folio import router as folio_router
@@ -58,6 +59,7 @@ from .service_point_payments import public_router as service_point_payments_publ
 from .service_points import admin_router as service_points_admin_router
 from .service_points import public_router as service_points_public_router
 from .site_content import router as site_content_router
+from .site_media import router as site_media_router
 from .staff_control import router as staff_control_router
 from .staff_guest_requests import router as staff_guest_requests_router
 from .staff_task_reports import router as staff_task_reports_router
@@ -72,6 +74,7 @@ install_observability(app)
 # domain modules to evolve independently.
 app.include_router(health_router)
 app.include_router(site_content_router)
+app.include_router(site_media_router)
 app.include_router(public_ai_admin_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
@@ -124,6 +127,7 @@ app.include_router(dining_control_router)
 app.include_router(dining_entitlements_router)
 app.include_router(dining_seating_router)
 app.include_router(dining_stays_router)
+app.include_router(dining_floor_layout_router)
 app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
 app.include_router(guest_pin_admin_router)
@@ -149,4 +153,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Paid Service Point QR
 # does not reactivate NFC and cannot mutate accommodation payment truth.
-app.version = "0.58.0"
+app.version = "0.60.0"
