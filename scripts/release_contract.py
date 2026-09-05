@@ -20,6 +20,7 @@ EXPECTED_MIGRATIONS = (
     "7_kitchen_operations",
     "8_dining_service_control",
     "9_guest_offer_campaigns",
+    "10_service_point_paid_access",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -65,6 +66,17 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_offer_campaigns_window_check",
         "guest_offer_campaigns_audience_check",
         "guest_offer_events_type_check",
+        "service_point_access_profiles_currency_check",
+        "service_point_access_profiles_paid_config_check",
+        "service_point_payment_intents_amount_check",
+        "service_point_payment_intents_currency_check",
+        "service_point_payment_intents_lock_snapshot_check",
+        "service_point_payment_intents_expiry_check",
+        "service_point_payment_intents_paid_state_check",
+        "service_point_payment_intents_unlocked_state_check",
+        "service_point_payment_events_payload_check",
+        "service_point_lock_actions_attempts_check",
+        "service_point_lock_actions_result_check",
     }
 )
 
