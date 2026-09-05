@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import DiningFloorPlan from "./DiningFloorPlan";
 import styles from "./WaiterEntry.module.css";
 
 type User = { id: string; username: string; display_name: string; role: string };
@@ -239,7 +240,9 @@ export default function WaiterEntry() {
       <article><strong>{floor?.reservations.filter((item) => item.status === "BOOKED").length ?? 0}</strong><span>броней столов</span></article>
     </section>
 
-    <section className={styles.section}><div className={styles.sectionHead}><div><small>Floor plan</small><h2>Столы</h2></div><button onClick={() => void load()}>Обновить</button></div><div className={styles.tables}>{floor?.tables.map((table) => <article key={table.id} data-status={table.status}><div><strong>{table.code}</strong><span>{TABLE_LABEL[table.status] ?? table.status}</span></div><h3>{table.name}</h3><p>{table.seats} мест</p><div><button disabled={busy === table.id} onClick={() => void tableStatus(table, "OCCUPIED")}>Занят</button><button disabled={busy === table.id} onClick={() => void tableStatus(table, "CLEANING")}>Уборка</button><button disabled={busy === table.id} onClick={() => void tableStatus(table, "AVAILABLE")}>Свободен</button></div></article>)}</div></section>
+    <DiningFloorPlan user={{ id: user.id, role: user.role }} />
+
+    <section className={styles.section}><div className={styles.sectionHead}><div><small>Быстрые статусы</small><h2>Управление столами</h2></div><button onClick={() => void load()}>Обновить</button></div><div className={styles.tables}>{floor?.tables.map((table) => <article key={table.id} data-status={table.status}><div><strong>{table.code}</strong><span>{TABLE_LABEL[table.status] ?? table.status}</span></div><h3>{table.name}</h3><p>{table.seats} мест</p><div><button disabled={busy === table.id} onClick={() => void tableStatus(table, "OCCUPIED")}>Занят</button><button disabled={busy === table.id} onClick={() => void tableStatus(table, "CLEANING")}>Уборка</button><button disabled={busy === table.id} onClick={() => void tableStatus(table, "AVAILABLE")}>Свободен</button></div></article>)}</div></section>
 
     <section className={styles.two}>
       <div className={styles.section}><div className={styles.sectionHead}><div><small>Kitchen → waiter</small><h2>Активные заказы</h2></div></div><div className={styles.orders}>{floor?.orders.map((order) => <article key={order.id} className={order.status === "READY" ? styles.ready : ""}><div><strong>{order.order_number}</strong><span>{ORDER_LABEL[order.status] ?? order.status}</span></div><p>{order.table_code ? `${order.table_code} · ${order.table_name || "стол"}` : order.room_code ? `Номер ${order.room_code}` : order.source}</p><small>{order.waiter_name ? `Официант: ${order.waiter_name}` : "Официант не назначен"}</small><b>{order.total_kgs.toLocaleString("ru-RU")} KGS</b><div>{!order.waiter_id && <button disabled={busy === order.id} onClick={() => void claim(order)}>Взять заказ</button>}{order.status === "READY" && (order.waiter_id === user.id || user.role !== "DINING_STAFF") && <button className={styles.primary} disabled={busy === order.id} onClick={() => void serve(order)}>Выдано гостю</button>}</div></article>)}</div></div>
