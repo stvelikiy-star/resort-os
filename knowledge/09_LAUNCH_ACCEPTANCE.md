@@ -1,75 +1,61 @@
 # THREE CROWNS RESORT OS — LAUNCH ACCEPTANCE
 
-Version: 3.8
-Date: 2026-09-02
-Status: INTERNAL RC FROZEN / EXTERNAL CUTOVER STOP
+Version: 4.0
+Date: 2026-09-05
+Status: RESORT OS 0.60.0 INTERNAL RC FROZEN / EXTERNAL CUTOVER STOP
 Canonical: YES
 
-This document separates repository/CI evidence from external production evidence. It must never be used to imply that the new Resort OS is live.
+This document separates repository/CI evidence from external production evidence. It must never be used to imply that Resort OS is already live on the real hotel infrastructure.
 
-## 1. Current repository boundary
+## 1. Frozen release boundary
 
 Repository: `stvelikiy-star/resort-os`.
-Integration branch: `integration/site-pms-cms-20260827`.
-Accepted executable head: `ab6b649d91df5e9698253d43788cc657ca7040c9`.
-Observed integration merge: `c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4`.
+Release: `0.60.0`.
+Release PR: `#112` — `feature/owner-corrections-20260905 -> main`.
+Accepted executable head: `c8db446d367284465853850136c31274c8e39370`.
+Observed main merge: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
+Post-merge truth-only head: `00fdb8d1b583cf418e1c39709fb79ca248e462e4`.
 
-The exact PR #107 product/security head completed **20/20 applicable non-RC workflows successfully, 0 failures**. `Release RC Truth CI` intentionally failed before refreeze because the previous RC manifest still pointed at the prior accepted release.
+Evidence:
 
-The observed PR #107 integration merge has **0 changed files** versus the tested product head.
-
-PR #107 is a narrow provider-environment and final launch-governance hardening delta. It does not enable any provider and does not change PMS/Kitchen business logic, room inventory, pricing, payment authority, database schema or NFC scope.
-
-Previous accepted product evidence remains part of the same tree:
-
-- PR #102 customer-facing AI truth hardening: 17/17 applicable non-RC workflows SUCCESS;
-- PR #98 Kitchen/Core release baseline: 43/43 non-RC workflows SUCCESS.
+- exact PR #112 head: **46/46 checks SUCCESS, 0 failures**;
+- accepted executable head and observed main merge are tree-equivalent;
+- observed main merge: **35/35 triggered main checks SUCCESS, 0 failures**;
+- post-merge truth-only head: **4/4 triggered checks SUCCESS, 0 failures**;
+- the post-merge truth delta contains documentation only and no executable product drift.
 
 The machine-readable release boundary is `release/current-rc.json`, guarded by `scripts/release_rc_truth_guard.py`.
 
-`main` is not a production source. Stale `main` must not be used for Beget deployment or DNS cutover.
+The production source branch is `main` because the accepted 0.60.0 executable tree is merged there. This is a source-of-release statement only: production cutover remains unauthorized until all external/governance evidence gates are green.
 
 Repository/CI evidence is not external staging evidence and is not production evidence.
 
-## 2. Current AI / messaging truth boundary
+## 2. Product authority boundary
 
-Customer-facing automation reads hotel facts from Resort Core. The accepted facts require:
+Canonical architecture:
 
-- check-in `14:00`;
-- checkout `12:00`;
-- gym absent;
-- sports grounds absent;
-- laundry not promoted until normalized;
-- conference halls not promoted until normalized;
-- sauna winter-only, 5,000 KGS/hour, approximately 4–5 people;
-- billiards 500 KGS/hour;
-- table tennis free for staying guests;
-- parking approximately 20–30 cars, free for staying guests;
-- no unverified payment-method enumeration in customer-facing AI context;
-- public payment methods/providers remain `NOT_VERIFIED_FOR_LAUNCH` until real manager/provider evidence exists.
+`PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
 `ReservationRequest != Reservation`.
 
-AI/n8n may qualify a lead and create a `ReservationRequest`; it must not confirm payment, create a guaranteed Reservation, invent a fixed prepayment percentage, choose a payment route, check a guest in/out, refund money, mutate hotel finance or write PostgreSQL directly.
+OWNER/MANAGER retain reservation and payment authority. AI/n8n may qualify leads and create bounded requests, but may not:
 
-Provider success belongs to provider evidence. QUEUED/UNKNOWN/timeout is not delivery success.
+- confirm payment;
+- guarantee a Reservation;
+- invent a fixed prepayment percentage or payment route;
+- check a guest in/out;
+- refund money;
+- mutate hotel finance directly;
+- bypass Core availability/pricing;
+- write generic business truth directly to PostgreSQL.
 
-## 3. Provider environment security boundary
+Growth outbound authority remains `NONE_AUTOMATIC`.
 
-Providers remain optional. When a provider/model path is configured, repository preflight now fails closed on obvious placeholder or structurally weak configuration:
+NFC acquiring/wallet remains deferred outside active V1.
 
-- Telegram Sales: real/non-placeholder token; webhook secret real/non-placeholder and at least 24 characters;
-- GREEN API: both ID and token real/non-placeholder; webhook secret real/non-placeholder and at least 24 characters;
-- OpenAI: any configured Resort OS OpenAI model requires a real/non-placeholder `OPENAI_API_KEY`;
-- Staff Voice: real Telegram bot token plus real/non-placeholder staff webhook secret at least 24 characters when transcription is configured.
+## 3. Canonical database release contract
 
-Obvious placeholder forms such as `CHANGE_ME`, `REPLACE_ME`, `PLACEHOLDER`, `YOUR_*`, `NOT_SET` and related markers are rejected.
-
-The exact PR #107 head passed the deterministic provider-security matrix and the Beget preflight integration cases. This is configuration-hygiene evidence only; it is **not provider launch E2E** and does not prove any provider is live.
-
-## 4. Canonical database release contract
-
-Exact committed migration ledger:
+The frozen 0.60.0 release contains **20 committed migrations**:
 
 1. `0_init`
 2. `1_site_content`
@@ -79,6 +65,20 @@ Exact committed migration ledger:
 6. `5_guest_os_core`
 7. `6_service_point_qr_operations`
 8. `7_kitchen_operations`
+9. `8_dining_service_control`
+10. `9_guest_offer_campaigns`
+11. `z10_service_point_paid_access`
+12. `z11_owner_corrections_20260905`
+13. `z12_guest_service_settings_20260905`
+14. `z13_housekeeping_charges_20260905`
+15. `z14_dining_entitlements_20260905`
+16. `z15_group_bookings_20260905`
+17. `z16_site_media_20260905`
+18. `z17_dining_floor_layout_20260905`
+19. `z18_site_media_slots_20260905`
+20. `z19_dining_table_status_guard_20260905`
+
+The shared release contract fingerprints **81 critical domain constraints** through `scripts/release_contract.py`.
 
 External staging and production migration mechanism:
 
@@ -90,97 +90,96 @@ npx prisma migrate deploy
 cd ../..
 ```
 
-`prisma db push` is not the external staging or production migration mechanism.
+Do not use `prisma db push` for external staging or production migration.
 
-The shared release contract maintains 27 critical hotel/payment PostgreSQL constraints. Kitchen migration/domain checks add their own menu/table/order/item invariants.
+The production-like acceptance run on clean PostgreSQL 16 proved:
 
-`prisma` and `@prisma/client` remain pinned exactly to `6.12.0`; deterministic lockfile install and database dependency security are release gates.
+- all 20 committed migrations apply cleanly;
+- Prisma migration status is current;
+- canonical seed = 84 rooms / 12 room categories / 48 rate rows;
+- Core, Public Web, Admin and Staff/Kitchen release contours pass;
+- the release E2E and database invariants pass.
 
-## 5. Canonical physical-room contract
+## 4. Physical room contract
 
 Physical-room data collection is closed. Do not ask the owner for the room register again.
 
 Canonical authority:
 
-- `data-intake/rooms.csv` — exactly 84 physical rooms / 12 mapped categories;
-- `data-intake/room-register-owner-approval.json` — checksum-bound owner approval;
-- `data-intake/owner-room-checklist.json` — provenance/history.
-
-The old mutable Google `ROOMS_IMPORT` spreadsheet is provenance only and must not become a parallel production source.
+- `data-intake/rooms.csv` — 84 physical rooms / 12 mapped categories;
+- checksum-bound owner approval evidence in the repository;
+- 48 rate rows in the accepted property seed.
 
 Remaining external room gate:
 
-```text
-real staging DB -> importer dry-run -> exact diff review -> safe apply -> final zero diff evidence
-```
+`real staging DB -> importer dry-run -> exact diff review -> safe apply -> final zero-diff evidence`.
 
-`scripts/import_physical_rooms.py` is dry-run by default, preserves existing runtime room operational state, does not change rates/reservations/payments/inventory blocks, and refuses unsafe apply conditions.
+## 5. Repository/CI verified product surface
 
-## 6. What is repository/CI verified
+The frozen release contains regression-gated contracts for:
 
-The accepted tree contains verified contracts for:
-
-- public site truth and RU/KG/EN rendering;
+- Public Site RU/KG/EN truth and CMS published-only runtime;
 - Transfer before Tours;
-- Core availability/pricing;
-- website `ReservationRequest` boundary;
+- Core availability/pricing and ReservationRequest boundary;
 - PMS chessboard, move/resize/Split Stay, stale/conflict protection and realtime;
 - Reception RBAC and CLEAN check-in gate;
 - Stay / RoomAssignment lifecycle;
-- Guest OS Room QR / PIN / HttpOnly session / requests;
-- Guest CRM factual history/preferences;
-- MAID / TECHNICIAN operations and staff voice;
-- Kitchen Admin, editable provisional menu, factual table register and Kitchen order lifecycle;
-- transactional check-in -> Dining arrival card;
-- Kitchen finance isolation from Hotel Payment/accommodation total;
+- Room QR / Guest PIN / HttpOnly GuestSession;
+- Guest OS requests, Marketplace and manager-controlled offers;
+- Guest CRM history/preferences;
+- MAID / TECHNICIAN / DINING staff operations;
+- Kitchen Admin, menu publication, stop-list, table reservations and visual Dining Floor;
+- Stay-linked Dining Sessions and Kitchen order lifecycle;
+- atomic group booking;
+- guest folio charges separated from actual Payments;
+- Payment idempotency, debt/remaining/overpaid views and owner analytics;
 - Service Point QR without Guest/Stay/Reservation/Payment leakage;
-- Payment fact/idempotency and owner finance/analytics boundaries;
-- unified inbox and provider-evidence semantics;
+- unified messaging inbox and provider-evidence semantics;
 - n8n/Core authority boundary;
 - provider environment fail-closed validation;
-- backup -> clean restore contract;
-- dependency security checks;
+- backup/restore tooling and release linkage tooling;
 - production package build contract;
-- CI-local staging;
-- exact Git SHA -> deployed image linkage verifier;
-- external staging acceptance orchestrator;
 - fail-closed launch verifier;
-- NFC deferred scope.
+- NFC deferred boundary.
 
-These checks do not prove external Beget networking, real devices, real provider delivery, actual monitoring, branch protection, Drive permission remediation or current live rollback readiness.
+This does not prove the real Beget host, real devices, real provider delivery, real monitoring, branch protection, Drive permission remediation, backups or current-live rollback readiness.
 
-## 7. Mandatory governance gates before final GO
-
-The final structural cutover verifier now requires both of these gates to be `VERIFIED`:
+## 6. Mandatory governance gates before final GO
 
 ### GitHub branch protection — issue #91
 
-Current factual state: **NOT VERIFIED**.
+Current state: **NOT VERIFIED**.
 
-The canonical integration branch currently reports `protected:false`; required status-check enforcement is off. Before production GO require evidence of the approved protection/PR/check/force-push policy and a fresh metadata read proving the policy is active.
+The actual production source branch is now `main`. Before production GO require:
+
+- `main` protected against force push/deletion;
+- PR/check discipline enforced for release changes;
+- required checks configured for the accepted release boundary;
+- fresh GitHub metadata proving protection is active;
+- a test PR proving required checks still execute normally.
 
 ### Google Drive launch-control permissions — issue #100
 
-Current factual state: **NOT VERIFIED**.
+Current state: **NOT VERIFIED**.
 
-Permission audit on 2026-09-02 found **13/13 top-level Three Crowns project folders expose `anyone with link -> writer`**, including the hierarchy containing current control Docs/Sheets. Before production GO public writer access must be removed/downgraded project-wide, named editors retained, any public links reader-only/disabled, and fresh metadata must prove no current operational/control surface retains `anyone:writer`.
+The last verified permission audit found public writer access on the top-level Three Crowns project hierarchy. Before production GO require removal/downgrade of `anyone:writer`, named editors only where appropriate, and a fresh permission audit proving current operational/control surfaces are not publicly writable.
 
-The connected toolset cannot safely mutate either external governance control, so neither gate is claimed fixed.
+Neither governance gate may be treated as fixed without external metadata evidence.
 
-## 8. External hard blockers
+## 7. External hard blockers
 
 Production cutover remains **STOP** until all required evidence below is real and current:
 
-1. VERIFIED GitHub branch protection / required-check enforcement;
+1. VERIFIED GitHub branch protection / required-check enforcement on `main`;
 2. VERIFIED Google Drive launch-control permission hardening;
 3. actual Beget host/account/network non-destructive preflight;
 4. verified rollback package for the currently live legacy `3korony.com` target;
 5. restore rehearsal / rollback gate success;
 6. isolated external HTTPS/WSS staging;
-7. exact accepted SHA/image linkage on that staging deployment;
+7. exact accepted SHA/image linkage on staging;
 8. external public-truth probe;
-9. real staging room reconciliation to the canonical 84-room register;
-10. real iPhone/Android/desktop/Telegram/Staff/Kitchen acceptance;
+9. real staging room reconciliation to 84 rooms / 12 categories;
+10. real iPhone / Android / desktop / Telegram / Staff / Kitchen acceptance;
 11. real E2E for every provider enabled at launch;
 12. real monitoring/alerting evidence;
 13. fresh pre-cutover backup and verified off-site copy;
@@ -189,47 +188,48 @@ Production cutover remains **STOP** until all required evidence below is real an
 
 No GitHub CI result by itself authorizes production DNS changes.
 
-## 9. Fail-closed repository checks
+## 8. Repository gates
 
-Repository release truth:
+Release truth:
 
 ```bash
 python scripts/release_rc_truth_guard.py
+```
+
+Repository launch structure:
+
+```bash
 python scripts/verify_launch_acceptance.py --mode repository
 ```
 
-Final cutover evidence verifier, only after real external evidence exists:
+Final structural cutover evidence validator, only after real external evidence exists:
 
 ```bash
 python scripts/verify_launch_acceptance.py \
   --mode cutover \
   --manifest /secure/path/launch-evidence.json \
-  --release-sha <EXACT_ACCEPTED_RELEASE_SHA>
+  --release-sha c8db446d367284465853850136c31274c8e39370
 ```
 
-The final manifest structurally requires `github_branch_protection` and `drive_launch_control_permissions` in addition to the other external gates. The verifier validates supplied evidence; it does not manufacture external proof.
+The verifier validates supplied evidence metadata. It does not manufacture external proof.
 
-Never commit credentials, provider tokens, database passwords or production secrets into launch evidence.
-
-## 10. Mandatory external staging order
+## 9. External staging order
 
 After authorized Beget/SSH access exists, execute in this order and stop on any failed gate.
 
-### Phase 0 — release source and governance
-
-Before deployment work, require VERIFIED #91 and #100 evidence in the launch-control process. Then on the canonical integration branch:
+### Phase 0 — exact release source
 
 ```bash
 git fetch origin
-git checkout integration/site-pms-cms-20260827
+git checkout main
 git pull --ff-only
 python scripts/release_rc_truth_guard.py
 python scripts/beget_deployment_guard.py
 ```
 
-Read `accepted_executable_head` from `release/current-rc.json`. Build/deploy the exact accepted SHA, not an unpinned moving branch.
+Read `accepted_executable_head` from `release/current-rc.json` and build/deploy that exact SHA, not an unpinned moving branch.
 
-### Phase 1 — host preflight
+### Phase 1 — host/env preflight
 
 ```bash
 bash scripts/host_preflight.sh
@@ -239,96 +239,35 @@ python scripts/beget_env_preflight.py \
   --network
 ```
 
-Do not change live routing/DNS here. Provider credentials may remain absent while those providers are disabled; any configured provider path must pass the fail-closed secret validation.
+No live routing/DNS change is allowed in this phase.
 
-### Phase 2 — legacy rollback capture and proof
+### Phase 2 — legacy rollback evidence
 
-Capture the actual live web root, authoritative DNS, real database presence/absence, uploads/media, runtime/reverse-proxy configuration, checksums, timestamps, off-site copy and responsible rollback owner.
+Capture real live web root/source, DNS/TTL, database presence/absence, uploads/media, proxy/runtime config, checksums, timestamps, off-site copy and rollback ownership.
 
-Then verify/rehearse and require:
-
-```bash
-python scripts/legacy_rollback_verify.py <ROLLBACK_EVIDENCE_DIR> --mark-verified
-python scripts/legacy_rollback_gate.py <ROLLBACK_EVIDENCE_DIR>
-```
-
-Required result:
-
-`RESULT: CUTOVER_ROLLBACK_PREREQUISITE_GREEN`
-
-No external deployment path may risk the legacy live target before this gate is green.
+Then require the repository rollback verifier/gate to be green before any risky cutover action.
 
 ### Phase 3 — isolated external staging
 
 - provision staging-only secrets and persistent storage;
-- provision private PostgreSQL;
-- apply all eight migrations with `prisma migrate deploy`;
+- start private PostgreSQL 16;
+- apply all 20 migrations with `prisma migrate deploy`;
+- perform canonical room reconciliation dry-run -> review -> safe apply;
 - load approved factual baseline only;
-- run canonical room dry-run -> review -> safe apply;
-- deploy exact accepted SHA;
+- deploy exact accepted SHA `c8db446d367284465853850136c31274c8e39370`;
 - start Core, Public, Admin/PMS, Staff/Kitchen and required n8n services;
-- verify HTTPS, WSS, cookies, CORS, persistence and private database topology.
+- verify HTTPS/WSS/cookies/CORS/persistence/private database;
+- record exact image/runtime revision labels.
 
-### Phase 4 — release linkage
+### Phase 4 — external acceptance
 
-```bash
-python scripts/deployment_release_linkage.py \
-  --expected-sha <EXACT_ACCEPTED_RELEASE_SHA> \
-  --compose-file compose.beget.yaml \
-  --env-file /secure/path/.env.staging \
-  --output <NON_SECRET_RELEASE_LINKAGE_JSON>
-```
+Run the external staging acceptance tooling against real staging URLs and retain evidence. Then complete real-device, provider, monitoring, backup and restore acceptance.
 
-Dirty checkout, missing service, stopped service, missing revision label or SHA mismatch is a hard failure.
-
-### Phase 5 — atomic external acceptance
-
-```bash
-STAGING_ACCEPTANCE_MUTATIONS=I_UNDERSTAND_SYNTHETIC_WRITES \
-APP_ENV=staging \
-python scripts/external_staging_acceptance.py \
-  --expected-sha <EXACT_ACCEPTED_RELEASE_SHA> \
-  --rollback-evidence-dir <ROLLBACK_EVIDENCE_DIR> \
-  --public-url https://<PUBLIC_STAGING_HOST>/ \
-  --core-url https://<API_STAGING_HOST> \
-  --admin-url https://<ADMIN_STAGING_HOST>/ \
-  --staff-url https://<STAFF_STAGING_HOST>/ \
-  --ws-url wss://<API_STAGING_HOST> \
-  --compose-file compose.beget.yaml \
-  --env-file /secure/path/.env.staging \
-  --backup-dir <REAL_BACKUP_DIR> \
-  --disk-path <REAL_APP_DISK_PATH> \
-  --output-dir <NEW_EMPTY_EXTERNAL_ACCEPTANCE_DIR>
-```
-
-Required result:
-
-`RESULT: EXTERNAL STAGING ACCEPTANCE GREEN`
-
-The runner requires staging hostnames and does not perform production DNS switch.
-
-### Phase 6 — real devices/providers/monitoring
-
-After scripted staging acceptance is green, record real evidence for:
-
-- iPhone Safari;
-- Android Chrome;
-- desktop;
-- Telegram Mini App where enabled;
-- PMS realtime/reconnect;
-- Staff MAID/TECHNICIAN;
-- Kitchen/DINING_STAFF;
-- Guest OS;
-- provider delivery/idempotency for each provider enabled at launch;
-- actual alert delivery, backup age/off-site copy and restore evidence.
-
-Templates, mocks, static credential validation and CI do not replace this phase.
-
-## 11. Final cutover sequence
+## 10. Final cutover sequence
 
 Only after every required external/governance gate is VERIFIED:
 
-1. freeze exact accepted SHA/image set;
+1. reconfirm frozen RC manifest and exact accepted SHA;
 2. take fresh pre-cutover backup and verify off-site copy;
 3. confirm legacy rollback package and DNS rollback target;
 4. rerun host and production preflight;
@@ -336,11 +275,11 @@ Only after every required external/governance gate is VERIFIED:
 6. obtain explicit owner GO;
 7. deploy exact accepted release image set;
 8. run readiness/smoke before public switch;
-9. change routing/DNS in the controlled window;
-10. smoke public truth, booking, PMS, Guest OS, Staff, Kitchen and WSS;
+9. change routing/DNS in a controlled window;
+10. smoke Public Site, booking, PMS, Guest OS, Staff, Kitchen and WSS;
 11. monitor errors/database/containers;
 12. roll back immediately if acceptance criteria fail.
 
-Database rollback uses the rehearsed backup/restore path. Do not improvise destructive reverse SQL.
+Database rollback uses the rehearsed backup/restore path; do not improvise destructive reverse SQL.
 
 Until explicit owner GO and every prerequisite above are complete, status remains **EXTERNAL PRODUCTION CUTOVER STOP**.
