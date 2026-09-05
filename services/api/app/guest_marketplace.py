@@ -1,4 +1,3 @@
-import json
 import uuid
 from typing import Any
 
@@ -64,15 +63,13 @@ async def create_guest_marketplace_order(
             qr, stay, session = await authorized_context(conn, token, tc_guest_session)
 
             requested_ids = {item.menu_item_id for item in payload.items}
-            published_ids = set(
-                await conn.fetch(
-                    '''SELECT id FROM kitchen_menu_items
-                       WHERE "propertyId"=$1 AND "isActive"=true AND "isDraft"=false
-                         AND id=ANY($2::uuid[])''',
-                    qr["propertyId"], list(requested_ids),
-                )
+            published_rows = await conn.fetch(
+                '''SELECT id FROM kitchen_menu_items
+                   WHERE "propertyId"=$1 AND "isActive"=true AND "isDraft"=false
+                     AND id=ANY($2::uuid[])''',
+                qr["propertyId"], list(requested_ids),
             )
-            published_ids = {row["id"] for row in published_ids}
+            published_ids = {row["id"] for row in published_rows}
             if requested_ids != published_ids:
                 raise HTTPException(
                     status_code=409,
