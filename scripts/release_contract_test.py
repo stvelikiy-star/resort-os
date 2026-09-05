@@ -19,7 +19,7 @@ def main() -> int:
     assert EXPECTED_MIGRATIONS[-3:] == (
         "8_dining_service_control",
         "9_guest_offer_campaigns",
-        "10_service_point_paid_access",
+        "z10_service_point_paid_access",
     )
     assert len(CRITICAL_CONSTRAINTS) == 48
     assert {
