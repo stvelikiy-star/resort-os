@@ -12,6 +12,7 @@ from .dining_seating import router as dining_seating_router
 from .dining_stays import router as dining_stays_router
 from .folio import router as folio_router
 from .google_control import router as google_control_router
+from .group_bookings import router as group_bookings_router
 from .growth_control import router as growth_control_router
 from .guest_crm import router as guest_crm_router
 from .guest_marketplace import router as guest_marketplace_router
@@ -104,6 +105,7 @@ app.include_router(guest_offers_admin_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)
+app.include_router(group_bookings_router)
 app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)
 app.include_router(guest_os_admin_router)
@@ -147,4 +149,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Paid Service Point QR
 # does not reactivate NFC and cannot mutate accommodation payment truth.
-app.version = "0.57.0"
+app.version = "0.58.0"
