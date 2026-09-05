@@ -31,6 +31,24 @@ ROOM_TYPE_CODES = {
     "Квартиры / апартаменты с кухней": "APARTMENT_KITCHEN",
 }
 
+# Owner correction supersedes the older intake reconstruction for these exact rooms.
+# Keep untouched raw bed/area fields because the owner correction only changes location,
+# operational existence/capacity and category.
+OWNER_ROOM_CORRECTIONS = {
+    "501": {
+        "floor": "BASEMENT",
+        "room_type": "Двухместный стандарт, цоколь",
+        "capacity_adults": "2",
+        "note": "OWNER_APPROVED_2026-09-05: basement above laundry; operational; two-person room",
+    },
+    "502": {
+        "floor": "BASEMENT",
+        "room_type": "Двухместный стандарт, цоколь",
+        "capacity_adults": "2",
+        "note": "OWNER_APPROVED_2026-09-05: basement above laundry; operational; two-person room",
+    },
+}
+
 
 def database_url() -> str:
     value = os.environ.get("DATABASE_URL", "postgresql://resort:resort@localhost:5432/resort_os")
@@ -58,6 +76,18 @@ def clean(value: str | None) -> str | None:
 def load_rooms() -> list[dict]:
     with ROOMS_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
+
+    for row in rows:
+        code = row["room_code"].strip()
+        correction = OWNER_ROOM_CORRECTIONS.get(code)
+        if not correction:
+            continue
+        row["floor"] = correction["floor"]
+        row["room_type"] = correction["room_type"]
+        row["capacity_adults"] = correction["capacity_adults"]
+        existing = clean(row.get("notes"))
+        row["notes"] = f"{existing}; {correction['note']}" if existing else correction["note"]
+
     codes = [r["room_code"].strip() for r in rows]
     if len(rows) != 84:
         raise RuntimeError(f"Expected 84 room rows, got {len(rows)}")
