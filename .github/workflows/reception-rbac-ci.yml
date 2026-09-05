@@ -13,6 +13,7 @@ on:
       - 'services/api/app/pms_chessboard_read.py'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/ReceptionBoard.tsx'
+      - 'apps/admin/components/ReservationFolioPanel.tsx'
       - 'scripts/verify_reception_rbac.py'
       - '.github/workflows/reception-rbac-ci.yml'
   workflow_dispatch:
