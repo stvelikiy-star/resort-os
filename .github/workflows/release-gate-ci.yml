@@ -3,6 +3,7 @@ name: Resort OS Release Gate
 on:
   push:
     branches:
+      - main
       - 'feature/**'
     paths:
       - 'services/api/**'
@@ -10,6 +11,7 @@ on:
       - 'apps/**'
       - 'scripts/**'
       - '.github/workflows/release-gate-ci.yml'
+      - '.github/workflows/n8n-core-contract-ci.yml'
   pull_request:
     paths:
       - 'services/api/**'
@@ -17,6 +19,7 @@ on:
       - 'apps/**'
       - 'scripts/**'
       - '.github/workflows/release-gate-ci.yml'
+      - '.github/workflows/n8n-core-contract-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -55,6 +58,8 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       SMOKE_OWNER_USERNAME: ci-owner
       SMOKE_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      AUTOMATION_SERVICE_KEY: CI-RELEASE-GATE-AUTOMATION-KEY-2026-THREE-CROWNS
+      AUTOMATION_SERVICE_NAME: ci-release-gate
       COOKIE_SECURE: false
 
     steps:
@@ -197,6 +202,30 @@ jobs:
 
       - name: Existing Site / PMS / CMS smoke
         run: python scripts/site_pms_cms_smoke.py
+
+      - name: Verify owner-approved automation truth
+        run: |
+          curl --fail -sS http://127.0.0.1:8000/api/v1/automation/read/hotel-facts \
+            -H "X-Resort-Service-Key: $AUTOMATION_SERVICE_KEY" > /tmp/release-hotel-facts.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/release-hotel-facts.json'))
+          assert d['property']['code']=='THREE_CROWNS'
+          assert d['inventory']['room_count']==84
+          assert d['inventory']['room_type_count']==12
+          facts=d['guest_facts']
+          assert facts['version']=='2026-09-05'
+          assert facts['public_contacts']['reservation_phone']['value']=='+996 558 08 50 02'
+          assert facts['public_contacts']['manager_phone']['value']=='+996 558 08 50 02'
+          conference=facts['facilities']['conference_halls']
+          assert conference['value'] is True
+          assert conference['status']=='CONFIRMED_OWNER_RULE'
+          assert conference['capacity_min']==20 and conference['capacity_max']==120
+          assert conference['banquet_use'] is True
+          assert facts['booking_truth']['old_two_day_unpaid_rule']['status']=='STALE_DO_NOT_USE'
+          assert facts['payment_methods_2026']['status']=='NOT_VERIFIED_FOR_LAUNCH'
+          print('Automation truth verified: owner-approved 2026-09-05 facts')
+          PY
 
       - name: Release 0.60 full-domain E2E
         run: python scripts/release_060_e2e.py
