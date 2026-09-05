@@ -9,6 +9,7 @@ from .crm_sync import router as crm_sync_router
 from .dining_control import router as dining_control_router
 from .dining_entitlements import router as dining_entitlements_router
 from .dining_seating import router as dining_seating_router
+from .dining_stays import router as dining_stays_router
 from .google_control import router as google_control_router
 from .growth_control import router as growth_control_router
 from .guest_crm import router as guest_crm_router
@@ -118,6 +119,7 @@ app.include_router(kitchen_arrivals_router)
 app.include_router(dining_control_router)
 app.include_router(dining_entitlements_router)
 app.include_router(dining_seating_router)
+app.include_router(dining_stays_router)
 app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
 app.include_router(guest_pin_admin_router)
@@ -143,4 +145,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Paid Service Point QR
 # does not reactivate NFC and cannot mutate accommodation payment truth.
-app.version = "0.56.0"
+app.version = "0.56.1"
