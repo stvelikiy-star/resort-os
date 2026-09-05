@@ -1,0 +1,32 @@
+.v3-territory-film video,
+.v3-amenities-photo video{width:100%;height:100%;display:block;object-fit:cover}
+
+.v3-territory-film video{height:min(72vw,760px);object-position:center center}
+
+.v3-lake-film{position:relative;isolation:isolate;background:#17372d}
+.v3-lake-film video{position:absolute;inset:0;object-position:center center}
+.v3-lake-film:after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,transparent 48%,rgba(5,25,18,.72) 100%);pointer-events:none}
+.v3-lake-film figcaption{position:absolute;z-index:2;left:24px;right:24px;bottom:22px;display:grid;gap:4px;color:#fff}
+.v3-lake-film figcaption span{color:#e5c98f;font-size:.6rem;font-weight:850;letter-spacing:.12em;text-transform:uppercase}
+.v3-lake-film figcaption strong{font-family:var(--serif);font-size:clamp(1.1rem,2vw,1.55rem);font-weight:500;letter-spacing:-.025em}
+.v3-water-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.v3-water-tags span{padding:9px 11px;border:1px solid rgba(20,67,51,.18);background:rgba(255,255,255,.42);color:#365547;font-size:.65rem;font-weight:800}
+
+@media(max-width:900px){
+  .v3-amenities-photo{min-height:520px}
+  .v3-territory-film video{height:62vw;min-height:360px}
+}
+
+@media(max-width:640px){
+  .v3-amenities-photo{min-height:430px}
+  .v3-territory-film{margin-left:0;margin-right:0}
+  .v3-territory-film video{height:68svh;min-height:460px}
+  .v3-film-caption{left:14px;right:14px;bottom:14px}
+  .v3-lake-film figcaption{left:18px;right:18px;bottom:18px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .v3-hero-media video,
+  .v3-territory-film video,
+  .v3-amenities-photo video{animation:none}
+}

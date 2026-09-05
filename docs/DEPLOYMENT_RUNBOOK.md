@@ -1,234 +1,282 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Date: 2026-08-26
-Status: PREPARED / NOT YET PRODUCTION EXECUTED
+Version: 3.2
+Date: 2026-09-05
+Status: RELEASE-CANDIDATE HANDOFF / CI-LOCAL VERIFICATION REQUIRED / EXTERNAL CUTOVER STOP
 
-This document defines a deployment path. It is not evidence that production deployment has happened.
+This runbook defines controlled external deployment and cutover. It is **not evidence that production deployment has happened**.
 
-## 1. Deployment units
+Canonical implementation state: `knowledge/04_CURRENT_STATE.md`.
+Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md`.
+Canonical release manifest: `release/current-rc.json`.
 
-Current container topology:
+**CI VERIFIED != EXTERNAL VERIFIED != PRODUCTION VERIFIED.**
 
-- PostgreSQL 16;
-- FastAPI Resort Core (`api`);
-- public Next.js site (`web`);
-- PMS/admin Next.js application (`admin`);
-- staff Next.js PWA (`staff`).
+---
 
-Source: `compose.production.yaml`.
+## 1. Release authority
 
-NFC is outside the active deployment scope.
+Repository: `stvelikiy-star/resort-os`.
+Integration branch: `integration/site-pms-cms-20260827`.
 
-## 2. Required production inputs
+Only an exact integration SHA whose full applicable regression and release gates are green may be frozen as the internal RC. Historical Vercel previews and stale `main` are not release authority.
 
-Before deployment provide only real infrastructure/configuration values:
+The merge tree must be compared against the exact tested PR head. A non-empty tested-head -> merge diff invalidates the evidence and requires another regression cycle.
 
-- deployment host or platform;
-- PostgreSQL credentials/storage;
-- final public/admin/staff/API hostnames;
-- HTTPS/TLS termination;
-- owner bootstrap credentials delivered out-of-band and cleared after bootstrap;
-- long random n8n/Resort Core service secret;
-- Telegram/OpenAI credentials only if the corresponding staff automation is activated;
-- owned public-site media.
+---
 
-V1 does **not** require an automated acquiring/payment provider. The manager decides and collects prepayment manually; Resort OS records only manager-confirmed internal payment facts.
+## 2. Deployment topology
 
-Never commit real secrets.
+Approved V1 topology:
 
-## 3. Hard production blockers
+- Caddy HTTPS/WSS edge;
+- PostgreSQL 16 private to deployment network;
+- FastAPI Resort Core;
+- public Next.js site;
+- Resort OS admin/PMS;
+- staff PWA, including Kitchen Admin;
+- pinned n8n runtime when automation is enabled;
+- persistent PostgreSQL/media/n8n state;
+- local backup directory plus verified off-site copy.
 
-Do not cut over production while any of these remain unresolved:
+Canonical authority:
 
-1. Current `main` has not been executed through an accepted verification path after the GitHub Actions runner issue.
-2. Database migration history is not yet a production-grade Prisma migration chain. Development currently uses schema bootstrap/db-push plus explicit SQL constraints. Before production, create and rehearse a baseline migration in staging.
-3. Backup + clean restore has not been rehearsed against the current schema.
-4. Public-site temporary/hotlinked media has not been replaced with owned Three Crowns assets.
-5. Final DNS/TLS/hostnames have not been approved.
-6. Monitoring/rollback acceptance has not been completed.
+`PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`.
 
-Automated acquiring is intentionally not a V1 production blocker under the current owner-approved manager-prepayment workflow.
+NFC acquiring/wallet remains outside active V1 runtime.
 
-## 4. Local release-candidate verification
+---
 
-While GitHub Actions jobs are being created but fail before executing steps (`steps=null`), run the repository-local verifier before staging/demo:
+## 3. Database release contract
 
-```bash
-bash scripts/release_candidate_check.sh
-```
+Committed migration chain:
 
-Optional synthetic presentation data after the check:
+1. `0_init`
+2. `1_site_content`
+3. `2_guest_service_tasks`
+4. `3_owner_analytics_snapshots`
+5. `4_guest_engagements`
+6. `5_guest_os_core`
+7. `6_service_point_qr_operations`
+8. `7_kitchen_operations`
+9. `8_dining_service_control`
+10. `9_guest_offer_campaigns`
 
-```bash
-RC_SEED_DEMO=1 bash scripts/release_candidate_check.sh
-```
-
-The local check validates/builds the canonical applications and Core development baseline. It does not replace the production migration/backup/staging gates.
-
-Presentation sequence and acceptance wording:
-
-`docs/DEMO_ACCEPTANCE_2026-08-26.md`.
-
-## 5. Staging sequence
-
-Use a clean staging database.
-
-1. Copy `.env.production.example` to a host-only `.env.production` and replace all placeholders.
-2. Create a database backup location before loading any real import.
-3. Build images:
+Production/staging migration mechanism:
 
 ```bash
-docker compose --env-file .env.production -f compose.production.yaml build
+npx prisma migrate deploy
 ```
 
-4. Prepare database schema in staging using the current canonical Prisma schema and `packages/database/sql/*.sql`.
+Do **not** use `prisma db push` for production migration.
 
-IMPORTANT: until a migration baseline is generated, this is a staging bootstrap procedure, not the approved production migration mechanism.
+The shared release contract maintains 37 critical hotel/payment/operations domain constraints. Kitchen/Dining/Guest Offer migration/domain gates additionally verify menu/table/order/item constraints, daily publication, table reservation, waiter assignment, offer targeting/actions/events and the unique GuestTask -> KitchenOrder link.
 
-5. Load the evidence-backed Three Crowns seed only into an empty/staging property database.
+Production evidence must capture:
 
-The seed must continue to reconcile to exactly 84 rooms and 12 categories.
+- exact release SHA/image set;
+- backup before migration;
+- migration command/result;
+- exact ten-migration ledger;
+- readiness/smoke result;
+- tested restore path.
 
-6. Bootstrap the first OWNER account out-of-band with `scripts/bootstrap_owner.py`, then clear `BOOTSTRAP_OWNER_PASSWORD` before production preflight.
-7. Start containers:
+---
+
+## 4. Business authority boundary
+
+`ReservationRequest != Reservation`.
+
+OWNER/MANAGER retain reservation confirmation and payment fact authority.
+
+AI/n8n must not guarantee a Reservation, confirm payment, invent a fixed prepayment percentage/payment route, bypass Core pricing/availability or write generic business state directly to PostgreSQL.
+
+Kitchen is also Core-backed. `KitchenOrder.totalKgs` is an operational amount and does **not** automatically create `Payment` or change `Reservation.totalKgs`.
+
+Growth outbound authority remains `NONE_AUTOMATIC`.
+
+---
+
+## 5. Hard external production blockers
+
+Physical room import gate #38 is already closed at the canonical 84-room / 12-category register. Do not collect the room register again.
+
+Production cutover remains **STOP** while any required external evidence is missing:
+
+1. real target room reconciliation against the canonical register;
+2. actual Beget host/account non-destructive preflight;
+3. verified rollback backup of the currently live legacy target;
+4. isolated external HTTPS/WSS staging;
+5. external public-truth probe;
+6. real iPhone/Android/desktop/Telegram/staff/Kitchen acceptance;
+7. provider E2E for every provider enabled at launch;
+8. real monitoring/alerting evidence;
+9. fresh pre-cutover database backup and off-site copy;
+10. exact DNS rollback capture;
+11. explicit final owner cutover approval.
+
+No GitHub CI result by itself authorizes production DNS switch or provider activation.
+
+---
+
+## 6. Fail-closed launch evidence
+
+Template: `release/launch-evidence.example.json`.
+
+Repository gate:
 
 ```bash
-docker compose --env-file .env.production -f compose.production.yaml up -d
+python scripts/verify_launch_acceptance.py --mode repository
 ```
 
-8. Verify Core canonical probes:
+Final structural evidence gate:
 
-- `/health/live` returns process liveness;
-- `/health/ready` returns database/property readiness and inventory counts;
-- legacy `/live` and `/ready` remain compatibility aliases only;
-- `/api/v1/booking/check-availability` returns seeded inventory;
-- unauthenticated PMS/admin endpoints reject access;
-- authenticated OWNER can open Command Center, chessboard, requests, reservations, finance and operations.
+```bash
+python scripts/verify_launch_acceptance.py \
+  --mode cutover \
+  --manifest /secure/path/launch-evidence.json \
+  --release-sha <exact-accepted-release-sha>
+```
 
-9. Verify one isolated booking lifecycle in staging using test dates/data only:
+The verifier validates evidence metadata. It does not manufacture external evidence.
 
-`ReservationRequest -> manager quote -> manager-confirmed internal payment -> GUARANTEED -> chessboard move/resize -> check-in -> optional relocation -> check-out -> housekeeping`.
+---
 
-10. Verify public-site inventory reflects chessboard mutations from the same Core data without a separate synchronization job.
+## 7. Preserve the current live target first
 
-11. Verify staff roles independently:
+Before replacing anything on the actual host, require the fail-closed legacy rollback package:
 
-- MAID cannot access manager data;
-- TECHNICIAN cannot access manager data;
-- each role sees only allowed operational task types/actions.
+- provider/account identified;
+- current DNS captured;
+- live source/web root archived;
+- legacy DB dumped if applicable;
+- uploads/media archived;
+- reverse-proxy/runtime configuration captured;
+- checksum/size/timestamp recorded;
+- restore target/procedure and rollback owner recorded;
+- off-site copy verified.
 
-## 6. Database migration gate
+A public HTML crawl is not a rollback backup.
 
-Before first production cutover create an immutable migration baseline from the current canonical schema and SQL modules.
+---
 
-Required evidence:
+## 8. External staging sequence
 
-- empty DB -> migrations -> expected schema;
-- backup -> migration -> application smoke test;
-- rollback/restore from backup;
-- constraint checks including `no_overlapping_active_room_blocks`.
+Use an isolated staging hostname; never point the live apex at an unaccepted release.
 
-Do not substitute `prisma db push` for the long-term production migration process.
+1. verify legacy rollback package;
+2. run actual-host preflight;
+3. provision secrets out-of-band;
+4. provision persistent storage;
+5. start private PostgreSQL;
+6. apply all ten committed migrations;
+7. run canonical room importer dry-run against staging, review the exact diff, then safely reconcile;
+8. load only approved factual data;
+9. bootstrap authorized users out-of-band;
+10. build/deploy the exact accepted release SHA;
+11. verify image revision labels match that SHA;
+12. start edge, Core, public, Admin, Staff/Kitchen and required n8n services;
+13. verify HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL;
+14. run the unified external staging acceptance runner and retain its checksum-backed evidence manifest.
 
-## 7. Backup/restore gate
+---
 
-Minimum production policy must define:
+## 9. Acceptance matrix
 
-- backup frequency;
-- retention;
-- encrypted storage location;
-- restore owner;
-- restore procedure;
-- last successfully tested restore date.
+### Public / Booking
 
-A backup is not considered operational until a clean restore has been tested and `LAST_VERIFIED_BACKUP_AT` is recorded for preflight.
+Verify RU/KG/EN rendered truth, availability/pricing through Core and `ReservationRequest` creation without automatic Reservation/Payment confirmation.
 
-## 8. Host routing
+### PMS / Reception
 
-The containers bind to loopback ports by default in `compose.production.yaml`:
+Verify:
 
-- web: `127.0.0.1:3000`;
-- admin: `127.0.0.1:3001`;
-- staff: `127.0.0.1:3002`;
-- API: `127.0.0.1:8000`.
+`ReservationRequest -> manager decision/payment fact -> Reservation -> chessboard -> CLEAN check-in -> Stay/RoomAssignment -> optional move/Split Stay -> checkout -> DIRTY -> housekeeping`.
 
-A deployment reverse proxy/load balancer should terminate HTTPS and route approved hostnames to these services. Exact hostnames remain a deployment decision and are not hard-coded here.
+Also verify stale/conflict rejection, realtime, TECH_BLOCK and RBAC.
 
-## 9. Cookie/CORS rule
+### Guest OS / CRM
 
-Production must use HTTPS (`COOKIE_SECURE=true`).
+Verify Room QR, PIN/session, requests, relocation, repeated guest history, checkout session revocation and factual room assignment. For the in-stay Marketplace, verify only manager-configured active offers are surfaced and that offer actions do not create payment/commercial truth automatically.
 
-`CORS_ORIGINS` must contain only exact approved UI origins.
+### Kitchen / Dining
 
-Set `COOKIE_DOMAIN` only when shared staff/admin/API session cookies across subdomains are intentionally required and tested.
+Verify:
 
-## 10. n8n boundary
+- Dining Staff opens Kitchen Admin;
+- factual tables can be created/edited without code changes;
+- draft menu can be edited/disabled/repriced;
+- current hotel-local day menu is explicitly published by meal type before Guest OS can order it;
+- stop-list and restore affect guest availability fail-closed;
+- table reservations enforce capacity/time conflicts;
+- waiter assignment and READY -> SERVED handoff work;
+- table order and room/Stay order use server-derived totals;
+- Guest OS order reaches Kitchen;
+- `NEW -> ACCEPTED -> COOKING -> READY -> SERVED` works;
+- successful check-in creates exactly one Dining arrival card;
+- repair sync does not duplicate it;
+- Kitchen order does not create Hotel `Payment` or alter `Reservation.totalKgs`;
+- completed table orders free the table when no other active order remains.
 
-Production n8n must use `AUTOMATION_SERVICE_KEY` and Resort Core APIs.
+### Service Point QR
 
-n8n must not:
-- write PostgreSQL directly;
-- create guaranteed Reservation directly;
-- decide/confirm prepayment;
-- check-in/check-out/refund;
-- invent price, availability or policy.
+Verify anonymous point QR routing without Guest/Stay/Reservation/Payment leakage. NFC must remain absent.
 
-Current channel path:
-- Instagram -> ManyChat -> n8n;
-- WhatsApp -> API Green -> n8n.
+### Finance / Owner
 
-## 11. Observability minimum
+Verify factual Payment ledger, remaining/overpaid/debt including checked-out debt, owner dashboards and no automatic Kitchen posting into accommodation finance.
 
-Before production approval require:
+### Staff / AI / messaging
 
-- API/app error logs with request IDs/timestamps;
-- container restart visibility;
+Verify real mobile MAID/TECHNICIAN/DINING flows and provider authenticity/idempotency for any messaging provider actually enabled at launch.
+
+---
+
+## 10. Production preflight and observability
+
+The actual target must pass `scripts/production_preflight.py` with real target environment/database evidence.
+
+Before cutover require real evidence for:
+
 - health/readiness monitoring;
-- PostgreSQL disk/storage monitoring;
-- backup failure alerting;
 - HTTP 5xx visibility;
-- AuditLog retention appropriate to operational needs.
+- container restart visibility;
+- PostgreSQL disk/storage monitoring;
+- backup age/checksum/off-site presence;
+- backup-failure alerting;
+- TLS expiry monitoring;
+- AuditLog retention;
+- exact deployed Git SHA/image identity.
 
-No external monitoring vendor is mandated by this document.
+---
 
-## 12. Public-site cutover gate
+## 11. Controlled cutover
 
-Before moving `3korony.com`:
+Only after all required launch-evidence gates are VERIFIED:
 
-- owned logo/media installed;
-- room catalog reviewed against canonical inventory;
-- current rates/business copy approved;
-- booking request path tested end-to-end;
-- mobile review complete;
-- existing site rollback target preserved;
-- DNS TTL reduced in advance if appropriate;
-- rollback instructions written and tested.
+1. freeze exact accepted SHA;
+2. take fresh pre-cutover backup and verify off-site copy;
+3. verify legacy rollback/DNS rollback target;
+4. rerun host and production preflight;
+5. confirm staging/device/provider evidence;
+6. obtain explicit owner approval;
+7. deploy exact accepted image set;
+8. run readiness/smoke before public switch;
+9. switch DNS/routing in a controlled window;
+10. rerun external public/booking/PMS/Guest OS/Staff/Kitchen smoke;
+11. monitor errors/database/containers;
+12. roll back if acceptance criteria fail.
 
-## 13. Production cutover
+Database rollback uses the rehearsed backup/restore path; do not improvise destructive reverse SQL.
 
-Only after staging acceptance and backup/migration gates:
+---
 
-1. take a fresh pre-cutover backup;
-2. run `scripts/production_preflight.py` successfully;
-3. deploy exact reviewed commit/image set;
-4. run readiness/smoke tests;
-5. switch routing/DNS;
-6. verify booking request from public site;
-7. verify manager login/PMS/chessboard;
-8. verify staff login/tasks;
-9. watch errors and database health;
-10. keep rollback available throughout the acceptance window.
+## 12. Current GO / STOP
 
-## 14. Rollback
+### GO — internal release engineering
 
-Rollback application code by redeploying the previously accepted image/commit.
+The repository has a mature Core/PMS/Guest OS/Finance/Staff/Kitchen stack and fail-closed release tooling. The final internal RC is valid only after the current exact-head full regression is green and the RC truth manifest is refrozen to the resulting integration SHA.
 
-If a database change is involved, do not improvise reverse SQL in production. Restore using the rehearsed migration rollback/backup procedure appropriate to that release.
+### STOP — external production declaration
 
-DNS rollback should point traffic to the preserved previous public target when required.
-
-## 15. Current verification caveat
-
-GitHub Actions currently creates workflow runs, but observed jobs terminate within seconds with `steps=null` and no downloadable job logs. This is not valid evidence of a test-step failure because no workflow step executed.
-
-Until runner execution is restored, latest changes remain `IMPLEMENTED / NOT CI-VERIFIED` unless explicit local/staging verification evidence is captured.
+External Beget/production remains **NOT VERIFIED** until the real evidence in section 5 is collected. Do not claim `PRODUCTION READY`, `LIVE` or `VERIFIED IN PRODUCTION` solely from repository/CI success.

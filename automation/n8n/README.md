@@ -6,10 +6,10 @@ Owner decision for V1 client work:
 
 - Instagram -> ManyChat -> n8n;
 - WhatsApp -> API Green -> n8n;
-- Telegram / other channels may also be orchestrated by n8n where useful;
-- public website -> Resort Core directly for deterministic availability, pricing and ReservationRequest creation.
+- Telegram may use n8n or the controlled direct Telegram adapter;
+- public website booking -> Resort Core directly.
 
-n8n owns conversation orchestration. Resort Core owns hotel truth.
+n8n owns provider conversation orchestration. Resort Core owns hotel truth and the controlled communication audit.
 
 The V1 sales objective is **qualification and hot-lead handoff to a manager**, not automated payment collection.
 
@@ -26,9 +26,43 @@ Runtime variables belong in n8n credentials/environment, never committed to work
 - `RESORT_CORE_URL`
 - `AUTOMATION_SERVICE_KEY`
 - ManyChat/API Green/channel credentials
-- OpenAI credentials used by the n8n AI workflow
+- `OPENAI_API_KEY`
+- `OPENAI_SALES_MODEL`
+
+## Canonical messaging-channel sequence
+
+For Instagram / WhatsApp / Telegram messaging automation the sequence is mandatory:
+
+1. provider event is normalized by n8n/provider adapter;
+2. n8n writes the inbound event to `POST /api/v1/automation/inbox/messages`;
+3. Core returns the canonical `conversation_id`;
+4. n8n reads approved hotel facts and deterministic availability only from Core;
+5. AI may extract/qualify facts and draft a reply;
+6. if the guest becomes a hot lead, n8n creates only a `ReservationRequest` and supplies that `conversation_id`;
+7. Core atomically links `Conversation.reservationRequestId` to the created request;
+8. provider adapter sends the reply outside Core;
+9. provider-confirmed outbound evidence is written back through `/api/v1/automation/inbox/messages`;
+10. only outbound `SENT`/`DELIVERED` evidence clears the inbox `needs_reply` state.
+
+A provider delivery timeout/UNKNOWN must never be described as success and must not be blindly retried when the provider has no client idempotency guarantee.
+
+## Website boundary
+
+The public website remains intentionally different from messaging channels:
+
+`Website -> Resort Core /api/v1/booking/requests`
+
+The authoritative website artifact is the Core `ReservationRequest`; the browser does not receive an automation service key and does not write directly to communication tables. The website must not be routed through n8n just to mimic a chat channel.
 
 ## Stable Core calls for client automation
+
+### Unified communication audit — required for messaging channels
+
+- `POST /api/v1/automation/inbox/messages`
+
+The same idempotency key with the same payload is a replay. The same key with a different payload is a conflict and must be investigated rather than retried.
+
+A `channel_code` has stable identity. Reusing the same code with a different channel kind/account is a conflict.
 
 ### Read-only truth
 
@@ -48,17 +82,13 @@ Date-specific availability and price must always come from this deterministic Co
 
 This creates only a `ReservationRequest`. A successful response still has `is_reservation=false`.
 
+When the lead came from unified inbox, send `conversation_id`. Core must return `conversation_linked=true`.
+
 ### Staff automation
 
 - `POST /api/v1/automation/staff-intake`
 
-Use only for already-structured staff operations that follow the confirmed Core task/status rules.
-
-### Optional audit/communication ingest
-
-- `POST /api/v1/automation/inbox/messages`
-
-This is optional for centralized audit/control. n8n remains responsible for actual channel delivery through ManyChat/API Green/etc.
+Use only for already-structured staff operations that follow confirmed Core task/status rules.
 
 ## Forbidden authority
 
@@ -76,39 +106,41 @@ AI/n8n must not directly:
 - write PostgreSQL;
 - invent hotel policies or prices.
 
-Prepayment is handled manually by the hotel manager. Resort OS may later contain the manager-confirmed payment/reservation fact for internal PMS/finance visibility, but n8n does not make that decision.
+Prepayment is handled manually by the hotel manager. Resort OS may contain manager-confirmed payment/reservation facts for internal PMS/finance visibility, but n8n does not make that decision.
 
-## Client sales flow
+## Canonical sales workflow template
 
-Recommended orchestration:
+`unified-client-channel-core.json` is the canonical provider-neutral workflow for Instagram / WhatsApp / Telegram messaging automation.
 
-1. Channel message arrives in ManyChat/API Green/other connector.
-2. n8n extracts the minimum structured facts from the conversation.
-3. If dates/guest count are incomplete, n8n asks the client for them.
-4. n8n calls `check-availability`.
-5. n8n presents only returned sellable categories/prices.
-6. n8n answers hotel questions from approved Core guest facts only.
-7. When the guest shows intent to continue, n8n collects contact details and creates a `ReservationRequest` using a stable idempotency key.
-8. n8n treats this as a **hot qualified lead** and hands the guest/request to a manager.
-9. The manager independently decides and collects prepayment.
-10. Future status questions may use `/automation/read/reservation-requests/{request_id}`.
-11. Only when Core contains an actual Reservation may the workflow tell the guest that a booking/reservation exists.
+It:
 
-The handoff target is therefore:
+- requires a normalized provider message;
+- persists inbound to the Core unified inbox first;
+- reads verified guest facts;
+- uses AI only to extract facts/draft text;
+- calls deterministic Core availability;
+- creates a linked `ReservationRequest` only for a qualified booking intent;
+- returns a draft/provider handoff with `auto_sent=false`;
+- requires provider delivery evidence to be written back to Core.
 
-`DATES + GUESTS + CONTACT + SELECTED/INTERESTED CATEGORY + CURRENT CORE PRICE + RESERVATION_REQUEST_ID -> MANAGER`
+Provider-specific ManyChat/API Green adapters should normalize into this workflow. Provider credentials are not committed to Git and are not considered deployed merely because a template exists.
 
-## Reservation adapter input
+`whatsapp-green-ai-admin.json` is retained as a provider/reference prototype from the earlier phase. It is **not the canonical launch workflow** because Block 10 requires the unified inbox-first contract. Do not activate it instead of `unified-client-channel-core.json` without updating it to the same audit/handoff rules.
+
+## Standalone reservation adapter input
+
+`reservation-intake-core.json` remains a smaller controlled adapter when facts are already structured. When `conversation_id` is supplied it must link the request back to that inbox conversation.
 
 ```json
 {
-  "channel": "WHATSAPP",
+  "channel": "WHATSAPP_GREEN",
   "message_id": "provider-message-id",
+  "conversation_id": "uuid-from-core-inbox",
   "guest_name": "Guest name",
   "phone": "+996...",
   "email": null,
-  "check_in": "2026-08-27",
-  "check_out": "2026-08-29",
+  "check_in": "2026-09-05",
+  "check_out": "2026-09-07",
   "adults": 2,
   "children": 0,
   "room_type_code": null,
@@ -135,7 +167,7 @@ Derive the idempotency key from a stable provider/channel event identifier. Neve
 
 Allowed intents: `MAINTENANCE`, `HOUSEKEEPING`, `GUEST_REQUEST`.
 
-Do not infer urgency rules unless they are explicitly approved. `NORMAL` is the safe default for automated staff intake.
+Do not infer urgency rules unless explicitly approved. `NORMAL` is the safe default for automated staff intake.
 
 ## Truth rules
 
@@ -143,17 +175,21 @@ Do not infer urgency rules unless they are explicitly approved. `NORMAL` is the 
 2. `ReservationRequest != Reservation`.
 3. Automation stops at qualification/handoff; the manager handles prepayment manually.
 4. Without a manager-confirmed reservation fact, automation must not say that the room is booked.
-5. The old public-site statement about keeping an unpaid preliminary booking for two days is stale and must not drive automation.
-6. Availability and prices come only from Resort Core.
-7. Payment received may be stated only when Core exposes a manager-confirmed `RECEIVED` payment fact.
-8. n8n must not infer the required prepayment amount or payment method from static configuration.
-9. Channel delivery success belongs to n8n/provider evidence, not to Resort Core assumptions.
-10. Unknown policy remains unknown; hand off to a manager instead of inventing an answer.
+5. Availability and prices come only from Resort Core.
+6. Payment received may be stated only when Core exposes a manager-confirmed `RECEIVED` payment fact.
+7. n8n must not infer the required prepayment amount or payment method from static configuration.
+8. Every messaging-channel inbound event is persisted before AI/handoff.
+9. A hot lead from an inbox conversation is linked to that exact conversation.
+10. Provider delivery success belongs to provider evidence, not Core assumptions.
+11. Reusing an idempotency key with a different payload is a conflict.
+12. Unknown policy remains unknown; hand off to a manager instead of inventing an answer.
 
 ## Existing templates
 
-- `guest-sales-context.json` — approved hotel facts + deterministic availability/pricing context for the AI conversation.
-- `reservation-intake-core.json` — normalized hot lead -> availability -> ReservationRequest.
+- `unified-client-channel-core.json` — canonical Instagram / WhatsApp / Telegram messaging orchestration contract.
+- `guest-sales-context-core.json` — approved hotel facts + deterministic availability/pricing context.
+- `reservation-intake-core.json` — structured hot lead -> availability -> linked ReservationRequest.
 - `staff-intake-core.json` — normalized staff input -> operational task.
+- `whatsapp-green-ai-admin.json` — earlier provider-specific reference prototype; not canonical for launch.
 
-Provider-specific ManyChat/API Green workflows are intentionally outside Resort Core and should be assembled in n8n when credentials are connected.
+Templates are source artifacts, not proof that ManyChat/API Green/OpenAI credentials or external webhooks are deployed.

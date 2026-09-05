@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -13,15 +14,44 @@ from .payment_idempotency import (
 )
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-payments"])
-manager_access = require_roles("OWNER", "MANAGER")
+payment_access = require_roles("OWNER", "MANAGER")
 
 
 class ReservationPaymentPayload(BaseModel):
     amount_kgs: int = Field(gt=0)
     method: str = Field(min_length=2, max_length=80)
+    paid_at: datetime | None = None
     external_ref: str | None = Field(default=None, max_length=180)
     note: str | None = Field(default=None, max_length=500)
     idempotency_key: str = Field(min_length=8, max_length=180)
+
+
+def utc_aware(value: datetime | None) -> datetime:
+    """Return a canonical UTC-aware timestamp for validation/API/audit semantics."""
+    if value is None:
+        return datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def prisma_timestamp(value: datetime) -> datetime:
+    """Convert UTC-aware time to Prisma's PostgreSQL TIMESTAMP(3) representation.
+
+    The canonical schema currently maps Prisma DateTime to `timestamp without time zone`.
+    Asyncpg therefore requires a naive datetime at the DB boundary. We retain the UTC
+    meaning explicitly everywhere else and strip tzinfo only for the bind parameter.
+    """
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def public_timestamp(value: datetime | None) -> datetime | None:
+    """Restore the schema's stored UTC-naive timestamp to explicit UTC for API output."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 async def _totals(conn, reservation_id: uuid.UUID):
@@ -53,11 +83,15 @@ async def record_reservation_payment(
     reservation_id: uuid.UUID,
     payload: ReservationPaymentPayload,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(payment_access),
 ):
     method = normalize_required_text(payload.method)
     external_ref = normalize_optional_text(payload.external_ref)
     note = normalize_optional_text(payload.note)
+    paid_at = utc_aware(payload.paid_at)
+    if paid_at > datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise HTTPException(status_code=422, detail={"code": "PAYMENT_TIME_IN_FUTURE", "message": "Payment time cannot be in the future."})
+    paid_at_db = prisma_timestamp(paid_at)
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -86,7 +120,7 @@ async def record_reservation_payment(
             existing = await conn.fetchrow(
                 '''
                 SELECT id,"reservationId","amountKgs",method,status::text AS status,"externalRef",
-                       metadata->>'note' AS note
+                       metadata->>'note' AS note,"paidAt","createdAt"
                 FROM payments
                 WHERE "idempotencyKey"=$1
                 ''',
@@ -120,6 +154,8 @@ async def record_reservation_payment(
                         "method": existing["method"],
                         "status": existing["status"],
                         "external_ref": existing["externalRef"],
+                        "paid_at": public_timestamp(existing["paidAt"]),
+                        "recorded_at": public_timestamp(existing["createdAt"]),
                     },
                     "finance": totals,
                 }
@@ -138,7 +174,7 @@ async def record_reservation_payment(
                         status_code=409,
                         detail={
                             "code": "PAYMENT_EXTERNAL_REF_CONFLICT",
-                            "message": "This manager payment reference is already recorded.",
+                            "message": "This payment reference is already recorded.",
                             "payment_id": str(reference_payment["id"]),
                             "reservation_id": str(reference_payment["reservationId"]) if reference_payment["reservationId"] else None,
                             "amount_kgs": int(reference_payment["amountKgs"]),
@@ -154,8 +190,12 @@ async def record_reservation_payment(
                   id,"reservationId","amountKgs",method,status,provider,"externalRef",
                   "idempotencyKey",metadata,"paidAt","createdAt","updatedAt"
                 ) VALUES ($1,$2,$3,$4,'RECEIVED','MANAGER_MANUAL',$5,$6,
-                  jsonb_build_object('note',$7::text,'recorded_by_staff_id',$8::text,'source','PMS'),
-                  now(),now(),now())
+                  jsonb_build_object(
+                    'note',$7::text,
+                    'recorded_by_staff_id',$8::text,
+                    'recorded_by_role',$9::text,
+                    'source','PMS_RECEPTION'
+                  ),$10,now(),now())
                 ''',
                 payment_id,
                 reservation_id,
@@ -165,6 +205,8 @@ async def record_reservation_payment(
                 payload.idempotency_key,
                 note,
                 user["id"],
+                user["role"],
+                paid_at_db,
             )
 
             totals = await _totals(conn, reservation_id)
@@ -174,15 +216,17 @@ async def record_reservation_payment(
                   id,"propertyId","actorType","actorId",action,resource,"resourceId",
                   source,result,"afterJson","createdAt"
                 ) VALUES ($1,$2,'STAFF',$3,'RECORD_INTERNAL_PAYMENT','Reservation',$4,
-                  'PMS','SUCCESS',
+                  'PMS_RECEPTION','SUCCESS',
                   jsonb_build_object(
                     'payment_id',$5::text,
                     'amount_kgs',$6::int,
                     'method',$7::text,
                     'external_ref',$8::text,
-                    'paid_kgs_after',$9::int,
-                    'remaining_kgs_after',$10::int,
-                    'overpaid_kgs_after',$11::int
+                    'paid_at',$9::text,
+                    'recorded_by_role',$10::text,
+                    'paid_kgs_after',$11::int,
+                    'remaining_kgs_after',$12::int,
+                    'overpaid_kgs_after',$13::int
                   ),now())
                 ''',
                 uuid.uuid4(),
@@ -193,6 +237,8 @@ async def record_reservation_payment(
                 payload.amount_kgs,
                 method,
                 external_ref,
+                paid_at.isoformat(),
+                user["role"],
                 totals["paid_kgs"],
                 totals["remaining_kgs"],
                 totals["overpaid_kgs"],
@@ -209,7 +255,10 @@ async def record_reservation_payment(
             "status": "RECEIVED",
             "provider": "MANAGER_MANUAL",
             "external_ref": external_ref,
+            "paid_at": paid_at,
+            "recorded_by_staff_id": user["id"],
+            "recorded_by_role": user["role"],
         },
         "finance": totals,
-        "truth": "Internal manager-recorded payment fact only. No acquiring or automatic prepayment policy was applied.",
+        "truth": "Internal staff-recorded payment fact only. Actual payment time and record time are stored separately. No acquiring confirmation is implied.",
     }

@@ -1,0 +1,287 @@
+{
+  "name": "Three Crowns - WhatsApp GREEN API AI Administrator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "three-crowns/whatsapp-green",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000001",
+      "name": "GREEN API Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-1100, 0],
+      "webhookId": "three-crowns-whatsapp-green"
+    },
+    {
+      "parameters": {
+        "jsCode": "const envelope=$json; const b=envelope.body??envelope; const expected=String($env.GREEN_API_WEBHOOK_SECRET||''); const provided=String(envelope.query?.token||''); const webhookOk=expected.length>=24 && provided===expected; const type=b.typeWebhook||''; const md=b.messageData||{}; const sd=b.senderData||{}; const text=md?.textMessageData?.textMessage || md?.extendedTextMessageData?.text || md?.quotedMessage?.textMessage || ''; const chatId=sd.chatId || sd.sender || ''; const idMessage=b.idMessage || ''; const phoneDigits=String(chatId).split('@')[0].replace(/\\D/g,''); const phone=phoneDigits ? '+'+phoneDigits : ''; const isGuestText=webhookOk && type==='incomingMessageReceived' && Boolean(chatId) && Boolean(String(text).trim()); return [{json:{webhook_ok:webhookOk,is_guest_text:isGuestText,chat_id:String(chatId),phone,message_id:String(idMessage),sender_name:String(sd.senderName||sd.senderContactName||'').trim(),text:String(text).trim()}}];"
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000002",
+      "name": "Normalize GREEN Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-880, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            { "id": "guest-text", "leftValue": "={{$json.is_guest_text}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000003",
+      "name": "Authorized Guest Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-660, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/read/hotel-facts'}}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}" }] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000004",
+      "name": "Get Verified Hotel Facts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-420, -140]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\\/$/,'') + '/responses'}}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "={{'Bearer ' + $env.OPENAI_API_KEY}}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: $env.OPENAI_WHATSAPP_MODEL || $env.OPENAI_SALES_MODEL, input: `Extract booking-search facts from this guest WhatsApp message for Three Crowns Resort. Return ONLY valid JSON with keys: intent (AVAILABILITY|HOTEL_QUESTION|BOOKING_INTENT|MANAGER|OTHER), check_in (YYYY-MM-DD|null), check_out (YYYY-MM-DD|null), adults (integer|null), children (integer|null), room_type_code (string|null), guest_name (string|null, only if explicitly stated by the guest), language (ru|kg|en), summary (short string). Current hotel timezone is Asia/Bishkek. Never invent missing values. Message: ${$('Normalize GREEN Event').item.json.text}` }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000005",
+      "name": "Extract Guest Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-180, -140]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$json; let text=p.output_text; if(!text && Array.isArray(p.output)){ const parts=[]; for(const i of p.output){ for(const c of (i.content||[])){ if(c.type==='output_text'&&c.text) parts.push(c.text); } } text=parts.join('\\n'); } if(!text) throw new Error('OpenAI intent extractor returned no text'); text=String(text).trim().replace(/^```(?:json)?/i,'').replace(/```$/,'').trim(); const intent=JSON.parse(text); const complete=Boolean(intent.check_in&&intent.check_out&&Number.isInteger(Number(intent.adults))&&Number(intent.adults)>0); const src=$('Normalize GREEN Event').item.json; const guestName=String(intent.guest_name||src.sender_name||'').trim(); return [{json:{...src,intent,guest_name:guestName,complete_search:complete}}];"
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000006",
+      "name": "Parse Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [60, -140]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "complete-search", "leftValue": "={{$json.complete_search}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true", "singleValue": true } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000007",
+      "name": "Have Exact Dates?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [280, -140]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/booking/check-availability'}}",
+        "sendQuery": true,
+        "queryParameters": { "parameters": [
+          { "name": "check_in", "value": "={{$json.intent.check_in}}" },
+          { "name": "check_out", "value": "={{$json.intent.check_out}}" },
+          { "name": "adults", "value": "={{Number($json.intent.adults)}}" },
+          { "name": "children", "value": "={{Number($json.intent.children || 0)}}" },
+          { "name": "room_type_code", "value": "={{$json.intent.room_type_code || ''}}" }
+        ] },
+        "options": { "timeout": 15000 }
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000008",
+      "name": "Core Check Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, -260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const facts=$('Get Verified Hotel Facts').item.json; const parsed=$('Parse Intent').item.json; const availability=$json; const options=(availability.results||[]).filter(x=>x.pricing?.sellable===true&&Number.isFinite(x.pricing?.total_kgs)).slice(0,8).map(x=>({room_type_code:x.room_type_code,room_type_name:x.room_type_name,area:x.area,available_count:x.available_count,total_kgs:x.pricing.total_kgs,nights:availability.nights})); const ctx={hotel_facts:facts,current_availability:{check_in:availability.check_in,check_out:availability.check_out,nights:availability.nights,adults:availability.adults,children:availability.children,options},reservation_request:null}; const shouldCreate=parsed.intent.intent==='BOOKING_INTENT' && options.length>0 && parsed.complete_search && parsed.guest_name.length>=2 && parsed.phone.length>=5 && Boolean(parsed.message_id); return [{json:{...parsed,verified_context:ctx,should_create_request:shouldCreate}}];"
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000009",
+      "name": "Build Availability Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, -260]
+    },
+    {
+      "parameters": {
+        "jsCode": "const facts=$('Get Verified Hotel Facts').item.json; return [{json:{...$json,verified_context:{hotel_facts:facts,current_availability:null,reservation_request:null},should_create_request:false}}];"
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000010",
+      "name": "Build Facts Only Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 20]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [{ "id": "create-request", "leftValue": "={{$json.should_create_request}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true", "singleValue": true } }],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000016",
+      "name": "Create Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [940, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/reservation-requests'}}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ idempotency_key: 'whatsapp-green:' + $json.message_id, channel: 'WHATSAPP_GREEN', guest_name: $json.guest_name, phone: $json.phone, email: null, check_in: $json.intent.check_in, check_out: $json.intent.check_out, adults: Number($json.intent.adults), children: Number($json.intent.children || 0), room_type_code: $json.intent.room_type_code || null, notes: `WhatsApp AI hot lead. ${$json.intent.summary || ''} Original: ${$json.text}`.slice(0,3900), external_message_id: $json.message_id }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000017",
+      "name": "Core Create ReservationRequest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, -220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const source=$('Build Availability Context').item.json; const result=$json; const ctx={...source.verified_context,reservation_request:{id:result.id||result.resultResourceId||null,is_reservation:false,idempotent_replay:Boolean(result.idempotent_replay)}}; return [{json:{...source,verified_context:ctx}}];"
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000018",
+      "name": "Attach Request Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1380, -220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1').replace(/\\/$/,'') + '/responses'}}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [
+          { "name": "Authorization", "value": "={{'Bearer ' + $env.OPENAI_API_KEY}}" },
+          { "name": "Content-Type", "value": "application/json" }
+        ] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: $env.OPENAI_WHATSAPP_MODEL || $env.OPENAI_SALES_MODEL, input: `You are the WhatsApp AI administrator for Three Crowns Resort & SPA. Reply in the guest language. Use ONLY VERIFIED_CONTEXT. If current_availability is null and the guest asks availability/price, ask for exact check-in, check-out and guest count. Never invent availability, price, discounts, payment status or hotel policy. ReservationRequest is not a reservation. If reservation_request has an id, say the request was passed to a manager but clearly state this is not yet a confirmed booking. Prepayment amount/terms/method are decided by a manager; do not invent a percentage or payment link. Keep reply concise and natural for WhatsApp. Guest message: ${$json.text}\nIntent: ${JSON.stringify($json.intent)}\nVERIFIED_CONTEXT: ${JSON.stringify($json.verified_context)}` }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000011",
+      "name": "Compose Verified Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, -80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p=$json; let text=p.output_text; if(!text&&Array.isArray(p.output)){const parts=[];for(const i of p.output){for(const c of(i.content||[])){if(c.type==='output_text'&&c.text)parts.push(c.text)}}text=parts.join('\\n')} if(!text) throw new Error('OpenAI reply composer returned no text'); return [{json:{chat_id:$('Normalize GREEN Event').item.json.chat_id,message_id:$('Normalize GREEN Event').item.json.message_id,reply:String(text).trim().slice(0,12000)}}];"
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000012",
+      "name": "Normalize Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1820, -80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.GREEN_API_URL || 'https://api.green-api.com') + '/waInstance' + $env.GREEN_API_ID_INSTANCE + '/sendMessage/' + $env.GREEN_API_TOKEN_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chatId: $json.chat_id, message: $json.reply }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000013",
+      "name": "GREEN Send Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {ok:true, accepted:true, provider:'GREEN_API'} }}",
+        "options": {}
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000014",
+      "name": "Respond Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [2260, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {ok:true, ignored:true} }}",
+        "options": {}
+      },
+      "id": "7d1a1000-0000-4000-8000-000000000015",
+      "name": "Respond Ignored",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-420, 180]
+    }
+  ],
+  "connections": {
+    "GREEN API Webhook": { "main": [[{ "node": "Normalize GREEN Event", "type": "main", "index": 0 }]] },
+    "Normalize GREEN Event": { "main": [[{ "node": "Authorized Guest Text?", "type": "main", "index": 0 }]] },
+    "Authorized Guest Text?": { "main": [[{ "node": "Get Verified Hotel Facts", "type": "main", "index": 0 }],[{ "node": "Respond Ignored", "type": "main", "index": 0 }]] },
+    "Get Verified Hotel Facts": { "main": [[{ "node": "Extract Guest Intent", "type": "main", "index": 0 }]] },
+    "Extract Guest Intent": { "main": [[{ "node": "Parse Intent", "type": "main", "index": 0 }]] },
+    "Parse Intent": { "main": [[{ "node": "Have Exact Dates?", "type": "main", "index": 0 }]] },
+    "Have Exact Dates?": { "main": [[{ "node": "Core Check Availability", "type": "main", "index": 0 }],[{ "node": "Build Facts Only Context", "type": "main", "index": 0 }]] },
+    "Core Check Availability": { "main": [[{ "node": "Build Availability Context", "type": "main", "index": 0 }]] },
+    "Build Availability Context": { "main": [[{ "node": "Create Hot Lead?", "type": "main", "index": 0 }]] },
+    "Build Facts Only Context": { "main": [[{ "node": "Create Hot Lead?", "type": "main", "index": 0 }]] },
+    "Create Hot Lead?": { "main": [[{ "node": "Core Create ReservationRequest", "type": "main", "index": 0 }],[{ "node": "Compose Verified Reply", "type": "main", "index": 0 }]] },
+    "Core Create ReservationRequest": { "main": [[{ "node": "Attach Request Result", "type": "main", "index": 0 }]] },
+    "Attach Request Result": { "main": [[{ "node": "Compose Verified Reply", "type": "main", "index": 0 }]] },
+    "Compose Verified Reply": { "main": [[{ "node": "Normalize Reply", "type": "main", "index": 0 }]] },
+    "Normalize Reply": { "main": [[{ "node": "GREEN Send Message", "type": "main", "index": 0 }]] },
+    "GREEN Send Message": { "main": [[{ "node": "Respond Accepted", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "versionId": "7d1a1000-0000-4000-8000-000000009999",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

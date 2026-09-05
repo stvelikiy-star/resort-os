@@ -1,0 +1,208 @@
+{
+  "name": "Three Crowns - Resort OS Google Control Center Sync",
+  "nodes": [
+    {
+      "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 5}]}},
+      "id": "gc-0001",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [-1200, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/read/crm-feed'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}"}]},
+        "sendQuery": true,
+        "queryParameters": {"parameters": [{"name": "limit", "value": "1000"}]},
+        "options": {}
+      },
+      "id": "gc-0002",
+      "name": "Fetch CRM Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-980, -260]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/read/google-control-feed'}}",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}"}]},
+        "sendQuery": true,
+        "queryParameters": {"parameters": [{"name": "limit", "value": "2000"}]},
+        "options": {}
+      },
+      "id": "gc-0003",
+      "name": "Fetch Control Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-980, 300]
+    },
+    {
+      "parameters": {"jsCode": "const d=$json; if(d.source_of_truth!=='RESORT_CORE') throw new Error('CRM feed contract failed'); for(const k of ['requests','reservations','payments']){if(!d[k]||!Array.isArray(d[k].items)) throw new Error('Missing '+k); if(d[k].truncated) throw new Error(k+' truncated');} return [{json:d}];"},
+      "id": "gc-0004",
+      "name": "Validate CRM",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, -260]
+    },
+    {
+      "parameters": {"jsCode": "const d=$json; if(d.source_of_truth!=='RESORT_CORE') throw new Error('Control feed contract failed'); for(const k of ['rooms','tasks','guests','site_content']){if(!d[k]||!Array.isArray(d[k].items)) throw new Error('Missing '+k); if(d[k].truncated) throw new Error(k+' truncated');} return [{json:d}];"},
+      "id": "gc-0005",
+      "name": "Validate Control",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 300]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.requests.items||[]).map(r=>({json:{'Request ID':r.lead_id,'Создано':r.created_at,'Источник':r.channel??'','Статус':r.status,'Имя гостя':r.guest_name,'Телефон':r.phone,'Email':r.email??'','Заезд':r.check_in,'Выезд':r.check_out,'Взрослые':r.adults,'Дети':r.children,'Категория':r.room_type_name??r.room_type_code??'','Quoted KGS':r.quoted_total_kgs??'','Required prepayment KGS':'','Booking №':r.booking_number??'','Ответственный':'','Последний контакт':r.updated_at,'Следующее действие':'','Комментарий':r.notes??'','Conversation ID':'','Канал':r.channel??'','Sync state':'SYNCED'}}));"},
+      "id": "gc-0101",
+      "name": "Map Requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, -500]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100001,"mode":"list","cachedResultName":"01_CRM_ЗАЯВКИ"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Request ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0102",
+      "name": "Upsert Requests",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, -500]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.reservations.items||[]).map(r=>({json:{'Reservation ID':r.booking_id,'Booking №':r.booking_number??'','Request ID':r.lead_id??'','Статус':r.status,'Гость':r.guest_name??'','Телефон':r.phone??'','Заезд':r.check_in,'Выезд':r.check_out,'Взрослые':r.adults,'Дети':r.children,'Номер':'','Категория':'','Total KGS':r.total_kgs,'Paid KGS':r.received_kgs,'Outstanding KGS':r.outstanding_kgs,'Последний платёж':'','Check-in fact':r.status==='CHECKED_IN'?'YES':'','Check-out fact':r.status==='CHECKED_OUT'?'YES':'','Комментарий':'','Updated at':r.updated_at,'Sync state':'SYNCED'}}));"},
+      "id": "gc-0201",
+      "name": "Map Reservations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, -260]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100002,"mode":"list","cachedResultName":"02_БРОНИ"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Reservation ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0202",
+      "name": "Upsert Reservations",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, -260]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.payments.items||[]).map(r=>({json:{'Payment ID':r.payment_id,'Reservation ID':r.booking_id??'','Request ID':r.lead_id??'','Статус':r.status,'Сумма KGS':r.amount_kgs,'Метод':r.method??'','Provider':r.provider??'','External ref':r.external_ref??'','Paid at':r.paid_at??'','Создано':r.created_at,'Комментарий':'','Sync state':'SYNCED'}}));"},
+      "id": "gc-0401",
+      "name": "Map Payments",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, -20]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100004,"mode":"list","cachedResultName":"04_ПЛАТЕЖИ"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Payment ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0402",
+      "name": "Upsert Payments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, -20]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.rooms.items||[]).map(r=>({json:{'Room ID':r.room_id,'Код номера':r.code,'Название':r.name,'Корпус / зона':r.building_or_zone??'','Этаж':r.floor??'','Категория':r.room_type_name??r.room_type_code??'','Площадь':r.area??'','Кровати':r.bed_configuration??'','Operational state':r.operational_state,'Текущая бронь':r.current_booking_number??'','Следующий заезд':r.next_check_in??'','Активная задача':r.active_task_title??'','Комментарий':'','Updated at':r.updated_at}}));"},
+      "id": "gc-0501",
+      "name": "Map Rooms",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 180]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100005,"mode":"list","cachedResultName":"05_НОМЕРА"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Room ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0502",
+      "name": "Upsert Rooms",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, 180]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.guests.items||[]).map(r=>({json:{'Guest ID':r.guest_id,'Имя':r.first_name??'','Фамилия':r.last_name??'','Телефон':r.phone??'','Email':r.email??'','Первый заезд':r.first_check_in??'','Последний заезд':r.last_check_in??'','Проживаний':r.stay_count,'LTV KGS':r.ltv_kgs,'Предпочтения':'','Комментарий':'','Updated at':r.updated_at}}));"},
+      "id": "gc-0301",
+      "name": "Map Guests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 400]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100003,"mode":"list","cachedResultName":"03_ГОСТИ"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Guest ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0302",
+      "name": "Upsert Guests",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, 400]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.tasks.items||[]).filter(r=>r.type==='HOUSEKEEPING').map(r=>({json:{'Task ID':r.task_id,'Room ID':r.room_id??'','Номер':r.room_code??'','Статус комнаты':'','Статус задачи':r.status,'Приоритет':r.priority,'Горничная':r.assigned_to??'','Описание':r.description??r.title,'Создано':r.created_at,'Завершено':r.completed_at??'','Фото / доказательство':'','Комментарий':''}}));"},
+      "id": "gc-0601",
+      "name": "Map Housekeeping",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 620]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100006,"mode":"list","cachedResultName":"06_УБОРКА"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Task ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0602",
+      "name": "Upsert Housekeeping",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, 620]
+    },
+    {
+      "parameters": {"jsCode": "return ($json.tasks.items||[]).filter(r=>r.type==='MAINTENANCE').map(r=>({json:{'Task ID':r.task_id,'Room ID':r.room_id??'','Номер':r.room_code??'','Статус комнаты':'','Статус задачи':r.status,'Приоритет':r.priority,'Техник':r.assigned_to??'','Проблема':r.description??r.title,'Источник':r.source??'','Создано':r.created_at,'Завершено':r.completed_at??'','Комментарий':''}}));"},
+      "id": "gc-0701",
+      "name": "Map Maintenance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 840]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100007,"mode":"list","cachedResultName":"07_РЕМОНТ"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Task ID"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0702",
+      "name": "Upsert Maintenance",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, 840]
+    },
+    {
+      "parameters": {"jsCode": "const out=[]; for(const d of ($json.site_content.items||[])){const draft=d.draft||{}; const pub=d.published||{}; const sections=new Set([...Object.keys(draft),...Object.keys(pub)]); for(const section of sections){const a=draft[section]||{}; const b=pub[section]||{}; const fields=new Set([...Object.keys(a),...Object.keys(b)]); for(const field of fields){const av=a[field]; const bv=b[field]; if(typeof av==='object'||typeof bv==='object') continue; out.push({json:{'Locale':d.locale,'Section':section,'Field':field,'Draft value':av??'','Published value':bv??'','Version':d.version,'Published version':d.published_version,'Published at':d.published_at??'','Needs review':String(av??'')===String(bv??'')?'NO':'YES','Комментарий':''}});}} return out;"},
+      "id": "gc-0801",
+      "name": "Map Site Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 1060]
+    },
+    {
+      "parameters": {"operation":"appendOrUpdate","documentId":{"__rl":true,"value":"1x6IfOYlx2TYuqgluLL092EixM-JogNiHe5NoZnifbMw","mode":"id"},"sheetName":{"__rl":true,"value":100008,"mode":"list","cachedResultName":"08_КОНТЕНТ_САЙТА"},"columns":{"mappingMode":"autoMapInputData","value":{},"matchingColumns":["Locale","Section","Field"],"schema":[],"attemptToConvertTypes":false,"convertFieldsToString":false},"options":{}},
+      "id": "gc-0802",
+      "name": "Upsert Site Content",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [-260, 1060]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {"main": [[{"node":"Fetch CRM Feed","type":"main","index":0},{"node":"Fetch Control Feed","type":"main","index":0}]]},
+    "Fetch CRM Feed": {"main": [[{"node":"Validate CRM","type":"main","index":0}]]},
+    "Validate CRM": {"main": [[{"node":"Map Requests","type":"main","index":0},{"node":"Map Reservations","type":"main","index":0},{"node":"Map Payments","type":"main","index":0}]]},
+    "Map Requests": {"main": [[{"node":"Upsert Requests","type":"main","index":0}]]},
+    "Map Reservations": {"main": [[{"node":"Upsert Reservations","type":"main","index":0}]]},
+    "Map Payments": {"main": [[{"node":"Upsert Payments","type":"main","index":0}]]},
+    "Fetch Control Feed": {"main": [[{"node":"Validate Control","type":"main","index":0}]]},
+    "Validate Control": {"main": [[{"node":"Map Rooms","type":"main","index":0},{"node":"Map Guests","type":"main","index":0},{"node":"Map Housekeeping","type":"main","index":0},{"node":"Map Maintenance","type":"main","index":0},{"node":"Map Site Content","type":"main","index":0}]]},
+    "Map Rooms": {"main": [[{"node":"Upsert Rooms","type":"main","index":0}]]},
+    "Map Guests": {"main": [[{"node":"Upsert Guests","type":"main","index":0}]]},
+    "Map Housekeeping": {"main": [[{"node":"Upsert Housekeeping","type":"main","index":0}]]},
+    "Map Maintenance": {"main": [[{"node":"Upsert Maintenance","type":"main","index":0}]]},
+    "Map Site Content": {"main": [[{"node":"Upsert Site Content","type":"main","index":0}]]}
+  },
+  "pinData": {},
+  "settings": {"executionOrder": "v1"},
+  "active": false,
+  "versionId": "8b84af3f-fbe8-4bf0-8d61-2408c4a3c001",
+  "meta": {"templateCredsSetupCompleted": false},
+  "tags": []
+}

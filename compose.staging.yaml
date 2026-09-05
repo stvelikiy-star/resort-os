@@ -1,0 +1,122 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - resort_staging_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "127.0.0.1:15432:5432"
+    networks: [resort-staging]
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      PROPERTY_CODE: ${PROPERTY_CODE}
+      RATE_PLAN_CODE: ${RATE_PLAN_CODE}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS}
+      COOKIE_SECURE: ${COOKIE_SECURE}
+      REQUIRE_COOKIE_DOMAIN: ${REQUIRE_COOKIE_DOMAIN}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY}
+      AUTOMATION_SERVICE_NAME: ${AUTOMATION_SERVICE_NAME}
+      REQUIRE_AUTOMATION_SERVICE: ${REQUIRE_AUTOMATION_SERVICE}
+      EXPECTED_ROOM_COUNT: ${EXPECTED_ROOM_COUNT}
+      EXPECTED_ROOM_TYPE_COUNT: ${EXPECTED_ROOM_TYPE_COUNT}
+      REQUIRE_MIGRATION_HISTORY: ${REQUIRE_MIGRATION_HISTORY}
+      REQUIRE_RECENT_BACKUP: ${REQUIRE_RECENT_BACKUP}
+      LAST_VERIFIED_BACKUP_AT: ${LAST_VERIFIED_BACKUP_AT}
+      MAX_BACKUP_AGE_HOURS: ${MAX_BACKUP_AGE_HOURS}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_INITDATA_MAX_AGE_SECONDS: ${TELEGRAM_INITDATA_MAX_AGE_SECONDS}
+      TELEGRAM_STAFF_WEBHOOK_SECRET: ${TELEGRAM_STAFF_WEBHOOK_SECRET}
+      STAFF_VOICE_MAX_BYTES: ${STAFF_VOICE_MAX_BYTES}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL}
+      OPENAI_TRANSCRIBE_TIMEOUT_SECONDS: ${OPENAI_TRANSCRIBE_TIMEOUT_SECONDS}
+      TELEGRAM_SALES_BOT_TOKEN: ${TELEGRAM_SALES_BOT_TOKEN}
+      TELEGRAM_SALES_WEBHOOK_SECRET: ${TELEGRAM_SALES_WEBHOOK_SECRET}
+      TELEGRAM_SALES_CHANNEL_CODE: ${TELEGRAM_SALES_CHANNEL_CODE}
+      TELEGRAM_SALES_DISPLAY_NAME: ${TELEGRAM_SALES_DISPLAY_NAME}
+      TELEGRAM_SALES_ACCOUNT_ID: ${TELEGRAM_SALES_ACCOUNT_ID}
+      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: ${TELEGRAM_PROVIDER_TIMEOUT_SECONDS}
+      TELEGRAM_BOT_API_BASE_URL: ${TELEGRAM_BOT_API_BASE_URL}
+      BOOTSTRAP_OWNER_USERNAME: ${BOOTSTRAP_OWNER_USERNAME}
+      BOOTSTRAP_OWNER_PASSWORD: ${BOOTSTRAP_OWNER_PASSWORD}
+      BOOTSTRAP_OWNER_DISPLAY_NAME: ${BOOTSTRAP_OWNER_DISPLAY_NAME}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "127.0.0.1:18000:8000"
+    networks: [resort-staging]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13000:3000"
+    networks: [resort-staging]
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        NEXT_PUBLIC_CORE_WS_URL: ${NEXT_PUBLIC_CORE_WS_URL}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13001:3001"
+    networks: [resort-staging]
+
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13002:3002"
+    networks: [resort-staging]
+
+networks:
+  resort-staging:
+    driver: bridge
+
+volumes:
+  resort_staging_pgdata:

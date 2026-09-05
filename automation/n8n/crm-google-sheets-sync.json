@@ -5,18 +5,15 @@
       "parameters": {
         "rule": {
           "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 5
-            }
+            {"field": "minutes", "minutesInterval": 5}
           ]
         }
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000001",
+      "id": "crm-sync-0001",
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
-      "position": [-1040, 0]
+      "position": [-1000, 0]
     },
     {
       "parameters": {
@@ -24,34 +21,28 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "X-Resort-Service-Key",
-              "value": "={{$env.AUTOMATION_SERVICE_KEY}}"
-            }
+            {"name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}"}
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            {
-              "name": "limit",
-              "value": "1000"
-            }
+            {"name": "limit", "value": "1000"}
           ]
         },
         "options": {}
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000002",
+      "id": "crm-sync-0002",
       "name": "Fetch CRM Feed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-800, 0]
+      "position": [-780, 0]
     },
     {
       "parameters": {
-        "jsCode": "const d = $json;\nif (d.source_of_truth !== 'RESORT_CORE') throw new Error('CRM feed source-of-truth contract failed');\nfor (const key of ['requests','reservations','payments']) {\n  if (!d[key] || !Array.isArray(d[key].items)) throw new Error(`CRM feed missing ${key}.items`);\n  if (d[key].truncated) throw new Error(`CRM feed ${key} is truncated at the current 1000-row safety limit; switch to incremental high-water sync before publishing this workflow again.`);\n}\nreturn [{ json: d }];"
+        "jsCode": "const d=$json; if(d.source_of_truth!=='RESORT_CORE') throw new Error('CRM feed source-of-truth contract failed'); for(const k of ['requests','reservations','payments']){ if(!d[k]||!Array.isArray(d[k].items)) throw new Error('CRM feed missing '+k+'.items'); if(d[k].truncated) throw new Error('CRM feed '+k+' truncated; do not advance sync cursor'); } return [{json:d}];"
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000003",
+      "id": "crm-sync-0003",
       "name": "Validate CRM Feed",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -59,225 +50,110 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $('Validate CRM Feed').item.json.requests.items ?? [];\nconst channel = (v) => {\n  const x = String(v ?? '').toUpperCase();\n  if (x.includes('INSTAGRAM')) return 'Instagram';\n  if (x.includes('WHATSAPP')) return 'WhatsApp';\n  if (x.includes('TELEGRAM')) return 'Telegram';\n  if (x.includes('WEB') || x.includes('SITE')) return 'Сайт';\n  if (x.includes('PHONE')) return 'Телефон';\n  if (x.includes('WALK')) return 'Walk-in';\n  if (x.includes('PARTNER')) return 'Партнер';\n  return 'Другое';\n};\nconst status = (v) => ({ NEW:'Новый', QUOTED:'В работе', AWAITING_PREPAYMENT:'Ждет ответ', CONVERTED:'Бронь создана', CANCELLED:'Закрыт', REJECTED:'Нецелевой', EXPIRED:'Закрыт' }[v] ?? 'В работе');\nreturn rows.map((r) => ({ json: {\n  'Lead ID': r.lead_id,\n  'Дата/время': r.created_at,\n  'Канал': channel(r.channel),\n  'Имя': r.guest_name,\n  'Телефон': r.phone,\n  'Контакт/ник': r.email ?? '',\n  'Заезд': r.check_in,\n  'Выезд': r.check_out,\n  'Ночей': r.nights,\n  'Гостей': Number(r.adults ?? 0) + Number(r.children ?? 0),\n  'Дети': r.children ?? 0,\n  'Тип номера': r.room_type_name ?? r.room_type_code ?? '',\n  'Бюджет KGS': r.quoted_total_kgs ?? '',\n  'Статус': status(r.status),\n  'Последний контакт': r.updated_at,\n  'Источник/кампания': channel(r.channel),\n  'Комментарий': r.notes ?? '',\n  'Booking ID': r.booking_id ?? ''\n} }));"
+        "jsCode": "const rows=$json.requests.items||[]; const channel=(v)=>{const x=String(v??'').toUpperCase(); if(x.includes('INSTAGRAM'))return 'Instagram'; if(x.includes('WHATSAPP'))return 'WhatsApp'; if(x.includes('TELEGRAM'))return 'Telegram'; if(x.includes('WEB')||x.includes('SITE'))return 'Сайт'; if(x.includes('PHONE'))return 'Телефон'; if(x.includes('WALK'))return 'Walk-in'; if(x.includes('PARTNER'))return 'Партнер'; return 'Другое';}; const status=(v)=>({NEW:'Новый',QUOTED:'В работе',AWAITING_PREPAYMENT:'Ждет ответ',CONVERTED:'Бронь создана',CANCELLED:'Закрыт',REJECTED:'Нецелевой',EXPIRED:'Закрыт'}[v]??String(v??'')); return rows.map(r=>({json:{'Lead ID':r.lead_id,'Дата/время':r.created_at,'Канал':channel(r.channel),'Имя':r.guest_name,'Телефон':r.phone,'Контакт/ник':r.email??'','Заезд':r.check_in,'Выезд':r.check_out,'Ночей':r.nights,'Гостей':Number(r.adults??0)+Number(r.children??0),'Дети':r.children??0,'Тип номера':r.room_type_name??r.room_type_code??'','Бюджет KGS':r.quoted_total_kgs??'','Статус':status(r.status),'Последний контакт':r.updated_at,'Источник/кампания':channel(r.channel),'Комментарий':r.notes??'','Booking ID':r.booking_id??''}}));"
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000004",
+      "id": "crm-sync-0101",
       "name": "Map Leads",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-300, -260]
+      "position": [-320, -240]
     },
     {
       "parameters": {
         "operation": "appendOrUpdate",
-        "documentId": {
-          "__rl": true,
-          "value": "1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": 1258982052,
-          "mode": "list",
-          "cachedResultName": "Лиды",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A/edit#gid=1258982052"
-        },
+        "documentId": {"__rl": true, "value": "1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A", "mode": "id"},
+        "sheetName": {"__rl": true, "value": 1258982052, "mode": "list", "cachedResultName": "Лиды"},
         "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Lead ID": "={{ $json['Lead ID'] }}",
-            "Дата/время": "={{ $json['Дата/время'] }}",
-            "Канал": "={{ $json['Канал'] }}",
-            "Имя": "={{ $json['Имя'] }}",
-            "Телефон": "={{ $json['Телефон'] }}",
-            "Контакт/ник": "={{ $json['Контакт/ник'] }}",
-            "Заезд": "={{ $json['Заезд'] }}",
-            "Выезд": "={{ $json['Выезд'] }}",
-            "Ночей": "={{ $json['Ночей'] }}",
-            "Гостей": "={{ $json['Гостей'] }}",
-            "Дети": "={{ $json['Дети'] }}",
-            "Тип номера": "={{ $json['Тип номера'] }}",
-            "Бюджет KGS": "={{ $json['Бюджет KGS'] }}",
-            "Статус": "={{ $json['Статус'] }}",
-            "Последний контакт": "={{ $json['Последний контакт'] }}",
-            "Источник/кампания": "={{ $json['Источник/кампания'] }}",
-            "Комментарий": "={{ $json['Комментарий'] }}",
-            "Booking ID": "={{ $json['Booking ID'] }}"
-          },
+          "mappingMode": "autoMapInputData",
+          "value": {},
           "matchingColumns": ["Lead ID"],
-          "schema": [
-            {"id":"Lead ID","displayName":"Lead ID","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true,"removed":false},
-            {"id":"Дата/время","displayName":"Дата/время","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Канал","displayName":"Канал","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Имя","displayName":"Имя","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Телефон","displayName":"Телефон","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Контакт/ник","displayName":"Контакт/ник","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Заезд","displayName":"Заезд","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Выезд","displayName":"Выезд","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Ночей","displayName":"Ночей","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Гостей","displayName":"Гостей","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Дети","displayName":"Дети","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Тип номера","displayName":"Тип номера","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Бюджет KGS","displayName":"Бюджет KGS","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Статус","displayName":"Статус","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Последний контакт","displayName":"Последний контакт","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Источник/кампания","displayName":"Источник/кампания","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Комментарий","displayName":"Комментарий","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Booking ID","displayName":"Booking ID","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true}
-          ],
+          "schema": [],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000005",
+      "id": "crm-sync-0102",
       "name": "Upsert Leads",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [0, -260]
+      "position": [-40, -240]
     },
     {
       "parameters": {
-        "jsCode": "const rows = $('Validate CRM Feed').item.json.reservations.items ?? [];\nconst bookingStatus = (v) => ({ GUARANTEED:'CONFIRMED', CONFIRMED:'CONFIRMED', CHECKED_IN:'CHECKED_IN', CHECKED_OUT:'CHECKED_OUT', CANCELLED:'CANCELLED', PENDING_PAYMENT:'PENDING_PAYMENT' }[v] ?? String(v ?? ''));\nconst paymentStatus = (r) => Number(r.received_kgs ?? 0) <= 0 ? 'Не оплачено' : Number(r.outstanding_kgs ?? 0) > 0 ? 'Частично' : 'Оплачено';\nreturn rows.map((r) => ({ json: {\n  'Booking ID': r.booking_id,\n  'Lead ID': r.lead_id ?? '',\n  'Дата создания': r.created_at,\n  'Гость': r.guest_name ?? '',\n  'Телефон': r.phone ?? '',\n  'Заезд': r.check_in,\n  'Выезд': r.check_out,\n  'Ночей': r.nights,\n  'Гостей': Number(r.adults ?? 0) + Number(r.children ?? 0),\n  'Сумма': r.total_kgs,\n  'Оплачено KGS': r.received_kgs,\n  'Остаток KGS': r.outstanding_kgs,\n  'Статус брони': bookingStatus(r.status),\n  'Статус оплаты': paymentStatus(r)\n} }));"
+        "jsCode": "const rows=$json.reservations.items||[]; const paymentStatus=(r)=>Number(r.received_kgs??0)<=0?'Не оплачено':Number(r.outstanding_kgs??0)>0?'Частично':'Оплачено'; return rows.map(r=>({json:{'Booking ID':r.booking_id,'Lead ID':r.lead_id??'','Дата создания':r.created_at,'Гость':r.guest_name??'','Телефон':r.phone??'','Заезд':r.check_in,'Выезд':r.check_out,'Ночей':r.nights,'Гостей':Number(r.adults??0)+Number(r.children??0),'Сумма':r.total_kgs,'Предоплата % (справочно, не фиксированная)':'','Предоплата KGS':'','Оплачено KGS':r.received_kgs,'Остаток KGS':r.outstanding_kgs,'Статус брони':String(r.status??''),'Статус оплаты':paymentStatus(r)}}));"
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000006",
+      "id": "crm-sync-0201",
       "name": "Map Bookings",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-300, 0]
+      "position": [-320, 0]
     },
     {
       "parameters": {
         "operation": "appendOrUpdate",
-        "documentId": {"__rl":true,"value":"1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A","mode":"id"},
-        "sheetName": {"__rl":true,"value":215292756,"mode":"list","cachedResultName":"Бронирования","cachedResultUrl":"https://docs.google.com/spreadsheets/d/1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A/edit#gid=215292756"},
+        "documentId": {"__rl": true, "value": "1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A", "mode": "id"},
+        "sheetName": {"__rl": true, "value": 215292756, "mode": "list", "cachedResultName": "Бронирования"},
         "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "Booking ID":"={{ $json['Booking ID'] }}",
-            "Lead ID":"={{ $json['Lead ID'] }}",
-            "Дата создания":"={{ $json['Дата создания'] }}",
-            "Гость":"={{ $json['Гость'] }}",
-            "Телефон":"={{ $json['Телефон'] }}",
-            "Заезд":"={{ $json['Заезд'] }}",
-            "Выезд":"={{ $json['Выезд'] }}",
-            "Ночей":"={{ $json['Ночей'] }}",
-            "Гостей":"={{ $json['Гостей'] }}",
-            "Сумма":"={{ $json['Сумма'] }}",
-            "Оплачено KGS":"={{ $json['Оплачено KGS'] }}",
-            "Остаток KGS":"={{ $json['Остаток KGS'] }}",
-            "Статус брони":"={{ $json['Статус брони'] }}",
-            "Статус оплаты":"={{ $json['Статус оплаты'] }}"
-          },
-          "matchingColumns":["Booking ID"],
-          "schema":[
-            {"id":"Booking ID","displayName":"Booking ID","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true,"removed":false},
-            {"id":"Lead ID","displayName":"Lead ID","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Дата создания","displayName":"Дата создания","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Гость","displayName":"Гость","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Телефон","displayName":"Телефон","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Заезд","displayName":"Заезд","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Выезд","displayName":"Выезд","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Ночей","displayName":"Ночей","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Гостей","displayName":"Гостей","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Сумма","displayName":"Сумма","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Оплачено KGS","displayName":"Оплачено KGS","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Остаток KGS","displayName":"Остаток KGS","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Статус брони","displayName":"Статус брони","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Статус оплаты","displayName":"Статус оплаты","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true}
-          ],
-          "attemptToConvertTypes":false,
-          "convertFieldsToString":false
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": ["Booking ID"],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000007",
+      "id": "crm-sync-0202",
       "name": "Upsert Bookings",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [0, 0]
+      "position": [-40, 0]
     },
     {
       "parameters": {
-        "jsCode": "const rows = $('Validate CRM Feed').item.json.payments.items ?? [];\nconst paymentStatus = (v) => ({ RECEIVED:'Оплачено', PENDING:'Не оплачено', REFUNDED:'Возврат', FAILED:'Ошибка', CANCELLED:'Ошибка' }[v] ?? 'Не оплачено');\nconst method = (v) => {\n  const x = String(v ?? '').toUpperCase();\n  if (x.includes('MBANK')) return 'MBank';\n  if (x.includes('OPTIMA')) return 'Optima';\n  if (x.includes('PAYBOX')) return 'PayBox';\n  if (x.includes('CASH')) return 'Наличные';\n  if (x.includes('CARD') || x.includes('POS')) return 'Карта/POS';\n  if (x.includes('BANK') || x.includes('TRANSFER')) return 'Банковский перевод';\n  return 'Другое';\n};\nreturn rows.map((r) => ({ json: {\n  'Payment ID': r.payment_id,\n  'Booking ID': r.booking_id ?? '',\n  'Дата': r.paid_at ?? r.created_at,\n  'Гость': r.guest_name ?? '',\n  'Сумма KGS': r.amount_kgs,\n  'Валюта': 'KGS',\n  'Метод': method(r.method),\n  'Статус': paymentStatus(r.status),\n  'Референс/транзакция': r.external_ref ?? '',\n  'Комментарий': r.provider ? `Core provider: ${r.provider}` : ''\n} }));"
+        "jsCode": "const rows=$json.payments.items||[]; return rows.map(r=>({json:{'Payment ID':r.payment_id,'Booking ID':r.booking_id??'','Дата':r.paid_at??r.created_at,'Гость':r.guest_name??'','Сумма KGS':r.amount_kgs,'Валюта':'KGS','Тип платежа':'','Метод':r.method??'','Статус':r.status,'Комиссия KGS':'','Чисто KGS':'','Референс/транзакция':r.external_ref??'','Комментарий':''}}));"
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000008",
+      "id": "crm-sync-0301",
       "name": "Map Payments",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-300, 260]
+      "position": [-320, 240]
     },
     {
       "parameters": {
         "operation": "appendOrUpdate",
-        "documentId": {"__rl":true,"value":"1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A","mode":"id"},
-        "sheetName": {"__rl":true,"value":1151975814,"mode":"list","cachedResultName":"Платежи","cachedResultUrl":"https://docs.google.com/spreadsheets/d/1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A/edit#gid=1151975814"},
+        "documentId": {"__rl": true, "value": "1Xqh696QZaNf25pYUA9TLnVEMWl4IZMMyMsZ16OhH_0A", "mode": "id"},
+        "sheetName": {"__rl": true, "value": 1151975814, "mode": "list", "cachedResultName": "Платежи"},
         "columns": {
-          "mappingMode":"defineBelow",
-          "value": {
-            "Payment ID":"={{ $json['Payment ID'] }}",
-            "Booking ID":"={{ $json['Booking ID'] }}",
-            "Дата":"={{ $json['Дата'] }}",
-            "Гость":"={{ $json['Гость'] }}",
-            "Сумма KGS":"={{ $json['Сумма KGS'] }}",
-            "Валюта":"={{ $json['Валюта'] }}",
-            "Метод":"={{ $json['Метод'] }}",
-            "Статус":"={{ $json['Статус'] }}",
-            "Референс/транзакция":"={{ $json['Референс/транзакция'] }}",
-            "Комментарий":"={{ $json['Комментарий'] }}"
-          },
-          "matchingColumns":["Payment ID"],
-          "schema":[
-            {"id":"Payment ID","displayName":"Payment ID","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true,"removed":false},
-            {"id":"Booking ID","displayName":"Booking ID","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Дата","displayName":"Дата","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Гость","displayName":"Гость","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Сумма KGS","displayName":"Сумма KGS","required":false,"defaultMatch":false,"display":true,"type":"number","canBeUsedToMatch":true},
-            {"id":"Валюта","displayName":"Валюта","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Метод","displayName":"Метод","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Статус","displayName":"Статус","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Референс/транзакция","displayName":"Референс/транзакция","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true},
-            {"id":"Комментарий","displayName":"Комментарий","required":false,"defaultMatch":false,"display":true,"type":"string","canBeUsedToMatch":true}
-          ],
-          "attemptToConvertTypes":false,
-          "convertFieldsToString":false
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": ["Payment ID"],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "c4b23008-20c3-45d1-a5db-001000000009",
+      "id": "crm-sync-0302",
       "name": "Upsert Payments",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.7,
-      "position": [0, 260]
+      "position": [-40, 240]
     }
   ],
   "connections": {
-    "Every 5 Minutes": {
-      "main": [[{"node":"Fetch CRM Feed","type":"main","index":0}]]
-    },
-    "Fetch CRM Feed": {
-      "main": [[{"node":"Validate CRM Feed","type":"main","index":0}]]
-    },
-    "Validate CRM Feed": {
-      "main": [[
-        {"node":"Map Leads","type":"main","index":0},
-        {"node":"Map Bookings","type":"main","index":0},
-        {"node":"Map Payments","type":"main","index":0}
-      ]]
-    },
-    "Map Leads": {"main":[[{"node":"Upsert Leads","type":"main","index":0}]]},
-    "Map Bookings": {"main":[[{"node":"Upsert Bookings","type":"main","index":0}]]},
-    "Map Payments": {"main":[[{"node":"Upsert Payments","type":"main","index":0}]]}
+    "Every 5 Minutes": {"main": [[{"node": "Fetch CRM Feed", "type": "main", "index": 0}]]},
+    "Fetch CRM Feed": {"main": [[{"node": "Validate CRM Feed", "type": "main", "index": 0}]]},
+    "Validate CRM Feed": {"main": [[{"node": "Map Leads", "type": "main", "index": 0}, {"node": "Map Bookings", "type": "main", "index": 0}, {"node": "Map Payments", "type": "main", "index": 0}]]},
+    "Map Leads": {"main": [[{"node": "Upsert Leads", "type": "main", "index": 0}]]},
+    "Map Bookings": {"main": [[{"node": "Upsert Bookings", "type": "main", "index": 0}]]},
+    "Map Payments": {"main": [[{"node": "Upsert Payments", "type": "main", "index": 0}]]}
   },
   "pinData": {},
-  "settings": {
-    "executionOrder": "v1",
-    "timezone": "Asia/Bishkek"
-  },
+  "settings": {"executionOrder": "v1", "timezone": "Asia/Bishkek"},
   "active": false,
-  "versionId": "c4b23008-20c3-45d1-a5db-001000000099",
-  "meta": {
-    "templateCredsSetupCompleted": false
-  },
+  "versionId": "9aa37dc7-20a6-44c5-a104-5f6976e86a22",
+  "meta": {"templateCredsSetupCompleted": false},
   "tags": []
 }

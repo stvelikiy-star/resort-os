@@ -1,0 +1,200 @@
+name: Three Crowns Dependency Security Inspection
+
+on:
+  pull_request:
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-next-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify committed lockfiles exist
+        run: test -s apps/web/package-lock.json && test -s apps/admin/package-lock.json && test -s apps/staff/package-lock.json
+
+      - name: Verify all three Next apps declare the same runtime dependency versions
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const paths=['apps/web/package.json','apps/admin/package.json','apps/staff/package.json'];
+          const pkgs=paths.map(p=>JSON.parse(fs.readFileSync(p,'utf8')));
+          const keys=['next','react','react-dom'];
+          for (const key of keys) {
+            const vals=pkgs.map(p=>p.dependencies?.[key]);
+            if (new Set(vals).size !== 1) throw new Error(`${key} differs across apps: ${vals.join(', ')}`);
+            console.log(`${key}=${vals[0]}`);
+          }
+          const postcss=pkgs.map(p=>p.overrides?.postcss);
+          if (new Set(postcss).size !== 1 || !postcss[0]) throw new Error(`postcss override differs/missing: ${postcss.join(', ')}`);
+          console.log(`postcss_override=${postcss[0]}`);
+          NODE
+
+      - name: Prove lockfiles match package manifests
+        run: |
+          for app in web admin staff; do
+            (cd "apps/$app" && npm ci --ignore-scripts --no-audit)
+          done
+
+      - name: Capture exact npm audit report
+        working-directory: apps/web
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          set -e
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('npm-audit.json','utf8'));
+          const vulns = report.vulnerabilities || {};
+          const rows = Object.entries(vulns).map(([name, v]) => ({
+            name,
+            severity: v.severity,
+            direct: Boolean(v.isDirect),
+            range: v.range,
+            fixAvailable: v.fixAvailable,
+            via: (v.via || []).map(x => typeof x === 'string' ? x : ({
+              source: x.source,
+              name: x.name,
+              severity: x.severity,
+              title: x.title,
+              url: x.url,
+              range: x.range
+            }))
+          }));
+          console.log(JSON.stringify({metadata: report.metadata, vulnerabilities: rows}, null, 2));
+          fs.writeFileSync('npm-audit-summary.json', JSON.stringify({metadata: report.metadata, vulnerabilities: rows}, null, 2));
+          NODE
+
+      - name: Gate high and critical npm vulnerabilities
+        working-directory: apps/web
+        run: |
+          node - <<'NODE'
+          const r=require('./npm-audit.json');
+          const counts=r.metadata?.vulnerabilities || {};
+          console.log('audit_counts='+JSON.stringify(counts));
+          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) {
+            console.error('High/critical npm vulnerability detected.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Upload frontend dependency evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-next-dependency-evidence
+          path: |
+            apps/web/package-lock.json
+            apps/admin/package-lock.json
+            apps/staff/package-lock.json
+            apps/web/npm-audit.json
+            apps/web/npm-audit-summary.json
+          retention-days: 7
+
+  inspect-python-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            services/api/requirements.txt
+            services/api/requirements-security.txt
+
+      - name: Prove backend requirements and scanner are exactly pinned
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          pattern = re.compile(r'^[A-Za-z0-9_.-]+(?:\[[A-Za-z0-9_.,-]+\])?==[^<>=!~\s]+$')
+          for path in [Path('services/api/requirements.txt'), Path('services/api/requirements-security.txt')]:
+              rows = []
+              for raw in path.read_text(encoding='utf-8').splitlines():
+                  line = raw.split('#', 1)[0].strip()
+                  if line:
+                      rows.append(line)
+              assert rows, f'{path} is empty'
+              bad = [line for line in rows if not pattern.fullmatch(line)]
+              assert not bad, f'{path} contains non-exact dependency pins: {bad}'
+              print(f'PINNED {path}: {len(rows)} requirement(s)')
+          PY
+
+      - name: Install pinned backend runtime and pinned audit tool
+        run: |
+          python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+          python -m pip install --disable-pip-version-check -r services/api/requirements-security.txt
+          python -m pip freeze --all | sort > services/api/backend-resolved-freeze.txt
+          pip-audit --version
+
+      - name: Capture machine-readable Python vulnerability evidence
+        shell: bash
+        run: |
+          set +e
+          pip-audit -r services/api/requirements.txt --format json --output services/api/pip-audit.json
+          AUDIT_EXIT=$?
+          set -e
+          printf '%s\n' "$AUDIT_EXIT" > services/api/pip-audit.exit
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report_path = Path('services/api/pip-audit.json')
+          exit_code = int(Path('services/api/pip-audit.exit').read_text().strip())
+          summary = {'audit_exit_code': exit_code, 'dependencies': 0, 'vulnerabilities': []}
+          if report_path.exists() and report_path.stat().st_size:
+              data = json.loads(report_path.read_text(encoding='utf-8'))
+              deps = data.get('dependencies', []) if isinstance(data, dict) else []
+              summary['dependencies'] = len(deps)
+              for dep in deps:
+                  for vuln in dep.get('vulns', []) or []:
+                      summary['vulnerabilities'].append({
+                          'dependency': dep.get('name'),
+                          'version': dep.get('version'),
+                          'id': vuln.get('id'),
+                          'aliases': vuln.get('aliases', []),
+                          'fix_versions': vuln.get('fix_versions', []),
+                      })
+          else:
+              summary['scanner_error'] = 'pip-audit did not produce JSON output'
+          Path('services/api/pip-audit-summary.json').write_text(
+              json.dumps(summary, indent=2, sort_keys=True), encoding='utf-8'
+          )
+          print(json.dumps(summary, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload backend dependency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-python-dependency-evidence
+          path: |
+            services/api/requirements.txt
+            services/api/requirements-security.txt
+            services/api/backend-resolved-freeze.txt
+            services/api/pip-audit.json
+            services/api/pip-audit-summary.json
+            services/api/pip-audit.exit
+          retention-days: 7
+
+      - name: Gate Python vulnerabilities and scanner failures
+        run: |
+          test -s services/api/pip-audit.json
+          test "$(cat services/api/pip-audit.exit)" = "0"

@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import os
+import re
 import uuid
 from datetime import date
 from pathlib import Path
@@ -31,6 +32,24 @@ ROOM_TYPE_CODES = {
     "Квартиры / апартаменты с кухней": "APARTMENT_KITCHEN",
 }
 
+# Owner correction supersedes the older intake reconstruction for these exact rooms.
+# Keep untouched raw bed/area fields because the owner correction only changes location,
+# operational existence/capacity and category.
+OWNER_ROOM_CORRECTIONS = {
+    "501": {
+        "floor": "BASEMENT",
+        "room_type": "Двухместный стандарт, цоколь",
+        "capacity_adults": "2",
+        "note": "OWNER_APPROVED_2026-09-05: basement above laundry; operational; two-person room",
+    },
+    "502": {
+        "floor": "BASEMENT",
+        "room_type": "Двухместный стандарт, цоколь",
+        "capacity_adults": "2",
+        "note": "OWNER_APPROVED_2026-09-05: basement above laundry; operational; two-person room",
+    },
+}
+
 
 def database_url() -> str:
     value = os.environ.get("DATABASE_URL", "postgresql://resort:resort@localhost:5432/resort_os")
@@ -55,9 +74,41 @@ def clean(value: str | None) -> str | None:
     return value
 
 
+def rate_capacity_adults(row: dict) -> int:
+    """Derive capacity only from the explicit tariff occupancy rule.
+
+    Some owner-approved room corrections can legitimately leave a sellable tariff
+    category with zero currently assigned rooms. In that case the category must not
+    disappear from room_types, because rates remain authoritative evidence that the
+    category exists. We never invent a room; only the type metadata is retained.
+    """
+    rule = clean(row.get("occupancy_rule"))
+    if not rule:
+        raise RuntimeError(f"Rate row for {row.get('room_type')} has no occupancy_rule")
+    match = re.search(r"\b(\d+)\b", rule)
+    if not match:
+        raise RuntimeError(f"Cannot derive capacity from occupancy_rule={rule!r}")
+    capacity = int(match.group(1))
+    if capacity <= 0 or capacity > 20:
+        raise RuntimeError(f"Invalid tariff capacity {capacity} in occupancy_rule={rule!r}")
+    return capacity
+
+
 def load_rooms() -> list[dict]:
     with ROOMS_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
+
+    for row in rows:
+        code = row["room_code"].strip()
+        correction = OWNER_ROOM_CORRECTIONS.get(code)
+        if not correction:
+            continue
+        row["floor"] = correction["floor"]
+        row["room_type"] = correction["room_type"]
+        row["capacity_adults"] = correction["capacity_adults"]
+        existing = clean(row.get("notes"))
+        row["notes"] = f"{existing}; {correction['note']}" if existing else correction["note"]
+
     codes = [r["room_code"].strip() for r in rows]
     if len(rows) != 84:
         raise RuntimeError(f"Expected 84 room rows, got {len(rows)}")
@@ -90,15 +141,41 @@ async def upsert_property(conn) -> uuid.UUID:
     )
 
 
-async def upsert_room_types(conn, property_id: uuid.UUID, room_rows: list[dict]) -> dict[str, uuid.UUID]:
-    grouped: dict[str, dict] = {}
+async def upsert_room_types(
+    conn,
+    property_id: uuid.UUID,
+    room_rows: list[dict],
+    rate_rows: list[dict],
+) -> dict[str, uuid.UUID]:
+    """Seed all canonical categories backed by either inventory or tariff evidence.
+
+    Inventory determines the facts for categories that currently have rooms. Tariff
+    rows are a safe fallback for a category with no room after an owner correction.
+    This keeps the canonical 12-category catalogue without synthesizing inventory.
+    """
+    room_samples: dict[str, dict] = {}
+    rate_samples: dict[str, dict] = {}
     for row in room_rows:
-        name = row["room_type"].strip()
-        grouped.setdefault(name, row)
+        room_samples.setdefault(row["room_type"].strip(), row)
+    for row in rate_rows:
+        rate_samples.setdefault(row["room_type"].strip(), row)
 
     ids: dict[str, uuid.UUID] = {}
-    for name, sample in grouped.items():
-        code = ROOM_TYPE_CODES[name]
+    for name, code in ROOM_TYPE_CODES.items():
+        room_sample = room_samples.get(name)
+        rate_sample = rate_samples.get(name)
+        if room_sample is None and rate_sample is None:
+            raise RuntimeError(f"Room type {name!r} has neither room nor tariff evidence")
+
+        if room_sample is not None:
+            capacity_adults = int(room_sample["capacity_adults"])
+            capacity_children = nullable_int(room_sample.get("capacity_children"))
+            area_label = clean(room_sample.get("area_m2"))
+        else:
+            capacity_adults = rate_capacity_adults(rate_sample)
+            capacity_children = None
+            area_label = None
+
         room_type_id = await conn.fetchval(
             '''
             INSERT INTO room_types (
@@ -113,9 +190,7 @@ async def upsert_room_types(conn, property_id: uuid.UUID, room_rows: list[dict])
             RETURNING id
             ''',
             uuid.uuid4(), property_id, code, name,
-            int(sample["capacity_adults"]),
-            nullable_int(sample.get("capacity_children")),
-            clean(sample.get("area_m2")),
+            capacity_adults, capacity_children, area_label,
         )
         ids[name] = room_type_id
     return ids
@@ -191,7 +266,7 @@ async def main() -> None:
     try:
         async with conn.transaction():
             property_id = await upsert_property(conn)
-            type_ids = await upsert_room_types(conn, property_id, room_rows)
+            type_ids = await upsert_room_types(conn, property_id, room_rows, rate_rows)
             await upsert_rooms(conn, property_id, type_ids, room_rows)
             await upsert_rates(conn, property_id, type_ids, rate_rows)
 

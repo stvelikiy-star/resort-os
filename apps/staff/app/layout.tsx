@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
+import "./shift-v2.css";
 
 export const metadata: Metadata = {
-  title: "Три Короны · Персонал",
-  description: "Операционный интерфейс Resort OS для персонала",
+  title: "Три Короны · Моя смена",
+  description: "Мобильный операционный интерфейс Resort OS для персонала",
   manifest: "/manifest.webmanifest",
 };
 
@@ -12,7 +13,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#173f31",
+  themeColor: "#0A1128",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

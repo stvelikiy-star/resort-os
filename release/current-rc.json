@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
+  "source_branch": "integration/site-pms-cms-20260827",
+  "accepted_executable_head": "ab6b649d91df5e9698253d43788cc657ca7040c9",
+  "observed_integration_merge": "c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4",
+  "observed_merge_tree_equivalent": true,
+  "accepted_head_workflows": {
+    "triggered": 20,
+    "success": 20,
+    "failures": 0
+  },
+  "production_source_branch": "integration/site-pms-cms-20260827",
+  "main_allowed_as_production_source": false,
+  "external_beget_staging_verified": false,
+  "legacy_live_rollback_verified": false,
+  "production_cutover_authorized": false,
+  "notes": [
+    "The accepted executable head is the exact PR #107 product/security head built from the previously frozen RC integration head.",
+    "The exact PR #107 head completed all 20 applicable non-RC workflows successfully with zero failures; Release RC Truth intentionally failed before refreeze because the previous RC remained frozen.",
+    "The observed integration merge has zero file differences versus the tested PR #107 head.",
+    "PR #107 adds fail-closed provider environment validation for Telegram Sales, GREEN API, OpenAI model paths and Staff Voice without enabling any provider or committing real credentials.",
+    "The final structural launch verifier now requires VERIFIED GitHub branch-protection evidence and VERIFIED Google Drive launch-control permission evidence before production cutover can pass.",
+    "Google Drive permission audit currently shows anyone-with-link writer access on all 13 top-level project folders; issue #100 remains open until owner/admin remediation is independently re-verified.",
+    "GitHub integration branch protection remains disabled; issue #91 remains open until protected:true and required-check enforcement are independently re-verified.",
+    "The prior PR #102 customer-facing AI guest-truth hardening and PR #98 Kitchen/Core release baseline remain part of this accepted product tree.",
+    "The canonical database release ledger remains exactly eight migrations ending in 7_kitchen_operations.",
+    "All external Beget/staging/rollback/device/provider/monitoring/backup/DNS/owner-GO evidence remains separate and production cutover remains STOP."
+  ]
+}

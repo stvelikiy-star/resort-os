@@ -1,0 +1,116 @@
+name: Management Kitchen Guest CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'apps/admin/app/admin-experience.css'
+      - 'apps/admin/app/guest-offers.css'
+      - 'apps/admin/app/layout.tsx'
+      - 'apps/admin/app/reception-readiness.css'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/admin/components/GuestOffersBoard.tsx'
+      - 'apps/admin/components/ReceptionWorkspace.tsx'
+      - 'apps/staff/app/kitchen/**'
+      - 'apps/staff/app/waiter/**'
+      - 'apps/staff/components/KitchenEntry.tsx'
+      - 'apps/staff/components/KitchenEntry.module.css'
+      - 'apps/staff/components/DiningDayPlanner.tsx'
+      - 'apps/staff/components/DiningDayPlanner.module.css'
+      - 'apps/staff/components/WaiterEntry.tsx'
+      - 'apps/staff/components/WaiterEntry.module.css'
+      - 'apps/web/app/g/**'
+      - 'apps/web/app/guest-marketplace.css'
+      - 'apps/web/components/GuestMarketplace.tsx'
+      - 'packages/database/prisma/migrations/8_dining_service_control/**'
+      - 'packages/database/prisma/migrations/9_guest_offer_campaigns/**'
+      - 'services/api/app/dining_control.py'
+      - 'services/api/app/guest_marketplace.py'
+      - 'services/api/app/guest_offers.py'
+      - 'services/api/app/reception_readiness.py'
+      - 'services/api/app/app_entry.py'
+      - 'scripts/guest_marketplace_contract_test.py'
+      - '.github/workflows/management-kitchen-guest-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-migrations-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile Core extensions and run contract guard
+        run: |
+          python -m compileall services/api/app/dining_control.py services/api/app/guest_marketplace.py services/api/app/guest_offers.py services/api/app/reception_readiness.py
+          python scripts/guest_marketplace_contract_test.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            packages/database/package-lock.json
+            apps/web/package-lock.json
+            apps/staff/package-lock.json
+            apps/admin/package-lock.json
+
+      - name: Apply canonical migration chain on clean PostgreSQL
+        working-directory: packages/database
+        run: |
+          npm ci
+          npx prisma validate
+          npx prisma migrate deploy
+          npx prisma migrate status
+
+      - name: Typecheck and build Admin
+        working-directory: apps/admin
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Staff / Kitchen / Waiter
+        working-directory: apps/staff
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Guest OS / Public Web
+        working-directory: apps/web
+        env:
+          CORE_API_URL: http://127.0.0.1:8000
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build

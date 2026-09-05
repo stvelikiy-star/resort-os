@@ -1,0 +1,143 @@
+.owner-grid-scroll{
+  max-height:calc(100svh - 220px);
+  min-height:560px;
+}
+
+/* Owner request: keep the room register readable while making the night grid materially denser. */
+.owner-grid-scroll[data-window-days="31"] .owner-grid-head,
+.owner-grid-scroll[data-window-days="31"] .owner-room-row{
+  grid-template-columns:300px 54px repeat(31,26px)!important;
+}
+
+.owner-grid-scroll[data-window-days="14"] .owner-grid-head,
+.owner-grid-scroll[data-window-days="14"] .owner-room-row{
+  grid-template-columns:300px 54px repeat(14,34px)!important;
+}
+
+.owner-room-head,
+.owner-room-label{
+  width:300px;
+}
+
+.owner-state-head,
+.owner-room-state{
+  left:300px;
+}
+
+.owner-group-label{
+  width:354px;
+  height:25px;
+}
+
+.owner-grid-head{
+  min-height:34px;
+}
+
+.owner-room-head,
+.owner-state-head{
+  min-height:34px;
+  padding:0 7px;
+  font-size:10px;
+}
+
+.owner-day-head{
+  min-height:34px;
+  font-size:8px;
+}
+
+.owner-day-head strong{
+  font-size:11px;
+}
+
+.owner-room-row{
+  min-height:32px;
+}
+
+.owner-room-label{
+  grid-template-columns:minmax(0,1fr);
+  gap:0;
+  height:32px;
+  padding:0 7px;
+}
+
+.owner-room-label strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:11px;
+  line-height:1.1;
+}
+
+.owner-room-label span{
+  display:none;
+}
+
+.owner-room-state{
+  height:32px;
+  font-size:8px;
+}
+
+.owner-night-cell{
+  height:32px;
+}
+
+.owner-booking-bar{
+  height:24px;
+  margin:4px 1px;
+  border-radius:5px;
+  padding:1px 4px;
+  gap:3px;
+}
+
+.owner-booking-bar strong{
+  font-size:9px;
+}
+
+.owner-booking-bar span{
+  font-size:7px;
+}
+
+.owner-grid-title h1{
+  font-size:22px;
+}
+
+.owner-grid-title p{
+  font-size:12px;
+}
+
+@media (max-height:800px){
+  .owner-grid-scroll{
+    max-height:calc(100svh - 205px);
+    min-height:470px;
+  }
+  .owner-grid-title p{
+    display:none;
+  }
+}
+
+@media (max-width:900px){
+  .owner-grid-scroll{
+    max-height:68svh;
+    min-height:420px;
+  }
+  .owner-grid-scroll[data-window-days="31"] .owner-grid-head,
+  .owner-grid-scroll[data-window-days="31"] .owner-room-row{
+    grid-template-columns:270px 48px repeat(31,25px)!important;
+  }
+  .owner-grid-scroll[data-window-days="14"] .owner-grid-head,
+  .owner-grid-scroll[data-window-days="14"] .owner-room-row{
+    grid-template-columns:270px 48px repeat(14,32px)!important;
+  }
+  .owner-room-head,
+  .owner-room-label{
+    width:270px;
+  }
+  .owner-state-head,
+  .owner-room-state{
+    left:270px;
+  }
+  .owner-group-label{
+    width:318px;
+  }
+}

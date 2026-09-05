@@ -1,5 +1,5 @@
-import StaffShell from "../components/StaffShell";
+import StaffRoleGateway from "../components/StaffRoleGateway";
 
 export default function StaffPage() {
-  return <StaffShell />;
+  return <StaffRoleGateway />;
 }

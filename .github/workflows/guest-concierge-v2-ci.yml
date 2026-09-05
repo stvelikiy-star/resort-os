@@ -1,0 +1,54 @@
+name: Guest Concierge V2 CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'apps/web/app/g/**'
+      - 'apps/web/app/guest-concierge.css'
+      - 'apps/web/components/GuestConciergeRuntime.tsx'
+      - 'services/api/app/guest_requests.py'
+      - 'scripts/guest_concierge_v2_contract_test.py'
+      - 'scripts/guest_concierge_v2_browser_contract.mjs'
+      - '.github/workflows/guest-concierge-v2-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Guest Concierge contract audit
+        run: python scripts/guest_concierge_v2_contract_test.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Run source/browser contract audit
+        run: node scripts/guest_concierge_v2_browser_contract.mjs
+
+      - name: Install public web dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Typecheck public web
+        working-directory: apps/web
+        run: npm run typecheck
+
+      - name: Build public web
+        working-directory: apps/web
+        env:
+          CORE_API_URL: http://127.0.0.1:8000
+        run: npm run build

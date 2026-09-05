@@ -4,13 +4,29 @@ on:
   pull_request:
     paths:
       - "apps/web/**"
+      - "services/api/app/site_content.py"
+      - "services/api/data/site_content_defaults.json"
       - "scripts/public_site_truth_guard.py"
+      - "scripts/public_i18n_guard.py"
+      - "scripts/external_public_truth_probe.py"
+      - "scripts/external_public_truth_probe_test.py"
+      - "scripts/owner_guest_facts_guard.py"
+      - "scripts/guest_os_truth_guard.py"
+      - "scripts/public_media_integrity_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
   push:
     branches: [main]
     paths:
       - "apps/web/**"
+      - "services/api/app/site_content.py"
+      - "services/api/data/site_content_defaults.json"
       - "scripts/public_site_truth_guard.py"
+      - "scripts/public_i18n_guard.py"
+      - "scripts/external_public_truth_probe.py"
+      - "scripts/external_public_truth_probe_test.py"
+      - "scripts/owner_guest_facts_guard.py"
+      - "scripts/guest_os_truth_guard.py"
+      - "scripts/public_media_integrity_guard.py"
       - ".github/workflows/public-site-truth-ci.yml"
 
 permissions:
@@ -26,3 +42,13 @@ jobs:
           python-version: "3.12"
       - name: Enforce canonical public sales boundary
         run: python3 scripts/public_site_truth_guard.py
+      - name: Enforce owner-approved guest service facts
+        run: python3 scripts/owner_guest_facts_guard.py
+      - name: Enforce implemented Guest OS request truth
+        run: python3 scripts/guest_os_truth_guard.py
+      - name: Enforce public media integrity
+        run: python3 scripts/public_media_integrity_guard.py
+      - name: Test external rendered-site truth probe
+        run: python3 scripts/external_public_truth_probe_test.py
+      - name: Enforce RU KG EN public locale contract
+        run: python3 scripts/public_i18n_guard.py

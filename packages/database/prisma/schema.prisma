@@ -56,8 +56,12 @@ enum InventoryBlockType {
 enum StaffRole {
   OWNER
   MANAGER
+  RECEPTION
   MAID
   TECHNICIAN
+  STORE_STAFF
+  DINING_STAFF
+  CONTENT_MANAGER
   BEACH_PARTNER
 }
 
@@ -80,6 +84,29 @@ enum OperationalTaskPriority {
   NORMAL
   HIGH
   URGENT
+}
+
+enum StayStatus {
+  PENDING
+  ACTIVE
+  CHECKED_OUT
+  CANCELLED
+}
+
+enum RoomQrStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ServicePointQrStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum GuestSessionStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
 }
 
 enum NfcWalletStatus {
@@ -144,6 +171,14 @@ model Property {
   guests                Guest[]
   requests              ReservationRequest[]
   reservations          Reservation[]
+  stays                 Stay[]
+  roomAssignments       RoomAssignment[]
+  roomQrs               RoomQr[]
+  servicePoints         ServicePoint[]
+  servicePointQrs       ServicePointQr[]
+  guestSessions         GuestSession[]
+  guestHistoryEvents    GuestHistoryEvent[]
+  guestPreferences      GuestPreference[]
   auditLogs             AuditLog[]
   staffUsers            StaffUser[]
   tasks                 OperationalTask[]
@@ -153,6 +188,8 @@ model Property {
   nfcWallets            NfcWallet[]
   nfcBracelets          NfcBracelet[]
   nfcTransactions       NfcTransaction[]
+  analyticsSnapshots    OwnerAnalyticsSnapshot[]
+  guestEngagements      GuestEngagement[]
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
 
@@ -194,6 +231,8 @@ model Room {
   operationalState RoomOperationalState @default(UNKNOWN)
   notes            String?
   inventoryBlocks  InventoryBlock[]
+  roomAssignments  RoomAssignment[]
+  roomQrs          RoomQr[]
   tasks            OperationalTask[]
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
@@ -240,17 +279,22 @@ model RatePeriod {
 }
 
 model Guest {
-  id           String        @id @default(uuid()) @db.Uuid
-  propertyId   String        @db.Uuid
-  property     Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  firstName    String?
-  lastName     String?
-  phone        String?
-  email        String?
-  reservations Reservation[]
-  nfcWallets   NfcWallet[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id            String              @id @default(uuid()) @db.Uuid
+  propertyId    String              @db.Uuid
+  property      Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  firstName     String?
+  lastName      String?
+  phone         String?
+  email         String?
+  reservations  Reservation[]
+  stays         Stay[]
+  guestSessions GuestSession[]
+  historyEvents GuestHistoryEvent[]
+  preferences   GuestPreference[]
+  nfcWallets    NfcWallet[]
+  engagements   GuestEngagement[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   @@index([propertyId, phone])
   @@map("guests")
@@ -303,12 +347,198 @@ model Reservation {
   notes          String?
   blocks         InventoryBlock[]
   payments       Payment[]
+  serviceTasks   OperationalTask[]   @relation("ReservationGuestServices")
+  engagements    GuestEngagement[]
+  stay           Stay?
   nfcWallet      NfcWallet?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   @@index([propertyId, checkIn, checkOut])
   @@map("reservations")
+}
+
+model Stay {
+  id                      String             @id @default(uuid()) @db.Uuid
+  propertyId              String             @db.Uuid
+  property                Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  reservationId           String             @unique @db.Uuid
+  reservation             Reservation        @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  guestId                 String             @db.Uuid
+  guest                   Guest              @relation(fields: [guestId], references: [id], onDelete: Restrict)
+  status                  StayStatus         @default(PENDING)
+  actualCheckInAt         DateTime?
+  actualCheckOutAt        DateTime?
+  guestAccessPinHash      String?
+  guestAccessPinIssuedAt  DateTime?
+  guestAccessPinExpiresAt DateTime?
+  roomAssignments         RoomAssignment[]
+  guestSessions           GuestSession[]
+  tasks                   OperationalTask[]
+  historyEvents           GuestHistoryEvent[]
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  @@index([propertyId, status])
+  @@index([guestId, createdAt])
+  @@map("stays")
+}
+
+model RoomAssignment {
+  id         String    @id @default(uuid()) @db.Uuid
+  propertyId String    @db.Uuid
+  property   Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stayId     String    @db.Uuid
+  stay       Stay      @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  roomId     String    @db.Uuid
+  room       Room      @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  startedAt  DateTime
+  endedAt    DateTime?
+  source     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([propertyId, roomId, startedAt, endedAt])
+  @@index([stayId, startedAt])
+  @@map("room_assignments")
+}
+
+model RoomQr {
+  id         String       @id @default(uuid()) @db.Uuid
+  propertyId String       @db.Uuid
+  property   Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomId     String       @db.Uuid
+  room       Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  tokenHash  String       @unique
+  status     RoomQrStatus @default(ACTIVE)
+  label      String?
+  issuedAt   DateTime     @default(now())
+  revokedAt  DateTime?
+  sessions   GuestSession[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@index([propertyId, roomId, status])
+  @@map("room_qrs")
+}
+
+model GuestSession {
+  id                 String             @id @default(uuid()) @db.Uuid
+  propertyId         String             @db.Uuid
+  property           Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stayId             String             @db.Uuid
+  stay               Stay               @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  guestId            String             @db.Uuid
+  guest              Guest              @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  roomQrId           String?            @db.Uuid
+  roomQr             RoomQr?            @relation(fields: [roomQrId], references: [id], onDelete: SetNull)
+  tokenHash          String             @unique
+  status             GuestSessionStatus @default(ACTIVE)
+  verificationMethod String             @default("PIN")
+  verifiedAt         DateTime            @default(now())
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  lastSeenAt         DateTime            @default(now())
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([propertyId, stayId, status])
+  @@index([guestId, createdAt])
+  @@index([expiresAt, status])
+  @@map("guest_sessions")
+}
+
+model GuestHistoryEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  propertyId  String    @db.Uuid
+  property    Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guestId     String    @db.Uuid
+  guest       Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  stayId      String?   @db.Uuid
+  stay        Stay?     @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  eventType   String
+  source      String?
+  payloadJson Json?
+  occurredAt  DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([propertyId, guestId, occurredAt])
+  @@index([stayId, occurredAt])
+  @@map("guest_history_events")
+}
+
+model GuestPreference {
+  id         String   @id @default(uuid()) @db.Uuid
+  propertyId String   @db.Uuid
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guestId    String   @db.Uuid
+  guest      Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  key        String
+  valueText  String?
+  metadata   Json?
+  source     String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([guestId, key])
+  @@index([propertyId, guestId, isActive])
+  @@map("guest_preferences")
+}
+
+model ServicePoint {
+  id             String                      @id @default(uuid()) @db.Uuid
+  propertyId     String                      @db.Uuid
+  property       Property                    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  code           String
+  name           String
+  category       String
+  zoneLabel      String?
+  isActive       Boolean                     @default(true)
+  requestOptions ServicePointRequestOption[]
+  qrs            ServicePointQr[]
+  tasks          OperationalTask[]
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@unique([propertyId, code])
+  @@index([propertyId, category, isActive])
+  @@map("service_points")
+}
+
+model ServicePointRequestOption {
+  id             String                  @id @default(uuid()) @db.Uuid
+  servicePointId String                  @db.Uuid
+  servicePoint   ServicePoint            @relation(fields: [servicePointId], references: [id], onDelete: Cascade)
+  code           String
+  label          String
+  taskType       OperationalTaskType
+  priority       OperationalTaskPriority @default(NORMAL)
+  isActive       Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([servicePointId, code])
+  @@index([servicePointId, isActive])
+  @@map("service_point_request_options")
+}
+
+model ServicePointQr {
+  id             String               @id @default(uuid()) @db.Uuid
+  propertyId     String               @db.Uuid
+  property       Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  servicePointId String               @db.Uuid
+  servicePoint   ServicePoint         @relation(fields: [servicePointId], references: [id], onDelete: Cascade)
+  tokenHash      String               @unique
+  status         ServicePointQrStatus @default(ACTIVE)
+  label          String?
+  issuedAt       DateTime             @default(now())
+  revokedAt      DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([propertyId, servicePointId, status])
+  @@map("service_point_qrs")
 }
 
 model InventoryBlock {
@@ -368,8 +598,8 @@ model StaffUser {
   assignedTasks         OperationalTask[] @relation("TaskAssignee")
   assignedConversations Conversation[]    @relation("ConversationAssignee")
   beachTransactions     NfcTransaction[]  @relation("BeachPartnerTransactions")
-  createdAt             DateTime           @default(now())
-  updatedAt             DateTime           @updatedAt
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 
   @@unique([propertyId, username])
   @@unique([propertyId, telegramUserId])
@@ -382,10 +612,10 @@ model AuthSession {
   userId     String    @db.Uuid
   user       StaffUser @relation(fields: [userId], references: [id], onDelete: Cascade)
   tokenHash  String    @unique
-  expiresAt  DateTime
-  revokedAt  DateTime?
+  expiresAt DateTime
+  revokedAt DateTime?
   lastSeenAt DateTime  @default(now())
-  createdAt  DateTime  @default(now())
+  createdAt DateTime   @default(now())
 
   @@index([userId, expiresAt])
   @@index([expiresAt])
@@ -393,27 +623,40 @@ model AuthSession {
 }
 
 model OperationalTask {
-  id            String                  @id @default(uuid()) @db.Uuid
-  propertyId    String                  @db.Uuid
-  property      Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  roomId        String?                 @db.Uuid
-  room          Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  type          OperationalTaskType
-  status        OperationalTaskStatus   @default(OPEN)
-  priority      OperationalTaskPriority @default(NORMAL)
-  title         String
-  description   String?
-  assignedToId  String?                 @db.Uuid
-  assignedTo    StaffUser?              @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  createdByType String
-  createdById   String?
-  source        String?
-  completedAt   DateTime?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
+  id             String                  @id @default(uuid()) @db.Uuid
+  propertyId     String                  @db.Uuid
+  property       Property                @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  roomId         String?                 @db.Uuid
+  room           Room?                   @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  reservationId  String?                 @db.Uuid
+  reservation    Reservation?            @relation("ReservationGuestServices", fields: [reservationId], references: [id], onDelete: SetNull)
+  stayId         String?                 @db.Uuid
+  stay           Stay?                   @relation(fields: [stayId], references: [id], onDelete: SetNull)
+  servicePointId String?                 @db.Uuid
+  servicePoint   ServicePoint?           @relation(fields: [servicePointId], references: [id], onDelete: SetNull)
+  serviceCode    String?
+  serviceDate    DateTime?               @db.Date
+  serviceTime    String?
+  type           OperationalTaskType
+  status         OperationalTaskStatus   @default(OPEN)
+  priority       OperationalTaskPriority @default(NORMAL)
+  title          String
+  description    String?
+  assignedToId   String?                 @db.Uuid
+  assignedTo     StaffUser?              @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdByType  String
+  createdById    String?
+  source         String?
+  completedAt    DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([propertyId, status, type])
   @@index([roomId, status])
+  @@index([reservationId, status])
+  @@index([stayId, status])
+  @@index([servicePointId, status])
+  @@index([propertyId, serviceCode, status, serviceDate])
   @@index([assignedToId, status])
   @@map("operational_tasks")
 }
@@ -456,28 +699,28 @@ model CommunicationChannel {
 }
 
 model Conversation {
-  id                     String             @id @default(uuid()) @db.Uuid
-  propertyId             String             @db.Uuid
-  property               Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  channelId              String             @db.Uuid
+  id                     String               @id @default(uuid()) @db.Uuid
+  propertyId             String               @db.Uuid
+  property               Property             @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  channelId              String               @db.Uuid
   channel                CommunicationChannel @relation(fields: [channelId], references: [id], onDelete: Restrict)
   externalConversationId String?
   externalContactId      String?
   contactName            String?
   contactPhone           String?
   contactUsername        String?
-  status                 ConversationStatus @default(OPEN)
-  assignedToId           String?            @db.Uuid
-  assignedTo             StaffUser?         @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  reservationRequestId   String?            @db.Uuid
-  reservationRequest     ReservationRequest? @relation(fields: [reservationRequestId], references: [id], onDelete: SetNull)
+  status                 ConversationStatus   @default(OPEN)
+  assignedToId           String?              @db.Uuid
+  assignedTo             StaffUser?           @relation("ConversationAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  reservationRequestId   String?              @db.Uuid
+  reservationRequest     ReservationRequest?  @relation(fields: [reservationRequestId], references: [id], onDelete: SetNull)
   lastInboundAt          DateTime?
   lastOutboundAt         DateTime?
   firstResponseAt        DateTime?
   resolvedAt             DateTime?
   messages               ConversationMessage[]
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
 
   @@unique([channelId, externalConversationId])
   @@index([propertyId, status, updatedAt])
@@ -608,4 +851,45 @@ model AuditLog {
 
   @@index([propertyId, createdAt])
   @@map("audit_logs")
+}
+
+model OwnerAnalyticsSnapshot {
+  id           String   @id @default(uuid()) @db.Uuid
+  propertyId   String   @db.Uuid
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  snapshotDate DateTime @db.Date
+  horizonDays  Int
+  payloadJson  Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([propertyId, snapshotDate])
+  @@index([propertyId, snapshotDate])
+  @@map("owner_analytics_snapshots")
+}
+
+model GuestEngagement {
+  id            String       @id @default(uuid()) @db.Uuid
+  propertyId    String       @db.Uuid
+  property      Property     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  guestId       String       @db.Uuid
+  guest         Guest        @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  reservationId String?      @db.Uuid
+  reservation   Reservation? @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  kind          String
+  status        String       @default("OPEN")
+  dueDate       DateTime?    @db.Date
+  channelHint   String?
+  title         String
+  notes         String?
+  score         Int?
+  feedbackText  String?
+  completedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([propertyId, status, dueDate])
+  @@index([guestId, createdAt])
+  @@index([reservationId])
+  @@map("guest_engagements")
 }

@@ -1,0 +1,98 @@
+{
+  "release": {
+    "candidate_sha": "0000000000000000000000000000000000000000",
+    "migrations": [
+      "0_init",
+      "1_site_content",
+      "2_guest_service_tasks",
+      "3_owner_analytics_snapshots",
+      "4_guest_engagements",
+      "5_guest_os_core",
+      "6_service_point_qr_operations",
+      "7_kitchen_operations",
+      "8_dining_service_control",
+      "9_guest_offer_campaigns"
+    ]
+  },
+  "external_evidence": {
+    "github_branch_protection": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Before production GO, attach evidence that the canonical integration/main branch policy is protected with the required PR/check/force-push controls. Current issue #91 remains the tracking gate until verified."
+    },
+    "drive_launch_control_permissions": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Before production GO, attach Drive permission metadata proving that anyone-with-link writer access has been removed from all 13 top-level Three Crowns project folders and current launch-control Docs/Sheets, with named-editor/read-only policy in place. Current issue #100 remains the tracking gate until verified."
+    },
+    "room_reconciliation": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Physical room import gate #38 is closed. On the real external staging database, run the approved importer dry-run, review the diff against the canonical 84-room register, then record safe reconciliation evidence."
+    },
+    "beget_host_preflight": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Run non-destructive host preflight on the actual target host/account."
+    },
+    "legacy_rollback_backup": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Require archive/dump/config/DNS evidence and checksum for the currently live site."
+    },
+    "external_https_wss_staging": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Real external staging must prove HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL."
+    },
+    "external_public_truth_probe": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Run external_public_truth_probe.py against the real staging URL."
+    },
+    "real_device_acceptance": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Require iPhone, Android, desktop and Telegram/staff acceptance on real devices."
+    },
+    "provider_acceptance": {
+      "enabled": false,
+      "status": "NOT_REQUIRED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "If WhatsApp/API Green/ManyChat or another provider is launch-enabled, change enabled=true and attach VERIFIED provider E2E evidence."
+    },
+    "monitoring_alerting": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Require real health/readiness, 5xx, container, DB/storage and backup-failure visibility."
+    },
+    "pre_cutover_backup": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Fresh backup immediately before cutover with timestamp/checksum/restore owner."
+    },
+    "dns_rollback_capture": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Capture current DNS and exact rollback target before any switch."
+    },
+    "owner_cutover_approval": {
+      "status": "NOT_VERIFIED",
+      "evidence_ref": null,
+      "verified_at": null,
+      "note": "Final production/DNS switch requires explicit owner approval after all other gates are complete."
+    }
+  }
+}

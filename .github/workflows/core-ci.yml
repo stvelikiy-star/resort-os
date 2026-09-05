@@ -69,6 +69,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
+      - name: Resolve hotel-local test dates
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+          today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              for i in range(6):
+                  f.write(f'D{i}={(today + timedelta(days=i)).isoformat()}\n')
+          PY
+
       - name: Validate and create development schema
         working-directory: packages/database
         run: |
@@ -123,7 +135,7 @@ jobs:
 
       - name: Verify public availability and create request
         run: |
-          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=2026-08-26&check_out=2026-08-28&adults=2&children=0" > /tmp/availability.json
+          curl --fail -sS "http://127.0.0.1:8000/api/v1/booking/check-availability?check_in=$D0&check_out=$D2&adults=2&children=0" > /tmp/availability.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/availability.json'))
@@ -133,7 +145,7 @@ jobs:
           PY
           curl --fail -sS -X POST http://127.0.0.1:8000/api/v1/booking/requests \
             -H 'Content-Type: application/json' \
-            -d '{"guest_name":"CI Test Guest","phone":"+996000000000","check_in":"2026-08-26","check_out":"2026-08-28","adults":2,"children":0,"source":"CI"}' > /tmp/request.json
+            -d "{\"guest_name\":\"CI Test Guest\",\"phone\":\"+996000000000\",\"check_in\":\"$D0\",\"check_out\":\"$D2\",\"adults\":2,\"children\":0,\"source\":\"CI\"}" > /tmp/request.json
           python - <<'PY'
           import json
           d=json.load(open('/tmp/request.json'))
@@ -144,13 +156,19 @@ jobs:
 
       - name: Verify protected PMS and login
         run: |
-          CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01")
+          CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=$D0&end=$D5")
           test "$CODE" = "401"
           curl --fail -sS -c /tmp/resort-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
             -H 'Content-Type: application/json' \
             -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json
           curl --fail -sS -b /tmp/resort-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/me.json
           python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"]=="OWNER"'
+
+      - name: Verify unified Site CMS CRM PMS contour
+        env:
+          SMOKE_OWNER_USERNAME: ci-owner
+          SMOKE_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+        run: python scripts/site_pms_cms_smoke.py
 
       - name: Quote stay without automatic prepayment rule
         run: |
@@ -196,7 +214,7 @@ jobs:
 
       - name: Verify reservation appears in PMS grid
         run: |
-          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=2026-08-25&end=2026-09-01" > /tmp/grid.json
+          curl --fail -sS -b /tmp/resort-cookies.txt "http://127.0.0.1:8000/api/v1/pms/grid?start=$D0&end=$D5" > /tmp/grid.json
           python - <<'PY'
           import json
           booking=open('/tmp/booking_number').read().strip()
@@ -229,13 +247,14 @@ jobs:
           python -c 'import json; assert json.load(open("/tmp/checkin.json"))["status"]=="CHECKED_IN"'
           python - <<'PY'
           import asyncio, os, uuid
-          from datetime import date, timedelta
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
           import asyncpg
           async def main():
               conn = await asyncpg.connect(os.environ['DATABASE_URL'].split('?')[0])
               try:
                   reservation_id = uuid.UUID(open('/tmp/reservation_id').read().strip())
-                  lived_from = date.today() - timedelta(days=1)
+                  lived_from = datetime.now(ZoneInfo('Asia/Bishkek')).date() - timedelta(days=1)
                   await conn.execute('UPDATE reservations SET "checkIn"=$1,"updatedAt"=now() WHERE id=$2', lived_from, reservation_id)
                   await conn.execute(
                       '''UPDATE inventory_blocks SET "startDate"=$1,"updatedAt"=now()

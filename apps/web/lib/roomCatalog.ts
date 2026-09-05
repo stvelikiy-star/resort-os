@@ -5,6 +5,7 @@ export type RoomCategory = {
   capacity: string;
   area: string;
   summary: string;
+  mediaKey?: string;
   rates: {
     early: number;
     peak: number;
@@ -62,6 +63,7 @@ export const roomCategories: RoomCategory[] = [
     capacity: "2 гостя",
     area: "27 м²",
     summary: "Двухместная категория в коттеджном доме площадью 27 м².",
+    mediaKey: "cottage-double-standard",
     rates: { early: 6000, peak: 8000, late: 6000 },
   },
   {
@@ -80,6 +82,7 @@ export const roomCategories: RoomCategory[] = [
     capacity: "2 гостя",
     area: "36 м²",
     summary: "Просторная двухместная категория площадью 36 м².",
+    mediaKey: "suite-double-pending-confirmation",
     rates: { early: 7000, peak: 8500, late: 7000 },
   },
   {
@@ -89,6 +92,7 @@ export const roomCategories: RoomCategory[] = [
     capacity: "3 гостя",
     area: "36 м²",
     summary: "Просторная трёхместная категория площадью 36 м².",
+    mediaKey: "suite-triple-pending-confirmation",
     rates: { early: 9000, peak: 11500, late: 9000 },
   },
   {
@@ -107,6 +111,7 @@ export const roomCategories: RoomCategory[] = [
     capacity: "до 4 гостей",
     area: "30 м²",
     summary: "Двухкомнатный стандарт для размещения до четырёх гостей.",
+    mediaKey: "corpus-1-two-room",
     rates: { early: 9500, peak: 12000, late: 9500 },
   },
   {
@@ -123,8 +128,9 @@ export const roomCategories: RoomCategory[] = [
     slug: "apartments-with-kitchen",
     name: "Апартаменты с кухней",
     capacity: "до 4 гостей",
-    area: "45–50 м²",
-    summary: "Апартаменты с кухней для размещения до четырёх гостей.",
+    area: "55–65 м²",
+    summary: "Апартаменты с кухней площадью 55–65 м² для размещения до четырёх гостей.",
+    mediaKey: "corpus-1-three-room-kitchen",
     rates: { early: 13000, peak: 15500, late: 13000 },
   },
 ];

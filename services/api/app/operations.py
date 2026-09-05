@@ -93,6 +93,78 @@ def task_to_dict(row) -> dict[str, Any]:
     }
 
 
+async def settle_terminal_maintenance_room(conn, property_id_value, room_id, task_id, actor_id):
+    """Serialize terminal maintenance transitions on the room.
+
+    The room remains TECH_BLOCK while any other maintenance task is active. When
+    the last repair is completed/cancelled, force DIRTY and create/reuse a
+    housekeeping task so the room cannot jump directly from repair to sellable.
+    """
+    room = await conn.fetchrow(
+        '''SELECT id,code,"operationalState"::text AS state FROM rooms
+           WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+        room_id,
+        property_id_value,
+    )
+    if not room:
+        raise HTTPException(status_code=409, detail="Task room no longer exists")
+
+    remaining = int(
+        await conn.fetchval(
+            '''
+            SELECT count(*)::int FROM operational_tasks
+            WHERE "propertyId"=$1 AND "roomId"=$2 AND type='MAINTENANCE'
+              AND id<>$3 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+            ''',
+            property_id_value,
+            room_id,
+            task_id,
+        )
+        or 0
+    )
+    if remaining > 0:
+        await conn.execute(
+            '''UPDATE rooms SET "operationalState"='TECH_BLOCK',"updatedAt"=now() WHERE id=$1''',
+            room_id,
+        )
+        return {"room_state": "TECH_BLOCK", "remaining_maintenance_tasks": remaining, "housekeeping_task_id": None}
+
+    await conn.execute(
+        '''UPDATE rooms SET "operationalState"='DIRTY',"updatedAt"=now() WHERE id=$1''',
+        room_id,
+    )
+    housekeeping_task_id = await conn.fetchval(
+        '''
+        SELECT id FROM operational_tasks
+        WHERE "roomId"=$1 AND type='HOUSEKEEPING'
+          AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+        ORDER BY "createdAt" DESC LIMIT 1
+        ''',
+        room_id,
+    )
+    if not housekeeping_task_id:
+        housekeeping_task_id = uuid.uuid4()
+        await conn.execute(
+            '''
+            INSERT INTO operational_tasks (
+              id,"propertyId","roomId",type,status,priority,title,description,
+              "createdByType","createdById",source,"createdAt","updatedAt"
+            ) VALUES ($1,$2,$3,'HOUSEKEEPING','OPEN','HIGH',$4,$5,'SYSTEM',$6,'MAINTENANCE_TERMINAL',now(),now())
+            ''',
+            housekeeping_task_id,
+            property_id_value,
+            room_id,
+            f"Уборка после ремонта · {room['code']}",
+            f"Создано после завершения/отмены ремонта {task_id}",
+            actor_id,
+        )
+    return {
+        "room_state": "DIRTY",
+        "remaining_maintenance_tasks": 0,
+        "housekeeping_task_id": str(housekeeping_task_id),
+    }
+
+
 @router.get("/tasks")
 async def list_tasks(
     request: Request,
@@ -106,7 +178,6 @@ async def list_tasks(
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if task_status and task_status not in TASK_STATUSES:
         raise HTTPException(status_code=422, detail="Unknown task status")
-
     line_staff_id = uuid.UUID(user["id"]) if user["role"] in {"MAID", "TECHNICIAN"} else None
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user["property_code"])
@@ -277,6 +348,7 @@ async def change_task_status(
                     task["roomId"], pid,
                 )
 
+            maintenance_result = None
             if task["type"] == "HOUSEKEEPING" and payload.status == "IN_INSPECTION" and task["roomId"]:
                 if room_state != "TECH_BLOCK":
                     await conn.execute('UPDATE rooms SET "operationalState"=\'IN_INSPECTION\', "updatedAt"=now() WHERE id=$1', task["roomId"])
@@ -289,27 +361,32 @@ async def change_task_status(
                 if room_state != "IN_INSPECTION":
                     raise HTTPException(
                         status_code=409,
-                        detail={
-                            "code": "HOUSEKEEPING_ROOM_NOT_IN_INSPECTION",
-                            "room_state": room_state,
-                        },
+                        detail={"code": "HOUSEKEEPING_ROOM_NOT_IN_INSPECTION", "room_state": room_state},
                     )
                 await conn.execute('UPDATE rooms SET "operationalState"=\'CLEAN\', "updatedAt"=now() WHERE id=$1', task["roomId"])
-            if task["type"] == "MAINTENANCE" and payload.status == "DONE" and task["roomId"]:
-                await conn.execute('UPDATE rooms SET "operationalState"=\'DIRTY\', "updatedAt"=now() WHERE id=$1', task["roomId"])
+            if task["type"] == "MAINTENANCE" and payload.status in {"DONE", "CANCELLED"} and task["roomId"]:
+                maintenance_result = await settle_terminal_maintenance_room(
+                    conn,
+                    pid,
+                    task["roomId"],
+                    task_id,
+                    user["id"],
+                )
 
             await conn.execute(
                 '''UPDATE operational_tasks SET status=$1::"OperationalTaskStatus",
                    "completedAt"=CASE WHEN $1='DONE' THEN now() ELSE NULL END, "updatedAt"=now() WHERE id=$2''',
                 payload.status, task_id,
             )
+            after_payload = {"from_status": current_status, "status": payload.status}
+            if maintenance_result:
+                after_payload.update(maintenance_result)
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
-                   VALUES ($1,$2,'STAFF',$3,'STATUS_CHANGE','OperationalTask',$4,'OPS','SUCCESS',
-                     jsonb_build_object('from_status',$5::text,'status',$6::text),now())''',
-                uuid.uuid4(), pid, user["id"], str(task_id), current_status, payload.status,
+                   VALUES ($1,$2,'STAFF',$3,'STATUS_CHANGE','OperationalTask',$4,'OPS','SUCCESS',$5::jsonb,now())''',
+                uuid.uuid4(), pid, user["id"], str(task_id), __import__("json").dumps(after_payload),
             )
-    return {"id": str(task_id), "status": payload.status}
+    return {"id": str(task_id), "status": payload.status, **(maintenance_result or {})}
 
 
 @router.patch("/rooms/{room_id}/state")

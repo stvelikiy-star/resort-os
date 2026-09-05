@@ -17,7 +17,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const b = $json.body ?? $json;\nconst required = ['channel','message_id','guest_name','phone','check_in','check_out','adults'];\nfor (const key of required) { if (b[key] === undefined || b[key] === null || String(b[key]).trim() === '') throw new Error(`Missing required field: ${key}`); }\nconst channel = String(b.channel).trim().toUpperCase();\nconst messageId = String(b.message_id).trim();\nreturn [{ json: { channel, message_id: messageId, idempotency_key: `${channel}:${messageId}`, guest_name: String(b.guest_name).trim(), phone: String(b.phone).trim(), email: b.email || null, check_in: String(b.check_in), check_out: String(b.check_out), adults: Number(b.adults), children: Number(b.children || 0), room_type_code: b.room_type_code || null, notes: b.notes || null } }];"
+        "jsCode": "const b = $json.body ?? $json;\nconst required = ['channel','message_id','guest_name','phone','check_in','check_out','adults'];\nfor (const key of required) { if (b[key] === undefined || b[key] === null || String(b[key]).trim() === '') throw new Error(`Missing required field: ${key}`); }\nconst channel = String(b.channel).trim().toUpperCase();\nconst messageId = String(b.message_id).trim();\nreturn [{ json: { channel, message_id: messageId, idempotency_key: `${channel}:${messageId}`, guest_name: String(b.guest_name).trim(), phone: String(b.phone).trim(), email: b.email || null, check_in: String(b.check_in), check_out: String(b.check_out), adults: Number(b.adults), children: Number(b.children || 0), room_type_code: b.room_type_code || null, notes: b.notes || null, conversation_id: b.conversation_id || null } }];"
       },
       "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262002",
       "name": "Normalize Intake",
@@ -60,7 +60,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ idempotency_key: $('Normalize Intake').item.json.idempotency_key, channel: $('Normalize Intake').item.json.channel, guest_name: $('Normalize Intake').item.json.guest_name, phone: $('Normalize Intake').item.json.phone, email: $('Normalize Intake').item.json.email, check_in: $('Normalize Intake').item.json.check_in, check_out: $('Normalize Intake').item.json.check_out, adults: $('Normalize Intake').item.json.adults, children: $('Normalize Intake').item.json.children, room_type_code: $('Normalize Intake').item.json.room_type_code, notes: $('Normalize Intake').item.json.notes, external_message_id: $('Normalize Intake').item.json.message_id }) }}",
+        "body": "={{ JSON.stringify({ idempotency_key: $('Normalize Intake').item.json.idempotency_key, channel: $('Normalize Intake').item.json.channel, guest_name: $('Normalize Intake').item.json.guest_name, phone: $('Normalize Intake').item.json.phone, email: $('Normalize Intake').item.json.email, check_in: $('Normalize Intake').item.json.check_in, check_out: $('Normalize Intake').item.json.check_out, adults: $('Normalize Intake').item.json.adults, children: $('Normalize Intake').item.json.children, room_type_code: $('Normalize Intake').item.json.room_type_code, notes: $('Normalize Intake').item.json.notes, external_message_id: $('Normalize Intake').item.json.message_id, conversation_id: $('Normalize Intake').item.json.conversation_id }) }}",
         "options": {}
       },
       "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262004",
@@ -71,7 +71,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const requestResult = $('Create Reservation Request').item.json;\nconst availability = $('Check Availability').item.json;\nif (requestResult.is_reservation !== false) throw new Error('Core contract violation: automation must not create a guaranteed reservation');\nreturn [{ json: { ok: true, reservation_request: requestResult, availability, truth: 'REQUEST_CREATED_NOT_CONFIRMED_RESERVATION' } }];"
+        "jsCode": "const requestResult = $('Create Reservation Request').item.json;\nconst availability = $('Check Availability').item.json;\nif (requestResult.is_reservation !== false) throw new Error('Core contract violation: automation must not create a guaranteed reservation');\nconst expectedLink = Boolean($('Normalize Intake').item.json.conversation_id);\nif (expectedLink && requestResult.conversation_linked !== true) throw new Error('Core contract violation: hot lead was not linked to its inbox conversation');\nreturn [{ json: { ok: true, reservation_request: requestResult, availability, truth: 'REQUEST_CREATED_NOT_CONFIRMED_RESERVATION' } }];"
       },
       "id": "3a5bb0ad-5762-4f38-b6ba-6c9cdd262005",
       "name": "Build Safe Result",

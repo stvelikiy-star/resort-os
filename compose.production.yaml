@@ -1,4 +1,34 @@
 services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      TLS_EMAIL: ${TLS_EMAIL}
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      ADMIN_HOST: ${ADMIN_HOST}
+      STAFF_HOST: ${STAFF_HOST}
+      API_HOST: ${API_HOST}
+      AUTOMATION_HOST: ${AUTOMATION_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${HOST_DATA_DIR:-./data}/media/public:/srv/media/public:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      staff:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [resort]
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -7,7 +37,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - resort_pgdata:/var/lib/postgresql/data
+      - ${HOST_DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -29,6 +59,10 @@ services:
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS}
       COOKIE_SECURE: ${COOKIE_SECURE}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+      AUTH_TRUST_PROXY_HEADERS: ${AUTH_TRUST_PROXY_HEADERS}
+      AUTH_LOGIN_WINDOW_SECONDS: ${AUTH_LOGIN_WINDOW_SECONDS}
+      AUTH_LOGIN_PAIR_MAX_FAILURES: ${AUTH_LOGIN_PAIR_MAX_FAILURES}
+      AUTH_LOGIN_IP_MAX_FAILURES: ${AUTH_LOGIN_IP_MAX_FAILURES}
       AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY}
       AUTOMATION_SERVICE_NAME: ${AUTOMATION_SERVICE_NAME}
       REQUIRE_AUTOMATION_SERVICE: ${REQUIRE_AUTOMATION_SERVICE}
@@ -36,6 +70,12 @@ services:
       TELEGRAM_INITDATA_MAX_AGE_SECONDS: ${TELEGRAM_INITDATA_MAX_AGE_SECONDS}
       TELEGRAM_STAFF_WEBHOOK_SECRET: ${TELEGRAM_STAFF_WEBHOOK_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL}
+      OPENAI_PUBLIC_ASSISTANT_MODEL: ${OPENAI_PUBLIC_ASSISTANT_MODEL}
+      OPENAI_SALES_MODEL: ${OPENAI_SALES_MODEL}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS}
+      AI_ADMIN_MAX_MESSAGES: ${AI_ADMIN_MAX_MESSAGES}
+      AI_ADMIN_RATE_LIMIT_PER_MINUTE: ${AI_ADMIN_RATE_LIMIT_PER_MINUTE}
       OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL}
     depends_on:
       postgres:
@@ -45,8 +85,6 @@ services:
       interval: 15s
       timeout: 5s
       retries: 10
-    ports:
-      - "127.0.0.1:8000:8000"
     networks: [resort]
 
   web:
@@ -64,8 +102,6 @@ services:
       interval: 20s
       timeout: 5s
       retries: 8
-    ports:
-      - "127.0.0.1:3000:3000"
     networks: [resort]
 
   admin:
@@ -74,6 +110,7 @@ services:
       dockerfile: apps/admin/Dockerfile
       args:
         CORE_API_URL: http://api:8000
+        NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}
     restart: unless-stopped
     depends_on:
       api:
@@ -83,8 +120,6 @@ services:
       interval: 20s
       timeout: 5s
       retries: 8
-    ports:
-      - "127.0.0.1:3001:3001"
     networks: [resort]
 
   staff:
@@ -102,8 +137,37 @@ services:
       interval: 20s
       timeout: 5s
       retries: 8
-    ports:
-      - "127.0.0.1:3002:3002"
+    networks: [resort]
+
+  n8n:
+    image: ${N8N_IMAGE:-n8nio/n8n:2.36.2}
+    restart: unless-stopped
+    environment:
+      N8N_HOST: ${AUTOMATION_HOST}
+      N8N_PROTOCOL: https
+      N8N_PORT: 5678
+      WEBHOOK_URL: https://${AUTOMATION_HOST}/
+      N8N_EDITOR_BASE_URL: https://${AUTOMATION_HOST}/
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "true"
+      GENERIC_TIMEZONE: Asia/Bishkek
+      TZ: Asia/Bishkek
+      RESORT_CORE_URL: http://api:8000
+      AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL}
+      OPENAI_WHATSAPP_MODEL: ${OPENAI_WHATSAPP_MODEL}
+      OPENAI_SALES_MODEL: ${OPENAI_SALES_MODEL}
+      GREEN_API_URL: ${GREEN_API_URL}
+      GREEN_API_ID_INSTANCE: ${GREEN_API_ID_INSTANCE}
+      GREEN_API_TOKEN_INSTANCE: ${GREEN_API_TOKEN_INSTANCE}
+      GREEN_API_WEBHOOK_SECRET: ${GREEN_API_WEBHOOK_SECRET}
+    volumes:
+      - ${HOST_DATA_DIR:-./data}/n8n:/home/node/.n8n
+      - ./automation/n8n:/opt/resort-workflows:ro
+    depends_on:
+      api:
+        condition: service_healthy
     networks: [resort]
 
 networks:
@@ -111,4 +175,5 @@ networks:
     driver: bridge
 
 volumes:
-  resort_pgdata:
+  caddy_data:
+  caddy_config:

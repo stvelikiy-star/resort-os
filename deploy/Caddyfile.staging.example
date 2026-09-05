@@ -1,0 +1,46 @@
+# Three Crowns staging reverse proxy.
+# Caddy manages TLS automatically once DNS points these staging-only names to this host.
+# Never use production names until production cutover is explicitly approved.
+
+staging.3korony.com {
+    encode zstd gzip
+
+    handle_path /core/* {
+        reverse_proxy 127.0.0.1:18000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:13000
+    }
+}
+
+pms-staging.3korony.com {
+    encode zstd gzip
+
+    # Browser REST calls. handle_path removes the /core prefix because FastAPI
+    # routes begin at /api, /health, etc.
+    handle_path /core/* {
+        reverse_proxy 127.0.0.1:18000
+    }
+
+    # V9 realtime uses /ws/pms/grid. Caddy preserves WebSocket upgrade headers.
+    handle /ws/* {
+        reverse_proxy 127.0.0.1:18000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:13001
+    }
+}
+
+staff-staging.3korony.com {
+    encode zstd gzip
+
+    handle_path /core/* {
+        reverse_proxy 127.0.0.1:18000
+    }
+
+    handle {
+        reverse_proxy 127.0.0.1:13002
+    }
+}

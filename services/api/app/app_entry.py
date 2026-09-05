@@ -1,27 +1,68 @@
 from .ai_sales import router as ai_sales_router
+from .analytics_reports import router as analytics_reports_router
 from .automation import router as automation_router
 from .automation_read import router as automation_read_router
 from .booking_admin import router as booking_admin_router
 from .channel_outbound import router as channel_outbound_router
 from .communication_ingest import router as communication_ingest_router
 from .crm_sync import router as crm_sync_router
+from .dining_control import router as dining_control_router
+from .dining_entitlements import router as dining_entitlements_router
+from .dining_floor_layout import router as dining_floor_layout_router
+from .dining_seating import router as dining_seating_router
+from .dining_stays import router as dining_stays_router
+from .folio import router as folio_router
+from .google_control import router as google_control_router
+from .group_bookings import router as group_bookings_router
+from .growth_control import router as growth_control_router
+from .guest_crm import router as guest_crm_router
+from .guest_marketplace import router as guest_marketplace_router
+from .guest_offers import admin_router as guest_offers_admin_router
+from .guest_offers import guest_router as guest_offers_guest_router
+from .guest_os import admin_router as guest_os_admin_router
+from .guest_os import public_router as guest_os_public_router
+from .guest_pin_admin import router as guest_pin_admin_router
+from .guest_requests import router as guest_requests_router
+from .guest_service_settings import router as guest_service_settings_router
+from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
+from .housekeeping_schedule import router as housekeeping_schedule_router
 from .inbox import router as inbox_router
+from .kitchen import admin_router as kitchen_admin_router
+from .kitchen_arrivals import router as kitchen_arrivals_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
 from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
 from .operations_history import router as operations_history_router
+from .owner_intelligence import router as owner_intelligence_router
+from .owner_operations_analytics import router as owner_operations_analytics_router
+from .owner_pace import admin_router as owner_pace_admin_router
+from .owner_pace import automation_router as owner_pace_automation_router
+from .pms_bulk_tasks import router as pms_bulk_tasks_router
 from .pms_chessboard import router as pms_chessboard_router
 from .pms_chessboard_read import router as pms_chessboard_read_router
+from .pms_control_snapshot import router as pms_control_snapshot_router
+from .pms_reservation_create import router as pms_reservation_create_router
+from .public_ai_admin import router as public_ai_admin_router
 from .realtime import router as realtime_router
+from .reception_readiness import router as reception_readiness_router
 from .reception_reservations import router as reception_reservations_router
 from .reservation_detail import router as reservation_detail_router
 from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
+from .service_point_payments import admin_router as service_point_payments_admin_router
+from .service_point_payments import integration_router as service_point_payments_integration_router
+from .service_point_payments import public_router as service_point_payments_public_router
+from .service_points import admin_router as service_points_admin_router
+from .service_points import public_router as service_points_public_router
+from .site_content import router as site_content_router
+from .site_media import router as site_media_router
 from .staff_control import router as staff_control_router
+from .staff_guest_requests import router as staff_guest_requests_router
+from .staff_task_reports import router as staff_task_reports_router
 from .staff_voice import router as staff_voice_router
 from .stays import router as stays_router
 from .telegram_auth import router as telegram_auth_router
@@ -32,19 +73,64 @@ install_observability(app)
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
 app.include_router(health_router)
+app.include_router(site_content_router)
+app.include_router(site_media_router)
+app.include_router(public_ai_admin_router)
+app.include_router(guest_os_public_router)
+app.include_router(guest_requests_router)
+# Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
+# on draft/inactive or non-published-for-today menu items.
+app.include_router(guest_marketplace_router)
+# Guest offers are authenticated in-stay marketing handoffs. Campaigns never
+# confirm price, availability, payment or provider execution on their own.
+app.include_router(guest_offers_guest_router)
+app.include_router(service_points_public_router)
+# Paid service-point access is separate from room finance and dormant NFC code.
+# It may unlock a configured TTLock only after a provider-confirmed payment event.
+app.include_router(service_point_payments_public_router)
+app.include_router(service_point_payments_integration_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
+app.include_router(reception_readiness_router)
 app.include_router(reservation_detail_router)
 app.include_router(reservation_payments_router)
+app.include_router(folio_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(hotel_finance_router)
+app.include_router(analytics_reports_router)
+app.include_router(owner_intelligence_router)
+app.include_router(owner_operations_analytics_router)
+app.include_router(guest_crm_router)
+app.include_router(owner_pace_admin_router)
+app.include_router(growth_control_router)
+app.include_router(guest_offers_admin_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
+app.include_router(pms_reservation_create_router)
+app.include_router(group_bookings_router)
+app.include_router(pms_control_snapshot_router)
+app.include_router(pms_bulk_tasks_router)
+app.include_router(guest_os_admin_router)
+app.include_router(service_points_admin_router)
+app.include_router(service_point_payments_admin_router)
+app.include_router(guest_service_settings_router)
+app.include_router(guest_services_router)
+app.include_router(housekeeping_schedule_router)
 app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
+app.include_router(staff_guest_requests_router)
+app.include_router(kitchen_admin_router)
+app.include_router(kitchen_arrivals_router)
+app.include_router(dining_control_router)
+app.include_router(dining_entitlements_router)
+app.include_router(dining_seating_router)
+app.include_router(dining_stays_router)
+app.include_router(dining_floor_layout_router)
+app.include_router(staff_task_reports_router)
 app.include_router(stays_router)
+app.include_router(guest_pin_admin_router)
 app.include_router(telegram_auth_router)
 
 # Direct provider adapters are retained as optional/reference integrations.
@@ -54,7 +140,9 @@ app.include_router(staff_voice_router)
 
 app.include_router(automation_router)
 app.include_router(automation_read_router)
+app.include_router(owner_pace_automation_router)
 app.include_router(crm_sync_router)
+app.include_router(google_control_router)
 app.include_router(communication_ingest_router)
 app.include_router(inbox_router)
 app.include_router(channel_outbound_router)
@@ -62,6 +150,7 @@ app.include_router(ai_sales_router)
 app.include_router(realtime_router)
 app.include_router(manager_dashboard_router)
 
-# NFC implementation remains dormant in source and is intentionally not composed
-# into the active Resort Core application until the owner explicitly reactivates it.
-app.version = "0.29.1"
+# Legacy NFC wallet/acquiring implementation remains dormant in source and is
+# intentionally not composed into the active application. Paid Service Point QR
+# does not reactivate NFC and cannot mutate accommodation payment truth.
+app.version = "0.60.0"

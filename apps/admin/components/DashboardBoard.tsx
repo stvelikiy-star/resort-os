@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import OwnerControlV2 from "./OwnerControlV2";
+import OwnerExecutivePack from "./OwnerExecutivePack";
+import OwnerOperationsPerformance from "./OwnerOperationsPerformance";
 
 type StayItem = {
   id: string;
@@ -93,6 +96,10 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
         </div>
         <button className="btn" onClick={load}>Обновить</button>
       </div>
+
+      <OwnerExecutivePack />
+      <OwnerControlV2 />
+      <OwnerOperationsPerformance />
 
       <section className="command-kpis">
         <article><span>Загрузка сейчас</span><strong>{data.stays.occupancy_percent}%</strong><small>{data.stays.occupied_rooms} из {data.rooms.total} номеров</small></article>

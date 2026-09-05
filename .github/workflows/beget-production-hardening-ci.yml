@@ -1,0 +1,211 @@
+name: Beget Production Hardening CI
+
+on:
+  pull_request:
+    paths:
+      - 'compose.beget.yaml'
+      - '.env.beget.example'
+      - 'deploy/Caddyfile'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
+      - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - 'scripts/beget_deployment_guard.py'
+      - 'scripts/beget_env_preflight.py'
+      - 'scripts/provider_env_security.py'
+      - 'scripts/provider_env_security_test.py'
+      - 'scripts/public_site_truth_guard.py'
+      - 'apps/web/app/layout.tsx'
+      - '.github/workflows/beget-production-hardening-ci.yml'
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+      - main
+    paths:
+      - 'compose.beget.yaml'
+      - '.env.beget.example'
+      - 'deploy/Caddyfile'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
+      - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - 'scripts/beget_deployment_guard.py'
+      - 'scripts/beget_env_preflight.py'
+      - 'scripts/provider_env_security.py'
+      - 'scripts/provider_env_security_test.py'
+      - 'scripts/public_site_truth_guard.py'
+      - 'apps/web/app/layout.tsx'
+      - '.github/workflows/beget-production-hardening-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  beget-hardening:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify database release contract and DBaaS URL handling
+        run: python scripts/release_contract_test.py
+
+      - name: Verify provider environment security matrix
+        run: python scripts/provider_env_security_test.py
+
+      - name: Verify Beget target topology contract
+        run: python scripts/beget_deployment_guard.py
+
+      - name: Build synthetic non-secret Beget env and run static preflight
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.env.beget.example').read_text(encoding='utf-8').splitlines()
+          replacements = {
+              'TLS_EMAIL': 'ops@threecrowns.test',
+              'DATABASE_URL': 'postgresql://resort:ci-password@db.internal.test:5432/resort_os?sslmode=require',
+              'PG_DUMP_DATABASE_URL': 'postgresql://resort:ci-password@db.internal.test:5432/resort_os?sslmode=require',
+              'AUTOMATION_SERVICE_KEY': 'ci-automation-service-key-abcdefghijklmnopqrstuvwxyz',
+              'N8N_ENCRYPTION_KEY': 'ci-n8n-encryption-key-abcdefghijklmnopqrstuvwxyz',
+              'S3_ENDPOINT_URL': 'https://s3.internal.test',
+              'S3_REGION': 'kg-test-1',
+              'S3_BACKUP_BUCKET': 'three-crowns-ci-backups',
+              'S3_ACCESS_KEY_ID': 'CIACCESSKEY123456',
+              'S3_SECRET_ACCESS_KEY': 'CISECRETKEYabcdefghijklmnopqrstuvwxyz',
+          }
+          rendered = []
+          for line in source:
+              if '=' in line and not line.lstrip().startswith('#'):
+                  key = line.split('=', 1)[0]
+                  if key in replacements:
+                      line = f'{key}={replacements[key]}'
+              rendered.append(line)
+          Path('/tmp/beget.ci.env').write_text('\n'.join(rendered) + '\n', encoding='utf-8')
+          PY
+          python scripts/beget_env_preflight.py --env-file /tmp/beget.ci.env | tee /tmp/beget-env-preflight.txt
+          grep -q '^RESULT: PASS STATIC$' /tmp/beget-env-preflight.txt
+
+      - name: Verify provider webhook secrets fail closed through Beget preflight
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          base = Path('/tmp/beget.ci.env').read_text(encoding='utf-8')
+
+          def replace(text: str, key: str, value: str) -> str:
+              lines = []
+              found = False
+              for line in text.splitlines():
+                  if line.startswith(key + '='):
+                      line = f'{key}={value}'
+                      found = True
+                  lines.append(line)
+              if not found:
+                  lines.append(f'{key}={value}')
+              return '\n'.join(lines) + '\n'
+
+          green_bad = replace(base, 'GREEN_API_ID_INSTANCE', '1234567890')
+          green_bad = replace(green_bad, 'GREEN_API_TOKEN_INSTANCE', 'real-looking-token-value')
+          green_bad = replace(green_bad, 'GREEN_API_WEBHOOK_SECRET', 'CHANGE_ME_WEBHOOK_SECRET')
+          Path('/tmp/beget.green-placeholder.env').write_text(green_bad, encoding='utf-8')
+
+          green_short = replace(base, 'GREEN_API_ID_INSTANCE', '1234567890')
+          green_short = replace(green_short, 'GREEN_API_TOKEN_INSTANCE', 'real-looking-token-value')
+          green_short = replace(green_short, 'GREEN_API_WEBHOOK_SECRET', 'too-short')
+          Path('/tmp/beget.green-short.env').write_text(green_short, encoding='utf-8')
+
+          green_good = replace(base, 'GREEN_API_ID_INSTANCE', '1234567890')
+          green_good = replace(green_good, 'GREEN_API_TOKEN_INSTANCE', 'real-looking-token-value')
+          green_good = replace(green_good, 'GREEN_API_WEBHOOK_SECRET', 'ci-green-webhook-secret-abcdefghijklmnopqrstuvwxyz')
+          Path('/tmp/beget.green-good.env').write_text(green_good, encoding='utf-8')
+
+          telegram_bad = replace(base, 'TELEGRAM_SALES_BOT_TOKEN', '123456:real-looking-token')
+          telegram_bad = replace(telegram_bad, 'TELEGRAM_SALES_WEBHOOK_SECRET', 'CHANGE_ME_TELEGRAM_SECRET')
+          Path('/tmp/beget.telegram-placeholder.env').write_text(telegram_bad, encoding='utf-8')
+
+          telegram_good = replace(base, 'TELEGRAM_SALES_BOT_TOKEN', '123456:real-looking-token')
+          telegram_good = replace(telegram_good, 'TELEGRAM_SALES_WEBHOOK_SECRET', 'ci-telegram-webhook-secret-abcdefghijklmnopqrstuvwxyz')
+          Path('/tmp/beget.telegram-good.env').write_text(telegram_good, encoding='utf-8')
+          PY
+
+          if python scripts/beget_env_preflight.py --env-file /tmp/beget.green-placeholder.env >/tmp/green-placeholder.txt 2>&1; then
+            echo 'GREEN API placeholder webhook secret unexpectedly passed' >&2
+            cat /tmp/green-placeholder.txt
+            exit 1
+          fi
+          grep -q 'GREEN API is enabled without a real GREEN_API_WEBHOOK_SECRET' /tmp/green-placeholder.txt
+
+          if python scripts/beget_env_preflight.py --env-file /tmp/beget.green-short.env >/tmp/green-short.txt 2>&1; then
+            echo 'GREEN API short webhook secret unexpectedly passed' >&2
+            cat /tmp/green-short.txt
+            exit 1
+          fi
+          grep -q 'GREEN_API_WEBHOOK_SECRET must be at least 24 characters' /tmp/green-short.txt
+
+          python scripts/beget_env_preflight.py --env-file /tmp/beget.green-good.env | grep -q '^RESULT: PASS STATIC$'
+
+          if python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-placeholder.env >/tmp/telegram-placeholder.txt 2>&1; then
+            echo 'Telegram placeholder webhook secret unexpectedly passed' >&2
+            cat /tmp/telegram-placeholder.txt
+            exit 1
+          fi
+          grep -q 'Telegram Sales is enabled without a real TELEGRAM_SALES_WEBHOOK_SECRET' /tmp/telegram-placeholder.txt
+
+          python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-good.env | grep -q '^RESULT: PASS STATIC$'
+
+      - name: Verify public truth still blocks rejected sports/payment drift
+        run: python scripts/public_site_truth_guard.py
+
+      - name: Validate backup and host scripts
+        run: |
+          bash -n scripts/production_backup.sh
+          bash -n scripts/production_backup_test.sh
+          bash -n scripts/host_preflight.sh
+          bash scripts/production_backup_test.sh
+
+      - name: Render Beget Docker Compose graph
+        run: |
+          docker compose --env-file /tmp/beget.ci.env -f compose.beget.yaml config > /tmp/beget-compose.yml
+          grep -q '^  api:' /tmp/beget-compose.yml
+          grep -q '^  web:' /tmp/beget-compose.yml
+          grep -q '^  admin:' /tmp/beget-compose.yml
+          grep -q '^  staff:' /tmp/beget-compose.yml
+          grep -q '^  n8n:' /tmp/beget-compose.yml
+          grep -q '^  caddy:' /tmp/beget-compose.yml
+          if grep -q '^  postgres:' /tmp/beget-compose.yml; then
+            echo 'Beget graph unexpectedly contains local PostgreSQL service' >&2
+            exit 1
+          fi
+          if grep -Eq '(^|[^0-9])5432:5432' /tmp/beget-compose.yml; then
+            echo 'Beget graph unexpectedly publishes PostgreSQL' >&2
+            exit 1
+          fi
+          grep -F 'sslmode=require' /tmp/beget-compose.yml >/dev/null
+          grep -F 'http://127.0.0.1:5678/healthz' /tmp/beget-compose.yml >/dev/null
+          grep -F 'max-size: 20m' /tmp/beget-compose.yml >/dev/null
+
+      - name: Validate Caddy syntax for production hostnames
+        run: |
+          docker run --rm \
+            -e TLS_EMAIL=ops@threecrowns.test \
+            -e PUBLIC_HOST=3korony.test \
+            -e ADMIN_HOST=admin.3korony.test \
+            -e STAFF_HOST=staff.3korony.test \
+            -e API_HOST=api.3korony.test \
+            -e AUTOMATION_HOST=automation.3korony.test \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+
+      - name: Ensure Beget compose application images remain buildable
+        run: docker compose --env-file /tmp/beget.ci.env -f compose.beget.yaml build api web admin staff

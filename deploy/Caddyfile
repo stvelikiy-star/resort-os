@@ -1,0 +1,42 @@
+{
+	email {$TLS_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$PUBLIC_HOST:3korony.com} {
+	encode zstd gzip
+	@media path /media/*
+	handle @media {
+		root * /srv/media/public
+		file_server
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}
+
+www.{$PUBLIC_HOST:3korony.com} {
+	redir https://{$PUBLIC_HOST:3korony.com}{uri} permanent
+}
+
+{$ADMIN_HOST:admin.3korony.com} {
+	encode zstd gzip
+	reverse_proxy admin:3001
+}
+
+{$STAFF_HOST:staff.3korony.com} {
+	encode zstd gzip
+	reverse_proxy staff:3002
+}
+
+{$API_HOST:api.3korony.com} {
+	encode zstd gzip
+	reverse_proxy api:8000
+}
+
+{$AUTOMATION_HOST:automation.3korony.com} {
+	encode zstd gzip
+	reverse_proxy n8n:5678
+}

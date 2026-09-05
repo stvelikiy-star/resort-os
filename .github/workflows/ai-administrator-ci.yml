@@ -1,0 +1,93 @@
+name: Three Crowns AI Administrator CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'services/api/app/public_ai_admin.py'
+      - 'services/api/app/app_entry.py'
+      - 'automation/n8n/whatsapp-green-ai-admin.json'
+      - 'compose.production.yaml'
+      - '.env.production.example'
+      - '.github/workflows/ai-administrator-ci.yml'
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+      - main
+    paths:
+      - 'apps/web/**'
+      - 'services/api/app/public_ai_admin.py'
+      - 'services/api/app/app_entry.py'
+      - 'automation/n8n/whatsapp-green-ai-admin.json'
+      - 'compose.production.yaml'
+      - '.env.production.example'
+      - '.github/workflows/ai-administrator-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ai-administrator-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify deterministic public web dependency tree
+        working-directory: apps/web
+        run: npm ci --ignore-scripts --no-audit
+
+      - name: Typecheck and build public site with AI widget
+        working-directory: apps/web
+        run: |
+          npm run typecheck
+          npm run build
+
+      - name: Compile public AI administrator Core module
+        run: python -m compileall -q services/api/app/public_ai_admin.py services/api/app/app_entry.py
+
+      - name: Validate WhatsApp n8n JSON and authority boundary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path=Path('automation/n8n/whatsapp-green-ai-admin.json')
+          data=json.loads(path.read_text(encoding='utf-8'))
+          raw=path.read_text(encoding='utf-8')
+          assert data['active'] is False
+          assert data['name']=='Three Crowns - WhatsApp GREEN API AI Administrator'
+          assert 'GREEN_API_WEBHOOK_SECRET' in raw
+          assert '/api/v1/booking/check-availability' in raw
+          assert '/api/v1/automation/read/hotel-facts' in raw
+          assert '/api/v1/automation/reservation-requests' in raw
+          assert "whatsapp-green:' + $json.message_id" in raw
+          assert 'ReservationRequest is not a reservation' in raw
+          assert 'sendMessage' in raw
+          assert 'postgres://' not in raw.lower()
+          assert 'postgresql://' not in raw.lower()
+          print('AI_ADMIN_N8N_CONTRACT_PASS')
+          PY
+
+      - name: Verify website stays Core-direct
+        run: |
+          grep -F '/core/api/v1/public/ai-admin/chat' apps/web/components/AiAdministratorWidget.tsx
+          if grep -Eq 'automation\.3korony|/webhook/three-crowns' apps/web/components/AiAdministratorWidget.tsx; then
+            echo 'Public website AI must call Resort Core directly, not n8n.' >&2
+            exit 1
+          fi
+
+      - name: Verify production env and compose wiring
+        run: |
+          grep -F 'OPENAI_PUBLIC_ASSISTANT_MODEL' .env.production.example
+          grep -F 'OPENAI_WHATSAPP_MODEL' .env.production.example
+          grep -F 'GREEN_API_ID_INSTANCE' .env.production.example
+          grep -F 'GREEN_API_WEBHOOK_SECRET' .env.production.example
+          docker compose --env-file <(sed -e 's/CHANGE_ME_STRONG_DATABASE_PASSWORD/ci-db/' -e 's/CHANGE_ME_LONG_RANDOM_SERVICE_KEY_AT_LEAST_32_CHARS/ci-automation-key-abcdefghijklmnopqrstuvwxyz/' -e 's/CHANGE_ME_DIFFERENT_LONG_RANDOM_ENCRYPTION_KEY/ci-n8n-key-abcdefghijklmnopqrstuvwxyz/' -e 's/CHANGE_ME_OWNER_EMAIL/ops@example.invalid/' -e 's/CHANGE_ME_LONG_RANDOM_WEBHOOK_SECRET/ci-green-webhook-secret-abcdefghijklmnopqrstuvwxyz/' .env.production.example) -f compose.production.yaml config --quiet

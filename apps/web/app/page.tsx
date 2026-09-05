@@ -2,27 +2,52 @@ import Image from "next/image";
 import Link from "next/link";
 
 import BookingWidget from "../components/BookingWidget";
-import ResortGallery from "../components/ResortGallery";
 import SiteHeader from "../components/SiteHeader";
+import { ownerApprovedGuestFacts, TWO_GIS_REVIEWS_URL } from "../lib/ownerApprovedGuestFacts";
 import { formatKgs, roomCategories } from "../lib/roomCatalog";
 
-const seasonRates = [
-  { index: "01", dates: "1 июня — 6 июля", label: "Начало сезона", range: "3 000–13 000 сом" },
-  { index: "02", dates: "7 июля — 25 августа", label: "Высокий сезон", range: "4 000–15 500 сом", peak: true },
-  { index: "03", dates: "26 августа — 15 сентября", label: "Бархатный сезон", range: "3 000–13 000 сом" },
+const ownerFacts = ownerApprovedGuestFacts.ru;
+const VERIFIED_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
+
+const advantages = [
+  { index: "01", title: "Первая линия Иссык-Куля", text: "Отдых строится вокруг озера: берег, собственный пляж и длинный пирс находятся внутри курортного маршрута.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "02", title: "Собственный пляж", text: "Не нужно планировать отдельную поездку к воде — пляж становится естественным продолжением территории.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "03", title: "Пирс 150 метров", text: "Одна из главных визуальных точек курорта: прогулки, воздух Иссык-Куля и открытая перспектива воды.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "04", title: "SPA и массаж", text: "После активного дня можно переключиться на спокойный формат отдыха и восстановление.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "05", title: "Бассейн 15×8 м", text: "Открытый бассейн дополняет отдых у озера и подходит для дневного курортного ритма.", image: VERIFIED_MEDIA_FALLBACK },
+  { index: "06", title: "12 категорий размещения", text: "От компактных одноместных номеров до двухкомнатных категорий и апартаментов с кухней.", image: VERIFIED_MEDIA_FALLBACK },
 ];
 
-const bookingSteps = [
-  ["01", "Выберите даты", "Заезд, выезд и состав гостей задают поиск по реальному инвентарю отеля."],
-  ["02", "Сравните варианты", "Resort Core возвращает фактическую доступность и итоговую стоимость для выбранного периода."],
-  ["03", "Отправьте заявку", "Выбранная категория и контакты передаются менеджеру. Номер автоматически не блокируется."],
-  ["04", "Подтвердите условия", "После согласования условий и предоплаты менеджер создаёт действующую подтверждённую бронь."],
+const territoryJourney = [
+  ["01", "Заезд и размещение", "Начните отдых без лишней суеты: выберите категорию заранее, проверьте наличие по датам и согласуйте детали с менеджером."],
+  ["02", "Территория курорта", "После заселения весь основной сценарий отдыха складывается внутри одной территории — номер, бассейн, SPA и путь к воде."],
+  ["03", "Открытый бассейн", "Бассейн 15×8 м — отдельная дневная зона для спокойного отдыха между прогулками и поездками."],
+  ["04", "SPA и массаж", "Вечером можно сменить активность на восстановление и более спокойный темп."],
+  ["05", "Собственный пляж", "Главная точка летнего дня — берег Иссык-Куля без необходимости выезжать за пределы курорта."],
+  ["06", "Пирс длиной 150 метров", "Финал маршрута — длинный пирс, открытая вода и тот самый масштаб Иссык-Куля, ради которого сюда возвращаются."],
 ];
 
-const galleryImages = [
-  { src: "/media/three-crowns/hero-resort.webp", alt: "Территория Три Короны Resort & SPA", label: "Территория" },
-  { src: "/media/three-crowns/room-double.webp", alt: "Номер в Три Короны Resort & SPA", label: "Номерной фонд" },
-  { src: "/media/three-crowns/lake-night.webp", alt: "Иссык-Куль у Три Короны Resort & SPA", label: "Иссык-Куль" },
+const amenityCards = [
+  ["Отдых у воды", "Собственный пляж, пирс 150 м и открытый бассейн 15×8 м формируют полноценный водный сценарий внутри курорта."],
+  ["SPA & Recovery", "SPA и массаж помогают дополнить пляжный отдых восстановлением и спокойным вечером."],
+  ["Для семей", "Большой выбор категорий позволяет подобрать размещение для одного гостя, пары или семьи до четырёх человек."],
+  ["Длинные заезды", "Апартаменты увеличенной площади и категория с кухней удобны, когда вы приезжаете не на одну-две ночи."],
+  ["Связь с менеджером", "Если не хочется разбираться самостоятельно, менеджер поможет подобрать категорию, даты и дополнительные услуги."],
+  [ownerFacts.included.title, ownerFacts.included.text],
+];
+
+const reviewThemes = ownerFacts.reviews.cards.map((review, index) => ({
+  score: String(index + 1).padStart(2, "0"),
+  ...review,
+}));
+
+const extraServices = ownerFacts.services.cards;
+
+const groupFormats = [
+  ["Корпоративные заезды", "Размещение команды, единая коммуникация с организатором и согласование программы пребывания."],
+  ["Спортивные сборы", "Подбираем номерной фонд под состав группы и заранее обсуждаем режим проживания и питания."],
+  ["Специальное меню", "Для спортивных и организованных групп можно заранее обсудить отдельные требования к рациону и графику питания."],
+  ["Группы и мероприятия", "Помогаем собрать проживание, питание, трансфер и дополнительные активности в одну понятную программу."],
 ];
 
 const hotelJsonLd = {
@@ -32,12 +57,7 @@ const hotelJsonLd = {
   url: "https://3korony.com",
   email: "3koronykg@mail.ru",
   telephone: "+996558085002",
-  address: {
-    "@type": "PostalAddress",
-    addressLocality: "Чолпон-Ата",
-    addressRegion: "Иссык-Кульская область",
-    addressCountry: "KG",
-  },
+  address: { "@type": "PostalAddress", streetAddress: "Иманбай Молдо", addressLocality: "Чолпон-Ата", postalCode: "722315", addressRegion: "Иссык-Кульская область", addressCountry: "KG" },
   amenityFeature: [
     { "@type": "LocationFeatureSpecification", name: "Собственный пляж", value: true },
     { "@type": "LocationFeatureSpecification", name: "Пирс 150 м", value: true },
@@ -48,91 +68,82 @@ const hotelJsonLd = {
 };
 
 export default function HomePage() {
+  const loopingAdvantages = [...advantages, ...advantages];
+
   return <>
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(hotelJsonLd) }} />
     <SiteHeader />
-    <main className="home-page" id="top">
-      <section className="home-hero" aria-labelledby="hero-title">
-        <div className="home-hero-media" aria-hidden="true"><Image src="/media/three-crowns/hero-resort.webp" alt="" fill priority sizes="100vw" /></div>
-        <div className="home-hero-shade" aria-hidden="true" />
-        <div className="wrap home-hero-content">
+    <main className="landing-v3" id="top">
+      <section className="v3-hero" aria-labelledby="hero-title">
+        <div className="v3-hero-media" aria-hidden="true">
+          <video autoPlay muted loop playsInline preload="metadata" poster={VERIFIED_MEDIA_FALLBACK} />
+        </div>
+        <div className="v3-hero-shade" aria-hidden="true" />
+        <div className="wrap v3-hero-content">
           <p className="eyebrow light">Три Короны · Resort & SPA · Чолпон-Ата</p>
-          <h1 id="hero-title">Иссык-Куль.<br />Отдых у самой воды.</h1>
-          <p className="home-hero-copy">84 номера, 12 категорий, собственный пляж, 150-метровый пирс, SPA и открытый бассейн 15×8 м — с реальной проверкой свободных вариантов по вашим датам.</p>
-          <div className="home-hero-actions"><a className="button button-accent" href="#booking">Проверить свободные номера</a><Link className="button button-quiet" href="/rooms">Смотреть 12 категорий</Link></div>
-          <div className="home-hero-facts" aria-label="Ключевые факты"><span>Чолпон-Ата</span><span>84 номера</span><span>12 категорий</span><span>Пирс 150 м</span></div>
+          <h1 id="hero-title">Иссык-Куль.<br />Ваш отдых начинается здесь.</h1>
+          <p className="v3-hero-copy">Курорт у самой воды: собственный пляж, 150-метровый пирс, SPA, открытый бассейн и 12 категорий размещения. Выберите даты — дальше мы поможем собрать отдых под вас.</p>
+          <div className="v3-hero-actions"><a className="button button-accent" href="#booking">Проверить свободные номера</a><Link className="button button-quiet" href="/rooms">Смотреть номерной фонд</Link></div>
+          <div className="v3-hero-meta" aria-label="Ключевые факты"><span><b>84</b> номера</span><span><b>12</b> категорий</span><span><b>150 м</b> пирс</span><span><b>15×8 м</b> бассейн</span></div>
         </div>
+        <a className="v3-scroll-cue" href="#booking" aria-label="Перейти к бронированию"><span>Начать</span><i>↓</i></a>
       </section>
 
-      <div className="wrap home-booking-lift"><BookingWidget /></div>
+      <section className="v3-booking" aria-labelledby="booking-experience-title">
+        <div className="wrap v3-booking-heading"><div><p className="eyebrow">Бронирование без лишних шагов</p><h2 className="display-title" id="booking-experience-title">Сначала даты.<br />Потом — лучший вариант.</h2></div><div className="v3-booking-intro-copy"><p>Укажите даты и состав гостей. Система покажет свободные категории и стоимость за весь период. Если понадобится помощь — менеджер подключится на любом этапе.</p><div className="v3-booking-trust"><span>Актуальное наличие</span><span>Стоимость за период</span><span>Помощь менеджера</span></div></div></div>
+        <div className="wrap v3-booking-stage"><div className="v3-booking-main"><BookingWidget /></div><aside className="v3-booking-help" aria-label="Помощь с бронированием"><div><p className="eyebrow light">Нужна помощь?</p><h3>Подберём номер вместе</h3><p>Расскажите, кто едет, на сколько дней и какой отдых вы хотите. Менеджер поможет сравнить категории и дополнительные услуги.</p></div><div className="v3-help-actions"><a href="tel:+996558085002">Позвонить · +996 558 08 50 02</a><a href="https://wa.me/996558085008" target="_blank" rel="noreferrer">Написать в WhatsApp ↗</a></div><div className="v3-booking-rule"><strong>Важно</strong><p>Номер автоматически не блокируется после заявки. Подтверждённая бронь оформляется менеджером после согласования условий и предоплаты.</p></div></aside></div>
+      </section>
 
-      <section className="home-section home-intro" aria-labelledby="intro-title">
-        <div className="wrap home-intro-grid">
-          <div><p className="eyebrow">Три Короны</p><h2 className="display-title" id="intro-title">Курортный ритм<br />у большого озера</h2></div>
-          <div className="home-intro-copy"><p>Пляж и длинный пирс задают день у воды, SPA и массаж — спокойный вечер, а номерной фонд позволяет выбрать формат от компактной категории до апартаментов.</p><a className="text-link" href="#resort">Посмотреть курорт →</a></div>
+      <section className="v3-advantages" aria-labelledby="advantages-title">
+        <div className="wrap v3-section-head"><div><p className="eyebrow">Почему Три Короны</p><h2 className="display-title" id="advantages-title">От номера<br />до воды — один маршрут</h2></div><p>Преимущества курорта не спрятаны в длинном списке. Они становятся последовательностью дня: проснуться, выйти на территорию, дойти до воды, отдохнуть у бассейна и закончить вечер в SPA.</p></div>
+        <div className="v3-advantage-marquee" aria-label="Преимущества курорта"><div className="v3-advantage-track">{loopingAdvantages.map((item, index) => <article className="v3-advantage-card" key={`${item.index}-${index}`} aria-hidden={index >= advantages.length}><div className="v3-advantage-image"><Image src={item.image} alt="" fill sizes="380px" /></div><div className="v3-advantage-body"><span>{item.index}</span><h3>{item.title}</h3><p>{item.text}</p></div></article>)}</div></div>
+      </section>
+
+      <section className="v3-rooms" id="rooms" aria-labelledby="rooms-title">
+        <div className="wrap v3-section-head"><div><p className="eyebrow">Номерной фонд</p><h2 className="display-title" id="rooms-title">Все 12 категорий.<br />Выбирайте спокойно.</h2></div><div><p>От компактных одноместных вариантов до просторных двухкомнатных категорий и апартаментов. Сравните вместимость, площадь и сезонную стоимость, а затем откройте нужную категорию и проверьте даты.</p><Link className="text-link" href="/rooms">Открыть полный каталог →</Link></div></div>
+        <div className="wrap v3-room-grid">{roomCategories.map((room) => <Link className="v3-room-card" href={`/rooms/${room.slug}`} key={room.slug}><div className="v3-room-card-photo"><Image src={VERIFIED_MEDIA_FALLBACK} alt="Три Короны Resort & SPA" fill sizes="(max-width: 760px) 88vw, (max-width: 1100px) 44vw, 31vw" /></div><div className="v3-room-card-body"><div className="v3-room-card-top"><span>{room.index}</span><span>{room.capacity} · {room.area}</span></div><h3>{room.name}</h3><p>{room.summary}</p><div className="v3-room-card-price"><small>Высокий сезон</small><strong>{formatKgs(room.rates.peak)} сом / сутки</strong></div><b>Смотреть категорию →</b></div></Link>)}</div>
+      </section>
+
+      <section className="v3-territory" id="resort" aria-labelledby="territory-title">
+        <div className="wrap v3-section-head light-head"><div><p className="eyebrow light">Территория курорта</p><h2 className="display-title light" id="territory-title">От первого шага<br />до конца пирса</h2></div><p>Пройдите весь маршрут курорта — от размещения и дневного отдыха до собственного пляжа и длинного пирса, который выходит в открытое пространство Иссык-Куля.</p></div>
+        <div className="wrap v3-territory-film">
+          <video autoPlay muted loop playsInline preload="metadata" poster={VERIFIED_MEDIA_FALLBACK} />
+          <div className="v3-film-caption"><span>Три Короны · территория</span><strong>Корпуса, зелень и внутренний маршрут курорта</strong></div>
         </div>
-        <div className="wrap home-facts" aria-label="Подтверждённые факты о курорте">
-          <div className="home-fact"><strong>84</strong><span>номерные позиции</span></div>
-          <div className="home-fact"><strong>12</strong><span>категорий размещения</span></div>
-          <div className="home-fact"><strong>150 м</strong><span>пирс у собственного пляжа</span></div>
-          <div className="home-fact"><strong>15×8 м</strong><span>открытый бассейн</span></div>
+        <div className="wrap v3-territory-route">{territoryJourney.map(([index, title, text]) => <article key={index}><span>{index}</span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div>
+      </section>
+
+      <section className="v3-amenities" id="experience" aria-labelledby="amenities-title">
+        <div className="wrap v3-amenities-layout">
+          <div className="v3-amenities-copy"><p className="eyebrow">Озеро и отдых у воды</p><h2 className="display-title" id="amenities-title">Иссык-Куль — часть<br />каждого дня.</h2><p className="lead">Собственный пляж, пирс длиной 150 метров и открытая вода задают ритм отдыха. Здесь можно провести спокойный день у берега или добавить больше движения и водных впечатлений.</p><div className="v3-water-tags"><span>Собственный пляж</span><span>Пирс 150 м</span><span>Открытый бассейн 15×8 м</span></div><a className="button button-dark" href="#booking">Проверить даты</a></div>
+          <figure className="v3-amenities-photo v3-lake-film">
+            <video autoPlay muted loop playsInline preload="metadata" poster={VERIFIED_MEDIA_FALLBACK} />
+            <figcaption><span>Иссык-Куль</span><strong>Пляж · пирс · вода · летние впечатления</strong></figcaption>
+          </figure>
         </div>
+        <div className="wrap v3-amenity-grid">{amenityCards.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
       </section>
 
-      <section className="home-section home-rooms" id="rooms" aria-labelledby="rooms-title">
-        <div className="wrap home-section-head">
-          <div><p className="eyebrow">Проживание</p><h2 className="display-title" id="rooms-title">От одноместного номера<br />до апартаментов</h2></div>
-          <div className="home-head-copy"><p>В каталоге показываем только подтверждённые параметры: базовую вместимость, площадь и сезонный прайс. Конфигурацию конкретного номера и дополнительные места подтверждает менеджер.</p><Link className="text-link" href="/rooms">Открыть полный каталог →</Link></div>
-        </div>
-        <div className="wrap home-room-editorial">
-          <figure className="home-room-photo"><Image src="/media/three-crowns/room-double.webp" alt="Номер из актуального медиапакета Три Короны" fill sizes="(max-width: 980px) 100vw, 50vw" /><figcaption className="home-room-photo-caption">Фото номерного фонда из актуального медиапакета. Для каждой категории отдельные фотографии будут привязаны после загрузки и верификации фотопакета.</figcaption></figure>
-          <div className="home-room-list" role="list">{roomCategories.map((room) => <article className="home-room-row" key={room.slug} role="listitem"><span>{room.index}</span><div><h3>{room.name}</h3><p>{room.capacity} · {room.area}</p></div><Link href={`/rooms/${room.slug}`} aria-label={`Подробнее: ${room.name}`}>Подробнее ↗</Link></article>)}</div>
-        </div>
-        <div className="wrap home-room-all"><p>Наличие конкретной категории зависит от выбранных дат и текущего инвентаря Resort Core.</p><Link className="button button-accent" href="/rooms">Сравнить все категории</Link></div>
+      <section className="v3-reviews" id="reviews" aria-labelledby="reviews-title">
+        <div className="wrap v3-section-head"><div><p className="eyebrow">{ownerFacts.reviews.eyebrow}</p><h2 className="display-title" id="reviews-title">{ownerFacts.reviews.title}</h2></div><p>{ownerFacts.reviews.intro}</p></div>
+        <div className="wrap v3-review-grid">{reviewThemes.map((review) => <article key={review.score}><span>{review.score}</span><h3>{review.title}</h3><p>{review.text}</p></article>)}</div>
+        <div className="wrap v3-hero-actions" data-owner-review-actions><a className="button button-dark" href={TWO_GIS_REVIEWS_URL} target="_blank" rel="noreferrer">{ownerFacts.reviews.readCta}</a><a className="button button-outline" href={TWO_GIS_REVIEWS_URL} target="_blank" rel="noreferrer">{ownerFacts.reviews.leaveCta}</a></div>
+        <div className="wrap v3-extra-services"><div className="v3-extra-heading"><p className="eyebrow light">{ownerFacts.services.eyebrow}</p><h3>{ownerFacts.services.title}</h3><p>{ownerFacts.services.intro}</p></div><div className="v3-extra-grid">{extraServices.map((service, index) => <article key={service.code} data-service-code={service.code}><span>{String(index + 1).padStart(2, "0")}</span><h4>{service.title}</h4><p>{service.text}</p>{service.cta && service.href ? <a className="text-link" href={service.href} target={service.href.startsWith("http") ? "_blank" : undefined} rel={service.href.startsWith("http") ? "noreferrer" : undefined}>{service.cta} →</a> : null}</article>)}</div></div>
       </section>
 
-      <section className="home-section home-rates" id="rates" aria-labelledby="rates-title">
-        <div className="wrap home-section-head">
-          <div><p className="eyebrow">Официальный летний прайс · 2026</p><h2 className="display-title" id="rates-title">Прозрачный ориентир.<br />Точная сумма — по датам.</h2></div>
-          <div className="home-head-copy"><p>Сезонная матрица даёт ориентир за номер в сутки. Итог проживания рассчитывает Core по выбранным ночам и доступной категории.</p><a className="text-link" href="#booking">Рассчитать мои даты →</a></div>
-        </div>
-        <div className="wrap home-rate-bands">{seasonRates.map((rate) => <article className={`home-rate-band ${rate.peak ? "is-peak" : ""}`} key={rate.dates}><span>{rate.index} · {rate.label}</span><h3>{rate.dates}</h3><p>официальный сезонный период</p><strong>{rate.range}</strong></article>)}</div>
-        <div className="wrap home-rate-table-wrap"><table className="home-rate-table"><thead><tr><th>Категория</th><th>1.06–6.07</th><th>7.07–25.08</th><th>26.08–15.09</th></tr></thead><tbody>{roomCategories.map((room) => <tr key={room.slug}><th>{room.name}</th><td>{formatKgs(room.rates.early)} сом</td><td>{formatKgs(room.rates.peak)} сом</td><td>{formatKgs(room.rates.late)} сом</td></tr>)}</tbody></table></div>
-        <div className="wrap home-rate-note"><strong>Важно</strong><p>Летняя матрица отражает официальный прайс 2026. Точный продаваемый тариф, питание и итоговая стоимость для конкретного периода возвращаются системой отеля при поиске.</p></div>
+      <section className="v3-groups" id="groups" aria-labelledby="groups-title">
+        <div className="v3-groups-media" aria-hidden="true"><Image src={VERIFIED_MEDIA_FALLBACK} alt="" fill sizes="100vw" /></div><div className="v3-groups-shade" aria-hidden="true" />
+        <div className="wrap v3-groups-content"><div className="v3-groups-intro"><p className="eyebrow light">Групповые заезды</p><h2 className="display-title light" id="groups-title">Команды, сборы<br />и корпоративный отдых</h2><p>Для организованных групп важен не только номер. Нужно заранее собрать размещение, график, питание, транспорт и коммуникацию с одним ответственным менеджером. Именно так мы предлагаем строить групповой заезд.</p><a className="button button-accent" href="https://wa.me/996558085008" target="_blank" rel="noreferrer">Обсудить групповой заезд</a></div><div className="v3-group-grid">{groupFormats.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{text}</p></article>)}</div></div>
       </section>
 
-      <section className="home-water" id="resort" aria-labelledby="resort-title">
-        <div className="home-water-media" aria-hidden="true"><Image src="/media/three-crowns/lake-night.webp" alt="" fill sizes="100vw" /></div>
-        <div className="home-water-shade" aria-hidden="true" />
-        <div className="wrap home-water-content"><p className="eyebrow light">Берег Иссык-Куля</p><h2 className="display-title light" id="resort-title">Собственный пляж.<br />Пирс длиной 150 метров.</h2><p className="home-water-copy">Пространство у воды — ключевая часть отдыха в «Трёх Коронах». Здесь мы показываем только те характеристики курорта, которые входят в текущую подтверждённую публичную базу проекта.</p><div className="home-water-tags"><span>Собственный пляж</span><span>Пирс 150 м</span><span>Открытый бассейн 15×8 м</span></div></div>
+      <section className="v3-contacts" id="contacts" aria-labelledby="contacts-title">
+        <div className="wrap v3-contact-head"><div><p className="eyebrow">Контакты и дорога</p><h2 className="display-title" id="contacts-title">Чолпон-Ата.<br />Берег Иссык-Куля.</h2><p>Три Короны Resort & SPA находится в Чолпон-Ате по адресу Иманбай Молдо, 722315. Откройте карту, постройте маршрут или свяжитесь с менеджером — поможем с приездом и проживанием.</p></div><div className="v3-contact-actions"><a href="tel:+996558085002"><span>Бронирование</span><strong>+996 558 08 50 02</strong></a><a href="https://wa.me/996558085008" target="_blank" rel="noreferrer"><span>WhatsApp / менеджер</span><strong>+996 558 08 50 08</strong></a><a href="mailto:3koronykg@mail.ru"><span>Email</span><strong>3koronykg@mail.ru</strong></a></div></div>
+        <div className="wrap v3-map-layout"><div className="v3-map-card"><iframe title="Три Короны Resort & SPA на Google Maps" src="https://www.google.com/maps?q=Imanbay%20Moldo%2C%20Cholpon-Ata%20722315%2C%20Kyrgyzstan&output=embed" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen /></div><div className="v3-arrival-card"><p className="eyebrow">Перед поездкой</p><h3>Сохраните контакты — остальное поможем организовать</h3><p>Напишите менеджеру, если нужен подбор номера, групповое размещение, трансфер или дополнительная программа по Иссык-Кулю.</p><div><a className="button button-dark" href="#booking">Выбрать даты</a><a className="text-link" href="https://www.google.com/maps/search/?api=1&query=Imanbay%20Moldo%2C%20Cholpon-Ata%20722315%2C%20Kyrgyzstan" target="_blank" rel="noreferrer">Открыть Google Maps ↗</a></div></div></div>
       </section>
 
-      <section className="home-section home-wellness" id="experience" aria-labelledby="wellness-title">
-        <div className="wrap home-wellness-grid">
-          <div className="home-wellness-copy"><p className="eyebrow">SPA & Wellness</p><h2 className="display-title" id="wellness-title">Спокойное продолжение<br />дня у озера</h2><p className="lead">В текущую подтверждённую публичную инфраструктуру входят SPA, массаж и открытый бассейн 15×8 м. Остальные сервисы публикуем только после отдельной проверки их актуальной операционной доступности.</p><div className="home-wellness-tags"><span>SPA</span><span>Массаж</span><span>Бассейн 15×8 м</span></div><a className="button button-dark" href="#booking">Выбрать даты</a></div>
-          <figure className="home-wellness-photo"><Image src="/media/three-crowns/hero-resort.webp" alt="Территория Три Короны Resort & SPA" fill sizes="(max-width: 980px) 100vw, 55vw" /><figcaption>Три Короны · Чолпон-Ата · Иссык-Куль</figcaption></figure>
-        </div>
-      </section>
-
-      <section className="home-section home-gallery" id="gallery" aria-labelledby="gallery-title">
-        <div className="wrap home-section-head"><div><p className="eyebrow">Галерея</p><h2 className="display-title" id="gallery-title">Только локальные<br />материалы проекта</h2></div><div className="home-head-copy"><p>Сейчас используются три материализованных фотографии из репозитория. Категорийные фото будут расширены после загрузки собственником полного медиапакета в подготовленную структуру Drive.</p></div></div>
-        <ResortGallery images={galleryImages} />
-      </section>
-
-      <section className="home-section home-booking-journey" aria-labelledby="journey-title">
-        <div className="wrap home-section-head"><div><p className="eyebrow">Как бронируем</p><h2 className="display-title" id="journey-title">Четыре понятных шага</h2></div><div className="home-head-copy"><p>Сайт не создаёт ложную «бронь» до оплаты. Он проверяет живой инвентарь, принимает заявку и передаёт её менеджеру.</p></div></div>
-        <div className="wrap home-steps">{bookingSteps.map(([index, title, text]) => <article className="home-step" key={index}><span>{index}</span><h3>{title}</h3><p>{text}</p></article>)}</div>
-      </section>
-
-      <section className="home-section home-contacts" id="contacts" aria-labelledby="contacts-title">
-        <div className="wrap home-section-head"><div><p className="eyebrow">Контакты</p><h2 className="display-title" id="contacts-title">Связаться с бронированием</h2></div><div className="home-head-copy"><p>Три Короны Resort & SPA находится в Чолпон-Ате, Иссык-Кульская область. Для бронирования используйте подтверждённый телефон или email.</p></div></div>
-        <div className="wrap home-contact-grid"><a className="home-contact-card" href="tel:+996558085002"><div><span>Телефон бронирования</span><strong>+996 558 08 50 02</strong><p>Нажмите, чтобы позвонить</p></div><b>Позвонить →</b></a><a className="home-contact-card" href="mailto:3koronykg@mail.ru"><div><span>Email</span><strong>3koronykg@mail.ru</strong><p>Чолпон-Ата · Иссык-Куль</p></div><b>Написать →</b></a></div>
-      </section>
-
-      <section className="home-final" aria-labelledby="final-title"><div className="wrap home-final-grid"><div><p className="eyebrow light">Ваши даты</p><h2 className="display-title" id="final-title">Проверьте свободные номера<br />в системе отеля</h2><p>Вы увидите только фактически доступные категории и стоимость для выбранного периода.</p></div><div className="home-final-actions"><a className="button button-accent" href="#booking">Проверить даты</a><a className="button button-quiet" href="tel:+996558085002">Позвонить менеджеру</a></div></div></section>
+      <section className="v3-final-cta"><div className="wrap v3-final-layout"><div><p className="eyebrow light">Три Короны · Resort & SPA</p><h2>Выберите даты.<br />Иссык-Куль уже ждёт.</h2></div><div><p>Проверьте свободные категории и стоимость проживания на ваш период.</p><a className="button button-accent" href="#booking">Проверить номера</a></div></div></section>
     </main>
-
-    <footer className="home-footer"><div className="wrap home-footer-inner"><strong>Три Короны · Resort & SPA</strong><div className="home-footer-links"><Link href="/rooms">Номера</Link><a href="/#booking">Бронирование</a><a href="tel:+996558085002">+996 558 08 50 02</a></div></div></footer>
+    <footer className="home-footer"><div className="wrap home-footer-inner"><strong>Три Короны · Resort & SPA</strong><div className="home-footer-links"><Link href="/rooms">Номера</Link><a href="/#resort">Территория</a><a href="/#groups">Группам</a><a href="/#contacts">Контакты</a></div></div></footer>
     <a className="mobile-book" href="#booking">Проверить свободные номера</a>
   </>;
 }

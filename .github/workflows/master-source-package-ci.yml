@@ -1,0 +1,45 @@
+name: Three Crowns Master Source Package
+
+on:
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build exact source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse HEAD)"
+          SHORT="${SHA:0:12}"
+          mkdir -p release
+          git archive --format=zip --prefix="resort-os-${SHORT}/" --output="release/resort-os-${SHORT}.zip" HEAD
+          sha256sum "release/resort-os-${SHORT}.zip" > "release/resort-os-${SHORT}.sha256"
+          {
+            echo "THREE CROWNS RESORT OS — EXACT SOURCE PACKAGE"
+            echo "commit=${SHA}"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "generated_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > release/EXACT_SOURCE_MANIFEST.txt
+          unzip -t "release/resort-os-${SHORT}.zip" >/tmp/unzip-test.txt
+          tail -1 /tmp/unzip-test.txt
+
+      - name: Upload exact source package
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-exact-source-${{ github.sha }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30

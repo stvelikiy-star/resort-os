@@ -92,15 +92,20 @@ jobs:
 
           rooms = load_rooms()
           rates = load_rates()
+          canonical_types = set(ROOM_TYPE_CODES)
+          physical_types = {row['room_type'].strip() for row in rooms}
           assert len(rooms) == 84
           assert len({row['room_code'].strip() for row in rooms}) == 84
-          assert {row['room_type'].strip() for row in rooms} == set(ROOM_TYPE_CODES)
+          assert physical_types <= canonical_types, (
+              f'physical room intake contains unknown categories: {sorted(physical_types - canonical_types)}'
+          )
           assert rates, 'rates.csv must not be empty'
 
           seen = set()
           covered_types = set()
           for row in rates:
               room_type = row['room_type'].strip()
+              assert room_type in canonical_types, f'unknown tariff category: {room_type}'
               valid_from = date.fromisoformat(row['valid_from'])
               valid_to = date.fromisoformat(row['valid_to'])
               assert valid_from <= valid_to, row
@@ -111,10 +116,14 @@ jobs:
               seen.add(key)
               covered_types.add(room_type)
 
-          assert covered_types == set(ROOM_TYPE_CODES), (
-              f'rate coverage mismatch: missing={sorted(set(ROOM_TYPE_CODES) - covered_types)}'
+          assert covered_types == canonical_types, (
+              f'rate coverage mismatch: missing={sorted(canonical_types - covered_types)}'
           )
-          print(f'PASS: source intake rooms={len(rooms)} rates={len(rates)} room_types={len(covered_types)}')
+          tariff_only = sorted(canonical_types - physical_types)
+          print(
+              f'PASS: source intake rooms={len(rooms)} rates={len(rates)} '
+              f'room_types={len(covered_types)} tariff_only={tariff_only}'
+          )
           PY
 
       - name: Apply constraints and seed source of truth

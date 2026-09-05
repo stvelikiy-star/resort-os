@@ -1,0 +1,121 @@
+name: Physical Room Import CI
+
+on:
+  pull_request:
+    branches:
+      - integration/site-pms-cms-20260827
+    paths:
+      - 'data-intake/rooms.csv'
+      - 'data-intake/room-register-owner-approval.json'
+      - 'data-intake/owner-room-checklist.json'
+      - 'scripts/import_physical_rooms.py'
+      - 'scripts/physical_room_import_contract_test.py'
+      - 'scripts/room_register_review.py'
+      - 'scripts/seed_from_intake.py'
+      - 'packages/database/**'
+      - 'services/api/requirements.txt'
+      - '.github/workflows/physical-room-import-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  physical-room-import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: resort_os
+          POSTGRES_USER: resort
+          POSTGRES_PASSWORD: resort
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resort -d resort_os"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      PROPERTY_CODE: THREE_CROWNS
+      RATE_PLAN_CODE: DIRECT_2026_27
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build clean PostgreSQL schema
+        working-directory: packages/database
+        run: |
+          npm install --no-audit --no-fund
+          npx prisma validate
+          npx prisma db push
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install Core tooling and seed canonical 84-room baseline
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall \
+            scripts/import_physical_rooms.py \
+            scripts/physical_room_import_contract_test.py \
+            scripts/room_register_review.py \
+            scripts/seed_from_intake.py
+          python scripts/apply_core_constraints.py
+          python scripts/seed_from_intake.py
+
+      - name: Verify checksum-bound owner approval first
+        run: |
+          python scripts/room_register_review.py \
+            --require-owner-approved \
+            --approval data-intake/room-register-owner-approval.json \
+            | tee /tmp/owner-room-approval.txt
+          grep -F 'RESULT: OWNER ROOM REGISTER APPROVED' /tmp/owner-room-approval.txt
+
+      - name: Capture canonical no-op dry-run evidence
+        run: |
+          python scripts/import_physical_rooms.py | tee /tmp/physical-room-dry-run.txt
+          grep -F 'owner_approval=VERIFIED canonical_rooms=84' /tmp/physical-room-dry-run.txt
+          grep -F 'desired_rooms=84 current_rooms=84' /tmp/physical-room-dry-run.txt
+          grep -F 'added_codes=0 missing_codes=0 metadata_changes=0' /tmp/physical-room-dry-run.txt
+          grep -F 'DRY RUN OK: approval verified; no database changes were made.' /tmp/physical-room-dry-run.txt
+
+      - name: E2E — fail-closed approval, reviewed diff, apply and runtime-state preservation
+        run: |
+          python scripts/physical_room_import_contract_test.py \
+            | tee /tmp/physical-room-contract.txt
+          grep -F 'PASS: owner-approved 84-room reconciliation' /tmp/physical-room-contract.txt
+
+      - name: Capture final canonical dry-run after E2E repair
+        run: |
+          python scripts/import_physical_rooms.py | tee /tmp/physical-room-final-dry-run.txt
+          grep -F 'added_codes=0 missing_codes=0 metadata_changes=0' /tmp/physical-room-final-dry-run.txt
+
+      - name: Upload reviewed physical-room evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-physical-room-import-evidence
+          path: |
+            data-intake/rooms.csv
+            data-intake/room-register-owner-approval.json
+            /tmp/owner-room-approval.txt
+            /tmp/physical-room-dry-run.txt
+            /tmp/physical-room-contract.txt
+            /tmp/physical-room-final-dry-run.txt
+          retention-days: 14

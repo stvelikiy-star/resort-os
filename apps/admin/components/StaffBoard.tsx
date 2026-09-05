@@ -34,6 +34,7 @@ type Overview = {
 const roleLabel: Record<string, string> = {
   OWNER: "Владелец",
   MANAGER: "Менеджер",
+  RECEPTION: "Ресепшен",
   MAID: "Горничная",
   TECHNICIAN: "Техник",
   BEACH_PARTNER: "Пляжный партнёр",
@@ -116,8 +117,10 @@ export default function StaffBoard() {
         <option value="ALL">Все роли</option>
         <option value="OWNER">Владелец</option>
         <option value="MANAGER">Менеджеры</option>
+        <option value="RECEPTION">Ресепшен</option>
         <option value="MAID">Горничные</option>
         <option value="TECHNICIAN">Техники</option>
+        <option value="BEACH_PARTNER">Пляжные партнёры</option>
       </select>
     </div>
 

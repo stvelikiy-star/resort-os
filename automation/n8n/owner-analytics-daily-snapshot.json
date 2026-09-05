@@ -1,0 +1,72 @@
+{
+  "name": "Three Crowns - Owner Analytics Daily Snapshot",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "10 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "9c24de87-a673-4c90-a1fb-40bd1c650001",
+      "name": "Daily 03:10 Bishkek",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-360, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/automation/intelligence/snapshots/capture?horizon_days=180'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Resort-Service-Key",
+              "value": "={{$env.AUTOMATION_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9c24de87-a673-4c90-a1fb-40bd1c650002",
+      "name": "Capture Resort Core Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-80, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $json;\nif (!result.snapshot_date || !result.payload?.summary) throw new Error('Owner analytics snapshot contract failed');\nreturn [{ json: { ok: true, snapshot_id: result.id, snapshot_date: result.snapshot_date, horizon_days: result.horizon_days, booked_room_nights: result.payload.summary.booked_room_nights, truth: 'RESORT_CORE_SNAPSHOT_CAPTURED' } }];"
+      },
+      "id": "9c24de87-a673-4c90-a1fb-40bd1c650003",
+      "name": "Assert Snapshot Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0]
+    }
+  ],
+  "connections": {
+    "Daily 03:10 Bishkek": {
+      "main": [[{"node": "Capture Resort Core Snapshot", "type": "main", "index": 0}]]
+    },
+    "Capture Resort Core Snapshot": {
+      "main": [[{"node": "Assert Snapshot Contract", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bishkek"
+  },
+  "active": false,
+  "versionId": "9c24de87-a673-4c90-a1fb-40bd1c650099",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

@@ -4,10 +4,13 @@ on:
   pull_request:
     paths:
       - 'packages/database/prisma/schema.prisma'
+      - 'packages/database/prisma/migrations/**'
       - 'packages/database/sql/**'
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/seed_from_intake.py'
       - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
       - '.github/workflows/migration-baseline-ci.yml'
   push:
     branches: [main]
@@ -18,6 +21,8 @@ on:
       - 'scripts/generate_migration_baseline.sh'
       - 'scripts/seed_from_intake.py'
       - 'scripts/production_preflight.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
       - '.github/workflows/migration-baseline-ci.yml'
   workflow_dispatch:
 
@@ -67,19 +72,95 @@ jobs:
           fi
           grep -q 'baseline generation is disabled' /tmp/generator-prod.err
 
-      - name: Generate reviewed-input baseline candidate
-        run: bash scripts/generate_migration_baseline.sh
+      - name: Prepare baseline candidate or validate committed baseline inputs
+        run: |
+          if test -s packages/database/prisma/migrations/0_init/migration.sql; then
+            echo 'Using committed 0_init baseline plus forward migrations.'
+            cd packages/database
+            npm install --no-audit --no-fund
+            npx prisma format
+            npx prisma validate
+          else
+            echo 'Generating 0_init baseline candidate.'
+            bash scripts/generate_migration_baseline.sh
+          fi
 
-      - name: Verify generated candidate and checksum
+      - name: Verify baseline and forward migrations
         run: |
           test -s packages/database/prisma/migrations/0_init/migration.sql
           test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
+          test -s packages/database/prisma/migrations/1_site_content/migration.sql
+          test -s packages/database/prisma/migrations/2_guest_service_tasks/migration.sql
+          test -s packages/database/prisma/migrations/3_owner_analytics_snapshots/migration.sql
+          test -s packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          test -s packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          test -s packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          test -s packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          test -s packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          test -s packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          test -s packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          PYTHONPATH=scripts python - <<'PY'
+          from pathlib import Path
+          from release_contract import EXPECTED_MIGRATIONS
+          root = Path('packages/database/prisma/migrations')
+          missing = [name for name in EXPECTED_MIGRATIONS if not (root / name / 'migration.sql').is_file()]
+          assert not missing, f'missing committed migrations: {missing}'
+          print(f'PASS: exact committed migration files={len(EXPECTED_MIGRATIONS)}')
+          PY
           grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
+          grep -q 'reservation_nonnegative_total' packages/database/prisma/migrations/0_init/migration.sql
+          grep -q 'inventory_block_valid_dates' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'payment_positive_amount' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'payment_has_context' packages/database/prisma/migrations/0_init/migration.sql
-          sha256sum packages/database/prisma/migrations/0_init/migration.sql
+          grep -q 'site_content_documents' packages/database/prisma/migrations/1_site_content/migration.sql
+          grep -q 'reservationId' packages/database/prisma/migrations/2_guest_service_tasks/migration.sql
+          grep -q 'serviceCode' packages/database/prisma/migrations/2_guest_service_tasks/migration.sql
+          grep -q 'operational_tasks_service_context_type_check' packages/database/prisma/migrations/2_guest_service_tasks/migration.sql
+          grep -q 'owner_analytics_snapshots' packages/database/prisma/migrations/3_owner_analytics_snapshots/migration.sql
+          grep -q 'owner_analytics_snapshots_horizon_check' packages/database/prisma/migrations/3_owner_analytics_snapshots/migration.sql
+          grep -q 'owner_analytics_snapshots_payload_object_check' packages/database/prisma/migrations/3_owner_analytics_snapshots/migration.sql
+          grep -q 'owner_analytics_snapshots_property_date_key' packages/database/prisma/migrations/3_owner_analytics_snapshots/migration.sql
+          grep -q 'guest_engagements' packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          grep -q 'guest_engagements_kind_check' packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          grep -q 'guest_engagements_status_check' packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          grep -q 'guest_engagements_score_check' packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          grep -q 'guest_engagements_feedback_reservation_key' packages/database/prisma/migrations/4_guest_engagements/migration.sql
+          grep -q 'CREATE TABLE "stays"' packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          grep -q 'CREATE TABLE "room_assignments"' packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          grep -q 'CREATE TABLE "room_qrs"' packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          grep -q 'CREATE TABLE "guest_sessions"' packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          grep -q 'guestAccessPinHash' packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          grep -q 'operational_tasks_stayId_fkey' packages/database/prisma/migrations/5_guest_os_core/migration.sql
+          grep -q 'CREATE TABLE "service_points"' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'CREATE TABLE "service_point_request_options"' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'CREATE TABLE "service_point_qrs"' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'service_point_qrs_one_active_per_point' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'operational_tasks_servicePointId_fkey' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'service_points_category_check' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'service_point_qrs_revocation_check' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'operational_tasks_service_point_context_check' packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
+          grep -q 'CREATE TABLE kitchen_menu_items' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'CREATE TABLE kitchen_tables' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'CREATE TABLE kitchen_orders' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'CREATE TABLE kitchen_order_items' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'kitchen_orders_guest_task_key' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'financial' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'CREATE TABLE kitchen_menu_availability' packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          grep -q 'CREATE TABLE kitchen_table_reservations' packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          grep -q 'kitchen_table_reservations_time_check' packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          grep -q 'CREATE TABLE guest_offer_campaigns' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          grep -q 'CREATE TABLE guest_offer_events' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          grep -q 'guest_offer_campaigns_action_check' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          grep -q 'CREATE TABLE "service_point_access_profiles"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'CREATE TABLE "service_point_payment_intents"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'CREATE TABLE "service_point_payment_events"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'CREATE TABLE "service_point_lock_actions"' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'service_point_payment_intents_lock_snapshot_check' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          grep -q 'service_point_payment_events_provider_event_key' packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          cd packages/database/prisma/migrations/0_init
+          sha256sum -c migration.sql.sha256
 
-      - name: Apply baseline to clean PostgreSQL with Prisma migration history
+      - name: Apply migration chain to clean PostgreSQL with Prisma migration history
         working-directory: packages/database
         run: |
           npx prisma migrate deploy
@@ -94,6 +175,9 @@ jobs:
       - name: Install API dependencies
         run: pip install -r services/api/requirements.txt
 
+      - name: Verify shared release contract unit invariants
+        run: python scripts/release_contract_test.py
+
       - name: Seed canonical Three Crowns development intake
         run: python scripts/seed_from_intake.py
 
@@ -102,32 +186,85 @@ jobs:
           APP_ENV: production
           COOKIE_SECURE: 'true'
           REQUIRE_RECENT_BACKUP: 'false'
-          AUTOMATION_SERVICE_KEY: ci-only-three-crowns-automation-key-00000001
+          CORS_ORIGINS: https://release-check.3korony.invalid
+          AUTOMATION_SERVICE_KEY: resort-core-automation-release-validation-key-00000001
           EXPECTED_ROOM_COUNT: '84'
           EXPECTED_ROOM_TYPE_COUNT: '12'
         run: |
+          expected_migrations="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_constraints="$(PYTHONPATH=scripts python -c 'from release_contract import CRITICAL_CONSTRAINTS; print(len(CRITICAL_CONSTRAINTS))')"
           python scripts/production_preflight.py | tee /tmp/production-preflight.txt
           grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
-          grep -q '^FACT: applied_migrations=1$' /tmp/production-preflight.txt
+          grep -q "^FACT: applied_migrations=${expected_migrations}$" /tmp/production-preflight.txt
+          grep -q "^FACT: critical_constraint_count=${expected_constraints}$" /tmp/production-preflight.txt
           grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
           grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
+          grep -q '^FACT: distinct_room_codes=84$' /tmp/production-preflight.txt
           grep -q '^RESULT: READY FOR NEXT DEPLOYMENT GATE$' /tmp/production-preflight.txt
 
       - name: Verify database migration ledger directly
         env:
           PGPASSWORD: resort
         run: |
+          expected_count="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_names="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(",".join(EXPECTED_MIGRATIONS))')"
           migration_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-          overlap_guard_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = 'no_overlapping_active_room_blocks'")"
-          test "$migration_count" = '1'
-          test "$overlap_guard_count" = '1'
+          migration_names="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          core_constraint_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
+          site_content_table="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select to_regclass('public.site_content_documents')::text")"
+          guest_service_columns="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.columns where table_schema='public' and table_name='operational_tasks' and column_name in ('reservationId','serviceCode','serviceDate','serviceTime')")"
+          guest_service_constraints="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('operational_tasks_service_context_type_check','operational_tasks_service_time_check','operational_tasks_reservationId_fkey')")"
+          owner_snapshot_table="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select to_regclass('public.owner_analytics_snapshots')::text")"
+          owner_snapshot_constraints="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('owner_analytics_snapshots_property_fkey','owner_analytics_snapshots_horizon_check','owner_analytics_snapshots_payload_object_check')")"
+          owner_snapshot_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='owner_analytics_snapshots' and indexname='owner_analytics_snapshots_property_date_key'")"
+          guest_engagement_table="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select to_regclass('public.guest_engagements')::text")"
+          guest_engagement_constraints="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('guest_engagements_property_fkey','guest_engagements_guest_fkey','guest_engagements_reservation_fkey','guest_engagements_kind_check','guest_engagements_status_check','guest_engagements_score_check','guest_engagements_score_kind_check','guest_engagements_feedback_reservation_check')")"
+          guest_engagement_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='guest_engagements' and indexname='guest_engagements_feedback_reservation_key'")"
+          guest_os_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('stays','room_assignments','room_qrs','guest_sessions','guest_history_events','guest_preferences')")"
+          guest_os_task_stay_column="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.columns where table_schema='public' and table_name='operational_tasks' and column_name='stayId'")"
+          guest_os_task_stay_fk="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname='operational_tasks_stayId_fkey'")"
+          service_point_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('service_points','service_point_request_options','service_point_qrs')")"
+          service_point_task_column="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.columns where table_schema='public' and table_name='operational_tasks' and column_name='servicePointId'")"
+          service_point_fk_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('service_points_propertyId_fkey','service_point_request_options_servicePointId_fkey','service_point_qrs_propertyId_fkey','service_point_qrs_servicePointId_fkey','operational_tasks_servicePointId_fkey')")"
+          service_point_check_count="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('service_points_category_check','service_point_qrs_revocation_check','operational_tasks_service_point_context_check')")"
+          service_point_active_qr_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_qrs' and indexname='service_point_qrs_one_active_per_point'")"
+          kitchen_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
+          kitchen_guest_task_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='kitchen_orders' and indexname='kitchen_orders_guest_task_key'")"
+          paid_access_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('service_point_access_profiles','service_point_payment_intents','service_point_payment_events','service_point_lock_actions')")"
+          paid_access_checks="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_constraint where conname in ('service_point_access_profiles_currency_check','service_point_access_profiles_paid_config_check','service_point_payment_intents_amount_check','service_point_payment_intents_currency_check','service_point_payment_intents_lock_snapshot_check','service_point_payment_intents_expiry_check','service_point_payment_intents_paid_state_check','service_point_payment_intents_unlocked_state_check','service_point_payment_events_payload_check','service_point_lock_actions_attempts_check','service_point_lock_actions_result_check')")"
+          paid_event_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_payment_events' and indexname='service_point_payment_events_provider_event_key'")"
+          test "$migration_count" = "$expected_count"
+          test "$migration_names" = "$expected_names"
+          test "$core_constraint_count" = '13'
+          test "$site_content_table" = 'site_content_documents'
+          test "$guest_service_columns" = '4'
+          test "$guest_service_constraints" = '3'
+          test "$owner_snapshot_table" = 'owner_analytics_snapshots'
+          test "$owner_snapshot_constraints" = '3'
+          test "$owner_snapshot_unique" = '1'
+          test "$guest_engagement_table" = 'guest_engagements'
+          test "$guest_engagement_constraints" = '8'
+          test "$guest_engagement_unique" = '1'
+          test "$guest_os_tables" = '6'
+          test "$guest_os_task_stay_column" = '1'
+          test "$guest_os_task_stay_fk" = '1'
+          test "$service_point_tables" = '3'
+          test "$service_point_task_column" = '1'
+          test "$service_point_fk_count" = '5'
+          test "$service_point_check_count" = '3'
+          test "$service_point_active_qr_unique" = '1'
+          test "$kitchen_tables" = '4'
+          test "$kitchen_guest_task_unique" = '1'
+          test "$paid_access_tables" = '4'
+          test "$paid_access_checks" = '11'
+          test "$paid_event_unique" = '1'
 
-      - name: Upload baseline candidate for explicit review
+      - name: Upload migration chain for explicit review
         uses: actions/upload-artifact@v4
         with:
-          name: three-crowns-migration-baseline-${{ github.event.pull_request.head.sha || github.sha }}
+          name: three-crowns-migration-chain-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            packages/database/prisma/migrations/0_init/migration.sql
+            packages/database/prisma/migrations/**/migration.sql
             packages/database/prisma/migrations/0_init/migration.sql.sha256
           if-no-files-found: error
           retention-days: 7

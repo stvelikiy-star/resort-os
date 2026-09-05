@@ -1,6 +1,6 @@
 {
-  "version": "2026-08-25",
-  "usage": "Customer-facing automation may use CONFIRMED facts. PARTIAL/UNKNOWN facts must not be stated as certain. STALE facts must not be used.",
+  "version": "2026-09-05",
+  "usage": "Customer-facing automation may use CONFIRMED facts. PARTIAL/UNKNOWN/REFERENCE facts must not be stated as certain. STALE facts must not be used.",
   "property": {
     "name": "Три Короны Resort & SPA",
     "city": "Чолпон-Ата",
@@ -14,9 +14,9 @@
       "status": "CONFIRMED"
     },
     "manager_phone": {
-      "value": "+996 558 08 50 08",
+      "value": "+996 558 08 50 02",
       "channels": ["WhatsApp", "Telegram"],
-      "status": "CONFIRMED"
+      "status": "CONFIRMED_OWNER_RULE"
     },
     "email": {
       "value": "3koronykg@mail.ru",
@@ -85,28 +85,49 @@
     },
     "sauna": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "status": "CONFIRMED_OWNER_RULE",
+      "season": "WINTER_ONLY",
+      "price_kgs_per_hour": 5000,
+      "capacity_note": "approximately 4–5 people"
     },
     "billiards": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "status": "CONFIRMED_OWNER_RULE",
+      "price_kgs_per_hour": 500
+    },
+    "table_tennis": {
+      "value": true,
+      "status": "CONFIRMED_OWNER_RULE",
+      "price_kgs": 0,
+      "rule": "Free for staying guests."
     },
     "laundry": {
-      "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "value": null,
+      "status": "UNKNOWN_DO_NOT_PROMOTE",
+      "rule": "Do not advertise laundry until it is normalized in current owner-approved public truth."
     },
     "parking": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE"
+      "status": "CONFIRMED_OWNER_RULE",
+      "capacity_note": "approximately 20–30 cars",
+      "rule": "Free for staying guests."
     },
     "conference_halls": {
       "value": true,
-      "status": "CONFIRMED_PUBLIC_SOURCE",
-      "capacity": {
-        "value": null,
-        "status": "UNKNOWN_CONFLICTING_PUBLIC_SOURCES",
-        "rule": "Do not quote conference capacity until normalized."
-      }
+      "status": "CONFIRMED_OWNER_RULE",
+      "capacity_min": 20,
+      "capacity_max": 120,
+      "banquet_use": true,
+      "banquet_menu": "agreed individually",
+      "rule": "The conference hall may be configured for a banquet; menu and final format are agreed individually with the hotel."
+    },
+    "gym": {
+      "value": false,
+      "status": "CONFIRMED_OWNER_RULE"
+    },
+    "sports_grounds": {
+      "value": false,
+      "status": "CONFIRMED_OWNER_RULE"
     }
   },
   "booking_truth": {
@@ -129,17 +150,20 @@
     "prepayment_amount": {
       "value": null,
       "status": "READ_FROM_CURRENT_REQUEST",
-      "rule": "Use required_prepayment_kgs returned by Resort Core. Do not independently assume a global percentage in client messaging."
+      "rule": "Use required_prepayment_kgs returned by Resort Core only as a manager-entered/internal fact. Do not independently assume, negotiate or advertise a global percentage."
     }
   },
   "payment_methods_2026": {
-    "items": ["Visa", "MasterCard", "QR", "cash", "bank transfer"],
-    "status": "CONFIRMED_2026_PRICE_LIST",
+    "status": "NOT_VERIFIED_FOR_LAUNCH",
+    "public_launch_methods": {
+      "value": null,
+      "status": "NOT_VERIFIED_FOR_LAUNCH"
+    },
     "online_provider": {
       "value": null,
-      "status": "NOT_CONFIGURED",
-      "rule": "Do not promise a specific online payment provider until it is connected."
-    }
+      "status": "NOT_VERIFIED_FOR_LAUNCH"
+    },
+    "rule": "Do not enumerate or promise payment methods/providers to a guest until the manager or launch-enabled provider evidence confirms the current route. Internal PMS may record the actual payment method selected by staff."
   },
   "meals_2026": {
     "summer_room_rate": {
@@ -160,7 +184,35 @@
       "three_meals_without_bed_kgs": 1400,
       "status": "CONFIRMED_2026_PRICE_LIST"
     },
+    "guest_order_cutoff": {
+      "minutes_before_meal_start": 60,
+      "status": "CONFIRMED_OWNER_RULE",
+      "rule": "Guest OS must reject a meal order later than 60 minutes before the configured breakfast/lunch/dinner start. Meal times themselves are configurable and must not be guessed."
+    },
+    "room_delivery": {
+      "available": true,
+      "fee_kgs_per_order": 200,
+      "status": "CONFIRMED_OWNER_RULE",
+      "rule": "Food and drinks may be delivered to the guest room for a 200 KGS delivery fee per order."
+    },
     "rule": "Date-specific room meal inclusion should come from Resort Core pricing, not from this static summary."
+  },
+  "housekeeping": {
+    "scheduled_cleaning_interval_days": 3,
+    "scheduled_linen_change_included": true,
+    "status": "CONFIRMED_OWNER_RULE",
+    "on_demand_cleaning": {
+      "paid": true,
+      "price_kgs": null,
+      "status": "CONFIRMED_OWNER_RULE_PRICE_NOT_SET",
+      "rule": "Do not quote a price until management configures it in Resort OS."
+    },
+    "on_demand_linen_change": {
+      "paid": true,
+      "price_kgs": null,
+      "status": "CONFIRMED_OWNER_RULE_PRICE_NOT_SET",
+      "rule": "Do not quote a price until management configures it in Resort OS."
+    }
   },
   "extra_guest_2026": {
     "adult_13_plus_kgs_per_day": {
@@ -180,13 +232,23 @@
   "operational_times": {
     "check_in": {
       "value": "14:00",
-      "status": "PARTIAL_SOURCE_SUPPORTED",
-      "rule": "May be shown only after current owner rule is normalized for production."
+      "status": "CONFIRMED_OWNER_RULE"
     },
     "check_out": {
+      "value": "12:00",
+      "status": "CONFIRMED_OWNER_RULE"
+    },
+    "breakfast": {
       "value": null,
-      "status": "UNKNOWN_CONFLICTING_PUBLIC_SOURCES",
-      "rule": "Public sources conflict between 11:00 and 12:00; do not state a definitive checkout time from automation yet."
+      "status": "OWNER_CONFIG_REQUIRED"
+    },
+    "lunch": {
+      "value": null,
+      "status": "OWNER_CONFIG_REQUIRED"
+    },
+    "dinner": {
+      "value": null,
+      "status": "OWNER_CONFIG_REQUIRED"
     }
   }
 }

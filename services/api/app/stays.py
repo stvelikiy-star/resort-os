@@ -1,12 +1,39 @@
+import base64
+import hashlib
+import secrets
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .auth import require_roles
+from .kitchen_arrivals import create_arrival_notification
 
 router = APIRouter(prefix="/api/v1/admin/stays", tags=["stays"])
-manager_access = require_roles("OWNER", "MANAGER")
+manager_access = require_roles("OWNER", "MANAGER", "RECEPTION")
+
+PIN_ITERATIONS = 200_000
+
+
+def issue_guest_pin() -> tuple[str, str]:
+    """Return the one-time visible PIN and a salted PBKDF2 representation for storage."""
+    pin = f"{secrets.randbelow(1_000_000):06d}"
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        pin.encode("utf-8"),
+        salt,
+        PIN_ITERATIONS,
+    )
+    stored = "$".join(
+        [
+            "pbkdf2_sha256",
+            str(PIN_ITERATIONS),
+            base64.urlsafe_b64encode(salt).decode("ascii"),
+            base64.urlsafe_b64encode(digest).decode("ascii"),
+        ]
+    )
+    return pin, stored
 
 
 async def property_context(conn, property_code: str):
@@ -42,6 +69,158 @@ async def room_for_local_date(conn, reservation_id: uuid.UUID, local_date):
         reservation_id,
         local_date,
     )
+
+
+async def activate_stay(
+    conn,
+    *,
+    property_id: uuid.UUID,
+    reservation,
+    room_id: uuid.UUID,
+):
+    if not reservation["primaryGuestId"]:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CHECK_IN_GUEST_REQUIRED",
+                "action": "ATTACH_PRIMARY_GUEST_FIRST",
+            },
+        )
+
+    guest_pin, guest_pin_hash = issue_guest_pin()
+    stay = await conn.fetchrow(
+        '''
+        INSERT INTO stays (
+          id,"propertyId","reservationId","guestId",status,"actualCheckInAt",
+          "guestAccessPinHash","guestAccessPinIssuedAt","guestAccessPinExpiresAt",
+          "createdAt","updatedAt"
+        ) VALUES ($1,$2,$3,$4,'ACTIVE',now(),$5,now(),now() + interval '24 hours',now(),now())
+        ON CONFLICT ("reservationId") DO UPDATE SET
+          "guestId"=EXCLUDED."guestId",
+          status='ACTIVE',
+          "actualCheckInAt"=COALESCE(stays."actualCheckInAt",now()),
+          "actualCheckOutAt"=NULL,
+          "guestAccessPinHash"=EXCLUDED."guestAccessPinHash",
+          "guestAccessPinIssuedAt"=now(),
+          "guestAccessPinExpiresAt"=now() + interval '24 hours',
+          "updatedAt"=now()
+        RETURNING id
+        ''',
+        uuid.uuid4(),
+        property_id,
+        reservation["id"],
+        reservation["primaryGuestId"],
+        guest_pin_hash,
+    )
+
+    active_assignment = await conn.fetchrow(
+        '''
+        SELECT id,"roomId"
+        FROM room_assignments
+        WHERE "stayId"=$1 AND "endedAt" IS NULL
+        FOR UPDATE
+        ''',
+        stay["id"],
+    )
+    if active_assignment and active_assignment["roomId"] != room_id:
+        await conn.execute(
+            'UPDATE room_assignments SET "endedAt"=now(),"updatedAt"=now() WHERE id=$1',
+            active_assignment["id"],
+        )
+        active_assignment = None
+
+    if active_assignment:
+        assignment_id = active_assignment["id"]
+    else:
+        assignment_id = uuid.uuid4()
+        await conn.execute(
+            '''
+            INSERT INTO room_assignments (
+              id,"propertyId","stayId","roomId","startedAt",source,"createdAt","updatedAt"
+            ) VALUES ($1,$2,$3,$4,now(),'CHECK_IN',now(),now())
+            ''',
+            assignment_id,
+            property_id,
+            stay["id"],
+            room_id,
+        )
+
+    await conn.execute(
+        '''
+        INSERT INTO guest_history_events (
+          id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
+        ) VALUES ($1,$2,$3,$4,'CHECK_IN','PMS',
+          jsonb_build_object('room_id',$5::text,'booking_number',$6::text),now(),now())
+        ''',
+        uuid.uuid4(),
+        property_id,
+        reservation["primaryGuestId"],
+        stay["id"],
+        str(room_id),
+        reservation["bookingNumber"],
+    )
+    return stay["id"], assignment_id, guest_pin
+
+
+async def close_stay(conn, *, property_id: uuid.UUID, reservation, room_id: uuid.UUID):
+    stay = await conn.fetchrow(
+        '''
+        SELECT id,"guestId",status::text AS status
+        FROM stays
+        WHERE "reservationId"=$1 AND "propertyId"=$2
+        FOR UPDATE
+        ''',
+        reservation["id"],
+        property_id,
+    )
+    if not stay:
+        return None, 0
+
+    await conn.execute(
+        '''
+        UPDATE room_assignments
+        SET "endedAt"=COALESCE("endedAt",now()),"updatedAt"=now()
+        WHERE "stayId"=$1 AND "endedAt" IS NULL
+        ''',
+        stay["id"],
+    )
+    revoked_sessions = await conn.fetchval(
+        '''
+        WITH revoked AS (
+          UPDATE guest_sessions
+          SET status='REVOKED',"revokedAt"=COALESCE("revokedAt",now()),"updatedAt"=now()
+          WHERE "stayId"=$1 AND status='ACTIVE'
+          RETURNING id
+        )
+        SELECT count(*)::int FROM revoked
+        ''',
+        stay["id"],
+    )
+    await conn.execute(
+        '''
+        UPDATE stays
+        SET status='CHECKED_OUT',"actualCheckOutAt"=now(),
+            "guestAccessPinHash"=NULL,"guestAccessPinIssuedAt"=NULL,
+            "guestAccessPinExpiresAt"=NULL,"updatedAt"=now()
+        WHERE id=$1
+        ''',
+        stay["id"],
+    )
+    await conn.execute(
+        '''
+        INSERT INTO guest_history_events (
+          id,"propertyId","guestId","stayId","eventType",source,"payloadJson","occurredAt","createdAt"
+        ) VALUES ($1,$2,$3,$4,'CHECK_OUT','PMS',
+          jsonb_build_object('room_id',$5::text,'booking_number',$6::text),now(),now())
+        ''',
+        uuid.uuid4(),
+        property_id,
+        stay["guestId"],
+        stay["id"],
+        str(room_id),
+        reservation["bookingNumber"],
+    )
+    return stay["id"], revoked_sessions or 0
 
 
 async def trim_schedule_for_early_checkout(
@@ -142,7 +321,7 @@ async def check_in(
             )
             reservation = await conn.fetchrow(
                 '''
-                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut"
+                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut","primaryGuestId",adults,children
                 FROM reservations
                 WHERE id=$1 AND "propertyId"=$2
                 FOR UPDATE
@@ -179,9 +358,29 @@ async def check_in(
                     },
                 )
 
+            stay_id, room_assignment_id, guest_access_pin = await activate_stay(
+                conn,
+                property_id=pid,
+                reservation=reservation,
+                room_id=room["id"],
+            )
             await conn.execute(
                 '''UPDATE reservations SET status='CHECKED_IN', "updatedAt"=now() WHERE id=$1''',
                 reservation_id,
+            )
+            kitchen_arrival_task_id = await create_arrival_notification(
+                conn,
+                property_id=pid,
+                reservation_id=reservation_id,
+                stay_id=stay_id,
+                room_id=room["id"],
+                room_code=room["code"],
+                booking_number=reservation["bookingNumber"],
+                check_in=reservation["checkIn"],
+                check_out=reservation["checkOut"],
+                adults=reservation["adults"],
+                children=reservation["children"],
+                actor_id=user["id"],
             )
             await conn.execute(
                 '''
@@ -193,7 +392,11 @@ async def check_in(
                     'room_code',$5::text,
                     'room_state',$6::text,
                     'planned_check_in',$7::text,
-                    'actual_local_date',$8::text
+                    'actual_local_date',$8::text,
+                    'stay_id',$9::text,
+                    'room_assignment_id',$10::text,
+                    'guest_pin_issued',true,
+                    'kitchen_arrival_task_id',$11::text
                   ),now())
                 ''',
                 uuid.uuid4(),
@@ -204,14 +407,22 @@ async def check_in(
                 room["room_state"],
                 str(reservation["checkIn"]),
                 str(local_today),
+                str(stay_id),
+                str(room_assignment_id),
+                str(kitchen_arrival_task_id) if kitchen_arrival_task_id else None,
             )
     return {
         "reservation_id": str(reservation_id),
+        "stay_id": str(stay_id),
         "status": "CHECKED_IN",
         "room_code": room["code"],
         "room_state": room["room_state"],
         "planned_check_in": reservation["checkIn"],
         "actual_local_date": local_today,
+        "guest_access_pin": guest_access_pin,
+        "guest_access_pin_valid_for_hours": 24,
+        "guest_access_pin_display_once": True,
+        "kitchen_arrival_task_id": str(kitchen_arrival_task_id) if kitchen_arrival_task_id else None,
     }
 
 
@@ -230,7 +441,7 @@ async def check_out(
             )
             reservation = await conn.fetchrow(
                 '''
-                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut","totalKgs"
+                SELECT id,status::text AS status,"bookingNumber","checkIn","checkOut","totalKgs","primaryGuestId"
                 FROM reservations
                 WHERE id=$1 AND "propertyId"=$2
                 FOR UPDATE
@@ -264,6 +475,13 @@ async def check_out(
                 local_today,
             )
 
+            stay_id, revoked_guest_sessions = await close_stay(
+                conn,
+                property_id=pid,
+                reservation=reservation,
+                room_id=room["id"],
+            )
+
             await conn.execute(
                 '''UPDATE reservations SET status='CHECKED_OUT', "updatedAt"=now() WHERE id=$1''',
                 reservation_id,
@@ -284,18 +502,31 @@ async def check_out(
             )
             if existing_task:
                 housekeeping_task_id = existing_task
+                await conn.execute(
+                    '''
+                    UPDATE operational_tasks
+                    SET "reservationId"=COALESCE("reservationId",$2),
+                        "stayId"=COALESCE("stayId",$3),"updatedAt"=now()
+                    WHERE id=$1
+                    ''',
+                    housekeeping_task_id,
+                    reservation_id,
+                    stay_id,
+                )
             else:
                 housekeeping_task_id = uuid.uuid4()
                 await conn.execute(
                     '''
                     INSERT INTO operational_tasks (
-                      id,"propertyId","roomId",type,status,priority,title,
+                      id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,
                       description,"createdByType","createdById",source,"createdAt","updatedAt"
-                    ) VALUES ($1,$2,$3,'HOUSEKEEPING','OPEN','HIGH',$4,$5,'SYSTEM',$6,'CHECK_OUT',now(),now())
+                    ) VALUES ($1,$2,$3,$4,$5,'HOUSEKEEPING','OPEN','HIGH',$6,$7,'SYSTEM',$8,'CHECK_OUT',now(),now())
                     ''',
                     housekeeping_task_id,
                     pid,
                     room["id"],
+                    reservation_id,
+                    stay_id,
                     f"Уборка после выезда · {room['code']}",
                     f"Автоматически создано после выезда {reservation['bookingNumber']}",
                     user["id"],
@@ -317,7 +548,9 @@ async def check_out(
                     'actual_local_date',$8::text,
                     'early_checkout_released_inventory',$9::boolean,
                     'stored_total_kgs',$6::int,
-                    'housekeeping_task_id',$10::text
+                    'housekeeping_task_id',$10::text,
+                    'stay_id',$11::text,
+                    'revoked_guest_sessions',$12::int
                   ),now())
                 ''',
                 uuid.uuid4(),
@@ -330,13 +563,17 @@ async def check_out(
                 str(local_today),
                 early_checkout_released_inventory,
                 str(housekeeping_task_id) if housekeeping_task_id else None,
+                str(stay_id) if stay_id else None,
+                revoked_guest_sessions,
             )
     return {
         "reservation_id": str(reservation_id),
+        "stay_id": str(stay_id) if stay_id else None,
         "status": "CHECKED_OUT",
         "room_code": room["code"],
         "room_state": "DIRTY",
         "housekeeping_task_id": str(housekeeping_task_id) if housekeeping_task_id else None,
+        "revoked_guest_sessions": revoked_guest_sessions,
         "actual_check_out": local_today,
         "planned_check_out_before": original_check_out,
         "early_checkout_released_inventory": early_checkout_released_inventory,

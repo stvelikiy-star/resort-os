@@ -1,0 +1,88 @@
+name: Database Dependency Security CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - integration/site-pms-cms-20260827
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-database-toolchain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql://audit:audit@127.0.0.1:5432/audit?schema=public
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: packages/database/package-lock.json
+
+      - name: Require exact Prisma pins and committed lockfile
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -s package-lock.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const p=JSON.parse(fs.readFileSync('package.json','utf8'));
+          const prisma=p.devDependencies?.prisma;
+          const client=p.dependencies?.['@prisma/client'];
+          if (!/^\d+\.\d+\.\d+$/.test(prisma || '')) throw new Error(`prisma must be exact: ${prisma}`);
+          if (!/^\d+\.\d+\.\d+$/.test(client || '')) throw new Error(`@prisma/client must be exact: ${client}`);
+          if (prisma !== client) throw new Error(`Prisma CLI/client mismatch: ${prisma} vs ${client}`);
+          console.log(`prisma_pair=${prisma}`);
+          NODE
+
+      - name: Prove deterministic database dependency install
+        working-directory: packages/database
+        run: npm ci --ignore-scripts --no-audit
+
+      - name: Capture database npm audit report
+        working-directory: packages/database
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > npm-audit.json
+          AUDIT_EXIT=$?
+          set -e
+          printf '%s\n' "$AUDIT_EXIT" > npm-audit.exit
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('npm-audit.json','utf8'));
+          const c=r.metadata?.vulnerabilities || {};
+          const rows=Object.entries(r.vulnerabilities || {}).map(([name,v])=>({name,severity:v.severity,direct:Boolean(v.isDirect),range:v.range,fixAvailable:v.fixAvailable}));
+          const out={counts:c,vulnerabilities:rows};
+          console.log(JSON.stringify(out,null,2));
+          fs.writeFileSync('npm-audit-summary.json',JSON.stringify(out,null,2));
+          if ((c.high||0)>0 || (c.critical||0)>0) process.exit(1);
+          NODE
+
+      - name: Validate Prisma schema and client generation
+        working-directory: packages/database
+        run: |
+          npx prisma validate
+          npx prisma generate
+
+      - name: Upload database dependency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-database-dependency-evidence
+          path: |
+            packages/database/package.json
+            packages/database/package-lock.json
+            packages/database/npm-audit.json
+            packages/database/npm-audit-summary.json
+            packages/database/npm-audit.exit
+          retention-days: 7
