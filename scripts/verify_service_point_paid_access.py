@@ -129,7 +129,12 @@ def main() -> None:
     check(intent.status_code == 201, f"payment intent created: {intent.text}")
     intent_body = intent.json()
     check(intent_body["status"] == "AWAITING_PAYMENT", "payment intent waits for provider confirmation")
-    check(intent_body.get("payment_qr_svg", "").startswith("<svg"), "bank QR is generated from provider bridge payload")
+    payment_qr_svg = intent_body.get("payment_qr_svg", "").lstrip()
+    check(
+        payment_qr_svg.startswith("<svg")
+        or (payment_qr_svg.startswith("<?xml") and "<svg" in payment_qr_svg[:256]),
+        "bank QR is generated from provider bridge payload",
+    )
     check(intent_body["amount_kgs"] == 50, "payment intent amount is immutable server truth")
 
     payments_mid = asyncio.run(db_value("SELECT count(*)::int FROM payments"))
