@@ -3,9 +3,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CORE = (ROOT / "services/api/app/guest_marketplace.py").read_text(encoding="utf-8")
 DINING_CORE = (ROOT / "services/api/app/dining_control.py").read_text(encoding="utf-8")
+OFFERS_CORE = (ROOT / "services/api/app/guest_offers.py").read_text(encoding="utf-8")
 APP_ENTRY = (ROOT / "services/api/app/app_entry.py").read_text(encoding="utf-8")
 RECEPTION_CORE = (ROOT / "services/api/app/reception_readiness.py").read_text(encoding="utf-8")
-MIGRATION = (ROOT / "packages/database/prisma/migrations/8_dining_service_control/migration.sql").read_text(encoding="utf-8")
+DINING_MIGRATION = (ROOT / "packages/database/prisma/migrations/8_dining_service_control/migration.sql").read_text(encoding="utf-8")
+OFFERS_MIGRATION = (ROOT / "packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql").read_text(encoding="utf-8")
 PAGE = (ROOT / "apps/web/app/g/[token]/page.tsx").read_text(encoding="utf-8")
 GUEST = (ROOT / "apps/web/components/GuestMarketplace.tsx").read_text(encoding="utf-8")
 KITCHEN = (ROOT / "apps/staff/components/KitchenEntry.tsx").read_text(encoding="utf-8")
@@ -13,6 +15,7 @@ DAY_PLANNER = (ROOT / "apps/staff/components/DiningDayPlanner.tsx").read_text(en
 WAITER = (ROOT / "apps/staff/components/WaiterEntry.tsx").read_text(encoding="utf-8")
 WAITER_PAGE = (ROOT / "apps/staff/app/waiter/page.tsx").read_text(encoding="utf-8")
 ADMIN_SHELL = (ROOT / "apps/admin/components/AdminShell.tsx").read_text(encoding="utf-8")
+OFFERS_ADMIN = (ROOT / "apps/admin/components/GuestOffersBoard.tsx").read_text(encoding="utf-8")
 RECEPTION_UI = (ROOT / "apps/admin/components/ReceptionWorkspace.tsx").read_text(encoding="utf-8")
 CSS = (ROOT / "apps/admin/app/admin-experience.css").read_text(encoding="utf-8")
 
@@ -35,10 +38,16 @@ def test_guest_marketplace_is_composed_in_guest_os():
     assert 'concierge-page ~ .ai-admin-root{display:none!important}' in PAGE
 
 
-def test_guest_marketplace_does_not_hardcode_kol_destination():
-    assert "NEXT_PUBLIC_KOL_MARKETPLACE_URL" in GUEST
-    assert "KOL_MARKETPLACE_URL &&" in GUEST
-    assert "http://" not in GUEST
+def test_guest_marketplace_offers_are_server_managed_not_hardcoded_partner_copy():
+    assert '"/offers"' in GUEST
+    assert "OfferCampaign" in GUEST
+    assert "NEXT_PUBLIC_KOL_MARKETPLACE_URL" not in GUEST
+    assert "KOL_MARKETPLACE_URL" not in GUEST
+    assert "offerCopy" not in GUEST
+    assert 'offer.action_type === "GUEST_REQUEST"' in GUEST
+    assert 'offer.action_type === "EXTERNAL_URL"' in GUEST
+    assert "offer.ai_prompt" in GUEST
+    assert 'offer.external_url.startsWith("https://")' in GUEST
 
 
 def test_kitchen_has_direct_role_bounded_entry_and_explicit_handoffs():
@@ -50,12 +59,12 @@ def test_kitchen_has_direct_role_bounded_entry_and_explicit_handoffs():
 
 
 def test_dining_schema_separates_daily_menu_tables_and_waiter_assignment():
-    assert "CREATE TABLE kitchen_menu_availability" in MIGRATION
-    assert '"serviceDate" date NOT NULL' in MIGRATION
-    assert '"soldOut" boolean NOT NULL DEFAULT false' in MIGRATION
-    assert "CREATE TABLE kitchen_table_reservations" in MIGRATION
-    assert "DINING_TABLE" not in MIGRATION
-    assert 'ALTER TABLE kitchen_orders ADD COLUMN "waiterId" uuid' in MIGRATION
+    assert "CREATE TABLE kitchen_menu_availability" in DINING_MIGRATION
+    assert '"serviceDate" date NOT NULL' in DINING_MIGRATION
+    assert '"soldOut" boolean NOT NULL DEFAULT false' in DINING_MIGRATION
+    assert "CREATE TABLE kitchen_table_reservations" in DINING_MIGRATION
+    assert "DINING_TABLE" not in DINING_MIGRATION
+    assert 'ALTER TABLE kitchen_orders ADD COLUMN "waiterId" uuid' in DINING_MIGRATION
 
 
 def test_dining_core_has_day_publish_stoplist_floor_and_table_booking():
@@ -80,6 +89,40 @@ def test_staff_has_separate_daily_menu_and_waiter_surfaces():
     assert "Выдано гостю" in WAITER
     assert "Забронировать стол" in WAITER
     assert 'import WaiterEntry from "../../components/WaiterEntry"' in WAITER_PAGE
+
+
+def test_guest_offer_schema_is_manager_controlled_and_event_audited():
+    assert "CREATE TABLE guest_offer_campaigns" in OFFERS_MIGRATION
+    assert "CREATE TABLE guest_offer_events" in OFFERS_MIGRATION
+    assert "GUEST_REQUEST','EXTERNAL_URL','AI_PROMPT" in OFFERS_MIGRATION
+    assert "CLICK','REQUEST','EXTERNAL_OPEN','AI_PROMPT" in OFFERS_MIGRATION
+    assert '"externalUrl" ~ \'^https://\'' in OFFERS_MIGRATION
+    assert "minStayNights" in OFFERS_MIGRATION and "maxStayNights" in OFFERS_MIGRATION
+
+
+def test_guest_offer_core_is_role_bounded_targeted_and_non_commercial_authority():
+    assert 'manager_access = require_roles("OWNER", "MANAGER")' in OFFERS_CORE
+    assert 'admin_router = APIRouter(prefix="/api/v1/admin/guest-offers"' in OFFERS_CORE
+    assert '@guest_router.get("/rooms/{token}/offers")' in OFFERS_CORE
+    assert '@guest_router.post("/rooms/{token}/offers/{campaign_id}/events"' in OFFERS_CORE
+    assert '"REQUEST_OR_HANDOFF_ONLY"' in OFFERS_CORE
+    assert '"isActive"=true' in OFFERS_CORE
+    assert '"minStayNights"' in OFFERS_CORE
+    assert "GUEST_OFFER_EVENT_ACTION_MISMATCH" in OFFERS_CORE
+    assert "app.include_router(guest_offers_guest_router)" in APP_ENTRY
+    assert "app.include_router(guest_offers_admin_router)" in APP_ENTRY
+
+
+def test_owner_manager_admin_can_manage_guest_offer_campaigns():
+    assert 'import GuestOffersBoard from "./GuestOffersBoard"' in ADMIN_SHELL
+    assert '"OFFERS"' in ADMIN_SHELL
+    assert "Офферы гостю" in ADMIN_SHELL
+    assert '<GuestOffersBoard />' in ADMIN_SHELL
+    assert '"/core/api/v1/admin/guest-offers"' in OFFERS_ADMIN
+    assert "Русский" in OFFERS_ADMIN and "Кыргызча" in OFFERS_ADMIN and "English" in OFFERS_ADMIN
+    assert "Внешний HTTPS-каталог" in OFFERS_ADMIN
+    assert "AI-сценарий" in OFFERS_ADMIN
+    assert "Заявка сотрудникам" in OFFERS_ADMIN
 
 
 def test_dashboard_contrast_no_longer_blanket_forces_all_descendants_white():
