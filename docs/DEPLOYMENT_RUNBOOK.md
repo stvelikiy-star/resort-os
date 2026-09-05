@@ -1,7 +1,7 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 3.1
-Date: 2026-09-02
+Version: 3.2
+Date: 2026-09-05
 Status: RELEASE-CANDIDATE HANDOFF / CI-LOCAL VERIFICATION REQUIRED / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment and cutover. It is **not evidence that production deployment has happened**.
@@ -59,6 +59,8 @@ Committed migration chain:
 6. `5_guest_os_core`
 7. `6_service_point_qr_operations`
 8. `7_kitchen_operations`
+9. `8_dining_service_control`
+10. `9_guest_offer_campaigns`
 
 Production/staging migration mechanism:
 
@@ -68,14 +70,14 @@ npx prisma migrate deploy
 
 Do **not** use `prisma db push` for production migration.
 
-The shared release contract maintains 27 critical hotel/payment domain constraints. Kitchen migration/domain gates additionally verify menu/table/order/item constraints and the unique GuestTask -> KitchenOrder link.
+The shared release contract maintains 37 critical hotel/payment/operations domain constraints. Kitchen/Dining/Guest Offer migration/domain gates additionally verify menu/table/order/item constraints, daily publication, table reservation, waiter assignment, offer targeting/actions/events and the unique GuestTask -> KitchenOrder link.
 
 Production evidence must capture:
 
 - exact release SHA/image set;
 - backup before migration;
 - migration command/result;
-- exact eight-migration ledger;
+- exact ten-migration ledger;
 - readiness/smoke result;
 - tested restore path.
 
@@ -167,7 +169,7 @@ Use an isolated staging hostname; never point the live apex at an unaccepted rel
 3. provision secrets out-of-band;
 4. provision persistent storage;
 5. start private PostgreSQL;
-6. apply all eight committed migrations;
+6. apply all ten committed migrations;
 7. run canonical room importer dry-run against staging, review the exact diff, then safely reconcile;
 8. load only approved factual data;
 9. bootstrap authorized users out-of-band;
@@ -195,15 +197,19 @@ Also verify stale/conflict rejection, realtime, TECH_BLOCK and RBAC.
 
 ### Guest OS / CRM
 
-Verify Room QR, PIN/session, requests, relocation, repeated guest history, checkout session revocation and factual room assignment.
+Verify Room QR, PIN/session, requests, relocation, repeated guest history, checkout session revocation and factual room assignment. For the in-stay Marketplace, verify only manager-configured active offers are surfaced and that offer actions do not create payment/commercial truth automatically.
 
-### Kitchen
+### Kitchen / Dining
 
 Verify:
 
 - Dining Staff opens Kitchen Admin;
 - factual tables can be created/edited without code changes;
 - draft menu can be edited/disabled/repriced;
+- current hotel-local day menu is explicitly published by meal type before Guest OS can order it;
+- stop-list and restore affect guest availability fail-closed;
+- table reservations enforce capacity/time conflicts;
+- waiter assignment and READY -> SERVED handoff work;
 - table order and room/Stay order use server-derived totals;
 - Guest OS order reaches Kitchen;
 - `NEW -> ACCEPTED -> COOKING -> READY -> SERVED` works;
