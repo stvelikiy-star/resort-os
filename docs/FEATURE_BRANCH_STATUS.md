@@ -1,1 +1,0 @@
-Work continues only on ux/management-kitchen-guest-v1-20260905 until review and CI are complete.
