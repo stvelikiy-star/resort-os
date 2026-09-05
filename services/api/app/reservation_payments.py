@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -24,6 +24,34 @@ class ReservationPaymentPayload(BaseModel):
     external_ref: str | None = Field(default=None, max_length=180)
     note: str | None = Field(default=None, max_length=500)
     idempotency_key: str = Field(min_length=8, max_length=180)
+
+
+def utc_aware(value: datetime | None) -> datetime:
+    """Return a canonical UTC-aware timestamp for validation/API/audit semantics."""
+    if value is None:
+        return datetime.now(timezone.utc)
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def prisma_timestamp(value: datetime) -> datetime:
+    """Convert UTC-aware time to Prisma's PostgreSQL TIMESTAMP(3) representation.
+
+    The canonical schema currently maps Prisma DateTime to `timestamp without time zone`.
+    Asyncpg therefore requires a naive datetime at the DB boundary. We retain the UTC
+    meaning explicitly everywhere else and strip tzinfo only for the bind parameter.
+    """
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def public_timestamp(value: datetime | None) -> datetime | None:
+    """Restore the schema's stored UTC-naive timestamp to explicit UTC for API output."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 async def _totals(conn, reservation_id: uuid.UUID):
@@ -60,11 +88,10 @@ async def record_reservation_payment(
     method = normalize_required_text(payload.method)
     external_ref = normalize_optional_text(payload.external_ref)
     note = normalize_optional_text(payload.note)
-    paid_at = payload.paid_at or datetime.now(timezone.utc)
-    if paid_at.tzinfo is None:
-        paid_at = paid_at.replace(tzinfo=timezone.utc)
-    if paid_at > datetime.now(timezone.utc) + __import__("datetime").timedelta(minutes=5):
+    paid_at = utc_aware(payload.paid_at)
+    if paid_at > datetime.now(timezone.utc) + timedelta(minutes=5):
         raise HTTPException(status_code=422, detail={"code": "PAYMENT_TIME_IN_FUTURE", "message": "Payment time cannot be in the future."})
+    paid_at_db = prisma_timestamp(paid_at)
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -127,8 +154,8 @@ async def record_reservation_payment(
                         "method": existing["method"],
                         "status": existing["status"],
                         "external_ref": existing["externalRef"],
-                        "paid_at": existing["paidAt"],
-                        "recorded_at": existing["createdAt"],
+                        "paid_at": public_timestamp(existing["paidAt"]),
+                        "recorded_at": public_timestamp(existing["createdAt"]),
                     },
                     "finance": totals,
                 }
@@ -179,7 +206,7 @@ async def record_reservation_payment(
                 note,
                 user["id"],
                 user["role"],
-                paid_at,
+                paid_at_db,
             )
 
             totals = await _totals(conn, reservation_id)
