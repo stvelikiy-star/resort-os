@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-02",
+  "version": "2026-09-05",
   "usage": "Customer-facing automation may use CONFIRMED facts. PARTIAL/UNKNOWN/REFERENCE facts must not be stated as certain. STALE facts must not be used.",
   "property": {
     "name": "Три Короны Resort & SPA",
@@ -14,9 +14,9 @@
       "status": "CONFIRMED"
     },
     "manager_phone": {
-      "value": "+996 558 08 50 08",
+      "value": "+996 558 08 50 02",
       "channels": ["WhatsApp", "Telegram"],
-      "status": "CONFIRMED"
+      "status": "CONFIRMED_OWNER_RULE"
     },
     "email": {
       "value": "3koronykg@mail.ru",
@@ -113,9 +113,13 @@
       "rule": "Free for staying guests."
     },
     "conference_halls": {
-      "value": null,
-      "status": "UNKNOWN_DO_NOT_PROMOTE",
-      "rule": "Do not advertise conference halls or quote capacity until current owner-approved public truth is established."
+      "value": true,
+      "status": "CONFIRMED_OWNER_RULE",
+      "capacity_min": 20,
+      "capacity_max": 120,
+      "banquet_use": true,
+      "banquet_menu": "agreed individually",
+      "rule": "The conference hall may be configured for a banquet; menu and final format are agreed individually with the hotel."
     },
     "gym": {
       "value": false,
@@ -159,7 +163,7 @@
       "value": null,
       "status": "NOT_VERIFIED_FOR_LAUNCH"
     },
-    "rule": "Do not enumerate or promise payment methods/providers to a guest until the manager or launch-enabled provider evidence confirms the current route."
+    "rule": "Do not enumerate or promise payment methods/providers to a guest until the manager or launch-enabled provider evidence confirms the current route. Internal PMS may record the actual payment method selected by staff."
   },
   "meals_2026": {
     "summer_room_rate": {
@@ -180,7 +184,35 @@
       "three_meals_without_bed_kgs": 1400,
       "status": "CONFIRMED_2026_PRICE_LIST"
     },
+    "guest_order_cutoff": {
+      "minutes_before_meal_start": 60,
+      "status": "CONFIRMED_OWNER_RULE",
+      "rule": "Guest OS must reject a meal order later than 60 minutes before the configured breakfast/lunch/dinner start. Meal times themselves are configurable and must not be guessed."
+    },
+    "room_delivery": {
+      "available": true,
+      "fee_kgs_per_order": 200,
+      "status": "CONFIRMED_OWNER_RULE",
+      "rule": "Food and drinks may be delivered to the guest room for a 200 KGS delivery fee per order."
+    },
     "rule": "Date-specific room meal inclusion should come from Resort Core pricing, not from this static summary."
+  },
+  "housekeeping": {
+    "scheduled_cleaning_interval_days": 3,
+    "scheduled_linen_change_included": true,
+    "status": "CONFIRMED_OWNER_RULE",
+    "on_demand_cleaning": {
+      "paid": true,
+      "price_kgs": null,
+      "status": "CONFIRMED_OWNER_RULE_PRICE_NOT_SET",
+      "rule": "Do not quote a price until management configures it in Resort OS."
+    },
+    "on_demand_linen_change": {
+      "paid": true,
+      "price_kgs": null,
+      "status": "CONFIRMED_OWNER_RULE_PRICE_NOT_SET",
+      "rule": "Do not quote a price until management configures it in Resort OS."
+    }
   },
   "extra_guest_2026": {
     "adult_13_plus_kgs_per_day": {
@@ -205,6 +237,18 @@
     "check_out": {
       "value": "12:00",
       "status": "CONFIRMED_OWNER_RULE"
+    },
+    "breakfast": {
+      "value": null,
+      "status": "OWNER_CONFIG_REQUIRED"
+    },
+    "lunch": {
+      "value": null,
+      "status": "OWNER_CONFIG_REQUIRED"
+    },
+    "dinner": {
+      "value": null,
+      "status": "OWNER_CONFIG_REQUIRED"
     }
   }
 }
