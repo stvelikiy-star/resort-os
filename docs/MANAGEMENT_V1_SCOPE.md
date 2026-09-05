@@ -1,1 +1,0 @@
-Scope: management dashboard contrast, dedicated Kitchen entry, Guest Marketplace, safe Kitchen ordering, AI/offer surface. Production remains STOP.
