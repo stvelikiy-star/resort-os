@@ -6,6 +6,8 @@ on:
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/**'
       - 'services/api/app/service_points.py'
+      - 'services/api/app/service_point_payments.py'
+      - 'services/api/app/service_auth.py'
       - 'services/api/app/app_entry.py'
       - 'services/api/app/operations.py'
       - 'apps/web/app/p/**'
@@ -16,6 +18,8 @@ on:
       - 'apps/admin/app/service-points.css'
       - 'apps/admin/app/layout.tsx'
       - 'scripts/verify_service_point_qr.py'
+      - 'scripts/verify_service_point_paid_access.py'
+      - 'scripts/mock_service_point_paid_access.py'
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
       - '.github/workflows/migration-baseline-ci.yml'
@@ -26,6 +30,8 @@ on:
       - 'packages/database/prisma/schema.prisma'
       - 'packages/database/prisma/migrations/**'
       - 'services/api/app/service_points.py'
+      - 'services/api/app/service_point_payments.py'
+      - 'services/api/app/service_auth.py'
       - 'services/api/app/app_entry.py'
       - 'services/api/app/operations.py'
       - 'apps/web/app/p/**'
@@ -36,6 +42,8 @@ on:
       - 'apps/admin/app/service-points.css'
       - 'apps/admin/app/layout.tsx'
       - 'scripts/verify_service_point_qr.py'
+      - 'scripts/verify_service_point_paid_access.py'
+      - 'scripts/mock_service_point_paid_access.py'
       - 'scripts/release_contract.py'
       - 'scripts/release_contract_test.py'
       - '.github/workflows/migration-baseline-ci.yml'
@@ -52,7 +60,7 @@ concurrency:
 jobs:
   service-point-qr:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16-alpine
@@ -69,6 +77,7 @@ jobs:
           --health-retries 10
 
     env:
+      APP_ENV: development
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
@@ -81,6 +90,13 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: Service Point Owner
       SERVICE_POINT_TECH_USERNAME: service-point-tech
       SERVICE_POINT_TECH_PASSWORD: Service-Point-Tech-2026
+      AUTOMATION_SERVICE_KEY: service-point-paid-access-ci-key-2026-00000001
+      AUTOMATION_SERVICE_NAME: paid-access-ci
+      SERVICE_POINT_PAYMENT_BRIDGE_URL: http://127.0.0.1:18081
+      TTLOCK_API_BASE_URL: http://127.0.0.1:18082
+      TTLOCK_CLIENT_ID: ttlock-ci-client
+      TTLOCK_ACCESS_TOKEN: ttlock-ci-token
+      PAID_ACCESS_MOCK_LOG: /tmp/service-point-paid-access-mock.jsonl
 
     steps:
       - uses: actions/checkout@v4
@@ -95,8 +111,9 @@ jobs:
           npm install --no-audit --no-fund
           npx prisma validate
           npx prisma migrate deploy
+          npx prisma migrate status
 
-      - name: Verify release ledger includes Service Point migration
+      - name: Verify release ledger includes Service Point paid-access migration
         run: python scripts/release_contract_test.py
 
       - name: Typecheck and build public Service Point QR surface
@@ -119,16 +136,26 @@ jobs:
           cache: 'pip'
           cache-dependency-path: services/api/requirements.txt
 
-      - name: Install and compile Resort Core and verifier
+      - name: Install and compile Resort Core and verifiers
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts/verify_service_point_qr.py scripts/upsert_staff_user.py
+          python -m compileall services/api/app scripts/verify_service_point_qr.py scripts/verify_service_point_paid_access.py scripts/mock_service_point_paid_access.py scripts/upsert_staff_user.py
 
       - name: Seed hotel and Service Point test roles
         run: |
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
           STAFF_USERNAME="$SERVICE_POINT_TECH_USERNAME" STAFF_PASSWORD="$SERVICE_POINT_TECH_PASSWORD" STAFF_DISPLAY_NAME='Service Point Technician' STAFF_ROLE=TECHNICIAN python scripts/upsert_staff_user.py
+
+      - name: Start isolated payment and TTLock mocks
+        run: |
+          python scripts/mock_service_point_paid_access.py >/tmp/service-point-paid-mocks.log 2>&1 &
+          echo $! >/tmp/service-point-paid-mocks.pid
+          for i in {1..20}; do
+            if curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/not-found | grep -q '^501$\|^404$'; then break; fi
+            if [ "$i" = "20" ]; then cat /tmp/service-point-paid-mocks.log; exit 1; fi
+            sleep 1
+          done
 
       - name: Start Resort Core
         run: |
@@ -140,14 +167,21 @@ jobs:
             sleep 1
           done
 
-      - name: Run Service Point QR lifecycle E2E
+      - name: Run anonymous Service Point QR lifecycle E2E
         run: python scripts/verify_service_point_qr.py
 
-      - name: Show Resort Core logs on failure
-        if: failure()
-        run: cat /tmp/service-point-api.log || true
+      - name: Run bank-confirmed paid access and TTLock E2E
+        run: python scripts/verify_service_point_paid_access.py
 
-      - name: Stop Resort Core
+      - name: Show diagnostics on failure
+        if: failure()
+        run: |
+          cat /tmp/service-point-api.log || true
+          cat /tmp/service-point-paid-mocks.log || true
+          cat /tmp/service-point-paid-access-mock.jsonl || true
+
+      - name: Stop isolated processes
         if: always()
         run: |
-          if [ -f /tmp/service-point-api.pid ]; then kill "$(cat /tmp/service-point-api.pid)" || true; fi
+          if [ -f /tmp/service-point-api.pid ]; then kill "$(cat /tmp/service-point-api.pid)" 2>/dev/null || true; fi
+          if [ -f /tmp/service-point-paid-mocks.pid ]; then kill "$(cat /tmp/service-point-paid-mocks.pid)" 2>/dev/null || true; fi
