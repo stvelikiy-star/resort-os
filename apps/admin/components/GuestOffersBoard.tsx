@@ -33,7 +33,7 @@ type Campaign = {
   analytics?: Analytics;
 };
 
-type FormState = Omit<Campaign, "id" | "analytics" | "active_from" | "active_to"> & {
+type FormState = Omit<Campaign, "id" | "analytics" | "active_from" | "active_to" | "max_stay_nights"> & {
   active_from: string;
   active_to: string;
   max_stay_nights: number | "";
@@ -169,7 +169,6 @@ export default function GuestOffersBoard() {
   function resetForm() {
     setEditingId(null);
     setForm(emptyForm);
-    setNotice(null);
   }
 
   function edit(item: Campaign) {
@@ -199,14 +198,15 @@ export default function GuestOffersBoard() {
     setError(null);
     setNotice(null);
     try {
+      const wasEditing = Boolean(editingId);
       const path = editingId ? `/core/api/v1/admin/guest-offers/${editingId}` : "/core/api/v1/admin/guest-offers";
       await api(path, {
         method: editingId ? "PUT" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload()),
       });
-      setNotice(editingId ? "Оффер обновлён." : "Оффер создан. По умолчанию он не должен быть активным, пока вы не проверили контент и действие.");
       resetForm();
+      setNotice(wasEditing ? "Оффер обновлён." : "Оффер создан. Перед включением проверьте RU/KG/EN, действие, период и ссылку.");
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось сохранить оффер");
