@@ -21,12 +21,21 @@ EXPECTED_MIGRATIONS = (
     "8_dining_service_control",
     "9_guest_offer_campaigns",
     "z10_service_point_paid_access",
+    "z11_owner_corrections_20260905",
+    "z12_guest_service_settings_20260905",
+    "z13_housekeeping_charges_20260905",
+    "z14_dining_entitlements_20260905",
+    "z15_group_bookings_20260905",
+    "z16_site_media_20260905",
+    "z17_dining_floor_layout_20260905",
+    "z18_site_media_slots_20260905",
+    "z19_dining_table_status_guard_20260905",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
-# production preflight and backup verification fail. Foreign keys and uniqueness
-# have additional migration-level tests; this fingerprint focuses on the
-# fail-closed domain constraints that protect Resort Core behaviour.
+# production preflight and backup verification fail. Foreign keys, uniqueness and
+# trigger-level invariants have additional migration/E2E tests; this fingerprint
+# focuses on fail-closed domain constraints that protect Resort Core behaviour.
 CRITICAL_CONSTRAINTS = frozenset(
     {
         "rate_period_valid_dates",
@@ -77,6 +86,39 @@ CRITICAL_CONSTRAINTS = frozenset(
         "service_point_payment_events_payload_check",
         "service_point_lock_actions_attempts_check",
         "service_point_lock_actions_result_check",
+        "property_guest_service_settings_cutoff_check",
+        "property_guest_service_settings_delivery_fee_check",
+        "property_guest_service_settings_housekeeping_interval_check",
+        "property_guest_service_settings_housekeeping_price_check",
+        "property_guest_service_settings_linen_price_check",
+        "kitchen_orders_subtotal_nonnegative",
+        "kitchen_orders_delivery_fee_nonnegative",
+        "operational_tasks_charge_nonnegative",
+        "operational_tasks_charge_status_check",
+        "dining_entitlements_meal_check",
+        "dining_entitlements_status_check",
+        "dining_entitlements_adult_check",
+        "dining_entitlements_child_check",
+        "dining_entitlements_nonempty_check",
+        "kitchen_tables_position_x_check",
+        "kitchen_tables_position_y_check",
+        "dining_table_sessions_meal_check",
+        "dining_table_sessions_status_check",
+        "dining_table_sessions_party_check",
+        "dining_table_sessions_adults_check",
+        "dining_table_sessions_children_check",
+        "dining_table_sessions_party_sum_check",
+        "guest_folio_charges_amount_check",
+        "guest_folio_charges_status_check",
+        "guest_folio_charges_source_check",
+        "booking_groups_dates_check",
+        "booking_groups_status_check",
+        "site_media_assets_size_check",
+        "site_media_assets_mime_check",
+        "kitchen_tables_floor_x_check",
+        "kitchen_tables_floor_y_check",
+        "kitchen_tables_floor_shape_check",
+        "site_media_slots_versions_check",
     }
 )
 
