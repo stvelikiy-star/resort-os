@@ -2,16 +2,22 @@ import uuid
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from .auth import require_roles
 from .guest_service_settings import load_settings
+
+router = APIRouter(prefix="/api/v1/ops/housekeeping", tags=["housekeeping-schedule"])
+schedule_access = require_roles("OWNER", "MANAGER", "RECEPTION", "MAID")
 
 
 async def ensure_due_housekeeping_tasks(conn, property_id: uuid.UUID) -> int:
     """Materialize due housekeeping tasks for active stays, idempotently.
 
     Owner rule: scheduled housekeeping repeats every configured N days (default 3)
-    and includes linen change when enabled. The helper is safe to call from every
-    staff/manager task-list read because the partial unique index prevents duplicate
-    stay/date tasks and the transaction-local advisory lock serializes concurrent reads.
+    and includes linen change when enabled. The helper is safe to call frequently:
+    a partial unique index prevents duplicate stay/date tasks and the transaction-local
+    advisory lock serializes concurrent sync calls.
     """
     await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', f'housekeeping-schedule:{property_id}')
     settings = await load_settings(conn, property_id)
@@ -103,3 +109,20 @@ async def ensure_due_housekeeping_tasks(conn, property_id: uuid.UUID) -> int:
                 )
             due += timedelta(days=interval_days)
     return created
+
+
+@router.post("/schedule/ensure")
+async def ensure_housekeeping_schedule(request: Request, user: dict = Depends(schedule_access)):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', user["property_code"])
+            if not property_id:
+                raise HTTPException(status_code=503, detail="Property not loaded")
+            created = await ensure_due_housekeeping_tasks(conn, property_id)
+            settings = await load_settings(conn, property_id)
+    return {
+        "created": created,
+        "interval_days": settings["scheduled_housekeeping_interval_days"],
+        "linen_change_included": settings["scheduled_linen_change_included"],
+        "truth": "Idempotent sync of due scheduled housekeeping tasks for active stays.",
+    }
