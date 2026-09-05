@@ -1,30 +1,49 @@
 {
   "schema_version": 1,
+  "release_version": "0.60.0",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "integration/site-pms-cms-20260827",
-  "accepted_executable_head": "ab6b649d91df5e9698253d43788cc657ca7040c9",
-  "observed_integration_merge": "c4a2b9584e9e6222ae7b213a6bf87ba3cd6f97e4",
+  "source_branch": "feature/owner-corrections-20260905",
+  "accepted_executable_head": "c8db446d367284465853850136c31274c8e39370",
+  "observed_merge_commit": "e5efe074abb4a277c032b017ae5fb02c5d0d5039",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 20,
-    "success": 20,
+    "triggered": 46,
+    "success": 46,
     "failures": 0
   },
-  "production_source_branch": "integration/site-pms-cms-20260827",
-  "main_allowed_as_production_source": false,
+  "merged_main_workflows": {
+    "triggered": 35,
+    "success": 35,
+    "failures": 0
+  },
+  "postmerge_truth_head": "00fdb8d1b583cf418e1c39709fb79ca248e462e4",
+  "postmerge_truth_workflows": {
+    "triggered": 4,
+    "success": 4,
+    "failures": 0
+  },
+  "production_source_branch": "main",
+  "main_allowed_as_production_source": true,
+  "migration_count": 20,
+  "critical_constraint_count": 81,
+  "canonical_property_seed": {
+    "rooms": 84,
+    "room_categories": 12,
+    "rate_rows": 48
+  },
   "external_beget_staging_verified": false,
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "The accepted executable head is the exact PR #107 product/security head built from the previously frozen RC integration head.",
-    "The exact PR #107 head completed all 20 applicable non-RC workflows successfully with zero failures; Release RC Truth intentionally failed before refreeze because the previous RC remained frozen.",
-    "The observed integration merge has zero file differences versus the tested PR #107 head.",
-    "PR #107 adds fail-closed provider environment validation for Telegram Sales, GREEN API, OpenAI model paths and Staff Voice without enabling any provider or committing real credentials.",
-    "The final structural launch verifier now requires VERIFIED GitHub branch-protection evidence and VERIFIED Google Drive launch-control permission evidence before production cutover can pass.",
-    "Google Drive permission audit currently shows anyone-with-link writer access on all 13 top-level project folders; issue #100 remains open until owner/admin remediation is independently re-verified.",
-    "GitHub integration branch protection remains disabled; issue #91 remains open until protected:true and required-check enforcement are independently re-verified.",
-    "The prior PR #102 customer-facing AI guest-truth hardening and PR #98 Kitchen/Core release baseline remain part of this accepted product tree.",
-    "The canonical database release ledger remains exactly eight migrations ending in 7_kitchen_operations.",
+    "Resort OS 0.60.0 is deliberately refrozen from the exact PR #112 tested head c8db446d367284465853850136c31274c8e39370.",
+    "The exact accepted head completed all 46 triggered checks successfully with zero failures before merge.",
+    "The observed main merge e5efe074abb4a277c032b017ae5fb02c5d0d5039 is tree-equivalent to the accepted executable head and completed all 35 triggered main checks successfully with zero failures.",
+    "The later post-merge truth-only main head 00fdb8d1b583cf418e1c39709fb79ca248e462e4 changed only canonical documentation and completed all 4 triggered checks successfully.",
+    "The production source branch is now main because the accepted release is merged there; this does not authorize production cutover while branch protection and external evidence remain incomplete.",
+    "The committed database release ledger contains 20 migrations and the shared release contract fingerprints 81 critical domain constraints.",
+    "The canonical property seed is 84 rooms, 12 room categories and 48 rate rows; the physical room intake gate remains closed.",
+    "GitHub branch protection / required checks remain NOT VERIFIED and issue #91 remains a hard cutover blocker.",
+    "Google Drive launch-control permission remediation remains NOT VERIFIED and issue #100 remains a hard cutover blocker.",
     "All external Beget/staging/rollback/device/provider/monitoring/backup/DNS/owner-GO evidence remains separate and production cutover remains STOP."
   ]
 }

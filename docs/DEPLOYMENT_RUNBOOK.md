@@ -1,8 +1,8 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 4.0
+Version: 4.1
 Date: 2026-09-05
-Status: RESORT OS 0.60.0 MERGED / REPOSITORY VERIFIED / EXTERNAL CUTOVER STOP
+Status: RESORT OS 0.60.0 INTERNAL RC FROZEN / REPOSITORY VERIFIED / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment and cutover. It is **not evidence that production deployment has happened**.
 
@@ -17,20 +17,23 @@ Canonical frozen external-production manifest: `release/current-rc.json`.
 ## 1. Current release boundary
 
 Repository: `stvelikiy-star/resort-os`.
-
+Release: `0.60.0`.
 Release PR: `#112`.
-Exact tested PR head: `c8db446d367284465853850136c31274c8e39370`.
-Merged `main` commit: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
+Exact accepted executable head: `c8db446d367284465853850136c31274c8e39370`.
+Observed tree-equivalent main merge: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
+Post-merge truth-only head: `00fdb8d1b583cf418e1c39709fb79ca248e462e4`.
 
 Evidence:
 
-- PR head: **46/46 checks SUCCESS, 0 failures**;
+- exact PR head: **46/46 checks SUCCESS, 0 failures**;
 - merge used an expected-head SHA guard;
-- resulting `main`: **35/35 triggered checks SUCCESS, 0 failures**.
+- accepted executable head and observed main merge are tree-equivalent;
+- observed main merge: **35/35 triggered checks SUCCESS, 0 failures**;
+- post-merge truth-only head: **4/4 triggered checks SUCCESS, 0 failures**.
 
-Repository release engineering is green. External deployment remains a separate gate.
+The external-production RC manifest has been deliberately refrozen to this 0.60.0 executable boundary.
 
-The frozen `release/current-rc.json` has not yet been deliberately refrozen to this new merged boundary. Do not treat the old manifest as proof that 0.60 has been externally accepted.
+The production source branch is `main`. That source selection does **not** authorize cutover while branch protection and external launch evidence remain incomplete.
 
 ---
 
@@ -59,7 +62,7 @@ NFC acquiring/wallet remains outside active V1 runtime.
 
 ## 3. Database release contract
 
-The current committed migration chain contains **20 migrations**:
+The frozen 0.60.0 committed migration chain contains **20 migrations**:
 
 1. `0_init`
 2. `1_site_content`
@@ -82,7 +85,7 @@ The current committed migration chain contains **20 migrations**:
 19. `z18_site_media_slots_20260905`
 20. `z19_dining_table_status_guard_20260905`
 
-The shared release contract currently fingerprints **81 critical domain constraints** in `scripts/release_contract.py`.
+The shared release contract fingerprints **81 critical domain constraints** in `scripts/release_contract.py`.
 
 Production/staging migration mechanism:
 
@@ -96,10 +99,10 @@ Production-like acceptance has already proven on clean PostgreSQL 16 that:
 
 - all 20 migrations apply successfully;
 - migration status is current;
-- the canonical property seed produces 84 rooms / 12 categories / 48 rate rows;
-- release smoke/E2E and backup/restore contracts pass on the tested release tree.
+- canonical property seed produces 84 rooms / 12 categories / 48 rate rows;
+- release smoke/E2E and database invariants pass on the accepted release tree.
 
-Production evidence must still capture the real target result:
+Real-target production evidence must still capture:
 
 - exact release SHA/image set;
 - backup before migration;
@@ -133,7 +136,7 @@ Physical room intake is already closed at the canonical **84-room / 12-category*
 
 Production cutover remains **STOP** while any required external evidence is missing:
 
-1. GitHub branch protection / required-check enforcement for the actual production source branch;
+1. GitHub branch protection / required-check enforcement on `main`;
 2. Google Drive launch-control permission remediation and verification;
 3. real target room reconciliation against the canonical register;
 4. actual Beget host/account non-destructive preflight;
@@ -145,8 +148,7 @@ Production cutover remains **STOP** while any required external evidence is miss
 10. real monitoring/alerting evidence;
 11. fresh pre-cutover database backup and off-site copy;
 12. exact DNS rollback capture;
-13. deliberate RC refreeze to the exact accepted release boundary;
-14. explicit final owner cutover approval.
+13. explicit final owner cutover approval.
 
 No GitHub CI result by itself authorizes production DNS switch or provider activation.
 
@@ -156,9 +158,10 @@ No GitHub CI result by itself authorizes production DNS switch or provider activ
 
 Template: `release/launch-evidence.example.json`.
 
-Repository gate:
+Repository gates:
 
 ```bash
+python scripts/release_rc_truth_guard.py
 python scripts/verify_launch_acceptance.py --mode repository
 ```
 
@@ -168,7 +171,7 @@ Final structural evidence gate:
 python scripts/verify_launch_acceptance.py \
   --mode cutover \
   --manifest /secure/path/launch-evidence.json \
-  --release-sha <exact-accepted-release-sha>
+  --release-sha c8db446d367284465853850136c31274c8e39370
 ```
 
 The verifier validates evidence metadata. It does not manufacture external evidence.
@@ -197,20 +200,22 @@ A public HTML crawl is not a rollback backup.
 
 Use an isolated staging hostname; never point the live apex at an unaccepted release.
 
-1. verify legacy rollback package;
-2. run actual-host preflight;
-3. provision secrets out-of-band;
-4. provision persistent storage;
-5. start private PostgreSQL 16;
-6. apply all 20 committed migrations with `prisma migrate deploy`;
-7. run canonical room reconciliation dry-run against staging, review the exact diff, then safely reconcile;
-8. load only approved factual data;
-9. bootstrap authorized users out-of-band;
-10. build/deploy the exact accepted release SHA;
-11. verify runtime/image revision labels match that SHA;
-12. start edge, Core, public, Admin, Staff/Kitchen and required n8n services;
-13. verify HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL;
-14. run unified external staging acceptance and retain checksum-backed evidence.
+1. check out `main` and verify `release/current-rc.json`;
+2. run `python scripts/release_rc_truth_guard.py`;
+3. verify legacy rollback package;
+4. run actual-host preflight;
+5. provision secrets out-of-band;
+6. provision persistent storage;
+7. start private PostgreSQL 16;
+8. apply all 20 committed migrations with `prisma migrate deploy`;
+9. run canonical room reconciliation dry-run against staging, review exact diff, then safely reconcile;
+10. load only approved factual data;
+11. bootstrap authorized users out-of-band;
+12. build/deploy exact accepted SHA `c8db446d367284465853850136c31274c8e39370`;
+13. verify runtime/image revision labels match that SHA;
+14. start edge, Core, public, Admin, Staff/Kitchen and required n8n services;
+15. verify HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL;
+16. run unified external staging acceptance and retain checksum-backed evidence.
 
 ---
 
@@ -289,19 +294,18 @@ Before cutover require real evidence for:
 
 Only after all required launch-evidence gates are VERIFIED:
 
-1. freeze exact accepted SHA;
-2. deliberately refreeze the external-production RC manifest to the accepted boundary;
-3. take fresh pre-cutover backup and verify off-site copy;
-4. verify legacy rollback/DNS rollback target;
-5. rerun host and production preflight;
-6. confirm staging/device/provider evidence;
-7. obtain explicit owner approval;
-8. deploy exact accepted image set;
-9. run readiness/smoke before public switch;
-10. switch DNS/routing in a controlled window;
-11. rerun external public/booking/PMS/Guest OS/Staff/Kitchen smoke;
-12. monitor errors/database/containers;
-13. roll back if acceptance criteria fail.
+1. reconfirm frozen RC manifest and exact accepted SHA;
+2. take fresh pre-cutover backup and verify off-site copy;
+3. verify legacy rollback/DNS rollback target;
+4. rerun host and production preflight;
+5. confirm staging/device/provider evidence;
+6. obtain explicit owner approval;
+7. deploy exact accepted image set;
+8. run readiness/smoke before public switch;
+9. switch DNS/routing in a controlled window;
+10. rerun external public/booking/PMS/Guest OS/Staff/Kitchen smoke;
+11. monitor errors/database/containers;
+12. roll back if acceptance criteria fail.
 
 Database rollback uses the rehearsed backup/restore path; do not improvise destructive reverse SQL.
 
@@ -311,8 +315,8 @@ Database rollback uses the rehearsed backup/restore path; do not improvise destr
 
 ### GO — internal release engineering
 
-Resort OS 0.60.0 is merged to `main` at `e5efe074abb4a277c032b017ae5fb02c5d0d5039`. The exact PR head passed 46/46 checks and the merged main commit passed 35/35 triggered checks.
+Resort OS 0.60.0 is merged, regression-green and deliberately refrozen to accepted executable head `c8db446d367284465853850136c31274c8e39370` with observed tree-equivalent main merge `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
 
 ### STOP — external production declaration
 
-External Beget/production remains **NOT VERIFIED** until all governance and real-world launch evidence is collected. Do not claim `PRODUCTION READY`, `LIVE` or `VERIFIED IN PRODUCTION` solely from repository/CI success.
+External Beget/production remains **NOT VERIFIED / EXTERNAL CUTOVER STOP** until all governance and real-world launch evidence is collected. Do not claim `PRODUCTION READY`, `LIVE` or `VERIFIED IN PRODUCTION` solely from repository/CI success.
