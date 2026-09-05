@@ -2,19 +2,26 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CORE = (ROOT / "services/api/app/guest_marketplace.py").read_text(encoding="utf-8")
+DINING_CORE = (ROOT / "services/api/app/dining_control.py").read_text(encoding="utf-8")
 APP_ENTRY = (ROOT / "services/api/app/app_entry.py").read_text(encoding="utf-8")
 RECEPTION_CORE = (ROOT / "services/api/app/reception_readiness.py").read_text(encoding="utf-8")
+MIGRATION = (ROOT / "packages/database/prisma/migrations/8_dining_service_control/migration.sql").read_text(encoding="utf-8")
 PAGE = (ROOT / "apps/web/app/g/[token]/page.tsx").read_text(encoding="utf-8")
 GUEST = (ROOT / "apps/web/components/GuestMarketplace.tsx").read_text(encoding="utf-8")
 KITCHEN = (ROOT / "apps/staff/components/KitchenEntry.tsx").read_text(encoding="utf-8")
+DAY_PLANNER = (ROOT / "apps/staff/components/DiningDayPlanner.tsx").read_text(encoding="utf-8")
+WAITER = (ROOT / "apps/staff/components/WaiterEntry.tsx").read_text(encoding="utf-8")
+WAITER_PAGE = (ROOT / "apps/staff/app/waiter/page.tsx").read_text(encoding="utf-8")
 ADMIN_SHELL = (ROOT / "apps/admin/components/AdminShell.tsx").read_text(encoding="utf-8")
 RECEPTION_UI = (ROOT / "apps/admin/components/ReceptionWorkspace.tsx").read_text(encoding="utf-8")
 CSS = (ROOT / "apps/admin/app/admin-experience.css").read_text(encoding="utf-8")
 
 
-def test_guest_marketplace_core_is_fail_closed_for_drafts():
-    assert '"isActive"=true AND "isDraft"=false' in CORE
-    assert "GUEST_MARKETPLACE_ITEM_NOT_PUBLISHED" in CORE
+def test_guest_marketplace_core_is_fail_closed_for_daily_approved_menu():
+    assert 'm."isActive"=true AND m."isDraft"=false' in CORE
+    assert 'a."serviceDate"=$2 AND a."isAvailable"=true AND a."soldOut"=false' in CORE
+    assert "GUEST_MARKETPLACE_MENU_NOT_PUBLISHED_TODAY" in CORE
+    assert "GUEST_MARKETPLACE_ITEM_NOT_AVAILABLE_TODAY" in CORE
     assert 'financial_posting": "NONE_AUTOMATIC"' in CORE
     assert '@router.get("/rooms/{token}/kitchen/menu")' in CORE
     assert '@router.post("/rooms/{token}/kitchen/orders"' in CORE
@@ -34,10 +41,45 @@ def test_guest_marketplace_does_not_hardcode_kol_destination():
     assert "http://" not in GUEST
 
 
-def test_kitchen_has_direct_role_bounded_entry():
+def test_kitchen_has_direct_role_bounded_entry_and_explicit_handoffs():
     assert 'new Set(["OWNER", "MANAGER", "DINING_STAFF"])' in KITCHEN
     assert '"/core/api/v1/auth/login"' in KITCHEN
-    assert "Кухня и зал" in KITCHEN
+    assert "Отдельный вход «Официант / зал»" in KITCHEN
+    assert 'href="/kitchen/today"' in KITCHEN
+    assert 'href="/waiter"' in KITCHEN
+
+
+def test_dining_schema_separates_daily_menu_tables_and_waiter_assignment():
+    assert "CREATE TABLE kitchen_menu_availability" in MIGRATION
+    assert '"serviceDate" date NOT NULL' in MIGRATION
+    assert '"soldOut" boolean NOT NULL DEFAULT false' in MIGRATION
+    assert "CREATE TABLE kitchen_table_reservations" in MIGRATION
+    assert "DINING_TABLE" not in MIGRATION
+    assert 'ALTER TABLE kitchen_orders ADD COLUMN "waiterId" uuid' in MIGRATION
+
+
+def test_dining_core_has_day_publish_stoplist_floor_and_table_booking():
+    assert '@router.post("/menu-day/publish"' in DINING_CORE
+    assert '@router.patch("/menu-day/{availability_id}")' in DINING_CORE
+    assert '@router.get("/table-reservations")' in DINING_CORE
+    assert '@router.post("/table-reservations"' in DINING_CORE
+    assert "DINING_TABLE_TIME_CONFLICT" in DINING_CORE
+    assert '@router.patch("/orders/{order_id}/waiter")' in DINING_CORE
+    assert 'user["role"] == "DINING_STAFF"' in DINING_CORE
+    assert '@router.get("/floor")' in DINING_CORE
+    assert "app.include_router(dining_control_router)" in APP_ENTRY
+
+
+def test_staff_has_separate_daily_menu_and_waiter_surfaces():
+    assert "Опубликовать:" in DAY_PLANNER
+    assert "Стоп-лист" in DAY_PLANNER
+    assert '"/core/api/v1/dining/menu-day/publish"' in DAY_PLANNER
+    assert 'new Set(["OWNER", "MANAGER", "DINING_STAFF"])' in WAITER
+    assert '"/core/api/v1/dining/floor"' in WAITER
+    assert "Взять заказ" in WAITER
+    assert "Выдано гостю" in WAITER
+    assert "Забронировать стол" in WAITER
+    assert 'import WaiterEntry from "../../components/WaiterEntry"' in WAITER_PAGE
 
 
 def test_dashboard_contrast_no_longer_blanket_forces_all_descendants_white():
