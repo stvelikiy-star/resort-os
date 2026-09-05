@@ -96,6 +96,8 @@ jobs:
           test -s packages/database/prisma/migrations/5_guest_os_core/migration.sql
           test -s packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
           test -s packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          test -s packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          test -s packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
           grep -q 'no_overlapping_active_room_blocks' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'reservation_nonnegative_total' packages/database/prisma/migrations/0_init/migration.sql
           grep -q 'inventory_block_valid_dates' packages/database/prisma/migrations/0_init/migration.sql
@@ -134,6 +136,12 @@ jobs:
           grep -q 'CREATE TABLE kitchen_order_items' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
           grep -q 'kitchen_orders_guest_task_key' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
           grep -q 'financial' packages/database/prisma/migrations/7_kitchen_operations/migration.sql
+          grep -q 'CREATE TABLE kitchen_menu_availability' packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          grep -q 'CREATE TABLE kitchen_table_reservations' packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          grep -q 'kitchen_table_reservations_time_check' packages/database/prisma/migrations/8_dining_service_control/migration.sql
+          grep -q 'CREATE TABLE guest_offer_campaigns' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          grep -q 'CREATE TABLE guest_offer_events' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
+          grep -q 'guest_offer_campaigns_action_check' packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
           cd packages/database/prisma/migrations/0_init
           sha256sum -c migration.sql.sha256
 
@@ -170,9 +178,9 @@ jobs:
         run: |
           python scripts/production_preflight.py | tee /tmp/production-preflight.txt
           grep -q '^FACT: migration_history_present=True$' /tmp/production-preflight.txt
-          grep -q '^FACT: applied_migrations=8$' /tmp/production-preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations'\]$" /tmp/production-preflight.txt
-          grep -q '^FACT: critical_constraint_count=27$' /tmp/production-preflight.txt
+          grep -q '^FACT: applied_migrations=10$' /tmp/production-preflight.txt
+          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations', '8_dining_service_control', '9_guest_offer_campaigns'\]$" /tmp/production-preflight.txt
+          grep -q '^FACT: critical_constraint_count=37$' /tmp/production-preflight.txt
           grep -q '^FACT: rooms=84$' /tmp/production-preflight.txt
           grep -q '^FACT: room_types=12$' /tmp/production-preflight.txt
           grep -q '^FACT: distinct_room_codes=84$' /tmp/production-preflight.txt
@@ -204,8 +212,8 @@ jobs:
           service_point_active_qr_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_qrs' and indexname='service_point_qrs_one_active_per_point'")"
           kitchen_tables="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
           kitchen_guest_task_unique="$(psql -h 127.0.0.1 -U resort -d resort_os_migration_test -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='kitchen_orders' and indexname='kitchen_orders_guest_task_key'")"
-          test "$migration_count" = '8'
-          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations'
+          test "$migration_count" = '10'
+          test "$migration_names" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns'
           test "$core_constraint_count" = '13'
           test "$site_content_table" = 'site_content_documents'
           test "$guest_service_columns" = '4'
