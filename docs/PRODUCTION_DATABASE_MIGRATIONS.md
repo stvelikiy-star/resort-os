@@ -1,6 +1,7 @@
 # Three Crowns — production database migration gate
 
 Date: 2026-09-05
+Release: `0.60.0`
 Status: **COMMITTED / CLEAN-DEPLOY VERIFIED / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
 
 This document defines the database migration boundary for Three Crowns Resort OS. It does not prove that migrations were run against a real production database.
@@ -9,7 +10,7 @@ This document defines the database migration boundary for Three Crowns Resort OS
 
 Production/staging schema changes are represented only by committed Prisma migrations.
 
-Exact current ledger:
+Exact frozen Resort OS 0.60.0 ledger — **20 migrations**:
 
 1. `0_init`
 2. `1_site_content`
@@ -21,6 +22,16 @@ Exact current ledger:
 8. `7_kitchen_operations`
 9. `8_dining_service_control`
 10. `9_guest_offer_campaigns`
+11. `z10_service_point_paid_access`
+12. `z11_owner_corrections_20260905`
+13. `z12_guest_service_settings_20260905`
+14. `z13_housekeeping_charges_20260905`
+15. `z14_dining_entitlements_20260905`
+16. `z15_group_bookings_20260905`
+17. `z16_site_media_20260905`
+18. `z17_dining_floor_layout_20260905`
+19. `z18_site_media_slots_20260905`
+20. `z19_dining_table_status_guard_20260905`
 
 The exact ledger is maintained in `scripts/release_contract.py` and verified fail-closed by CI.
 
@@ -41,41 +52,53 @@ CI verifies:
 
 - Prisma schema validation;
 - clean PostgreSQL migration deploy from empty database;
-- exact ten-migration ledger;
-- 37 critical hotel/payment/operations domain constraints from the shared release contract;
-- Kitchen migration-specific table, status, price and idempotent task-link constraints;
-- Dining daily-menu, table-reservation and waiter-assignment constraints;
-- Guest Offer campaign action, targeting, URL/window and event constraints;
-- 84-room / 12-room-type development intake integrity;
+- exact **20-migration** ledger;
+- **81 critical domain constraints** from the shared release contract in `scripts/release_contract.py`;
+- Kitchen/Dining table, status, price, publication, reservation, session and idempotency constraints;
+- Guest OS, Guest Offers, Guest Service settings and Housekeeping charge constraints;
+- Service Point QR / paid-access boundaries;
+- Group Booking and Guest Folio constraints;
+- CMS Media asset/slot constraints;
+- 84-room / 12-room-category canonical property integrity;
+- 48 accepted rate rows in the production-like property seed;
 - Resort Core/PMS/business invariant regressions;
 - backup creation and clean restore with the current migration/constraint fingerprint;
-- Full Staging migration/application startup path once its workflow ledger matches this contract.
+- production-like staging migration/application startup path.
 
 The canonical room register is 84 rooms / 12 mapped categories. Real target reconciliation remains an external deployment evidence step.
 
 ## Critical database boundary
 
-The canonical hotel/payment/operations constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains 37 constraints, including:
+The canonical domain constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains **81 constraints**.
+
+The fingerprint covers the current Hotel / Payment / Guest / Operations / Service Point / Kitchen / Dining / Group Booking / Folio / CMS Media release boundary, including:
 
 - valid rate/request/reservation/inventory dates;
 - nonnegative/positive financial bounds;
-- `no_overlapping_active_room_blocks`;
+- active room overlap protection;
 - Guest Services context/time guards;
 - Owner analytics/Growth guards;
-- Service Point category/QR/context guards;
-- Dining menu-publication and table-reservation guards;
-- Guest Offer action, URL, targeting/window and event guards.
+- Service Point QR/context guards;
+- Kitchen order/item/menu constraints;
+- Dining publication, reservation, floor/session/table-state guards;
+- Guest Offer action/target/window/event guards;
+- Group Booking invariants;
+- Guest Folio receivable/payment separation;
+- CMS Media identity/publication/slot invariants.
 
-Kitchen constraints are additionally checked by migration/domain tests, including menu prices/categories, table state/seats, order status/source/count/total/meal type, item quantity/price/status and the unique GuestTask-to-KitchenOrder link.
-
-Foreign keys and uniqueness are additionally checked by migration/domain tests.
+Foreign keys, uniqueness and migration-specific triggers are additionally checked by migration/domain tests.
 
 ## Fresh staging / production database
 
-Use the exact accepted release and run:
+Use the exact accepted release SHA from `release/current-rc.json` and run:
 
 ```bash
+cd packages/database
+npm ci
+npx prisma validate
 npx prisma migrate deploy
+npx prisma migrate status
+cd ../..
 ```
 
 Then run production preflight with real target environment/database evidence:
@@ -128,9 +151,10 @@ Do not claim production migration success until the actual target database has:
 - fresh backup evidence;
 - exact accepted release SHA/image set;
 - `migrate deploy` result;
-- exact ten-migration ledger;
-- critical constraint fingerprint plus Kitchen/Dining/Guest Offer migration-specific invariants;
+- exact **20-migration ledger**;
+- the **81-constraint** shared release fingerprint plus migration-specific invariants;
 - readiness/smoke result;
-- tested rollback/restore path.
+- tested rollback/restore path;
+- verified off-site backup copy.
 
-See `knowledge/09_LAUNCH_ACCEPTANCE.md` for the full cutover gate.
+See `knowledge/09_LAUNCH_ACCEPTANCE.md` for the full cutover gate. **EXTERNAL PRODUCTION CUTOVER STOP** remains in force until all required external evidence is VERIFIED.
