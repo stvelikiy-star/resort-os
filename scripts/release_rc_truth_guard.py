@@ -16,9 +16,11 @@ DOCS = (
 )
 ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
+    "release/launch-evidence.example.json",
     "knowledge/04_CURRENT_STATE.md",
     "knowledge/09_LAUNCH_ACCEPTANCE.md",
     "docs/DEPLOYMENT_RUNBOOK.md",
+    "docs/PRODUCTION_DATABASE_MIGRATIONS.md",
     "docs/RELEASE_0.60.0_2026-09-05.md",
     "docs/README.md",
     "docs/STAGING_RUNBOOK_2026-08-28.md",
