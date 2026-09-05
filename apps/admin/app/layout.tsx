@@ -14,6 +14,7 @@ import "./owner-executive.css";
 import "./growth-control.css";
 import "./guest-history.css";
 import "./guest-crm.css";
+import "./guest-offers.css";
 import "./dashboard.css";
 import "./reception.css";
 import "./reception-readiness.css";
