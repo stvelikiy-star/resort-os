@@ -4,6 +4,7 @@ import GuestConciergeRuntime from "../../../components/GuestConciergeRuntime";
 import GuestMarketplace from "../../../components/GuestMarketplace";
 import "../../guest-concierge.css";
 import "../../guest-marketplace.css";
+import "../../guest-owner-corrections.css";
 
 type GuestOsPageProps = { params: Promise<{ token: string }> };
 
