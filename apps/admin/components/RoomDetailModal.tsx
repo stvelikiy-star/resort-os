@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type RoomDetail = {
   room: {
@@ -49,6 +49,8 @@ type RoomDetail = {
   truth: string;
 };
 
+type RoomState = "CLEAN" | "DIRTY" | "IN_INSPECTION" | "TECH_BLOCK";
+
 const stateLabel: Record<string, string> = {
   UNKNOWN: "Не указан",
   CLEAN: "Готов",
@@ -59,6 +61,12 @@ const stateLabel: Record<string, string> = {
 const taskType: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
 const taskStatus: Record<string, string> = { OPEN: "Открыта", IN_PROGRESS: "В работе", IN_INSPECTION: "Проверка", DONE: "Готово", CANCELLED: "Отменена" };
 const blockType: Record<string, string> = { RESERVATION: "Бронь", MAINTENANCE: "Ремонт", MANUAL: "Ручной блок" };
+const readinessActions: Array<{ state: RoomState; label: string; note: string }> = [
+  { state: "CLEAN", label: "✓ Номер готов", note: "Можно заселять" },
+  { state: "DIRTY", label: "Уборка", note: "Нужна подготовка" },
+  { state: "IN_INSPECTION", label: "На проверку", note: "Ждёт контроля" },
+  { state: "TECH_BLOCK", label: "Ремонт / блок", note: "Не заселять" },
+];
 
 function dateTime(value?: string | null) {
   if (!value) return "—";
@@ -67,34 +75,74 @@ function dateTime(value?: string | null) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-export default function RoomDetailModal({ roomId, onClose }: { roomId: string; onClose: () => void; onUpdated?: () => void }) {
+export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId: string; onClose: () => void; onUpdated?: () => void }) {
   const [data, setData] = useState<RoomDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [busyState, setBusyState] = useState<RoomState | null>(null);
   const [section, setSection] = useState<"TASKS" | "BLOCKS">("TASKS");
 
-  useEffect(() => {
-    let alive = true;
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    fetch(`/core/api/v1/admin/rooms/${roomId}`, { cache: "no-store" })
-      .then(async (response) => {
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(body.detail || "Не удалось открыть номер");
-        return body as RoomDetail;
-      })
-      .then((body) => { if (alive) setData(body); })
-      .catch((e) => { if (alive) setError(e instanceof Error ? e.message : "Ошибка карточки номера"); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
+    try {
+      const response = await fetch(`/core/api/v1/admin/rooms/${roomId}`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.detail || "Не удалось открыть номер");
+      setData(body as RoomDetail);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ошибка карточки номера");
+    } finally {
+      setLoading(false);
+    }
   }, [roomId]);
+
+  useEffect(() => { void load(); }, [load]);
 
   const activeTasks = useMemo(() => data?.tasks.filter((task) => !["DONE", "CANCELLED"].includes(task.status)) || [], [data]);
   const activeBlocks = useMemo(() => data?.blocks.filter((block) => block.active) || [], [data]);
 
+  async function setReadiness(nextState: RoomState) {
+    if (!data || busyState) return;
+    if (nextState === "TECH_BLOCK" && !window.confirm(`Поставить номер ${data.room.code} в технический блок? Заселение должно быть остановлено до снятия блока.`)) return;
+
+    setBusyState(nextState);
+    setError(null);
+    setNotice(null);
+    try {
+      // Normal housekeeping acceptance must close the inspection task as well as
+      // set the room CLEAN. This prevents a green room with an orphaned inspection.
+      const inspection = data.tasks.find((task) => task.type === "HOUSEKEEPING" && task.status === "IN_INSPECTION");
+      const response = nextState === "CLEAN" && inspection
+        ? await fetch(`/core/api/v1/ops/tasks/${inspection.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "DONE" }),
+          })
+        : await fetch(`/core/api/v1/ops/rooms/${roomId}/state`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ state: nextState }),
+          });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = typeof body?.detail === "string" ? body.detail : body?.detail?.code || `HTTP ${response.status}`;
+        throw new Error(detail);
+      }
+      setNotice(nextState === "CLEAN" ? "Номер подтверждён как готовый." : `Статус: ${stateLabel[nextState]}.`);
+      await load();
+      onUpdated?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось изменить готовность номера");
+    } finally {
+      setBusyState(null);
+    }
+  }
+
   return <div className="room-detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="room-detail-modal" role="dialog" aria-modal="true">
-      {loading ? <div className="loading">Загрузка номера…</div> : error ? <div className="error-box">{error}</div> : data && <>
+      {loading && !data ? <div className="loading">Загрузка номера…</div> : error && !data ? <div className="error-box">{error}</div> : data && <>
         <header className="room-detail-head">
           <div><p className="eyebrow">Карточка номера</p><h2>№ {data.room.code}</h2><p>{data.room.room_type_name}</p></div>
           <button className="btn" onClick={onClose}>Закрыть</button>
@@ -105,6 +153,15 @@ export default function RoomDetailModal({ roomId, onClose }: { roomId: string; o
           <span>Активных задач: <b>{activeTasks.length}</b></span>
           <span>Активных блоков: <b>{activeBlocks.length}</b></span>
         </div>
+
+        <section className="room-readiness-control" aria-label="Готовность номера">
+          <div className="room-readiness-head"><div><small>Быстрый статус</small><strong>Готовность номера</strong></div><span>Изменение сразу сохраняется в Resort Core</span></div>
+          <div className="room-readiness-actions">
+            {readinessActions.map((action) => <button key={action.state} type="button" className={`room-readiness-button ${action.state} ${data.room.operational_state === action.state ? "active" : ""}`} disabled={busyState !== null} onClick={() => void setReadiness(action.state)}><strong>{busyState === action.state ? "Сохраняю…" : action.label}</strong><small>{action.note}</small></button>)}
+          </div>
+          {notice && <div className="content-message success">{notice}</div>}
+          {error && <div className="error-box">{error}</div>}
+        </section>
 
         <section className="room-detail-facts">
           <div><small>Категория</small><strong>{data.room.room_type_name}</strong></div>
