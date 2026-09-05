@@ -11,7 +11,17 @@
       "6_service_point_qr_operations",
       "7_kitchen_operations",
       "8_dining_service_control",
-      "9_guest_offer_campaigns"
+      "9_guest_offer_campaigns",
+      "z10_service_point_paid_access",
+      "z11_owner_corrections_20260905",
+      "z12_guest_service_settings_20260905",
+      "z13_housekeeping_charges_20260905",
+      "z14_dining_entitlements_20260905",
+      "z15_group_bookings_20260905",
+      "z16_site_media_20260905",
+      "z17_dining_floor_layout_20260905",
+      "z18_site_media_slots_20260905",
+      "z19_dining_table_status_guard_20260905"
     ]
   },
   "external_evidence": {
@@ -19,80 +29,80 @@
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Before production GO, attach evidence that the canonical integration/main branch policy is protected with the required PR/check/force-push controls. Current issue #91 remains the tracking gate until verified."
+      "note": "Before production GO, attach evidence that main is protected with the required PR/check/force-push controls. Issue #91 remains the tracking gate until verified."
     },
     "drive_launch_control_permissions": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Before production GO, attach Drive permission metadata proving that anyone-with-link writer access has been removed from all 13 top-level Three Crowns project folders and current launch-control Docs/Sheets, with named-editor/read-only policy in place. Current issue #100 remains the tracking gate until verified."
+      "note": "Before production GO, attach Drive permission metadata proving that anyone-with-link writer access has been removed from all 13 top-level Three Crowns project folders and current launch-control Docs/Sheets, with named-editor/read-only policy in place. Issue #100 remains the tracking gate until verified."
     },
     "room_reconciliation": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Physical room import gate #38 is closed. On the real external staging database, run the approved importer dry-run, review the diff against the canonical 84-room register, then record safe reconciliation evidence."
+      "note": "Physical room intake gate #38 is closed. On the real external staging database, run the approved importer dry-run, review the exact diff against the canonical 84-room / 12-category register, then record safe reconciliation evidence."
     },
     "beget_host_preflight": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Run non-destructive host preflight on the actual target host/account."
+      "note": "Run non-destructive host/environment/network preflight on the actual authorized Beget target."
     },
     "legacy_rollback_backup": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Require archive/dump/config/DNS evidence and checksum for the currently live site."
+      "note": "Require archive/dump/uploads/config/DNS evidence, checksum and verified restore ownership for the currently live target."
     },
     "external_https_wss_staging": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Real external staging must prove HTTPS, WSS, cookies, CORS, persistence and private PostgreSQL."
+      "note": "Real isolated external staging must prove HTTPS, WSS, cookies, CORS, persistence, exact accepted SHA/image identity and private PostgreSQL."
     },
     "external_public_truth_probe": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Run external_public_truth_probe.py against the real staging URL."
+      "note": "Run the external public-truth probe against the real staging URL and retain output/evidence."
     },
     "real_device_acceptance": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Require iPhone, Android, desktop and Telegram/staff acceptance on real devices."
+      "note": "Require real iPhone Safari, Android Chrome, desktop and Telegram/Staff/Kitchen acceptance."
     },
     "provider_acceptance": {
       "enabled": false,
       "status": "NOT_REQUIRED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "If WhatsApp/API Green/ManyChat or another provider is launch-enabled, change enabled=true and attach VERIFIED provider E2E evidence."
+      "note": "If any messaging/AI provider is launch-enabled, set enabled=true and attach VERIFIED provider E2E, authenticity and idempotency evidence."
     },
     "monitoring_alerting": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Require real health/readiness, 5xx, container, DB/storage and backup-failure visibility."
+      "note": "Require real health/readiness, HTTP 5xx, container restart, DB/storage, TLS and backup-failure visibility with alert delivery evidence."
     },
     "pre_cutover_backup": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Fresh backup immediately before cutover with timestamp/checksum/restore owner."
+      "note": "Fresh actual-target backup immediately before cutover with timestamp, checksum, off-site copy and restore owner."
     },
     "dns_rollback_capture": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Capture current DNS and exact rollback target before any switch."
+      "note": "Capture current DNS/TTL and exact rollback values before any production routing change."
     },
     "owner_cutover_approval": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Final production/DNS switch requires explicit owner approval after all other gates are complete."
+      "note": "Final production/DNS switch requires explicit owner approval only after all other required gates are VERIFIED."
     }
   }
 }
