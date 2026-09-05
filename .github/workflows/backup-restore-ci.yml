@@ -78,12 +78,14 @@ jobs:
           fi
           test -s packages/database/prisma/migrations/0_init/migration.sql
           test -s packages/database/prisma/migrations/0_init/migration.sql.sha256
-          test -s packages/database/prisma/migrations/5_guest_os_core/migration.sql
-          test -s packages/database/prisma/migrations/6_service_point_qr_operations/migration.sql
-          test -s packages/database/prisma/migrations/7_kitchen_operations/migration.sql
-          test -s packages/database/prisma/migrations/8_dining_service_control/migration.sql
-          test -s packages/database/prisma/migrations/9_guest_offer_campaigns/migration.sql
-          test -s packages/database/prisma/migrations/z10_service_point_paid_access/migration.sql
+          PYTHONPATH=scripts python - <<'PY'
+          from pathlib import Path
+          from release_contract import EXPECTED_MIGRATIONS
+          root = Path('packages/database/prisma/migrations')
+          missing = [name for name in EXPECTED_MIGRATIONS if not (root / name / 'migration.sql').is_file()]
+          assert not missing, f'missing committed migrations: {missing}'
+          print(f'PASS: committed migration files={len(EXPECTED_MIGRATIONS)}')
+          PY
           (
             cd packages/database/prisma/migrations/0_init
             sha256sum -c migration.sql.sha256
@@ -123,23 +125,26 @@ jobs:
           EXPECTED_ROOM_COUNT: '84'
           EXPECTED_ROOM_TYPE_COUNT: '12'
         run: |
+          expected_migrations="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_constraints="$(PYTHONPATH=scripts python -c 'from release_contract import CRITICAL_CONSTRAINTS; print(len(CRITICAL_CONSTRAINTS))')"
           python scripts/production_preflight.py | tee /tmp/preflight.txt
-          grep -q '^FACT: applied_migrations=11$' /tmp/preflight.txt
-          grep -q "^FACT: migration_names=\['0_init', '1_site_content', '2_guest_service_tasks', '3_owner_analytics_snapshots', '4_guest_engagements', '5_guest_os_core', '6_service_point_qr_operations', '7_kitchen_operations', '8_dining_service_control', '9_guest_offer_campaigns', 'z10_service_point_paid_access'\]$" /tmp/preflight.txt
-          grep -q '^FACT: critical_constraint_count=48$' /tmp/preflight.txt
+          grep -q "^FACT: applied_migrations=${expected_migrations}$" /tmp/preflight.txt
+          grep -q "^FACT: critical_constraint_count=${expected_constraints}$" /tmp/preflight.txt
           grep -q '^RESULT: READY FOR NEXT DEPLOYMENT GATE$' /tmp/preflight.txt
 
       - name: Create migration-aware backup artifact
         env:
           BACKUP_DIR: /tmp/three-crowns-backups
         run: |
+          expected_migrations="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_constraints="$(PYTHONPATH=scripts python -c 'from release_contract import CRITICAL_CONSTRAINTS; print(len(CRITICAL_CONSTRAINTS))')"
           python scripts/database_backup.py | tee /tmp/backup-output.txt
           BACKUP_FILE=$(grep '^BACKUP_FILE=' /tmp/backup-output.txt | cut -d= -f2-)
           BACKUP_MANIFEST=$(grep '^BACKUP_MANIFEST=' /tmp/backup-output.txt | cut -d= -f2-)
           test -s "$BACKUP_FILE"
           test -s "$BACKUP_MANIFEST"
-          grep -q '^BACKUP_MIGRATIONS=11$' /tmp/backup-output.txt
-          grep -q '^BACKUP_CRITICAL_CONSTRAINTS=48$' /tmp/backup-output.txt
+          grep -q "^BACKUP_MIGRATIONS=${expected_migrations}$" /tmp/backup-output.txt
+          grep -q "^BACKUP_CRITICAL_CONSTRAINTS=${expected_constraints}$" /tmp/backup-output.txt
           grep -q 'three-crowns-postgres-backup-v3' "$BACKUP_MANIFEST"
           echo "BACKUP_FILE=$BACKUP_FILE" >> "$GITHUB_ENV"
           echo "BACKUP_MANIFEST=$BACKUP_MANIFEST" >> "$GITHUB_ENV"
@@ -155,21 +160,27 @@ jobs:
         env:
           RESTORE_DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os_restore
         run: |
+          expected_migrations="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_constraints="$(PYTHONPATH=scripts python -c 'from release_contract import CRITICAL_CONSTRAINTS; print(len(CRITICAL_CONSTRAINTS))')"
           python scripts/database_restore_verify.py | tee /tmp/restore-output.txt
           grep -q '^RESTORE_VERIFICATION=SUCCESS$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOMS=84$' /tmp/restore-output.txt
           grep -q '^RESTORED_ROOM_TYPES=12$' /tmp/restore-output.txt
-          grep -q '^RESTORED_CRITICAL_CONSTRAINTS=48$' /tmp/restore-output.txt
+          grep -q "^RESTORED_CRITICAL_CONSTRAINTS=${expected_constraints}$" /tmp/restore-output.txt
           grep -q '^RESTORED_MIGRATION_HISTORY_PRESENT=True$' /tmp/restore-output.txt
-          grep -q '^RESTORED_APPLIED_MIGRATIONS=11$' /tmp/restore-output.txt
+          grep -q "^RESTORED_APPLIED_MIGRATIONS=${expected_migrations}$" /tmp/restore-output.txt
           grep -q '^LAST_VERIFIED_BACKUP_AT=' /tmp/restore-output.txt
 
       - name: Verify restored migration ledger directly
         env:
           PGPASSWORD: resort
         run: |
+          expected_count="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
+          expected_names="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(",".join(EXPECTED_MIGRATIONS))')"
           source_migrations="$(psql -h 127.0.0.1 -U resort -d resort_os -Atc "select migration_name || ':' || checksum from _prisma_migrations where finished_at is not null and rolled_back_at is null order by started_at,migration_name")"
           restored_migrations="$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select migration_name || ':' || checksum from _prisma_migrations where finished_at is not null and rolled_back_at is null order by started_at,migration_name")"
+          restored_count="$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
+          restored_names="$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
           test "$source_migrations" = "$restored_migrations"
-          test "$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = '11'
-          test "$(psql -h 127.0.0.1 -U resort -d resort_os_restore -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = '0_init,1_site_content,2_guest_service_tasks,3_owner_analytics_snapshots,4_guest_engagements,5_guest_os_core,6_service_point_qr_operations,7_kitchen_operations,8_dining_service_control,9_guest_offer_campaigns,z10_service_point_paid_access'
+          test "$restored_count" = "$expected_count"
+          test "$restored_names" = "$expected_names"
