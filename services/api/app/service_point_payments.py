@@ -2,7 +2,6 @@ import json
 import os
 import time
 import uuid
-from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from urllib.parse import urlparse
 
@@ -21,6 +20,7 @@ TTLOCK_API_BASE_URL = os.environ.get("TTLOCK_API_BASE_URL", "https://api.sciener
 TTLOCK_CLIENT_ID = os.environ.get("TTLOCK_CLIENT_ID", "")
 TTLOCK_ACCESS_TOKEN = os.environ.get("TTLOCK_ACCESS_TOKEN", "")
 INTENT_TTL_MINUTES = max(3, min(int(os.environ.get("SERVICE_POINT_PAYMENT_TTL_MINUTES", "10")), 30))
+MAX_INTENTS_PER_POINT_5_MIN = max(5, min(int(os.environ.get("SERVICE_POINT_PAYMENT_RATE_LIMIT_5_MIN", "30")), 200))
 
 admin_router = APIRouter(prefix="/api/v1/admin/service-point-payments", tags=["admin-service-point-payments"])
 public_router = APIRouter(prefix="/api/v1/service-point-payments", tags=["service-point-payments"])
@@ -69,13 +69,21 @@ def _normalized_code(value: str | None) -> str | None:
     return clean or None
 
 
-def _bridge_url_is_allowed() -> bool:
-    if not PAYMENT_BRIDGE_URL:
+def _endpoint_url_is_allowed(value: str) -> bool:
+    if not value:
         return False
-    parsed = urlparse(PAYMENT_BRIDGE_URL)
+    parsed = urlparse(value)
     if parsed.scheme == "https" and parsed.hostname:
         return True
     return APP_ENV != "production" and parsed.scheme == "http" and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+
+
+def _bridge_url_is_allowed() -> bool:
+    return _endpoint_url_is_allowed(PAYMENT_BRIDGE_URL)
+
+
+def _ttlock_url_is_allowed() -> bool:
+    return _endpoint_url_is_allowed(TTLOCK_API_BASE_URL)
 
 
 def _profile_readiness(row) -> dict[str, Any]:
@@ -83,7 +91,12 @@ def _profile_readiness(row) -> dict[str, Any]:
         return {"ready": False, "code": "PAID_ACCESS_NOT_ENABLED"}
     if not _bridge_url_is_allowed() or not AUTOMATION_SERVICE_KEY:
         return {"ready": False, "code": "PAYMENT_BRIDGE_NOT_CONFIGURED"}
-    if row["lockProviderCode"].upper() == "TTLOCK" and (not TTLOCK_CLIENT_ID or not TTLOCK_ACCESS_TOKEN):
+    lock_provider = (row["lockProviderCode"] or "").upper()
+    if lock_provider != "TTLOCK":
+        return {"ready": False, "code": "LOCK_PROVIDER_NOT_IMPLEMENTED"}
+    if not _ttlock_url_is_allowed():
+        return {"ready": False, "code": "TTLOCK_ENDPOINT_NOT_ALLOWED"}
+    if not TTLOCK_CLIENT_ID or not TTLOCK_ACCESS_TOKEN:
         return {"ready": False, "code": "TTLOCK_NOT_CONFIGURED"}
     return {"ready": True, "code": "READY"}
 
@@ -163,12 +176,14 @@ async def _create_bridge_checkout(*, provider_code: str, reference: str, amount_
     qr_payload = str(body.get("qr_payload") or "").strip() or None
     if not provider_payment_id or not (checkout_url or qr_payload):
         raise RuntimeError("PAYMENT_BRIDGE_INVALID_RESPONSE")
-    if checkout_url and urlparse(checkout_url).scheme != "https" and APP_ENV == "production":
+    if checkout_url and APP_ENV == "production" and urlparse(checkout_url).scheme != "https":
         raise RuntimeError("PAYMENT_BRIDGE_INSECURE_CHECKOUT_URL")
     return provider_payment_id, checkout_url, qr_payload
 
 
 async def _ttlock_unlock(lock_external_id: str) -> tuple[bool, str | None, dict[str, Any]]:
+    if not _ttlock_url_is_allowed():
+        return False, "TTLOCK_ENDPOINT_NOT_ALLOWED", {}
     if not TTLOCK_CLIENT_ID or not TTLOCK_ACCESS_TOKEN:
         return False, "TTLOCK_NOT_CONFIGURED", {}
     if not lock_external_id.isdigit():
@@ -185,27 +200,49 @@ async def _ttlock_unlock(lock_external_id: str) -> tuple[bool, str | None, dict[
         body = response.json()
     except Exception:
         return False, "TTLOCK_NETWORK_ERROR", {}
-    errcode = int(body.get("errcode", -1))
+    try:
+        errcode = int(body.get("errcode", -1))
+    except (TypeError, ValueError):
+        errcode = -1
     if response.status_code < 300 and errcode == 0:
         return True, None, {"errcode": 0, "description": body.get("description")}
     return False, f"TTLOCK_{errcode}", {"errcode": errcode, "errmsg": body.get("errmsg")}
+
+
+async def _audit_unlock(conn, *, row, success: bool, error_code: str | None, result: dict[str, Any]):
+    await conn.execute(
+        '''INSERT INTO audit_logs (
+             id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
+           ) VALUES ($1,$2,'SERVICE','service-point-access','UNLOCK_SERVICE_POINT','ServicePointPaymentIntent',$3,
+             'SERVICE_POINT_PAID_ACCESS',$4,$5::jsonb,now())''',
+        uuid.uuid4(),
+        row["propertyId"],
+        str(row["id"]),
+        "SUCCESS" if success else "FAILURE",
+        json.dumps({
+            "service_point_id": str(row["servicePointId"]),
+            "lock_provider_code": row["lockProviderCode"],
+            "lock_external_id": row["lockExternalId"],
+            "error_code": error_code,
+            "provider_result": result,
+        }),
+    )
 
 
 async def _attempt_unlock(request: Request, intent_id: uuid.UUID) -> dict[str, Any]:
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             row = await conn.fetchrow(
-                '''SELECT i.id,i."propertyId",i."servicePointId",i.status::text AS status,i."paidAt",
-                          p."lockProviderCode",p."lockExternalId",p."isActive"
-                   FROM service_point_payment_intents i
-                   JOIN service_point_access_profiles p ON p."servicePointId"=i."servicePointId"
-                   WHERE i.id=$1 FOR UPDATE OF i,p''',
+                '''SELECT id,"propertyId","servicePointId",status::text AS status,"paidAt","lockProviderCode","lockExternalId"
+                   FROM service_point_payment_intents WHERE id=$1 FOR UPDATE''',
                 intent_id,
             )
             if not row:
                 raise HTTPException(status_code=404, detail={"code": "SERVICE_POINT_PAYMENT_INTENT_NOT_FOUND"})
             if row["status"] == "UNLOCKED":
                 return {"status": "UNLOCKED", "idempotent": True}
+            if row["status"] == "UNLOCK_PENDING":
+                return {"status": "UNLOCK_PENDING", "idempotent": True}
             if row["status"] not in {"PAID", "UNLOCK_FAILED"} or not row["paidAt"]:
                 raise HTTPException(status_code=409, detail={"code": "PAYMENT_NOT_VERIFIED"})
             action_id = await conn.fetchval(
@@ -231,6 +268,12 @@ async def _attempt_unlock(request: Request, intent_id: uuid.UUID) -> dict[str, A
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
+            current = await conn.fetchrow(
+                '''SELECT id,"propertyId","servicePointId","lockProviderCode","lockExternalId" FROM service_point_payment_intents WHERE id=$1 FOR UPDATE''',
+                intent_id,
+            )
+            if not current:
+                raise HTTPException(status_code=404, detail={"code": "SERVICE_POINT_PAYMENT_INTENT_NOT_FOUND"})
             if success:
                 await conn.execute(
                     '''UPDATE service_point_lock_actions SET status='SUCCEEDED',"lastErrorCode"=NULL,"providerResultJson"=$2::jsonb,"updatedAt"=now() WHERE id=$1''',
@@ -240,6 +283,7 @@ async def _attempt_unlock(request: Request, intent_id: uuid.UUID) -> dict[str, A
                     '''UPDATE service_point_payment_intents SET status='UNLOCKED',"unlockedAt"=now(),"failureCode"=NULL,"updatedAt"=now() WHERE id=$1''',
                     intent_id,
                 )
+                await _audit_unlock(conn, row=current, success=True, error_code=None, result=result)
                 return {"status": "UNLOCKED", "idempotent": False}
             await conn.execute(
                 '''UPDATE service_point_lock_actions SET status='FAILED',"lastErrorCode"=$2,"providerResultJson"=$3::jsonb,"updatedAt"=now() WHERE id=$1''',
@@ -249,6 +293,7 @@ async def _attempt_unlock(request: Request, intent_id: uuid.UUID) -> dict[str, A
                 '''UPDATE service_point_payment_intents SET status='UNLOCK_FAILED',"failureCode"=$2,"updatedAt"=now() WHERE id=$1''',
                 intent_id, error_code,
             )
+            await _audit_unlock(conn, row=current, success=False, error_code=error_code, result=result)
     return {"status": "UNLOCK_FAILED", "failure_code": error_code}
 
 
@@ -267,31 +312,59 @@ async def public_access_profile(token: str, request: Request):
 @public_router.post("/points/{token}/intents", status_code=status.HTTP_201_CREATED)
 async def create_public_payment_intent(token: str, payload: PublicIntentCreate, request: Request):
     async with request.app.state.db.acquire() as conn:
-        point = await resolve_service_point(conn, token)
-        if not point:
-            raise HTTPException(status_code=404, detail={"code": "SERVICE_POINT_QR_NOT_FOUND"})
-        profile = await _profile_row(conn, point["servicePointId"])
-        readiness = _profile_readiness(profile)
-        if not readiness["ready"]:
-            raise HTTPException(status_code=503, detail={"code": readiness["code"]})
-        existing = await conn.fetchrow(
-            '''SELECT id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
-                      "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"
-               FROM service_point_payment_intents WHERE "servicePointId"=$1 AND "clientRequestId"=$2''',
-            point["servicePointId"], payload.client_request_id,
-        )
-        if existing:
-            return _intent_payload(existing)
-        intent_id = uuid.uuid4()
-        reference = f"TCSP-{uuid.uuid4().hex[:20].upper()}"
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=INTENT_TTL_MINUTES)
-        await conn.execute(
-            '''INSERT INTO service_point_payment_intents (
-                 id,"propertyId","servicePointId","clientRequestId",reference,"providerCode","amountKgs",currency,status,"expiresAt","createdAt","updatedAt"
-               ) VALUES ($1,$2,$3,$4,$5,$6,$7,'KGS','CREATED',$8,now(),now())''',
-            intent_id, point["propertyId"], point["servicePointId"], payload.client_request_id, reference,
-            profile["providerCode"], profile["amountKgs"], expires_at,
-        )
+        async with conn.transaction():
+            point = await resolve_service_point(conn, token, lock=True)
+            if not point:
+                raise HTTPException(status_code=404, detail={"code": "SERVICE_POINT_QR_NOT_FOUND"})
+            profile = await _profile_row(conn, point["servicePointId"])
+            readiness = _profile_readiness(profile)
+            if not readiness["ready"]:
+                raise HTTPException(status_code=503, detail={"code": readiness["code"]})
+            existing = await conn.fetchrow(
+                '''SELECT id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
+                          "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"
+                   FROM service_point_payment_intents WHERE "servicePointId"=$1 AND "clientRequestId"=$2''',
+                point["servicePointId"], payload.client_request_id,
+            )
+            if existing:
+                return _intent_payload(existing)
+            recent_count = int(await conn.fetchval(
+                '''SELECT count(*)::int FROM service_point_payment_intents
+                   WHERE "servicePointId"=$1 AND "createdAt">=now()-interval '5 minutes' ''',
+                point["servicePointId"],
+            ) or 0)
+            if recent_count >= MAX_INTENTS_PER_POINT_5_MIN:
+                raise HTTPException(status_code=429, detail={"code": "SERVICE_POINT_PAYMENT_RATE_LIMITED"})
+            intent_id = uuid.uuid4()
+            reference = f"TCSP-{uuid.uuid4().hex[:20].upper()}"
+            inserted = await conn.fetchval(
+                '''INSERT INTO service_point_payment_intents (
+                     id,"propertyId","servicePointId","clientRequestId",reference,"providerCode","lockProviderCode","lockExternalId",
+                     "amountKgs",currency,status,"expiresAt","createdAt","updatedAt"
+                   ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'KGS','CREATED',now()+($10::int*interval '1 minute'),now(),now())
+                   ON CONFLICT ("servicePointId","clientRequestId") DO NOTHING
+                   RETURNING id''',
+                intent_id,
+                point["propertyId"],
+                point["servicePointId"],
+                payload.client_request_id,
+                reference,
+                profile["providerCode"],
+                profile["lockProviderCode"],
+                profile["lockExternalId"],
+                profile["amountKgs"],
+                INTENT_TTL_MINUTES,
+            )
+            if not inserted:
+                existing = await conn.fetchrow(
+                    '''SELECT id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
+                              "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"
+                       FROM service_point_payment_intents WHERE "servicePointId"=$1 AND "clientRequestId"=$2''',
+                    point["servicePointId"], payload.client_request_id,
+                )
+                if existing:
+                    return _intent_payload(existing)
+                raise HTTPException(status_code=409, detail={"code": "SERVICE_POINT_PAYMENT_IDEMPOTENCY_CONFLICT"})
 
     try:
         provider_payment_id, checkout_url, qr_payload = await _create_bridge_checkout(
@@ -304,20 +377,36 @@ async def create_public_payment_intent(token: str, payload: PublicIntentCreate, 
         failure_code = str(exc)[:120]
         async with request.app.state.db.acquire() as conn:
             await conn.execute(
-                '''UPDATE service_point_payment_intents SET status='PAYMENT_FAILED',"failureCode"=$2,"updatedAt"=now() WHERE id=$1''',
+                '''UPDATE service_point_payment_intents SET status='PAYMENT_FAILED',"failureCode"=$2,"updatedAt"=now()
+                   WHERE id=$1 AND status='CREATED' ''',
                 intent_id, failure_code,
             )
         raise HTTPException(status_code=503, detail={"code": failure_code})
 
     async with request.app.state.db.acquire() as conn:
-        row = await conn.fetchrow(
-            '''UPDATE service_point_payment_intents
-               SET status='AWAITING_PAYMENT',"providerPaymentId"=$2,"checkoutUrl"=$3,"qrPayload"=$4,"updatedAt"=now()
-               WHERE id=$1
-               RETURNING id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
-                         "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"''',
-            intent_id, provider_payment_id, checkout_url, qr_payload,
-        )
+        try:
+            row = await conn.fetchrow(
+                '''UPDATE service_point_payment_intents
+                   SET status='AWAITING_PAYMENT',"providerPaymentId"=$2,"checkoutUrl"=$3,"qrPayload"=$4,"updatedAt"=now()
+                   WHERE id=$1 AND status='CREATED'
+                   RETURNING id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
+                             "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"''',
+                intent_id, provider_payment_id, checkout_url, qr_payload,
+            )
+        except Exception:
+            await conn.execute(
+                '''UPDATE service_point_payment_intents SET status='PAYMENT_FAILED',"failureCode"='PROVIDER_PAYMENT_ID_CONFLICT',"updatedAt"=now()
+                   WHERE id=$1 AND status='CREATED' ''',
+                intent_id,
+            )
+            raise HTTPException(status_code=409, detail={"code": "PROVIDER_PAYMENT_ID_CONFLICT"})
+        if not row:
+            row = await conn.fetchrow(
+                '''SELECT id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
+                          "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"
+                   FROM service_point_payment_intents WHERE id=$1''',
+                intent_id,
+            )
     return _intent_payload(row)
 
 
@@ -335,13 +424,16 @@ async def get_public_payment_intent(token: str, intent_id: uuid.UUID, request: R
         )
         if not row:
             raise HTTPException(status_code=404, detail={"code": "SERVICE_POINT_PAYMENT_INTENT_NOT_FOUND"})
-        if row["status"] == "AWAITING_PAYMENT" and row["expiresAt"] < datetime.now(timezone.utc):
-            row = await conn.fetchrow(
-                '''UPDATE service_point_payment_intents SET status='EXPIRED',"updatedAt"=now() WHERE id=$1
+        if row["status"] == "AWAITING_PAYMENT":
+            expired = await conn.fetchrow(
+                '''UPDATE service_point_payment_intents SET status='EXPIRED',"updatedAt"=now()
+                   WHERE id=$1 AND status='AWAITING_PAYMENT' AND "expiresAt"<=now()
                    RETURNING id,reference,"providerCode","providerPaymentId","amountKgs",currency,status::text AS status,
                              "checkoutUrl","qrPayload","paidAt","expiresAt","unlockedAt","failureCode"''',
                 intent_id,
             )
+            if expired:
+                row = expired
     return _intent_payload(row)
 
 
@@ -357,7 +449,7 @@ async def confirm_provider_payment(
         async with conn.transaction():
             row = await conn.fetchrow(
                 '''SELECT id,"propertyId","servicePointId",reference,"providerCode","providerPaymentId","amountKgs",currency,
-                          status::text AS status,"paidAt"
+                          status::text AS status,"paidAt",("expiresAt"<=now()) AS expired
                    FROM service_point_payment_intents WHERE reference=$1 FOR UPDATE''',
                 payload.reference,
             )
@@ -372,29 +464,72 @@ async def confirm_provider_payment(
 
             await conn.execute(
                 '''INSERT INTO service_point_payment_events (
-                     id,"propertyId","intentId","providerCode","eventType","providerPaymentId","payloadJson","createdAt"
-                   ) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,now())''',
-                uuid.uuid4(), row["propertyId"], row["id"], normalized_provider, payload.status, payload.provider_payment_id,
-                json.dumps({"event_id": payload.event_id, "actor": service["actor_id"], "amount_kgs": payload.amount_kgs, "currency": payload.currency}),
+                     id,"propertyId","intentId","providerCode","providerEventId","eventType","providerPaymentId","payloadJson","createdAt"
+                   ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,now())
+                   ON CONFLICT DO NOTHING''',
+                uuid.uuid4(),
+                row["propertyId"],
+                row["id"],
+                normalized_provider,
+                payload.event_id,
+                payload.status,
+                payload.provider_payment_id,
+                json.dumps({"actor": service["actor_id"], "amount_kgs": payload.amount_kgs, "currency": payload.currency}),
             )
 
             if payload.status == "FAILED":
                 if row["status"] not in {"PAID", "UNLOCK_PENDING", "UNLOCKED", "UNLOCK_FAILED"}:
                     await conn.execute(
-                        '''UPDATE service_point_payment_intents SET status='PAYMENT_FAILED',"providerPaymentId"=$2,"failureCode"='PROVIDER_PAYMENT_FAILED',"updatedAt"=now() WHERE id=$1''',
+                        '''UPDATE service_point_payment_intents SET status='PAYMENT_FAILED',"providerPaymentId"=$2,
+                             "failureCode"='PROVIDER_PAYMENT_FAILED',"updatedAt"=now() WHERE id=$1''',
                         row["id"], payload.provider_payment_id,
                     )
                 return {"status": "PAYMENT_FAILED", "intent_id": str(row["id"])}
 
             if row["status"] in {"PAID", "UNLOCK_PENDING", "UNLOCKED", "UNLOCK_FAILED"}:
                 paid_intent_id = row["id"]
-            else:
+                late_payment = False
+            elif row["expired"]:
                 await conn.execute(
-                    '''UPDATE service_point_payment_intents SET status='PAID',"providerPaymentId"=$2,"paidAt"=now(),"failureCode"=NULL,"updatedAt"=now() WHERE id=$1''',
+                    '''UPDATE service_point_payment_intents SET status='UNLOCK_FAILED',"providerPaymentId"=$2,"paidAt"=now(),
+                         "failureCode"='LATE_PAYMENT_REQUIRES_REVIEW',"updatedAt"=now() WHERE id=$1''',
                     row["id"], payload.provider_payment_id,
                 )
                 paid_intent_id = row["id"]
+                late_payment = True
+            else:
+                await conn.execute(
+                    '''UPDATE service_point_payment_intents SET status='PAID',"providerPaymentId"=$2,"paidAt"=now(),
+                         "failureCode"=NULL,"updatedAt"=now() WHERE id=$1''',
+                    row["id"], payload.provider_payment_id,
+                )
+                paid_intent_id = row["id"]
+                late_payment = False
 
+            await conn.execute(
+                '''INSERT INTO audit_logs (
+                     id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
+                   ) VALUES ($1,$2,'SERVICE',$3,'VERIFY_PROVIDER_PAYMENT','ServicePointPaymentIntent',$4,
+                     'SERVICE_POINT_PAID_ACCESS','SUCCESS',$5::jsonb,now())''',
+                uuid.uuid4(),
+                row["propertyId"],
+                service["actor_id"],
+                str(row["id"]),
+                json.dumps({
+                    "provider_code": normalized_provider,
+                    "provider_payment_id": payload.provider_payment_id,
+                    "amount_kgs": payload.amount_kgs,
+                    "currency": payload.currency,
+                    "late_payment": late_payment,
+                }),
+            )
+
+    if late_payment:
+        return {
+            "intent_id": str(paid_intent_id),
+            "payment_status": "PAID",
+            "unlock": {"status": "UNLOCK_FAILED", "failure_code": "LATE_PAYMENT_REQUIRES_REVIEW"},
+        }
     unlock = await _attempt_unlock(request, paid_intent_id)
     return {"intent_id": str(paid_intent_id), "payment_status": "PAID", "unlock": unlock}
 
