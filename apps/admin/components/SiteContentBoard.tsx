@@ -1,6 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import SiteMediaBoard from "./SiteMediaBoard";
 
 type Locale = "ru" | "kg" | "en";
 type Content = Record<string, Record<string, string>>;
@@ -162,13 +163,15 @@ export default function SiteContentBoard() {
         <div>
           <p className="eyebrow">Сайт / Контент</p>
           <h1>Редактор публичного сайта</h1>
-          <p>Тексты, конференц-блок, контакты и SEO хранятся в Core. Доступность, цены и брони остаются отдельной доменной правдой PMS.</p>
+          <p>Тексты, фотографии, конференц-блок, контакты и SEO управляются через Resort Core. Доступность, цены и брони остаются отдельной доменной правдой PMS.</p>
         </div>
         <div className="content-head-actions">
           <button className="btn" onClick={exportJson}>Экспорт JSON</button>
           <label className="btn file-btn">Импорт JSON<input type="file" accept="application/json" onChange={(event) => void importJson(event.target.files?.[0] || null)} /></label>
         </div>
       </header>
+
+      <SiteMediaBoard />
 
       <section className="content-status-row">
         <div className="locale-tabs">{LOCALES.map((entry) => <button key={entry.code} className={locale === entry.code ? "active" : ""} onClick={() => setLocale(entry.code)}>{entry.label}</button>)}</div>
@@ -195,7 +198,7 @@ export default function SiteContentBoard() {
       </div>
 
       <footer className="content-savebar">
-        <div><strong>Публикация безопасна для броней</strong><span>CMS меняет публичный контент. Номерной фонд, цены, inventory и заявки остаются в Core.</span></div>
+        <div><strong>Публикация безопасна для броней</strong><span>CMS меняет публичный контент и медиа. Номерной фонд, цены, inventory и заявки остаются в Core.</span></div>
         <div><button className="btn" disabled={saving} onClick={() => void saveDraft()}>Сохранить черновик</button><button className="btn primary" disabled={saving} onClick={() => void publish()}>{saving ? "Сохраняю…" : "Опубликовать на сайте"}</button></div>
       </footer>
     </main>
