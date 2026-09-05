@@ -23,7 +23,7 @@ SLOT_LABELS: dict[str, str] = {
 }
 
 
-class SlotPatch(BaseModel):
+class SlotDraftPatch(BaseModel):
     asset_id: uuid.UUID | None = None
     alt_text: str | None = Field(default=None, max_length=500)
 
@@ -63,25 +63,47 @@ def asset_item(row) -> dict[str, Any]:
     }
 
 
-def slot_item(row) -> dict[str, Any]:
+def media_ref(asset_id, filename, mime_type, byte_size, alt_text):
+    if asset_id is None:
+        return None
+    return {
+        "asset_id": str(asset_id),
+        "filename": filename,
+        "mime_type": mime_type,
+        "byte_size": byte_size,
+        "alt_text": alt_text,
+        "url": f"/core/api/v1/site/media/{asset_id}",
+    }
+
+
+def admin_slot_item(row) -> dict[str, Any]:
     return {
         "slot": row["slot"],
         "label": SLOT_LABELS.get(row["slot"], row["slot"]),
-        "asset_id": str(row["assetId"]),
-        "filename": row["filename"],
-        "mime_type": row["mimeType"],
-        "byte_size": row["byteSize"],
-        "alt_text": row["slot_alt"] or row["asset_alt"],
-        "url": f"/core/api/v1/site/media/{row['assetId']}",
+        "version": row["version"],
+        "published_version": row["publishedVersion"],
+        "published_at": row["publishedAt"],
+        "dirty": row["version"] != row["publishedVersion"],
+        "draft": media_ref(
+            row["draftAssetId"], row["draft_filename"], row["draft_mime"], row["draft_bytes"],
+            row["draftAltText"] or row["draft_asset_alt"],
+        ),
+        "published": media_ref(
+            row["publishedAssetId"], row["published_filename"], row["published_mime"], row["published_bytes"],
+            row["publishedAltText"] or row["published_asset_alt"],
+        ),
         "updated_at": row["updatedAt"],
     }
 
 
-SLOT_SELECT = '''
-SELECT s.slot,s."assetId",s."altText" AS slot_alt,s."updatedAt",
-       a.filename,a."mimeType",a."byteSize",a."altText" AS asset_alt,a."isActive"
+ADMIN_SLOT_SELECT = '''
+SELECT s.slot,s."draftAssetId",s."publishedAssetId",s."draftAltText",s."publishedAltText",
+       s.version,s."publishedVersion",s."publishedAt",s."updatedAt",
+       da.filename AS draft_filename,da."mimeType" AS draft_mime,da."byteSize" AS draft_bytes,da."altText" AS draft_asset_alt,da."isActive" AS draft_active,
+       pa.filename AS published_filename,pa."mimeType" AS published_mime,pa."byteSize" AS published_bytes,pa."altText" AS published_asset_alt,pa."isActive" AS published_active
 FROM site_media_slots s
-JOIN site_media_assets a ON a.id=s."assetId" AND a."propertyId"=s."propertyId"
+LEFT JOIN site_media_assets da ON da.id=s."draftAssetId" AND da."propertyId"=s."propertyId"
+LEFT JOIN site_media_assets pa ON pa.id=s."publishedAssetId" AND pa."propertyId"=s."propertyId"
 '''
 
 
@@ -162,7 +184,8 @@ async def archive_media(asset_id: uuid.UUID, request: Request, user: dict[str, A
         async with conn.transaction():
             property_id = await get_property_id(conn)
             used_slots = await conn.fetch(
-                'SELECT slot FROM site_media_slots WHERE "propertyId"=$1 AND "assetId"=$2 ORDER BY slot',
+                '''SELECT slot FROM site_media_slots
+                   WHERE "propertyId"=$1 AND ("draftAssetId"=$2 OR "publishedAssetId"=$2) ORDER BY slot''',
                 property_id, asset_id,
             )
             if used_slots:
@@ -171,7 +194,7 @@ async def archive_media(asset_id: uuid.UUID, request: Request, user: dict[str, A
                     detail={
                         "code": "SITE_MEDIA_ASSET_IN_USE",
                         "slots": [row["slot"] for row in used_slots],
-                        "message": "Сначала замените изображение в опубликованных слотах.",
+                        "message": "Сначала замените или очистите изображение в слотах и опубликуйте изменения.",
                     },
                 )
             row = await conn.fetchrow(
@@ -194,22 +217,30 @@ async def archive_media(asset_id: uuid.UUID, request: Request, user: dict[str, A
 async def admin_media_slots(request: Request, _user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
-        rows = await conn.fetch(
-            SLOT_SELECT + ' WHERE s."propertyId"=$1 ORDER BY s.slot', property_id,
-        )
-    assigned = {row["slot"]: slot_item(row) for row in rows if row["isActive"]}
+        rows = await conn.fetch(ADMIN_SLOT_SELECT + ' WHERE s."propertyId"=$1 ORDER BY s.slot', property_id)
+    assigned = {row["slot"]: admin_slot_item(row) for row in rows}
     return {
         "items": [
-            assigned.get(slot) or {"slot": slot, "label": label, "asset_id": None, "url": None, "alt_text": None}
+            assigned.get(slot) or {
+                "slot": slot,
+                "label": label,
+                "version": 0,
+                "published_version": 0,
+                "published_at": None,
+                "dirty": False,
+                "draft": None,
+                "published": None,
+                "updated_at": None,
+            }
             for slot, label in SLOT_LABELS.items()
         ]
     }
 
 
-@router.put("/api/v1/admin/site/media/slots/{slot}")
-async def assign_media_slot(
+@router.put("/api/v1/admin/site/media/slots/{slot}/draft")
+async def save_media_slot_draft(
     slot: str,
-    payload: SlotPatch,
+    payload: SlotDraftPatch,
     request: Request,
     user: dict[str, Any] = Depends(manager_access),
 ):
@@ -218,42 +249,69 @@ async def assign_media_slot(
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             property_id = await get_property_id(conn)
-            if payload.asset_id is None:
-                removed = await conn.fetchval(
-                    'DELETE FROM site_media_slots WHERE "propertyId"=$1 AND slot=$2 RETURNING id', property_id, slot,
+            if payload.asset_id is not None:
+                asset = await conn.fetchrow(
+                    '''SELECT id,"isActive" FROM site_media_assets WHERE id=$1 AND "propertyId"=$2 FOR SHARE''',
+                    payload.asset_id, property_id,
                 )
-                await conn.execute(
-                    '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
-                       VALUES ($1,$2,'STAFF',$3,'CLEAR_SLOT','SiteMediaSlot',$4,'ADMIN_CMS','SUCCESS',
-                         jsonb_build_object('slot',$4::text,'had_binding',$5::boolean),now())''',
-                    uuid.uuid4(), property_id, user["id"], slot, bool(removed),
-                )
-                return {"slot": slot, "label": SLOT_LABELS[slot], "asset_id": None, "url": None, "alt_text": None}
+                if not asset or not asset["isActive"]:
+                    raise HTTPException(status_code=422, detail={"code": "SITE_MEDIA_ACTIVE_ASSET_REQUIRED"})
 
-            asset = await conn.fetchrow(
-                '''SELECT id,filename,"mimeType","byteSize","altText","isActive" FROM site_media_assets
-                   WHERE id=$1 AND "propertyId"=$2 FOR SHARE''', payload.asset_id, property_id,
-            )
-            if not asset or not asset["isActive"]:
-                raise HTTPException(status_code=422, detail={"code": "SITE_MEDIA_ACTIVE_ASSET_REQUIRED"})
-            binding_id = uuid.uuid4()
             await conn.execute(
-                '''INSERT INTO site_media_slots (id,"propertyId",slot,"assetId","altText","updatedById","createdAt","updatedAt")
-                   VALUES ($1,$2,$3,$4,$5,$6,now(),now())
+                '''INSERT INTO site_media_slots (
+                     id,"propertyId",slot,"draftAssetId","draftAltText",version,"publishedVersion","updatedById","createdAt","updatedAt"
+                   ) VALUES ($1,$2,$3,$4,$5,1,0,$6,now(),now())
                    ON CONFLICT ("propertyId",slot) DO UPDATE SET
-                     "assetId"=EXCLUDED."assetId","altText"=EXCLUDED."altText","updatedById"=EXCLUDED."updatedById","updatedAt"=now()''',
-                binding_id, property_id, slot, payload.asset_id, alt_text, uuid.UUID(user["id"]),
+                     "draftAssetId"=EXCLUDED."draftAssetId","draftAltText"=EXCLUDED."draftAltText",
+                     version=site_media_slots.version+1,"updatedById"=EXCLUDED."updatedById","updatedAt"=now()''',
+                uuid.uuid4(), property_id, slot, payload.asset_id, alt_text, uuid.UUID(user["id"]),
             )
-            row = await conn.fetchrow(
-                SLOT_SELECT + ' WHERE s."propertyId"=$1 AND s.slot=$2', property_id, slot,
-            )
+            row = await conn.fetchrow(ADMIN_SLOT_SELECT + ' WHERE s."propertyId"=$1 AND s.slot=$2', property_id, slot)
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
-                   VALUES ($1,$2,'STAFF',$3,'ASSIGN_SLOT','SiteMediaSlot',$4,'ADMIN_CMS','SUCCESS',
-                     jsonb_build_object('slot',$4::text,'asset_id',$5::text),now())''',
-                uuid.uuid4(), property_id, user["id"], slot, str(payload.asset_id),
+                   VALUES ($1,$2,'STAFF',$3,'SAVE_DRAFT','SiteMediaSlot',$4,'ADMIN_CMS','SUCCESS',
+                     jsonb_build_object('slot',$4::text,'asset_id',$5::text,'version',$6::int),now())''',
+                uuid.uuid4(), property_id, user["id"], slot,
+                str(payload.asset_id) if payload.asset_id else None, row["version"],
             )
-    return slot_item(row)
+    return admin_slot_item(row)
+
+
+@router.post("/api/v1/admin/site/media/slots/{slot}/publish")
+async def publish_media_slot(slot: str, request: Request, user: dict[str, Any] = Depends(manager_access)):
+    slot = validate_slot(slot)
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            property_id = await get_property_id(conn)
+            current = await conn.fetchrow(
+                '''SELECT id,"draftAssetId",version FROM site_media_slots
+                   WHERE "propertyId"=$1 AND slot=$2 FOR UPDATE''', property_id, slot,
+            )
+            if not current:
+                raise HTTPException(status_code=409, detail={"code": "SITE_MEDIA_SLOT_DRAFT_REQUIRED"})
+            if current["draftAssetId"] is not None:
+                active = await conn.fetchval(
+                    'SELECT "isActive" FROM site_media_assets WHERE id=$1 AND "propertyId"=$2',
+                    current["draftAssetId"], property_id,
+                )
+                if not active:
+                    raise HTTPException(status_code=409, detail={"code": "SITE_MEDIA_DRAFT_ASSET_ARCHIVED"})
+            await conn.execute(
+                '''UPDATE site_media_slots SET
+                     "publishedAssetId"="draftAssetId","publishedAltText"="draftAltText",
+                     "publishedVersion"=version,"publishedAt"=now(),"updatedById"=$3,"updatedAt"=now()
+                   WHERE "propertyId"=$1 AND slot=$2''',
+                property_id, slot, uuid.UUID(user["id"]),
+            )
+            row = await conn.fetchrow(ADMIN_SLOT_SELECT + ' WHERE s."propertyId"=$1 AND s.slot=$2', property_id, slot)
+            await conn.execute(
+                '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'PUBLISH','SiteMediaSlot',$4,'ADMIN_CMS','SUCCESS',
+                     jsonb_build_object('slot',$4::text,'published_version',$5::int,'asset_id',$6::text),now())''',
+                uuid.uuid4(), property_id, user["id"], slot, row["publishedVersion"],
+                str(row["publishedAssetId"]) if row["publishedAssetId"] else None,
+            )
+    return admin_slot_item(row)
 
 
 @router.get("/api/v1/site/media-config")
@@ -261,13 +319,32 @@ async def public_media_config(request: Request):
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
         rows = await conn.fetch(
-            SLOT_SELECT + ' WHERE s."propertyId"=$1 AND a."isActive"=true ORDER BY s.slot', property_id,
+            '''SELECT s.slot,s."publishedAssetId",s."publishedAltText",s."publishedAt",
+                      a.filename,a."mimeType",a."byteSize",a."altText",a."isActive"
+               FROM site_media_slots s
+               JOIN site_media_assets a ON a.id=s."publishedAssetId" AND a."propertyId"=s."propertyId"
+               WHERE s."propertyId"=$1 AND s."publishedAssetId" IS NOT NULL AND a."isActive"=true
+               ORDER BY s.slot''',
+            property_id,
         )
-    items = [slot_item(row) for row in rows]
+    items = [
+        {
+            "slot": row["slot"],
+            "label": SLOT_LABELS.get(row["slot"], row["slot"]),
+            "asset_id": str(row["publishedAssetId"]),
+            "filename": row["filename"],
+            "mime_type": row["mimeType"],
+            "byte_size": row["byteSize"],
+            "alt_text": row["publishedAltText"] or row["altText"],
+            "url": f"/core/api/v1/site/media/{row['publishedAssetId']}",
+            "published_at": row["publishedAt"],
+        }
+        for row in rows
+    ]
     return {
         "items": items,
         "slots": {item["slot"]: item for item in items},
-        "truth": "Only manager-published active media slots are exposed to the public site.",
+        "truth": "Only explicitly published active media slots are exposed to the public site.",
     }
 
 
