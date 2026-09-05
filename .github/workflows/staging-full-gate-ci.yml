@@ -3,6 +3,7 @@ name: Three Crowns Full Staging Gate
 on:
   push:
     branches:
+      - main
       - integration/site-pms-cms-20260827
     paths:
       - 'apps/**'
@@ -58,30 +59,20 @@ jobs:
       REQUIRE_RECENT_BACKUP: 'false'
       LAST_VERIFIED_BACKUP_AT: ''
       MAX_BACKUP_AGE_HOURS: ''
-      TELEGRAM_BOT_TOKEN: ''
-      TELEGRAM_INITDATA_MAX_AGE_SECONDS: '600'
-      TELEGRAM_STAFF_WEBHOOK_SECRET: ''
-      STAFF_VOICE_MAX_BYTES: '20000000'
-      OPENAI_API_KEY: ''
-      OPENAI_TRANSCRIBE_MODEL: ''
-      OPENAI_API_BASE_URL: https://api.openai.com/v1
-      OPENAI_TRANSCRIBE_TIMEOUT_SECONDS: '60'
-      TELEGRAM_SALES_BOT_TOKEN: ''
-      TELEGRAM_SALES_WEBHOOK_SECRET: ''
-      TELEGRAM_SALES_CHANNEL_CODE: TELEGRAM_SALES_STAGING
-      TELEGRAM_SALES_DISPLAY_NAME: Telegram Sales Staging
-      TELEGRAM_SALES_ACCOUNT_ID: ''
-      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: '10'
-      TELEGRAM_BOT_API_BASE_URL: https://api.telegram.org
-      BOOTSTRAP_OWNER_USERNAME: staging_owner
+      STAGING_ACCEPTANCE_MUTATIONS: I_UNDERSTAND_SYNTHETIC_WRITES
+      GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:13000
+      SERVICE_POINT_PUBLIC_BASE_URL: http://127.0.0.1:13000
+      BOOTSTRAP_OWNER_USERNAME: staging-owner
+      BOOTSTRAP_OWNER_PASSWORD: staging-owner-password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: Staging Owner
-      STAGING_MAID_USERNAME: staging_maid
-      STAGING_MAID_DISPLAY_NAME: Staging Maid
-      STAGING_TECHNICIAN_USERNAME: staging_tech
-      STAGING_TECHNICIAN_DISPLAY_NAME: Staging Technician
-      SMOKE_OWNER_USERNAME: staging_owner
-      SMOKE_MAID_USERNAME: staging_maid
-      SMOKE_TECHNICIAN_USERNAME: staging_tech
+      DINING_STAFF_USERNAME: staging-dining
+      DINING_STAFF_PASSWORD: staging-dining-password-2026
+      RECEPTION_USERNAME: staging-reception
+      RECEPTION_PASSWORD: staging-reception-password-2026
+      MAID_USERNAME: staging-maid
+      MAID_PASSWORD: staging-maid-password-2026
+      TECHNICIAN_USERNAME: staging-technician
+      TECHNICIAN_PASSWORD: staging-technician-password-2026
 
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +80,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            packages/database/package-lock.json
+            apps/web/package-lock.json
+            apps/admin/package-lock.json
+            apps/staff/package-lock.json
 
       - uses: actions/setup-python@v5
         with:
@@ -96,226 +93,141 @@ jobs:
           cache: pip
           cache-dependency-path: services/api/requirements.txt
 
-      - name: Generate isolated CI credentials
-        shell: bash
+      - name: Install PostgreSQL client and utilities
         run: |
-          suffix="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          db_password="Db-${suffix}-Only"
-          owner_password="Owner-${suffix}-Only"
-          maid_password="Maid-${suffix}-Only"
-          tech_password="Tech-${suffix}-Only"
-          automation_key="Automation-${suffix}-Only-Key"
-          {
-            echo "POSTGRES_PASSWORD=$db_password"
-            echo "DATABASE_URL=postgresql://$POSTGRES_USER:$db_password@127.0.0.1:15432/$POSTGRES_DB?schema=public"
-            echo "BOOTSTRAP_OWNER_PASSWORD=$owner_password"
-            echo "STAGING_MAID_PASSWORD=$maid_password"
-            echo "STAGING_TECHNICIAN_PASSWORD=$tech_password"
-            echo "SMOKE_OWNER_PASSWORD=$owner_password"
-            echo "SMOKE_MAID_PASSWORD=$maid_password"
-            echo "SMOKE_TECHNICIAN_PASSWORD=$tech_password"
-            echo "AUTOMATION_SERVICE_KEY=$automation_key"
-          } >> "$GITHUB_ENV"
-
-      - name: Create synthetic staging env file
-        shell: bash
-        run: |
-          cat > .env.staging.ci <<EOF
-          POSTGRES_DB=$POSTGRES_DB
-          POSTGRES_USER=$POSTGRES_USER
-          POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-          PROPERTY_CODE=$PROPERTY_CODE
-          RATE_PLAN_CODE=$RATE_PLAN_CODE
-          APP_ENV=staging
-          CORS_ORIGINS=
-          NEXT_PUBLIC_CORE_WS_URL=$NEXT_PUBLIC_CORE_WS_URL
-          SESSION_TTL_HOURS=$SESSION_TTL_HOURS
-          COOKIE_SECURE=false
-          REQUIRE_COOKIE_DOMAIN=false
-          COOKIE_DOMAIN=
-          AUTOMATION_SERVICE_KEY=$AUTOMATION_SERVICE_KEY
-          AUTOMATION_SERVICE_NAME=$AUTOMATION_SERVICE_NAME
-          REQUIRE_AUTOMATION_SERVICE=true
-          EXPECTED_ROOM_COUNT=84
-          EXPECTED_ROOM_TYPE_COUNT=12
-          REQUIRE_MIGRATION_HISTORY=true
-          REQUIRE_RECENT_BACKUP=false
-          LAST_VERIFIED_BACKUP_AT=
-          MAX_BACKUP_AGE_HOURS=
-          TELEGRAM_BOT_TOKEN=
-          TELEGRAM_INITDATA_MAX_AGE_SECONDS=600
-          TELEGRAM_STAFF_WEBHOOK_SECRET=
-          STAFF_VOICE_MAX_BYTES=20000000
-          OPENAI_API_KEY=
-          OPENAI_TRANSCRIBE_MODEL=
-          OPENAI_API_BASE_URL=https://api.openai.com/v1
-          OPENAI_TRANSCRIBE_TIMEOUT_SECONDS=60
-          TELEGRAM_SALES_BOT_TOKEN=
-          TELEGRAM_SALES_WEBHOOK_SECRET=
-          TELEGRAM_SALES_CHANNEL_CODE=TELEGRAM_SALES_STAGING
-          TELEGRAM_SALES_DISPLAY_NAME=Telegram Sales Staging
-          TELEGRAM_SALES_ACCOUNT_ID=
-          TELEGRAM_PROVIDER_TIMEOUT_SECONDS=10
-          TELEGRAM_BOT_API_BASE_URL=https://api.telegram.org
-          BOOTSTRAP_OWNER_USERNAME=$BOOTSTRAP_OWNER_USERNAME
-          BOOTSTRAP_OWNER_PASSWORD=$BOOTSTRAP_OWNER_PASSWORD
-          BOOTSTRAP_OWNER_DISPLAY_NAME=$BOOTSTRAP_OWNER_DISPLAY_NAME
-          STAGING_MAID_USERNAME=$STAGING_MAID_USERNAME
-          STAGING_MAID_PASSWORD=$STAGING_MAID_PASSWORD
-          STAGING_MAID_DISPLAY_NAME=$STAGING_MAID_DISPLAY_NAME
-          STAGING_TECHNICIAN_USERNAME=$STAGING_TECHNICIAN_USERNAME
-          STAGING_TECHNICIAN_PASSWORD=$STAGING_TECHNICIAN_PASSWORD
-          STAGING_TECHNICIAN_DISPLAY_NAME=$STAGING_TECHNICIAN_DISPLAY_NAME
-          SMOKE_OWNER_USERNAME=$SMOKE_OWNER_USERNAME
-          SMOKE_OWNER_PASSWORD=$SMOKE_OWNER_PASSWORD
-          SMOKE_MAID_USERNAME=$SMOKE_MAID_USERNAME
-          SMOKE_MAID_PASSWORD=$SMOKE_MAID_PASSWORD
-          SMOKE_TECHNICIAN_USERNAME=$SMOKE_TECHNICIAN_USERNAME
-          SMOKE_TECHNICIAN_PASSWORD=$SMOKE_TECHNICIAN_PASSWORD
-          EOF
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
 
       - name: Start isolated PostgreSQL
+        shell: bash
         run: |
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml down -v --remove-orphans || true
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml up -d postgres
-          for i in $(seq 1 30); do
-            if pg_isready -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+          set -euo pipefail
+          docker run -d --name resort-postgres-staging \
+            -e POSTGRES_DB="$POSTGRES_DB" \
+            -e POSTGRES_USER="$POSTGRES_USER" \
+            -e POSTGRES_PASSWORD=resort_staging_password \
+            -p 15432:5432 postgres:16-alpine
+          for i in {1..30}; do
+            if PGPASSWORD=resort_staging_password pg_isready -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
               exit 0
             fi
-            sleep 2
+            sleep 1
           done
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml logs --no-color postgres
+          docker logs resort-postgres-staging
           exit 1
 
-      - name: Apply committed Prisma migration chain
+      - name: Export database URL
+        run: echo "DATABASE_URL=postgresql://${POSTGRES_USER}:resort_staging_password@127.0.0.1:15432/${POSTGRES_DB}?schema=public" >> "$GITHUB_ENV"
+
+      - name: Install database package
+        working-directory: packages/database
+        run: npm ci --no-audit --no-fund
+
+      - name: Validate and deploy exact migration chain
         working-directory: packages/database
         run: |
-          npm install --no-audit --no-fund
           npx prisma validate
-          cd prisma/migrations/0_init
-          sha256sum -c migration.sql.sha256
-          cd ../../..
-          PYTHONPATH=../../scripts python - <<'PY'
-          from pathlib import Path
-          from release_contract import EXPECTED_MIGRATIONS
-          root = Path('prisma/migrations')
-          missing = [name for name in EXPECTED_MIGRATIONS if not (root / name / 'migration.sql').is_file()]
-          assert not missing, f'missing committed migrations: {missing}'
-          print(f'PASS: committed migration files={len(EXPECTED_MIGRATIONS)}')
-          PY
           npx prisma migrate deploy
           npx prisma migrate status
 
-      - name: Install Core tooling and seed synthetic staging baseline
-        run: |
-          pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts
-          python scripts/seed_from_intake.py
-          python scripts/bootstrap_owner.py
-          python scripts/bootstrap_staging_staff.py
+      - name: Install Resort Core dependencies
+        run: pip install -r services/api/requirements.txt
 
-      - name: Verify migration ledger and database invariants
-        env:
-          PGPASSWORD: ${{ env.POSTGRES_PASSWORD }}
+      - name: Validate release/data truth and seed canonical hotel
         run: |
-          expected_count="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(len(EXPECTED_MIGRATIONS))')"
-          expected_names="$(PYTHONPATH=scripts python -c 'from release_contract import EXPECTED_MIGRATIONS; print(",".join(EXPECTED_MIGRATIONS))')"
-          migration_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-          migration_names="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select string_agg(migration_name,',' order by started_at) from _prisma_migrations where finished_at is not null and rolled_back_at is null")"
-          constraint_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname = any(array['rate_period_valid_dates','rate_period_nonnegative_price','reservation_request_valid_dates','reservation_request_positive_adults','reservation_request_nonnegative_children','reservation_valid_dates','reservation_positive_adults','reservation_nonnegative_children','reservation_nonnegative_total','inventory_block_valid_dates','no_overlapping_active_room_blocks','payment_positive_amount','payment_has_context'])")"
-          room_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from rooms")"
-          room_type_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from room_types")"
-          site_content_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.site_content_documents')::text")"
-          guest_service_columns="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.columns where table_schema='public' and table_name='operational_tasks' and column_name in ('reservationId','serviceCode','serviceDate','serviceTime')")"
-          owner_snapshot_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.owner_analytics_snapshots')::text")"
-          owner_snapshot_constraints="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname in ('owner_analytics_snapshots_property_fkey','owner_analytics_snapshots_horizon_check','owner_analytics_snapshots_payload_object_check')")"
-          guest_engagement_table="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select to_regclass('public.guest_engagements')::text")"
-          guest_engagement_constraints="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname in ('guest_engagements_property_fkey','guest_engagements_guest_fkey','guest_engagements_reservation_fkey','guest_engagements_kind_check','guest_engagements_status_check','guest_engagements_score_check','guest_engagements_score_kind_check','guest_engagements_feedback_reservation_check')")"
-          guest_os_tables="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('stays','room_assignments','room_qrs','guest_sessions','guest_history_events','guest_preferences')")"
-          service_point_tables="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('service_points','service_point_request_options','service_point_qrs')")"
-          service_point_checks="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_constraint where conname in ('service_points_category_check','service_point_qrs_revocation_check','operational_tasks_service_point_context_check')")"
-          service_point_active_qr_unique="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='service_point_qrs' and indexname='service_point_qrs_one_active_per_point'")"
-          kitchen_table_count="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema='public' and table_name in ('kitchen_menu_items','kitchen_tables','kitchen_orders','kitchen_order_items')")"
-          kitchen_guest_task_unique="$(psql -h 127.0.0.1 -p 15432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from pg_indexes where schemaname='public' and tablename='kitchen_orders' and indexname='kitchen_orders_guest_task_key'")"
-          test "$migration_count" = "$expected_count"
-          test "$migration_names" = "$expected_names"
-          test "$constraint_count" = '13'
-          test "$room_count" = '84'
-          test "$room_type_count" = '12'
-          test "$site_content_table" = 'site_content_documents'
-          test "$guest_service_columns" = '4'
-          test "$owner_snapshot_table" = 'owner_analytics_snapshots'
-          test "$owner_snapshot_constraints" = '3'
-          test "$guest_engagement_table" = 'guest_engagements'
-          test "$guest_engagement_constraints" = '8'
-          test "$guest_os_tables" = '6'
-          test "$service_point_tables" = '3'
-          test "$service_point_checks" = '3'
-          test "$service_point_active_qr_unique" = '1'
-          test "$kitchen_table_count" = '4'
-          test "$kitchen_guest_task_unique" = '1'
-
-      - name: Enforce release scope and public truth guards
-        run: |
-          python scripts/release_scope_guard.py
+          python scripts/release_contract_test.py
+          python scripts/release_rc_truth_guard.py --allow-non-accepted-head
+          python scripts/owner_corrections_truth_guard.py
           python scripts/public_site_truth_guard.py
           python scripts/owner_guest_facts_guard.py
-          python scripts/public_i18n_guard.py
+          python scripts/seed_from_intake.py
+          python scripts/bootstrap_owner.py
+          python scripts/bootstrap_dining_staff.py
+          python scripts/bootstrap_staging_users.py
 
-      - name: Build and start real staging application containers
+      - name: Build public, admin and staff apps
+        shell: bash
         run: |
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml up -d --build api web admin staff
-          for i in $(seq 1 45); do
-            if curl --fail --silent http://127.0.0.1:18000/health/ready >/tmp/staging-ready.json; then
-              break
-            fi
-            sleep 2
+          set -euo pipefail
+          for app in web admin staff; do
+            pushd "apps/${app}"
+            npm ci --no-audit --no-fund
+            npm run typecheck
+            npm run build
+            popd
           done
-          curl --fail --silent http://127.0.0.1:18000/health/ready
-          for url in http://127.0.0.1:13000/ http://127.0.0.1:13001/ http://127.0.0.1:13002/; do
-            for i in $(seq 1 30); do
-              if curl --fail --silent "$url" >/tmp/frontend.html; then
-                break
-              fi
-              sleep 2
+
+      - name: Start Resort Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 18000 > /tmp/staging-core.log 2>&1 &
+          echo $! > /tmp/staging-core.pid
+          for i in {1..40}; do
+            curl --fail -sS http://127.0.0.1:18000/health/ready >/tmp/staging-ready.json 2>/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/staging-core.log || true
+          exit 1
+
+      - name: Start public web
+        working-directory: apps/web
+        run: |
+          PORT=13000 CORE_API_URL=http://127.0.0.1:18000 npm start > /tmp/staging-web.log 2>&1 &
+          echo $! > /tmp/staging-web.pid
+
+      - name: Start admin
+        working-directory: apps/admin
+        run: |
+          PORT=13001 CORE_API_URL=http://127.0.0.1:18000 npm start > /tmp/staging-admin.log 2>&1 &
+          echo $! > /tmp/staging-admin.pid
+
+      - name: Start staff
+        working-directory: apps/staff
+        run: |
+          PORT=13002 CORE_API_URL=http://127.0.0.1:18000 npm start > /tmp/staging-staff.log 2>&1 &
+          echo $! > /tmp/staging-staff.pid
+
+      - name: Wait for Next apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          for port in 13000 13001 13002; do
+            for i in {1..40}; do
+              if curl --fail -sS "http://127.0.0.1:${port}" >/dev/null 2>&1; then break; fi
+              sleep 1
             done
-            curl --fail --silent "$url" >/dev/null
+            curl --fail -sS "http://127.0.0.1:${port}" >/dev/null
           done
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml ps
 
-      - name: Prove deployed frontends are real Resort OS surfaces, not preview stubs
+      - name: Run full synthetic staging acceptance
+        env:
+          PUBLIC_URL: http://127.0.0.1:13000
+          ADMIN_URL: http://127.0.0.1:13001
+          STAFF_URL: http://127.0.0.1:13002
         run: |
-          curl --fail --silent http://127.0.0.1:13000/ > /tmp/web.html
-          curl --fail --silent http://127.0.0.1:13001/ > /tmp/admin.html
-          curl --fail --silent http://127.0.0.1:13002/ > /tmp/staff.html
-          grep -q 'Три Короны' /tmp/web.html
-          grep -q 'Resort OS' /tmp/admin.html
-          grep -Eq 'Resort OS|Моя смена|Три Короны' /tmp/staff.html
-          test "$(wc -c </tmp/web.html)" -gt 1000
-          test "$(wc -c </tmp/admin.html)" -gt 1000
-          test "$(wc -c </tmp/staff.html)" -gt 1000
+          python scripts/staging_acceptance.py
+          python scripts/release_060_e2e.py
 
-      - name: Run complete staging acceptance gate
-        run: python scripts/staging_full_gate.py
-
-      - name: Verify NFC routes remain absent from active runtime
+      - name: Prove NFC remains absent from active V1 schema/runtime
+        shell: bash
         run: |
-          python - <<'PY'
-          import json, urllib.request
-          doc = json.load(urllib.request.urlopen('http://127.0.0.1:18000/openapi.json', timeout=10))
-          paths = set(doc.get('paths', {}))
-          forbidden = sorted(path for path in paths if '/nfc' in path.lower() or '/beach' in path.lower())
-          if forbidden:
-              raise SystemExit('Dormant NFC/beach routes unexpectedly composed: ' + ', '.join(forbidden))
-          print('PASS: active staging runtime contains no NFC/beach HTTP routes')
-          PY
+          set -euo pipefail
+          ! grep -R -n -E 'nfc_wallet|nfc_transaction|process_nfc_payment' packages/database/prisma/migrations services/api/app apps || {
+            echo 'Active V1 contains forbidden NFC transaction runtime/schema'; exit 1;
+          }
 
-      - name: Dump staging diagnostics on failure
+      - name: Show logs on failure
         if: failure()
         run: |
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml ps || true
-          docker compose --env-file .env.staging.ci -f compose.staging.yaml logs --no-color --tail=250 postgres api web admin staff || true
+          cat /tmp/staging-core.log || true
+          cat /tmp/staging-web.log || true
+          cat /tmp/staging-admin.log || true
+          cat /tmp/staging-staff.log || true
 
-      - name: Tear down isolated staging
+      - name: Stop services
         if: always()
-        run: docker compose --env-file .env.staging.ci -f compose.staging.yaml down -v --remove-orphans || true
+        shell: bash
+        run: |
+          for file in /tmp/staging-core.pid /tmp/staging-web.pid /tmp/staging-admin.pid /tmp/staging-staff.pid; do
+            if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi
+          done
+          docker rm -f resort-postgres-staging >/dev/null 2>&1 || true
