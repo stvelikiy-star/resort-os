@@ -206,7 +206,9 @@ def main() -> None:
     check(audit_count == 1, "successful unlock is auditable without provider secrets")
 
     # Prove late bank confirmation never auto-opens a door. Manager may explicitly
-    # retry the unlock after reviewing the real paid event.
+    # retry the unlock after reviewing the real paid event. Backdate the intent as a
+    # whole so the database invariant expiresAt > createdAt remains true while the
+    # provider confirmation still arrives after expiry.
     late_intent_response = client.post(
         f"/api/v1/service-point-payments/points/{token}/intents",
         json={"client_request_id": f"ci-late-{uuid.uuid4()}"},
@@ -214,7 +216,10 @@ def main() -> None:
     check(late_intent_response.status_code == 201, late_intent_response.text)
     late_intent = late_intent_response.json()
     asyncio.run(db_execute(
-        '''UPDATE service_point_payment_intents SET "expiresAt"=now()-interval '1 second' WHERE id=$1''',
+        '''UPDATE service_point_payment_intents
+           SET "createdAt"=now()-interval '11 minutes',
+               "expiresAt"=now()-interval '1 second'
+           WHERE id=$1''',
         uuid.UUID(late_intent["id"]),
     ))
     calls_before_late = len(mock_events("ttlock_unlock"))
