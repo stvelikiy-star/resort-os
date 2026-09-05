@@ -12,6 +12,8 @@ type Folio = {
   payments: Payment[];
 };
 
+type AuthMe = { role?: string | null };
+
 const METHODS = [
   ["CASH", "Наличные"],
   ["CARD_POS", "Карта / POS"],
@@ -37,6 +39,7 @@ async function api(path: string, init?: RequestInit) {
 
 export default function ReservationFolioPanel({ reservationId, onChanged }: { reservationId: string; onChanged?: () => void | Promise<void> }) {
   const [folio, setFolio] = useState<Folio | null>(null);
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,11 +69,22 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
   }, [reservationId]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    fetch("/core/api/v1/auth/me", { cache: "no-store" })
+      .then(async (response) => response.ok ? await response.json() as AuthMe : null)
+      .then((payload) => { if (active) setViewerRole(payload?.role || null); })
+      .catch(() => { if (active) setViewerRole(null); });
+    return () => { active = false; };
+  }, []);
 
   const openCharges = useMemo(() => folio?.charges.filter((item) => item.status === "OPEN") ?? [], [folio]);
+  const canManagePayments = viewerRole === "OWNER" || viewerRole === "MANAGER";
+  const canCloseCharges = canManagePayments;
 
   async function recordPayment(event: FormEvent) {
     event.preventDefault();
+    if (!canManagePayments) return;
     const amountKgs = Number(amount);
     if (!Number.isFinite(amountKgs) || amountKgs <= 0) return;
     setBusy("payment"); setError(null); setNotice(null);
@@ -115,6 +129,7 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
   }
 
   async function closeCharge(charge: Charge, status: "WAIVED" | "VOID") {
+    if (!canCloseCharges) return;
     const reason = window.prompt(status === "WAIVED" ? "Причина списания/комплимента:" : "Причина аннулирования начисления:");
     if (!reason?.trim()) return;
     setBusy(charge.id); setError(null); setNotice(null);
@@ -142,13 +157,16 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     </div>
 
     <div className={styles.grid}>
-      <form className={styles.card} onSubmit={recordPayment}>
-        <div className={styles.cardHead}><div><small>Касса / ресепшен</small><h4>Принять оплату</h4></div></div>
+      {canManagePayments ? <form className={styles.card} onSubmit={recordPayment}>
+        <div className={styles.cardHead}><div><small>Касса / менеджер</small><h4>Принять оплату</h4></div></div>
         <div className={styles.two}><label>Сумма, сом<input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)} required /></label><label>Способ<select value={method} onChange={(e) => setMethod(e.target.value)}>{METHODS.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label></div>
         <label>Фактическое время оплаты<input type="datetime-local" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} required /></label>
         <div className={styles.two}><label>Чек / транзакция<input value={externalRef} maxLength={180} onChange={(e) => setExternalRef(e.target.value)} placeholder="необязательно" /></label><label>Комментарий<input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" /></label></div>
         <button className={styles.primary} disabled={busy === "payment"}>{busy === "payment" ? "Записываю…" : "Принять оплату"}</button>
-      </form>
+      </form> : <div className={styles.card}>
+        <div className={styles.cardHead}><div><small>Финансовые права</small><h4>Оплаты — только просмотр</h4></div></div>
+        <p className={styles.hint}>Ресепшен видит историю и остаток. Запись факта получения денег и списание начислений доступны OWNER / MANAGER.</p>
+      </div>}
 
       <form className={styles.card} onSubmit={createCharge}>
         <div className={styles.cardHead}><div><small>Дополнительные услуги</small><h4>Добавить начисление</h4></div></div>
@@ -160,7 +178,7 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     </div>
 
     <div className={styles.history}>
-      <section><h4>Начисления · {folio?.charges.length ?? 0}</h4>{!folio?.charges.length ? <p>Дополнительных начислений нет.</p> : folio.charges.map((charge) => <div key={charge.id} data-status={charge.status}><span><strong>{charge.description}</strong><small>{charge.code} · {charge.source_type} · {charge.service_date || charge.created_at}</small></span><b>{money(charge.amount_kgs)}</b><em>{charge.status}</em>{charge.status === "OPEN" && <span className={styles.rowActions}><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "WAIVED")}>Списать</button><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "VOID")}>Аннулировать</button></span>}</div>)}</section>
+      <section><h4>Начисления · {folio?.charges.length ?? 0}</h4>{!folio?.charges.length ? <p>Дополнительных начислений нет.</p> : folio.charges.map((charge) => <div key={charge.id} data-status={charge.status}><span><strong>{charge.description}</strong><small>{charge.code} · {charge.source_type} · {charge.service_date || charge.created_at}</small></span><b>{money(charge.amount_kgs)}</b><em>{charge.status}</em>{charge.status === "OPEN" && canCloseCharges && <span className={styles.rowActions}><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "WAIVED")}>Списать</button><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "VOID")}>Аннулировать</button></span>}</div>)}</section>
       <section><h4>История оплат · {folio?.payments.length ?? 0}</h4>{!folio?.payments.length ? <p>Оплат пока нет.</p> : [...folio.payments].reverse().map((payment) => <div key={payment.id}><span><strong>{METHODS.find(([value]) => value === payment.method)?.[1] || payment.method}</strong><small>Оплачено: {payment.paid_at || "—"}<br />Внесено в PMS: {payment.recorded_at}</small></span><b>{money(payment.amount_kgs)}</b><em>{payment.status}</em></div>)}</section>
     </div>
   </section>;

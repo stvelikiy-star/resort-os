@@ -3,6 +3,7 @@ name: Production Monitoring Contract CI
 on:
   pull_request:
     branches:
+      - main
       - integration/site-pms-cms-20260827
     paths:
       - 'scripts/production_monitoring_check.py'

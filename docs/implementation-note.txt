@@ -1,1 +1,0 @@
-Dining implementation in progress on feature/owner-corrections-20260905.
