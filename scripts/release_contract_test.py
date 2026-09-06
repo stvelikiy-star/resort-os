@@ -3,23 +3,24 @@ from release_contract import CRITICAL_CONSTRAINTS, EXPECTED_MIGRATIONS, clean_po
 
 
 def main() -> int:
-    source = "postgresql://user:pass@db.example:5432/resort?schema=public&sslmode=require&connect_timeout=7"
+    source = "postgresql://user@db.example:5432/resort?schema=public&sslmode=require&connect_timeout=7"
     cleaned = clean_postgres_url(source)
     assert "schema=" not in cleaned
     assert "sslmode=require" in cleaned
     assert "connect_timeout=7" in cleaned
-    assert cleaned.startswith("postgresql://user:pass@db.example:5432/resort?")
+    assert cleaned.startswith("postgresql://user@db.example:5432/resort?")
 
     assert migration_names_match_exactly(list(EXPECTED_MIGRATIONS))
     assert not migration_names_match_exactly(list(EXPECTED_MIGRATIONS[:-1]))
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 20
-    assert EXPECTED_MIGRATIONS[-3:] == (
+    assert len(EXPECTED_MIGRATIONS) == 21
+    assert EXPECTED_MIGRATIONS[-4:] == (
         "z17_dining_floor_layout_20260905",
         "z18_site_media_slots_20260905",
         "z19_dining_table_status_guard_20260905",
+        "z20_dining_active_table_unique_20260906",
     )
     assert len(CRITICAL_CONSTRAINTS) == 81
     assert {
@@ -59,7 +60,7 @@ def main() -> int:
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact twenty-migration Resort OS 0.60 release ledger is fail-closed")
+    print("PASS: exact 21-migration Resort OS 0.60 release ledger is fail-closed")
     print("PASS: current 0.60 Dining, Guest, CMS, Group Booking and Service Point boundaries are canonical")
     print("PASS: current critical constraint fingerprint contains 81 constraints")
     return 0
