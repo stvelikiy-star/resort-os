@@ -35,6 +35,15 @@ Exact frozen Resort OS 0.60.0 ledger — **20 migrations**:
 
 The exact ledger is maintained in `scripts/release_contract.py` and verified fail-closed by CI.
 
+### Forward candidate boundary after the frozen 0.60.0 RC
+
+PR candidates may carry forward migrations without rewriting the already frozen 0.60.0 history. The current audit candidate extends the frozen ledger with:
+
+21. `z20_dining_active_table_unique_20260906`
+22. `z21_dining_production_snapshots_20260906`
+
+For the current candidate, `scripts/release_contract.py` is authoritative and therefore defines **22 migrations / 87 critical constraints**. This forward candidate is not the frozen 0.60.0 RC and is not production evidence. A future release refreeze must explicitly accept the exact candidate SHA and ledger before production use.
+
 ## Rules
 
 1. `prisma db push` is allowed only for disposable development/test databases.
@@ -52,13 +61,14 @@ CI verifies:
 
 - Prisma schema validation;
 - clean PostgreSQL migration deploy from empty database;
-- exact **20-migration** ledger;
-- **81 critical domain constraints** from the shared release contract in `scripts/release_contract.py`;
+- exact **20-migration** frozen 0.60.0 ledger plus the separately validated forward candidate contract when present;
+- **81 critical domain constraints** for the frozen 0.60.0 boundary, while the current audit candidate is validated against the **87-constraint** forward contract in `scripts/release_contract.py`;
 - Kitchen/Dining table, status, price, publication, reservation, session and idempotency constraints;
 - Guest OS, Guest Offers, Guest Service settings and Housekeeping charge constraints;
 - Service Point QR / paid-access boundaries;
 - Group Booking and Guest Folio constraints;
 - CMS Media asset/slot constraints;
+- Dining production snapshot integrity and immutable Chef OS baseline/delta constraints in the forward candidate;
 - 84-room / 12-room-category canonical property integrity;
 - 48 accepted rate rows in the production-like property seed;
 - Resort Core/PMS/business invariant regressions;
@@ -69,7 +79,7 @@ The canonical room register is 84 rooms / 12 mapped categories. Real target reco
 
 ## Critical database boundary
 
-The canonical domain constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py` and currently contains **81 constraints**.
+The canonical domain constraint fingerprint is defined by `CRITICAL_CONSTRAINTS` in `scripts/release_contract.py`. The frozen 0.60.0 boundary contains **81 constraints**; the current forward audit candidate contains **87 constraints** after adding Chef OS production snapshot guards.
 
 The fingerprint covers the current Hotel / Payment / Guest / Operations / Service Point / Kitchen / Dining / Group Booking / Folio / CMS Media release boundary, including:
 
@@ -81,6 +91,7 @@ The fingerprint covers the current Hotel / Payment / Guest / Operations / Servic
 - Service Point QR/context guards;
 - Kitchen order/item/menu constraints;
 - Dining publication, reservation, floor/session/table-state guards;
+- Dining production snapshot meal/count/fingerprint/reason guards in the forward candidate;
 - Guest Offer action/target/window/event guards;
 - Group Booking invariants;
 - Guest Folio receivable/payment separation;
@@ -151,10 +162,12 @@ Do not claim production migration success until the actual target database has:
 - fresh backup evidence;
 - exact accepted release SHA/image set;
 - `migrate deploy` result;
-- exact **20-migration ledger**;
-- the **81-constraint** shared release fingerprint plus migration-specific invariants;
+- the exact ledger for the deliberately accepted/refrozen release;
+- its exact shared release constraint fingerprint plus migration-specific invariants;
 - readiness/smoke result;
 - tested rollback/restore path;
 - verified off-site backup copy.
+
+The currently frozen 0.60.0 production boundary remains **20 migrations / 81 constraints**. The audit branch's **22 migrations / 87 constraints** remain a forward candidate until deliberately refrozen; they must not be described as already deployed production truth.
 
 See `knowledge/09_LAUNCH_ACCEPTANCE.md` for the full cutover gate. **EXTERNAL PRODUCTION CUTOVER STOP** remains in force until all required external evidence is VERIFIED.
