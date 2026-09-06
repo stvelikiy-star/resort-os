@@ -34,6 +34,7 @@ from .housekeeping_schedule import router as housekeeping_schedule_router
 from .inbox import router as inbox_router
 from .kitchen import admin_router as kitchen_admin_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
+from .kitchen_menu_management import router as kitchen_menu_management_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
 from .observability import install_observability
@@ -126,6 +127,10 @@ app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
 app.include_router(staff_guest_requests_router)
+# OWNER/MANAGER menu mutation routes are composed before the legacy kitchen
+# router so a DINING_STAFF session can operate orders/tables but cannot change
+# catalogue prices or publish menu items.
+app.include_router(kitchen_menu_management_router)
 app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
 app.include_router(dining_control_router)
