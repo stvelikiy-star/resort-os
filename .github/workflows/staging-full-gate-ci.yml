@@ -242,6 +242,7 @@ jobs:
         run: |
           python scripts/staging_acceptance.py
           python scripts/release_060_e2e.py
+          python scripts/release_060_extended_e2e.py
 
       - name: Prove NFC remains absent from active V1 schema/runtime
         shell: bash
