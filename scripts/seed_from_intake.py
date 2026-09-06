@@ -33,20 +33,18 @@ ROOM_TYPE_CODES = {
 }
 
 # Owner correction supersedes the older intake reconstruction for these exact rooms.
-# Keep untouched raw bed/area fields because the owner correction only changes location,
-# operational existence/capacity and category.
+# The canonical rooms.csv now contains the owner-approved note itself, so the seed
+# must not append another English note and create drift from the physical register.
 OWNER_ROOM_CORRECTIONS = {
     "501": {
         "floor": "BASEMENT",
         "room_type": "Двухместный стандарт, цоколь",
         "capacity_adults": "2",
-        "note": "OWNER_APPROVED_2026-09-05: basement above laundry; operational; two-person room",
     },
     "502": {
         "floor": "BASEMENT",
         "room_type": "Двухместный стандарт, цоколь",
         "capacity_adults": "2",
-        "note": "OWNER_APPROVED_2026-09-05: basement above laundry; operational; two-person room",
     },
 }
 
@@ -106,8 +104,6 @@ def load_rooms() -> list[dict]:
         row["floor"] = correction["floor"]
         row["room_type"] = correction["room_type"]
         row["capacity_adults"] = correction["capacity_adults"]
-        existing = clean(row.get("notes"))
-        row["notes"] = f"{existing}; {correction['note']}" if existing else correction["note"]
 
     codes = [r["room_code"].strip() for r in rows]
     if len(rows) != 84:
