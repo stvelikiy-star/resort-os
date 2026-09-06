@@ -168,18 +168,34 @@ async def create_session(
                 '''SELECT id,code,name,seats,"isActive",status FROM kitchen_tables
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''', payload.table_id, pid,
             )
-            if not table or not table["isActive"] or table["status"] == "OUT_OF_SERVICE":
+            if not table or not table["isActive"]:
                 raise HTTPException(status_code=404, detail="Active dining table not found")
+            if table["status"] != "AVAILABLE":
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_TABLE_NOT_AVAILABLE",
+                        "table_code": table["code"],
+                        "table_status": table["status"],
+                    },
+                )
             party_size = int(stay["adults"]) + int(stay["children"])
             if party_size > int(table["seats"]):
                 raise HTTPException(status_code=409, detail={"code": "DINING_TABLE_TOO_SMALL", "seats": table["seats"], "party_size": party_size})
             waiter_id = await validate_waiter(conn, pid, user, payload.waiter_id)
             conflict = await conn.fetchrow(
-                '''SELECT id,"stayId" FROM dining_table_sessions
-                   WHERE "tableId"=$1 AND status='SEATED' LIMIT 1 FOR UPDATE''', payload.table_id,
+                '''SELECT id,"stayId",status FROM dining_table_sessions
+                   WHERE "tableId"=$1 AND status IN ('WAITING','SEATED') LIMIT 1 FOR UPDATE''', payload.table_id,
             )
-            if conflict and payload.status == "SEATED":
-                raise HTTPException(status_code=409, detail={"code": "DINING_TABLE_OCCUPIED", "session_id": str(conflict["id"])})
+            if conflict:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_TABLE_ACTIVE_SESSION",
+                        "session_id": str(conflict["id"]),
+                        "session_status": conflict["status"],
+                    },
+                )
             existing = await conn.fetchrow(
                 '''SELECT id,"tableId",status FROM dining_table_sessions
                    WHERE "stayId"=$1 AND status IN ('WAITING','SEATED') LIMIT 1 FOR UPDATE''', payload.stay_id,
@@ -230,13 +246,22 @@ async def patch_session_status(
                 raise HTTPException(status_code=403, detail="This table belongs to another waiter")
             if row["status"] in {"RELEASED", "CANCELLED"}:
                 raise HTTPException(status_code=409, detail={"code": "DINING_SESSION_CLOSED", "status": row["status"]})
-            if payload.status == "SEATED":
+            if payload.status in {"WAITING", "SEATED"}:
                 conflict = await conn.fetchrow(
-                    '''SELECT id FROM dining_table_sessions WHERE "tableId"=$1 AND status='SEATED' AND id<>$2 LIMIT 1 FOR UPDATE''',
+                    '''SELECT id,status FROM dining_table_sessions
+                       WHERE "tableId"=$1 AND status IN ('WAITING','SEATED') AND id<>$2
+                       LIMIT 1 FOR UPDATE''',
                     row["tableId"], session_id,
                 )
                 if conflict:
-                    raise HTTPException(status_code=409, detail={"code": "DINING_TABLE_OCCUPIED", "session_id": str(conflict["id"])})
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "DINING_TABLE_ACTIVE_SESSION",
+                            "session_id": str(conflict["id"]),
+                            "session_status": conflict["status"],
+                        },
+                    )
             await conn.execute(
                 '''UPDATE dining_table_sessions SET status=$2,
                      "seatedAt"=CASE WHEN $2='SEATED' AND "seatedAt" IS NULL THEN now() ELSE "seatedAt" END,
@@ -268,23 +293,42 @@ async def move_session(
                 raise HTTPException(status_code=404, detail="Dining table session not found")
             if session["status"] not in {"WAITING", "SEATED"}:
                 raise HTTPException(status_code=409, detail={"code": "DINING_SESSION_NOT_MOVABLE", "status": session["status"]})
+            if payload.target_table_id == session["tableId"]:
+                raise HTTPException(status_code=409, detail={"code": "DINING_MOVE_SAME_TABLE"})
             if user["role"] == "DINING_STAFF" and session["waiterId"] not in {None, uuid.UUID(user["id"])}:
                 raise HTTPException(status_code=403, detail="This table belongs to another waiter")
             target = await conn.fetchrow(
-                '''SELECT id,seats,status,"isActive" FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                '''SELECT id,code,seats,status,"isActive" FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 payload.target_table_id, pid,
             )
-            if not target or not target["isActive"] or target["status"] == "OUT_OF_SERVICE":
+            if not target or not target["isActive"]:
                 raise HTTPException(status_code=404, detail="Target table not available")
+            if target["status"] != "AVAILABLE":
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_TARGET_TABLE_NOT_AVAILABLE",
+                        "table_code": target["code"],
+                        "table_status": target["status"],
+                    },
+                )
             if int(session["partySize"]) > int(target["seats"]):
                 raise HTTPException(status_code=409, detail={"code": "DINING_TABLE_TOO_SMALL", "seats": target["seats"], "party_size": session["partySize"]})
-            if session["status"] == "SEATED":
-                conflict = await conn.fetchrow(
-                    '''SELECT id FROM dining_table_sessions WHERE "tableId"=$1 AND status='SEATED' AND id<>$2 LIMIT 1 FOR UPDATE''',
-                    payload.target_table_id, session_id,
+            conflict = await conn.fetchrow(
+                '''SELECT id,status FROM dining_table_sessions
+                   WHERE "tableId"=$1 AND status IN ('WAITING','SEATED') AND id<>$2
+                   LIMIT 1 FOR UPDATE''',
+                payload.target_table_id, session_id,
+            )
+            if conflict:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_TABLE_ACTIVE_SESSION",
+                        "session_id": str(conflict["id"]),
+                        "session_status": conflict["status"],
+                    },
                 )
-                if conflict:
-                    raise HTTPException(status_code=409, detail={"code": "DINING_TABLE_OCCUPIED", "session_id": str(conflict["id"])})
 
             if payload.waiter_mode == "KEEP":
                 waiter_id = session["waiterId"]
