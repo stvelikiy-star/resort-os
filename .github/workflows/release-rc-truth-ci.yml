@@ -33,9 +33,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # Pull requests are future release candidates. Keep the historical
-            # 0.60.0 manifest/docs immutable, but do not require the candidate
-            # executable tree to equal the already accepted 0.60.0 tree.
+            # Pull requests may represent a controlled next candidate. Validate the
+            # current manifest/docs contract without requiring PR HEAD itself to be
+            # identical to the already accepted executable tree.
             python scripts/release_rc_truth_guard.py --allow-non-accepted-head
           else
             # Direct main/integration pushes remain strict and fail closed on
@@ -49,7 +49,7 @@ jobs:
           python - <<'PY'
           import json
           rc = json.load(open('release/current-rc.json', encoding='utf-8'))
-          assert rc['release_version'] == '0.60.0'
+          assert rc['release_version'] == '0.61.0'
           assert rc['production_source_branch'] == 'main'
           assert rc['main_allowed_as_production_source'] is True
           assert rc['production_cutover_authorized'] is False
