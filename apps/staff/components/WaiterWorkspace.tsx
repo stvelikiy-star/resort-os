@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import DiningFolioActions from "./DiningFolioActions";
 import DiningGuestSeatingPanel from "./DiningGuestSeatingPanel";
 import DiningReadyRealtime from "./DiningReadyRealtime";
 import WaiterEntry from "./WaiterEntry";
@@ -27,6 +28,7 @@ export default function WaiterWorkspace() {
   return <>
     <WaiterEntry />
     {authorized && <DiningReadyRealtime />}
+    {authorized && <DiningFolioActions />}
     {authorized && <DiningGuestSeatingPanel />}
   </>;
 }
