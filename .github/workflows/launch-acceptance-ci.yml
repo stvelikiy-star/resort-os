@@ -17,6 +17,7 @@ on:
       - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
       - 'docs/DEPLOYMENT_RUNBOOK.md'
       - 'docs/RELEASE_0.60.0_2026-09-05.md'
+      - 'docs/RELEASE_0.61.0_2026-09-06.md'
       - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
       - 'packages/database/prisma/migrations/**'
       - '.github/workflows/release-rc-truth-ci.yml'
@@ -36,6 +37,7 @@ on:
       - 'knowledge/09_LAUNCH_ACCEPTANCE.md'
       - 'docs/DEPLOYMENT_RUNBOOK.md'
       - 'docs/RELEASE_0.60.0_2026-09-05.md'
+      - 'docs/RELEASE_0.61.0_2026-09-06.md'
       - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
       - 'packages/database/prisma/migrations/**'
       - '.github/workflows/release-rc-truth-ci.yml'
@@ -61,12 +63,12 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # A development PR is a new candidate, not the already frozen 0.60.0 tree.
-            # Validate the immutable RC manifest/docs contract without misclassifying
-            # legitimate candidate product changes as corruption of the frozen RC.
+            # A PR may be a controlled next release candidate. Validate the frozen
+            # manifest/docs contract without misclassifying legitimate candidate
+            # changes as corruption of the accepted executable tree.
             python scripts/release_rc_truth_guard.py --allow-non-accepted-head
           else
-            # main must stay strict: product drift requires an explicit release refreeze.
+            # main must stay strict: product drift requires an explicit refreeze.
             python scripts/release_rc_truth_guard.py
           fi
 
@@ -77,9 +79,6 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # The frozen 0.60.0 docs remain historical truth while this PR carries
-            # the next forward migration contract. The candidate evidence template
-            # must still match the current contract exactly.
             python scripts/verify_launch_acceptance.py --mode repository --allow-candidate-contract
           else
             python scripts/verify_launch_acceptance.py --mode repository
