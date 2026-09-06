@@ -111,7 +111,7 @@ def validate_manifest(manifest: dict[str, Any], expected_sha: str | None = None)
     return errors
 
 
-def repository_checks(root: Path) -> list[str]:
+def repository_checks(root: Path, *, allow_candidate_contract: bool = False) -> list[str]:
     errors: list[str] = []
     current_state = (root / "knowledge" / "04_CURRENT_STATE.md").read_text(encoding="utf-8")
     runbook = (root / "docs" / "DEPLOYMENT_RUNBOOK.md").read_text(encoding="utf-8")
@@ -140,10 +140,16 @@ def repository_checks(root: Path) -> list[str]:
         if fragment in joined:
             errors.append(f"stale release statement remains in canonical docs: {fragment}")
 
-    for path, content in canonical_docs.items():
-        for migration in EXPECTED_MIGRATIONS:
-            if migration not in content:
-                errors.append(f"{path} must include migration {migration}")
+    # The canonical docs describe the already frozen production RC. A development
+    # PR may legitimately carry the next forward migration before a new release is
+    # refrozen. In candidate mode the RC truth guard has already proven those docs
+    # still describe the frozen release, while the candidate launch-evidence
+    # template below must match the current forward migration contract exactly.
+    if not allow_candidate_contract:
+        for path, content in canonical_docs.items():
+            for migration in EXPECTED_MIGRATIONS:
+                if migration not in content:
+                    errors.append(f"{path} must include migration {migration}")
 
     constraint_count = str(len(CRITICAL_CONSTRAINTS))
     if constraint_count not in migration_doc or "scripts/release_contract.py" not in migration_doc:
@@ -172,16 +178,26 @@ def main() -> int:
     parser.add_argument("--mode", choices=("repository", "cutover"), required=True)
     parser.add_argument("--manifest", default="release/launch-evidence.example.json")
     parser.add_argument("--release-sha")
+    parser.add_argument(
+        "--allow-candidate-contract",
+        action="store_true",
+        help="repository mode only: allow frozen RC docs while validating a forward candidate migration contract",
+    )
     args = parser.parse_args()
 
+    if args.allow_candidate_contract and args.mode != "repository":
+        parser.error("--allow-candidate-contract is valid only with --mode repository")
+
     if args.mode == "repository":
-        errors = repository_checks(Path.cwd())
+        errors = repository_checks(Path.cwd(), allow_candidate_contract=args.allow_candidate_contract)
         if errors:
             for item in errors:
                 print(f"FAIL: {item}")
             print("RESULT: RELEASE REPOSITORY NOT READY")
             return 1
         print(f"FACT: migrations={len(EXPECTED_MIGRATIONS)}")
+        if args.allow_candidate_contract:
+            print("FACT: candidate_contract_mode=true; frozen RC documentation is validated separately by release_rc_truth_guard.py")
         print("FACT: physical_room_import_gate_38=closed")
         print("FACT: launch_governance_gates=github_branch_protection,drive_launch_control_permissions")
         print("FACT: launch_example_is_fail_closed=true")
