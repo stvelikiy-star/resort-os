@@ -5,8 +5,12 @@ export type SiteContent = {
   booking?: Record<string, string>;
   advantages?: Record<string, string>;
   conference?: Record<string, string>;
+  rooms?: Record<string, string>;
+  territory?: Record<string, string>;
+  amenities?: Record<string, string>;
   groups?: Record<string, string>;
   contacts?: Record<string, string>;
+  final?: Record<string, string>;
   seo?: Record<string, string>;
 };
 

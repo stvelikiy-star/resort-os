@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 
+import DiningFolioActions from "./DiningFolioActions";
 import DiningGuestSeatingPanel from "./DiningGuestSeatingPanel";
+import DiningReadyRealtime from "./DiningReadyRealtime";
 import WaiterEntry from "./WaiterEntry";
 
 const ALLOWED = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
@@ -25,6 +27,8 @@ export default function WaiterWorkspace() {
 
   return <>
     <WaiterEntry />
+    {authorized && <DiningReadyRealtime />}
+    {authorized && <DiningFolioActions />}
     {authorized && <DiningGuestSeatingPanel />}
   </>;
 }

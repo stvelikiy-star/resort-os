@@ -7,11 +7,12 @@ import styles from "./GroupBookingBoard.module.css";
 type Room = {
   room_id: string; code: string; name: string; room_type_code: string; room_type_name: string;
   building_or_zone?: string | null; floor?: string | null; beds_raw?: string | null;
-  capacity_adults: number; capacity_children: number; operational_state: string;
+  capacity_adults: number; capacity_children: number | null; children_capacity_confirmed: boolean; operational_state: string;
   available: boolean; reason?: string | null;
   pricing?: { sellable: boolean; total_kgs?: number | null; reason?: string | null } | null;
 };
 type Group = { id: string; code: string; name: string; contact_name: string; contact_phone: string; check_in: string; check_out: string; status: string; room_count: number; total_kgs: number; paid_kgs: number };
+type Props = { userRole: string };
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 
@@ -29,7 +30,8 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-export default function GroupBookingBoard() {
+export default function GroupBookingBoard({ userRole }: Props) {
+  const canOverrideRates = ["OWNER", "MANAGER"].includes(userRole);
   const [checkIn, setCheckIn] = useState(dateOffset(1));
   const [checkOut, setCheckOut] = useState(dateOffset(4));
   const [adults, setAdults] = useState(2);
@@ -78,30 +80,40 @@ export default function GroupBookingBoard() {
     const q = query.trim().toLowerCase();
     return rooms.filter((room) => {
       if (!room.available) return false;
-      if (onlyPriced && (!room.pricing?.sellable || room.pricing.total_kgs == null) && !Number(overrides[room.room_id])) return false;
+      const hasCoreRate = Boolean(room.pricing?.sellable && room.pricing.total_kgs != null);
+      const hasAuthorizedOverride = canOverrideRates && Number(overrides[room.room_id]) > 0;
+      if (!canOverrideRates && !hasCoreRate) return false;
+      if (onlyPriced && !hasCoreRate && !hasAuthorizedOverride) return false;
       if (roomType !== "ALL" && room.room_type_name !== roomType) return false;
       if (zone !== "ALL" && room.building_or_zone !== zone) return false;
       if (q && ![room.code, room.name, room.room_type_name, room.building_or_zone, room.floor].some((value) => String(value || "").toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [rooms, query, roomType, zone, onlyPriced, overrides]);
+  }, [rooms, query, roomType, zone, onlyPriced, overrides, canOverrideRates]);
 
   const selectedRooms = useMemo(() => rooms.filter((room) => selected.has(room.room_id)), [rooms, selected]);
   const selectedTotal = useMemo(() => selectedRooms.reduce((sum, room) => {
-    const override = Number(overrides[room.room_id]);
+    const override = canOverrideRates ? Number(overrides[room.room_id]) : 0;
     return sum + (override > 0 ? override : Number(room.pricing?.total_kgs || 0));
-  }, 0), [selectedRooms, overrides]);
+  }, 0), [selectedRooms, overrides, canOverrideRates]);
 
   function toggle(id: string) {
     setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   }
-  function selectVisible() { setSelected(new Set(visible.filter((room) => room.pricing?.sellable || Number(overrides[room.room_id]) > 0).map((room) => room.room_id))); }
+  function selectVisible() {
+    setSelected(new Set(visible.filter((room) => room.pricing?.sellable || (canOverrideRates && Number(overrides[room.room_id]) > 0)).map((room) => room.room_id)));
+  }
 
   async function commit(event: FormEvent) {
     event.preventDefault();
     if (!selectedRooms.length) { setError("Выберите хотя бы один номер."); return; }
-    const unresolved = selectedRooms.find((room) => (!room.pricing?.sellable || room.pricing.total_kgs == null) && !(Number(overrides[room.room_id]) > 0));
-    if (unresolved) { setError(`Для номера ${unresolved.code} нет подтверждённой цены. Укажите ручную цену.`); return; }
+    const unresolved = selectedRooms.find((room) => (!room.pricing?.sellable || room.pricing.total_kgs == null) && !(canOverrideRates && Number(overrides[room.room_id]) > 0));
+    if (unresolved) {
+      setError(canOverrideRates
+        ? `Для номера ${unresolved.code} нет подтверждённой цены. Укажите ручную цену.`
+        : `Для номера ${unresolved.code} нет подтверждённой Core-цены. Ресепшен не может менять тариф — обратитесь к менеджеру.`);
+      return;
+    }
     if (!window.confirm(`Создать группу «${groupName}» на ${selectedRooms.length} номеров? Общая сумма: ${money(selectedTotal)}. Операция атомарная.`)) return;
     setBusy(true); setError(null); setNotice(null);
     try {
@@ -112,7 +124,7 @@ export default function GroupBookingBoard() {
           contact_email: contactEmail.trim() || null, check_in: checkIn, check_out: checkOut, notes: notes.trim() || null,
           rooms: selectedRooms.map((room) => ({
             room_id: room.room_id, adults, children,
-            manager_total_kgs: Number(overrides[room.room_id]) > 0 ? Math.round(Number(overrides[room.room_id])) : null,
+            manager_total_kgs: canOverrideRates && Number(overrides[room.room_id]) > 0 ? Math.round(Number(overrides[room.room_id])) : null,
           })),
         }),
       });
@@ -125,11 +137,12 @@ export default function GroupBookingBoard() {
 
   return <main className={styles.shell}>
     <header className={styles.head}><div><p>PMS · Group Booking</p><h1>Групповая бронь</h1><span>Один фильтр → несколько номеров → одна атомарная операция. Если доступность изменилась, группа не создаётся частично.</span></div><button onClick={() => void loadGroups()}>↻ История</button></header>
+    {!canOverrideRates && <div className={styles.notice}>Режим ресепшен: групповую бронь можно создать по действующим Core-тарифам. Изменение цены доступно только OWNER / MANAGER.</div>}
     {error && <div className={styles.error}>{error}</div>}{notice && <div className={styles.notice}>{notice}</div>}
 
     <section className={styles.searchCard}>
       <div className={styles.searchFields}><label>Заезд<input type="date" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} /></label><label>Выезд<input type="date" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></label><label>Взр. / номер<input type="number" min="1" max="20" value={adults} onChange={(e) => setAdults(Math.max(1, Number(e.target.value) || 1))} /></label><label>Дет. / номер<input type="number" min="0" max="20" value={children} onChange={(e) => setChildren(Math.max(0, Number(e.target.value) || 0))} /></label><button className={styles.primary} onClick={() => void search()} disabled={loading}>{loading ? "Проверяю…" : "Найти свободные"}</button></div>
-      {rooms.length > 0 && <div className={styles.filters}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Номер / категория / корпус" /><select value={roomType} onChange={(e) => setRoomType(e.target.value)}><option value="ALL">Все категории</option>{roomTypes.map((value) => <option key={value}>{value}</option>)}</select><select value={zone} onChange={(e) => setZone(e.target.value)}><option value="ALL">Все корпуса / зоны</option>{zones.map((value) => <option key={value}>{value}</option>)}</select><label><input type="checkbox" checked={onlyPriced} onChange={(e) => setOnlyPriced(e.target.checked)} /> Только с ценой</label><button onClick={selectVisible}>Выбрать показанные</button><button onClick={() => setSelected(new Set())}>Снять выбор</button></div>}
+      {rooms.length > 0 && <div className={styles.filters}><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Номер / категория / корпус" /><select value={roomType} onChange={(e) => setRoomType(e.target.value)}><option value="ALL">Все категории</option>{roomTypes.map((value) => <option key={value}>{value}</option>)}</select><select value={zone} onChange={(e) => setZone(e.target.value)}><option value="ALL">Все корпуса / зоны</option>{zones.map((value) => <option key={value}>{value}</option>)}</select>{canOverrideRates && <label><input type="checkbox" checked={onlyPriced} onChange={(e) => setOnlyPriced(e.target.checked)} /> Только с ценой</label>}<button onClick={selectVisible}>Выбрать показанные</button><button onClick={() => setSelected(new Set())}>Снять выбор</button></div>}
     </section>
 
     {rooms.length > 0 && <div className={styles.layout}>
@@ -138,9 +151,10 @@ export default function GroupBookingBoard() {
         <div className={styles.rooms}>{visible.map((room) => {
           const override = overrides[room.room_id] || "";
           const needsOverride = !room.pricing?.sellable || room.pricing.total_kgs == null;
+          const childCapacity = room.children_capacity_confirmed ? String(room.capacity_children ?? 0) : "не подтверждено";
           return <article key={room.room_id} className={selected.has(room.room_id) ? styles.selected : ""}>
-            <label className={styles.roomMain}><input type="checkbox" checked={selected.has(room.room_id)} onChange={() => toggle(room.room_id)} /><span><strong>№ {room.code}</strong><b>{room.room_type_name}</b><small>{room.building_or_zone || "—"} · {room.floor || "—"} · до {room.capacity_adults}+{room.capacity_children}</small></span></label>
-            <div className={styles.price}>{needsOverride ? <><span>Цена требует решения</span><input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="Ручная цена" /></> : <><span>Core rate</span><strong>{money(Number(room.pricing!.total_kgs))}</strong>{selected.has(room.room_id) && <input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="или override" />}</>}</div>
+            <label className={styles.roomMain}><input type="checkbox" checked={selected.has(room.room_id)} onChange={() => toggle(room.room_id)} /><span><strong>№ {room.code}</strong><b>{room.room_type_name}</b><small>{room.building_or_zone || "—"} · {room.floor || "—"} · взрослых до {room.capacity_adults} · дети: {childCapacity}</small></span></label>
+            <div className={styles.price}>{needsOverride ? <>{canOverrideRates ? <><span>Цена требует решения</span><input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="Ручная цена" /></> : <span>Нет подтверждённой Core-цены</span>}</> : <><span>Core rate</span><strong>{money(Number(room.pricing!.total_kgs))}</strong>{canOverrideRates && selected.has(room.room_id) && <input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="или override" />}</>}</div>
           </article>;
         })}</div>
       </section>

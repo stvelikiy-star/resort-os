@@ -171,6 +171,68 @@ def main():
     denied_schedule = reception.get(f'/api/v1/admin/pms/reservations/{reservation_id}/schedule')
     assert denied_schedule.status_code == 403, denied_schedule.text
 
+    # Reception may create an atomic group at Core rates, but never override price.
+    group_start = today + timedelta(days=10)
+    group_end = today + timedelta(days=12)
+    child_probe = reception.post('/api/v1/admin/pms/groups/availability', json={
+        "check_in": group_start.isoformat(),
+        "check_out": group_end.isoformat(),
+        "adults_per_room": 1,
+        "children_per_room": 1,
+    })
+    child_probe.raise_for_status()
+    child_body = child_probe.json()
+    assert child_body["children_capacity_policy"] == "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED"
+    unconfirmed = [row for row in child_body["items"] if row["children_capacity_confirmed"] is False]
+    assert unconfirmed, "Expected canonical UNKNOWN child-capacity categories"
+    for row in unconfirmed:
+        assert row["capacity_children"] is None
+        if row["operational_state"] != "TECH_BLOCK" and row["capacity_adults"] >= 1:
+            assert row["available"] is False
+            assert row["reason"] == "CHILD_CAPACITY_UNCONFIRMED"
+
+    group_availability = reception.post('/api/v1/admin/pms/groups/availability', json={
+        "check_in": group_start.isoformat(),
+        "check_out": group_end.isoformat(),
+        "adults_per_room": 1,
+        "children_per_room": 0,
+    })
+    group_availability.raise_for_status()
+    group_room = next(
+        row for row in group_availability.json()["items"]
+        if row["available"] and row.get("pricing") and row["pricing"]["sellable"] and row["pricing"]["total_kgs"]
+    )
+    group_payload = {
+        "name": f"Reception Group {suffix}",
+        "contact_name": "Reception Group CI",
+        "contact_phone": "+996556" + suffix[:6],
+        "check_in": group_start.isoformat(),
+        "check_out": group_end.isoformat(),
+        "rooms": [{"room_id": group_room["room_id"], "adults": 1, "children": 0}],
+        "notes": "Reception atomic group RBAC acceptance",
+    }
+    denied_override_payload = dict(group_payload)
+    denied_override_payload["rooms"] = [{
+        "room_id": group_room["room_id"],
+        "adults": 1,
+        "children": 0,
+        "manager_total_kgs": int(group_room["pricing"]["total_kgs"]) + 1,
+    }]
+    denied_group_override = reception.post('/api/v1/admin/pms/groups', json=denied_override_payload)
+    assert denied_group_override.status_code == 403, denied_group_override.text
+    assert denied_group_override.json()["detail"]["code"] == "GROUP_RATE_OVERRIDE_FORBIDDEN"
+
+    group_commit = reception.post('/api/v1/admin/pms/groups', json=group_payload)
+    group_commit.raise_for_status()
+    group_result = group_commit.json()
+    assert group_result["atomic"] is True
+    assert group_result["payment_created"] is False
+    assert group_result["room_count"] == 1
+    assert group_result["rooms"][0]["pricing_source"] == "CORE_RATE"
+    groups = reception.get('/api/v1/admin/pms/groups')
+    groups.raise_for_status()
+    assert any(row["id"] == group_result["group_id"] for row in groups.json()["items"])
+
     # Operational desk authority is real: Reception performs check-in and check-out.
     checkin = reception.post(f'/api/v1/admin/stays/reservations/{reservation_id}/check-in')
     checkin.raise_for_status()

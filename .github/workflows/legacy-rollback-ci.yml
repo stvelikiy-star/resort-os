@@ -3,6 +3,7 @@ name: Legacy Rollback CI
 on:
   pull_request:
     branches:
+      - main
       - integration/site-pms-cms-20260827
     paths:
       - 'scripts/legacy_rollback_capture.py'

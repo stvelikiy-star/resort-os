@@ -287,7 +287,7 @@ export default function GuestOsRuntime({ token }: { token: string }) {
               <p className="guest-os-eyebrow">{copy.contact}</p>
               <h2>{copy.contactText}</h2>
               <div className="guest-os-actions">
-                <a className="guest-os-primary" href="https://wa.me/996558085008" target="_blank" rel="noreferrer">{copy.whatsapp}</a>
+                <a className="guest-os-primary" href="https://wa.me/996558085002" target="_blank" rel="noreferrer">{copy.whatsapp}</a>
                 <a className="guest-os-secondary" href="tel:+996558085002">{copy.call}</a>
                 <Link className="guest-os-secondary" href={locale === "ru" ? "/rules" : `/rules?lang=${locale}`}>{copy.rules}</Link>
               </div>

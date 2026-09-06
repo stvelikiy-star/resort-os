@@ -14,6 +14,7 @@ from .pms_reservation_create import find_conflicts, load_room, property_context
 
 router = APIRouter(prefix="/api/v1/admin/pms/groups", tags=["admin-pms-groups"])
 access = require_roles("OWNER", "MANAGER", "RECEPTION")
+RATE_OVERRIDE_ROLES = {"OWNER", "MANAGER"}
 
 
 class GroupAvailabilityPayload(BaseModel):
@@ -74,8 +75,15 @@ async def room_candidate(conn, property_id: uuid.UUID, room_id: uuid.UUID, check
         raise HTTPException(status_code=404, detail={"code": "ROOM_NOT_FOUND", "room_id": str(room_id)})
     if room["operational_state"] == "TECH_BLOCK":
         return {"room": room, "available": False, "reason": "TECH_BLOCK", "conflicts": [], "pricing": None}
-    if int(room["capacityAdults"]) < adults or int(room["capacityChildren"] or 0) < children:
-        return {"room": room, "available": False, "reason": "CAPACITY", "conflicts": [], "pricing": None}
+    if int(room["capacityAdults"]) < adults:
+        return {"room": room, "available": False, "reason": "CAPACITY_ADULTS", "conflicts": [], "pricing": None}
+    child_capacity = room["capacityChildren"]
+    if children > 0 and child_capacity is None:
+        # UNKNOWN is not zero. A group with children is sellable only when the
+        # category has an explicit owner-confirmed child-capacity policy.
+        return {"room": room, "available": False, "reason": "CHILD_CAPACITY_UNCONFIRMED", "conflicts": [], "pricing": None}
+    if child_capacity is not None and int(child_capacity) < children:
+        return {"room": room, "available": False, "reason": "CAPACITY_CHILDREN", "conflicts": [], "pricing": None}
     conflicts = await find_conflicts(conn, room_id, check_in, check_out)
     pricing = await price_room_type(conn, room["roomTypeId"], check_in, check_out)
     return {
@@ -90,6 +98,7 @@ async def room_candidate(conn, property_id: uuid.UUID, room_id: uuid.UUID, check
 def public_candidate(candidate: dict[str, Any]):
     room = candidate["room"]
     pricing = candidate["pricing"] or {}
+    child_capacity = room["capacityChildren"]
     return {
         "room_id": str(room["id"]),
         "code": room["code"],
@@ -101,7 +110,8 @@ def public_candidate(candidate: dict[str, Any]):
         "floor": room["floorLabel"],
         "beds_raw": room["bedConfiguration"],
         "capacity_adults": int(room["capacityAdults"]),
-        "capacity_children": int(room["capacityChildren"] or 0),
+        "capacity_children": int(child_capacity) if child_capacity is not None else None,
+        "children_capacity_confirmed": child_capacity is not None,
         "operational_state": room["operational_state"],
         "available": candidate["available"],
         "reason": candidate["reason"],
@@ -138,6 +148,7 @@ async def group_availability(payload: GroupAvailabilityPayload, request: Request
         "check_out": payload.check_out,
         "nights": (payload.check_out - payload.check_in).days,
         "requested_guests_per_room": {"adults": payload.adults_per_room, "children": payload.children_per_room},
+        "children_capacity_policy": "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED",
         "available_count": len(available),
         "priced_count": len(sellable),
         "items": items,
@@ -146,6 +157,15 @@ async def group_availability(payload: GroupAvailabilityPayload, request: Request
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def commit_group(payload: GroupCommitPayload, request: Request, user: dict[str, Any] = Depends(access)):
+    if user.get("role") not in RATE_OVERRIDE_ROLES and any(member.manager_total_kgs is not None for member in payload.rooms):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "GROUP_RATE_OVERRIDE_FORBIDDEN",
+                "message": "Reception may create group reservations only at the current Core rate. Rate override requires OWNER or MANAGER.",
+            },
+        )
+
     group_id = uuid.uuid4()
     group_code = f"GR-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
     created: list[dict[str, Any]] = []

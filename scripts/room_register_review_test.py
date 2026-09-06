@@ -7,9 +7,11 @@ from pathlib import Path
 from room_register_review import (
     EXPECTED_CHECKLIST_QUESTIONS,
     EXPECTED_ROOM_COUNT,
+    EXPECTED_ROOM_TYPE_COUNT,
     audit_checklist,
     audit_rooms,
     load_checklist,
+    load_rates,
     load_rooms,
     validate_owner_approval,
 )
@@ -19,13 +21,23 @@ APPROVAL_PATH = Path("data-intake/room-register-owner-approval.json")
 
 def main() -> None:
     rooms = load_rooms()
+    rates = load_rates()
     checklist = load_checklist()
-    errors, issues = audit_rooms(rooms)
+    errors, issues = audit_rooms(rooms, rates)
     errors.extend(audit_checklist(checklist))
     assert errors == [], errors
     assert len(rooms) == EXPECTED_ROOM_COUNT
     assert len({row['room_code'].strip() for row in rooms}) == EXPECTED_ROOM_COUNT
     assert len(checklist['questions']) == EXPECTED_CHECKLIST_QUESTIONS
+
+    inventory_types = {row['room_type'].strip() for row in rooms if row.get('room_type', '').strip()}
+    catalog_types = {row['room_type'].strip() for row in rates if row.get('room_type', '').strip()}
+    assert len(catalog_types) == EXPECTED_ROOM_TYPE_COUNT
+    assert inventory_types <= catalog_types
+    assert 'Одноместный, улучшенный' in catalog_types
+    assert 'Одноместный, улучшенный' not in inventory_types, (
+        'owner correction moved 501/502 out of SINGLE_IMPROVED; do not synthesize a physical room'
+    )
 
     blockers = [item for item in issues if item['severity'] == 'BLOCKER']
     reviews = [item for item in issues if item['severity'] == 'REVIEW']
@@ -75,6 +87,7 @@ def main() -> None:
     print(
         f'ROOM_REGISTER_REVIEW_TEST_OK blockers={len(blockers)} reviews={len(reviews)} '
         f'policy_reviews={len(policy_reviews)} checklist_questions={len(checklist["questions"])} '
+        f'catalog_room_types={len(catalog_types)} inventory_room_types={len(inventory_types)} '
         'owner_approved=true'
     )
 

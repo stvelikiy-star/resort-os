@@ -1,4 +1,4 @@
-name: Realtime PMS CI
+name: Realtime PMS and Dining CI
 
 on:
   push:
@@ -7,12 +7,14 @@ on:
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/**'
+      - 'apps/staff/**'
       - '.github/workflows/realtime-ci.yml'
   pull_request:
     paths:
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/**'
+      - 'apps/staff/**'
       - '.github/workflows/realtime-ci.yml'
   workflow_dispatch:
 
@@ -51,6 +53,7 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
       PMS_WS_POLL_SECONDS: 0.25
+      DINING_WS_POLL_SECONDS: 0.25
 
     steps:
       - uses: actions/checkout@v4
@@ -67,12 +70,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
-      - name: Create database schema
+      - name: Create database schema from committed migrations
         working-directory: packages/database
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npx prisma validate
-          npx prisma db push
+          npx prisma migrate deploy
+          npx prisma migrate status
 
       - uses: actions/setup-python@v5
         with:
@@ -85,7 +89,6 @@ jobs:
 
       - name: Prepare property and owner
         run: |
-          python scripts/apply_core_constraints.py
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
 
@@ -105,7 +108,7 @@ jobs:
           test -n "$SESSION"
           echo "$SESSION" > /tmp/realtime-session
 
-      - name: Verify snapshot and live database change over websocket
+      - name: Verify PMS snapshot and live database change over websocket
         run: |
           python - <<'PY'
           import asyncio
@@ -138,6 +141,57 @@ jobs:
                       assert message['version'] != first_version
                       changed=next(room for room in message['data']['rooms'] if room['id']==target['id'])
                       assert changed['operational_state']=='TECH_BLOCK'
+                      break
+
+          asyncio.run(main())
+          PY
+
+      - name: Verify Kitchen READY event over dining websocket
+        run: |
+          python - <<'PY'
+          import asyncio
+          import json
+          import uuid
+          import httpx
+          import websockets
+
+          async def ok(response, label):
+              if response.status_code not in {200, 201}:
+                  raise AssertionError(f"{label}: {response.status_code} {response.text}")
+              return response.json()
+
+          async def main():
+              token=open('/tmp/realtime-session').read().strip()
+              cookie={"resort_session": token}
+              uri='ws://127.0.0.1:8000/ws/dining/ready'
+              async with websockets.connect(uri, additional_headers={"Cookie": f"resort_session={token}"}) as ws:
+                  initial=json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                  assert initial['type']=='dining.ready.snapshot'
+                  assert initial['scope']=='ALL'
+
+                  async with httpx.AsyncClient(base_url='http://127.0.0.1:8000', cookies=cookie, timeout=15) as client:
+                      await ok(await client.post('/api/v1/kitchen/menu/bootstrap-draft'), 'bootstrap menu')
+                      menu=await ok(await client.get('/api/v1/kitchen/menu'), 'menu')
+                      item=menu['items'][0]
+                      await ok(await client.patch(f"/api/v1/kitchen/menu/{item['id']}", json={"is_active": True, "is_draft": False}), 'approve menu item')
+                      code=f"WS-{uuid.uuid4().hex[:6].upper()}"
+                      table=await ok(await client.post('/api/v1/kitchen/tables', json={"code": code, "name": "Realtime CI", "seats": 2}), 'create table')
+                      order=await ok(await client.post('/api/v1/kitchen/orders', json={
+                          "source": "TABLE",
+                          "table_id": table['id'],
+                          "guest_count": 1,
+                          "items": [{"menu_item_id": item['id'], "quantity": 1}],
+                      }), 'create order')
+                      for state in ('ACCEPTED','COOKING','READY'):
+                          await ok(await client.patch(f"/api/v1/kitchen/orders/{order['id']}/status", json={"status": state}), f'order {state}')
+
+                  while True:
+                      message=json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                      if message.get('type')!='dining.order.ready':
+                          continue
+                      assert message['order']['id']==order['id']
+                      assert message['order']['order_number']==order['order_number']
+                      assert message['order']['table_code']==code
                       break
 
           asyncio.run(main())

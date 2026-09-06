@@ -30,7 +30,18 @@ jobs:
         run: python -m py_compile scripts/release_rc_truth_guard.py
 
       - name: Verify frozen release candidate truth
-        run: python scripts/release_rc_truth_guard.py
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Pull requests are future release candidates. Keep the historical
+            # 0.60.0 manifest/docs immutable, but do not require the candidate
+            # executable tree to equal the already accepted 0.60.0 tree.
+            python scripts/release_rc_truth_guard.py --allow-non-accepted-head
+          else
+            # Direct main/integration pushes remain strict and fail closed on
+            # executable drift until a release is explicitly refrozen.
+            python scripts/release_rc_truth_guard.py
+          fi
 
       - name: Verify main production-source boundary remains fail-closed
         shell: bash

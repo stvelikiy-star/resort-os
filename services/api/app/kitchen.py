@@ -6,6 +6,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, s
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
 
@@ -173,11 +174,16 @@ async def insert_order(
 
 
 async def audit(conn, pid, actor_type: str, actor_id: str | None, action: str, resource_id: str, payload: dict[str, Any]):
+    audit_payload = {
+        "financial_effect": "NONE_AUTOMATIC",
+        "reservation_total_effect": "NONE",
+        **payload,
+    }
     await conn.execute(
         '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
            VALUES ($1,$2,$3,$4,$5,'KitchenOrder',$6,'KITCHEN','SUCCESS',$7::jsonb,now())''',
         uuid.uuid4(), pid, actor_type, actor_id, action, resource_id,
-        json.dumps({**payload, "financial_effect": "NONE_AUTOMATIC", "reservation_total_effect": "NONE"}),
+        json.dumps(audit_payload, ensure_ascii=False, default=str),
     )
 
 
@@ -325,11 +331,28 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             table_id = payload.table_id
+            live_session = None
             if table_id:
+                await lock_dining_tables(conn, table_id)
                 exists = await conn.fetchval('SELECT 1 FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true', table_id, pid)
                 if not exists:
                     raise HTTPException(status_code=422, detail="Active table not found")
+                if payload.source == "TABLE":
+                    live_session = await active_session_for_table(conn, table_id)
+
             stay_id = payload.stay_id
+            if live_session:
+                if stay_id is not None and stay_id != live_session["stayId"]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "KITCHEN_TABLE_STAY_MISMATCH",
+                            "session_id": str(live_session["id"]),
+                            "session_stay_id": str(live_session["stayId"]),
+                        },
+                    )
+                stay_id = live_session["stayId"]
+
             reservation_id = None
             room_id = None
             if stay_id:
@@ -342,12 +365,26 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
                 room_id = await conn.fetchval('SELECT id FROM rooms WHERE "propertyId"=$1 AND code=$2', pid, payload.room_code.strip())
                 if not room_id:
                     raise HTTPException(status_code=422, detail="Room not found")
+
+            guest_count = int(live_session["partySize"]) if live_session else payload.guest_count
+            meal_type = payload.meal_type if payload.meal_type is not None else (live_session["mealType"] if live_session else None)
             order_id, order_number, total = await insert_order(
                 conn, pid=pid, source=payload.source, table_id=table_id, stay_id=stay_id, reservation_id=reservation_id,
-                room_id=room_id, guest_task_id=None, guest_count=payload.guest_count, meal_type=payload.meal_type,
+                room_id=room_id, guest_task_id=None, guest_count=guest_count, meal_type=meal_type,
                 notes=payload.notes, opened_by_id=uuid.UUID(user["id"]), items=payload.items,
             )
-            await audit(conn, pid, "STAFF", user["id"], "CREATE_KITCHEN_ORDER", str(order_id), {"order_number": order_number, "total_kgs": total, "source": payload.source})
+            await audit(
+                conn, pid, "STAFF", user["id"], "CREATE_KITCHEN_ORDER", str(order_id),
+                {
+                    "order_number": order_number,
+                    "total_kgs": total,
+                    "source": payload.source,
+                    "stay_id": str(stay_id) if stay_id else None,
+                    "live_session_id": str(live_session["id"]) if live_session else None,
+                    "guest_count": guest_count,
+                    "meal_type": meal_type,
+                },
+            )
     return {"id": str(order_id), "order_number": order_number, "status": "NEW", "total_kgs": total, "financial_posting": "NONE_AUTOMATIC"}
 
 
@@ -356,11 +393,44 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
-            row = await conn.fetchrow('SELECT id,status,"tableId","guestTaskId","orderNumber" FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', order_id, pid)
+            row = await conn.fetchrow(
+                '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId"
+                   FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                order_id, pid,
+            )
             if not row:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
+            if row["tableId"]:
+                await lock_dining_tables(conn, row["tableId"])
             if payload.status not in ORDER_TRANSITIONS[row["status"]]:
                 raise HTTPException(status_code=409, detail={"code": "KITCHEN_ORDER_INVALID_TRANSITION", "from": row["status"], "to": payload.status})
+
+            folio_effect = "NONE_AUTOMATIC"
+            if payload.status == "CANCELLED" and row["folioChargeId"]:
+                charge = await conn.fetchrow(
+                    '''SELECT id,status,"amountKgs" FROM guest_folio_charges
+                       WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                    row["folioChargeId"], pid,
+                )
+                if charge and charge["status"] == "PAID":
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "KITCHEN_ORDER_PAID_CHARGE_CANCEL_FORBIDDEN",
+                            "folio_charge_id": str(charge["id"]),
+                            "message": "Paid dining charge requires an explicit finance refund/adjustment before order cancellation.",
+                        },
+                    )
+                if charge and charge["status"] == "OPEN":
+                    await conn.execute(
+                        '''UPDATE guest_folio_charges SET status='VOID',
+                             metadata=COALESCE(metadata,'{}'::jsonb) || jsonb_build_object(
+                               'void_reason','KITCHEN_ORDER_CANCELLED','voided_by',$2::text,'voided_at',now()
+                             ),"updatedAt"=now() WHERE id=$1''',
+                        charge["id"], user["id"],
+                    )
+                    folio_effect = "VOID_OPEN_FOLIO_CHARGE"
+
             await conn.execute(
                 '''UPDATE kitchen_orders SET status=$2,"acceptedAt"=CASE WHEN $2='ACCEPTED' THEN COALESCE("acceptedAt",now()) ELSE "acceptedAt" END,
                      "readyAt"=CASE WHEN $2='READY' THEN COALESCE("readyAt",now()) ELSE "readyAt" END,
@@ -372,7 +442,13 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
             if row["guestTaskId"]:
                 task_status = "DONE" if payload.status == "SERVED" else "CANCELLED" if payload.status == "CANCELLED" else "IN_PROGRESS"
                 await conn.execute(
-                    '''UPDATE operational_tasks SET status=$2::"OperationalTaskStatus","completedAt"=CASE WHEN $2 IN ('DONE','CANCELLED') THEN now() ELSE NULL END,"updatedAt"=now() WHERE id=$1''',
+                    '''UPDATE operational_tasks SET status=$2::"OperationalTaskStatus",
+                         "completedAt"=CASE WHEN $2 IN ('DONE','CANCELLED') THEN now() ELSE NULL END,
+                         "chargeStatus"=CASE
+                           WHEN $2='CANCELLED' AND "chargeStatus" IN ('PENDING','POSTED') THEN 'CANCELLED'
+                           ELSE "chargeStatus"
+                         END,
+                         "updatedAt"=now() WHERE id=$1''',
                     row["guestTaskId"], task_status,
                 )
             if row["tableId"] and payload.status in {"SERVED", "CANCELLED"}:
@@ -380,8 +456,22 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
                     '''SELECT 1 FROM kitchen_orders WHERE "tableId"=$1 AND id<>$2 AND status IN ('NEW','ACCEPTED','COOKING','READY') LIMIT 1''', row["tableId"], order_id,
                 )
                 if not other:
-                    await conn.execute('UPDATE kitchen_tables SET status=\'AVAILABLE\',"updatedAt"=now() WHERE id=$1', row["tableId"])
-            await audit(conn, pid, "STAFF", user["id"], "UPDATE_KITCHEN_ORDER_STATUS", str(order_id), {"order_number": row["orderNumber"], "from": row["status"], "to": payload.status})
+                    live_session = await active_session_for_table(conn, row["tableId"])
+                    table_status = live_table_status(live_session) if live_session else "AVAILABLE"
+                    await conn.execute(
+                        'UPDATE kitchen_tables SET status=$2,"updatedAt"=now() WHERE id=$1',
+                        row["tableId"], table_status,
+                    )
+            await audit(
+                conn, pid, "STAFF", user["id"], "UPDATE_KITCHEN_ORDER_STATUS", str(order_id),
+                {
+                    "order_number": row["orderNumber"],
+                    "from": row["status"],
+                    "to": payload.status,
+                    "folio_charge_id": str(row["folioChargeId"]) if row["folioChargeId"] else None,
+                    "financial_effect": folio_effect,
+                },
+            )
     return {"id": str(order_id), "status": payload.status}
 
 

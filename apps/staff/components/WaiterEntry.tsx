@@ -10,6 +10,7 @@ type TableItem = { id: string; code: string; name: string; seats: number; status
 type Reservation = { id: string; table_id: string; table_code: string; table_name: string; guest_name: string; phone?: string | null; party_size: number; starts_at: string; ends_at: string; status: string; notes?: string | null };
 type Order = { id: string; order_number: string; status: string; source: string; table_id?: string | null; table_code?: string | null; table_name?: string | null; room_code?: string | null; guest_count: number; total_kgs: number; waiter_id?: string | null; waiter_name?: string | null; opened_at: string };
 type MenuItem = { id: string; name_ru: string; category: string; price_kgs: number; is_active: boolean; is_draft: boolean };
+type DiningSession = { id: string; stay_id: string; reservation_id: string; table_id: string; status: string; party_size: number; meal_type?: "BREAKFAST" | "LUNCH" | "DINNER" | "OTHER" | null; guest_name?: string | null; room_code?: string | null };
 type Floor = { service_date: string; current_user_id: string; tables: TableItem[]; reservations: Reservation[]; orders: Order[] };
 
 const ALLOWED = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
@@ -39,6 +40,7 @@ export default function WaiterEntry() {
   const [error, setError] = useState<string | null>(null);
   const [floor, setFloor] = useState<Floor | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [sessions, setSessions] = useState<DiningSession[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
   const [reservationTable, setReservationTable] = useState("");
@@ -49,18 +51,21 @@ export default function WaiterEntry() {
   const [reservationEnd, setReservationEnd] = useState(localInput(3));
 
   const [orderTable, setOrderTable] = useState("");
+  const [orderGuestCount, setOrderGuestCount] = useState(1);
   const [qty, setQty] = useState<Record<string, number>>({});
   const [orderNote, setOrderNote] = useState("");
 
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const [floorBody, menuBody] = await Promise.all([
+      const [floorBody, menuBody, sessionsBody] = await Promise.all([
         api("/core/api/v1/dining/floor"),
         api("/core/api/v1/kitchen/menu"),
+        api("/core/api/v1/dining/sessions?status=ACTIVE"),
       ]);
       setFloor(floorBody);
       setMenu(menuBody.items ?? []);
+      setSessions(sessionsBody.items ?? []);
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить зал");
@@ -87,6 +92,7 @@ export default function WaiterEntry() {
   const approvedMenu = useMemo(() => menu.filter((item) => item.is_active && !item.is_draft), [menu]);
   const selectedItems = useMemo(() => approvedMenu.filter((item) => (qty[item.id] ?? 0) > 0), [approvedMenu, qty]);
   const draftTotal = useMemo(() => selectedItems.reduce((sum, item) => sum + item.price_kgs * (qty[item.id] ?? 0), 0), [selectedItems, qty]);
+  const selectedSession = useMemo(() => sessions.find((item) => item.table_id === orderTable && ["WAITING", "SEATED"].includes(item.status)) ?? null, [sessions, orderTable]);
   const ready = floor?.orders.filter((order) => order.status === "READY") ?? [];
   const mine = floor?.orders.filter((order) => order.waiter_id === user?.id) ?? [];
   const unassigned = floor?.orders.filter((order) => !order.waiter_id) ?? [];
@@ -118,6 +124,7 @@ export default function WaiterEntry() {
     await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
     setUser(null);
     setFloor(null);
+    setSessions([]);
   }
 
   async function tableStatus(table: TableItem, status: string) {
@@ -208,7 +215,9 @@ export default function WaiterEntry() {
         body: JSON.stringify({
           source: "TABLE",
           table_id: orderTable,
-          guest_count: 1,
+          stay_id: selectedSession?.stay_id ?? null,
+          guest_count: selectedSession?.party_size ?? orderGuestCount,
+          meal_type: selectedSession?.meal_type ?? null,
           notes: orderNote || null,
           items: selectedItems.map((item) => ({ menu_item_id: item.id, quantity: qty[item.id] })),
         }),
@@ -220,6 +229,7 @@ export default function WaiterEntry() {
       });
       setQty({});
       setOrderNote("");
+      setOrderGuestCount(1);
       await load();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Не удалось создать заказ"); }
     finally { setBusy(null); }
@@ -247,7 +257,7 @@ export default function WaiterEntry() {
     <section className={styles.two}>
       <div className={styles.section}><div className={styles.sectionHead}><div><small>Kitchen → waiter</small><h2>Активные заказы</h2></div></div><div className={styles.orders}>{floor?.orders.map((order) => <article key={order.id} className={order.status === "READY" ? styles.ready : ""}><div><strong>{order.order_number}</strong><span>{ORDER_LABEL[order.status] ?? order.status}</span></div><p>{order.table_code ? `${order.table_code} · ${order.table_name || "стол"}` : order.room_code ? `Номер ${order.room_code}` : order.source}</p><small>{order.waiter_name ? `Официант: ${order.waiter_name}` : "Официант не назначен"}</small><b>{order.total_kgs.toLocaleString("ru-RU")} KGS</b><div>{!order.waiter_id && <button disabled={busy === order.id} onClick={() => void claim(order)}>Взять заказ</button>}{order.status === "READY" && (order.waiter_id === user.id || user.role !== "DINING_STAFF") && <button className={styles.primary} disabled={busy === order.id} onClick={() => void serve(order)}>Выдано гостю</button>}</div></article>)}</div></div>
 
-      <form className={styles.section} onSubmit={createOrder}><div className={styles.sectionHead}><div><small>Новый заказ</small><h2>Заказ со стола</h2></div></div><label>Стол<select value={orderTable} onChange={(e) => setOrderTable(e.target.value)} required><option value="">Выберите стол</option>{floor?.tables.filter((table) => table.status !== "OUT_OF_SERVICE").map((table) => <option key={table.id} value={table.id}>{table.code} · {table.name} · {TABLE_LABEL[table.status] ?? table.status}</option>)}</select></label><div className={styles.menuPicker}>{approvedMenu.map((item) => <label key={item.id}><span><strong>{item.name_ru}</strong><small>{item.price_kgs.toLocaleString("ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(e) => setQty((current) => ({ ...current, [item.id]: Number(e.target.value) || 0 }))} /></label>)}</div><label>Комментарий<input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder="Например: без лука" /></label><div className={styles.total}><span>Сумма</span><strong>{draftTotal.toLocaleString("ru-RU")} KGS</strong></div><button className={styles.primary} disabled={busy === "order" || !orderTable || !selectedItems.length}>Создать заказ</button></form>
+      <form className={styles.section} onSubmit={createOrder}><div className={styles.sectionHead}><div><small>Новый заказ</small><h2>Заказ со стола</h2></div></div><label>Стол<select value={orderTable} onChange={(e) => setOrderTable(e.target.value)} required><option value="">Выберите стол</option>{floor?.tables.filter((table) => table.status !== "OUT_OF_SERVICE").map((table) => <option key={table.id} value={table.id}>{table.code} · {table.name} · {TABLE_LABEL[table.status] ?? table.status}</option>)}</select></label>{selectedSession ? <div className={styles.total}><span>{selectedSession.guest_name || "Гость отеля"}{selectedSession.room_code ? ` · номер ${selectedSession.room_code}` : ""}</span><strong>{selectedSession.party_size} гостей</strong></div> : <label>Гостей<input type="number" min="1" max="30" value={orderGuestCount} onChange={(e) => setOrderGuestCount(Number(e.target.value) || 1)} /></label>}<div className={styles.menuPicker}>{approvedMenu.map((item) => <label key={item.id}><span><strong>{item.name_ru}</strong><small>{item.price_kgs.toLocaleString("ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(e) => setQty((current) => ({ ...current, [item.id]: Number(e.target.value) || 0 }))} /></label>)}</div><label>Комментарий<input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder="Например: без лука" /></label><div className={styles.total}><span>Сумма</span><strong>{draftTotal.toLocaleString("ru-RU")} KGS</strong></div><button className={styles.primary} disabled={busy === "order" || !orderTable || !selectedItems.length}>Создать заказ</button></form>
     </section>
 
     <section className={styles.two}>

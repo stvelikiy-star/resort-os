@@ -25,7 +25,10 @@ def main() -> int:
         'applyContent(content, locale);\n  dispatchReady(locale);',
         'queueMicrotask(() => applyContent(content, locale));',
         'text(".v3-advantages .v3-section-head > p", content.advantages?.intro);',
-        "help.textContent = `${locale === \"en\" ? \"Call\" : locale === \"kg\" ? \"Чалуу\" : \"Позвонить\"} · ${phone}`",
+        'content.booking?.help_call_label || (locale === "en" ? "Call" : locale === "kg" ? "Чалуу" : "Позвонить")',
+        'content.territory',
+        'content.amenities',
+        'content.final',
     )
 
     # The generic i18n layer is allowed to localize non-CMS UI and currently

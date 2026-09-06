@@ -1,0 +1,36 @@
+name: Owner Corrections Truth CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data-intake/**'
+      - 'packages/database/prisma/migrations/**'
+      - 'services/api/app/guest_service_settings.py'
+      - 'services/api/data/site_content_defaults.json'
+      - 'scripts/owner_corrections_truth_guard.py'
+      - '.github/workflows/owner-corrections-truth-ci.yml'
+  pull_request:
+    paths:
+      - 'data-intake/**'
+      - 'packages/database/prisma/migrations/**'
+      - 'services/api/app/guest_service_settings.py'
+      - 'services/api/data/site_content_defaults.json'
+      - 'scripts/owner_corrections_truth_guard.py'
+      - '.github/workflows/owner-corrections-truth-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-corrections-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify owner-approved cross-layer truth
+        run: python scripts/owner_corrections_truth_guard.py

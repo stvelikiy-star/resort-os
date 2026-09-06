@@ -41,7 +41,7 @@ type MediaSlot = {
 type DraftValue = { assetId: string; altText: string };
 
 const GROUPS = [
-  { key: "PRIMARY", label: "Главные блоки", match: (slot: string) => ["HERO", "CONFERENCE"].includes(slot) },
+  { key: "PRIMARY", label: "Главные блоки", match: (slot: string) => ["HERO", "CONFERENCE", "TERRITORY", "WATER", "GROUPS"].includes(slot) },
   { key: "GALLERY", label: "Галерея", match: (slot: string) => slot.startsWith("GALLERY_") },
   { key: "ADVANTAGE", label: "Преимущества", match: (slot: string) => slot.startsWith("ADVANTAGE_") },
   { key: "ROOM", label: "Номерной фонд", match: (slot: string) => slot.startsWith("ROOM_") },

@@ -10,8 +10,8 @@ room_code,room_name,building_or_zone,floor,room_type,capacity_adults,capacity_ch
 303,303,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
 304,304,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
 305,305,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп,16-24,UNKNOWN,PHOTO_2026-08-25
-501,501,UNKNOWN,MANSARD,"Одноместный, улучшенный",1,UNKNOWN,1сп+1сп+крк,21,UNKNOWN,"PHOTO_2026-08-25; OWNER_APPROVED_2026-09-01; canonical category and raw bed label retained per owner acceptance"
-502,502,UNKNOWN,MANSARD,"Одноместный, улучшенный",1,UNKNOWN,1сп+1сп+крк,21,UNKNOWN,"PHOTO_2026-08-25; OWNER_APPROVED_2026-09-01; canonical category and raw bed label retained per owner acceptance"
+501,501,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп+крк,21,UNKNOWN,"PHOTO_2026-08-25; OWNER_APPROVED_2026-09-05: цоколь над прачечной; действующий; двухместный; raw bed/area retained"
+502,502,UNKNOWN,BASEMENT,"Двухместный стандарт, цоколь",2,UNKNOWN,1сп+1сп+крк,21,UNKNOWN,"PHOTO_2026-08-25; OWNER_APPROVED_2026-09-05: цоколь над прачечной; действующий; двухместный; raw bed/area retained"
 1А,1А,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
 1Б,1Б,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25
 1В,1В,COTTAGE,UNKNOWN,Двухместный стандарт в коттеджном доме,2,UNKNOWN,,27,UNKNOWN,PHOTO_2026-08-25

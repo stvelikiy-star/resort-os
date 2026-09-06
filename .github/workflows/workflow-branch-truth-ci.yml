@@ -1,0 +1,31 @@
+name: Workflow Branch Truth CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/workflow_branch_truth_guard.py'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/workflow_branch_truth_guard.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-branch-truth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify canonical main workflow coverage
+        run: python scripts/workflow_branch_truth_guard.py

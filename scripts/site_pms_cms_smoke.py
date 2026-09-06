@@ -85,7 +85,7 @@ def main() -> int:
     check(status == 422 and rejected.get("detail", {}).get("code") == "PUBLIC_CONTENT_TRUTH_VIOLATION", "CMS rejects fixed 30% prepayment claim")
 
     forbidden_amenity = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
-    forbidden_amenity.setdefault("advantages", {})["intro"] = "На территории работает сауна."
+    forbidden_amenity.setdefault("advantages", {})["intro"] = "На территории работает прачечная."
     status, rejected = request(
         "/api/v1/admin/site/content/ru/draft",
         method="PUT",
@@ -93,7 +93,7 @@ def main() -> int:
         authenticated=True,
         allow_error=True,
     )
-    check(status == 422 and rejected.get("detail", {}).get("code") == "PUBLIC_CONTENT_TRUTH_VIOLATION", "CMS rejects uncanonicalized sauna claim")
+    check(status == 422 and rejected.get("detail", {}).get("code") == "PUBLIC_CONTENT_TRUTH_VIOLATION", "CMS rejects uncanonicalized laundry claim")
 
     unknown_schema = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
     unknown_schema["unreviewed_section"] = {"copy": "test"}

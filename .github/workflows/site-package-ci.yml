@@ -3,6 +3,7 @@ name: Three Crowns Ready Site Package
 on:
   push:
     branches:
+      - main
       - integration/site-pms-cms-20260827
     paths:
       - '.github/workflows/site-package-ci.yml'
@@ -67,12 +68,9 @@ jobs:
           - public website TypeScript typecheck
           - public website production build
 
-          The immediately preceding executable product commit 98230dd7cbdf9cbdaa2e3333d431a1c780fad187
-          completed all 23 associated PR CI contours successfully, including Full Staging,
-          Resort Core, PMS Chessboard Mutation, Guest Services, migrations, backup/restore,
-          AI Administrator, dependency security and the single-server production package.
-
-          Production DNS cutover and external host acceptance are separate deployment gates.
+          Package evidence is commit-scoped. Production DNS cutover and external host
+          acceptance are separate fail-closed deployment gates and are never implied
+          by creation of this ZIP.
           EOF
           (cd /tmp && zip -qr "${GITHUB_WORKSPACE}/three-crowns-ready-site-${SHORT_SHA}.zip" "${ROOT}")
           sha256sum "three-crowns-ready-site-${SHORT_SHA}.zip" | tee ready-site.sha256

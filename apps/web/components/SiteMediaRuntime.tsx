@@ -23,18 +23,23 @@ function setImage(image: HTMLImageElement | null, media?: MediaSlot) {
   if (media.alt_text) image.alt = media.alt_text;
 }
 
+function setFeatureVisual(selector: string, media?: MediaSlot, withShade = false) {
+  if (!media?.url) return;
+  const root = document.querySelector<HTMLElement>(selector);
+  if (!root) return;
+  const video = root.querySelector<HTMLVideoElement>("video");
+  if (video) video.poster = media.url;
+  root.style.backgroundImage = withShade
+    ? `linear-gradient(rgba(8,17,38,.20),rgba(8,17,38,.60)),url("${media.url}")`
+    : `url("${media.url}")`;
+  root.style.backgroundSize = "cover";
+  root.style.backgroundPosition = "center";
+}
+
 function applyMedia(slots: Record<string, MediaSlot>) {
-  const hero = slots.HERO;
-  if (hero?.url) {
-    const media = document.querySelector<HTMLElement>(".v3-hero-media");
-    const video = media?.querySelector<HTMLVideoElement>("video");
-    if (video) video.poster = hero.url;
-    if (media) {
-      media.style.backgroundImage = `url("${hero.url}")`;
-      media.style.backgroundSize = "cover";
-      media.style.backgroundPosition = "center";
-    }
-  }
+  setFeatureVisual(".v3-hero-media", slots.HERO);
+  setFeatureVisual(".v3-territory-film", slots.TERRITORY);
+  setFeatureVisual(".v3-lake-film", slots.WATER);
 
   const conference = slots.CONFERENCE;
   if (conference?.url) {
@@ -43,6 +48,18 @@ function applyMedia(slots: Record<string, MediaSlot>) {
       visual.style.backgroundImage = `linear-gradient(rgba(8,17,38,.32),rgba(8,17,38,.72)),url("${conference.url}")`;
       visual.style.backgroundSize = "cover";
       visual.style.backgroundPosition = "center";
+    }
+  }
+
+  const groups = slots.GROUPS;
+  if (groups?.url) {
+    const visual = document.querySelector<HTMLImageElement>(".v3-groups-media img");
+    setImage(visual, groups);
+    const fallback = document.querySelector<HTMLElement>(".v3-groups-media");
+    if (fallback) {
+      fallback.style.backgroundImage = `url("${groups.url}")`;
+      fallback.style.backgroundSize = "cover";
+      fallback.style.backgroundPosition = "center";
     }
   }
 

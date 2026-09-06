@@ -7,15 +7,27 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import current_user, require_roles
+from .auth import require_roles
+from .dining_coordination import (
+    active_session_for_table,
+    live_table_status,
+    lock_dining_tables,
+    reservation_matches_session,
+    reservation_window_contains_now,
+)
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-control"])
 dining_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
-manager_access = require_roles("OWNER", "MANAGER")
 
 MEAL_TYPES = {"BREAKFAST", "LUNCH", "DINNER", "OTHER"}
-RESERVATION_STATUSES = {"BOOKED", "SEATED", "COMPLETED", "CANCELLED", "NO_SHOW"}
 ACTIVE_ORDER_STATUSES = ("NEW", "ACCEPTED", "COOKING", "READY")
+TABLE_RESERVATION_TRANSITIONS: dict[str, set[str]] = {
+    "BOOKED": {"SEATED", "CANCELLED", "NO_SHOW"},
+    "SEATED": {"COMPLETED", "CANCELLED"},
+    "COMPLETED": set(),
+    "CANCELLED": set(),
+    "NO_SHOW": set(),
+}
 
 
 class MenuDayPublish(BaseModel):
@@ -85,6 +97,33 @@ async def audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, resourc
            ) VALUES ($1,$2,'STAFF',$3,$4,$5,$6,'DINING_CONTROL','SUCCESS',$7::jsonb,now())''',
         uuid.uuid4(), pid, user["id"], action, resource, resource_id, json.dumps(payload, ensure_ascii=False, default=str),
     )
+
+
+async def validate_table_reservation_links(
+    conn,
+    pid: uuid.UUID,
+    stay_id: uuid.UUID | None,
+    reservation_id: uuid.UUID | None,
+) -> tuple[uuid.UUID | None, uuid.UUID | None]:
+    resolved_stay = stay_id
+    resolved_reservation = reservation_id
+    if stay_id is not None:
+        stay = await conn.fetchrow(
+            '''SELECT id,"reservationId",status::text AS status FROM stays
+               WHERE id=$1 AND "propertyId"=$2''', stay_id, pid,
+        )
+        if not stay:
+            raise HTTPException(status_code=422, detail={"code": "DINING_TABLE_RESERVATION_STAY_NOT_FOUND"})
+        if reservation_id is not None and reservation_id != stay["reservationId"]:
+            raise HTTPException(status_code=422, detail={"code": "DINING_TABLE_RESERVATION_LINK_MISMATCH"})
+        resolved_reservation = stay["reservationId"]
+    elif reservation_id is not None:
+        exists = await conn.fetchval(
+            'SELECT id FROM reservations WHERE id=$1 AND "propertyId"=$2', reservation_id, pid,
+        )
+        if not exists:
+            raise HTTPException(status_code=422, detail={"code": "DINING_TABLE_RESERVATION_BOOKING_NOT_FOUND"})
+    return resolved_stay, resolved_reservation
 
 
 @router.get("/menu-day")
@@ -249,8 +288,8 @@ async def list_table_reservations(
         start = datetime.combine(day, time.min, tzinfo=tz)
         end = start + timedelta(days=1)
         rows = await conn.fetch(
-            '''SELECT tr.id,tr."tableId",tr."guestName",tr.phone,tr."partySize",tr."startsAt",tr."endsAt",tr.status,tr.notes,
-                      t.code AS table_code,t.name AS table_name,t.seats
+            '''SELECT tr.id,tr."tableId",tr."stayId",tr."reservationId",tr."guestName",tr.phone,tr."partySize",
+                      tr."startsAt",tr."endsAt",tr.status,tr.notes,t.code AS table_code,t.name AS table_name,t.seats
                FROM kitchen_table_reservations tr
                JOIN kitchen_tables t ON t.id=tr."tableId"
                WHERE tr."propertyId"=$1 AND tr."startsAt"<$3 AND tr."endsAt">$2
@@ -265,6 +304,8 @@ async def list_table_reservations(
                 "table_name": row["table_name"], "seats": row["seats"], "guest_name": row["guestName"],
                 "phone": row["phone"], "party_size": row["partySize"], "starts_at": row["startsAt"],
                 "ends_at": row["endsAt"], "status": row["status"], "notes": row["notes"],
+                "stay_id": str(row["stayId"]) if row["stayId"] else None,
+                "reservation_id": str(row["reservationId"]) if row["reservationId"] else None,
             }
             for row in rows
         ],
@@ -280,8 +321,9 @@ async def create_table_reservation(
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
+            await lock_dining_tables(conn, payload.table_id)
             table_row = await conn.fetchrow(
-                '''SELECT id,code,name,seats,"isActive" FROM kitchen_tables
+                '''SELECT id,code,name,seats,status,"isActive" FROM kitchen_tables
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 payload.table_id, pid,
             )
@@ -292,6 +334,10 @@ async def create_table_reservation(
                     status_code=409,
                     detail={"code": "DINING_TABLE_TOO_SMALL", "seats": table_row["seats"], "party_size": payload.party_size},
                 )
+
+            stay_id, reservation_link_id = await validate_table_reservation_links(
+                conn, pid, payload.stay_id, payload.reservation_id,
+            )
             conflict = await conn.fetchrow(
                 '''SELECT id,"guestName","startsAt","endsAt" FROM kitchen_table_reservations
                    WHERE "tableId"=$1 AND status IN ('BOOKED','SEATED')
@@ -310,17 +356,39 @@ async def create_table_reservation(
                         "ends_at": conflict["endsAt"],
                     },
                 )
-            reservation_id = uuid.uuid4()
+
+            live_session = await active_session_for_table(conn, payload.table_id)
+            current_window = await reservation_window_contains_now(conn, payload.starts_at, payload.ends_at)
+            if current_window and live_session:
+                proposed = {"stayId": stay_id, "reservationId": reservation_link_id}
+                if not reservation_matches_session(proposed, live_session):
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "DINING_TABLE_LIVE_SESSION_CONFLICT",
+                            "session_id": str(live_session["id"]),
+                            "session_status": live_session["status"],
+                        },
+                    )
+
+            initial_status = "SEATED" if current_window and live_session and live_session["status"] == "SEATED" else "BOOKED"
+            reservation_row_id = uuid.uuid4()
             await conn.execute(
                 '''INSERT INTO kitchen_table_reservations (
                      id,"propertyId","tableId","stayId","reservationId","guestName",phone,"partySize","startsAt","endsAt",status,notes,"createdById","createdAt","updatedAt"
-                   ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'BOOKED',$11,$12,now(),now())''',
-                reservation_id, pid, payload.table_id, payload.stay_id, payload.reservation_id,
+                   ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),now())''',
+                reservation_row_id, pid, payload.table_id, stay_id, reservation_link_id,
                 payload.guest_name.strip(), payload.phone, payload.party_size, payload.starts_at, payload.ends_at,
-                payload.notes, uuid.UUID(user["id"]),
+                initial_status, payload.notes, uuid.UUID(user["id"]),
             )
-            await audit(conn, pid, user, "CREATE_TABLE_RESERVATION", "KitchenTableReservation", str(reservation_id), payload.model_dump())
-    return {"id": str(reservation_id), "status": "BOOKED", "table_code": table_row["code"]}
+            await audit(conn, pid, user, "CREATE_TABLE_RESERVATION", "KitchenTableReservation", str(reservation_row_id), {
+                **payload.model_dump(),
+                "resolved_stay_id": str(stay_id) if stay_id else None,
+                "resolved_reservation_id": str(reservation_link_id) if reservation_link_id else None,
+                "status": initial_status,
+                "live_session_id": str(live_session["id"]) if current_window and live_session else None,
+            })
+    return {"id": str(reservation_row_id), "status": initial_status, "table_code": table_row["code"]}
 
 
 @router.patch("/table-reservations/{reservation_id}")
@@ -333,41 +401,101 @@ async def patch_table_reservation(
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
+            preliminary = await conn.fetchrow(
+                '''SELECT id,"tableId" FROM kitchen_table_reservations
+                   WHERE id=$1 AND "propertyId"=$2''', reservation_id, pid,
+            )
+            if not preliminary:
+                raise HTTPException(status_code=404, detail="Table reservation not found")
+            await lock_dining_tables(conn, preliminary["tableId"])
             row = await conn.fetchrow(
-                '''SELECT id,"tableId",status FROM kitchen_table_reservations
+                '''SELECT id,"tableId","stayId","reservationId","startsAt","endsAt",status FROM kitchen_table_reservations
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 reservation_id, pid,
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Table reservation not found")
+
+            current_status = row["status"]
+            if payload.status == current_status:
+                return {"id": str(reservation_id), "status": current_status, "idempotent_replay": True}
+            if payload.status not in TABLE_RESERVATION_TRANSITIONS.get(current_status, set()):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_RESERVATION_INVALID_TRANSITION",
+                        "from": current_status,
+                        "to": payload.status,
+                    },
+                )
+
+            live_session = await active_session_for_table(conn, row["tableId"])
+            matching_session = bool(live_session and reservation_matches_session(row, live_session))
+            if payload.status == "SEATED" and live_session and not matching_session:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_RESERVATION_LIVE_SESSION_CONFLICT",
+                        "session_id": str(live_session["id"]),
+                        "session_status": live_session["status"],
+                    },
+                )
+            if matching_session and payload.status != "SEATED":
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_RESERVATION_HAS_ACTIVE_SESSION",
+                        "session_id": str(live_session["id"]),
+                        "session_status": live_session["status"],
+                        "action": "RELEASE_OR_CANCEL_DINING_SESSION_FIRST",
+                    },
+                )
+
             await conn.execute(
                 'UPDATE kitchen_table_reservations SET status=$2,"updatedAt"=now() WHERE id=$1',
                 reservation_id, payload.status,
             )
             if payload.status == "SEATED":
+                if matching_session and live_session["status"] == "WAITING":
+                    await conn.execute(
+                        '''UPDATE dining_table_sessions SET status='SEATED',
+                             "seatedAt"=COALESCE("seatedAt",now()),"updatedAt"=now() WHERE id=$1''',
+                        live_session["id"],
+                    )
+                    live_session = {**dict(live_session), "status": "SEATED"}
                 await conn.execute(
                     "UPDATE kitchen_tables SET status='OCCUPIED',\"updatedAt\"=now() WHERE id=$1 AND \"propertyId\"=$2",
                     row["tableId"], pid,
                 )
             elif payload.status in {"COMPLETED", "CANCELLED", "NO_SHOW"}:
-                active_orders = int(
-                    await conn.fetchval(
-                        '''SELECT count(*)::int FROM kitchen_orders
-                           WHERE "tableId"=$1 AND status=ANY($2::text[])''',
-                        row["tableId"], list(ACTIVE_ORDER_STATUSES),
-                    )
-                    or 0
-                )
-                if active_orders == 0:
+                if live_session:
                     await conn.execute(
-                        "UPDATE kitchen_tables SET status='CLEANING',\"updatedAt\"=now() WHERE id=$1 AND \"propertyId\"=$2",
-                        row["tableId"], pid,
+                        'UPDATE kitchen_tables SET status=$2,"updatedAt"=now() WHERE id=$1',
+                        row["tableId"], live_table_status(live_session),
                     )
+                else:
+                    active_orders = int(
+                        await conn.fetchval(
+                            '''SELECT count(*)::int FROM kitchen_orders
+                               WHERE "tableId"=$1 AND status=ANY($2::text[])''',
+                            row["tableId"], list(ACTIVE_ORDER_STATUSES),
+                        )
+                        or 0
+                    )
+                    if active_orders == 0:
+                        await conn.execute(
+                            "UPDATE kitchen_tables SET status='CLEANING',\"updatedAt\"=now() WHERE id=$1 AND \"propertyId\"=$2",
+                            row["tableId"], pid,
+                        )
             await audit(
                 conn, pid, user, "PATCH_TABLE_RESERVATION", "KitchenTableReservation", str(reservation_id),
-                {"from_status": row["status"], "status": payload.status},
+                {
+                    "from_status": current_status, "status": payload.status,
+                    "live_session_id": str(live_session["id"]) if live_session else None,
+                    "live_session_match": matching_session,
+                },
             )
-    return {"id": str(reservation_id), "status": payload.status}
+    return {"id": str(reservation_id), "status": payload.status, "idempotent_replay": False}
 
 
 @router.patch("/orders/{order_id}/waiter")
@@ -428,8 +556,8 @@ async def dining_floor(
                WHERE "propertyId"=$1 AND "isActive"=true ORDER BY code''', pid,
         )
         reservations = await conn.fetch(
-            '''SELECT tr.id,tr."tableId",tr."guestName",tr.phone,tr."partySize",tr."startsAt",tr."endsAt",tr.status,tr.notes,
-                      t.code AS table_code,t.name AS table_name
+            '''SELECT tr.id,tr."tableId",tr."stayId",tr."reservationId",tr."guestName",tr.phone,tr."partySize",
+                      tr."startsAt",tr."endsAt",tr.status,tr.notes,t.code AS table_code,t.name AS table_name
                FROM kitchen_table_reservations tr
                JOIN kitchen_tables t ON t.id=tr."tableId"
                WHERE tr."propertyId"=$1 AND tr."startsAt"<$3 AND tr."endsAt">$2
@@ -458,7 +586,9 @@ async def dining_floor(
         "reservations": [
             {"id": str(r["id"]), "table_id": str(r["tableId"]), "table_code": r["table_code"], "table_name": r["table_name"],
              "guest_name": r["guestName"], "phone": r["phone"], "party_size": r["partySize"], "starts_at": r["startsAt"],
-             "ends_at": r["endsAt"], "status": r["status"], "notes": r["notes"]}
+             "ends_at": r["endsAt"], "status": r["status"], "notes": r["notes"],
+             "stay_id": str(r["stayId"]) if r["stayId"] else None,
+             "reservation_id": str(r["reservationId"]) if r["reservationId"] else None}
             for r in reservations
         ],
         "orders": [

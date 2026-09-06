@@ -142,6 +142,8 @@ async def record_reservation_payment(
                     external_ref=external_ref,
                     note=note,
                     compare_note=True,
+                    paid_at=paid_at,
+                    compare_paid_at=payload.paid_at is not None,
                 )
                 totals = await _totals(conn, reservation_id)
                 return {

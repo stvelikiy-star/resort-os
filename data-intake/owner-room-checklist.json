@@ -4,7 +4,7 @@
     "spreadsheet_title": "НОМЕРНОЙ ФОНД — Три Короны — Production Import 84",
     "sheet": "OWNER_CHECKLIST",
     "captured_at": "2026-09-01",
-    "truth_note": "Snapshot of owner-review questions only; canonical room data remains data-intake/rooms.csv. At capture time all 84 ROOMS_IMPORT rows had owner_confirmed=NO and all P0/P1 checklist answers were blank."
+    "truth_note": "Historical snapshot of owner-review questions. Canonical room data remains data-intake/rooms.csv. The 2026-09-05 owner correction supersedes the earlier mansard/single-room assumption for 501/502: both are operational two-person basement rooms above the laundry."
   },
   "questions": [
     {
@@ -14,10 +14,10 @@
       "question": "Как называется корпус/здание для этой группы? Один корпус или несколько?"
     },
     {
-      "id": "P0_MANSARD_501_502",
+      "id": "P0_501_502_BASEMENT_CORRECTION",
       "priority": "P0",
-      "group": "501, 502 · мансарда",
-      "question": "Это реально гостевые номера? Если да — подтвердить категорию и корпус. Если нет — исключить из продаваемого фонда и указать назначение."
+      "group": "501, 502 · цоколь над прачечной",
+      "question": "Решено владельцем 2026-09-05: оба номера действующие, двухместные, цоколь над прачечной; категория — «Двухместный стандарт, цоколь». Не возвращать старую классификацию «мансарда / одноместный улучшенный»."
     },
     {
       "id": "P0_COTTAGE_UNITS",

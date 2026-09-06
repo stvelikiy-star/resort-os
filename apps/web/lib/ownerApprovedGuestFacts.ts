@@ -9,7 +9,7 @@ export type OwnerApprovedGuestFacts = {
 };
 
 export const TWO_GIS_REVIEWS_URL = "https://2gis.kg/cholpon-ata/firm/70000001027860639/tab/reviews";
-const MANAGER_WHATSAPP = "https://wa.me/996558085008";
+const MANAGER_WHATSAPP = "https://wa.me/996558085002";
 const transferHref = (message: string) => `${MANAGER_WHATSAPP}?text=${encodeURIComponent(message)}`;
 
 export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGuestFacts> = {

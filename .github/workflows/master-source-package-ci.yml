@@ -3,6 +3,7 @@ name: Three Crowns Master Source Package
 on:
   push:
     branches:
+      - main
       - integration/site-pms-cms-20260827
   workflow_dispatch:
 

@@ -161,7 +161,11 @@ async def check_availability(
             JOIN rooms r ON r."roomTypeId" = rt.id
             WHERE rt."propertyId" = $1
               AND rt."capacityAdults" >= $2
-              AND ($3::text IS NULL OR rt.code = $3)
+              AND (
+                  $3::int = 0
+                  OR (rt."capacityChildren" IS NOT NULL AND rt."capacityChildren" >= $3)
+              )
+              AND ($4::text IS NULL OR rt.code = $4)
               AND r."operationalState" <> 'TECH_BLOCK'
               AND NOT EXISTS (
                   SELECT 1
@@ -169,12 +173,13 @@ async def check_availability(
                   WHERE ib."roomId" = r.id
                     AND ib.active = true
                     AND daterange(ib."startDate", ib."endDate", '[)')
-                        && daterange($4::date, $5::date, '[)')
+                        && daterange($5::date, $6::date, '[)')
               )
             ORDER BY rt.name, r.code
             ''',
             property_id,
             adults,
+            children,
             room_type_code,
             check_in,
             check_out,
@@ -220,6 +225,7 @@ async def check_availability(
         "nights": (check_out - check_in).days,
         "adults": adults,
         "children": children,
+        "children_capacity_policy": "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED",
         "results": result,
         "rule": "Availability is informational until a paid reservation is created. An unpaid request is not a reservation.",
     }
