@@ -22,26 +22,66 @@ const LOCALES: { code: Locale; label: string }[] = [
   { code: "en", label: "English" },
 ];
 
+const cardFields = (count: number, prefix = "Карточка") => Array.from({ length: count }, (_, rawIndex) => {
+  const index = rawIndex + 1;
+  return [[`card_${index}_title`, `${prefix} ${index} · заголовок`], [`card_${index}_text`, `${prefix} ${index} · текст`]] as const;
+}).flat();
+
+const journeyFields = Array.from({ length: 6 }, (_, rawIndex) => {
+  const index = rawIndex + 1;
+  return [[`journey_${index}_title`, `Маршрут ${index} · заголовок`], [`journey_${index}_text`, `Маршрут ${index} · текст`]] as const;
+}).flat();
+
 const FIELDS = [
   { section: "hero", label: "Первый экран", fields: [
     ["eyebrow", "Надзаголовок"], ["title", "Главный заголовок"], ["copy", "Описание"],
-    ["primary_cta", "Главная кнопка"], ["secondary_cta", "Вторая кнопка"],
+    ["primary_cta", "Главная кнопка"], ["secondary_cta", "Вторая кнопка"], ["scroll_cta", "Подсказка прокрутки"],
   ] },
-  { section: "booking", label: "Бронирование", fields: [
+  { section: "booking", label: "Бронирование и помощь", fields: [
     ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"],
+    ["trust_1", "Доверие 1"], ["trust_2", "Доверие 2"], ["trust_3", "Доверие 3"],
+    ["help_eyebrow", "Помощь · надзаголовок"], ["help_title", "Помощь · заголовок"], ["help_copy", "Помощь · текст"],
+    ["help_call_label", "Помощь · звонок"], ["help_whatsapp_label", "Помощь · WhatsApp"],
+    ["rule_title", "Правило · заголовок"], ["rule_copy", "Правило · текст"],
   ] },
   { section: "advantages", label: "Преимущества", fields: [
     ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"],
+    ...cardFields(6),
   ] },
   { section: "conference", label: "Конференции / банкет", fields: [
     ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["copy", "Основное описание"],
     ["capacity", "Вместимость"], ["banquet", "Банкетный формат"], ["menu", "Меню / условия"], ["cta", "Текст кнопки"],
   ] },
-  { section: "groups", label: "Групповые заезды", fields: [
-    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["copy", "Описание"],
+  { section: "rooms", label: "Номерной фонд · оформление раздела", fields: [
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"], ["catalog_cta", "Ссылка на каталог"],
+    ["high_season_label", "Подпись цены"], ["per_night_label", "Единица цены"], ["card_cta", "Кнопка карточки"],
   ] },
-  { section: "contacts", label: "Контакты", fields: [
+  { section: "territory", label: "Территория", fields: [
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"],
+    ["visual_label", "Подпись визуала"], ["visual_caption", "Описание визуала"],
+    ...journeyFields,
+  ] },
+  { section: "amenities", label: "Озеро / инфраструктура", fields: [
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"],
+    ["tag_1", "Тег 1"], ["tag_2", "Тег 2"], ["tag_3", "Тег 3"], ["cta", "Кнопка"],
+    ["visual_label", "Подпись визуала"], ["visual_caption", "Описание визуала"],
+    ...cardFields(5),
+  ] },
+  { section: "groups", label: "Групповые заезды", fields: [
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["copy", "Описание"], ["cta", "Кнопка"],
+    ...cardFields(4),
+  ] },
+  { section: "contacts", label: "Контакты и дорога", fields: [
     ["phone", "Телефон бронирования"], ["whatsapp", "WhatsApp менеджера"], ["email", "Email"], ["address", "Адрес"],
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["intro", "Описание"],
+    ["phone_label", "Подпись телефона"], ["whatsapp_label", "Подпись WhatsApp"], ["email_label", "Подпись Email"],
+    ["pretrip_eyebrow", "Перед поездкой · надзаголовок"], ["pretrip_title", "Перед поездкой · заголовок"],
+    ["pretrip_copy", "Перед поездкой · текст"], ["booking_cta", "Кнопка выбора дат"], ["map_cta", "Кнопка карты"],
+  ] },
+  { section: "final", label: "Финальный CTA и подвал", fields: [
+    ["eyebrow", "Надзаголовок"], ["title", "Заголовок"], ["copy", "Описание"], ["cta", "Кнопка"],
+    ["footer_brand", "Бренд в подвале"], ["footer_rooms", "Подвал · Номера"], ["footer_resort", "Подвал · Территория"],
+    ["footer_groups", "Подвал · Группы"], ["footer_contacts", "Подвал · Контакты"], ["mobile_cta", "Мобильная кнопка"],
   ] },
   { section: "seo", label: "SEO", fields: [
     ["title", "Title страницы"], ["description", "Meta description"],
@@ -73,7 +113,7 @@ export default function SiteContentBoard() {
       for (const entry of payload.items) next[entry.locale] = cloneContent(entry.draft);
       setDrafts(next);
     } catch {
-      setError("Контент API недоступен. Проверьте Resort Core и Prisma-миграцию 1_site_content.");
+      setError("Контент API недоступен. Проверьте Resort Core и Prisma-миграцию site_content.");
     } finally {
       setLoading(false);
     }
@@ -163,7 +203,7 @@ export default function SiteContentBoard() {
         <div>
           <p className="eyebrow">Сайт / Контент</p>
           <h1>Редактор публичного сайта</h1>
-          <p>Тексты, фотографии, конференц-блок, контакты и SEO управляются через Resort Core. Доступность, цены и брони остаются отдельной доменной правдой PMS.</p>
+          <p>Маркетинговые тексты, фотографии, конференц-блок, контакты и SEO управляются через Resort Core. Номерной фонд, цены, брони и утверждённые правила услуг остаются отдельной доменной правдой PMS.</p>
         </div>
         <div className="content-head-actions">
           <button className="btn" onClick={exportJson}>Экспорт JSON</button>
@@ -190,7 +230,7 @@ export default function SiteContentBoard() {
           <section className="content-card" key={group.section}>
             <div className="content-card-head"><h2>{group.label}</h2><span>{group.section}</span></div>
             {group.fields.map(([key, label]) => {
-              const multiline = ["copy", "intro", "description", "address", "banquet", "menu"].includes(key);
+              const multiline = ["copy", "intro", "description", "address", "banquet", "menu", "help_copy", "rule_copy", "pretrip_copy", "visual_caption"].includes(key) || key.endsWith("_text");
               return <label className="content-field" key={key}><span>{label}</span>{multiline ? <textarea rows={3} value={current[group.section]?.[key] || ""} onChange={(event) => change(group.section, key, event)} /> : <input value={current[group.section]?.[key] || ""} onChange={(event) => change(group.section, key, event)} />}</label>;
             })}
           </section>
@@ -198,7 +238,7 @@ export default function SiteContentBoard() {
       </div>
 
       <footer className="content-savebar">
-        <div><strong>Публикация безопасна для броней</strong><span>CMS меняет публичный контент и медиа. Номерной фонд, цены, inventory и заявки остаются в Core.</span></div>
+        <div><strong>Публикация безопасна для броней</strong><span>CMS меняет публичный редакционный контент и медиа. Номерной фонд, цены, inventory, оплаты и заявки остаются в Core.</span></div>
         <div><button className="btn" disabled={saving} onClick={() => void saveDraft()}>Сохранить черновик</button><button className="btn primary" disabled={saving} onClick={() => void publish()}>{saving ? "Сохраняю…" : "Опубликовать на сайте"}</button></div>
       </footer>
     </main>
