@@ -231,6 +231,9 @@ jobs:
       - name: Release 0.60 full-domain E2E
         run: python scripts/release_060_e2e.py
 
+      - name: Dining folio E2E
+        run: python scripts/dining_folio_e2e.py
+
       - name: Chef production snapshot E2E
         run: python scripts/chef_production_snapshot_e2e.py
 
