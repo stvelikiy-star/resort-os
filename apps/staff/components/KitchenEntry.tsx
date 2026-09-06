@@ -166,7 +166,7 @@ export default function KitchenEntry() {
         <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. «Меню сегодня» публикует блюда и стоп-лист. Официант ведёт столы/выдачу READY → SERVED. Гостю показываются только активные, утверждённые и опубликованные позиции.</span>
       </div>
     </section>
-    <ChefProduction />
+    <ChefProduction userRole={user.role} />
     <KitchenAdmin />
   </>;
 }
