@@ -8,6 +8,7 @@ SHELL = ROOT / "apps/admin/components/AdminShell.tsx"
 GRID_V9 = ROOT / "apps/admin/components/PMSGridV9.tsx"
 OWNER_GRID = ROOT / "apps/admin/components/PMSOwnerGrid.tsx"
 STAFF_BOARD = ROOT / "apps/admin/components/StaffBoard.tsx"
+RATE_BOARD = ROOT / "apps/admin/components/RateManagementBoard.tsx"
 
 
 def require(path: Path, *needles: str) -> None:
@@ -32,6 +33,7 @@ def main() -> int:
         'fetch("/core/api/v1/auth/me"',
         'fetch("/core/api/v1/auth/login"',
         'import PMSGrid from "./PMSGridV9"',
+        'import RateManagementBoard from "./RateManagementBoard"',
         'user.role',
         'isManager',
         'isReception',
@@ -43,6 +45,10 @@ def main() -> int:
         '{canUseOps && <button className={tab === "OPS"',
         '{tab === "OPS" && canUseOps && <OperationsBoard user={user} />}',
         'if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";',
+        'tab === "RATES"',
+        '>Цены / Сезоны</button>',
+        '{tab === "RATES" && isManager && <RateManagementBoard />}',
+        '<StaffBoard userRole={user.role} />',
     )
     require(GRID_V9, 'import PMSOwnerGrid from "./PMSOwnerGrid"', "<PMSOwnerGrid />")
     require(
@@ -53,12 +59,26 @@ def main() -> int:
         'PMS · рабочая шахматка',
     )
     require(
+        RATE_BOARD,
+        'fetch("/core/api/v1/admin/rates"',
+        '"/core/api/v1/admin/rates/periods"',
+        'method: editing ? "PATCH" : "POST"',
+        'Цены и сезоны',
+        'Уже сохранённая сумма существующей брони автоматически не переписывается.',
+    )
+    require(
         STAFF_BOARD,
         'RECEPTION: "Ресепшен"',
-        '<option value="RECEPTION">Ресепшен</option>',
-        'BEACH_PARTNER: "Пляжный партнёр"',
-        '<option value="BEACH_PARTNER">Пляжные партнёры</option>',
+        'DINING_STAFF: "Столовая / ресторан"',
+        'BEACH_PARTNER: "Пляжный партнёр (legacy)"',
         'fetch("/core/api/v1/admin/staff/overview"',
+        'fetch("/core/api/v1/admin/staff",',
+        'fetch(`/core/api/v1/admin/staff/${editing.id}`',
+        'fetch(`/core/api/v1/admin/staff/${item.id}`',
+        'data.can_manage_access',
+        'data.managed_roles.map',
+        'item.role === "OWNER"',
+        'Пляжный партнёр (legacy)',
     )
 
     # These markers belong to the historical one-file owner-review/demo surface and
@@ -72,7 +92,7 @@ def main() -> int:
         "localStorage.setItem",
         "function initState()",
     )
-    for path in (PAGE, SHELL, GRID_V9, OWNER_GRID):
+    for path in (PAGE, SHELL, GRID_V9, OWNER_GRID, STAFF_BOARD, RATE_BOARD):
         forbid(path, *forbidden)
 
     demo_route = ROOT / "apps/admin/app/demo/page.tsx"
@@ -84,7 +104,7 @@ def main() -> int:
         if "/demo" in page_text or "/demo" in shell_text or "app/demo" in page_text or "app/demo" in shell_text:
             raise AssertionError("normal admin runtime references the historical /demo route")
 
-    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; non-admin staff roles fail closed, demo markers are absent, operations UI follows staff RBAC, and existing staff roles are visible")
+    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; rates/seasons and staff access are Core-backed, non-admin roles fail closed, demo markers are absent, and operations UI follows staff RBAC")
     return 0
 
 
