@@ -58,7 +58,17 @@ jobs:
           python-version: '3.12'
 
       - name: Verify frozen release truth
-        run: python scripts/release_rc_truth_guard.py
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # A development PR is a new candidate, not the already frozen 0.60.0 tree.
+            # Validate the immutable RC manifest/docs contract without misclassifying
+            # legitimate candidate product changes as corruption of the frozen RC.
+            python scripts/release_rc_truth_guard.py --allow-non-accepted-head
+          else
+            # main must stay strict: product drift requires an explicit release refreeze.
+            python scripts/release_rc_truth_guard.py
+          fi
 
       - name: Verify canonical database release contract
         run: python scripts/release_contract_test.py
