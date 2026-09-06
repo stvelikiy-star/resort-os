@@ -7,7 +7,7 @@ import styles from "./GroupBookingBoard.module.css";
 type Room = {
   room_id: string; code: string; name: string; room_type_code: string; room_type_name: string;
   building_or_zone?: string | null; floor?: string | null; beds_raw?: string | null;
-  capacity_adults: number; capacity_children: number; operational_state: string;
+  capacity_adults: number; capacity_children: number | null; children_capacity_confirmed: boolean; operational_state: string;
   available: boolean; reason?: string | null;
   pricing?: { sellable: boolean; total_kgs?: number | null; reason?: string | null } | null;
 };
@@ -151,8 +151,9 @@ export default function GroupBookingBoard({ userRole }: Props) {
         <div className={styles.rooms}>{visible.map((room) => {
           const override = overrides[room.room_id] || "";
           const needsOverride = !room.pricing?.sellable || room.pricing.total_kgs == null;
+          const childCapacity = room.children_capacity_confirmed ? String(room.capacity_children ?? 0) : "не подтверждено";
           return <article key={room.room_id} className={selected.has(room.room_id) ? styles.selected : ""}>
-            <label className={styles.roomMain}><input type="checkbox" checked={selected.has(room.room_id)} onChange={() => toggle(room.room_id)} /><span><strong>№ {room.code}</strong><b>{room.room_type_name}</b><small>{room.building_or_zone || "—"} · {room.floor || "—"} · до {room.capacity_adults}+{room.capacity_children}</small></span></label>
+            <label className={styles.roomMain}><input type="checkbox" checked={selected.has(room.room_id)} onChange={() => toggle(room.room_id)} /><span><strong>№ {room.code}</strong><b>{room.room_type_name}</b><small>{room.building_or_zone || "—"} · {room.floor || "—"} · взрослых до {room.capacity_adults} · дети: {childCapacity}</small></span></label>
             <div className={styles.price}>{needsOverride ? <>{canOverrideRates ? <><span>Цена требует решения</span><input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="Ручная цена" /></> : <span>Нет подтверждённой Core-цены</span>}</> : <><span>Core rate</span><strong>{money(Number(room.pricing!.total_kgs))}</strong>{canOverrideRates && selected.has(room.room_id) && <input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="или override" />}</>}</div>
           </article>;
         })}</div>
