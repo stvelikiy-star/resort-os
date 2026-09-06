@@ -100,7 +100,7 @@ CHECKS: list[tuple[str, str, str]] = [
     ("scripts/verify_kitchen_operations.py", "KITCHEN OPERATIONS E2E: PASS", "kitchen lifecycle E2E verifier present"),
     (".github/workflows/core-ci.yml", "Verify check-in checkout housekeeping lifecycle", "core stay lifecycle gate"),
     (".github/workflows/release-gate-ci.yml", "Root control-center verification", "release control-center gate"),
-    (".github/workflows/full-staging-gate.yml", "Run full synthetic staging acceptance", "full staging gate"),
+    (".github/workflows/staging-full-gate-ci.yml", "Run full synthetic staging acceptance", "full staging gate"),
     (".github/workflows/inbox-ci.yml", "Verify command center communication metrics and resolve conversation", "inbox E2E gate"),
     (".github/workflows/guest-services-ci.yml", "Run unified Guest Services Center E2E", "guest services gate"),
     (".github/workflows/kitchen-operations-ci.yml", "Run Kitchen Menu Management E2E", "kitchen management gate"),
