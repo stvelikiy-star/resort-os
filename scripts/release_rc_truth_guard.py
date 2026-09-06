@@ -29,6 +29,7 @@ ALLOWED_HYGIENE_PATHS = {
     ".github/workflows/launch-acceptance-ci.yml",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
 
 
 def git(*args: str) -> str:
@@ -55,6 +56,12 @@ def validate_workflows(label: str, evidence: object, errors: list[str]) -> None:
 
 def main() -> int:
     errors: list[str] = []
+    allow_non_accepted_head = ALLOW_NON_ACCEPTED_HEAD_FLAG in sys.argv[1:]
+    unknown_args = [arg for arg in sys.argv[1:] if arg != ALLOW_NON_ACCEPTED_HEAD_FLAG]
+    if unknown_args:
+        fail("unknown argument(s): " + ", ".join(unknown_args))
+        return 2
+
     try:
         rc = json.loads(RC_PATH.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -109,32 +116,38 @@ def main() -> int:
     if rc.get("observed_merge_tree_equivalent") is not True:
         errors.append("observed merge tree equivalence must be true")
 
-    if SHA_RE.fullmatch(accepted):
-        try:
-            git("cat-file", "-e", f"{accepted}^{{commit}}")
-            changed = git("diff", "--name-only", accepted, "HEAD")
-            unexpected = sorted(path for path in changed.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
-            if unexpected:
-                errors.append("executable/product drift after frozen accepted head: " + ", ".join(unexpected))
-        except subprocess.CalledProcessError as exc:
-            errors.append(f"cannot validate accepted executable head: {exc}")
+    # Strict RC truth validates the frozen historical commits and tree equivalence.
+    # Development/staging gates deliberately use --allow-non-accepted-head because
+    # they run on a new candidate PR, often with a shallow checkout. In that mode
+    # we still validate the manifest/docs contract below, but do not pretend the
+    # candidate HEAD is the already frozen accepted executable head.
+    if not allow_non_accepted_head:
+        if SHA_RE.fullmatch(accepted):
+            try:
+                git("cat-file", "-e", f"{accepted}^{{commit}}")
+                changed = git("diff", "--name-only", accepted, "HEAD")
+                unexpected = sorted(path for path in changed.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
+                if unexpected:
+                    errors.append("executable/product drift after frozen accepted head: " + ", ".join(unexpected))
+            except subprocess.CalledProcessError as exc:
+                errors.append(f"cannot validate accepted executable head: {exc}")
 
-    if SHA_RE.fullmatch(accepted) and SHA_RE.fullmatch(observed):
-        try:
-            observed_diff = git("diff", "--name-only", accepted, observed)
-            if observed_diff:
-                errors.append("observed main merge is not tree-equivalent to accepted executable head")
-        except subprocess.CalledProcessError as exc:
-            errors.append(f"cannot validate observed main merge: {exc}")
+        if SHA_RE.fullmatch(accepted) and SHA_RE.fullmatch(observed):
+            try:
+                observed_diff = git("diff", "--name-only", accepted, observed)
+                if observed_diff:
+                    errors.append("observed main merge is not tree-equivalent to accepted executable head")
+            except subprocess.CalledProcessError as exc:
+                errors.append(f"cannot validate observed main merge: {exc}")
 
-    if SHA_RE.fullmatch(observed) and SHA_RE.fullmatch(postmerge):
-        try:
-            postmerge_diff = git("diff", "--name-only", observed, postmerge)
-            unexpected = sorted(path for path in postmerge_diff.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
-            if unexpected:
-                errors.append("post-merge truth head contains executable/product drift: " + ", ".join(unexpected))
-        except subprocess.CalledProcessError as exc:
-            errors.append(f"cannot validate post-merge truth head: {exc}")
+        if SHA_RE.fullmatch(observed) and SHA_RE.fullmatch(postmerge):
+            try:
+                postmerge_diff = git("diff", "--name-only", observed, postmerge)
+                unexpected = sorted(path for path in postmerge_diff.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
+                if unexpected:
+                    errors.append("post-merge truth head contains executable/product drift: " + ", ".join(unexpected))
+            except subprocess.CalledProcessError as exc:
+                errors.append(f"cannot validate post-merge truth head: {exc}")
 
     for doc in DOCS:
         try:
@@ -166,8 +179,13 @@ def main() -> int:
     print("FACT: postmerge_truth_workflows=4/4")
     print("FACT: production_source_branch=main")
     print("FACT: production_cutover_authorized=false")
-    print("PASS: RC manifest, canonical docs and frozen executable tree are consistent")
-    print("RESULT: RELEASE RC TRUTH GREEN; EXTERNAL CUTOVER STOP")
+    if allow_non_accepted_head:
+        print("FACT: candidate_head_mode=non_accepted_head_allowed; frozen tree comparison intentionally skipped")
+        print("PASS: RC manifest and canonical docs are structurally consistent for candidate validation")
+        print("RESULT: RELEASE RC CONTRACT GREEN; CANDIDATE IS NOT THE FROZEN RC")
+    else:
+        print("PASS: RC manifest, canonical docs and frozen executable tree are consistent")
+        print("RESULT: RELEASE RC TRUTH GREEN; EXTERNAL CUTOVER STOP")
     return 0
 
 
