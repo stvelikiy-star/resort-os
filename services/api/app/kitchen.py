@@ -6,6 +6,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, s
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
 
@@ -331,6 +332,7 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
             pid = await property_id(conn, user["property_code"])
             table_id = payload.table_id
             if table_id:
+                await lock_dining_tables(conn, table_id)
                 exists = await conn.fetchval('SELECT 1 FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true', table_id, pid)
                 if not exists:
                     raise HTTPException(status_code=422, detail="Active table not found")
@@ -368,6 +370,8 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
+            if row["tableId"]:
+                await lock_dining_tables(conn, row["tableId"])
             if payload.status not in ORDER_TRANSITIONS[row["status"]]:
                 raise HTTPException(status_code=409, detail={"code": "KITCHEN_ORDER_INVALID_TRANSITION", "from": row["status"], "to": payload.status})
 
@@ -422,7 +426,12 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
                     '''SELECT 1 FROM kitchen_orders WHERE "tableId"=$1 AND id<>$2 AND status IN ('NEW','ACCEPTED','COOKING','READY') LIMIT 1''', row["tableId"], order_id,
                 )
                 if not other:
-                    await conn.execute('UPDATE kitchen_tables SET status=\'AVAILABLE\',"updatedAt"=now() WHERE id=$1', row["tableId"])
+                    live_session = await active_session_for_table(conn, row["tableId"])
+                    table_status = live_table_status(live_session) if live_session else "AVAILABLE"
+                    await conn.execute(
+                        'UPDATE kitchen_tables SET status=$2,"updatedAt"=now() WHERE id=$1',
+                        row["tableId"], table_status,
+                    )
             await audit(
                 conn, pid, "STAFF", user["id"], "UPDATE_KITCHEN_ORDER_STATUS", str(order_id),
                 {
