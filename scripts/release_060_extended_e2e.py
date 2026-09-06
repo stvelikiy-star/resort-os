@@ -228,7 +228,25 @@ async def main() -> None:
             assert order["financial_posting"] == "OPEN_FOLIO_CHARGE_NOT_PAYMENT"
             guest_order_id = order["id"]
 
-        # 4. Kitchen can fulfill the room order, while finance remains a folio receivable only.
+            cancelled_order = ok(
+                await guest.post(
+                    f"/api/v1/guest-os/rooms/{room_token}/kitchen/orders",
+                    json={
+                        "guest_count": 1,
+                        "meal_type": "OTHER",
+                        "delivery_to_room": False,
+                        "notes": "Extended release E2E cancellation",
+                        "items": [{"menu_item_id": selected["id"], "quantity": 1}],
+                    },
+                ),
+                "Guest OS order prepared for cancellation",
+            )
+            cancelled_order_id = cancelled_order["id"]
+            cancelled_task_id = cancelled_order["task_id"]
+            cancelled_total = cancelled_order["total_kgs"]
+            assert cancelled_order["delivery_fee_kgs"] == 0
+
+        # 4. Kitchen can fulfill one room order while finance remains a folio receivable only.
         for next_status in ["ACCEPTED", "COOKING", "READY", "SERVED"]:
             changed = ok(
                 await owner.patch(f"/api/v1/kitchen/orders/{guest_order_id}/status", json={"status": next_status}),
@@ -236,13 +254,53 @@ async def main() -> None:
             )
             assert changed["status"] == next_status
 
-        folio = ok(await owner.get(f"/api/v1/admin/folio/reservations/{reservation_id}"), "folio after Guest OS delivery")
-        charge = next(
+        folio_before_cancel = ok(
+            await owner.get(f"/api/v1/admin/folio/reservations/{reservation_id}"),
+            "folio before Guest OS order cancellation",
+        )
+        cancelled_charge_before = next(
+            item for item in folio_before_cancel["charges"]
+            if item["source_type"] == "KITCHEN_ORDER" and item["source_id"] == cancelled_order_id
+        )
+        assert cancelled_charge_before["status"] == "OPEN"
+        extras_before_cancel = folio_before_cancel["totals"]["extras_kgs"]
+
+        cancelled = ok(
+            await owner.patch(
+                f"/api/v1/kitchen/orders/{cancelled_order_id}/status",
+                json={"status": "CANCELLED"},
+            ),
+            "cancel Guest OS kitchen order",
+        )
+        assert cancelled["status"] == "CANCELLED"
+
+        # 5. Cancellation must void the receivable; it must never leave a ghost debt or fabricate/refund a Payment.
+        folio = ok(await owner.get(f"/api/v1/admin/folio/reservations/{reservation_id}"), "folio after Guest OS cancellation")
+        served_charge = next(
             item for item in folio["charges"]
             if item["source_type"] == "KITCHEN_ORDER" and item["source_id"] == guest_order_id
         )
-        assert charge["amount_kgs"] == order["total_kgs"]
-        assert folio["totals"]["paid_kgs"] == 777, "Guest OS order must never fabricate payment truth"
+        cancelled_charge = next(
+            item for item in folio["charges"]
+            if item["source_type"] == "KITCHEN_ORDER" and item["source_id"] == cancelled_order_id
+        )
+        assert served_charge["amount_kgs"] == order["total_kgs"]
+        assert served_charge["status"] == "OPEN"
+        assert cancelled_charge["amount_kgs"] == cancelled_total
+        assert cancelled_charge["status"] == "VOID"
+        assert folio["totals"]["extras_kgs"] == extras_before_cancel - cancelled_total
+        assert folio["totals"]["paid_kgs"] == 777, "Kitchen order lifecycle must never fabricate payment truth"
+
+        conn = await asyncpg.connect(DATABASE_URL)
+        try:
+            task = await conn.fetchrow(
+                '''SELECT status::text AS status,"chargeStatus" FROM operational_tasks WHERE id=$1''',
+                uuid.UUID(cancelled_task_id),
+            )
+            assert task and task["status"] == "CANCELLED"
+            assert task["chargeStatus"] == "CANCELLED"
+        finally:
+            await conn.close()
 
         print(
             "Release 0.60 extended E2E PASS:",
@@ -253,6 +311,8 @@ async def main() -> None:
                 "transfer_from": source_code,
                 "transfer_to": target_code,
                 "guest_order_id": guest_order_id,
+                "cancelled_order_id": cancelled_order_id,
+                "cancelled_charge_status": cancelled_charge["status"],
                 "delivery_fee_kgs": order["delivery_fee_kgs"],
                 "paid_kgs": folio["totals"]["paid_kgs"],
             },
