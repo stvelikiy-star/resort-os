@@ -136,6 +136,7 @@ jobs:
       - name: Validate release/data truth and seed canonical hotel
         run: |
           python scripts/release_contract_test.py
+          python scripts/core_db_url_contract_test.py
           python scripts/release_rc_truth_guard.py --allow-non-accepted-head
           python scripts/owner_corrections_truth_guard.py
           python scripts/public_site_truth_guard.py
