@@ -62,6 +62,27 @@ async def create_table(client: httpx.AsyncClient, label: str) -> dict[str, Any]:
     )
 
 
+async def ensure_orderable_menu_item(client: httpx.AsyncClient) -> dict[str, Any]:
+    menu = ok(await client.get("/api/v1/kitchen/menu"), "load kitchen menu")
+    approved = [item for item in menu.get("items", []) if item.get("is_active") and not item.get("is_draft")]
+    if approved:
+        return approved[0]
+
+    ok(await client.post("/api/v1/kitchen/menu/bootstrap-draft"), "bootstrap synthetic kitchen menu")
+    menu = ok(await client.get("/api/v1/kitchen/menu"), "reload kitchen menu")
+    candidates = [item for item in menu.get("items", []) if item.get("is_active")]
+    assert candidates, "synthetic kitchen menu item is required"
+    chosen = candidates[0]
+    updated = ok(
+        await client.patch(
+            f"/api/v1/kitchen/menu/{chosen['id']}",
+            json={"is_active": True, "is_draft": False},
+        ),
+        "approve synthetic kitchen menu item",
+    )
+    return updated
+
+
 async def main() -> None:
     context = await release_stay()
     stay_id = context["stay_id"]
@@ -113,6 +134,12 @@ async def main() -> None:
             ),
             "cancel external synthetic reservation",
         )
+        reopen_terminal = await owner.patch(
+            f"/api/v1/dining/table-reservations/{external_reservation['id']}",
+            json={"status": "BOOKED"},
+        )
+        assert reopen_terminal.status_code == 409, reopen_terminal.text
+        assert reopen_terminal.json().get("detail", {}).get("code") == "DINING_RESERVATION_INVALID_TRANSITION"
 
         # A reservation linked to the same Stay is synchronized with live seating.
         source_table = await create_table(owner, "Coordination linked source")
@@ -150,6 +177,13 @@ async def main() -> None:
         )
         session_id = session["id"]
 
+        backward = await owner.patch(
+            f"/api/v1/dining/sessions/{session_id}/status",
+            json={"status": "WAITING"},
+        )
+        assert backward.status_code == 409, backward.text
+        assert backward.json().get("detail", {}).get("code") == "DINING_SESSION_INVALID_TRANSITION"
+
         reservations = ok(
             await owner.get(f"/api/v1/dining/table-reservations?service_date={D0.isoformat()}"),
             "list table reservations after seating",
@@ -159,6 +193,36 @@ async def main() -> None:
         assert linked_after_seat["table_id"] == source_table["id"]
         assert linked_after_seat["stay_id"] == stay_id
         assert linked_after_seat["reservation_id"] == reservation_id
+
+        # Closing the final kitchen order must not free a table while a live
+        # dining session still owns it.
+        menu_item = await ensure_orderable_menu_item(owner)
+        order = ok(
+            await owner.post(
+                "/api/v1/kitchen/orders",
+                json={
+                    "source": "TABLE",
+                    "table_id": source_table["id"],
+                    "stay_id": stay_id,
+                    "guest_count": session["party_size"],
+                    "meal_type": "OTHER",
+                    "notes": "Dining coordination occupancy regression",
+                    "items": [{"menu_item_id": menu_item["id"], "quantity": 1}],
+                },
+            ),
+            "create coordinated table order",
+        )
+        for next_status in ("ACCEPTED", "COOKING", "READY", "SERVED"):
+            ok(
+                await owner.patch(
+                    f"/api/v1/kitchen/orders/{order['id']}/status",
+                    json={"status": next_status},
+                ),
+                f"advance coordinated order to {next_status}",
+            )
+        floor_after_serve = ok(await owner.get("/api/v1/dining/floor-layout"), "floor after final table order served")
+        source_after_serve = next(item for item in floor_after_serve["tables"] if item["id"] == source_table["id"])
+        assert source_after_serve["status"] == "OCCUPIED", source_after_serve
 
         # Reservation lifecycle cannot independently close while its matching
         # live session is still authoritative.
@@ -228,6 +292,13 @@ async def main() -> None:
         assert source_state == "CLEANING"
         assert target_state == "CLEANING"
 
+        closed_session_mutation = await owner.patch(
+            f"/api/v1/dining/sessions/{session_id}/status",
+            json={"status": "SEATED"},
+        )
+        assert closed_session_mutation.status_code == 409, closed_session_mutation.text
+        assert closed_session_mutation.json().get("detail", {}).get("code") == "DINING_SESSION_INVALID_TRANSITION"
+
         print(
             "Dining coordination E2E PASS:",
             {
@@ -235,6 +306,7 @@ async def main() -> None:
                 "blocked_reservation_id": external_reservation["id"],
                 "linked_reservation_id": linked_reservation["id"],
                 "session_id": session_id,
+                "order_id": order["id"],
                 "moved_to_table_id": target_table["id"],
                 "final_reservation_status": linked_after_release["status"],
             },
