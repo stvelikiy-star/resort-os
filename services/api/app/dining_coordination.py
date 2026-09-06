@@ -41,7 +41,7 @@ async def active_session_for_table(
     exclude_session_id: uuid.UUID | None = None,
 ):
     return await conn.fetchrow(
-        '''SELECT id,"stayId","reservationId","tableId",status,"serviceDate"
+        '''SELECT id,"stayId","reservationId","tableId",status,"serviceDate","partySize","mealType"
            FROM dining_table_sessions
            WHERE "tableId"=$1 AND status IN ('WAITING','SEATED')
              AND ($2::uuid IS NULL OR id<>$2)
