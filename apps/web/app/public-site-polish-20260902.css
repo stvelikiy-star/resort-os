@@ -1,0 +1,198 @@
+/* Three Crowns — public-site polish 2026-09-02
+   Loaded after luxury-director.css. Visual-only layer: no booking/Core/business semantics.
+   Approved general resort media only. Exact room-category media remains intentionally unbound. */
+
+:root {
+  --tc-approved-beach: url("/media/three-crowns/approved/territory/beach-mountains.webp");
+  --tc-approved-pier: url("/media/three-crowns/approved/territory/pier-front.webp");
+  --tc-approved-pool: url("/media/three-crowns/approved/territory/pool.webp");
+  --tc-focus: rgba(214, 231, 245, .92);
+  --tc-soft-line: rgba(219, 231, 242, .18);
+}
+
+/* Use real, PUBLIC_USE=YES resort imagery without changing the page's factual model. */
+.v3-hero-media {
+  background-image: linear-gradient(90deg, rgba(4, 9, 21, .2), rgba(4, 9, 21, .02)), var(--tc-approved-beach) !important;
+  background-size: cover !important;
+  background-position: center 56% !important;
+  background-repeat: no-repeat !important;
+}
+.v3-hero-media video { opacity: 0 !important; pointer-events: none !important; }
+
+.v3-territory-film {
+  min-height: clamp(430px, 54vw, 720px) !important;
+  background-image: linear-gradient(180deg, rgba(3, 12, 24, .04), rgba(3, 12, 24, .42)), var(--tc-approved-pool) !important;
+  background-size: cover !important;
+  background-position: center 50% !important;
+  background-repeat: no-repeat !important;
+}
+.v3-territory-film video { opacity: 0 !important; pointer-events: none !important; }
+
+.v3-lake-film {
+  min-height: clamp(430px, 52vw, 680px) !important;
+  background-image: linear-gradient(180deg, rgba(4, 12, 25, .02), rgba(4, 12, 25, .54)), var(--tc-approved-pier) !important;
+  background-size: cover !important;
+  background-position: center 52% !important;
+  background-repeat: no-repeat !important;
+}
+.v3-lake-film video { opacity: 0 !important; pointer-events: none !important; }
+
+.v3-groups-media {
+  background-image: linear-gradient(90deg, rgba(4, 10, 22, .82), rgba(4, 10, 22, .32)), var(--tc-approved-beach) !important;
+  background-size: cover !important;
+  background-position: center 60% !important;
+}
+.v3-groups-media img { opacity: 0 !important; }
+
+/* Give the advantage rail real visual rhythm instead of one repeated fallback. */
+.v3-advantage-card:nth-child(6n + 1) .v3-advantage-image,
+.v3-advantage-card:nth-child(6n + 2) .v3-advantage-image {
+  background-image: linear-gradient(180deg, rgba(4, 12, 24, .02), rgba(4, 12, 24, .2)), var(--tc-approved-beach) !important;
+}
+.v3-advantage-card:nth-child(6n + 3) .v3-advantage-image,
+.v3-advantage-card:nth-child(6n + 4) .v3-advantage-image {
+  background-image: linear-gradient(180deg, rgba(4, 12, 24, .02), rgba(4, 12, 24, .2)), var(--tc-approved-pier) !important;
+}
+.v3-advantage-card:nth-child(6n + 5) .v3-advantage-image,
+.v3-advantage-card:nth-child(6n + 6) .v3-advantage-image {
+  background-image: linear-gradient(180deg, rgba(4, 12, 24, .02), rgba(4, 12, 24, .2)), var(--tc-approved-pool) !important;
+}
+.v3-advantage-image {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+.v3-advantage-image img { opacity: 0 !important; }
+
+/* Editorial hierarchy: premium but calmer than the previous oversized display treatment. */
+.v3-hero h1 {
+  max-width: 980px !important;
+  font-size: clamp(3.7rem, 7vw, 7.35rem) !important;
+  line-height: .9 !important;
+  letter-spacing: -.052em !important;
+}
+.display-title {
+  font-size: clamp(2.75rem, 5vw, 5.45rem) !important;
+  line-height: .94 !important;
+  letter-spacing: -.048em !important;
+}
+.v3-hero-copy { max-width: 670px !important; }
+.v3-section-head { align-items: end !important; gap: clamp(28px, 5vw, 86px) !important; }
+.v3-section-head > p,
+.v3-section-head > div:last-child { max-width: 590px; }
+
+/* Make the booking block feel like the main transactional surface, not another card row. */
+.v3-booking-stage { gap: clamp(18px, 2.4vw, 34px) !important; }
+.v3-booking-main .booking-shell { border-radius: 30px !important; }
+.v3-booking-help { border-radius: 26px !important; }
+.v3-booking-trust { row-gap: 8px !important; }
+
+/* Room catalogue remains truthful: generic resort fallback is deliberately de-emphasized
+   until exact category media receives PUBLIC_USE approval. */
+.v3-room-card-photo {
+  min-height: 245px !important;
+  background: linear-gradient(155deg, #10233a, #071323) !important;
+}
+.v3-room-card-photo::after {
+  content: "Три Короны · Resort visual";
+  position: absolute;
+  z-index: 3;
+  left: 18px;
+  bottom: 16px;
+  padding: 7px 10px;
+  border: 1px solid rgba(235, 242, 248, .24);
+  border-radius: 999px;
+  color: rgba(248, 251, 253, .86);
+  background: rgba(4, 13, 25, .48);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: .66rem;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.v3-room-card-photo img {
+  opacity: .72 !important;
+  filter: saturate(.78) contrast(1.06) brightness(.72) !important;
+}
+.v3-room-card:hover .v3-room-card-photo img {
+  opacity: .86 !important;
+  filter: saturate(.9) contrast(1.05) brightness(.78) !important;
+}
+
+/* Cards: cleaner vertical rhythm and slightly less glass-noise. */
+.v3-advantage-card,
+.v3-room-card,
+.v3-amenity-grid article,
+.v3-review-grid article,
+.v3-extra-grid article,
+.v3-group-grid article {
+  border-color: var(--tc-soft-line) !important;
+}
+.v3-extra-grid article { min-height: 220px; }
+.v3-contact-actions a { min-height: 92px; }
+
+/* Strong, consistent keyboard affordance across desktop/mobile. */
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--tc-focus) !important;
+  outline-offset: 4px !important;
+  border-radius: 10px;
+}
+.site-language-switcher button:focus-visible,
+.menu-toggle:focus-visible { border-radius: 999px; }
+
+@media (max-width: 960px) {
+  .v3-hero h1 { font-size: clamp(3.3rem, 9.2vw, 5.7rem) !important; }
+  .display-title { font-size: clamp(2.55rem, 7vw, 4.5rem) !important; }
+  .v3-section-head { align-items: start !important; }
+  .v3-territory-film,
+  .v3-lake-film { min-height: clamp(390px, 72vw, 610px) !important; }
+}
+
+@media (max-width: 640px) {
+  .v3-hero { min-height: 92svh !important; }
+  .v3-hero-media { background-position: 58% center !important; }
+  .v3-hero h1 {
+    font-size: clamp(3rem, 14vw, 4.7rem) !important;
+    line-height: .91 !important;
+    max-width: 11ch !important;
+  }
+  .display-title { font-size: clamp(2.45rem, 12vw, 3.75rem) !important; }
+  .v3-hero-copy { font-size: .98rem !important; line-height: 1.65 !important; max-width: 34rem !important; }
+  .v3-hero-meta {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    width: 100% !important;
+  }
+  .v3-hero-meta span { padding: 12px 12px 12px 0 !important; }
+  .v3-territory-film,
+  .v3-lake-film {
+    width: calc(100% - 28px) !important;
+    min-height: 420px !important;
+    border-radius: 22px !important;
+  }
+  .v3-territory-film { background-position: 52% center !important; }
+  .v3-lake-film { background-position: 48% center !important; }
+  .v3-room-card-photo { min-height: 220px !important; }
+  .v3-room-card-photo::after { font-size: .58rem; left: 12px; bottom: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  .v3-advantage-track { animation-play-state: paused !important; }
+  .v3-advantage-card,
+  .v3-room-card,
+  .v3-amenity-grid article,
+  .v3-review-grid article,
+  .v3-extra-grid article,
+  .v3-group-grid article,
+  .button,
+  .header-book,
+  .search-button { transition: none !important; transform: none !important; }
+  .v3-advantage-card:hover,
+  .v3-room-card:hover,
+  .v3-amenity-grid article:hover,
+  .v3-review-grid article:hover,
+  .v3-extra-grid article:hover,
+  .v3-group-grid article:hover { transform: none !important; }
+}

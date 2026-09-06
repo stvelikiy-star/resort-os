@@ -20,6 +20,8 @@ import "./owner-corrections.css";
 import "./mobile-hardening.css";
 import "./ai-admin.css";
 import "./luxury-director.css";
+import "./public-site-polish-20260902.css";
+import "./room-media-polish.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { content } = await getPublishedSiteContent("ru");
