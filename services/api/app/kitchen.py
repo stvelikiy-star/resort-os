@@ -331,12 +331,28 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
             table_id = payload.table_id
+            live_session = None
             if table_id:
                 await lock_dining_tables(conn, table_id)
                 exists = await conn.fetchval('SELECT 1 FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true', table_id, pid)
                 if not exists:
                     raise HTTPException(status_code=422, detail="Active table not found")
+                if payload.source == "TABLE":
+                    live_session = await active_session_for_table(conn, table_id)
+
             stay_id = payload.stay_id
+            if live_session:
+                if stay_id is not None and stay_id != live_session["stayId"]:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "KITCHEN_TABLE_STAY_MISMATCH",
+                            "session_id": str(live_session["id"]),
+                            "session_stay_id": str(live_session["stayId"]),
+                        },
+                    )
+                stay_id = live_session["stayId"]
+
             reservation_id = None
             room_id = None
             if stay_id:
@@ -349,12 +365,26 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
                 room_id = await conn.fetchval('SELECT id FROM rooms WHERE "propertyId"=$1 AND code=$2', pid, payload.room_code.strip())
                 if not room_id:
                     raise HTTPException(status_code=422, detail="Room not found")
+
+            guest_count = int(live_session["partySize"]) if live_session else payload.guest_count
+            meal_type = payload.meal_type if payload.meal_type is not None else (live_session["mealType"] if live_session else None)
             order_id, order_number, total = await insert_order(
                 conn, pid=pid, source=payload.source, table_id=table_id, stay_id=stay_id, reservation_id=reservation_id,
-                room_id=room_id, guest_task_id=None, guest_count=payload.guest_count, meal_type=payload.meal_type,
+                room_id=room_id, guest_task_id=None, guest_count=guest_count, meal_type=meal_type,
                 notes=payload.notes, opened_by_id=uuid.UUID(user["id"]), items=payload.items,
             )
-            await audit(conn, pid, "STAFF", user["id"], "CREATE_KITCHEN_ORDER", str(order_id), {"order_number": order_number, "total_kgs": total, "source": payload.source})
+            await audit(
+                conn, pid, "STAFF", user["id"], "CREATE_KITCHEN_ORDER", str(order_id),
+                {
+                    "order_number": order_number,
+                    "total_kgs": total,
+                    "source": payload.source,
+                    "stay_id": str(stay_id) if stay_id else None,
+                    "live_session_id": str(live_session["id"]) if live_session else None,
+                    "guest_count": guest_count,
+                    "meal_type": meal_type,
+                },
+            )
     return {"id": str(order_id), "order_number": order_number, "status": "NEW", "total_kgs": total, "financial_posting": "NONE_AUTOMATIC"}
 
 
