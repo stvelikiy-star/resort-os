@@ -1,0 +1,61 @@
+name: Management Final Acceptance CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'apps/staff/**'
+      - 'services/api/**'
+      - 'scripts/**'
+      - 'docs/THREE_CROWNS_MANAGEMENT_FINAL_ACCEPTANCE_2026-09-06.md'
+      - '.github/workflows/management-final-acceptance-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  management-final-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run management final truth assertions
+        run: python scripts/verify_management_final_acceptance.py
+
+      - name: Compile management Core and acceptance scripts
+        run: python -m compileall -q services/api/app scripts
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            apps/admin/package-lock.json
+            apps/staff/package-lock.json
+
+      - name: Typecheck and build Admin
+        working-directory: apps/admin
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Typecheck and build Staff
+        working-directory: apps/staff
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Acceptance summary
+        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_CI_PASS'
