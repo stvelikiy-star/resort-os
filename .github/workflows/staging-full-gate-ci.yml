@@ -63,16 +63,11 @@ jobs:
       GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:13000
       SERVICE_POINT_PUBLIC_BASE_URL: http://127.0.0.1:13000
       BOOTSTRAP_OWNER_USERNAME: staging-owner
-      BOOTSTRAP_OWNER_PASSWORD: staging-owner-password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: Staging Owner
       DINING_STAFF_USERNAME: staging-dining
-      DINING_STAFF_PASSWORD: staging-dining-password-2026
       RECEPTION_USERNAME: staging-reception
-      RECEPTION_PASSWORD: staging-reception-password-2026
       MAID_USERNAME: staging-maid
-      MAID_PASSWORD: staging-maid-password-2026
       TECHNICIAN_USERNAME: staging-technician
-      TECHNICIAN_PASSWORD: staging-technician-password-2026
 
     steps:
       - uses: actions/checkout@v4
@@ -92,6 +87,29 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: services/api/requirements.txt
+
+      - name: Generate isolated synthetic credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          dining_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          reception_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          maid_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          tech_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          {
+            echo "BOOTSTRAP_OWNER_PASSWORD=${owner_pass}"
+            echo "DINING_STAFF_PASSWORD=${dining_pass}"
+            echo "RECEPTION_PASSWORD=${reception_pass}"
+            echo "MAID_PASSWORD=${maid_pass}"
+            echo "TECHNICIAN_PASSWORD=${tech_pass}"
+            echo "SMOKE_OWNER_USERNAME=${BOOTSTRAP_OWNER_USERNAME}"
+            echo "SMOKE_OWNER_PASSWORD=${owner_pass}"
+            echo "SMOKE_MAID_USERNAME=${MAID_USERNAME}"
+            echo "SMOKE_MAID_PASSWORD=${maid_pass}"
+            echo "SMOKE_TECHNICIAN_USERNAME=${TECHNICIAN_USERNAME}"
+            echo "SMOKE_TECHNICIAN_PASSWORD=${tech_pass}"
+          } >> "$GITHUB_ENV"
 
       - name: Install PostgreSQL client and utilities
         run: |
