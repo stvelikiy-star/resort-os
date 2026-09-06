@@ -62,7 +62,7 @@ CHECKS: list[tuple[str, str, str]] = [
     # Rates / staff access
     ("services/api/app/rate_management.py", 'router = APIRouter(prefix="/api/v1/admin/rates"', "rates API prefix"),
     ("services/api/app/rate_management.py", "RATE_PERIOD_OVERLAP", "rate overlap guard"),
-    ("services/api/app/staff_control.py", 'router = APIRouter(prefix="/api/v1/admin/staff-control"', "staff control API prefix"),
+    ("services/api/app/staff_control.py", 'router = APIRouter(prefix="/api/v1/admin/staff"', "staff control API prefix"),
     ("services/api/app/staff_control.py", 'owner_access = require_roles("OWNER")', "staff owner-only guard"),
     ("services/api/app/staff_control.py", "auth_sessions", "staff session revocation"),
 
