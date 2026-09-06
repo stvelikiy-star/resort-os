@@ -49,7 +49,7 @@ export default function KitchenEntry() {
       setPulse({
         menu: menuBody.items ?? [],
         tables: tablesBody.items ?? [],
-        orders: orderBody.items ?? [],
+        orders: ordersBody.items ?? [],
         arrivals: arrivalsBody.items ?? [],
       });
       setPulseError(null);
