@@ -77,7 +77,11 @@ def audit_checklist(checklist: dict[str, Any]) -> list[str]:
     return errors
 
 
-def audit_rooms(rooms: list[dict[str, str]], rates: list[dict[str, str]]) -> tuple[list[str], list[dict[str, Any]]]:
+def audit_rooms(
+    rooms: list[dict[str, str]], rates: list[dict[str, str]] | None = None
+) -> tuple[list[str], list[dict[str, Any]]]:
+    if rates is None:
+        rates = load_rates()
     structural_errors: list[str] = []
     issues: list[dict[str, Any]] = []
 
