@@ -170,19 +170,19 @@ jobs:
       - name: Start public web
         working-directory: apps/web
         run: |
-          PORT=13000 CORE_API_URL=http://127.0.0.1:18000 npm start > /tmp/staging-web.log 2>&1 &
+          CORE_API_URL=http://127.0.0.1:18000 npx next start -p 13000 > /tmp/staging-web.log 2>&1 &
           echo $! > /tmp/staging-web.pid
 
       - name: Start admin
         working-directory: apps/admin
         run: |
-          PORT=13001 CORE_API_URL=http://127.0.0.1:18000 npm start > /tmp/staging-admin.log 2>&1 &
+          CORE_API_URL=http://127.0.0.1:18000 npx next start -p 13001 > /tmp/staging-admin.log 2>&1 &
           echo $! > /tmp/staging-admin.pid
 
       - name: Start staff
         working-directory: apps/staff
         run: |
-          PORT=13002 CORE_API_URL=http://127.0.0.1:18000 npm start > /tmp/staging-staff.log 2>&1 &
+          CORE_API_URL=http://127.0.0.1:18000 npx next start -p 13002 > /tmp/staging-staff.log 2>&1 &
           echo $! > /tmp/staging-staff.pid
 
       - name: Wait for Next apps
