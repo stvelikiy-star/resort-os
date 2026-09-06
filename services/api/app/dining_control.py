@@ -21,6 +21,13 @@ dining_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
 
 MEAL_TYPES = {"BREAKFAST", "LUNCH", "DINNER", "OTHER"}
 ACTIVE_ORDER_STATUSES = ("NEW", "ACCEPTED", "COOKING", "READY")
+TABLE_RESERVATION_TRANSITIONS: dict[str, set[str]] = {
+    "BOOKED": {"SEATED", "CANCELLED", "NO_SHOW"},
+    "SEATED": {"COMPLETED", "CANCELLED"},
+    "COMPLETED": set(),
+    "CANCELLED": set(),
+    "NO_SHOW": set(),
+}
 
 
 class MenuDayPublish(BaseModel):
@@ -409,6 +416,19 @@ async def patch_table_reservation(
             if not row:
                 raise HTTPException(status_code=404, detail="Table reservation not found")
 
+            current_status = row["status"]
+            if payload.status == current_status:
+                return {"id": str(reservation_id), "status": current_status, "idempotent_replay": True}
+            if payload.status not in TABLE_RESERVATION_TRANSITIONS.get(current_status, set()):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_RESERVATION_INVALID_TRANSITION",
+                        "from": current_status,
+                        "to": payload.status,
+                    },
+                )
+
             live_session = await active_session_for_table(conn, row["tableId"])
             matching_session = bool(live_session and reservation_matches_session(row, live_session))
             if payload.status == "SEATED" and live_session and not matching_session:
@@ -470,12 +490,12 @@ async def patch_table_reservation(
             await audit(
                 conn, pid, user, "PATCH_TABLE_RESERVATION", "KitchenTableReservation", str(reservation_id),
                 {
-                    "from_status": row["status"], "status": payload.status,
+                    "from_status": current_status, "status": payload.status,
                     "live_session_id": str(live_session["id"]) if live_session else None,
                     "live_session_match": matching_session,
                 },
             )
-    return {"id": str(reservation_id), "status": payload.status}
+    return {"id": str(reservation_id), "status": payload.status, "idempotent_replay": False}
 
 
 @router.patch("/orders/{order_id}/waiter")
