@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import ChefProduction from "./ChefProduction";
-import KitchenAdmin from "./KitchenAdmin";
+import KitchenAdminV2 from "./KitchenAdminV2";
 import styles from "./KitchenEntry.module.css";
 
 type User = { id: string; username: string; display_name: string; role: string; property_code: string };
@@ -49,7 +49,7 @@ export default function KitchenEntry() {
       setPulse({
         menu: menuBody.items ?? [],
         tables: tablesBody.items ?? [],
-        orders: ordersBody.items ?? [],
+        orders: orderBody.items ?? [],
         arrivals: arrivalsBody.items ?? [],
       });
       setPulseError(null);
@@ -163,10 +163,10 @@ export default function KitchenEntry() {
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. «Меню сегодня» публикует блюда и стоп-лист. Официант ведёт столы/выдачу READY → SERVED. Гостю показываются только активные, утверждённые и опубликованные позиции.</span>
+        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; DINING_STAFF работает с заказами и столами без права менять цены.</span>
       </div>
     </section>
     <ChefProduction userRole={user.role} />
-    <KitchenAdmin />
+    <KitchenAdminV2 />
   </>;
 }
