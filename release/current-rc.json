@@ -1,31 +1,31 @@
 {
   "schema_version": 1,
-  "release_version": "0.60.0",
+  "release_version": "0.61.0",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "feature/owner-corrections-20260905",
-  "accepted_executable_head": "c8db446d367284465853850136c31274c8e39370",
-  "observed_merge_commit": "e5efe074abb4a277c032b017ae5fb02c5d0d5039",
+  "source_branch": "audit/full-project-fixes-20260905",
+  "accepted_executable_head": "e1ac7003abe7f63bd306778edd50a1c63dab6f17",
+  "observed_merge_commit": "8e43893c5fd6ba7f997ab7126d0d1dc5b80729e9",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 46,
-    "success": 46,
+    "triggered": 59,
+    "success": 59,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 35,
-    "success": 35,
+    "triggered": 38,
+    "success": 38,
     "failures": 0
   },
-  "postmerge_truth_head": "00fdb8d1b583cf418e1c39709fb79ca248e462e4",
+  "postmerge_truth_head": "8e43893c5fd6ba7f997ab7126d0d1dc5b80729e9",
   "postmerge_truth_workflows": {
-    "triggered": 4,
-    "success": 4,
+    "triggered": 38,
+    "success": 38,
     "failures": 0
   },
   "production_source_branch": "main",
   "main_allowed_as_production_source": true,
-  "migration_count": 20,
-  "critical_constraint_count": 81,
+  "migration_count": 22,
+  "critical_constraint_count": 87,
   "canonical_property_seed": {
     "rooms": 84,
     "room_categories": 12,
@@ -35,15 +35,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS 0.60.0 is deliberately refrozen from the exact PR #112 tested head c8db446d367284465853850136c31274c8e39370.",
-    "The exact accepted head completed all 46 triggered checks successfully with zero failures before merge.",
-    "The observed main merge e5efe074abb4a277c032b017ae5fb02c5d0d5039 is tree-equivalent to the accepted executable head and completed all 35 triggered main checks successfully with zero failures.",
-    "The later post-merge truth-only main head 00fdb8d1b583cf418e1c39709fb79ca248e462e4 changed only canonical documentation and completed all 4 triggered checks successfully.",
-    "The production source branch is now main because the accepted release is merged there; this does not authorize production cutover while branch protection and external evidence remain incomplete.",
-    "The committed database release ledger contains 20 migrations and the shared release contract fingerprints 81 critical domain constraints.",
-    "The canonical property seed is 84 rooms, 12 room categories and 48 rate rows; the physical room intake gate remains closed.",
-    "GitHub branch protection / required checks remain NOT VERIFIED and issue #91 remains a hard cutover blocker.",
+    "Resort OS 0.61.0 accepts the exact PR #116 tested executable head e1ac7003abe7f63bd306778edd50a1c63dab6f17.",
+    "The exact accepted head completed all 59 pull-request workflow runs successfully with zero failures.",
+    "The observed main merge 8e43893c5fd6ba7f997ab7126d0d1dc5b80729e9 is tree-equivalent to the accepted executable head with zero changed files.",
+    "The observed main merge triggered 40 push workflows: 38 product/security/migration/staging checks succeeded; Release RC Truth CI and Launch Acceptance CI failed closed by design because the prior frozen manifest still pointed to 0.60.0 before this refreeze.",
+    "The committed database release ledger contains 22 migrations and the shared release contract fingerprints 87 critical domain constraints.",
+    "Rooms 501/502 canonical intake truth is corrected to the owner-approved two-person basement inventory above the laundry; room intake remains closed at 84 rooms / 12 categories / 48 rate rows.",
+    "Payment idempotency includes normalized actual paid_at, production DATABASE_URL is fail-closed, Reception/finance RBAC is aligned, and housekeeping downtime catch-up uses the latest due service rather than historical task bursts.",
+    "GitHub main branch protection / required checks remain NOT VERIFIED and issue #91 remains a hard cutover blocker.",
     "Google Drive launch-control permission remediation remains NOT VERIFIED and issue #100 remains a hard cutover blocker.",
-    "All external Beget/staging/rollback/device/provider/monitoring/backup/DNS/owner-GO evidence remains separate and production cutover remains STOP."
+    "External Beget/staging/rollback/device/provider/monitoring/backup/DNS evidence remains separate; production cutover remains STOP."
   ]
 }
