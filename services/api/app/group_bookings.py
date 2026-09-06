@@ -14,6 +14,7 @@ from .pms_reservation_create import find_conflicts, load_room, property_context
 
 router = APIRouter(prefix="/api/v1/admin/pms/groups", tags=["admin-pms-groups"])
 access = require_roles("OWNER", "MANAGER", "RECEPTION")
+RATE_OVERRIDE_ROLES = {"OWNER", "MANAGER"}
 
 
 class GroupAvailabilityPayload(BaseModel):
@@ -146,6 +147,15 @@ async def group_availability(payload: GroupAvailabilityPayload, request: Request
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def commit_group(payload: GroupCommitPayload, request: Request, user: dict[str, Any] = Depends(access)):
+    if user.get("role") not in RATE_OVERRIDE_ROLES and any(member.manager_total_kgs is not None for member in payload.rooms):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "GROUP_RATE_OVERRIDE_FORBIDDEN",
+                "message": "Reception may create group reservations only at the current Core rate. Rate override requires OWNER or MANAGER.",
+            },
+        )
+
     group_id = uuid.uuid4()
     group_code = f"GR-{date.today():%y%m%d}-{secrets.token_hex(3).upper()}"
     created: list[dict[str, Any]] = []
