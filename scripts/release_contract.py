@@ -30,6 +30,7 @@ EXPECTED_MIGRATIONS = (
     "z17_dining_floor_layout_20260905",
     "z18_site_media_slots_20260905",
     "z19_dining_table_status_guard_20260905",
+    "z20_dining_active_table_unique_20260906",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
