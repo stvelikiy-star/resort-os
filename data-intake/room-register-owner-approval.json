@@ -17,7 +17,6 @@
     "GROUP:UNKNOWN_FIELD:building_or_zone:Двухместный улучшенный",
     "GROUP:UNKNOWN_FIELD:building_or_zone:Люкс двухместный",
     "GROUP:UNKNOWN_FIELD:building_or_zone:Люкс трехместный",
-    "GROUP:UNKNOWN_FIELD:building_or_zone:Одноместный, улучшенный",
     "GROUP:UNKNOWN_FIELD:building_or_zone:Одноместный, цоколь",
     "GROUP:UNKNOWN_FIELD:building_or_zone:Полулюкс без балкона",
     "GROUP:UNKNOWN_FIELD:capacity_children:Апартаменты",
@@ -29,7 +28,6 @@
     "GROUP:UNKNOWN_FIELD:capacity_children:Квартиры / апартаменты с кухней",
     "GROUP:UNKNOWN_FIELD:capacity_children:Люкс двухместный",
     "GROUP:UNKNOWN_FIELD:capacity_children:Люкс трехместный",
-    "GROUP:UNKNOWN_FIELD:capacity_children:Одноместный, улучшенный",
     "GROUP:UNKNOWN_FIELD:capacity_children:Одноместный, цоколь",
     "GROUP:UNKNOWN_FIELD:capacity_children:Полулюкс без балкона",
     "GROUP:UNKNOWN_FIELD:floor:Апартаменты",
@@ -57,5 +55,5 @@
     "P1_BED_LEGEND",
     "P1_CHILD_CAPACITY"
   ],
-  "note": "Owner correction on 2026-09-05 supersedes the earlier 501/502 mansard/single-room assumption. Rooms 501/502 are operational two-person basement rooms above the laundry and map to the existing 'Двухместный стандарт, цоколь' category. Unspecified building/child-capacity fields remain UNKNOWN; raw bed and area facts are retained without invention; operational_status remains runtime PMS truth."
+  "note": "Owner correction on 2026-09-05 supersedes the earlier 501/502 mansard/single-room assumption. Rooms 501/502 are operational two-person basement rooms above the laundry and map to the existing 'Двухместный стандарт, цоколь' category. Unspecified building/child-capacity fields remain UNKNOWN; raw bed and area facts are retained without invention; operational_status remains runtime PMS truth. The tariff-only category 'Одноместный, улучшенный' currently has no physical rooms after this correction and therefore does not generate physical-room review issues."
 }
