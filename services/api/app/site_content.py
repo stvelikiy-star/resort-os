@@ -18,9 +18,10 @@ DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "data" / "site_content_
 MAX_CONTENT_BYTES = 50_000
 MAX_FIELD_CHARS = 5_000
 
-# Public CMS is intentionally narrower than arbitrary marketing copy. These are
-# stale commercial rules or amenities that are not yet canonicalized for public
-# promotion. Keep this aligned with scripts/public_site_truth_guard.py.
+# Public CMS remains narrower than arbitrary marketing copy. These rules protect
+# owner-rejected/stale commercial claims. Sauna, billiards and conference are not
+# forbidden here because their current owner-approved public facts are canonical;
+# this is intentionally aligned with scripts/public_site_truth_guard.py.
 FORBIDDEN_PUBLIC_CONTENT = {
     "fixed 30 percent prepayment": re.compile(
         r"(?:30\s*%[^\n]{0,100}(?:предоплат|prepay|prepayment|алдын\s+ала\s+төл)|(?:предоплат|prepay|prepayment|алдын\s+ала\s+төл)[^\n]{0,100}30\s*%)",
@@ -34,9 +35,7 @@ FORBIDDEN_PUBLIC_CONTENT = {
         r"(?:(?:предоплат|prepay|prepayment|алдын\s+ала\s+төл)[^\n]{0,100}(?:перв[^\n]{0,20}(?:ноч|сут)|first\s+night|биринчи\s+түн)|(?:перв[^\n]{0,20}(?:ноч|сут)|first\s+night|биринчи\s+түн)[^\n]{0,100}(?:предоплат|prepay|prepayment|алдын\s+ала\s+төл))",
         re.I,
     ),
-    "uncanonicalized billiards claim": re.compile(r"бильярд|billiards?", re.I),
     "uncanonicalized laundry claim": re.compile(r"прачечн|laundry|кир\s+жуучу", re.I),
-    "uncanonicalized sauna claim": re.compile(r"саун|sauna", re.I),
 }
 
 router = APIRouter(tags=["site-content"])
@@ -62,16 +61,37 @@ def default_for(locale: str) -> dict[str, Any]:
     return json.loads(json.dumps(defaults()[locale], ensure_ascii=False))
 
 
+def merge_with_defaults(template: dict[str, Any], stored: dict[str, Any]) -> dict[str, Any]:
+    """Overlay stored CMS values on the current reviewed schema defaults.
+
+    This makes CMS schema evolution backward-compatible: when a new reviewed field
+    is added, older database documents immediately receive its safe default instead
+    of exposing a blank editor field or forcing a migration that mutates published
+    content. Unknown stored sections/fields are retained for validation visibility;
+    save/publish still fail closed against the current template.
+    """
+    result = json.loads(json.dumps(template, ensure_ascii=False))
+    for section_name, section in stored.items():
+        if isinstance(section, dict) and isinstance(result.get(section_name), dict):
+            result[section_name].update(section)
+        else:
+            result[section_name] = section
+    return result
+
+
 def decode_jsonb(value: Any, fallback: dict[str, Any]) -> dict[str, Any]:
+    decoded: dict[str, Any] | None = None
     if isinstance(value, dict):
-        return value
-    if isinstance(value, str) and value.strip():
+        decoded = value
+    elif isinstance(value, str) and value.strip():
         try:
-            decoded = json.loads(value)
-            return decoded if isinstance(decoded, dict) else fallback
+            candidate = json.loads(value)
+            decoded = candidate if isinstance(candidate, dict) else None
         except json.JSONDecodeError:
-            return fallback
-    return fallback
+            decoded = None
+    if decoded is None:
+        return json.loads(json.dumps(fallback, ensure_ascii=False))
+    return merge_with_defaults(fallback, decoded) if fallback else decoded
 
 
 def validate_locale(locale: str) -> str:
@@ -161,11 +181,12 @@ async def load_row(conn, property_id: uuid.UUID, locale: str) -> dict[str, Any] 
     if not row:
         return None
     fallback = default_for(locale)
+    raw_published = decode_jsonb(row["publishedJson"], {})
     return {
         "id": row["id"],
         "locale": row["locale"],
         "draftJson": decode_jsonb(row["draftJson"], fallback),
-        "publishedJson": decode_jsonb(row["publishedJson"], {}),
+        "publishedJson": merge_with_defaults(fallback, raw_published) if raw_published else {},
         "version": row["version"],
         "publishedVersion": row["publishedVersion"],
         "publishedAt": row["publishedAt"],
@@ -248,13 +269,14 @@ async def publish_site_content(locale: str, request: Request, user: dict[str, An
                     uuid.uuid4(), property_id, locale, SCOPE, seed, staff_id,
                 )
             else:
-                # Revalidate under the publish transaction. This is intentional
-                # even though save-draft validates too: publish is the public boundary.
+                # Revalidate the merged current schema under the publish transaction.
+                # This keeps older documents compatible while preventing unknown fields.
                 validate_public_content(locale, row["draftJson"])
+                merged = json.dumps(row["draftJson"], ensure_ascii=False)
                 await conn.execute(
-                    '''UPDATE site_content_documents SET "publishedJson"="draftJson","publishedVersion"=version,
-                       "publishedAt"=now(),"updatedByStaffId"=$1,"updatedAt"=now() WHERE id=$2''',
-                    staff_id, row["id"],
+                    '''UPDATE site_content_documents SET "draftJson"=$1::jsonb,"publishedJson"=$1::jsonb,
+                       "publishedVersion"=version,"publishedAt"=now(),"updatedByStaffId"=$2,"updatedAt"=now() WHERE id=$3''',
+                    merged, staff_id, row["id"],
                 )
             published = await load_row(conn, property_id, locale)
             await conn.execute(
