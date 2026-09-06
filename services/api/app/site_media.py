@@ -17,6 +17,9 @@ ALLOWED = {"image/jpeg", "image/png", "image/webp"}
 SLOT_LABELS: dict[str, str] = {
     "HERO": "Главный экран",
     "CONFERENCE": "Конференц-зал",
+    "TERRITORY": "Территория · главный визуал",
+    "WATER": "Иссык-Куль / отдых у воды · главный визуал",
+    "GROUPS": "Групповые заезды · фон",
     **{f"GALLERY_{index}": f"Галерея · фото {index}" for index in range(1, 9)},
     **{f"ADVANTAGE_{index}": f"Преимущество · карточка {index}" for index in range(1, 7)},
     **{f"ROOM_{index:02d}": f"Номерной фонд · категория {index:02d}" for index in range(1, 13)},
