@@ -11,9 +11,11 @@ on:
       - 'services/api/app/pms_reservation_create.py'
       - 'services/api/app/pms_chessboard.py'
       - 'services/api/app/pms_chessboard_read.py'
+      - 'services/api/app/group_bookings.py'
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/components/ReceptionBoard.tsx'
       - 'apps/admin/components/ReservationFolioPanel.tsx'
+      - 'apps/admin/components/GroupBookingBoard.tsx'
       - 'scripts/verify_reception_rbac.py'
       - '.github/workflows/reception-rbac-ci.yml'
   workflow_dispatch:
