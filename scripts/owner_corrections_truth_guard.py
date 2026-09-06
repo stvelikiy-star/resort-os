@@ -12,6 +12,14 @@ APPROVAL = ROOT / "data-intake" / "room-register-owner-approval.json"
 OWNER_MIGRATION = ROOT / "packages" / "database" / "prisma" / "migrations" / "z11_owner_corrections_20260905" / "migration.sql"
 SETTINGS = ROOT / "services" / "api" / "app" / "guest_service_settings.py"
 SITE_DEFAULTS = ROOT / "services" / "api" / "data" / "site_content_defaults.json"
+CONTACT_SURFACES = (
+    ROOT / "apps" / "web" / "app" / "page.tsx",
+    ROOT / "apps" / "web" / "components" / "GuestConciergeRuntime.tsx",
+    ROOT / "apps" / "web" / "components" / "GuestOsRuntime.tsx",
+    ROOT / "apps" / "web" / "lib" / "ownerApprovedGuestFacts.ts",
+)
+CURRENT_CONTACT_DIGITS = "996558085002"
+STALE_CONTACT_DIGITS = "996558085008"
 
 
 def fail(message: str) -> None:
@@ -69,9 +77,16 @@ def main() -> None:
         if not conference.get("menu"):
             fail(f"{locale} conference individual-menu rule missing")
 
+    for path in CONTACT_SURFACES:
+        text = path.read_text(encoding="utf-8")
+        if STALE_CONTACT_DIGITS in text:
+            fail(f"stale manager contact remains in {path.relative_to(ROOT)}")
+        if CURRENT_CONTACT_DIGITS not in text:
+            fail(f"corrected manager contact missing from {path.relative_to(ROOT)}")
+
     print(
         "PASS: owner corrections are consistent across canonical room intake, checksum evidence, "
-        "database migration, guest-service defaults and public conference content"
+        "database migration, guest-service defaults, public conference content and guest contact surfaces"
     )
 
 
