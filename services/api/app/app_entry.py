@@ -9,6 +9,7 @@ from .crm_sync import router as crm_sync_router
 from .dining_control import router as dining_control_router
 from .dining_entitlements import router as dining_entitlements_router
 from .dining_floor_layout import router as dining_floor_layout_router
+from .dining_production_snapshots import router as dining_production_snapshots_router
 from .dining_seating import router as dining_seating_router
 from .dining_stays import router as dining_stays_router
 from .folio import router as folio_router
@@ -125,6 +126,7 @@ app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
 app.include_router(dining_control_router)
 app.include_router(dining_entitlements_router)
+app.include_router(dining_production_snapshots_router)
 app.include_router(dining_seating_router)
 app.include_router(dining_stays_router)
 app.include_router(dining_floor_layout_router)
