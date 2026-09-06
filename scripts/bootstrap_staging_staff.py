@@ -8,18 +8,39 @@ from argon2 import PasswordHasher
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 
+
+def first_env(*names: str) -> str | None:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
 STAFF = [
     {
+        "role": "RECEPTION",
+        "username": first_env("RECEPTION_USERNAME", "STAGING_RECEPTION_USERNAME"),
+        "password": first_env("RECEPTION_PASSWORD", "STAGING_RECEPTION_PASSWORD"),
+        "display_name": first_env("RECEPTION_DISPLAY_NAME", "STAGING_RECEPTION_DISPLAY_NAME") or "Staging Reception",
+    },
+    {
+        "role": "DINING_STAFF",
+        "username": first_env("DINING_STAFF_USERNAME", "STAGING_DINING_USERNAME"),
+        "password": first_env("DINING_STAFF_PASSWORD", "STAGING_DINING_PASSWORD"),
+        "display_name": first_env("DINING_STAFF_DISPLAY_NAME", "STAGING_DINING_DISPLAY_NAME") or "Staging Dining",
+    },
+    {
         "role": "MAID",
-        "username": os.environ.get("STAGING_MAID_USERNAME"),
-        "password": os.environ.get("STAGING_MAID_PASSWORD"),
-        "display_name": os.environ.get("STAGING_MAID_DISPLAY_NAME", "Staging Maid"),
+        "username": first_env("MAID_USERNAME", "STAGING_MAID_USERNAME"),
+        "password": first_env("MAID_PASSWORD", "STAGING_MAID_PASSWORD"),
+        "display_name": first_env("MAID_DISPLAY_NAME", "STAGING_MAID_DISPLAY_NAME") or "Staging Maid",
     },
     {
         "role": "TECHNICIAN",
-        "username": os.environ.get("STAGING_TECHNICIAN_USERNAME"),
-        "password": os.environ.get("STAGING_TECHNICIAN_PASSWORD"),
-        "display_name": os.environ.get("STAGING_TECHNICIAN_DISPLAY_NAME", "Staging Technician"),
+        "username": first_env("TECHNICIAN_USERNAME", "STAGING_TECHNICIAN_USERNAME"),
+        "password": first_env("TECHNICIAN_PASSWORD", "STAGING_TECHNICIAN_PASSWORD"),
+        "display_name": first_env("TECHNICIAN_DISPLAY_NAME", "STAGING_TECHNICIAN_DISPLAY_NAME") or "Staging Technician",
     },
 ]
 
@@ -35,11 +56,20 @@ async def main() -> None:
     if APP_ENV != "staging":
         raise RuntimeError("bootstrap_staging_staff.py only runs with APP_ENV=staging")
 
+    configured = []
     for item in STAFF:
-        if not item["username"] or not item["password"]:
-            raise RuntimeError(f"Missing staging credentials for {item['role']}")
-        if len(item["password"]) < 12:
+        username = item["username"]
+        password = item["password"]
+        if not username and not password:
+            continue
+        if not username or not password:
+            raise RuntimeError(f"Incomplete staging credentials for {item['role']}")
+        if len(password) < 12:
             raise RuntimeError(f"Staging password for {item['role']} must be at least 12 characters")
+        configured.append(item)
+
+    if not configured:
+        raise RuntimeError("No staging staff credentials were configured")
 
     conn = await asyncpg.connect(database_url())
     try:
@@ -48,7 +78,7 @@ async def main() -> None:
             raise RuntimeError(f"Property {PROPERTY_CODE} is not seeded")
 
         async with conn.transaction():
-            for item in STAFF:
+            for item in configured:
                 username = item["username"].strip().lower()
                 password_hash = password_hasher.hash(item["password"])
                 user_id = await conn.fetchval(
