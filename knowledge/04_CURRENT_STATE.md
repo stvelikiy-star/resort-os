@@ -1,8 +1,8 @@
 # RESORT OS — CURRENT STATE
 
-Version: 4.1
-Date: 2026-09-05
-Status: RESORT OS 0.60.0 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP
+Version: 5.0
+Date: 2026-09-06
+Status: RESORT OS 0.61.0 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP
 Canonical: YES
 Authority: factual implementation reality only
 
@@ -11,22 +11,20 @@ Authority: factual implementation reality only
 ## Audited executable boundary
 
 Repository: `stvelikiy-star/resort-os`.
-Release PR: `#112` — `feature/owner-corrections-20260905 -> main`.
-Exact accepted executable head: `c8db446d367284465853850136c31274c8e39370`.
-Observed tree-equivalent main merge: `e5efe074abb4a277c032b017ae5fb02c5d0d5039`.
-Post-merge truth-only main head: `00fdb8d1b583cf418e1c39709fb79ca248e462e4`.
+Accepted release source PR: `#116` — `audit/full-project-fixes-20260905 -> main`.
+Exact accepted executable head: `e1ac7003abe7f63bd306778edd50a1c63dab6f17`.
+Observed tree-equivalent main merge: `8e43893c5fd6ba7f997ab7126d0d1dc5b80729e9`.
+Post-merge truth reference: `8e43893c5fd6ba7f997ab7126d0d1dc5b80729e9`.
 
 Evidence:
 
-- PR #112 exact tested head: **46/46 checks SUCCESS, 0 failures**;
+- exact PR #116 head: **59/59 pull-request workflows SUCCESS, 0 failures**;
 - accepted executable head and observed main merge have **0 changed files** between them;
-- observed main merge: **35/35 triggered checks SUCCESS, 0 failures**;
-- post-merge truth-only head: **4/4 triggered checks SUCCESS, 0 failures**;
-- the post-merge truth delta changed canonical documentation only.
+- observed main merge triggered 40 push workflows: **38 product/security/migration/staging workflows SUCCESS**;
+- `Release RC Truth CI` and `Launch Acceptance CI` failed closed on that merge because the previous frozen manifest still described 0.60.0; the 0.61.0 refreeze exists specifically to close that intentional release-truth gap without weakening the gates.
 
-The machine-readable release manifest `release/current-rc.json` is deliberately refrozen to Resort OS `0.60.0` and the exact accepted executable boundary above.
-
-The production source branch is now `main` because the accepted executable release is merged there. This does **not** authorize external deployment or DNS cutover while governance and real-world launch evidence remain incomplete.
+The machine-readable release manifest is `release/current-rc.json`.
+Production source branch is `main`. Source selection does **not** authorize external deployment or DNS cutover.
 
 ## Architecture authority
 
@@ -36,22 +34,21 @@ Core product surfaces:
 
 - Public Next.js site;
 - Resort OS Admin/PMS;
-- Staff PWA including MAID / TECHNICIAN / DINING flows;
-- Guest OS / Guest CRM contracts;
+- Staff PWA for MAID / TECHNICIAN / DINING and controlled operational roles;
+- Guest OS / Guest CRM;
 - Kitchen / Dining operations;
 - FastAPI Resort Core;
 - PostgreSQL 16;
 - n8n automation contracts.
 
 `ReservationRequest != Reservation`.
+OWNER/MANAGER retain reservation and payment authority. AI/n8n may create bounded requests and messages but may not confirm payment, guarantee a Reservation, invent payment policy, check in/out, refund, bypass Core pricing/availability or write generic business truth directly to PostgreSQL.
 
-OWNER/MANAGER retain reservation and payment authority. AI/n8n cannot confirm payment, guarantee a Reservation, invent a fixed prepayment percentage/payment route or bypass Core availability/pricing.
-
-NFC acquiring/wallet remains deferred and outside active V1 composition.
+NFC acquiring/wallet remains outside active V1. Real bank/TTLock activation remains fail-closed until actual provider credentials/contracts/hardware E2E exist.
 
 ## Database release contract
 
-The frozen 0.60.0 committed migration chain contains **20 migrations**:
+The frozen 0.61.0 committed migration chain contains **22 migrations**:
 
 1. `0_init`
 2. `1_site_content`
@@ -73,24 +70,19 @@ The frozen 0.60.0 committed migration chain contains **20 migrations**:
 18. `z17_dining_floor_layout_20260905`
 19. `z18_site_media_slots_20260905`
 20. `z19_dining_table_status_guard_20260905`
+21. `z20_dining_active_table_unique_20260906`
+22. `z21_dining_production_snapshots_20260906`
 
-Shared release tooling fingerprints **81 critical domain constraints** through `scripts/release_contract.py`.
+Shared release tooling fingerprints **87 critical domain constraints** through `scripts/release_contract.py`.
+Production/staging migration mechanism is only `npx prisma migrate deploy`; do not use `prisma db push` for production migration.
 
-Production/staging migration mechanism is only:
-
-```bash
-npx prisma migrate deploy
-```
-
-Do **not** use `prisma db push` for production migration.
-
-A clean PostgreSQL 16 acceptance run successfully applied all 20 committed migrations and seeded the canonical property dataset:
+Canonical property data remains:
 
 - 84 rooms;
 - 12 room categories;
 - 48 rate rows.
 
-The room intake/import gate remains closed at this canonical register. Do not collect the room register again.
+Physical room intake is closed. Rooms 501/502 are canonically the owner-approved two-person basement inventory above the laundry; the stale mansard/single classification is no longer authoritative.
 
 ## Public site
 
@@ -100,13 +92,14 @@ Repository/CI verified:
 - Transfer before Tours;
 - Core availability/pricing;
 - ReservationRequest creation boundary;
-- no fixed 30% prepayment claim;
+- no invented fixed prepayment percentage;
 - no automatic Reservation/Payment confirmation;
 - CMS published-only runtime;
 - CMS Media Library Draft -> Publish flow;
-- current approved contact/service facts.
+- current approved contact/service facts;
+- public room-media integrity guards.
 
-External rendered production truth is not yet verified on a real target host.
+Existing Vercel review deployments are review/demo surfaces, not proof that `3korony.com` production matches this RC.
 
 ## PMS / Reception
 
@@ -121,33 +114,34 @@ Current PMS includes:
 - CLEAN check-in gate;
 - realtime/audit;
 - factual RoomAssignment relocation;
-- checkout -> DIRTY/housekeeping lifecycle;
-- Reception authority boundaries;
+- checkout -> DIRTY -> housekeeping lifecycle;
+- group booking;
 - Guest OS PIN/session lifecycle;
-- OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN / DINING access boundaries where defined.
+- OWNER / MANAGER / RECEPTION / MAID / TECHNICIAN / DINING boundaries where defined.
 
-The canonical room register is 84 rooms / 12 categories.
+0.61.0 audit corrections align guest folio UI with backend authority: OWNER/MANAGER retain payment recording/waive/void authority; RECEPTION can read finance and create allowed service charges without forbidden payment mutations.
+
+Payment idempotency now includes normalized actual `paid_at` so the same idempotency key cannot silently replay a different payment timestamp.
 
 ## Stay / Guest OS / CRM
 
 Implemented and regression-gated:
 
 - `Stay` and `RoomAssignment` lifecycle;
-- Room QR and GuestSession/PIN access;
+- Room QR + 6-digit PIN + HttpOnly GuestSession;
 - checkout session revocation;
 - Guest OS requests;
-- Guest CRM history across repeated stays and relocations;
+- Guest CRM repeated-stay/relocation history;
 - manager-confirmed preferences;
 - GuestHistoryEvent and AuditLog trails;
-- Guest Marketplace / manager-controlled offers;
-- Kitchen menu/order access through GuestSession authority;
-- request flows that do not create payment/commercial truth automatically.
+- manager-controlled Guest Marketplace/offers;
+- Kitchen menu/order access through GuestSession authority.
 
-Room QR / GuestSession remains separate from anonymous Service Point QR.
+Room QR is **not** a physical lock credential. Anonymous Service Point QR is a separate context.
 
 ## Kitchen / Dining
 
-Kitchen is a Resort Core/PostgreSQL operational domain, not a parallel accounting system.
+Kitchen/Dining is Core/PostgreSQL-backed and does not create a parallel accounting truth.
 
 Current release includes:
 
@@ -155,112 +149,121 @@ Current release includes:
 - editable RU/KG/EN menu;
 - hotel-local daily menu publication by meal type;
 - stop-list / restore;
-- factual table register;
-- visual Dining Floor with OWNER/MANAGER layout editing and staff operational view;
-- table states and capacity/time conflict guards;
+- factual table register and visual Dining Floor;
+- OWNER/MANAGER layout editing;
+- table state/capacity/time-conflict protection;
 - waiter assignment;
-- Dining Sessions linked to Stay;
-- Kitchen order lifecycle `NEW -> ACCEPTED -> COOKING -> READY -> SERVED/CANCELLED`;
+- Stay-linked Dining Sessions;
+- order lifecycle `NEW -> ACCEPTED -> COOKING -> READY -> SERVED/CANCELLED`;
 - Guest OS Kitchen orders;
 - server-derived totals;
 - Dining arrival cards;
-- table/session status invariants;
-- Kitchen totals isolated from accommodation `Payment` and `Reservation.totalKgs`.
+- active-table uniqueness guard;
+- Dining production snapshots with integrity constraints for meal/count/fingerprint/reason.
+
+Kitchen/Dining operational amounts do not automatically become Hotel `Payment` or alter accommodation commercial truth.
+
+## Housekeeping / Maintenance / Guest Services
+
+Implemented and regression-gated:
+
+- MAID / TECHNICIAN workflows;
+- unified Guest Services Center over canonical OperationalTask;
+- role-based routing;
+- claim/complete/checklist/report flows;
+- room readiness controls;
+- anonymous Service Point QR -> OperationalTask;
+- no hidden automatic payment effects.
+
+0.61.0 changes missed 3-day housekeeping catch-up to `LATEST_DUE_ONLY`: downtime must not generate a burst of historical OPEN tasks. Included-linen and idempotency semantics remain preserved.
 
 ## Group bookings / folio / finance
 
-Release 0.60 adds and verifies:
+Implemented:
 
-- atomic group booking flow;
+- atomic group booking;
 - guest folio charges separated from actual Payments;
-- corrected payment timestamps;
-- PostgreSQL locking corrections found by production-like E2E;
+- payment timestamp/idempotency corrections;
 - remaining/overpaid/debt views including checked-out debt;
 - Owner Intelligence / Control / Growth / Dashboard analytics.
 
 Growth outbound authority remains `NONE_AUTOMATIC`.
 
-## Staff / Guest Services
+## Service Point QR / physical access boundary
 
-Implemented and regression-gated:
+Service Point QR is implemented with opaque display-once tokens, rotate/revoke lifecycle, public routing and context-mixing protections.
 
-- MAID / TECHNICIAN workflows;
-- Dining staff operations;
-- unified Guest Services Center over canonical OperationalTask;
-- role-based request routing;
-- staff voice contract;
-- anonymous Service Point QR -> OperationalTask routing;
-- no hidden automatic payment side effects.
+A paid-access Core boundary exists, but **real bank acquiring and real TTLock actuation are not production-verified**. Do not treat static bank QR, client callback or repository mocks as proof of payment or door opening.
 
-## Service Point QR / NFC boundary
-
-Service Point QR is implemented and CI-verified with opaque display-once tokens, rotate/revoke lifecycle, public routing and context-mixing protections.
-
-NFC payment/acquiring remains outside the active V1 release boundary. A successful NFC boundary check verifies that it has not been accidentally reactivated.
+NFC acquiring/wallet remains deferred outside active V1.
 
 ## AI / n8n / messaging
 
 Implemented contracts include:
 
 - unified messaging inbox;
-- provider idempotency and delivery evidence;
+- provider idempotency and delivery evidence semantics;
 - `Conversation <-> ReservationRequest` linkage;
 - AI draft authority boundary;
 - n8n -> Resort Core contract;
 - Telegram sales contract;
 - Staff Voice contract;
-- owner-approved guest facts and fail-closed provider configuration validation.
+- owner-approved guest facts;
+- fail-closed provider secret/config validation.
 
-No provider is considered live merely because repository validation is green. Real provider E2E is external launch evidence.
+No provider is considered live merely because repository CI is green. Real provider E2E is external launch evidence.
+
+## Production safety corrections in 0.61.0
+
+- production/prod environment without `DATABASE_URL` fails closed instead of silently falling back to development storage;
+- canonical room register guards prevent 501/502 owner corrections from drifting back through seed/import paths;
+- workflow branch-truth guard requires canonical release workflows to cover `main`;
+- payment and Reception finance authority are aligned across Core and UI;
+- housekeeping catch-up avoids historical task bursts.
 
 ## Release governance
 
-Repository result:
+Repository facts:
 
-- exact accepted executable head: `c8db446d367284465853850136c31274c8e39370` — **46/46 SUCCESS**;
-- tree-equivalent main merge: `e5efe074abb4a277c032b017ae5fb02c5d0d5039` — **35/35 SUCCESS**;
-- truth-only main head: `00fdb8d1b583cf418e1c39709fb79ca248e462e4` — **4/4 SUCCESS**;
-- frozen external-production manifest: `release/current-rc.json` now points to Resort OS 0.60.0.
+- accepted executable head `e1ac7003abe7f63bd306778edd50a1c63dab6f17`: **59/59 PR workflows SUCCESS**;
+- tree-equivalent main merge `8e43893c5fd6ba7f997ab7126d0d1dc5b80729e9`: **0 changed files** vs accepted head;
+- main merge: **38 successful non-refreeze workflows**, with two intentional pre-refreeze fail-closed release gates;
+- release ledger: **22 migrations / 87 critical constraints / 84 rooms / 12 categories / 48 rates**.
 
 Production governance remains fail-closed:
 
-- GitHub `main` branch protection / required-check enforcement is **NOT VERIFIED**;
-- Google Drive launch-control permissions are **NOT VERIFIED** and prior audit found public writer exposure;
-- external Beget/staging/rollback/device/provider/monitoring/backup/DNS evidence is incomplete;
+- GitHub `main` branch is currently `protected:false`; required-check enforcement is off — issue #91;
+- Google Drive launch-control permissions remain NOT VERIFIED; latest audit recorded public writer exposure — issue #100;
+- actual Beget/staging/rollback/device/provider/monitoring/backup/DNS evidence is incomplete;
 - explicit final owner cutover approval has not been given.
-
-Therefore the refrozen RC does **not** authorize DNS switch or external production declaration.
 
 ## Deployment state
 
-### GO — repository release engineering
+### GO — internal release engineering
 
-Resort OS 0.60.0 is merged, regression-green and deliberately frozen as the internal external-production candidate.
+Resort OS 0.61.0 is the intended refrozen internal external-production candidate once this release-hygiene PR itself is green and merged.
 
 ### STOP — external production cutover
 
-External production remains **NOT VERIFIED / CUTOVER STOP** until the launch evidence gate is closed, including:
+External production remains **NOT VERIFIED / EXTERNAL PRODUCTION CUTOVER STOP** until all required launch evidence is VERIFIED:
 
-1. GitHub branch protection / required checks on `main`;
-2. Google Drive launch-control permission remediation/verification;
+1. GitHub branch protection / required checks;
+2. Google Drive launch-control permission remediation;
 3. actual Beget host/account preflight;
-4. verified legacy rollback package;
+4. verified rollback package for current live `3korony.com`;
 5. isolated external HTTPS/WSS staging;
-6. public truth probe;
-7. real device acceptance;
-8. provider E2E for providers enabled at launch;
-9. monitoring/alerting evidence;
-10. fresh pre-cutover DB backup and off-site copy;
-11. DNS rollback capture;
-12. explicit owner cutover approval.
-
-## Launch rule
+6. real staging room reconciliation;
+7. external public-truth probe;
+8. real-device acceptance;
+9. provider E2E for every launch-enabled provider;
+10. monitoring/alerting evidence;
+11. fresh pre-cutover backup + off-site copy;
+12. DNS rollback capture;
+13. explicit owner GO.
 
 Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md` and `scripts/verify_launch_acceptance.py`.
-Canonical frozen external-production manifest: `release/current-rc.json`.
-
-Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until every required external/governance evidence gate is VERIFIED.
+Canonical release manifest: `release/current-rc.json`.
 
 ## Extension rule
 
-Extend rather than rewrite the verified Resort Core/PostgreSQL/PMS/Stay/Guest OS/Guest CRM/OperationalTask/Finance/Owner analytics/Inbox/Audit/RBAC boundaries. Do not reactivate NFC or automatic commercial/payment authority as a side effect of deployment work.
+Extend rather than rewrite the verified Resort Core/PostgreSQL/PMS/Stay/Guest OS/Guest CRM/OperationalTask/Finance/Owner analytics/Inbox/Audit/RBAC boundaries. Do not reactivate NFC or grant automatic commercial/payment authority as a side effect of deployment work.
