@@ -12,7 +12,7 @@ DOCS = (
     Path("knowledge/04_CURRENT_STATE.md"),
     Path("knowledge/09_LAUNCH_ACCEPTANCE.md"),
     Path("docs/DEPLOYMENT_RUNBOOK.md"),
-    Path("docs/RELEASE_0.61.0_2026-09-06.md"),
+    Path("docs/RELEASE_0.62.0_2026-09-07.md"),
 )
 ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
@@ -23,6 +23,7 @@ ALLOWED_HYGIENE_PATHS = {
     "docs/PRODUCTION_DATABASE_MIGRATIONS.md",
     "docs/RELEASE_0.60.0_2026-09-05.md",
     "docs/RELEASE_0.61.0_2026-09-06.md",
+    "docs/RELEASE_0.62.0_2026-09-07.md",
     "docs/README.md",
     "docs/STAGING_RUNBOOK_2026-08-28.md",
     "scripts/release_rc_truth_guard.py",
@@ -41,18 +42,12 @@ def fail(message: str) -> None:
     print(f"FAIL: {message}")
 
 
-def validate_workflows(label: str, evidence: object, errors: list[str]) -> None:
+def validate_workflows(label: str, evidence: object, expected: dict[str, int], errors: list[str]) -> None:
     if not isinstance(evidence, dict):
         errors.append(f"{label} must be an object")
         return
-    triggered = evidence.get("triggered")
-    success = evidence.get("success")
-    failures = evidence.get("failures")
-    if not isinstance(triggered, int) or triggered <= 0:
-        errors.append(f"{label} must contain a positive triggered count")
-        return
-    if success != triggered or failures != 0:
-        errors.append(f"{label} must be all-success with zero failures")
+    if evidence != expected:
+        errors.append(f"{label} must equal {expected}, got {evidence}")
 
 
 def main() -> int:
@@ -69,105 +64,70 @@ def main() -> int:
         fail(f"cannot read RC manifest: {exc}")
         return 1
 
+    expected = {
+        "release_version": "0.62.0",
+        "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
+        "source_branch": "chore/management-final-acceptance-20260906",
+        "accepted_executable_head": "609a309c97f30b5f95828956188507fc35ed3d0d",
+        "observed_merge_commit": "bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d",
+        "postmerge_truth_head": "bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d",
+        "production_source_branch": "main",
+        "migration_count": 22,
+        "critical_constraint_count": 87,
+    }
     if rc.get("schema_version") != 1:
         errors.append("unsupported RC manifest schema")
-    if rc.get("release_version") != "0.61.0":
-        errors.append("release_version must be 0.61.0 for the frozen release boundary")
-    if rc.get("status") != "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING":
-        errors.append("RC status is not the expected frozen pre-external state")
-    if rc.get("source_branch") != "audit/full-project-fixes-20260905":
-        errors.append("source_branch must identify the exact tested PR #116 source branch")
-    if rc.get("production_source_branch") != "main":
-        errors.append("production_source_branch must be main")
+    for key, value in expected.items():
+        if rc.get(key) != value:
+            errors.append(f"{key} must be {value!r}")
     if rc.get("main_allowed_as_production_source") is not True:
-        errors.append("main must be the allowed production source branch")
+        errors.append("main must remain the allowed production source branch")
+    if rc.get("observed_merge_tree_equivalent") is not True:
+        errors.append("observed merge must remain tree-equivalent to accepted head")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
         if rc.get(key) is not False:
             errors.append(f"{key} must remain false until real external evidence exists")
+    if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
+        errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
 
-    if rc.get("migration_count") != 22:
-        errors.append("migration_count must be 22 for Resort OS 0.61.0")
-    if rc.get("critical_constraint_count") != 87:
-        errors.append("critical_constraint_count must be 87 for Resort OS 0.61.0")
-    seed = rc.get("canonical_property_seed") or {}
-    if seed != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
-        errors.append("canonical_property_seed must remain 84 rooms / 12 categories / 48 rate rows")
+    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 21, "success": 21, "failures": 0}, errors)
+    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 20, "success": 20, "failures": 0}, errors)
+    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 20, "success": 20, "failures": 0}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
     observed = str(rc.get("observed_merge_commit") or "").lower()
     postmerge = str(rc.get("postmerge_truth_head") or "").lower()
-    for label, value in (
-        ("accepted_executable_head", accepted),
-        ("observed_merge_commit", observed),
-        ("postmerge_truth_head", postmerge),
-    ):
+    for label, value in (("accepted_executable_head", accepted), ("observed_merge_commit", observed), ("postmerge_truth_head", postmerge)):
         if not SHA_RE.fullmatch(value):
             errors.append(f"{label} is not an exact 40-character Git SHA")
 
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), errors)
-
-    if rc.get("accepted_head_workflows") != {"triggered": 59, "success": 59, "failures": 0}:
-        errors.append("accepted head evidence must remain exactly 59/59 for PR #116")
-    if rc.get("merged_main_workflows") != {"triggered": 38, "success": 38, "failures": 0}:
-        errors.append("merged main eligible evidence must remain exactly 38/38")
-    if rc.get("postmerge_truth_workflows") != {"triggered": 38, "success": 38, "failures": 0}:
-        errors.append("post-merge truth evidence must remain exactly 38/38")
-    if rc.get("observed_merge_tree_equivalent") is not True:
-        errors.append("observed merge tree equivalence must be true")
-
-    # PR #116's main merge intentionally produced two fail-closed release-control
-    # workflow failures because the previous frozen manifest still described 0.60.0.
-    # The 38/38 main evidence above records the successful product/security/
-    # migration/staging workflows. This guard itself is the refreeze mechanism that
-    # must turn release truth/launch acceptance green again; it never treats those
-    # pre-refreeze failures as product success or external evidence.
-
     if not allow_non_accepted_head:
-        if SHA_RE.fullmatch(accepted):
-            try:
-                git("cat-file", "-e", f"{accepted}^{{commit}}")
-                changed = git("diff", "--name-only", accepted, "HEAD")
-                unexpected = sorted(path for path in changed.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
-                if unexpected:
-                    errors.append("executable/product drift after frozen accepted head: " + ", ".join(unexpected))
-            except subprocess.CalledProcessError as exc:
-                errors.append(f"cannot validate accepted executable head: {exc}")
+        try:
+            git("cat-file", "-e", f"{accepted}^{{commit}}")
+            changed = git("diff", "--name-only", accepted, "HEAD")
+            unexpected = sorted(path for path in changed.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
+            if unexpected:
+                errors.append("executable/product drift after accepted head: " + ", ".join(unexpected))
+            observed_diff = git("diff", "--name-only", accepted, observed)
+            if observed_diff:
+                errors.append("observed main merge is not tree-equivalent to accepted executable head")
+            postmerge_diff = git("diff", "--name-only", observed, postmerge)
+            unexpected_post = sorted(path for path in postmerge_diff.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
+            if unexpected_post:
+                errors.append("post-merge truth head contains executable/product drift: " + ", ".join(unexpected_post))
+        except subprocess.CalledProcessError as exc:
+            errors.append(f"cannot validate frozen release tree: {exc}")
 
-        if SHA_RE.fullmatch(accepted) and SHA_RE.fullmatch(observed):
-            try:
-                observed_diff = git("diff", "--name-only", accepted, observed)
-                if observed_diff:
-                    errors.append("observed main merge is not tree-equivalent to accepted executable head")
-            except subprocess.CalledProcessError as exc:
-                errors.append(f"cannot validate observed main merge: {exc}")
-
-        if SHA_RE.fullmatch(observed) and SHA_RE.fullmatch(postmerge):
-            try:
-                postmerge_diff = git("diff", "--name-only", observed, postmerge)
-                unexpected = sorted(path for path in postmerge_diff.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
-                if unexpected:
-                    errors.append("post-merge truth head contains executable/product drift: " + ", ".join(unexpected))
-            except subprocess.CalledProcessError as exc:
-                errors.append(f"cannot validate post-merge truth head: {exc}")
-
+    required_markers = ("0.62.0", accepted, observed, "22", "87", "main", "EXTERNAL", "STOP")
     for doc in DOCS:
         try:
             text = doc.read_text(encoding="utf-8")
         except Exception as exc:
             errors.append(f"cannot read {doc}: {exc}")
             continue
-        if accepted not in text:
-            errors.append(f"{doc} does not cite accepted executable head")
-        if observed not in text:
-            errors.append(f"{doc} does not cite observed main merge")
-        if "main" not in text.lower() or "production source" not in text.lower():
-            errors.append(f"{doc} does not state the main production-source boundary")
-        if "EXTERNAL" not in text or "STOP" not in text:
-            errors.append(f"{doc} does not preserve external/cutover STOP boundary")
-        if "22" not in text or "87" not in text:
-            errors.append(f"{doc} does not state the 22-migration / 87-constraint 0.61.0 boundary")
+        for marker in required_markers:
+            if marker not in text:
+                errors.append(f"{doc} missing release marker {marker!r}")
 
     if errors:
         for error in errors:
@@ -175,23 +135,19 @@ def main() -> int:
         print("RESULT: RELEASE RC TRUTH RED")
         return 1
 
-    print(f"FACT: release_version={rc['release_version']}")
+    print("FACT: release_version=0.62.0")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
-    print(f"FACT: postmerge_truth_head={postmerge}")
-    print("FACT: accepted_head_workflows=59/59")
-    print("FACT: merged_main_eligible_workflows=38/38")
-    print("FACT: pre_refreeze_release_control_failures=Release RC Truth CI,Launch Acceptance CI")
+    print("FACT: accepted_head_workflows=21/21")
+    print("FACT: merged_main_eligible_workflows=20/20")
+    print("FACT: pre_refreeze_release_control_failure=Release RC Truth CI")
     print("FACT: migrations=22")
     print("FACT: critical_constraints=87")
     print("FACT: production_source_branch=main")
     print("FACT: production_cutover_authorized=false")
     if allow_non_accepted_head:
-        print("FACT: candidate_head_mode=non_accepted_head_allowed; frozen tree comparison intentionally skipped")
-        print("PASS: RC manifest and canonical docs are structurally consistent for candidate validation")
-        print("RESULT: RELEASE RC CONTRACT GREEN; CANDIDATE IS NOT YET MERGED FROZEN MAIN")
+        print("RESULT: RELEASE RC CONTRACT GREEN; CANDIDATE HYGIENE HEAD ALLOWED")
     else:
-        print("PASS: RC manifest, canonical docs and frozen executable tree are consistent")
         print("RESULT: RELEASE RC TRUTH GREEN; EXTERNAL CUTOVER STOP")
     return 0
 
