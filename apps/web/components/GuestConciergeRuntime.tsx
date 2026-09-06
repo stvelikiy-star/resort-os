@@ -30,6 +30,8 @@ type Service = { code: RequestCode; icon: string; title: string; note: string };
 
 const STORAGE_KEY = "three-crowns-guest-language";
 const SITE_STORAGE_KEY = "three-crowns-site-language";
+const HOTEL_PHONE_E164 = "+996558085002";
+const HOTEL_WHATSAPP_URL = "https://wa.me/996558085002";
 
 const COPY = {
   ru: {
@@ -456,7 +458,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
 
       <section className="concierge-section concierge-requests"><div className="concierge-heading"><h2>{copy.myRequests}</h2><button onClick={() => void loadRequests()}>{copy.refresh}</button></div>{!requests.length ? <p className="concierge-empty">{copy.noRequests}</p> : <div className="concierge-request-list">{requests.map((item) => { const code = (SERVICE_ORDER.includes(item.request_code as RequestCode) || item.request_code === "PARKING" ? item.request_code : "ADMIN") as RequestCode; return <article key={item.id}><div><strong>{copy.services[code][0]}</strong><span data-status={item.status}>{copy.status[item.status]}</span></div>{item.description && <p>{item.description}</p>} {item.status === "OPEN" && <button onClick={() => void cancelRequest(item.id)}>{copy.cancel}</button>}</article>; })}</div>}</section>
 
-      <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p></article><article><h3>{copy.contacts}</h3><a href="tel:+996558085002">{copy.call}</a><a href="https://wa.me/996558085008" target="_blank" rel="noreferrer">{copy.message}</a></article></div></section>
+      <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p></article><article><h3>{copy.contacts}</h3><a href={`tel:${HOTEL_PHONE_E164}`}>{copy.call}</a><a href={HOTEL_WHATSAPP_URL} target="_blank" rel="noreferrer">{copy.message}</a></article></div></section>
       <button className="concierge-signout" onClick={() => void logout()}>{copy.signOut}</button>
     </>}
 
