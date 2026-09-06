@@ -173,11 +173,16 @@ async def insert_order(
 
 
 async def audit(conn, pid, actor_type: str, actor_id: str | None, action: str, resource_id: str, payload: dict[str, Any]):
+    audit_payload = {
+        "financial_effect": "NONE_AUTOMATIC",
+        "reservation_total_effect": "NONE",
+        **payload,
+    }
     await conn.execute(
         '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
            VALUES ($1,$2,$3,$4,$5,'KitchenOrder',$6,'KITCHEN','SUCCESS',$7::jsonb,now())''',
         uuid.uuid4(), pid, actor_type, actor_id, action, resource_id,
-        json.dumps({**payload, "financial_effect": "NONE_AUTOMATIC", "reservation_total_effect": "NONE"}),
+        json.dumps(audit_payload, ensure_ascii=False, default=str),
     )
 
 
@@ -356,11 +361,42 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
-            row = await conn.fetchrow('SELECT id,status,"tableId","guestTaskId","orderNumber" FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', order_id, pid)
+            row = await conn.fetchrow(
+                '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId"
+                   FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                order_id, pid,
+            )
             if not row:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
             if payload.status not in ORDER_TRANSITIONS[row["status"]]:
                 raise HTTPException(status_code=409, detail={"code": "KITCHEN_ORDER_INVALID_TRANSITION", "from": row["status"], "to": payload.status})
+
+            folio_effect = "NONE_AUTOMATIC"
+            if payload.status == "CANCELLED" and row["folioChargeId"]:
+                charge = await conn.fetchrow(
+                    '''SELECT id,status,"amountKgs" FROM guest_folio_charges
+                       WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                    row["folioChargeId"], pid,
+                )
+                if charge and charge["status"] == "PAID":
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "KITCHEN_ORDER_PAID_CHARGE_CANCEL_FORBIDDEN",
+                            "folio_charge_id": str(charge["id"]),
+                            "message": "Paid dining charge requires an explicit finance refund/adjustment before order cancellation.",
+                        },
+                    )
+                if charge and charge["status"] == "OPEN":
+                    await conn.execute(
+                        '''UPDATE guest_folio_charges SET status='VOID',
+                             metadata=COALESCE(metadata,'{}'::jsonb) || jsonb_build_object(
+                               'void_reason','KITCHEN_ORDER_CANCELLED','voided_by',$2::text,'voided_at',now()
+                             ),"updatedAt"=now() WHERE id=$1''',
+                        charge["id"], user["id"],
+                    )
+                    folio_effect = "VOID_OPEN_FOLIO_CHARGE"
+
             await conn.execute(
                 '''UPDATE kitchen_orders SET status=$2,"acceptedAt"=CASE WHEN $2='ACCEPTED' THEN COALESCE("acceptedAt",now()) ELSE "acceptedAt" END,
                      "readyAt"=CASE WHEN $2='READY' THEN COALESCE("readyAt",now()) ELSE "readyAt" END,
@@ -372,7 +408,13 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
             if row["guestTaskId"]:
                 task_status = "DONE" if payload.status == "SERVED" else "CANCELLED" if payload.status == "CANCELLED" else "IN_PROGRESS"
                 await conn.execute(
-                    '''UPDATE operational_tasks SET status=$2::"OperationalTaskStatus","completedAt"=CASE WHEN $2 IN ('DONE','CANCELLED') THEN now() ELSE NULL END,"updatedAt"=now() WHERE id=$1''',
+                    '''UPDATE operational_tasks SET status=$2::"OperationalTaskStatus",
+                         "completedAt"=CASE WHEN $2 IN ('DONE','CANCELLED') THEN now() ELSE NULL END,
+                         "chargeStatus"=CASE
+                           WHEN $2='CANCELLED' AND "chargeStatus" IN ('PENDING','POSTED') THEN 'CANCELLED'
+                           ELSE "chargeStatus"
+                         END,
+                         "updatedAt"=now() WHERE id=$1''',
                     row["guestTaskId"], task_status,
                 )
             if row["tableId"] and payload.status in {"SERVED", "CANCELLED"}:
@@ -381,7 +423,16 @@ async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, req
                 )
                 if not other:
                     await conn.execute('UPDATE kitchen_tables SET status=\'AVAILABLE\',"updatedAt"=now() WHERE id=$1', row["tableId"])
-            await audit(conn, pid, "STAFF", user["id"], "UPDATE_KITCHEN_ORDER_STATUS", str(order_id), {"order_number": row["orderNumber"], "from": row["status"], "to": payload.status})
+            await audit(
+                conn, pid, "STAFF", user["id"], "UPDATE_KITCHEN_ORDER_STATUS", str(order_id),
+                {
+                    "order_number": row["orderNumber"],
+                    "from": row["status"],
+                    "to": payload.status,
+                    "folio_charge_id": str(row["folioChargeId"]) if row["folioChargeId"] else None,
+                    "financial_effect": folio_effect,
+                },
+            )
     return {"id": str(order_id), "status": payload.status}
 
 
