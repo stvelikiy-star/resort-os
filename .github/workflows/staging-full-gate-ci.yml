@@ -243,6 +243,7 @@ jobs:
           python scripts/staging_acceptance.py
           python scripts/release_060_e2e.py
           python scripts/release_060_extended_e2e.py
+          python scripts/dining_coordination_e2e.py
 
       - name: Verify NFC remains deferred from the active V1 route surface
         run: |
