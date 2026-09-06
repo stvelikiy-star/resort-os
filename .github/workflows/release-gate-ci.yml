@@ -122,7 +122,8 @@ jobs:
               try:
                   expected_tables = [
                       'kitchen_tables', 'dining_table_sessions', 'dining_entitlements',
-                      'guest_folio_charges', 'booking_groups', 'site_media_assets', 'site_media_slots',
+                      'dining_production_snapshots', 'guest_folio_charges', 'booking_groups',
+                      'site_media_assets', 'site_media_slots',
                   ]
                   for table in expected_tables:
                       exists = await conn.fetchval('SELECT to_regclass($1)', f'public.{table}')
@@ -138,7 +139,7 @@ jobs:
                   )
                   assert trigger == 1, 'dining table status guard missing'
                   migration_count = await conn.fetchval('SELECT count(*)::int FROM _prisma_migrations WHERE finished_at IS NOT NULL')
-                  assert migration_count >= 20, migration_count
+                  assert migration_count >= 22, migration_count
                   print('Migrated schema verified:', migration_count, 'migrations')
               finally:
                   await conn.close()
@@ -229,6 +230,9 @@ jobs:
 
       - name: Release 0.60 full-domain E2E
         run: python scripts/release_060_e2e.py
+
+      - name: Chef production snapshot E2E
+        run: python scripts/chef_production_snapshot_e2e.py
 
       - name: Dining coordination E2E
         run: python scripts/dining_coordination_e2e.py
