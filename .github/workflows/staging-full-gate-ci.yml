@@ -244,13 +244,10 @@ jobs:
           python scripts/release_060_e2e.py
           python scripts/release_060_extended_e2e.py
 
-      - name: Prove NFC remains absent from active V1 schema/runtime
-        shell: bash
+      - name: Verify NFC remains deferred from the active V1 route surface
         run: |
-          set -euo pipefail
-          ! grep -R -n -E 'nfc_wallet|nfc_transaction|process_nfc_payment' packages/database/prisma/migrations services/api/app apps || {
-            echo 'Active V1 contains forbidden NFC transaction runtime/schema'; exit 1;
-          }
+          python scripts/release_scope_guard.py --self-test
+          python scripts/release_scope_guard.py
 
       - name: Show logs on failure
         if: failure()
