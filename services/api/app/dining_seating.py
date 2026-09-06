@@ -19,6 +19,12 @@ from .dining_coordination import (
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-seating"])
 read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
 write_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+SESSION_TRANSITIONS: dict[str, set[str]] = {
+    "WAITING": {"SEATED", "CANCELLED"},
+    "SEATED": {"RELEASED", "CANCELLED"},
+    "RELEASED": set(),
+    "CANCELLED": set(),
+}
 
 
 class SeatingCreate(BaseModel):
@@ -305,8 +311,20 @@ async def patch_session_status(
                 raise HTTPException(status_code=404, detail="Dining table session not found")
             if user["role"] == "DINING_STAFF" and row["waiterId"] not in {None, uuid.UUID(user["id"])}:
                 raise HTTPException(status_code=403, detail="This table belongs to another waiter")
-            if row["status"] in {"RELEASED", "CANCELLED"}:
-                raise HTTPException(status_code=409, detail={"code": "DINING_SESSION_CLOSED", "status": row["status"]})
+
+            current_status = row["status"]
+            if payload.status == current_status:
+                current = await conn.fetchrow(SESSION_SELECT + ' WHERE ds.id=$1', session_id)
+                return session_item(current)
+            if payload.status not in SESSION_TRANSITIONS.get(current_status, set()):
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "DINING_SESSION_INVALID_TRANSITION",
+                        "from": current_status,
+                        "to": payload.status,
+                    },
+                )
 
             if payload.status in {"WAITING", "SEATED"}:
                 conflict = await active_session_for_table(conn, row["tableId"], exclude_session_id=session_id)
@@ -357,7 +375,7 @@ async def patch_session_status(
             table_status = "OCCUPIED" if payload.status == "SEATED" else "RESERVED" if payload.status == "WAITING" else "CLEANING"
             await conn.execute('UPDATE kitchen_tables SET status=$2,"updatedAt"=now() WHERE id=$1', row["tableId"], table_status)
             await audit(conn, pid, user, "PATCH_DINING_TABLE_SESSION", str(session_id), {
-                "from_status": row["status"], "status": payload.status,
+                "from_status": current_status, "status": payload.status,
                 "table_reservation_id": str(linked_reservation["id"]) if linked_reservation else None,
             })
             result = await conn.fetchrow(SESSION_SELECT + ' WHERE ds.id=$1', session_id)
