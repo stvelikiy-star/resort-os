@@ -12,7 +12,7 @@ DOCS = (
     Path("knowledge/04_CURRENT_STATE.md"),
     Path("knowledge/09_LAUNCH_ACCEPTANCE.md"),
     Path("docs/DEPLOYMENT_RUNBOOK.md"),
-    Path("docs/RELEASE_0.60.0_2026-09-05.md"),
+    Path("docs/RELEASE_0.61.0_2026-09-06.md"),
 )
 ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
@@ -22,6 +22,7 @@ ALLOWED_HYGIENE_PATHS = {
     "docs/DEPLOYMENT_RUNBOOK.md",
     "docs/PRODUCTION_DATABASE_MIGRATIONS.md",
     "docs/RELEASE_0.60.0_2026-09-05.md",
+    "docs/RELEASE_0.61.0_2026-09-06.md",
     "docs/README.md",
     "docs/STAGING_RUNBOOK_2026-08-28.md",
     "scripts/release_rc_truth_guard.py",
@@ -70,24 +71,24 @@ def main() -> int:
 
     if rc.get("schema_version") != 1:
         errors.append("unsupported RC manifest schema")
-    if rc.get("release_version") != "0.60.0":
-        errors.append("release_version must be 0.60.0 for the frozen release boundary")
+    if rc.get("release_version") != "0.61.0":
+        errors.append("release_version must be 0.61.0 for the frozen release boundary")
     if rc.get("status") != "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING":
         errors.append("RC status is not the expected frozen pre-external state")
-    if rc.get("source_branch") != "feature/owner-corrections-20260905":
-        errors.append("source_branch must identify the exact tested PR #112 source branch")
+    if rc.get("source_branch") != "audit/full-project-fixes-20260905":
+        errors.append("source_branch must identify the exact tested PR #116 source branch")
     if rc.get("production_source_branch") != "main":
-        errors.append("production_source_branch must be main after the accepted release merge")
+        errors.append("production_source_branch must be main")
     if rc.get("main_allowed_as_production_source") is not True:
-        errors.append("main must be the allowed production source branch for the refrozen 0.60.0 boundary")
+        errors.append("main must be the allowed production source branch")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
         if rc.get(key) is not False:
-            errors.append(f"{key} must remain false until external evidence exists")
+            errors.append(f"{key} must remain false until real external evidence exists")
 
-    if rc.get("migration_count") != 20:
-        errors.append("migration_count must remain 20 for Resort OS 0.60.0")
-    if rc.get("critical_constraint_count") != 81:
-        errors.append("critical_constraint_count must remain 81 for Resort OS 0.60.0")
+    if rc.get("migration_count") != 22:
+        errors.append("migration_count must be 22 for Resort OS 0.61.0")
+    if rc.get("critical_constraint_count") != 87:
+        errors.append("critical_constraint_count must be 87 for Resort OS 0.61.0")
     seed = rc.get("canonical_property_seed") or {}
     if seed != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
         errors.append("canonical_property_seed must remain 84 rooms / 12 categories / 48 rate rows")
@@ -107,20 +108,22 @@ def main() -> int:
     validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), errors)
     validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), errors)
 
-    if rc.get("accepted_head_workflows") != {"triggered": 46, "success": 46, "failures": 0}:
-        errors.append("accepted head evidence must remain exactly 46/46 for PR #112")
-    if rc.get("merged_main_workflows") != {"triggered": 35, "success": 35, "failures": 0}:
-        errors.append("merged main evidence must remain exactly 35/35")
-    if rc.get("postmerge_truth_workflows") != {"triggered": 4, "success": 4, "failures": 0}:
-        errors.append("post-merge truth evidence must remain exactly 4/4")
+    if rc.get("accepted_head_workflows") != {"triggered": 59, "success": 59, "failures": 0}:
+        errors.append("accepted head evidence must remain exactly 59/59 for PR #116")
+    if rc.get("merged_main_workflows") != {"triggered": 38, "success": 38, "failures": 0}:
+        errors.append("merged main eligible evidence must remain exactly 38/38")
+    if rc.get("postmerge_truth_workflows") != {"triggered": 38, "success": 38, "failures": 0}:
+        errors.append("post-merge truth evidence must remain exactly 38/38")
     if rc.get("observed_merge_tree_equivalent") is not True:
         errors.append("observed merge tree equivalence must be true")
 
-    # Strict RC truth validates the frozen historical commits and tree equivalence.
-    # Development/staging gates deliberately use --allow-non-accepted-head because
-    # they run on a new candidate PR, often with a shallow checkout. In that mode
-    # we still validate the manifest/docs contract below, but do not pretend the
-    # candidate HEAD is the already frozen accepted executable head.
+    # PR #116's main merge intentionally produced two fail-closed release-control
+    # workflow failures because the previous frozen manifest still described 0.60.0.
+    # The 38/38 main evidence above records the successful product/security/
+    # migration/staging workflows. This guard itself is the refreeze mechanism that
+    # must turn release truth/launch acceptance green again; it never treats those
+    # pre-refreeze failures as product success or external evidence.
+
     if not allow_non_accepted_head:
         if SHA_RE.fullmatch(accepted):
             try:
@@ -163,6 +166,8 @@ def main() -> int:
             errors.append(f"{doc} does not state the main production-source boundary")
         if "EXTERNAL" not in text or "STOP" not in text:
             errors.append(f"{doc} does not preserve external/cutover STOP boundary")
+        if "22" not in text or "87" not in text:
+            errors.append(f"{doc} does not state the 22-migration / 87-constraint 0.61.0 boundary")
 
     if errors:
         for error in errors:
@@ -174,15 +179,17 @@ def main() -> int:
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
     print(f"FACT: postmerge_truth_head={postmerge}")
-    print("FACT: accepted_head_workflows=46/46")
-    print("FACT: merged_main_workflows=35/35")
-    print("FACT: postmerge_truth_workflows=4/4")
+    print("FACT: accepted_head_workflows=59/59")
+    print("FACT: merged_main_eligible_workflows=38/38")
+    print("FACT: pre_refreeze_release_control_failures=Release RC Truth CI,Launch Acceptance CI")
+    print("FACT: migrations=22")
+    print("FACT: critical_constraints=87")
     print("FACT: production_source_branch=main")
     print("FACT: production_cutover_authorized=false")
     if allow_non_accepted_head:
         print("FACT: candidate_head_mode=non_accepted_head_allowed; frozen tree comparison intentionally skipped")
         print("PASS: RC manifest and canonical docs are structurally consistent for candidate validation")
-        print("RESULT: RELEASE RC CONTRACT GREEN; CANDIDATE IS NOT THE FROZEN RC")
+        print("RESULT: RELEASE RC CONTRACT GREEN; CANDIDATE IS NOT YET MERGED FROZEN MAIN")
     else:
         print("PASS: RC manifest, canonical docs and frozen executable tree are consistent")
         print("RESULT: RELEASE RC TRUTH GREEN; EXTERNAL CUTOVER STOP")
