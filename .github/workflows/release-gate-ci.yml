@@ -230,6 +230,9 @@ jobs:
       - name: Release 0.60 full-domain E2E
         run: python scripts/release_060_e2e.py
 
+      - name: Dining coordination E2E
+        run: python scripts/dining_coordination_e2e.py
+
       - name: Root control-center verification
         run: npm test
 
