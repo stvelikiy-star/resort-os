@@ -88,6 +88,19 @@ jobs:
           cache: pip
           cache-dependency-path: services/api/requirements.txt
 
+      - name: Resolve hotel-local release dates
+        run: |
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+          today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              f.write(f'D0={today.isoformat()}\n')
+              f.write(f'D2={(today + timedelta(days=2)).isoformat()}\n')
+              f.write(f'D5={(today + timedelta(days=5)).isoformat()}\n')
+          PY
+
       - name: Generate isolated synthetic credentials
         shell: bash
         run: |
@@ -97,6 +110,11 @@ jobs:
           reception_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
           maid_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
           tech_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          echo "::add-mask::${owner_pass}"
+          echo "::add-mask::${dining_pass}"
+          echo "::add-mask::${reception_pass}"
+          echo "::add-mask::${maid_pass}"
+          echo "::add-mask::${tech_pass}"
           {
             echo "BOOTSTRAP_OWNER_PASSWORD=${owner_pass}"
             echo "DINING_STAFF_PASSWORD=${dining_pass}"
