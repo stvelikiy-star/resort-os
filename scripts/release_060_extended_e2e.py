@@ -61,7 +61,7 @@ async def main() -> None:
         )
         assert login["role"] == "OWNER"
 
-        # 1. Dining session transfer must be atomic: old table -> CLEANING, target -> OCCUPIED.
+        # 1. Dining session transfer must be atomic and fail closed on invalid targets.
         source_code = f"XFER-{uuid.uuid4().hex[:5].upper()}"
         target_code = f"XFER-{uuid.uuid4().hex[:5].upper()}"
         source = ok(
@@ -108,6 +108,29 @@ async def main() -> None:
             "seat guest for transfer",
         )
         session_id = session["id"]
+
+        same_table = await owner.post(
+            f"/api/v1/dining/sessions/{session_id}/move",
+            json={"target_table_id": source_id, "waiter_mode": "KEEP"},
+        )
+        assert same_table.status_code == 409
+        assert same_table.json().get("detail", {}).get("code") == "DINING_MOVE_SAME_TABLE"
+
+        ok(
+            await owner.patch(f"/api/v1/kitchen/tables/{target_id}", json={"status": "CLEANING"}),
+            "mark transfer target cleaning",
+        )
+        unavailable_target = await owner.post(
+            f"/api/v1/dining/sessions/{session_id}/move",
+            json={"target_table_id": target_id, "waiter_mode": "CLEAR"},
+        )
+        assert unavailable_target.status_code == 409
+        assert unavailable_target.json().get("detail", {}).get("code") == "DINING_TARGET_TABLE_NOT_AVAILABLE"
+        ok(
+            await owner.patch(f"/api/v1/kitchen/tables/{target_id}", json={"status": "AVAILABLE"}),
+            "return transfer target available",
+        )
+
         moved = ok(
             await owner.post(
                 f"/api/v1/dining/sessions/{session_id}/move",
