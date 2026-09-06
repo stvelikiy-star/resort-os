@@ -13,6 +13,7 @@ import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV9";
+import RateManagementBoard from "./RateManagementBoard";
 import ReceptionWorkspace from "./ReceptionWorkspace";
 import ReportsBoard from "./ReportsBoard";
 import RequestsBoard from "./RequestsBoard";
@@ -29,7 +30,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "GROUPS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -128,7 +129,7 @@ export default function AdminShell() {
         <form className="login-card" onSubmit={login}>
           <p className="eyebrow">Три Короны · Resort OS</p>
           <h1>Вход в управление</h1>
-          <p className="login-copy">Шахматка, CRM, бронирования, сайт и операционные данные доступны только сотрудникам.</p>
+          <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
           <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></label>
           {error && <div className="login-error">{error}</div>}
@@ -151,6 +152,7 @@ export default function AdminShell() {
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
+          {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
           {canUseReception && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
@@ -173,6 +175,7 @@ export default function AdminShell() {
       </div>
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
+      {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
@@ -188,7 +191,7 @@ export default function AdminShell() {
       {tab === "REPORTS" && isManager && <ReportsBoard />}
       {tab === "CONTENT" && isManager && <SiteContentBoard />}
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
-      {tab === "STAFF" && isManager && <StaffBoard />}
+      {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
       {tab === "INBOX" && isManager && <InboxBoard />}
     </>
   );

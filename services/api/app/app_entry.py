@@ -50,6 +50,7 @@ from .pms_chessboard_read import router as pms_chessboard_read_router
 from .pms_control_snapshot import router as pms_control_snapshot_router
 from .pms_reservation_create import router as pms_reservation_create_router
 from .public_ai_admin import router as public_ai_admin_router
+from .rate_management import router as rate_management_router
 from .realtime import router as realtime_router
 from .reception_readiness import router as reception_readiness_router
 from .reception_reservations import router as reception_reservations_router
@@ -100,6 +101,7 @@ app.include_router(reservation_payments_router)
 app.include_router(folio_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
+app.include_router(rate_management_router)
 app.include_router(hotel_finance_router)
 app.include_router(analytics_reports_router)
 app.include_router(owner_intelligence_router)
