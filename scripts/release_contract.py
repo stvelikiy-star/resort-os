@@ -31,6 +31,7 @@ EXPECTED_MIGRATIONS = (
     "z18_site_media_slots_20260905",
     "z19_dining_table_status_guard_20260905",
     "z20_dining_active_table_unique_20260906",
+    "z21_dining_production_snapshots_20260906",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -120,6 +121,12 @@ CRITICAL_CONSTRAINTS = frozenset(
         "kitchen_tables_floor_y_check",
         "kitchen_tables_floor_shape_check",
         "site_media_slots_versions_check",
+        "dining_production_snapshots_meal_check",
+        "dining_production_snapshots_adult_check",
+        "dining_production_snapshots_child_check",
+        "dining_production_snapshots_entitlement_count_check",
+        "dining_production_snapshots_fingerprint_check",
+        "dining_production_snapshots_reason_check",
     }
 )
 
