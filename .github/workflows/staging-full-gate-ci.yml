@@ -142,8 +142,7 @@ jobs:
           python scripts/owner_guest_facts_guard.py
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
-          python scripts/bootstrap_dining_staff.py
-          python scripts/bootstrap_staging_users.py
+          python scripts/bootstrap_staging_staff.py
 
       - name: Build public, admin and staff apps
         shell: bash
