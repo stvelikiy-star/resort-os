@@ -1,8 +1,8 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 6.0  
+Version: 6.1  
 Date: 2026-09-07  
-Status: RESORT OS 0.62.0 INTERNAL RC FROZEN / REPOSITORY VERIFIED / EXTERNAL CUTOVER STOP
+Status: RESORT OS 0.62.1 INTERNAL RC FROZEN / REPOSITORY VERIFIED / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment. It is not evidence that deployment has happened.
 
@@ -12,13 +12,13 @@ Canonical machine manifest: `release/current-rc.json`.
 
 ## 1. Release boundary
 
-Release: `0.62.0`.
-Accepted source PR: `#122`.
-Accepted executable head: `609a309c97f30b5f95828956188507fc35ed3d0d`.
-Observed tree-equivalent main merge: `bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d`.
+Release: `0.62.1`.
+Accepted source PR: `#125`.
+Accepted executable head: `b3bb0c1be4c522d765509796ddd1d32e8606dc89`.
+Observed tree-equivalent main merge: `7f689458b2cf507d76a8c54fbe164e9492f79aca`.
 Production source branch: `main`.
 
-Evidence: accepted head **21/21 SUCCESS**; observed merge **20 eligible product/security/migration/staging SUCCESS**; the only failed push workflow was the expected fail-closed `Release RC Truth CI` caused by the previous 0.61.0 manifest.
+Evidence: accepted head **28/28 SUCCESS**; observed merge is tree-equivalent and produced **23 eligible successful product/security/migration/staging workflows**. The only failed push workflow was the expected fail-closed `Release RC Truth CI`, which correctly detected executable drift from 0.62.0. Final post-merge Release Gate is SUCCESS.
 
 ## 2. Approved topology
 
@@ -127,7 +127,7 @@ Never use `prisma db push` for external staging/production.
 
 ## 8. First external staging sequence
 
-1. check out `main` and confirm manifest 0.62.0;
+1. check out `main` and confirm manifest 0.62.1;
 2. run `python scripts/release_rc_truth_guard.py`;
 3. run host/environment preflight;
 4. preserve verified legacy rollback package;
@@ -138,7 +138,7 @@ Never use `prisma db push` for external staging/production.
 9. apply all 22 migrations;
 10. run production/database preflight;
 11. reconcile canonical room register: dry-run -> exact diff review -> safe apply -> zero diff;
-12. build exact accepted SHA `609a309c97f30b5f95828956188507fc35ed3d0d`;
+12. build exact accepted SHA `b3bb0c1be4c522d765509796ddd1d32e8606dc89`;
 13. start Core/Public/Admin/Staff in isolated staging contour;
 14. start n8n only after Core readiness;
 15. route Caddy staging hostnames and verify TLS/WSS;
@@ -179,6 +179,8 @@ Application rollback and database rollback are separate decisions. Never improvi
 
 ## 12. Production cutover gate
 
-Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all required external evidence in `knowledge/09_LAUNCH_ACCEPTANCE.md` is verified, including branch protection, Drive permissions, real host/staging/device/provider/monitoring/backup/DNS rollback evidence and explicit owner GO.
+Per owner plan, GitHub branch protection and Drive permission hardening are recommendations/deferred controls. Beget/VPS is the final external phase.
+
+Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until the final external phase verifies actual host/staging, rollback, real devices/providers, monitoring, backup/restore/off-site copy, DNS rollback evidence and explicit owner GO.
 
 No CI success alone authorizes DNS switching or provider activation.
