@@ -1,22 +1,22 @@
 # Three Crowns — production database migration gate
 
 Date: 2026-09-07  
-Release: `0.62.1`  
+Release: `0.62.2`  
 Status: **COMMITTED / CLEAN-DEPLOY VERIFIED IN REPOSITORY CI / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
 
 This document defines the database migration boundary. It does not prove real production migration.
 
 ## Release identity
 
-Accepted executable head: `b3bb0c1be4c522d765509796ddd1d32e8606dc89`.  
-Observed tree-equivalent main merge: `7f689458b2cf507d76a8c54fbe164e9492f79aca`.  
+Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
+Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
 Production source branch: `main`.
 
-Repository acceptance on the accepted head is **28/28 workflows SUCCESS**. The observed merge retained the same tree and produced **23 eligible successful product/security/migration/staging workflows**; the previous-manifest Release RC guard failed closed before the 0.62.1 refreeze.
+Repository acceptance on the accepted head is **41/41 workflows SUCCESS**. The observed merge retained the same tree and produced **32/32 eligible successful product/security/migration/staging workflows**; the previous 0.62.1 Release RC guard failed closed before this controlled 0.62.2 refreeze.
 
 ## Canonical migration ledger
 
-Release 0.62.1 retains exactly **22 committed migrations**:
+Release 0.62.2 retains exactly **22 committed migrations**:
 
 1. `0_init`
 2. `1_site_content`
@@ -94,4 +94,4 @@ Repository CI proves the mechanism against the 22-migration / 87-constraint cont
 
 ## Production boundary
 
-Database engineering is repository-ready. External production migration remains **EXTERNAL PRODUCTION CUTOVER STOP** until the actual target has exact accepted SHA/image linkage, fresh backup, successful migrate deploy/status, readiness/smoke, tested restore/rollback and verified off-site copy.
+Database engineering is repository-ready. External production migration remains **EXTERNAL PRODUCTION CUTOVER STOP** until the actual target has exact accepted SHA/image linkage, fresh backup, successful migrate deploy/status, readiness/smoke, tested restore/rollback and verified off-site copy. Beget/VPS remains deferred to the final owner-approved phase.
