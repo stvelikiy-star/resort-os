@@ -69,10 +69,11 @@ def main() -> int:
 
     rc = json.loads(read("release/current-rc.json"))
     ok(rc["release_version"] == "0.62.2", "release 0.62.2")
-    ok(rc["accepted_executable_head"] == "b79e22ee56c43e5f9146df7597d4c9e5e4124afa", "accepted route-hardening SHA")
-    ok(rc["observed_merge_commit"] == "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5", "observed merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 41, "success": 41, "failures": 0}, "41/41 accepted workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 32, "success": 32, "failures": 0}, "32/32 eligible merge workflows")
+    ok(rc["accepted_executable_head"] == "ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd", "accepted safety-hardening SHA")
+    ok(rc["observed_merge_commit"] == "7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc", "observed safety merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 25, "success": 25, "failures": 0}, "25/25 accepted workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 eligible merge workflows")
+    ok(rc["postmerge_truth_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 postmerge truth workflows")
     ok(rc["migration_count"] == 22 and rc["critical_constraint_count"] == 87, "22 migrations / 87 constraints")
     ok(rc["canonical_property_seed"] == {"rooms": 84, "room_categories": 12, "rate_rows": 48}, "canonical property seed")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
