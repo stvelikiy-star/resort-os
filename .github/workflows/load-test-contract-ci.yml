@@ -40,8 +40,18 @@ jobs:
           test "$code" = "2"
           grep -q 'LOAD_TEST_ENV must be ci, test, or staging' /tmp/load-env.out
 
-      - name: Pull pinned k6 image
-        run: docker pull grafana/k6:0.54.0
+      - name: Pull pinned k6 image with bounded retry
+        run: |
+          for attempt in 1 2 3; do
+            if docker pull grafana/k6:0.54.0; then
+              exit 0
+            fi
+            if test "$attempt" = "3"; then
+              echo 'k6 image pull failed after 3 attempts' >&2
+              exit 1
+            fi
+            sleep $((attempt * 3))
+          done
 
       - name: Validate k6 script syntax and options without sending traffic
         run: |
