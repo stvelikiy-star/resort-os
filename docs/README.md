@@ -10,18 +10,27 @@ Use these sources, in order, for current release and launch decisions:
 3. `knowledge/09_LAUNCH_ACCEPTANCE.md` — external acceptance and cutover gates.
 4. `docs/DEPLOYMENT_RUNBOOK.md` — controlled deployment procedure.
 5. `docs/PRODUCTION_DATABASE_MIGRATIONS.md` — migration/constraint ledger.
-6. `docs/RELEASE_0.62.1_2026-09-07.md` — current release record.
+6. `docs/RELEASE_0.62.2_2026-09-07.md` — current release record.
 
 If a dated historical document conflicts with a source above, the current sources above win.
 
 ## Current release identity
 
-Release: **Resort OS 0.62.1**.  
-Accepted executable head: `b3bb0c1be4c522d765509796ddd1d32e8606dc89`.  
-Observed tree-equivalent main merge: `7f689458b2cf507d76a8c54fbe164e9492f79aca`.  
+Release: **Resort OS 0.62.2**.  
+Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
+Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
 Production source branch: `main`.
 
-Accepted PR #125 head passed **28/28 workflows**. The observed merge retained the same tree and produced **23 eligible successful product/security/migration/staging workflows**; `Release RC Truth CI` failed closed because the previous 0.62.0 manifest correctly detected executable hardening drift. This 0.62.1 refreeze is the controlled correction.
+Accepted PR #127 head passed **41/41 workflows**. The observed merge retained the same tree and produced **32/32 eligible successful product/security/migration/staging workflows**; `Release RC Truth CI` failed closed because the previous 0.62.1 manifest correctly detected executable route-hardening drift. This 0.62.2 refreeze is the controlled correction.
+
+## 0.62.2 hardening delta
+
+- Kitchen menu mutation authority no longer depends on router registration order.
+- Legacy operational bootstrap/PATCH menu mutations are removed from the active application graph before composition.
+- Runtime active API route uniqueness is a Release Gate invariant.
+- Active FastAPI/OpenAPI version identity is 0.62.2.
+- Existing 0.62.1 Admin demo and Kitchen production fail-close hardening remains active.
+- Public website source remained frozen: PR #127 changed zero `apps/web/**` files.
 
 ## Property/database authority
 
@@ -39,13 +48,13 @@ Frozen database boundary remains **22 committed migrations / 87 critical domain 
 - Real bank acquiring and TTLock remain provider/hardware gated.
 - NFC acquiring/wallet remains deferred outside active V1.
 - Google Drive/Sheets are control/archive/mirror surfaces, not transaction truth.
-- Historical `/admin/demo` is fail-closed.
-- Kitchen draft bootstrap is unavailable to DINING_STAFF and fail-closed in production.
 
-## Historical documents
+## Current owner plan
 
-`docs/RELEASE_0.62.0_2026-09-07.md`, `docs/RELEASE_0.61.0_2026-09-06.md`, `docs/RELEASE_0.60.0_2026-09-05.md`, older staging/handoff/RC documents and historical Vercel previews remain evidence/reference only and must not override the current manifest.
+GitHub branch protection and Google Drive permission hardening are advisory/deferred rather than current internal-RC blockers. Beget/VPS is intentionally the final phase.
 
 ## External production remains fail-closed
 
-Per owner plan, GitHub branch protection and Drive permission hardening are recommendations/deferred controls; Beget/VPS is the final external phase. Repository green does not mean live production. Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until actual host/staging/rollback/device/provider/monitoring/backup/DNS evidence and explicit owner GO exist.
+Repository green does not mean live production. Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until real target-host, rollback, HTTPS/WSS staging, device/provider, monitoring, backup/restore/off-site, DNS rollback and explicit owner GO evidence exists.
+
+Historical release files including 0.62.1 and earlier remain reference evidence only and do not override the current 0.62.2 manifest.
