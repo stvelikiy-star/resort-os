@@ -31,9 +31,15 @@ jobs:
         run: |
           docker compose --env-file .env.production.ci -f compose.production.yaml config > .production-compose.rendered.yml
           grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://api.3korony.com' .production-compose.rendered.yml
-          grep -F 'image: n8nio/n8n:2.36.2' .production-compose.rendered.yml
+          grep -F 'image: n8nio/n8n:2.37.10' .production-compose.rendered.yml
+          grep -F 'image: postgres:16.15-alpine' .production-compose.rendered.yml
+          grep -F 'image: caddy:2.11.4-alpine' .production-compose.rendered.yml
           if grep -Eq '(^|[^0-9])5432:5432' .production-compose.rendered.yml; then
             echo 'PostgreSQL must not publish 5432 to the host.' >&2
+            exit 1
+          fi
+          if grep -F 'n8nio/n8n:2.36.2' .production-compose.rendered.yml; then
+            echo 'Vulnerable/stale n8n 2.36.2 must not appear in production graph.' >&2
             exit 1
           fi
 
@@ -47,15 +53,18 @@ jobs:
             -e API_HOST=api.3korony.example.invalid \
             -e AUTOMATION_HOST=automation.3korony.example.invalid \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
-            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+            caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
 
       - name: Validate operational shell scripts
         run: |
           bash -n scripts/production_backup.sh
           bash -n scripts/host_preflight.sh
 
-      - name: Pull pinned n8n production image
-        run: docker pull n8nio/n8n:2.36.2
+      - name: Pull pinned production infrastructure images
+        run: |
+          docker pull n8nio/n8n:2.37.10
+          docker pull postgres:16.15-alpine
+          docker pull caddy:2.11.4-alpine
 
       - name: Build deterministic Resort OS application images
         run: docker compose --env-file .env.production.ci -f compose.production.yaml build api web admin staff
