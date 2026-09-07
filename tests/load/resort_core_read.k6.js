@@ -17,14 +17,10 @@ if (!['ci', 'test', 'staging'].includes(declaredEnv)) {
   failClosed('LOAD_TEST_ENV must be exactly ci, test, or staging');
 }
 
-let parsed;
-try {
-  parsed = new URL(baseUrl);
-} catch (_) {
-  failClosed('LOAD_BASE_URL must be a valid URL');
-}
+const urlMatch = baseUrl.match(/^https?:\/\/([^/:]+)(?::\d+)?(?:\/|$)/i);
+if (!urlMatch) failClosed('LOAD_BASE_URL must be a valid http(s) URL');
+const hostname = urlMatch[1].toLowerCase();
 
-const hostname = parsed.hostname.toLowerCase();
 const explicitlyBlockedHosts = new Set([
   '3korony.com',
   'www.3korony.com',
@@ -33,7 +29,7 @@ if (explicitlyBlockedHosts.has(hostname)) {
   failClosed('public production hostname is explicitly blocked');
 }
 
-const isLoopback = ['127.0.0.1', 'localhost', '::1'].includes(hostname);
+const isLoopback = ['127.0.0.1', 'localhost'].includes(hostname);
 const stagingMarker = hostname.includes('staging') || hostname.includes('test') || hostname.endsWith('.invalid');
 if (!isLoopback && !stagingMarker) {
   failClosed('non-loopback target must contain staging/test marker or use an .invalid host');
