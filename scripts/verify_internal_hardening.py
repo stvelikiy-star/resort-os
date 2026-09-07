@@ -122,7 +122,16 @@ def main() -> int:
     ok('os.environ.get("APP_ENV", "development").strip().lower() == "production"' in kitchen, "bootstrap checks production APP_ENV")
     ok('raise HTTPException(status_code=404, detail="Not found")' in kitchen, "bootstrap 404 in production")
     kitchen_verify = read("scripts/verify_kitchen_menu_management.py")
-    ok("bootstrapDenied.status_code == 403" in kitchen_verify or "bootstrap_denied.status_code == 403" in kitchen_verify or "bootstrap" in kitchen_verify and "403" in kitchen_verify, "DINING_STAFF bootstrap negative E2E present")
+    ok("denied_bootstrap.status_code == 403" in kitchen_verify, "DINING_STAFF bootstrap negative E2E present")
+    ok("denied_patch.status_code == 403" in kitchen_verify, "DINING_STAFF menu patch negative E2E present")
+
+    app_entry = read("services/api/app/app_entry.py")
+    ok("def _strip_legacy_kitchen_menu_mutations()" in app_entry, "legacy Kitchen mutation routes explicitly stripped")
+    ok('(\"POST\", \"/api/v1/kitchen/menu/bootstrap-draft\")' in app_entry, "legacy Kitchen bootstrap blocked in operational router")
+    ok('(\"PATCH\", \"/api/v1/kitchen/menu/{item_id}\")' in app_entry, "legacy Kitchen patch blocked in operational router")
+    ok("_strip_legacy_kitchen_menu_mutations()" in app_entry, "Kitchen route canonicalization executes before composition")
+    ok('app.include_router(kitchen_menu_management_router)' in app_entry and 'app.include_router(kitchen_admin_router)' in app_entry, "canonical manager and operational Kitchen routers composed")
+    ok('app.version = "0.62.2"' in app_entry, "runtime version advanced for canonical Kitchen hardening")
 
     staging = read("scripts/external_staging_acceptance.py")
     for marker in (
@@ -133,7 +142,7 @@ def main() -> int:
     ):
         ok(marker in staging, f"external fail-closed marker: {marker}")
 
-    ok(passed >= 100, f"hardening suite too small: {passed}")
+    ok(passed >= 105, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
     print("BOUNDARY: management/admin/staff/Core only; apps/web is frozen; Beget/VPS deferred by owner")
     return 0

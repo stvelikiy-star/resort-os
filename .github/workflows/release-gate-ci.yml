@@ -111,6 +111,9 @@ jobs:
           pip install -r services/api/requirements.txt
           python -m compileall -q services/api/app scripts
 
+      - name: Verify active API route uniqueness
+        run: python scripts/verify_active_route_uniqueness.py
+
       - name: Verify migrated release schema
         run: |
           python - <<'PY'
