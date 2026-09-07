@@ -1,6 +1,6 @@
 services:
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     environment:
       TLS_EMAIL: ${TLS_EMAIL}
@@ -30,7 +30,7 @@ services:
     networks: [resort]
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16.15-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -140,7 +140,7 @@ services:
     networks: [resort]
 
   n8n:
-    image: ${N8N_IMAGE:-n8nio/n8n:2.36.2}
+    image: ${N8N_IMAGE:-n8nio/n8n:2.37.10}
     restart: unless-stopped
     environment:
       N8N_HOST: ${AUTOMATION_HOST}
