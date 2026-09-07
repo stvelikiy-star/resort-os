@@ -45,7 +45,16 @@ www.{$PUBLIC_HOST:3korony.com} {
 
 {$API_HOST:api.3korony.com} {
 	encode zstd gzip
-	reverse_proxy api:8000
+	@telegram_webhooks path /api/v1/channels/telegram/webhook /api/v1/channels/telegram/staff/webhook
+	handle @telegram_webhooks {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy api:8000
+	}
 }
 
 {$AUTOMATION_HOST:automation.3korony.com} {
