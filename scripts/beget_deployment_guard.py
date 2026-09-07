@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "compose.beget.yaml"
 ENV = ROOT / ".env.beget.example"
 BACKUP = ROOT / "scripts/production_backup.sh"
+CADDY = ROOT / "deploy/Caddyfile"
 
 
 def require(text: str, snippet: str, label: str, errors: list[str]) -> None:
@@ -17,7 +18,7 @@ def require(text: str, snippet: str, label: str, errors: list[str]) -> None:
 
 def main() -> int:
     errors: list[str] = []
-    for path in (COMPOSE, ENV, BACKUP):
+    for path in (COMPOSE, ENV, BACKUP, CADDY):
         if not path.is_file():
             errors.append(f"missing required Beget deployment file: {path.relative_to(ROOT)}")
     if errors:
@@ -28,9 +29,8 @@ def main() -> int:
     compose = COMPOSE.read_text(encoding="utf-8")
     env = ENV.read_text(encoding="utf-8")
     backup = BACKUP.read_text(encoding="utf-8")
+    caddy = CADDY.read_text(encoding="utf-8")
 
-    # Managed PostgreSQL is external in this target graph. A top-level postgres
-    # service here would silently revert the architecture to single-server DB.
     if "\n  postgres:\n" in compose:
         errors.append("compose.beget.yaml: local postgres service is forbidden in DBaaS topology")
     if '"5432:5432"' in compose or "'5432:5432'" in compose:
@@ -45,9 +45,19 @@ def main() -> int:
         "N8N_DIAGNOSTICS_ENABLED: \"false\"",
         "EXECUTIONS_DATA_PRUNE: \"true\"",
         "http://127.0.0.1:5678/healthz",
-        "NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}",
+        "NEXT_PUBLIC_CORE_WS_URL: wss://${ADMIN_HOST}",
     ):
         require(compose, snippet, "compose.beget.yaml", errors)
+
+    if "NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}" in compose:
+        errors.append("compose.beget.yaml: browser Admin WebSocket must not cross to API_HOST with host-only auth cookie")
+
+    if caddy.count("@core_ws path /ws/*") != 2:
+        errors.append("deploy/Caddyfile: expected exactly two same-origin /ws/* matchers for admin and staff")
+    if caddy.count("handle @core_ws") != 2:
+        errors.append("deploy/Caddyfile: expected exactly two same-origin websocket proxy handlers")
+    if caddy.count("reverse_proxy api:8000") < 3:
+        errors.append("deploy/Caddyfile: Core websocket/API proxy routing is incomplete")
 
     for service in ("caddy", "api", "web", "admin", "staff", "n8n"):
         require(compose, f"  {service}:\n", "compose.beget.yaml", errors)
@@ -87,6 +97,7 @@ def main() -> int:
     print("FACT: target_offsite_backup=required_s3")
     print("FACT: docker_log_rotation=required")
     print("FACT: n8n_healthcheck=required")
+    print("FACT: browser_websocket_topology=same_origin_host_only_cookie")
 
     if errors:
         for error in errors:
@@ -94,7 +105,7 @@ def main() -> int:
         print("RESULT: BEGET DEPLOYMENT CONTRACT DRIFT")
         return 1
 
-    print("PASS: Beget target remains VPS apps + managed DBaaS + required S3 backup")
+    print("PASS: Beget target remains VPS apps + managed DBaaS + required S3 backup + same-origin browser realtime")
     return 0
 
 
