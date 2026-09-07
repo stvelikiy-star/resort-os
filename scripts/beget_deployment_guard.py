@@ -56,8 +56,16 @@ def main() -> int:
         errors.append("deploy/Caddyfile: expected exactly two same-origin /ws/* matchers for admin and staff")
     if caddy.count("handle @core_ws") != 2:
         errors.append("deploy/Caddyfile: expected exactly two same-origin websocket proxy handlers")
-    if caddy.count("reverse_proxy api:8000") < 3:
+    if caddy.count("reverse_proxy api:8000") < 4:
         errors.append("deploy/Caddyfile: Core websocket/API proxy routing is incomplete")
+
+    for snippet in (
+        "@telegram_webhooks path /api/v1/channels/telegram/webhook /api/v1/channels/telegram/staff/webhook",
+        "request_body {",
+        "max_size 1MB",
+        "handle @telegram_webhooks",
+    ):
+        require(caddy, snippet, "deploy/Caddyfile", errors)
 
     for service in ("caddy", "api", "web", "admin", "staff", "n8n"):
         require(compose, f"  {service}:\n", "compose.beget.yaml", errors)
@@ -98,6 +106,7 @@ def main() -> int:
     print("FACT: docker_log_rotation=required")
     print("FACT: n8n_healthcheck=required")
     print("FACT: browser_websocket_topology=same_origin_host_only_cookie")
+    print("FACT: public_telegram_webhook_body_limit=1MB")
 
     if errors:
         for error in errors:
@@ -105,7 +114,7 @@ def main() -> int:
         print("RESULT: BEGET DEPLOYMENT CONTRACT DRIFT")
         return 1
 
-    print("PASS: Beget target remains VPS apps + managed DBaaS + required S3 backup + same-origin browser realtime")
+    print("PASS: Beget target remains hardened with same-origin realtime and bounded public webhooks")
     return 0
 
 
