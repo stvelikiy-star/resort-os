@@ -16,6 +16,7 @@ on:
       - 'automation/n8n/owner-analytics-daily-snapshot.json'
       - 'scripts/release_contract.py'
       - 'scripts/verify_owner_control_v2.py'
+      - 'scripts/verify_owner_control_v2_ci.py'
       - '.github/workflows/owner-control-v2-ci.yml'
   push:
     branches: [main]
@@ -29,6 +30,7 @@ on:
       - 'automation/n8n/owner-analytics-daily-snapshot.json'
       - 'scripts/release_contract.py'
       - 'scripts/verify_owner_control_v2.py'
+      - 'scripts/verify_owner_control_v2_ci.py'
       - '.github/workflows/owner-control-v2-ci.yml'
   workflow_dispatch:
 
@@ -59,7 +61,9 @@ jobs:
           --health-retries 10
 
     env:
+      APP_ENV: ci
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
+      RESORT_CORE_TEST_URL: http://127.0.0.1:8000
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
       COOKIE_SECURE: false
@@ -101,7 +105,7 @@ jobs:
       - name: Install and compile Core
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts/verify_owner_control_v2.py
+          python -m compileall services/api/app scripts/verify_owner_control_v2_ci.py
           python -m json.tool automation/n8n/owner-analytics-daily-snapshot.json >/dev/null
 
       - name: Seed Three Crowns and bootstrap OWNER
@@ -118,8 +122,8 @@ jobs:
             sleep 1
           done
 
-      - name: Run Owner Control V2 E2E
-        run: python scripts/verify_owner_control_v2.py
+      - name: Run Owner Control V2 local-only E2E
+        run: python scripts/verify_owner_control_v2_ci.py
 
       - name: Show Core logs on failure
         if: failure()
