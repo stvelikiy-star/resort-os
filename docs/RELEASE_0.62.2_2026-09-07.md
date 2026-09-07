@@ -2,35 +2,34 @@
 
 Status: **INTERNAL RC FROZEN / EXTERNAL PRODUCTION CUTOVER STOP**
 
-Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
-Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
+Accepted executable/release-boundary head: `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`.  
+Observed tree-equivalent main merge: `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc`.  
 Production source branch: `main`.
 
-## Why 0.62.2 exists
+## Why the same-version safety refreeze exists
 
-A strict post-0.62.1 audit found a structural authorization hazard in Kitchen routing: operational `kitchen.py` still carried duplicate menu mutation endpoints while the canonical manager router carried protected equivalents. Runtime behavior was currently safe only because router registration order selected the manager route first. That is not an acceptable security invariant.
+The active application runtime remains 0.62.2. A strict post-freeze operational audit found several non-runtime mutation utilities and CI E2E entrypoints that could fail open when environment targeting was incomplete or overridden. Because `Release RC Truth` correctly treats these safety/control paths as part of the frozen release boundary, the accepted boundary must move even though the product/runtime version does not.
 
-The same audit found stale active FastAPI runtime identity `0.60.0` after the repository had advanced to 0.62.x.
+## Safety hardening now included
 
-## Fixes
+- synthetic demo and operations scripts require an explicit allowed non-production environment and fail closed on blank/unknown values;
+- legacy `release_candidate_check.sh` is retired as a mutating/db-push entrypoint;
+- migration baseline generation requires explicit `development|test|ci` and refuses staging/production/unknown environments;
+- Owner Control V2 mutating E2E has no credential/service-key fallback and is restricted to `ci|test` with localhost-only Core/PostgreSQL;
+- Guest OS Core, Owner Intelligence, Owner Growth and PMS resize mutation workflows run through `scripts/run_local_mutating_ci.py`;
+- that runner allowlists exact verifier names, requires explicit `ci|test`, explicit owner credentials, explicit database/Core URLs and localhost-only targets;
+- `verify_mutating_utility_safety.py` and Management Final Acceptance enforce these boundaries against regression.
 
-- legacy operational `POST /api/v1/kitchen/menu/bootstrap-draft` is removed from the active application graph before operational Kitchen router composition;
-- legacy operational `PATCH /api/v1/kitchen/menu/{item_id}` is likewise removed;
-- canonical Kitchen menu mutations remain OWNER/MANAGER-authoritative;
-- DINING_STAFF retains operational menu read/order/table capabilities without price/publish mutation authority;
-- `scripts/verify_active_route_uniqueness.py` now imports the real FastAPI application and rejects every duplicate API HTTP method/path pair;
-- the main Release Gate executes that structural route check after Core installation;
-- active FastAPI/OpenAPI runtime identity is `0.62.2`.
-
-Previous 0.62.1 hardening remains active, including Admin demo fail-close and production Kitchen bootstrap fail-close.
+Earlier 0.62.2 Kitchen route/RBAC and active-route uniqueness hardening remains fully in force.
 
 ## Evidence
 
-PR #127 exact tested head: **41/41 workflows SUCCESS, 0 failures**.  
-Observed tree-equivalent main merge: **32/32 eligible product/security/migration/staging workflows SUCCESS**.  
-One additional `Release RC Truth CI` push run failed closed exactly because the previous 0.62.1 manifest detected executable drift; 0.62.2 is the controlled refreeze.
+PR #132 exact tested head `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`: **25/25 workflows SUCCESS, 0 failures**.  
+Observed main merge `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc` is tree-equivalent; compare shows zero file changes between tested head and merge.  
+Observed main merge: **23/23 applicable non-truth push workflows SUCCESS**.  
+One additional `Release RC Truth CI` push run failed closed because the previous frozen manifest correctly detected the safety-boundary drift; this record and manifest are the controlled correction.
 
-The main Release Gate passed clean PostgreSQL migrations, active route uniqueness, schema verification, canonical seed, OWNER bootstrap, Admin/Public/Staff builds, Core start, Site/PMS/CMS smoke, automation truth, full-domain E2E, Dining folio E2E, Chef snapshot E2E, Dining coordination E2E and Root Control Center verification.
+The full test contour includes guarded mutating E2E, Management Final Acceptance, clean PostgreSQL migration/seed checks, Core lifecycle, PMS, Kitchen/Dining, automation contracts, backup/restore, Full Staging Gate, Single Server Production Package and the main Release Gate.
 
 ## Frozen contracts
 
@@ -40,12 +39,13 @@ The main Release Gate passed clean PostgreSQL migrations, active route uniquenes
 - **12 room categories**;
 - **48 rate rows**;
 - `ReservationRequest != Reservation`;
-- PostgreSQL/Core remain transaction authority.
+- PostgreSQL/Core remain transaction authority;
+- public website source remains frozen.
 
 ## Scope boundary
 
-PR #127 changed zero `apps/web/**` files. The public site remained frozen and was only built/smoke-tested for compatibility.
+PRs #129, #130, #131 and #132 changed no `apps/web/**` product source. The public site was only built/smoke-tested as compatibility evidence. No external Beget/VPS deployment is claimed.
 
-GitHub branch protection and Google Drive permission hardening are advisory/deferred by owner decision. Beget/VPS and all external staging/rollback/device/provider/monitoring/backup/DNS work remain the final external phase.
+GitHub branch protection and Google Drive permission hardening remain advisory/deferred by owner decision. Beget/VPS and all external staging/rollback/device/provider/monitoring/backup/DNS work remain the final external phase.
 
 **EXTERNAL PRODUCTION CUTOVER STOP** remains active. No production deployment is claimed by this release record.
