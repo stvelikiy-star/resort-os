@@ -10,6 +10,7 @@ on:
       - 'packages/database/**'
       - 'data-intake/**'
       - 'scripts/verify_pms_resize_financial_invariants.py'
+      - 'scripts/run_local_mutating_ci.py'
       - '.github/workflows/pms-final-acceptance-ci.yml'
   workflow_dispatch:
 
@@ -40,6 +41,7 @@ jobs:
           --health-retries 10
 
     env:
+      APP_ENV: ci
       DATABASE_URL: postgresql://resort:resort@localhost:5432/resort_os?schema=public
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
@@ -72,7 +74,7 @@ jobs:
       - name: Install Core and seed approved 84-room intake
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts/verify_pms_resize_financial_invariants.py
+          python -m compileall services/api/app scripts/verify_pms_resize_financial_invariants.py scripts/run_local_mutating_ci.py
           python scripts/apply_core_constraints.py
           python scripts/seed_from_intake.py
           python scripts/bootstrap_owner.py
@@ -88,8 +90,8 @@ jobs:
           cat /tmp/pms-final-api.log || true
           exit 1
 
-      - name: E2E — resize pricing preview and immutable Payment fact
-        run: python scripts/verify_pms_resize_financial_invariants.py
+      - name: E2E — resize pricing preview and immutable Payment fact through local-only guard
+        run: python scripts/run_local_mutating_ci.py verify_pms_resize_financial_invariants.py
 
       - name: Show Core diagnostics on failure
         if: failure()

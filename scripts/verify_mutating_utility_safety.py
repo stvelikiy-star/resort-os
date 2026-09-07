@@ -20,6 +20,14 @@ def main() -> None:
     owner_legacy = read("scripts/verify_owner_control_v2.py")
     owner_ci = read("scripts/verify_owner_control_v2_ci.py")
     owner_workflow = read(".github/workflows/owner-control-v2-ci.yml")
+    mutating_runner = read("scripts/run_local_mutating_ci.py")
+
+    guarded_workflows = {
+        "guest-os-core": (".github/workflows/guest-os-core-ci.yml", "verify_guest_os_core.py"),
+        "owner-intelligence": (".github/workflows/owner-intelligence-ci.yml", "verify_owner_intelligence.py"),
+        "owner-growth": (".github/workflows/owner-growth-control-ci.yml", "verify_owner_growth_control.py"),
+        "pms-resize": (".github/workflows/pms-final-acceptance-ci.yml", "verify_pms_resize_financial_invariants.py"),
+    }
 
     require("is retired" in rc, "legacy release_candidate_check is explicitly retired")
     require("exit 2" in rc, "legacy release_candidate_check always stops")
@@ -45,6 +53,26 @@ def main() -> None:
     require('os.environ.get("AUTOMATION_SERVICE_KEY", "")' in owner_ci, "owner-control CI has no service-key fallback")
     require("APP_ENV: ci" in owner_workflow, "owner-control workflow explicitly declares CI environment")
     require("verify_owner_control_v2_ci.py" in owner_workflow, "owner-control workflow invokes guarded E2E only")
+
+    require('ALLOWED_TARGETS = {' in mutating_runner, "central mutating CI runner has explicit target allowlist")
+    require('LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}' in mutating_runner, "central mutating CI runner defines localhost boundary")
+    require('app_env not in {"ci", "test"}' in mutating_runner, "central mutating CI runner rejects non-ci/test environments")
+    require('require_local_url("DATABASE_URL", database_url)' in mutating_runner, "central mutating CI runner rejects non-local PostgreSQL")
+    require('require_local_url("Core URL", core_url)' in mutating_runner, "central mutating CI runner rejects non-local Core")
+    require('BOOTSTRAP_OWNER_PASSWORD' in mutating_runner, "central mutating CI runner requires explicit owner credential")
+
+    for label, (workflow_path, verifier) in guarded_workflows.items():
+        workflow = read(workflow_path)
+        require("APP_ENV: ci" in workflow, f"{label} workflow explicitly declares CI environment")
+        require("scripts/run_local_mutating_ci.py" in workflow, f"{label} workflow depends on the central local-only runner")
+        require(
+            f"python scripts/run_local_mutating_ci.py {verifier}" in workflow,
+            f"{label} workflow invokes {verifier} only through the local-only runner",
+        )
+        require(
+            f"run: python scripts/{verifier}" not in workflow,
+            f"{label} workflow has no direct unguarded verifier execution",
+        )
 
     print("MUTATING_UTILITY_SAFETY_PASS")
 
