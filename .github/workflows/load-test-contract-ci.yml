@@ -46,10 +46,11 @@ jobs:
       - name: Validate k6 script syntax and options without sending traffic
         run: |
           docker run --rm \
+            -v "$PWD/tests/load:/tests/load:ro" \
+            grafana/k6:0.54.0 inspect \
             -e LOAD_BASE_URL=http://127.0.0.1:8000 \
             -e LOAD_TEST_ENV=ci \
-            -v "$PWD/tests/load:/tests/load:ro" \
-            grafana/k6:0.54.0 inspect /tests/load/resort_core_read.k6.js >/tmp/k6-inspect.txt
+            /tests/load/resort_core_read.k6.js >/tmp/k6-inspect.txt
           grep -q 'ramping-vus' /tmp/k6-inspect.txt
 
       - name: Assert non-mutating route surface
