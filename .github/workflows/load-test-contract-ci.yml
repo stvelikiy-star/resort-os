@@ -1,0 +1,60 @@
+name: Load Test Contract CI
+
+on:
+  pull_request:
+    paths:
+      - 'tests/load/**'
+      - 'scripts/run_load_test.sh'
+      - 'docs/LOAD_TESTING.md'
+      - '.github/workflows/load-test-contract-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-load-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell runner syntax
+        run: bash -n scripts/run_load_test.sh
+
+      - name: Verify production hostname is fail-closed before Docker execution
+        run: |
+          set +e
+          LOAD_TEST_ENV=staging LOAD_BASE_URL=https://3korony.com bash scripts/run_load_test.sh >/tmp/load-prod.out 2>&1
+          code=$?
+          set -e
+          test "$code" = "2"
+          grep -q 'public production hostname is forbidden' /tmp/load-prod.out
+
+      - name: Verify unknown environment is fail-closed
+        run: |
+          set +e
+          LOAD_TEST_ENV=production LOAD_BASE_URL=http://127.0.0.1:8000 bash scripts/run_load_test.sh >/tmp/load-env.out 2>&1
+          code=$?
+          set -e
+          test "$code" = "2"
+          grep -q 'LOAD_TEST_ENV must be ci, test, or staging' /tmp/load-env.out
+
+      - name: Pull pinned k6 image
+        run: docker pull grafana/k6:0.54.0
+
+      - name: Validate k6 script syntax and options without sending traffic
+        run: |
+          docker run --rm \
+            -e LOAD_BASE_URL=http://127.0.0.1:8000 \
+            -e LOAD_TEST_ENV=ci \
+            -v "$PWD/tests/load:/tests/load:ro" \
+            grafana/k6:0.54.0 inspect /tests/load/resort_core_read.k6.js >/tmp/k6-inspect.txt
+          grep -q 'ramping-vus' /tmp/k6-inspect.txt
+
+      - name: Assert non-mutating route surface
+        run: |
+          ! grep -E '/confirm-payment|/check-in|/check-out|POST.+booking/requests|PATCH|DELETE' tests/load/resort_core_read.k6.js
+          grep -q '/ready' tests/load/resort_core_read.k6.js
+          grep -q '/api/v1/booking/check-availability' tests/load/resort_core_read.k6.js
+          grep -q '/api/v1/pms/grid' tests/load/resort_core_read.k6.js
