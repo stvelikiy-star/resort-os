@@ -10,28 +10,26 @@ Canonical: YES
 ## Release identity
 
 Repository: `stvelikiy-star/resort-os`.  
-Accepted safety source PR: `#132` — `hardening/local-mutating-ci-runner-20260907 -> main`.  
-Accepted executable/release-boundary head: `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`.  
-Observed tree-equivalent main merge: `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc`.  
+Accepted test/safety source PR: `#135` — `test/load-stress-harness-20260907 -> main`.  
+Accepted executable/release-boundary head: `d851c5c64a103ab263b977b3b07c970f29676783`.  
+Observed tree-equivalent main merge: `b477e76a32b7fc0fdf8a349cda400c7fa12bc297`.  
 Production source branch: `main`.
 
 Evidence:
-- PR #132 exact tested head: **25/25 workflows SUCCESS, 0 failures**;
+- PR #135 exact tested head: **22/22 workflows SUCCESS, 0 failures**;
 - accepted head and observed merge are tree-equivalent; GitHub compare reports zero changed files;
-- observed main merge: **23/23 applicable non-truth workflows SUCCESS**;
-- one additional `Release RC Truth CI` push run failed closed because the previous 0.62.2 manifest correctly detected safety-boundary drift; this controlled 0.62.2 safety refreeze updates that boundary without changing runtime version.
+- observed main merge: **20/20 applicable non-truth workflows SUCCESS**;
+- one additional `Release RC Truth CI` push run failed closed because the previous 0.62.2 manifest correctly detected the new load-test safety boundary; this same-version refreeze is the controlled correction.
 
 Machine authority: `release/current-rc.json`.
 
-## Hardening accepted in the final 0.62.2 safety boundary
+## Hardening accepted in the final 0.62.2 boundary
 
-- Kitchen mutation authority and active-route uniqueness hardening from the original 0.62.2 freeze remain in force;
-- synthetic demo/operations mutation utilities fail closed unless an explicit allowed non-production environment is supplied;
-- legacy `release_candidate_check.sh` mutating/db-push path is retired;
-- migration baseline generation is restricted to explicit `development|test|ci` disposable environments;
-- Owner Control V2 mutating E2E requires explicit `ci|test`, localhost-only Resort Core/PostgreSQL and explicit credentials;
-- Guest OS Core, Owner Intelligence, Owner Growth and PMS resize mutating E2E workflows run only through the allowlisted localhost-only `scripts/run_local_mutating_ci.py` guard;
-- Management Final Acceptance regression-checks these safety boundaries;
+- all prior 0.62.2 mutation, route-uniqueness, migration and localhost-only CI hardening remains in force;
+- the new k6 read-pressure harness is explicitly limited to `ci|test|staging`;
+- `3korony.com` and `www.3korony.com` are explicitly blocked as load-test targets;
+- the harness uses only readiness, booking availability and optional authenticated PMS-grid reads; it does not mutate reservations, payments, stays or provider state;
+- real capacity is **not** claimed until this harness is executed against isolated external Beget/VPS staging with CPU/RAM/PostgreSQL/Caddy observations;
 - active FastAPI runtime version remains `0.62.2`.
 
 ## Architecture authority
@@ -76,12 +74,12 @@ External staging/production schema changes use `npx prisma migrate deploy`; neve
 
 ## Repository-verified management contour
 
-Verified contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore and release/staging/package gates.
+Verified contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore, release/staging/package gates and the guarded load-test contract.
 
-The public website is frozen by owner instruction. PRs #129–#132 and this refreeze accept **zero `apps/web/**` changes**; Public Web is only built as compatibility evidence.
+The public website is frozen by owner instruction. PR #135 accepts **zero `apps/web/**` changes**; Public Web is only built as compatibility evidence.
 
-## Current plan boundary
+## Current external boundary
 
-GitHub branch protection and Google Drive public-writer remediation remain advisory/deferred per owner decision and do not block the current internal RC. Beget/VPS is deliberately the final phase.
+GitHub `main` branch protection and Google Drive public-writer remediation remain unresolved launch-security items. Beget/VPS external runtime access, legacy rollback, HTTPS/WSS staging, real devices/providers, monitoring, actual load execution, fresh backup/restore/off-site evidence and DNS rollback are not claimed by repository CI.
 
-External production remains **EXTERNAL PRODUCTION CUTOVER STOP**. Real host, rollback, HTTPS/WSS staging, real devices/providers, monitoring, fresh backup/restore/off-site evidence and explicit owner GO are not claimed by repository CI.
+External production remains **EXTERNAL PRODUCTION CUTOVER STOP** until those items and explicit owner GO are complete.

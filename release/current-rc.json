@@ -2,24 +2,24 @@
   "schema_version": 1,
   "release_version": "0.62.2",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "hardening/local-mutating-ci-runner-20260907",
-  "accepted_executable_head": "ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd",
-  "observed_merge_commit": "7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc",
+  "source_branch": "test/load-stress-harness-20260907",
+  "accepted_executable_head": "d851c5c64a103ab263b977b3b07c970f29676783",
+  "observed_merge_commit": "b477e76a32b7fc0fdf8a349cda400c7fa12bc297",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 25,
-    "success": 25,
+    "triggered": 22,
+    "success": 22,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 23,
-    "success": 23,
+    "triggered": 20,
+    "success": 20,
     "failures": 0
   },
-  "postmerge_truth_head": "7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc",
+  "postmerge_truth_head": "b477e76a32b7fc0fdf8a349cda400c7fa12bc297",
   "postmerge_truth_workflows": {
-    "triggered": 23,
-    "success": 23,
+    "triggered": 20,
+    "success": 20,
     "failures": 0
   },
   "production_source_branch": "main",
@@ -35,18 +35,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS runtime version remains 0.62.2; this is a controlled safety-boundary refreeze, not a product/runtime version bump.",
-    "PR #132 exact tested head ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd completed 25/25 pull-request workflows successfully with zero failures.",
-    "Observed main merge 7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc is tree-equivalent to the tested head; GitHub compare reports no changed files between them.",
-    "The observed merge completed 23/23 applicable non-truth push workflows successfully. The one additional Release RC Truth CI run failed closed because the previous manifest correctly detected safety-boundary drift; this refreeze is the controlled correction.",
-    "Synthetic demo and operations utilities require explicit non-production environments and fail closed on blank or unknown environment values.",
-    "The legacy release_candidate_check mutating path is retired; production/staging release evidence uses committed migrations and guarded release/staging gates, never prisma db push.",
-    "Migration baseline generation is restricted to explicit disposable development/test/ci environments.",
-    "Owner Control V2 mutating E2E is isolated to explicit ci/test with localhost-only Resort Core and PostgreSQL targets and no credential fallbacks.",
-    "Guest OS Core, Owner Intelligence, Owner Growth and PMS resize mutating E2E workflows are routed through an allowlisted localhost-only CI runner requiring explicit ci/test environment and owner credentials.",
+    "Resort OS runtime version remains 0.62.2; this is a controlled test/safety-boundary refreeze, not a product/runtime version bump.",
+    "PR #135 exact tested head d851c5c64a103ab263b977b3b07c970f29676783 completed 22/22 pull-request workflows successfully with zero failures.",
+    "Observed main merge b477e76a32b7fc0fdf8a349cda400c7fa12bc297 is tree-equivalent to the tested head; GitHub compare reports zero changed files.",
+    "The observed merge completed 20/20 applicable non-truth push workflows successfully. The one additional Release RC Truth CI run failed closed because the prior frozen manifest correctly detected the new load-test safety boundary; this refreeze is the controlled correction.",
+    "The added k6 load harness is read-only, explicitly limited to ci/test/staging, blocks 3korony.com and www.3korony.com, and does not mutate reservations, payments, stays or provider state.",
+    "Real load capacity is not claimed until the harness is executed against an isolated external Beget/VPS staging target with resource observations.",
     "Database release ledger remains 22 committed migrations and 87 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Public website source remained frozen throughout the safety hardening; no apps/web changes are accepted by this refreeze.",
-    "Beget/VPS, external HTTPS/WSS staging, legacy rollback, real devices/providers, monitoring, backup/restore/off-site evidence and DNS cutover remain external work.",
+    "Public website source remained frozen; PR #135 contains zero apps/web changes.",
+    "Beget/VPS, external HTTPS/WSS staging, legacy rollback, real devices/providers, monitoring, actual load evidence, backup/restore/off-site evidence and DNS cutover remain external work.",
     "Production cutover remains unauthorized until the final external phase is executed and explicit owner GO is recorded."
   ]
 }
