@@ -2,34 +2,35 @@
 
 Status: **INTERNAL RC FROZEN / EXTERNAL PRODUCTION CUTOVER STOP**
 
-Accepted executable/release-boundary head: `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`.  
-Observed tree-equivalent main merge: `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc`.  
+Accepted executable/release-boundary head: `d851c5c64a103ab263b977b3b07c970f29676783`.  
+Observed tree-equivalent main merge: `b477e76a32b7fc0fdf8a349cda400c7fa12bc297`.  
 Production source branch: `main`.
 
-## Why the same-version safety refreeze exists
+## Why the same-version refreeze exists
 
-The active application runtime remains 0.62.2. A strict post-freeze operational audit found several non-runtime mutation utilities and CI E2E entrypoints that could fail open when environment targeting was incomplete or overridden. Because `Release RC Truth` correctly treats these safety/control paths as part of the frozen release boundary, the accepted boundary must move even though the product/runtime version does not.
+The active application runtime remains 0.62.2. PR #135 added only guarded load/stress testing infrastructure and documentation; it did not change `apps/web/**` or hotel business logic. `Release RC Truth` correctly classified executable test/control paths as release-boundary drift and failed closed after merge, so the accepted boundary is advanced without a runtime version bump.
 
-## Safety hardening now included
+## Load-test safety now included
 
-- synthetic demo and operations scripts require an explicit allowed non-production environment and fail closed on blank/unknown values;
-- legacy `release_candidate_check.sh` is retired as a mutating/db-push entrypoint;
-- migration baseline generation requires explicit `development|test|ci` and refuses staging/production/unknown environments;
-- Owner Control V2 mutating E2E has no credential/service-key fallback and is restricted to `ci|test` with localhost-only Core/PostgreSQL;
-- Guest OS Core, Owner Intelligence, Owner Growth and PMS resize mutation workflows run through `scripts/run_local_mutating_ci.py`;
-- that runner allowlists exact verifier names, requires explicit `ci|test`, explicit owner credentials, explicit database/Core URLs and localhost-only targets;
-- `verify_mutating_utility_safety.py` and Management Final Acceptance enforce these boundaries against regression.
+- real k6 read-pressure harness using pinned `grafana/k6:0.54.0`;
+- explicit `ci|test|staging` environment requirement;
+- explicit block for `3korony.com` and `www.3korony.com`;
+- non-loopback targets must be clearly staging/test-marked;
+- default pressure profile 10→25→50 VUs with failure and p95/p99 thresholds;
+- optional authenticated PMS-grid reads require explicit staging credentials;
+- no reservation, payment, check-in/out or provider mutations;
+- bounded retry protects the CI contract from transient registry 502 errors.
 
-Earlier 0.62.2 Kitchen route/RBAC and active-route uniqueness hardening remains fully in force.
+Repository validation of the harness is **not** a claim that the real Beget server has passed load testing. Actual capacity remains external evidence.
 
 ## Evidence
 
-PR #132 exact tested head `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`: **25/25 workflows SUCCESS, 0 failures**.  
-Observed main merge `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc` is tree-equivalent; compare shows zero file changes between tested head and merge.  
-Observed main merge: **23/23 applicable non-truth push workflows SUCCESS**.  
-One additional `Release RC Truth CI` push run failed closed because the previous frozen manifest correctly detected the safety-boundary drift; this record and manifest are the controlled correction.
+PR #135 exact tested head `d851c5c64a103ab263b977b3b07c970f29676783`: **22/22 workflows SUCCESS, 0 failures**.  
+Observed main merge `b477e76a32b7fc0fdf8a349cda400c7fa12bc297` is tree-equivalent; compare shows zero changed files between tested head and merge.  
+Observed main merge: **20/20 applicable non-truth push workflows SUCCESS**.  
+One additional `Release RC Truth CI` push run failed closed because the previous frozen manifest correctly detected the new load-test test/safety boundary; this record and manifest are the controlled correction.
 
-The full test contour includes guarded mutating E2E, Management Final Acceptance, clean PostgreSQL migration/seed checks, Core lifecycle, PMS, Kitchen/Dining, automation contracts, backup/restore, Full Staging Gate, Single Server Production Package and the main Release Gate.
+During development the new load-test CI caught and corrected two real harness defects (Docker/k6 environment propagation and unsupported URL parsing), and one external Docker Hub 502 was hardened with bounded retry. The final harness contract is green.
 
 ## Frozen contracts
 
@@ -40,12 +41,11 @@ The full test contour includes guarded mutating E2E, Management Final Acceptance
 - **48 rate rows**;
 - `ReservationRequest != Reservation`;
 - PostgreSQL/Core remain transaction authority;
-- public website source remains frozen.
+- public website source remains frozen;
+- release `0.62.2` remains unchanged.
 
-## Scope boundary
+## External boundary
 
-PRs #129, #130, #131 and #132 changed no `apps/web/**` product source. The public site was only built/smoke-tested as compatibility evidence. No external Beget/VPS deployment is claimed.
-
-GitHub branch protection and Google Drive permission hardening remain advisory/deferred by owner decision. Beget/VPS and all external staging/rollback/device/provider/monitoring/backup/DNS work remain the final external phase.
+GitHub `main` protection, Google Drive public-writer remediation, Beget/VPS access, external HTTPS/WSS, legacy rollback, real devices/providers, actual load execution, monitoring, fresh backup/restore/off-site evidence, immutable deployment linkage and DNS rollback remain external launch work.
 
 **EXTERNAL PRODUCTION CUTOVER STOP** remains active. No production deployment is claimed by this release record.
