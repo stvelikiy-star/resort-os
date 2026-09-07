@@ -44,7 +44,7 @@ jobs:
           python - <<'PY'
           import json
           rc = json.load(open('release/current-rc.json', encoding='utf-8'))
-          assert rc['release_version'] == '0.62.1'
+          assert rc['release_version'] == '0.62.2'
           assert rc['production_source_branch'] == 'main'
           assert rc['main_allowed_as_production_source'] is True
           assert rc['production_cutover_authorized'] is False

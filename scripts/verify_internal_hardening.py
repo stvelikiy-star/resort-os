@@ -68,11 +68,11 @@ def main() -> int:
     ok("BOOTSTRAP_OWNER_PASSWORD=\n" in prod, "owner bootstrap password absent")
 
     rc = json.loads(read("release/current-rc.json"))
-    ok(rc["release_version"] == "0.62.1", "release 0.62.1")
-    ok(rc["accepted_executable_head"] == "b3bb0c1be4c522d765509796ddd1d32e8606dc89", "accepted hardening SHA")
-    ok(rc["observed_merge_commit"] == "7f689458b2cf507d76a8c54fbe164e9492f79aca", "observed merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 28, "success": 28, "failures": 0}, "28/28 accepted workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 eligible merge workflows")
+    ok(rc["release_version"] == "0.62.2", "release 0.62.2")
+    ok(rc["accepted_executable_head"] == "b79e22ee56c43e5f9146df7597d4c9e5e4124afa", "accepted route-hardening SHA")
+    ok(rc["observed_merge_commit"] == "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5", "observed merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 41, "success": 41, "failures": 0}, "41/41 accepted workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 32, "success": 32, "failures": 0}, "32/32 eligible merge workflows")
     ok(rc["migration_count"] == 22 and rc["critical_constraint_count"] == 87, "22 migrations / 87 constraints")
     ok(rc["canonical_property_seed"] == {"rooms": 84, "room_categories": 12, "rate_rows": 48}, "canonical property seed")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
@@ -131,7 +131,9 @@ def main() -> int:
     ok('(\"PATCH\", \"/api/v1/kitchen/menu/{item_id}\")' in app_entry, "legacy Kitchen patch blocked in operational router")
     ok("_strip_legacy_kitchen_menu_mutations()" in app_entry, "Kitchen route canonicalization executes before composition")
     ok('app.include_router(kitchen_menu_management_router)' in app_entry and 'app.include_router(kitchen_admin_router)' in app_entry, "canonical manager and operational Kitchen routers composed")
-    ok('app.version = "0.62.2"' in app_entry, "runtime version advanced for canonical Kitchen hardening")
+    ok('app.version = "0.62.2"' in app_entry, "runtime version matches 0.62.2 release")
+    route_guard = read("scripts/verify_active_route_uniqueness.py")
+    ok("DUPLICATE_ROUTE" in route_guard and "app.routes" in route_guard, "active API route uniqueness guard present")
 
     staging = read("scripts/external_staging_acceptance.py")
     for marker in (
@@ -142,7 +144,7 @@ def main() -> int:
     ):
         ok(marker in staging, f"external fail-closed marker: {marker}")
 
-    ok(passed >= 105, f"hardening suite too small: {passed}")
+    ok(passed >= 106, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
     print("BOUNDARY: management/admin/staff/Core only; apps/web is frozen; Beget/VPS deferred by owner")
     return 0

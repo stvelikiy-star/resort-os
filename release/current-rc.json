@@ -1,25 +1,25 @@
 {
   "schema_version": 1,
-  "release_version": "0.62.1",
+  "release_version": "0.62.2",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "audit/internal-hardening-20260907",
-  "accepted_executable_head": "b3bb0c1be4c522d765509796ddd1d32e8606dc89",
-  "observed_merge_commit": "7f689458b2cf507d76a8c54fbe164e9492f79aca",
+  "source_branch": "audit/kitchen-route-canonicalization-20260907",
+  "accepted_executable_head": "b79e22ee56c43e5f9146df7597d4c9e5e4124afa",
+  "observed_merge_commit": "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 28,
-    "success": 28,
+    "triggered": 41,
+    "success": 41,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 23,
-    "success": 23,
+    "triggered": 32,
+    "success": 32,
     "failures": 0
   },
-  "postmerge_truth_head": "7f689458b2cf507d76a8c54fbe164e9492f79aca",
+  "postmerge_truth_head": "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5",
   "postmerge_truth_workflows": {
-    "triggered": 23,
-    "success": 23,
+    "triggered": 32,
+    "success": 32,
     "failures": 0
   },
   "production_source_branch": "main",
@@ -35,13 +35,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS 0.62.1 accepts PR #125 tested head b3bb0c1be4c522d765509796ddd1d32e8606dc89 after strict internal management hardening.",
-    "The exact accepted head completed 28/28 pull-request workflows successfully with zero failures.",
-    "Observed main merge 7f689458b2cf507d76a8c54fbe164e9492f79aca is tree-equivalent to the accepted head.",
-    "The observed merge completed 23/23 eligible product/security/migration/staging workflows successfully; Release RC Truth CI failed closed exactly because the previous 0.62.0 manifest detected executable drift. This 0.62.1 refreeze is the controlled correction.",
-    "Hardening closed the unauthenticated historical Admin demo route and fail-closed Kitchen draft bootstrap for DINING_STAFF and production.",
+    "Resort OS 0.62.2 accepts PR #127 tested head b79e22ee56c43e5f9146df7597d4c9e5e4124afa after strict active-route and Kitchen RBAC hardening.",
+    "The exact accepted head completed 41/41 pull-request workflows successfully with zero failures.",
+    "Observed main merge 731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5 is tree-equivalent to the accepted head.",
+    "The observed merge completed 32/32 eligible product/security/migration/staging workflows successfully; Release RC Truth CI failed closed exactly because the previous 0.62.1 manifest detected executable drift. This 0.62.2 refreeze is the controlled correction.",
+    "Hardening removed router-order-dependent Kitchen menu mutation authority by stripping the legacy operational POST bootstrap and PATCH menu mutation routes before composition.",
+    "A runtime active API route uniqueness gate now fails if any API method/path pair is registered more than once.",
+    "Active FastAPI runtime identity is 0.62.2.",
     "Database release ledger remains 22 committed migrations and 87 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Public website source remained frozen; PR #125 changed zero apps/web files.",
+    "Public website source remained frozen; PR #127 changed zero apps/web files.",
     "Per owner plan, GitHub branch protection and Google Drive public-writer remediation are advisory/deferred and are not internal-release blockers.",
     "Beget/VPS, external staging, rollback, devices, providers, monitoring, backups and DNS cutover are intentionally deferred to the final external phase.",
     "Production cutover remains unauthorized until the final external phase is executed and explicit owner GO is recorded."
