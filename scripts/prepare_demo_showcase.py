@@ -19,9 +19,10 @@ from http.cookiejar import CookieJar
 
 
 CORE_BASE_URL = os.environ.get("CORE_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
-APP_ENV = os.environ.get("APP_ENV", "development").lower()
+APP_ENV = os.environ.get("APP_ENV", "").strip().lower()
 USERNAME = os.environ.get("DEMO_OWNER_USERNAME") or os.environ.get("BOOTSTRAP_OWNER_USERNAME")
 PASSWORD = os.environ.get("DEMO_OWNER_PASSWORD") or os.environ.get("BOOTSTRAP_OWNER_PASSWORD")
+ALLOWED_SYNTHETIC_ENVS = {"development", "test", "ci", "staging"}
 
 DEMO_GUESTS = [
     ("DEMO · Айдана", "+996700900001"),
@@ -54,8 +55,8 @@ def api(opener: urllib.request.OpenerDirector, method: str, path: str, payload=N
 
 
 def main() -> None:
-    if APP_ENV in {"production", "prod"}:
-        fail("prepare_demo_showcase.py is disabled when APP_ENV=production")
+    if APP_ENV not in ALLOWED_SYNTHETIC_ENVS:
+        fail("prepare_demo_showcase.py requires explicit APP_ENV=development|test|ci|staging; refusing unknown or production environment")
     if not USERNAME or not PASSWORD:
         fail("Set DEMO_OWNER_USERNAME/DEMO_OWNER_PASSWORD or BOOTSTRAP_OWNER_USERNAME/BOOTSTRAP_OWNER_PASSWORD")
 
@@ -69,8 +70,6 @@ def main() -> None:
     print(f"Logging in as {USERNAME!r}...")
     api(opener, "POST", "/api/v1/auth/login", {"username": USERNAME, "password": PASSWORD})
 
-    # Use hotel-relative near-future dates. Availability itself determines which
-    # categories are safe/sellable under the currently loaded rate periods.
     first_check_in = date.today() + timedelta(days=1)
     summary: list[dict] = []
 
@@ -78,85 +77,20 @@ def main() -> None:
         check_in = first_check_in + timedelta(days=index)
         nights = 2 + (index % 3)
         check_out = check_in + timedelta(days=nights)
-        query = urllib.parse.urlencode(
-            {
-                "check_in": check_in.isoformat(),
-                "check_out": check_out.isoformat(),
-                "adults": 2,
-                "children": 0,
-            }
-        )
+        query = urllib.parse.urlencode({"check_in": check_in.isoformat(), "check_out": check_out.isoformat(), "adults": 2, "children": 0})
         availability = api(opener, "GET", f"/api/v1/booking/check-availability?{query}")
-        sellable = [
-            item
-            for item in availability.get("results", [])
-            if item.get("pricing", {}).get("sellable") and item.get("available_count", 0) > 0
-        ]
+        sellable = [item for item in availability.get("results", []) if item.get("pricing", {}).get("sellable") and item.get("available_count", 0) > 0]
         if not sellable:
             print(f"SKIP {guest_name}: no sellable category for {check_in} -> {check_out}")
             continue
-
-        # Spread the demo across categories when enough availability exists.
         room_type = sellable[index % len(sellable)]
-        request_item = api(
-            opener,
-            "POST",
-            "/api/v1/booking/requests",
-            {
-                "guest_name": guest_name,
-                "phone": phone,
-                "email": None,
-                "check_in": check_in.isoformat(),
-                "check_out": check_out.isoformat(),
-                "adults": 2,
-                "children": 0,
-                "room_type_code": room_type["room_type_code"],
-                "source": "DEMO_SHOWCASE",
-                "notes": "Synthetic development demo data. Not a real guest booking.",
-            },
-        )
+        request_item = api(opener, "POST", "/api/v1/booking/requests", {"guest_name": guest_name, "phone": phone, "email": None, "check_in": check_in.isoformat(), "check_out": check_out.isoformat(), "adults": 2, "children": 0, "room_type_code": room_type["room_type_code"], "source": "DEMO_SHOWCASE", "notes": "Synthetic development demo data. Not a real guest booking."})
         request_id = request_item["id"]
-        quote = api(
-            opener,
-            "POST",
-            f"/api/v1/admin/booking/requests/{request_id}/quote",
-            {"room_type_code": room_type["room_type_code"]},
-        )
-
-        # This is explicitly a synthetic manager-recorded demo fact. There is no
-        # global prepayment percentage in Core; the amount exists only to exercise
-        # the real manager-controlled conversion path during the demo.
+        quote = api(opener, "POST", f"/api/v1/admin/booking/requests/{request_id}/quote", {"room_type_code": room_type["room_type_code"]})
         demo_payment = 1000 + index * 500
-        reservation = api(
-            opener,
-            "POST",
-            f"/api/v1/admin/booking/requests/{request_id}/confirm-payment",
-            {
-                "amount_kgs": demo_payment,
-                "method": "DEMO_MANUAL",
-                "provider": "DEMO_SHOWCASE",
-                "external_ref": f"DEMO-{check_in:%Y%m%d}-{index + 1}",
-                "idempotency_key": f"demo-showcase-{check_in:%Y%m%d}-{index + 1}-{request_id}",
-            },
-        )
-        summary.append(
-            {
-                "guest": guest_name,
-                "request_id": request_id,
-                "booking_number": reservation.get("booking_number"),
-                "reservation_id": reservation.get("reservation_id"),
-                "room_code": reservation.get("room_code"),
-                "room_type": quote.get("room_type_name"),
-                "check_in": check_in.isoformat(),
-                "check_out": check_out.isoformat(),
-                "stay_total_kgs": quote.get("quoted_total_kgs"),
-                "demo_payment_kgs": demo_payment,
-            }
-        )
-        print(
-            f"OK {guest_name}: {reservation.get('booking_number')} · room {reservation.get('room_code')} · "
-            f"{check_in} -> {check_out}"
-        )
+        reservation = api(opener, "POST", f"/api/v1/admin/booking/requests/{request_id}/confirm-payment", {"amount_kgs": demo_payment, "method": "DEMO_MANUAL", "provider": "DEMO_SHOWCASE", "external_ref": f"DEMO-{check_in:%Y%m%d}-{index + 1}", "idempotency_key": f"demo-showcase-{check_in:%Y%m%d}-{index + 1}-{request_id}"})
+        summary.append({"guest": guest_name, "request_id": request_id, "booking_number": reservation.get("booking_number"), "reservation_id": reservation.get("reservation_id"), "room_code": reservation.get("room_code"), "room_type": quote.get("room_type_name"), "check_in": check_in.isoformat(), "check_out": check_out.isoformat(), "stay_total_kgs": quote.get("quoted_total_kgs"), "demo_payment_kgs": demo_payment})
+        print(f"OK {guest_name}: {reservation.get('booking_number')} · room {reservation.get('room_code')} · {check_in} -> {check_out}")
 
     if not summary:
         fail("No demo reservation could be created. Check rate periods and availability.")
