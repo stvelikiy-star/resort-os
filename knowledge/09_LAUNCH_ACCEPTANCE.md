@@ -11,16 +11,16 @@ Repository/CI evidence is not external staging or production evidence.
 
 Repository: `stvelikiy-star/resort-os`.  
 Release: `0.62.2`.  
-Accepted source PR: `#127` — `audit/kitchen-route-canonicalization-20260907 -> main`.  
-Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
-Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
+Accepted safety source PR: `#132` — `hardening/local-mutating-ci-runner-20260907 -> main`.  
+Accepted executable/release-boundary head: `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`.  
+Observed tree-equivalent main merge: `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc`.  
 Production source branch: `main`.
 
 Evidence:
-- accepted PR #127 head: **41/41 workflows SUCCESS, 0 failures**;
-- accepted head and observed merge share the same tree;
-- observed main merge: **32/32 eligible product/security/migration/staging workflows SUCCESS**;
-- `Release RC Truth CI` failed closed only because 0.62.1 correctly rejected the new executable; this 0.62.2 refreeze is the controlled correction.
+- accepted PR #132 head: **25/25 workflows SUCCESS, 0 failures**;
+- accepted head and observed merge are tree-equivalent with zero file differences;
+- observed main merge: **23/23 applicable non-truth workflows SUCCESS**;
+- the one additional `Release RC Truth CI` run failed closed because the prior frozen boundary correctly rejected the safety drift; this same-version refreeze is the controlled correction.
 
 Machine truth: `release/current-rc.json`. Guard: `scripts/release_rc_truth_guard.py`.
 
@@ -30,7 +30,7 @@ Machine truth: `release/current-rc.json`. Guard: `scripts/release_rc_truth_guard
 
 `ReservationRequest != Reservation`. OWNER/MANAGER retain reservation/payment authority. AI/n8n cannot confirm payment/reservation, invent policy, check guests in/out, refund or bypass Core pricing/availability.
 
-Kitchen menu mutation authority is now structurally single-owner: OWNER/MANAGER canonical routes only. Active API route uniqueness is release-gated so RBAC cannot depend on duplicate route order. Real bank/TTLock remains provider-gated; NFC remains outside active V1.
+Kitchen menu mutation authority remains structurally single-owner: OWNER/MANAGER canonical routes only. Active API route uniqueness is release-gated. Mutating CI/demo utilities are now fail-closed and localhost-isolated where applicable. Real bank/TTLock remains provider-gated; NFC remains outside active V1.
 
 ## 3. Database/property contract
 
@@ -52,9 +52,9 @@ Never use `prisma db push` as staging/production release evidence.
 
 ## 4. Repository-verified management contour
 
-0.62.2 includes PMS/chessboard, Rates/Seasons, Reception, CRM, groups, Guest OS/Services/Offers, housekeeping/maintenance, Finance, Reports/Analytics, Staff/RBAC, Kitchen/Dining, QR/service points, Inbox, automation contracts, backup/restore, production package, staging/release gates, Admin demo fail-close and active API route uniqueness enforcement.
+0.62.2 includes PMS/chessboard, Rates/Seasons, Reception, CRM, groups, Guest OS/Services/Offers, housekeeping/maintenance, Finance, Reports/Analytics, Staff/RBAC, Kitchen/Dining, QR/service points, Inbox, automation contracts, backup/restore, production package, staging/release gates, Admin demo fail-close, active API route uniqueness enforcement and the final mutating-CI safety boundary.
 
-The public website source remained frozen during PR #127 (`apps/web/** = 0`). Public Web build/smoke is compatibility evidence only.
+The public website source remained frozen during PRs #129–#132 (`apps/web/** = 0`). Public Web build/smoke is compatibility evidence only.
 
 ## 5. Owner-prioritized external phase
 
@@ -77,18 +77,18 @@ Final structural cutover evidence check, only after real evidence exists:
 python scripts/verify_launch_acceptance.py \
   --mode cutover \
   --manifest /secure/path/launch-evidence.json \
-  --release-sha b79e22ee56c43e5f9146df7597d4c9e5e4124afa
+  --release-sha ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd
 ```
 
 ## 7. Final external sequence — deferred until Beget/VPS phase
 
-1. verify main and 0.62.2 manifest;
+1. verify `main` and 0.62.2 manifest;
 2. run release truth, host and environment preflight;
 3. preserve/checksum current legacy rollback;
 4. create persistent storage and private PostgreSQL;
 5. apply all 22 migrations;
 6. reconcile 84-room canonical register to zero diff;
-7. build/deploy exact accepted executable `b79e22ee56c43e5f9146df7597d4c9e5e4124afa` to isolated HTTPS/WSS staging;
+7. build/deploy exact accepted release-boundary head `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd` to isolated HTTPS/WSS staging;
 8. verify Core/Public/Admin/Staff/Kitchen and secure network boundaries;
 9. run full external acceptance plus real-device/provider checks;
 10. prove fresh backup and clean restore;

@@ -10,27 +10,29 @@ Canonical: YES
 ## Release identity
 
 Repository: `stvelikiy-star/resort-os`.  
-Accepted source PR: `#127` — `audit/kitchen-route-canonicalization-20260907 -> main`.  
-Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
-Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
+Accepted safety source PR: `#132` — `hardening/local-mutating-ci-runner-20260907 -> main`.  
+Accepted executable/release-boundary head: `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`.  
+Observed tree-equivalent main merge: `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc`.  
 Production source branch: `main`.
 
 Evidence:
-- PR #127 accepted head: **41/41 workflows SUCCESS, 0 failures**;
-- accepted head and observed merge are tree-equivalent;
-- observed merge: **32/32 eligible product/security/migration/staging workflows SUCCESS**;
-- one additional `Release RC Truth CI` push run failed closed exactly because the previous 0.62.1 manifest detected executable drift; 0.62.2 is the controlled refreeze.
+- PR #132 exact tested head: **25/25 workflows SUCCESS, 0 failures**;
+- accepted head and observed merge are tree-equivalent; GitHub compare reports zero changed files;
+- observed main merge: **23/23 applicable non-truth workflows SUCCESS**;
+- one additional `Release RC Truth CI` push run failed closed because the previous 0.62.2 manifest correctly detected safety-boundary drift; this controlled 0.62.2 safety refreeze updates that boundary without changing runtime version.
 
 Machine authority: `release/current-rc.json`.
 
-## Hardening accepted in 0.62.2
+## Hardening accepted in the final 0.62.2 safety boundary
 
-- Kitchen menu mutations no longer depend on FastAPI router registration order;
-- legacy operational `POST /api/v1/kitchen/menu/bootstrap-draft` and `PATCH /api/v1/kitchen/menu/{item_id}` routes are stripped before application composition;
-- the canonical menu mutation router remains OWNER/MANAGER-authoritative while DINING_STAFF keeps operational read/order/table access;
-- active API route uniqueness is now checked at runtime in the main Release Gate: duplicate HTTP method + `/api/...` path pairs fail the release;
-- active FastAPI runtime version is `0.62.2` instead of the stale `0.60.0` identity;
-- previous 0.62.1 hardening remains in force: `/admin/demo` fail-closed, production Kitchen bootstrap 404, DINING_STAFF mutation denial, strict auth/RBAC/data/release assertions.
+- Kitchen mutation authority and active-route uniqueness hardening from the original 0.62.2 freeze remain in force;
+- synthetic demo/operations mutation utilities fail closed unless an explicit allowed non-production environment is supplied;
+- legacy `release_candidate_check.sh` mutating/db-push path is retired;
+- migration baseline generation is restricted to explicit `development|test|ci` disposable environments;
+- Owner Control V2 mutating E2E requires explicit `ci|test`, localhost-only Resort Core/PostgreSQL and explicit credentials;
+- Guest OS Core, Owner Intelligence, Owner Growth and PMS resize mutating E2E workflows run only through the allowlisted localhost-only `scripts/run_local_mutating_ci.py` guard;
+- Management Final Acceptance regression-checks these safety boundaries;
+- active FastAPI runtime version remains `0.62.2`.
 
 ## Architecture authority
 
@@ -76,10 +78,10 @@ External staging/production schema changes use `npx prisma migrate deploy`; neve
 
 Verified contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore and release/staging/package gates.
 
-The public website is frozen by owner instruction. PR #127 changed **zero `apps/web/**` files**; Public Web was only built as compatibility evidence.
+The public website is frozen by owner instruction. PRs #129–#132 and this refreeze accept **zero `apps/web/**` changes**; Public Web is only built as compatibility evidence.
 
 ## Current plan boundary
 
-GitHub branch protection and Google Drive public-writer remediation are advisory/deferred per owner decision and do not block the current internal RC. Beget/VPS is deliberately the final phase.
+GitHub branch protection and Google Drive public-writer remediation remain advisory/deferred per owner decision and do not block the current internal RC. Beget/VPS is deliberately the final phase.
 
 External production remains **EXTERNAL PRODUCTION CUTOVER STOP**. Real host, rollback, HTTPS/WSS staging, real devices/providers, monitoring, fresh backup/restore/off-site evidence and explicit owner GO are not claimed by repository CI.

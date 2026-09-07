@@ -13,12 +13,12 @@ Canonical machine manifest: `release/current-rc.json`.
 ## 1. Release boundary
 
 Release: `0.62.2`.  
-Accepted source PR: `#127`.  
-Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
-Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
+Accepted safety source PR: `#132`.  
+Accepted executable/release-boundary head: `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`.  
+Observed tree-equivalent main merge: `7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc`.  
 Production source branch: `main`.
 
-Evidence: accepted head **41/41 SUCCESS**; observed merge **32/32 eligible SUCCESS**; the only additional failed push workflow was expected `Release RC Truth CI` fail-close against the previous 0.62.1 executable boundary.
+Evidence: accepted head **25/25 SUCCESS**; observed merge **23/23 applicable non-truth workflows SUCCESS**. The one additional failed push workflow was the expected `Release RC Truth CI` fail-close against the previous frozen safety boundary. Runtime remains 0.62.2.
 
 ## 2. Approved topology
 
@@ -54,6 +54,8 @@ Before DNS/apex or web-server changes: record DNS/IP/TTL, capture current web ro
 ## 6. Environment and secrets
 
 Create `.env.production` only on the server from `.env.production.example`. Generate independent strong secrets. Never commit production secrets. Keep n8n pinned; do not replace with `latest` without a tested release change.
+
+Mutating CI/demo utilities are not deployment tools. Official guarded mutation verifiers require explicit `ci|test` and localhost Core/PostgreSQL. The retired `release_candidate_check.sh` must not be used as a deployment path.
 
 ## 7. Database contract
 
@@ -107,7 +109,7 @@ Never use `prisma db push` for external staging/production.
 7. apply all 22 migrations;
 8. run production/database preflight;
 9. reconcile canonical room register to zero diff;
-10. build exact accepted SHA `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`;
+10. build exact accepted SHA `ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd`;
 11. start Core/Public/Admin/Staff/Kitchen in isolated staging;
 12. start n8n only after Core readiness;
 13. route staging HTTPS/WSS and verify TLS, secure cookies, exact CORS and private PostgreSQL;

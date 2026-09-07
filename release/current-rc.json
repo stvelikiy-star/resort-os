@@ -2,24 +2,24 @@
   "schema_version": 1,
   "release_version": "0.62.2",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "audit/kitchen-route-canonicalization-20260907",
-  "accepted_executable_head": "b79e22ee56c43e5f9146df7597d4c9e5e4124afa",
-  "observed_merge_commit": "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5",
+  "source_branch": "hardening/local-mutating-ci-runner-20260907",
+  "accepted_executable_head": "ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd",
+  "observed_merge_commit": "7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 41,
-    "success": 41,
+    "triggered": 25,
+    "success": 25,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 32,
-    "success": 32,
+    "triggered": 23,
+    "success": 23,
     "failures": 0
   },
-  "postmerge_truth_head": "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5",
+  "postmerge_truth_head": "7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc",
   "postmerge_truth_workflows": {
-    "triggered": 32,
-    "success": 32,
+    "triggered": 23,
+    "success": 23,
     "failures": 0
   },
   "production_source_branch": "main",
@@ -35,17 +35,18 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS 0.62.2 accepts PR #127 tested head b79e22ee56c43e5f9146df7597d4c9e5e4124afa after strict active-route and Kitchen RBAC hardening.",
-    "The exact accepted head completed 41/41 pull-request workflows successfully with zero failures.",
-    "Observed main merge 731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5 is tree-equivalent to the accepted head.",
-    "The observed merge completed 32/32 eligible product/security/migration/staging workflows successfully; Release RC Truth CI failed closed exactly because the previous 0.62.1 manifest detected executable drift. This 0.62.2 refreeze is the controlled correction.",
-    "Hardening removed router-order-dependent Kitchen menu mutation authority by stripping the legacy operational POST bootstrap and PATCH menu mutation routes before composition.",
-    "A runtime active API route uniqueness gate now fails if any API method/path pair is registered more than once.",
-    "Active FastAPI runtime identity is 0.62.2.",
+    "Resort OS runtime version remains 0.62.2; this is a controlled safety-boundary refreeze, not a product/runtime version bump.",
+    "PR #132 exact tested head ccf9a7bdca0187ecb712e35d8d0e53bd3d9051cd completed 25/25 pull-request workflows successfully with zero failures.",
+    "Observed main merge 7cf4b5a3c4164f7224a2fd70807cecf40cfb42bc is tree-equivalent to the tested head; GitHub compare reports no changed files between them.",
+    "The observed merge completed 23/23 applicable non-truth push workflows successfully. The one additional Release RC Truth CI run failed closed because the previous manifest correctly detected safety-boundary drift; this refreeze is the controlled correction.",
+    "Synthetic demo and operations utilities require explicit non-production environments and fail closed on blank or unknown environment values.",
+    "The legacy release_candidate_check mutating path is retired; production/staging release evidence uses committed migrations and guarded release/staging gates, never prisma db push.",
+    "Migration baseline generation is restricted to explicit disposable development/test/ci environments.",
+    "Owner Control V2 mutating E2E is isolated to explicit ci/test with localhost-only Resort Core and PostgreSQL targets and no credential fallbacks.",
+    "Guest OS Core, Owner Intelligence, Owner Growth and PMS resize mutating E2E workflows are routed through an allowlisted localhost-only CI runner requiring explicit ci/test environment and owner credentials.",
     "Database release ledger remains 22 committed migrations and 87 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Public website source remained frozen; PR #127 changed zero apps/web files.",
-    "Per owner plan, GitHub branch protection and Google Drive public-writer remediation are advisory/deferred and are not internal-release blockers.",
-    "Beget/VPS, external staging, rollback, devices, providers, monitoring, backups and DNS cutover are intentionally deferred to the final external phase.",
+    "Public website source remained frozen throughout the safety hardening; no apps/web changes are accepted by this refreeze.",
+    "Beget/VPS, external HTTPS/WSS staging, legacy rollback, real devices/providers, monitoring, backup/restore/off-site evidence and DNS cutover remain external work.",
     "Production cutover remains unauthorized until the final external phase is executed and explicit owner GO is recorded."
   ]
 }
