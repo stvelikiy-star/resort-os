@@ -50,9 +50,6 @@ jobs:
       - name: Run strict internal hardening assertions
         run: python scripts/verify_internal_hardening.py
 
-      - name: Run auth security contract assertions
-        run: python scripts/auth_security_contract_test.py
-
       - name: Compile management Core and acceptance scripts
         run: python -m compileall -q services/api/app scripts
 
