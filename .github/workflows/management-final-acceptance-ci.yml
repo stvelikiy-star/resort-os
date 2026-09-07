@@ -7,6 +7,8 @@ on:
       - 'apps/staff/**'
       - 'services/api/**'
       - 'scripts/**'
+      - 'data-intake/**'
+      - 'release/**'
       - 'docs/THREE_CROWNS_MANAGEMENT_FINAL_ACCEPTANCE_2026-09-06.md'
       - '.github/workflows/management-final-acceptance-ci.yml'
   workflow_dispatch:
@@ -21,16 +23,32 @@ concurrency:
 jobs:
   management-final-acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
+      - name: Enforce frozen public website scope
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+          echo "$changed"
+          if printf '%s\n' "$changed" | grep -q '^apps/web/'; then
+            echo 'BLOCKED: apps/web is frozen by owner scope during management hardening.' >&2
+            exit 1
+          fi
+
       - name: Run management final truth assertions
         run: python scripts/verify_management_final_acceptance.py
+
+      - name: Run strict internal hardening assertions
+        run: python scripts/verify_internal_hardening.py
 
       - name: Compile management Core and acceptance scripts
         run: python -m compileall -q services/api/app scripts
@@ -58,4 +76,4 @@ jobs:
           npm run build
 
       - name: Acceptance summary
-        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_CI_PASS'
+        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_AND_INTERNAL_HARDENING_PASS'
