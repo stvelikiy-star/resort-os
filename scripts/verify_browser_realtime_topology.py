@@ -14,31 +14,39 @@ def require(text: str, needle: str, label: str) -> None:
     if needle not in text:
         errors.append(f"{label}: missing {needle!r}")
 
-# Browser session cookies remain host-only. We deliberately do not widen them to .3korony.com.
+# Browser session cookies remain host-only. Do not widen them to the parent domain.
 for label, env in (("production env", ENV_PROD), ("Beget env", ENV_BEGET)):
     require(env, "COOKIE_DOMAIN=\n", label)
     if "COOKIE_DOMAIN=.3korony.com" in env or "COOKIE_DOMAIN=3korony.com" in env:
         errors.append(f"{label}: broad cross-subdomain session cookie is forbidden")
 
-# Admin WebSocket must be same-origin with the host that owns the admin session cookie.
+# Admin browser WebSocket must be same-origin with the host that owns the admin cookie.
 for label, compose in (("production compose", PROD), ("Beget compose", BEGET)):
     require(compose, "NEXT_PUBLIC_CORE_WS_URL: wss://${ADMIN_HOST}", label)
     if "NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}" in compose:
         errors.append(f"{label}: cross-subdomain browser WebSocket to API_HOST is forbidden")
 
-# Caddy must proxy websocket paths on both authenticated browser hosts directly to Core.
-for host in ("{$ADMIN_HOST:admin.3korony.com}", "{$STAFF_HOST:staff.3korony.com}"):
-    require(CADDY, host, "Caddyfile")
+admin_marker = "{$ADMIN_HOST:admin.3korony.com} {"
+staff_marker = "{$STAFF_HOST:staff.3korony.com} {"
+api_marker = "{$API_HOST:api.3korony.com} {"
 
-# These exact route fragments ensure /ws/* is handled by Core before the generic Next proxy.
-admin_block = CADDY.split("{$ADMIN_HOST:admin.3korony.com} {", 1)[1].split("}", 1)[0] if "{$ADMIN_HOST:admin.3korony.com} {" in CADDY else ""
-staff_block = CADDY.split("{$STAFF_HOST:staff.3korony.com} {", 1)[1].split("}", 1)[0] if "{$STAFF_HOST:staff.3korony.com} {" in CADDY else ""
+if admin_marker not in CADDY or staff_marker not in CADDY or api_marker not in CADDY:
+    errors.append("Caddyfile: authenticated host blocks are missing")
+    admin_block = staff_block = ""
+else:
+    admin_block = CADDY.split(admin_marker, 1)[1].split(staff_marker, 1)[0]
+    staff_block = CADDY.split(staff_marker, 1)[1].split(api_marker, 1)[0]
+
+# /ws/* must be routed to Core before the generic Next.js handler.
 for label, block, next_target in (("admin", admin_block, "admin:3001"), ("staff", staff_block, "staff:3002")):
-    require(block, "@realtime path /ws/*", f"Caddy {label}")
+    require(block, "@core_ws path /ws/*", f"Caddy {label}")
+    require(block, "handle @core_ws", f"Caddy {label}")
     require(block, "reverse_proxy api:8000", f"Caddy {label}")
     require(block, f"reverse_proxy {next_target}", f"Caddy {label}")
-    if block.find("reverse_proxy api:8000") > block.find(f"reverse_proxy {next_target}"):
-        errors.append(f"Caddy {label}: realtime route must be evaluated before generic Next proxy")
+    core_pos = block.find("reverse_proxy api:8000")
+    next_pos = block.find(f"reverse_proxy {next_target}")
+    if core_pos < 0 or next_pos < 0 or core_pos > next_pos:
+        errors.append(f"Caddy {label}: realtime Core route must precede generic Next proxy")
 
 print("Three Crowns browser realtime topology guard")
 if errors:
