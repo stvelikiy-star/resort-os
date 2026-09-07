@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import os
-import uuid
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .auth import SESSION_COOKIE, hash_session_token
+from .websocket_security import require_websocket_same_origin
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 POLL_SECONDS = max(0.25, float(os.environ.get("DINING_WS_POLL_SECONDS", "1")))
@@ -53,8 +53,6 @@ async def authenticate(websocket: WebSocket, conn) -> dict[str, Any] | None:
 
 
 async def ready_orders(conn, user: dict[str, Any]) -> list[dict[str, Any]]:
-    # DINING_STAFF receives only orders explicitly assigned to that waiter.
-    # OWNER/MANAGER may observe all READY orders for operational supervision.
     rows = await conn.fetch(
         '''SELECT o.id,o."orderNumber",o."tableId",o."roomId",o."waiterId",o."guestCount",o."totalKgs",o."readyAt",
                   t.code AS table_code,t.name AS table_name,r.code AS room_code
@@ -87,6 +85,9 @@ async def ready_orders(conn, user: dict[str, Any]) -> list[dict[str, Any]]:
 
 @router.websocket("/ws/dining/ready")
 async def dining_ready_websocket(websocket: WebSocket):
+    if not await require_websocket_same_origin(websocket):
+        return
+
     async with websocket.app.state.db.acquire() as conn:
         user = await authenticate(websocket, conn)
         if not user:
