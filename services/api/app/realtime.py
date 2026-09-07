@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .auth import SESSION_COOKIE, hash_session_token
+from .websocket_security import require_websocket_same_origin
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 POLL_SECONDS = float(os.environ.get("PMS_WS_POLL_SECONDS", "2"))
@@ -127,6 +128,9 @@ async def build_snapshot(conn, start: date, end: date) -> dict[str, Any]:
 
 @router.websocket("/ws/pms/grid")
 async def pms_grid_websocket(websocket: WebSocket):
+    if not await require_websocket_same_origin(websocket):
+        return
+
     today = date.today()
     try:
         start = parse_iso_date(websocket.query_params.get("start"), today)
