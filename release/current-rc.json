@@ -1,25 +1,25 @@
 {
   "schema_version": 1,
-  "release_version": "0.62.0",
+  "release_version": "0.62.1",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "chore/management-final-acceptance-20260906",
-  "accepted_executable_head": "609a309c97f30b5f95828956188507fc35ed3d0d",
-  "observed_merge_commit": "bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d",
+  "source_branch": "audit/internal-hardening-20260907",
+  "accepted_executable_head": "b3bb0c1be4c522d765509796ddd1d32e8606dc89",
+  "observed_merge_commit": "7f689458b2cf507d76a8c54fbe164e9492f79aca",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 21,
-    "success": 21,
+    "triggered": 28,
+    "success": 28,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 20,
-    "success": 20,
+    "triggered": 23,
+    "success": 23,
     "failures": 0
   },
-  "postmerge_truth_head": "bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d",
+  "postmerge_truth_head": "7f689458b2cf507d76a8c54fbe164e9492f79aca",
   "postmerge_truth_workflows": {
-    "triggered": 20,
-    "success": 20,
+    "triggered": 23,
+    "success": 23,
     "failures": 0
   },
   "production_source_branch": "main",
@@ -35,14 +35,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS 0.62.0 accepts PR #122 tested head 609a309c97f30b5f95828956188507fc35ed3d0d after Kitchen/Dining production management and final management acceptance were merged.",
-    "The exact accepted head completed all 21 pull-request workflows successfully with zero failures.",
-    "Observed main merge bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d is tree-equivalent to the accepted head.",
-    "The observed main merge produced 20 successful product/security/migration/staging workflows; Release RC Truth CI failed closed because the previous frozen manifest still described 0.61.0. This 0.62.0 refreeze closes that intentional release-truth gap.",
+    "Resort OS 0.62.1 accepts PR #125 tested head b3bb0c1be4c522d765509796ddd1d32e8606dc89 after strict internal management hardening.",
+    "The exact accepted head completed 28/28 pull-request workflows successfully with zero failures.",
+    "Observed main merge 7f689458b2cf507d76a8c54fbe164e9492f79aca is tree-equivalent to the accepted head.",
+    "The observed merge completed 23/23 eligible product/security/migration/staging workflows successfully; Release RC Truth CI failed closed exactly because the previous 0.62.0 manifest detected executable drift. This 0.62.1 refreeze is the controlled correction.",
+    "Hardening closed the unauthenticated historical Admin demo route and fail-closed Kitchen draft bootstrap for DINING_STAFF and production.",
     "Database release ledger remains 22 committed migrations and 87 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Public website source was frozen during the final management closure; PR #122 changed only acceptance workflow/document/script files.",
-    "GitHub main branch protection / required checks remain NOT VERIFIED and continue to block production GO.",
-    "Google Drive launch-control permission remediation remains NOT VERIFIED and continues to block production GO.",
-    "External host/staging/rollback/device/provider/monitoring/backup/DNS evidence remains separate; production cutover remains STOP."
+    "Public website source remained frozen; PR #125 changed zero apps/web files.",
+    "Per owner plan, GitHub branch protection and Google Drive public-writer remediation are advisory/deferred and are not internal-release blockers.",
+    "Beget/VPS, external staging, rollback, devices, providers, monitoring, backups and DNS cutover are intentionally deferred to the final external phase.",
+    "Production cutover remains unauthorized until the final external phase is executed and explicit owner GO is recorded."
   ]
 }

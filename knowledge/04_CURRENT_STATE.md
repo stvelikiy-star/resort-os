@@ -1,46 +1,52 @@
 # RESORT OS — CURRENT STATE
 
-Version: 6.0  
+Version: 6.1  
 Date: 2026-09-07  
-Status: RESORT OS 0.62.0 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP  
+Status: RESORT OS 0.62.1 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP  
 Canonical: YES
 
 **IMPLEMENTED != EXTERNAL VERIFIED != PRODUCTION VERIFIED.**
 
 ## Release identity
 
-Repository: `stvelikiy-star/resort-os`.
-Accepted source PR: `#122`.
-Accepted executable head: `609a309c97f30b5f95828956188507fc35ed3d0d`.
-Observed tree-equivalent main merge: `bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d`.
+Repository: `stvelikiy-star/resort-os`.  
+Accepted source PR: `#125` — `audit/internal-hardening-20260907 -> main`.  
+Accepted executable head: `b3bb0c1be4c522d765509796ddd1d32e8606dc89`.  
+Observed tree-equivalent main merge: `7f689458b2cf507d76a8c54fbe164e9492f79aca`.  
 Production source branch: `main`.
 
 Evidence:
-
-- PR #122 accepted head: **21/21 workflows SUCCESS**;
-- accepted head and main merge are tree-equivalent;
-- main merge: **20 successful product/security/migration/staging workflows**;
-- one `Release RC Truth CI` push failure was fail-closed release hygiene caused by the old 0.61.0 manifest; the 0.62.0 refreeze corrects it.
+- PR #125 accepted head: **28/28 workflows SUCCESS, 0 failures**;
+- accepted head and observed merge are tree-equivalent;
+- observed merge: **23/23 eligible product/security/migration/staging workflows SUCCESS**;
+- one additional `Release RC Truth CI` push run failed closed exactly because the prior 0.62.0 manifest detected executable drift; 0.62.1 is the controlled refreeze.
 
 Machine authority: `release/current-rc.json`.
+
+## Hardening accepted in 0.62.1
+
+- historical `/admin/demo` is fail-closed with 404 instead of bypassing the authenticated AdminShell;
+- Kitchen draft bootstrap is OWNER/MANAGER-only outside production;
+- Kitchen draft bootstrap is 404 in production even for OWNER/MANAGER;
+- DINING_STAFF bootstrap denial is covered by negative E2E;
+- management CI rejects any `apps/web/**` change during this frozen-site phase;
+- strict internal hardening assertions cover release truth, auth/RBAC markers, production-env safety, 84-room intake, 12-category normalization, 48 rate rows, Kitchen boundaries and external acceptance fail-closed behavior.
 
 ## Architecture authority
 
 `PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
-`ReservationRequest != Reservation`.
-OWNER/MANAGER retain reservation and payment authority. AI/n8n cannot confirm payment, guarantee reservations, invent payment policy, check in/out, refund, bypass Core pricing/availability or write generic business truth directly to PostgreSQL.
+`ReservationRequest != Reservation`. OWNER/MANAGER retain reservation and payment authority. AI/n8n cannot confirm payment, guarantee reservations, invent payment policy, check in/out, refund, bypass Core pricing/availability or write generic business truth directly to PostgreSQL.
 
 Real bank/TTLock remains provider-gated. NFC acquiring/wallet remains outside active V1.
 
 ## Database/property release contract
 
-Release 0.62.0 retains **22 committed migrations / 87 critical domain constraints**.
-Canonical property baseline remains **84 rooms / 12 room categories / 48 rate rows**.
+Release 0.62.1 retains **22 committed migrations / 87 critical domain constraints**.  
+Canonical property baseline remains **84 rooms / 12 room categories / 48 rate rows**.  
 Rooms 501/502 remain owner-approved two-person basement rooms above the laundry.
 
 Canonical 22-migration ledger:
-
 1. `0_init`
 2. `1_site_content`
 3. `2_guest_service_tasks`
@@ -66,64 +72,20 @@ Canonical 22-migration ledger:
 
 Production/staging schema changes use `npx prisma migrate deploy`; never replace the committed ledger with `prisma db push`.
 
-## Product state
+## Repository-verified management contour
 
-Repository/CI verified product contour includes:
+Verified contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore and release/staging/package gates.
 
-- public RU/KG/EN site, Core availability/pricing, CMS published-only runtime and ReservationRequest boundary;
-- PMS supershakhmatka, rates/seasons, move/resize/Split Stay, stale/conflict protection and realtime;
-- Reception, group booking, CLEAN check-in gate, Stay/RoomAssignment and checkout -> DIRTY -> housekeeping;
-- OWNER/MANAGER/RECEPTION/MAID/TECHNICIAN/DINING RBAC where defined;
-- Guest OS Room QR + PIN + HttpOnly session, requests, CRM history/preferences and manager-controlled offers;
-- Guest Services unified task center;
-- Operations assignment/history, inspection/rework and TECH_BLOCK protection;
-- Kitchen/Dining production management: real menu item creation, draft/publish, price/publish authority for OWNER/MANAGER, operational DINING_STAFF access, stop-list, table/session/order lifecycle and production snapshots;
-- finance/folio separation, payment idempotency, debt/remaining/overpaid views and owner analytics;
-- Service Point QR privacy boundaries;
-- Unified Inbox, Telegram, Staff Voice, AI and n8n authority contracts;
-- backup/restore tooling, production package validation and final management acceptance.
+The public website is frozen by owner instruction and was not changed by PR #125.
 
-PR #122 changed no public website source files; the public site remained frozen during final management closure.
+## Owner-approved priority change
 
-## Final management acceptance
+GitHub branch protection and Google Drive public-writer remediation remain recommended security improvements, but **are not blockers for the current internal-release phase** by explicit owner decision. They can be handled later.
 
-The accepted system includes the complete daily management menu: Dashboard, PMS, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Dining, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports, Content, Operations, Staff and Inbox.
+Beget/VPS deployment is intentionally postponed to the **final external phase**. Until that phase is executed, external staging, live rollback, devices, providers, monitoring, real backups and DNS cutover remain unverified.
 
-`Management Final Acceptance CI` validates 70+ runtime/RBAC/CI invariants plus Core compile and Admin/Staff typecheck/build.
+Production cutover therefore remains **EXTERNAL PRODUCTION CUTOVER STOP** for the simple reason that the external phase has not been executed yet, not because GitHub protection or Drive permissions block internal work.
 
-## Production safety boundaries
-
-- PostgreSQL is private to deployment network.
-- Production `DATABASE_URL` is fail-closed.
-- Guest folio charges are separate from actual Payments.
-- Kitchen/Dining totals do not automatically create Hotel Payment.
-- Growth outbound authority remains `NONE_AUTOMATIC`.
-- Room QR is not a TTLock credential.
-- provider activation requires real credentials/contracts/hardware E2E.
-- a green repository does not prove live external infrastructure.
-
-## External blockers
-
-Production cutover remains **EXTERNAL PRODUCTION CUTOVER STOP** until verified real evidence exists for:
-
-1. GitHub `main` branch protection / required checks;
-2. Google Drive launch-control permissions;
-3. actual host/account/network preflight;
-4. legacy `3korony.com` rollback package;
-5. isolated external HTTPS/WSS staging;
-6. real staging room reconciliation;
-7. external public-truth acceptance;
-8. real-device Staff/Kitchen/Admin acceptance;
-9. provider E2E for enabled providers;
-10. monitoring/alerting;
-11. fresh backup + restore + off-site copy;
-12. DNS rollback capture;
-13. explicit owner GO.
-
-Canonical launch gate: `knowledge/09_LAUNCH_ACCEPTANCE.md`.
-Canonical deployment procedure: `docs/DEPLOYMENT_RUNBOOK.md`.
+Canonical launch procedure: `knowledge/09_LAUNCH_ACCEPTANCE.md`.  
+Canonical deployment procedure: `docs/DEPLOYMENT_RUNBOOK.md`.  
 Canonical release manifest: `release/current-rc.json`.
-
-## Extension rule
-
-Extend rather than rewrite the verified Core/PostgreSQL/PMS/Stay/Guest OS/Guest CRM/Operations/Finance/Owner analytics/Inbox/Audit/RBAC boundaries. Do not reactivate NFC or grant automatic commercial/payment authority as a side effect of deployment work.
