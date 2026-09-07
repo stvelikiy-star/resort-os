@@ -103,28 +103,46 @@ def main() -> int:
     ok(rc["legacy_live_rollback_verified"] is False, "legacy rollback is not falsely marked verified")
     ok(rc["production_cutover_authorized"] is False, "production cutover remains fail-closed")
 
-    # 6) Canonical room register data quality.
+    # 6) Canonical room-register source quality. rooms.csv is source evidence; the
+    # canonical 12-category catalogue is the union normalized by seed_from_intake.py.
     room_rows = rows("data-intake/rooms.csv")
-    ok(len(room_rows) == 84, "canonical room register has exactly 84 rows")
+    ok(len(room_rows) == 84, "canonical physical room register has exactly 84 rows")
     codes = [r["room_code"].strip() for r in room_rows]
     ok(len(set(codes)) == 84, "room codes are unique")
     ok(all(code for code in codes), "room codes are non-empty")
     ok(all(r["room_name"].strip() for r in room_rows), "room names are non-empty")
-    ok(all(int(r["capacity_adults"]) >= 1 for r in room_rows), "every room has positive adult capacity")
+    ok(all(int(r["capacity_adults"]) >= 1 for r in room_rows), "every physical room has positive adult capacity")
     room_types = {r["room_type"].strip() for r in room_rows}
-    ok(len(room_types) == 12, "room register has exactly 12 room types")
+    canonical_types = {
+        "Одноместный, цоколь",
+        "Двухместный стандарт, цоколь",
+        "Одноместный, улучшенный",
+        "Двухместный стандарт в коттеджном доме",
+        "Двухместный улучшенный",
+        "Полулюкс без балкона",
+        "Люкс двухместный",
+        "Люкс трехместный",
+        "Двухкомнатный стандарт",
+        "Двухкомнатный полулюкс",
+        "Апартаменты",
+        "Квартиры / апартаменты с кухней",
+    }
+    seed = read("scripts/seed_from_intake.py")
+    for room_type in canonical_types:
+        ok(f'"{room_type}"' in seed, f"seed mapping contains canonical type: {room_type}")
+    ok(room_types <= canonical_types, "physical room source contains only mapped canonical types")
     by_code = {r["room_code"].strip(): r for r in room_rows}
     ok("501" in by_code and "502" in by_code, "rooms 501 and 502 exist")
     ok(by_code["501"]["capacity_adults"] == "2", "room 501 is two-person inventory")
     ok(by_code["502"]["capacity_adults"] == "2", "room 502 is two-person inventory")
 
-    # 7) Rate ledger: 12 categories x 4 contiguous/non-overlapping periods = 48 rows.
+    # 7) Rate ledger: 12 canonical categories x 4 non-overlapping periods = 48 rows.
     rate_rows = rows("data-intake/rates.csv")
     ok(len(rate_rows) == 48, "rate ledger has exactly 48 rows")
     rate_types = {r["room_type"].strip() for r in rate_rows}
-    ok(rate_types == room_types, "rate room types exactly match room register types")
+    ok(rate_types == canonical_types, "rate ledger covers exactly the canonical 12 categories")
     counts = Counter(r["room_type"].strip() for r in rate_rows)
-    ok(set(counts.values()) == {4}, "each room type has exactly four rate periods")
+    ok(set(counts.values()) == {4}, "each canonical category has exactly four rate periods")
     periods: dict[str, list[tuple[date, date]]] = defaultdict(list)
     zero_rows = 0
     for r in rate_rows:
@@ -179,7 +197,6 @@ def main() -> int:
     ]
     ok(sequence == sorted(sequence), "external acceptance gates execute in strict safety order")
 
-    # This guard deliberately exceeds the previous 70-check final acceptance when combined.
     ok(passed >= 100, f"internal hardening suite unexpectedly small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
     print("BOUNDARY: management/admin/staff/Core only; apps/web is frozen; Beget/VPS deferred by owner")
