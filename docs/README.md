@@ -10,18 +10,18 @@ Use these sources, in order, for current release and launch decisions:
 3. `knowledge/09_LAUNCH_ACCEPTANCE.md` — external acceptance and cutover gates.
 4. `docs/DEPLOYMENT_RUNBOOK.md` — controlled deployment procedure.
 5. `docs/PRODUCTION_DATABASE_MIGRATIONS.md` — migration/constraint ledger.
-6. `docs/RELEASE_0.62.0_2026-09-07.md` — current release record.
+6. `docs/RELEASE_0.62.1_2026-09-07.md` — current release record.
 
 If a dated historical document conflicts with a source above, the current sources above win.
 
 ## Current release identity
 
-Release: **Resort OS 0.62.0**.  
-Accepted executable head: `609a309c97f30b5f95828956188507fc35ed3d0d`.  
-Observed tree-equivalent main merge: `bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d`.  
+Release: **Resort OS 0.62.1**.  
+Accepted executable head: `b3bb0c1be4c522d765509796ddd1d32e8606dc89`.  
+Observed tree-equivalent main merge: `7f689458b2cf507d76a8c54fbe164e9492f79aca`.  
 Production source branch: `main`.
 
-Accepted PR #122 head passed **21/21 workflows**. The observed merge retained the same tree and produced **20 eligible successful product/security/migration/staging workflows**; `Release RC Truth CI` failed closed because the previous manifest still described 0.61.0, which this 0.62.0 refreeze corrects.
+Accepted PR #125 head passed **28/28 workflows**. The observed merge retained the same tree and produced **23 eligible successful product/security/migration/staging workflows**; `Release RC Truth CI` failed closed because the previous 0.62.0 manifest correctly detected executable hardening drift. This 0.62.1 refreeze is the controlled correction.
 
 ## Property/database authority
 
@@ -39,11 +39,13 @@ Frozen database boundary remains **22 committed migrations / 87 critical domain 
 - Real bank acquiring and TTLock remain provider/hardware gated.
 - NFC acquiring/wallet remains deferred outside active V1.
 - Google Drive/Sheets are control/archive/mirror surfaces, not transaction truth.
+- Historical `/admin/demo` is fail-closed.
+- Kitchen draft bootstrap is unavailable to DINING_STAFF and fail-closed in production.
 
 ## Historical documents
 
-`docs/RELEASE_0.61.0_2026-09-06.md`, `docs/RELEASE_0.60.0_2026-09-05.md`, older staging/handoff/RC documents and historical Vercel previews remain evidence/reference only and must not override the current manifest.
+`docs/RELEASE_0.62.0_2026-09-07.md`, `docs/RELEASE_0.61.0_2026-09-06.md`, `docs/RELEASE_0.60.0_2026-09-05.md`, older staging/handoff/RC documents and historical Vercel previews remain evidence/reference only and must not override the current manifest.
 
 ## External production remains fail-closed
 
-Repository green does not mean live production. Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until the launch gate verifies branch protection, Drive permissions, target host/staging, rollback, real devices/providers, monitoring, backup/restore/off-site copy, DNS rollback and explicit owner GO.
+Per owner plan, GitHub branch protection and Drive permission hardening are recommendations/deferred controls; Beget/VPS is the final external phase. Repository green does not mean live production. Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until actual host/staging/rollback/device/provider/monitoring/backup/DNS evidence and explicit owner GO exist.
