@@ -31,6 +31,12 @@ async def main() -> None:
     owner = await login(OWNER_USERNAME, OWNER_PASSWORD)
     dining = await login(DINING_USERNAME, DINING_PASSWORD)
     try:
+        denied_bootstrap = await dining.post("/api/v1/kitchen/menu/bootstrap-draft")
+        check(
+            denied_bootstrap.status_code == 403,
+            f"DINING_STAFF draft bootstrap must be 403, got {denied_bootstrap.status_code}: {denied_bootstrap.text}",
+        )
+
         created = await owner.post(
             "/api/v1/kitchen/menu",
             json={"code": code, "category": "MAIN", "name_ru": "CI блюдо", "price_kgs": 321, "is_active": True, "is_draft": True},
