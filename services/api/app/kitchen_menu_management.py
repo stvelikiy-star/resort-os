@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import uuid
 from typing import Any, Literal
@@ -8,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
 from .auth import require_roles
+from .kitchen import DRAFT_MENU
 
 router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen-menu-management"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -76,6 +78,33 @@ async def _audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, item_i
         json.dumps(before, ensure_ascii=False, default=str) if before is not None else None,
         json.dumps(after, ensure_ascii=False, default=str) if after is not None else None,
     )
+
+
+@router.post("/menu/bootstrap-draft")
+async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(manager_access)):
+    """Test/staging bootstrap only; production must never seed synthetic menu data.
+
+    This route intentionally shadows the historical operational-router endpoint because
+    this manager router is mounted first. DINING_STAFF therefore receives 403, while a
+    production runtime receives 404 even for OWNER/MANAGER.
+    """
+    if os.environ.get("APP_ENV", "development").strip().lower() == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+
+    created = 0
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await _property_id(conn, user["property_code"])
+            for code, category, ru, kg, en, price, sort_order in DRAFT_MENU:
+                result = await conn.execute(
+                    '''INSERT INTO kitchen_menu_items (
+                         id,"propertyId",code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
+                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,true,$9,now(),now())
+                       ON CONFLICT ("propertyId",code) DO NOTHING''',
+                    uuid.uuid4(), pid, code, category, ru, kg, en, price, sort_order,
+                )
+                created += int(result.endswith("1"))
+    return {"created": created, "draft": True, "truth": "TEST_STAGING_BOOTSTRAP_ONLY"}
 
 
 @router.post("/menu", status_code=status.HTTP_201_CREATED)
