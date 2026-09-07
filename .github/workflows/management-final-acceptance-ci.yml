@@ -53,6 +53,9 @@ jobs:
       - name: Verify synthetic mutation scripts fail closed
         run: python scripts/verify_synthetic_script_safety.py
 
+      - name: Verify legacy mutating utilities are fail closed
+        run: python scripts/verify_mutating_utility_safety.py
+
       - name: Compile management Core and acceptance scripts
         run: python -m compileall -q services/api/app scripts
 
