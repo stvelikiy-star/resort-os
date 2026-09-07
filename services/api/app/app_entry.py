@@ -75,6 +75,32 @@ from .telegram_sales import router as telegram_sales_router
 
 install_observability(app)
 
+
+def _strip_legacy_kitchen_menu_mutations() -> None:
+    """Keep menu mutation authority in kitchen_menu_management only.
+
+    The operational Kitchen router historically carried duplicate bootstrap/PATCH
+    routes with DINING_STAFF access. Even when composition order made the manager
+    routes win, leaving those duplicates active made RBAC depend on router order.
+    Remove only those legacy mutations before the operational router is composed.
+    Read-only menu access and order/table operations remain available to DINING_STAFF.
+    """
+    blocked = {
+        ("POST", "/api/v1/kitchen/menu/bootstrap-draft"),
+        ("PATCH", "/api/v1/kitchen/menu/{item_id}"),
+    }
+    kept = []
+    for route in kitchen_admin_router.routes:
+        path = getattr(route, "path", None)
+        methods = set(getattr(route, "methods", set()) or set())
+        if any((method, path) in blocked for method in methods):
+            continue
+        kept.append(route)
+    kitchen_admin_router.routes[:] = kept
+
+
+_strip_legacy_kitchen_menu_mutations()
+
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
 app.include_router(health_router)
@@ -127,9 +153,9 @@ app.include_router(operations_router)
 app.include_router(operations_assignment_router)
 app.include_router(operations_history_router)
 app.include_router(staff_guest_requests_router)
-# OWNER/MANAGER menu mutation routes are composed before the legacy kitchen
-# router so a DINING_STAFF session can operate orders/tables but cannot change
-# catalogue prices or publish menu items.
+# OWNER/MANAGER own all menu mutation routes. The operational Kitchen router is
+# stripped of its historical duplicate menu mutations before composition, so
+# authorization no longer depends on include_router order.
 app.include_router(kitchen_menu_management_router)
 app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
@@ -166,4 +192,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Paid Service Point QR
 # does not reactivate NFC and cannot mutate accommodation payment truth.
-app.version = "0.60.0"
+app.version = "0.62.2"
