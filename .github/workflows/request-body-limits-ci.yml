@@ -1,0 +1,39 @@
+name: Request Body Limits CI
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/Caddyfile'
+      - 'services/api/app/site_media.py'
+      - 'scripts/verify_request_body_limits.py'
+      - '.github/workflows/request-body-limits-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'deploy/Caddyfile'
+      - 'services/api/app/site_media.py'
+      - 'scripts/verify_request_body_limits.py'
+      - '.github/workflows/request-body-limits-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify edge and application body limits
+        run: python scripts/verify_request_body_limits.py
+      - name: Validate Caddy syntax
+        run: |
+          docker run --rm \
+            -e TLS_EMAIL=ops@example.invalid \
+            -e PUBLIC_HOST=3korony.example.invalid \
+            -e ADMIN_HOST=admin.3korony.example.invalid \
+            -e STAFF_HOST=staff.3korony.example.invalid \
+            -e API_HOST=api.3korony.example.invalid \
+            -e AUTOMATION_HOST=automation.3korony.example.invalid \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
