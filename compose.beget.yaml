@@ -120,7 +120,7 @@ services:
       dockerfile: apps/admin/Dockerfile
       args:
         CORE_API_URL: http://api:8000
-        NEXT_PUBLIC_CORE_WS_URL: wss://${API_HOST}
+        NEXT_PUBLIC_CORE_WS_URL: wss://${ADMIN_HOST}
         RELEASE_SHA: ${RELEASE_SHA:?RELEASE_SHA must identify the exact accepted git commit}
     restart: unless-stopped
     init: true

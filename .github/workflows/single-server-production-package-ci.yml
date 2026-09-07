@@ -27,13 +27,19 @@ jobs:
           sed -i 's#HOST_DATA_DIR=/srv/three-crowns/data#HOST_DATA_DIR=./.ci-data#' .env.production.ci
           mkdir -p .ci-data/postgres .ci-data/n8n .ci-data/media/public
 
-      - name: Validate Docker Compose production graph and WSS wiring
+      - name: Validate Docker Compose production graph and same-origin WSS wiring
         run: |
           docker compose --env-file .env.production.ci -f compose.production.yaml config > .production-compose.rendered.yml
-          grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://api.3korony.com' .production-compose.rendered.yml
+          grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://admin.3korony.com' .production-compose.rendered.yml
+          if grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://api.3korony.com' .production-compose.rendered.yml; then
+            echo 'Admin WebSocket must remain same-origin so host-only session cookies are sent.' >&2
+            exit 1
+          fi
           grep -F 'image: n8nio/n8n:2.37.10' .production-compose.rendered.yml
           grep -F 'image: postgres:16.15-alpine' .production-compose.rendered.yml
           grep -F 'image: caddy:2.11.4-alpine' .production-compose.rendered.yml
+          grep -F '@core_ws path /ws/*' deploy/Caddyfile
+          test "$(grep -c '@core_ws path /ws/\*' deploy/Caddyfile)" -eq 2
           if grep -Eq '(^|[^0-9])5432:5432' .production-compose.rendered.yml; then
             echo 'PostgreSQL must not publish 5432 to the host.' >&2
             exit 1
