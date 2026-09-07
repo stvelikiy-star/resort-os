@@ -23,12 +23,24 @@ www.{$PUBLIC_HOST:3korony.com} {
 
 {$ADMIN_HOST:admin.3korony.com} {
 	encode zstd gzip
-	reverse_proxy admin:3001
+	@core_ws path /ws/*
+	handle @core_ws {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy admin:3001
+	}
 }
 
 {$STAFF_HOST:staff.3korony.com} {
 	encode zstd gzip
-	reverse_proxy staff:3002
+	@core_ws path /ws/*
+	handle @core_ws {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy staff:3002
+	}
 }
 
 {$API_HOST:api.3korony.com} {
