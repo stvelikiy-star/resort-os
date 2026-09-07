@@ -1,22 +1,22 @@
 # Three Crowns — production database migration gate
 
 Date: 2026-09-07  
-Release: `0.62.0`  
+Release: `0.62.1`  
 Status: **COMMITTED / CLEAN-DEPLOY VERIFIED IN REPOSITORY CI / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
 
 This document defines the database migration boundary. It does not prove real production migration.
 
 ## Release identity
 
-Accepted executable head: `609a309c97f30b5f95828956188507fc35ed3d0d`.  
-Observed tree-equivalent main merge: `bccc491ea24c94668ef1bea4d86fb61a5b8e6f3d`.  
+Accepted executable head: `b3bb0c1be4c522d765509796ddd1d32e8606dc89`.  
+Observed tree-equivalent main merge: `7f689458b2cf507d76a8c54fbe164e9492f79aca`.  
 Production source branch: `main`.
 
-Repository acceptance on the accepted head is **21/21 workflows SUCCESS**. The observed merge retained the same tree and produced **20 eligible successful product/security/migration/staging workflows**; the old-manifest Release RC guard failed closed before the 0.62.0 refreeze.
+Repository acceptance on the accepted head is **28/28 workflows SUCCESS**. The observed merge retained the same tree and produced **23 eligible successful product/security/migration/staging workflows**; the previous-manifest Release RC guard failed closed before the 0.62.1 refreeze.
 
 ## Canonical migration ledger
 
-Release 0.62.0 retains exactly **22 committed migrations**:
+Release 0.62.1 retains exactly **22 committed migrations**:
 
 1. `0_init`
 2. `1_site_content`
