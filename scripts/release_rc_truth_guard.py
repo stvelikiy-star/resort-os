@@ -21,6 +21,7 @@ ALLOWED_HYGIENE_PATHS = {
     "knowledge/09_LAUNCH_ACCEPTANCE.md",
     "docs/DEPLOYMENT_RUNBOOK.md",
     "docs/PRODUCTION_DATABASE_MIGRATIONS.md",
+    "docs/DEMO_ACCEPTANCE_2026-08-26.md",
     "docs/RELEASE_0.60.0_2026-09-05.md",
     "docs/RELEASE_0.61.0_2026-09-06.md",
     "docs/RELEASE_0.62.0_2026-09-07.md",
