@@ -6,7 +6,7 @@ x-logging: &resort-logging
 
 services:
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     init: true
     environment:
@@ -158,7 +158,7 @@ services:
     logging: *resort-logging
 
   n8n:
-    image: ${N8N_IMAGE:-n8nio/n8n:2.36.2}
+    image: ${N8N_IMAGE:-n8nio/n8n:2.37.10}
     restart: unless-stopped
     init: true
     environment:
