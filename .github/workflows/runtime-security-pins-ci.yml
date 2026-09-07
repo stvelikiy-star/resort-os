@@ -1,0 +1,43 @@
+name: Runtime Security Pins CI
+
+on:
+  pull_request:
+    paths:
+      - 'compose.production.yaml'
+      - 'compose.beget.yaml'
+      - 'compose.staging.yaml'
+      - '.env.production.example'
+      - '.env.beget.example'
+      - 'scripts/production_backup.sh'
+      - 'scripts/verify_runtime_security_pins.py'
+      - '.github/workflows/single-server-production-package-ci.yml'
+      - '.github/workflows/runtime-security-pins-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'compose.production.yaml'
+      - 'compose.beget.yaml'
+      - 'compose.staging.yaml'
+      - '.env.production.example'
+      - '.env.beget.example'
+      - 'scripts/production_backup.sh'
+      - 'scripts/verify_runtime_security_pins.py'
+      - '.github/workflows/single-server-production-package-ci.yml'
+      - '.github/workflows/runtime-security-pins-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-security-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile pin guard
+        run: python -m py_compile scripts/verify_runtime_security_pins.py
+      - name: Verify exact runtime security pins
+        run: python scripts/verify_runtime_security_pins.py

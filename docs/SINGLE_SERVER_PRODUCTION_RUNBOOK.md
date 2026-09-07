@@ -4,15 +4,15 @@ Status: deployment procedure for the approved simple topology.
 
 ## 1. Target topology
 
-One VPS/VDS with Docker and one public IPv4 hosts the complete active Resort OS contour:
+The approved Beget hosting contour runs the complete active Resort OS stack with Docker-compatible application services and one public application edge:
 
 - `3korony.com` -> public Next.js web;
 - `admin.3korony.com` -> PMS/Admin Next.js;
 - `staff.3korony.com` -> Staff PWA;
 - `api.3korony.com` -> FastAPI Resort Core;
 - `automation.3korony.com` -> n8n;
-- PostgreSQL remains private inside the Docker network;
-- public media lives under host persistent storage;
+- PostgreSQL remains private and is never exposed to the public internet;
+- public media lives under persistent storage;
 - backups are written outside container layers and copied off-site.
 
 Canonical truth boundary remains:
@@ -21,28 +21,19 @@ Canonical truth boundary remains:
 
 n8n, Google Drive and Google Sheets are not alternative booking/inventory/payment authorities.
 
-## 2. Minimum host requirements
+## 2. Minimum hosting requirements
 
-Recommended initial production host:
+The Beget target must provide enough resources and capabilities for the approved Docker/Compose contour: approximately 4 vCPU, 8 GB RAM, 120–160 GB SSD/NVMe, stable public HTTPS ingress, persistent storage, private PostgreSQL connectivity and controlled administrative access. The underlying provider OS is an infrastructure detail, not a separate Three Crowns project stage.
 
-- Ubuntu 24.04 LTS or equivalent supported Linux;
-- 4 vCPU;
-- 8 GB RAM;
-- 120–160 GB NVMe/SSD;
-- static public IPv4;
-- root or sudo SSH access;
-- Docker Engine + Docker Compose plugin;
-- provider snapshot capability strongly preferred.
+Only ports required for the public application edge should be internet-accessible. PostgreSQL must not be exposed to the public internet.
 
-Only ports 80/443 should be public for the application. SSH must be restricted by key-based access/firewall policy. PostgreSQL must not be exposed to the public internet.
-
-### Mandatory first action on the purchased host
+### Mandatory first action on the actual target
 
 Run the non-destructive infrastructure probe before installing, stopping or replacing anything:
 
 `bash scripts/host_preflight.sh`
 
-The probe reports OS/architecture, CPU, RAM, disk, root/sudo, Docker/Compose, outbound registry reachability, current 80/443 listeners, a possible 5432 listener and the `/srv/three-crowns` layout capability. It does not mutate the host.
+The probe reports architecture, CPU, RAM, disk, Docker/Compose availability where applicable, outbound registry reachability, current 80/443 listeners, a possible 5432 listener and the `/srv/three-crowns` layout capability. It does not mutate the host.
 
 Interpretation:
 
@@ -60,13 +51,13 @@ Recommended root:
 
 Persistent data:
 
-- `/srv/three-crowns/data/postgres`;
+- `/srv/three-crowns/data/postgres` when a local PostgreSQL service is used by the approved topology;
 - `/srv/three-crowns/data/n8n`;
 - `/srv/three-crowns/data/media/public`;
 - `/srv/three-crowns/data/media/private`;
 - `/srv/three-crowns/backups`.
 
-The Git checkout may be replaced during deployment. The data and backup directories must not be deleted with the checkout.
+The Git checkout may be replaced during deployment. Persistent data and backup directories must not be deleted with it.
 
 ## 4. Preserve the currently live site before any cutover
 
@@ -86,7 +77,7 @@ Do not delete or overwrite the legacy site merely because the new containers bui
 
 ## 5. DNS before launch
 
-All required names ultimately point to the same server IP:
+The required public names are:
 
 - apex `3korony.com`;
 - `www.3korony.com`;
@@ -95,42 +86,42 @@ All required names ultimately point to the same server IP:
 - `api.3korony.com`;
 - `automation.3korony.com`.
 
-Do not switch the live apex until external staging/acceptance and rollback criteria are satisfied. Use staging hostnames first when the current apex is serving the legacy site.
+Do not switch the live apex until external staging/acceptance and rollback criteria are satisfied. Use isolated staging first while the current apex is serving the legacy site.
 
 ## 6. Secrets and environment
 
-Copy `.env.production.example` to `.env.production` on the server only.
+Use `.env.beget.example` for the Beget target or `.env.production.example` for the generic single-server package. Create the real environment file only on the deployment target.
 
 Generate independent strong values for:
 
-- `POSTGRES_PASSWORD`;
+- database credentials where applicable;
 - `AUTOMATION_SERVICE_KEY`;
 - `N8N_ENCRYPTION_KEY`;
 - staff/Telegram webhook secrets when enabled;
 - OpenAI/provider secrets when enabled.
 
-Never commit `.env.production` or copy it into ordinary backup archives.
+Never commit production environment files or copy them into ordinary backup archives.
 
-The production baseline pins `n8nio/n8n:2.36.2`, a known patched 2.x release. Do not replace it with `latest`; upgrade n8n only through an explicit tested release change.
+The audited production baseline pins `n8nio/n8n:2.37.10`, which is above the September 2026 fixed stable baseline. Do not replace it with `latest`; upgrade n8n only through an explicit tested security/release change. Generic single-server PostgreSQL is pinned to `postgres:16.15-alpine`, and the edge proxy is pinned to `caddy:2.11.4-alpine`.
 
 ## 7. First deployment sequence
 
 1. Run `scripts/host_preflight.sh` and retain its evidence.
 2. Preserve the currently live site and record its rollback point.
-3. Put the intended tested Resort OS release commit on the server without overwriting legacy files.
-4. Create persistent host directories and restrict permissions.
+3. Put the intended tested Resort OS release commit on the Beget target without overwriting legacy files.
+4. Create persistent directories and restrict permissions.
 5. Create staging/production environment files with correct hosts and independent secrets.
-6. Validate the graph with Docker Compose config.
-7. Start the isolated PostgreSQL container only.
+6. Validate the Docker Compose graph.
+7. Prepare the private PostgreSQL target defined by the approved Beget topology.
 8. Apply the committed Prisma migration chain with `prisma migrate deploy` from the repository/tooling contour.
 9. Run database/application production preflight and verify the migration ledger.
 10. Import/reconcile the physical room register only after all required owner confirmations are complete.
 11. Build application images from the pinned dependency tree/release commit.
 12. Start API, web, admin and staff in the non-apex acceptance contour.
 13. Start n8n only after Core is healthy.
-14. Start/route Caddy for the approved staging hostnames and verify automatic TLS issuance.
+14. Route the approved staging hostnames and verify TLS.
 15. Run external staging acceptance against HTTPS/WSS origins.
-16. Complete real iPhone/Android/Telegram acceptance.
+16. Complete real iPhone/Android/Telegram acceptance as applicable.
 17. Take and verify a fresh backup/restore point.
 18. Only after all gates pass, perform controlled apex cutover to `3korony.com`.
 
@@ -169,12 +160,12 @@ After controlled cutover, repeat health/smoke checks on the real `3korony.com` o
 
 Recommended policy:
 
-- nightly local backup;
-- at least 14 daily local restore points initially;
-- provider VPS snapshots;
-- copy backup directories to an off-site destination such as the Three Crowns Google Drive backup area.
+- nightly local backup where the target topology supports it;
+- at least 14 daily restore points initially;
+- provider snapshots where available;
+- verified off-site copy in a restricted backup destination.
 
-Google Drive is an off-site archive/control layer, not live hotel database truth.
+Google Drive is an archive/control layer only if its permissions are restricted appropriately; it is never live hotel database truth.
 
 A backup is not considered verified until a clean restore has been tested.
 
@@ -210,17 +201,17 @@ Daily users only need:
 - `3korony.com` for guests;
 - `admin.3korony.com` for management/reception;
 - `staff.3korony.com` or Telegram for staff;
-- Google Drive for documents/original files/report exports.
+- controlled document storage for originals/report exports.
 
 GitHub, Docker, PostgreSQL internals and n8n administration are engineering/operations surfaces, not normal hotel workflows.
 
 ## 13. Remaining non-code gates
 
-Even with the single-server package CI-verified, production cutover remains blocked until:
+Even with repository CI green, production cutover remains blocked until:
 
-1. the actual purchased hosting passes `scripts/host_preflight.sh` (or is upgraded to a suitable VPS/VDS);
+1. the actual Beget target passes non-destructive preflight;
 2. the currently live legacy site has a recorded backup/rollback point;
-3. the 84-room physical register has owner-approved P0 facts;
+3. the 84-room physical register is reconciled against the final real data;
 4. external HTTPS/WSS acceptance succeeds;
 5. real-device acceptance succeeds;
-6. final backup/restore, secrets, DNS and rollback evidence is recorded.
+6. final backup/restore, secrets, monitoring, DNS and rollback evidence is recorded.
