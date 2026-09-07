@@ -16,6 +16,8 @@ import urllib.request
 from datetime import date, timedelta
 
 BASE = os.environ.get("CORE_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+APP_ENV = os.environ.get("APP_ENV", "").strip().lower()
+ALLOWED_SYNTHETIC_ENVS = {"development", "test", "ci", "staging"}
 OWNER_USERNAME = os.environ.get("RC_OWNER_USERNAME", "rc-owner")
 OWNER_PASSWORD = os.environ.get("RC_OWNER_PASSWORD", "RC-Local-Only-Password-2026")
 MAID_USERNAME = os.environ.get("RC_MAID_USERNAME", "rc-maid")
@@ -61,8 +63,11 @@ def room_state(owner, room_id: str) -> str:
 
 
 def main() -> int:
-    if os.environ.get("APP_ENV", "development").lower() in {"prod", "production"}:
-        print("ERROR: release_operations_smoke.py refuses production", file=sys.stderr)
+    if APP_ENV not in ALLOWED_SYNTHETIC_ENVS:
+        print(
+            "ERROR: release_operations_smoke.py requires explicit APP_ENV=development|test|ci|staging; refusing unknown or production environment",
+            file=sys.stderr,
+        )
         return 1
 
     owner = opener()
@@ -82,7 +87,6 @@ def main() -> int:
     room = next((item for item in rooms if item.get("code") == "101"), rooms[0])
     room_id = room["id"]
 
-    # Ensure the synthetic smoke starts from a known physical state without touching booking truth.
     call(owner, "PATCH", f"/api/v1/ops/rooms/{room_id}/state", {"state": "CLEAN"})
 
     _, created = call(
@@ -103,7 +107,6 @@ def main() -> int:
     assert created["status"] == "OPEN"
     assert room_state(owner, room_id) == "DIRTY"
 
-    # A manager cannot skip the workflow directly to DONE/CLEAN.
     code, rejected = call(
         owner,
         "PATCH",
@@ -115,14 +118,12 @@ def main() -> int:
     assert rejected["detail"]["code"] == "INVALID_TASK_TRANSITION", rejected
     assert room_state(owner, room_id) == "DIRTY"
 
-    # Maid claims the unassigned task and sends it to inspection.
     _, claimed = call(maid, "POST", f"/api/v1/ops/tasks/{task_id}/claim")
     assert claimed["status"] == "IN_PROGRESS"
     _, inspection = call(maid, "PATCH", f"/api/v1/ops/tasks/{task_id}/status", {"status": "IN_INSPECTION"})
     assert inspection["status"] == "IN_INSPECTION"
     assert room_state(owner, room_id) == "IN_INSPECTION"
 
-    # Manager rejects inspection; room returns to DIRTY and the same maid can continue.
     _, rework = call(owner, "PATCH", f"/api/v1/ops/tasks/{task_id}/status", {"status": "IN_PROGRESS"})
     assert rework["status"] == "IN_PROGRESS"
     assert room_state(owner, room_id) == "DIRTY"
