@@ -12,7 +12,7 @@ DOCS = (
     Path("knowledge/04_CURRENT_STATE.md"),
     Path("knowledge/09_LAUNCH_ACCEPTANCE.md"),
     Path("docs/DEPLOYMENT_RUNBOOK.md"),
-    Path("docs/RELEASE_0.62.1_2026-09-07.md"),
+    Path("docs/RELEASE_0.62.2_2026-09-07.md"),
 )
 ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
@@ -25,6 +25,7 @@ ALLOWED_HYGIENE_PATHS = {
     "docs/RELEASE_0.61.0_2026-09-06.md",
     "docs/RELEASE_0.62.0_2026-09-07.md",
     "docs/RELEASE_0.62.1_2026-09-07.md",
+    "docs/RELEASE_0.62.2_2026-09-07.md",
     "docs/README.md",
     "docs/STAGING_RUNBOOK_2026-08-28.md",
     "scripts/release_rc_truth_guard.py",
@@ -67,12 +68,12 @@ def main() -> int:
         return 1
 
     expected = {
-        "release_version": "0.62.1",
+        "release_version": "0.62.2",
         "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-        "source_branch": "audit/internal-hardening-20260907",
-        "accepted_executable_head": "b3bb0c1be4c522d765509796ddd1d32e8606dc89",
-        "observed_merge_commit": "7f689458b2cf507d76a8c54fbe164e9492f79aca",
-        "postmerge_truth_head": "7f689458b2cf507d76a8c54fbe164e9492f79aca",
+        "source_branch": "audit/kitchen-route-canonicalization-20260907",
+        "accepted_executable_head": "b79e22ee56c43e5f9146df7597d4c9e5e4124afa",
+        "observed_merge_commit": "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5",
+        "postmerge_truth_head": "731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5",
         "production_source_branch": "main",
         "migration_count": 22,
         "critical_constraint_count": 87,
@@ -92,9 +93,9 @@ def main() -> int:
     if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
         errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
 
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 28, "success": 28, "failures": 0}, errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 23, "success": 23, "failures": 0}, errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 23, "success": 23, "failures": 0}, errors)
+    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 41, "success": 41, "failures": 0}, errors)
+    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 32, "success": 32, "failures": 0}, errors)
+    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 32, "success": 32, "failures": 0}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
     observed = str(rc.get("observed_merge_commit") or "").lower()
@@ -120,7 +121,7 @@ def main() -> int:
         except subprocess.CalledProcessError as exc:
             errors.append(f"cannot validate frozen release tree: {exc}")
 
-    required_markers = ("0.62.1", accepted, observed, "22", "87", "main", "EXTERNAL", "STOP")
+    required_markers = ("0.62.2", accepted, observed, "22", "87", "main", "EXTERNAL", "STOP")
     for doc in DOCS:
         try:
             text = doc.read_text(encoding="utf-8")
@@ -137,11 +138,11 @@ def main() -> int:
         print("RESULT: RELEASE RC TRUTH RED")
         return 1
 
-    print("FACT: release_version=0.62.1")
+    print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
-    print("FACT: accepted_head_workflows=28/28")
-    print("FACT: merged_main_eligible_workflows=23/23")
+    print("FACT: accepted_head_workflows=41/41")
+    print("FACT: merged_main_eligible_workflows=32/32")
     print("FACT: pre_refreeze_release_control_failure=Release RC Truth CI")
     print("FACT: migrations=22")
     print("FACT: critical_constraints=87")
