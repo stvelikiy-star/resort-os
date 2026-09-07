@@ -7,10 +7,14 @@ MIGRATION_DIR="$DB_DIR/prisma/migrations/0_init"
 MIGRATION_FILE="$MIGRATION_DIR/migration.sql"
 CUSTOM_SQL="$DB_DIR/sql/001_core_constraints.sql"
 
-if [[ "${APP_ENV:-development}" == "production" || "${APP_ENV:-development}" == "prod" ]]; then
-  echo "ERROR: baseline generation is disabled when APP_ENV=production" >&2
-  exit 1
-fi
+case "${APP_ENV:-}" in
+  development|test|ci) ;;
+  *)
+    echo "ERROR: generate_migration_baseline.sh requires explicit APP_ENV=development|test|ci" >&2
+    echo "Baseline generation is forbidden for blank, staging, production, or unknown environments." >&2
+    exit 1
+    ;;
+esac
 
 if [[ -e "$DB_DIR/prisma/migrations" && "${ALLOW_REPLACE_MIGRATIONS:-0}" != "1" ]]; then
   echo "ERROR: prisma/migrations already exists. Review it manually; this script will not overwrite migration history." >&2
@@ -90,6 +94,7 @@ Required next steps before committing/using this baseline:
 1. Review migration.sql, especially PostgreSQL enums/indexes/FKs and appended custom constraints.
 2. Apply it to a clean PostgreSQL database with `npx prisma migrate deploy`.
 3. Run seed + Resort Core release checks against that clean migrated database.
-4. Compare an existing db-push staging schema with the baseline before any `migrate resolve --applied 0_init`.
+4. Compare any disposable development schema with the baseline before any `migrate resolve --applied 0_init`.
 5. Never run `migrate resolve` merely to hide schema drift.
+6. Never generate/replace migration history in staging or production.
 NEXT
