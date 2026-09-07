@@ -10,7 +10,7 @@ CUSTOM_SQL="$DB_DIR/sql/001_core_constraints.sql"
 case "${APP_ENV:-}" in
   development|test|ci) ;;
   *)
-    echo "ERROR: generate_migration_baseline.sh requires explicit APP_ENV=development|test|ci" >&2
+    echo "ERROR: baseline generation is disabled outside explicit APP_ENV=development|test|ci" >&2
     echo "Baseline generation is forbidden for blank, staging, production, or unknown environments." >&2
     exit 1
     ;;
