@@ -1,7 +1,7 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 6.2  
-Date: 2026-09-07  
+Version: 6.3  
+Date: 2026-09-08  
 Status: RESORT OS 0.62.2 INTERNAL RC FROZEN / REPOSITORY VERIFIED / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment. It is not evidence that deployment has happened.
@@ -13,18 +13,20 @@ Canonical machine manifest: `release/current-rc.json`.
 ## 1. Release boundary
 
 Release: `0.62.2`.  
-Accepted source PR: `#135`.  
-Accepted executable/release-boundary head: `d851c5c64a103ab263b977b3b07c970f29676783`.  
-Observed tree-equivalent main merge: `b477e76a32b7fc0fdf8a349cda400c7fa12bc297`.  
+Accepted source PR: `#143`.  
+Accepted executable/release-boundary head: `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`.  
+Observed tree-equivalent main merge: `c931b7e12973ecb62b8f9595d60f0d7947e7ad8e`.  
 Production source branch: `main`.
 
-Evidence: accepted head **22/22 SUCCESS**; observed merge **20/20 applicable non-truth workflows SUCCESS**. The additional failed push workflow was the expected `Release RC Truth CI` fail-close against the previous frozen boundary. Runtime remains 0.62.2.
+Evidence: accepted head **24/24 SUCCESS**; observed merge **23/23 applicable non-truth workflows SUCCESS**. The additional failed push workflow was the expected `Release RC Truth CI` fail-close against the previous frozen boundary. Runtime remains 0.62.2.
 
 ## 2. Approved topology
 
 Single-server V1: Caddy HTTPS/WSS edge, PostgreSQL 16 private Docker network, FastAPI Resort Core, Public Next.js, Admin/PMS Next.js, Staff/Kitchen PWA, pinned n8n when enabled, persistent database/media/n8n storage and local + off-site verified backup.
 
 Authority: `PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`.
+
+Authenticated browser realtime must remain same-origin on Admin/Staff hosts. PostgreSQL must remain private. Production runtime images must use the exact audited pins encoded by the release configuration; floating `latest` is not release evidence.
 
 ## 3. Host preflight
 
@@ -40,7 +42,9 @@ Before DNS/apex or web-server changes: record DNS/IP/TTL, capture current web ro
 
 ## 6. Environment and secrets
 
-Create `.env.production` only on the server from the example. Generate independent strong secrets. Never commit production secrets. Keep n8n pinned. Mutating CI/demo utilities are not deployment tools.
+Create `.env.production` only on the server from the example. Generate independent strong secrets. Never commit production secrets. Keep exact audited runtime pins. Mutating CI/demo utilities are not deployment tools.
+
+Do not broaden `COOKIE_DOMAIN` to make realtime work. The accepted topology uses host-only sessions and same-origin Admin/Staff WebSocket routing. Do not remove WebSocket Origin enforcement or Caddy body-size boundaries.
 
 ## 7. Database contract
 
@@ -61,34 +65,46 @@ Never use `prisma db push` for external staging/production.
 
 ## 8. First external staging sequence
 
-1. check out `main` and confirm 0.62.2 manifest;
+1. check out `main` and confirm the 0.62.2 manifest;
 2. run `python scripts/release_rc_truth_guard.py`;
-3. run host/environment preflight;
-4. preserve verified legacy rollback package;
-5. create persistent directories and staging secrets;
-6. validate Compose graph and start private PostgreSQL;
-7. apply all 22 migrations;
-8. run production/database preflight;
-9. reconcile canonical 84-room register to zero diff;
-10. build exact accepted SHA `d851c5c64a103ab263b977b3b07c970f29676783`;
-11. start Core/Public/Admin/Staff/Kitchen in isolated staging;
-12. start n8n only after Core readiness;
-13. route staging HTTPS/WSS and verify TLS, secure cookies, exact CORS and private PostgreSQL;
-14. run external staging acceptance and real-device/provider checks;
-15. run the guarded k6 baseline from `docs/LOAD_TESTING.md`; only increase to 25→100→250 VUs after resource headroom is observed;
-16. take fresh backup and perform clean restore/off-site verification.
+3. verify GitHub/Drive launch-security gates and record any unresolved STOP items;
+4. run host/environment preflight;
+5. preserve and checksum the live legacy rollback package;
+6. create persistent directories and staging secrets;
+7. validate Compose graph and start private PostgreSQL;
+8. apply all 22 migrations;
+9. run production/database preflight;
+10. reconcile canonical 84-room register to zero diff;
+11. build exact accepted SHA `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`;
+12. start Core/Public/Admin/Staff/Kitchen in isolated staging;
+13. start n8n only after Core readiness;
+14. route staging HTTPS/WSS and verify TLS, secure host-only cookies, exact CORS, WebSocket Origin policy, same-origin realtime and private PostgreSQL;
+15. verify edge request-body limits: Telegram webhook 1 MB, generic public/admin/staff/API 2 MB, CMS media upload 8 MB;
+16. run external business acceptance and real-device/provider checks;
+17. run the guarded k6 baseline from `docs/LOAD_TESTING.md`; only increase pressure after resource headroom is observed;
+18. prove monitoring/restart/self-healing;
+19. take a fresh backup and perform clean restore plus off-site verification;
+20. record immutable SHA/image/runtime linkage and DNS rollback evidence.
 
 ## 9. Load-test boundary
 
-The repository now contains a k6 read-pressure harness. It explicitly blocks `3korony.com` / `www.3korony.com`, requires `LOAD_TEST_ENV=ci|test|staging`, and does not mutate reservations, payments, stays or providers. Repository CI validates the harness itself; **actual Beget capacity is not proven until an isolated external staging run records latency, failure rate, CPU, RAM, PostgreSQL connections and recovery health.**
+The repository contains a k6 read-pressure harness. It explicitly blocks `3korony.com` / `www.3korony.com`, requires `LOAD_TEST_ENV=ci|test|staging`, and does not mutate reservations, payments, stays or providers. Repository CI validates the harness itself; **actual Beget/VPS capacity is not proven until an isolated external staging run records latency, failure rate, CPU, RAM, PostgreSQL connections and recovery health.**
 
 ## 10. Required acceptance
 
-Prove canonical site compatibility, Admin/PMS, Staff/Kitchen, Core readiness, WSS, server-authoritative reservation/pricing state, CLEAN check-in gate, checkout→DIRTY→housekeeping, Kitchen RBAC/menu/order/table lifecycle, active API route uniqueness, private PostgreSQL, guarded load thresholds, backup→clean restore and executable legacy rollback.
+Prove canonical site compatibility, Admin/PMS, Staff/Kitchen, Core readiness, secure HTTPS/WSS, same-origin authenticated realtime, request-body limits, server-authoritative reservation/pricing state, CLEAN check-in gate, checkout→DIRTY→housekeeping, Kitchen RBAC/menu/order/table lifecycle, active API route uniqueness, private PostgreSQL, guarded load thresholds, monitoring/restart recovery, backup→clean restore and executable legacy rollback.
 
 ## 11. Current blockers
 
-Before production cutover: protect GitHub `main`, remove/downgrade public Google Drive writer grants, obtain authorized Beget/VPS execution, prove live rollback, external HTTPS/WSS, real devices/providers, monitoring, actual load evidence, backup/restore/off-site copy, immutable release/image/deployment linkage and DNS rollback.
+Before production cutover:
+- protect GitHub `main` and require the release/security checks;
+- remove/downgrade public Google Drive writer grants;
+- obtain an authorized Beget/VPS execution path;
+- prove live rollback and target migration/reconciliation;
+- prove external HTTPS/WSS and real-device/provider behavior;
+- prove actual load capacity and monitoring;
+- prove backup/restore/off-site evidence;
+- record immutable deployment linkage and DNS rollback.
 
 ## 12. Production cutover gate
 
