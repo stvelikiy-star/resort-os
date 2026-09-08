@@ -1,7 +1,7 @@
 # RESORT OS — CURRENT STATE
 
-Version: 6.2  
-Date: 2026-09-07  
+Version: 6.3  
+Date: 2026-09-08  
 Status: RESORT OS 0.62.2 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP  
 Canonical: YES
 
@@ -10,27 +10,34 @@ Canonical: YES
 ## Release identity
 
 Repository: `stvelikiy-star/resort-os`.  
-Accepted test/safety source PR: `#135` — `test/load-stress-harness-20260907 -> main`.  
-Accepted executable/release-boundary head: `d851c5c64a103ab263b977b3b07c970f29676783`.  
-Observed tree-equivalent main merge: `b477e76a32b7fc0fdf8a349cda400c7fa12bc297`.  
+Accepted security source PR: `#143` — `audit/request-body-limits-v2-20260907 -> main`.  
+Accepted executable/release-boundary head: `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`.  
+Observed tree-equivalent main merge: `c931b7e12973ecb62b8f9595d60f0d7947e7ad8e`.  
 Production source branch: `main`.
 
 Evidence:
-- PR #135 exact tested head: **22/22 workflows SUCCESS, 0 failures**;
+- PR #143 exact tested head: **24/24 workflows SUCCESS, 0 failures, 0 cancellations**;
 - accepted head and observed merge are tree-equivalent; GitHub compare reports zero changed files;
-- observed main merge: **20/20 applicable non-truth workflows SUCCESS**;
-- one additional `Release RC Truth CI` push run failed closed because the previous 0.62.2 manifest correctly detected the new load-test safety boundary; this same-version refreeze is the controlled correction.
+- observed main merge: **23/23 applicable non-truth workflows SUCCESS**;
+- one additional `Release RC Truth CI` push run failed closed because the previous 0.62.2 manifest correctly detected executable/security drift after the older frozen boundary; this same-version refreeze is the controlled correction.
 
 Machine authority: `release/current-rc.json`.
 
 ## Hardening accepted in the final 0.62.2 boundary
 
-- all prior 0.62.2 mutation, route-uniqueness, migration and localhost-only CI hardening remains in force;
-- the new k6 read-pressure harness is explicitly limited to `ci|test|staging`;
-- `3korony.com` and `www.3korony.com` are explicitly blocked as load-test targets;
-- the harness uses only readiness, booking availability and optional authenticated PMS-grid reads; it does not mutate reservations, payments, stays or provider state;
-- real capacity is **not** claimed until this harness is executed against isolated external Beget/VPS staging with CPU/RAM/PostgreSQL/Caddy observations;
+All prior 0.62.2 domain, mutation, migration, route-uniqueness, localhost-only CI and guarded load-test controls remain in force. The current refreeze additionally accepts the audited security changes from PRs #137-#143:
+
+- production runtime images are exactly pinned to the audited security baseline;
+- authenticated browser WebSockets use same-origin host routing rather than broad cross-subdomain cookies;
+- PMS/Dining WebSocket handshakes enforce browser Origin policy in production;
+- Telegram public webhook request bodies are bounded at the edge;
+- generic public/admin/staff/API request bodies are bounded at the edge;
+- CMS media upload has a dedicated 8 MB edge boundary aligned with FastAPI validation;
+- Caddy/realtime/body-limit regression guards are included in CI;
+- the browser topology guard distinguishes dedicated Admin media routing from the generic Admin Next proxy;
 - active FastAPI runtime version remains `0.62.2`.
+
+The guarded k6 harness remains restricted to `ci|test|staging`, explicitly blocks `3korony.com` / `www.3korony.com`, and does not mutate reservations, payments, stays or provider state. Real capacity is **not** claimed until isolated external staging is load-tested with resource observations.
 
 ## Architecture authority
 
@@ -74,12 +81,25 @@ External staging/production schema changes use `npx prisma migrate deploy`; neve
 
 ## Repository-verified management contour
 
-Verified contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore, release/staging/package gates and the guarded load-test contract.
+Verified repository contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore, release/staging/package gates, guarded load-test contract, production runtime pinning, same-origin browser realtime, WebSocket Origin security and request-body limits.
 
-The public website is frozen by owner instruction. PR #135 accepts **zero `apps/web/**` changes**; Public Web is only built as compatibility evidence.
+The public website is frozen by owner instruction. PRs #137-#143 accept **zero `apps/web/**` product-source changes**; Public Web is built only as compatibility evidence.
 
 ## Current external boundary
 
-GitHub `main` branch protection and Google Drive public-writer remediation remain unresolved launch-security items. Beget/VPS external runtime access, legacy rollback, HTTPS/WSS staging, real devices/providers, monitoring, actual load execution, fresh backup/restore/off-site evidence and DNS rollback are not claimed by repository CI.
+The following are still not production-verified:
 
-External production remains **EXTERNAL PRODUCTION CUTOVER STOP** until those items and explicit owner GO are complete.
+- GitHub `main` branch protection / required checks;
+- removal or downgrade of public Google Drive writer grants;
+- authorized Beget/VPS execution path;
+- real legacy-live rollback package and restore rehearsal;
+- exact 22 migrations and zero-diff 84-room reconciliation on the target database;
+- external HTTPS/WSS staging;
+- real iPhone/Android/desktop/Staff/Kitchen device acceptance;
+- launch-enabled bank/TTLock provider E2E, if those providers are enabled;
+- real load/stress execution with CPU/RAM/PostgreSQL/Caddy observations;
+- production monitoring/alerts and restart/self-healing evidence;
+- fresh backup -> clean restore -> off-site copy evidence;
+- immutable release/image/runtime linkage and DNS rollback.
+
+External production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all required evidence and explicit owner GO are complete.
