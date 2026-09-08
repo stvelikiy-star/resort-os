@@ -13,6 +13,9 @@
 		file_server
 	}
 	handle {
+		request_body {
+			max_size 2MB
+		}
 		reverse_proxy web:3000
 	}
 }
@@ -23,11 +26,21 @@ www.{$PUBLIC_HOST:3korony.com} {
 
 {$ADMIN_HOST:admin.3korony.com} {
 	encode zstd gzip
+	@media_upload path /core/api/v1/admin/site/media
+	handle @media_upload {
+		request_body {
+			max_size 8MB
+		}
+		reverse_proxy admin:3001
+	}
 	@core_ws path /ws/*
 	handle @core_ws {
 		reverse_proxy api:8000
 	}
 	handle {
+		request_body {
+			max_size 2MB
+		}
 		reverse_proxy admin:3001
 	}
 }
@@ -39,6 +52,9 @@ www.{$PUBLIC_HOST:3korony.com} {
 		reverse_proxy api:8000
 	}
 	handle {
+		request_body {
+			max_size 2MB
+		}
 		reverse_proxy staff:3002
 	}
 }
@@ -53,6 +69,9 @@ www.{$PUBLIC_HOST:3korony.com} {
 		reverse_proxy api:8000
 	}
 	handle {
+		request_body {
+			max_size 2MB
+		}
 		reverse_proxy api:8000
 	}
 }

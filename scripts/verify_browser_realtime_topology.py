@@ -38,10 +38,21 @@ for label, block, next_target in (("admin", admin_block, "admin:3001"), ("staff"
     require(block, "@core_ws path /ws/*", f"Caddy {label}")
     require(block, "handle @core_ws", f"Caddy {label}")
     require(block, "reverse_proxy api:8000", f"Caddy {label}")
-    require(block, f"reverse_proxy {next_target}", f"Caddy {label}")
-    core_pos = block.find("reverse_proxy api:8000")
-    next_pos = block.find(f"reverse_proxy {next_target}")
-    if core_pos < 0 or next_pos < 0 or core_pos > next_pos:
+
+    core_pos = block.find("handle @core_ws")
+    generic_candidates = (
+        f"\thandle {{\n\t\treverse_proxy {next_target}\n\t}}",
+        f"\thandle {{\n\t\trequest_body {{\n\t\t\tmax_size 2MB\n\t\t}}\n\t\treverse_proxy {next_target}\n\t}}",
+    )
+    generic_positions = [block.find(marker) for marker in generic_candidates]
+    generic_positions = [pos for pos in generic_positions if pos >= 0]
+
+    if not generic_positions:
+        errors.append(f"Caddy {label}: generic Next proxy handle is missing")
+        continue
+
+    generic_pos = min(generic_positions)
+    if core_pos < 0 or core_pos > generic_pos:
         errors.append(f"Caddy {label}: realtime Core route must precede generic Next proxy")
 
 print("Three Crowns browser realtime topology guard")
