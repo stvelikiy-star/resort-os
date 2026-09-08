@@ -50,6 +50,30 @@ Do not broaden `COOKIE_DOMAIN` to make realtime work. The accepted topology uses
 
 Release boundary: **22 migrations / 87 critical constraints / 84 rooms / 12 categories / 48 rates**.
 
+Canonical 22-migration ledger:
+1. `0_init`
+2. `1_site_content`
+3. `2_guest_service_tasks`
+4. `3_owner_analytics_snapshots`
+5. `4_guest_engagements`
+6. `5_guest_os_core`
+7. `6_service_point_qr_operations`
+8. `7_kitchen_operations`
+9. `8_dining_service_control`
+10. `9_guest_offer_campaigns`
+11. `z10_service_point_paid_access`
+12. `z11_owner_corrections_20260905`
+13. `z12_guest_service_settings_20260905`
+14. `z13_housekeeping_charges_20260905`
+15. `z14_dining_entitlements_20260905`
+16. `z15_group_bookings_20260905`
+17. `z16_site_media_20260905`
+18. `z17_dining_floor_layout_20260905`
+19. `z18_site_media_slots_20260905`
+20. `z19_dining_table_status_guard_20260905`
+21. `z20_dining_active_table_unique_20260906`
+22. `z21_dining_production_snapshots_20260906`
+
 Apply only committed migrations:
 
 ```bash
