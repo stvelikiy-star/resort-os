@@ -24,7 +24,7 @@ jobs:
           git cat-file -e ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4^{commit}
           test -f apps/admin/package.json
           test -f services/api/Dockerfile
-          test -f packages/database/schema.prisma
+          test -f packages/database/prisma/schema.prisma
           test -f compose.staging.yaml
           test -f RUN_REAL_ADMIN_MAC.sh
           test -f .env.real-admin
@@ -43,7 +43,7 @@ jobs:
           sha256sum dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip > dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip.sha256
           unzip -l dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip | grep 'apps/admin/package.json'
           unzip -l dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip | grep 'services/api/Dockerfile'
-          unzip -l dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip | grep 'packages/database/schema.prisma'
+          unzip -l dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip | grep 'packages/database/prisma/schema.prisma'
           unzip -l dist/THREE_CROWNS_REAL_ADMIN_0.62.2_MAC.zip | grep 'RUN_REAL_ADMIN_MAC.sh'
 
       - name: Upload actual Resort OS package
