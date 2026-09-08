@@ -69,11 +69,11 @@ def main() -> int:
 
     rc = json.loads(read("release/current-rc.json"))
     ok(rc["release_version"] == "0.62.2", "release 0.62.2")
-    ok(rc["accepted_executable_head"] == "d851c5c64a103ab263b977b3b07c970f29676783", "accepted load-test safety SHA")
-    ok(rc["observed_merge_commit"] == "b477e76a32b7fc0fdf8a349cda400c7fa12bc297", "observed load-test safety merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 22, "success": 22, "failures": 0}, "22/22 accepted workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 20, "success": 20, "failures": 0}, "20/20 eligible merge workflows")
-    ok(rc["postmerge_truth_workflows"] == {"triggered": 20, "success": 20, "failures": 0}, "20/20 postmerge truth workflows")
+    ok(rc["accepted_executable_head"] == "ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4", "accepted security-boundary SHA")
+    ok(rc["observed_merge_commit"] == "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e", "observed security-boundary merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 24, "success": 24, "failures": 0}, "24/24 accepted workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 eligible merge workflows")
+    ok(rc["postmerge_truth_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 postmerge non-truth workflows")
     ok(rc["migration_count"] == 22 and rc["critical_constraint_count"] == 87, "22 migrations / 87 constraints")
     ok(rc["canonical_property_seed"] == {"rooms": 84, "room_categories": 12, "rate_rows": 48}, "canonical property seed")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
@@ -141,13 +141,13 @@ def main() -> int:
         '"legacy_rollback_gate"', '"deployment_release_linkage"', '"external_public_truth"',
         '"staging_business_acceptance"', '"production_monitoring"', '"production_target_allowed": False',
         'parsed.scheme != "https"', 'parsed.scheme != "wss"', 'output directory must be empty',
-        'contains_credentials": False', 'changes_dns": False',
+        '"contains_credentials": False', '"changes_dns": False',
     ):
         ok(marker in staging, f"external fail-closed marker: {marker}")
 
     ok(passed >= 106, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
-    print("BOUNDARY: management/admin/staff/Core only; apps/web is frozen; Beget/VPS deferred by owner")
+    print("BOUNDARY: management/admin/staff/Core only; apps/web is frozen; external Beget/VPS cutover remains STOP")
     return 0
 
 

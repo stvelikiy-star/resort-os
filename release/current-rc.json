@@ -2,24 +2,24 @@
   "schema_version": 1,
   "release_version": "0.62.2",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "test/load-stress-harness-20260907",
-  "accepted_executable_head": "d851c5c64a103ab263b977b3b07c970f29676783",
-  "observed_merge_commit": "b477e76a32b7fc0fdf8a349cda400c7fa12bc297",
+  "source_branch": "audit/request-body-limits-v2-20260907",
+  "accepted_executable_head": "ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4",
+  "observed_merge_commit": "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 22,
-    "success": 22,
+    "triggered": 24,
+    "success": 24,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 20,
-    "success": 20,
+    "triggered": 23,
+    "success": 23,
     "failures": 0
   },
-  "postmerge_truth_head": "b477e76a32b7fc0fdf8a349cda400c7fa12bc297",
+  "postmerge_truth_head": "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e",
   "postmerge_truth_workflows": {
-    "triggered": 20,
-    "success": 20,
+    "triggered": 23,
+    "success": 23,
     "failures": 0
   },
   "production_source_branch": "main",
@@ -35,15 +35,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS runtime version remains 0.62.2; this is a controlled test/safety-boundary refreeze, not a product/runtime version bump.",
-    "PR #135 exact tested head d851c5c64a103ab263b977b3b07c970f29676783 completed 22/22 pull-request workflows successfully with zero failures.",
-    "Observed main merge b477e76a32b7fc0fdf8a349cda400c7fa12bc297 is tree-equivalent to the tested head; GitHub compare reports zero changed files.",
-    "The observed merge completed 20/20 applicable non-truth push workflows successfully. The one additional Release RC Truth CI run failed closed because the prior frozen manifest correctly detected the new load-test safety boundary; this refreeze is the controlled correction.",
-    "The added k6 load harness is read-only, explicitly limited to ci/test/staging, blocks 3korony.com and www.3korony.com, and does not mutate reservations, payments, stays or provider state.",
-    "Real load capacity is not claimed until the harness is executed against an isolated external Beget/VPS staging target with resource observations.",
+    "Resort OS runtime version remains 0.62.2; this is a controlled same-version security-boundary refreeze, not a product/runtime version bump.",
+    "PR #143 exact tested head ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4 completed 24/24 pull-request workflows successfully with zero failures and zero cancellations.",
+    "Observed main merge c931b7e12973ecb62b8f9595d60f0d7947e7ad8e is tree-equivalent to the tested head; GitHub compare reports zero changed files.",
+    "The observed merge completed 23/23 applicable non-truth push workflows successfully. The one additional Release RC Truth CI run failed closed because the prior frozen manifest correctly detected executable/security drift; this refreeze is the controlled correction.",
+    "The refrozen boundary includes runtime image pinning, same-origin authenticated WebSocket routing and Origin enforcement, Telegram webhook request-body limits, generic edge body limits and CMS media-upload limits from PRs #137-#143.",
+    "The browser realtime topology verifier was corrected to distinguish the dedicated CMS media route from the generic Admin Next proxy; the corrected PR head passed the complete 24-workflow suite.",
     "Database release ledger remains 22 committed migrations and 87 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Public website source remained frozen; PR #135 contains zero apps/web changes.",
-    "Beget/VPS, external HTTPS/WSS staging, legacy rollback, real devices/providers, monitoring, actual load evidence, backup/restore/off-site evidence and DNS cutover remain external work.",
-    "Production cutover remains unauthorized until the final external phase is executed and explicit owner GO is recorded."
+    "Public website source remained frozen throughout PRs #137-#143; no apps/web product-source changes are accepted by this refreeze.",
+    "GitHub main protection, Google Drive public-writer remediation, Beget/VPS runtime access, external HTTPS/WSS staging, legacy rollback, real devices/providers, monitoring, actual load evidence, backup/restore/off-site evidence, immutable deployment linkage and DNS rollback remain external launch work.",
+    "Production cutover remains unauthorized until every external launch gate is proven and explicit owner GO is recorded."
   ]
 }

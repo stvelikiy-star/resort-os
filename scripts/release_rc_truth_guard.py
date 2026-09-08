@@ -71,10 +71,10 @@ def main() -> int:
     expected = {
         "release_version": "0.62.2",
         "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-        "source_branch": "test/load-stress-harness-20260907",
-        "accepted_executable_head": "d851c5c64a103ab263b977b3b07c970f29676783",
-        "observed_merge_commit": "b477e76a32b7fc0fdf8a349cda400c7fa12bc297",
-        "postmerge_truth_head": "b477e76a32b7fc0fdf8a349cda400c7fa12bc297",
+        "source_branch": "audit/request-body-limits-v2-20260907",
+        "accepted_executable_head": "ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4",
+        "observed_merge_commit": "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e",
+        "postmerge_truth_head": "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e",
         "production_source_branch": "main",
         "migration_count": 22,
         "critical_constraint_count": 87,
@@ -94,9 +94,9 @@ def main() -> int:
     if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
         errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
 
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 22, "success": 22, "failures": 0}, errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 20, "success": 20, "failures": 0}, errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 20, "success": 20, "failures": 0}, errors)
+    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 24, "success": 24, "failures": 0}, errors)
+    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 23, "success": 23, "failures": 0}, errors)
+    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 23, "success": 23, "failures": 0}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
     observed = str(rc.get("observed_merge_commit") or "").lower()
@@ -142,10 +142,10 @@ def main() -> int:
     print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
-    print("FACT: accepted_head_workflows=22/22")
-    print("FACT: merged_main_eligible_workflows=20/20")
+    print("FACT: accepted_head_workflows=24/24")
+    print("FACT: merged_main_eligible_workflows=23/23")
     print("FACT: pre_refreeze_release_control_failure=Release RC Truth CI")
-    print("FACT: load_test_harness=guarded_ci_test_staging_only")
+    print("FACT: security_boundary=runtime_pins_same_origin_ws_origin_and_body_limits")
     print("FACT: migrations=22")
     print("FACT: critical_constraints=87")
     print("FACT: production_source_branch=main")

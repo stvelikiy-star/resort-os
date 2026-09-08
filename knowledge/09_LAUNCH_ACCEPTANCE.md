@@ -1,7 +1,7 @@
 # THREE CROWNS RESORT OS — LAUNCH ACCEPTANCE
 
-Version: 6.2  
-Date: 2026-09-07  
+Version: 6.3  
+Date: 2026-09-08  
 Status: RESORT OS 0.62.2 INTERNAL RC FROZEN / EXTERNAL PRODUCTION CUTOVER STOP  
 Canonical: YES
 
@@ -11,16 +11,16 @@ Repository/CI evidence is not external staging or production evidence.
 
 Repository: `stvelikiy-star/resort-os`.  
 Release: `0.62.2`.  
-Accepted source PR: `#135` — `test/load-stress-harness-20260907 -> main`.  
-Accepted executable/release-boundary head: `d851c5c64a103ab263b977b3b07c970f29676783`.  
-Observed tree-equivalent main merge: `b477e76a32b7fc0fdf8a349cda400c7fa12bc297`.  
+Accepted source PR: `#143` — `audit/request-body-limits-v2-20260907 -> main`.  
+Accepted executable/release-boundary head: `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`.  
+Observed tree-equivalent main merge: `c931b7e12973ecb62b8f9595d60f0d7947e7ad8e`.  
 Production source branch: `main`.
 
 Evidence:
-- accepted PR #135 head: **22/22 workflows SUCCESS, 0 failures**;
+- accepted PR #143 head: **24/24 workflows SUCCESS, 0 failures, 0 cancellations**;
 - accepted head and observed merge are tree-equivalent with zero file differences;
-- observed main merge: **20/20 applicable non-truth workflows SUCCESS**;
-- the additional `Release RC Truth CI` run failed closed because the prior manifest correctly rejected the new test/safety boundary; this refreeze is the controlled correction.
+- observed main merge: **23/23 applicable non-truth workflows SUCCESS**;
+- the additional `Release RC Truth CI` push run failed closed because the prior manifest correctly rejected executable/security drift after the older frozen boundary; this refreeze is the controlled correction.
 
 Machine truth: `release/current-rc.json`. Guard: `scripts/release_rc_truth_guard.py`.
 
@@ -41,9 +41,18 @@ External staging/production migration uses only `npx prisma migrate deploy`; `pr
 
 ## 4. Repository-verified contour
 
-0.62.2 includes PMS/chessboard, Rates/Seasons, Reception, CRM, groups, Guest OS/Services/Offers, housekeeping/maintenance, Finance, Reports/Analytics, Staff/RBAC, Kitchen/Dining, QR/service points, Inbox, automation contracts, backup/restore, production package, staging/release gates, active-route uniqueness, mutating-CI safety and the new guarded k6 load-test harness.
+0.62.2 includes PMS/chessboard, Rates/Seasons, Reception, CRM, groups, Guest OS/Services/Offers, housekeeping/maintenance, Finance, Reports/Analytics, Staff/RBAC, Kitchen/Dining, QR/service points, Inbox, automation contracts, backup/restore, production package, staging/release gates, active-route uniqueness, mutating-CI safety and guarded k6 load testing.
 
-The load harness is read-only, restricted to `ci|test|staging`, and explicitly blocks the public `3korony.com` host. Its CI contract is green, but **real server load capacity is not yet externally verified**.
+The current security boundary additionally includes:
+- exact production runtime image pins;
+- same-origin Admin/Staff authenticated WebSocket routing;
+- production WebSocket Origin enforcement;
+- 1 MB Telegram webhook body boundary;
+- 2 MB generic public/admin/staff/API edge body boundaries;
+- dedicated 8 MB CMS media upload edge boundary aligned with application validation;
+- CI guards for runtime pins, WebSocket security/topology and request-body limits.
+
+These are repository-verified controls. Real external HTTPS/WSS, capacity and device behavior remain external evidence.
 
 ## 5. Remaining external launch gate
 
@@ -51,13 +60,15 @@ Production cutover remains **STOP** until real evidence exists for:
 - protected GitHub `main` with required checks;
 - removal/downgrade of public Google Drive writer grants;
 - authorized Beget/VPS runtime path;
-- legacy rollback package;
+- actual live legacy rollback package plus restore rehearsal;
 - room reconciliation and exact 22 migrations on target;
 - external HTTPS/WSS staging;
 - real-device and launch-enabled provider checks;
 - real k6 load/stress run with resource observations;
-- monitoring and fresh backup→clean restore plus off-site copy;
-- exact release/image/deployment linkage and DNS rollback;
+- monitoring/restart/self-healing acceptance;
+- fresh backup -> clean restore plus off-site copy;
+- exact immutable release/image/deployment linkage;
+- DNS rollback;
 - explicit owner GO.
 
 No CI result alone authorizes DNS cutover.
@@ -75,22 +86,25 @@ Final structural cutover evidence check must use the accepted SHA:
 python scripts/verify_launch_acceptance.py \
   --mode cutover \
   --manifest /secure/path/launch-evidence.json \
-  --release-sha d851c5c64a103ab263b977b3b07c970f29676783
+  --release-sha ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4
 ```
 
 ## 7. Final external sequence
 
 1. verify `main` and the 0.62.2 manifest;
-2. run release truth, host and environment preflight;
-3. preserve/checksum current legacy rollback;
-4. create persistent storage and private PostgreSQL;
-5. apply all 22 migrations;
-6. reconcile 84-room canonical register to zero diff;
-7. build/deploy exact accepted release-boundary head `d851c5c64a103ab263b977b3b07c970f29676783` to isolated HTTPS/WSS staging;
-8. verify Core/Public/Admin/Staff/Kitchen and secure network boundaries;
-9. run external acceptance and real-device/provider checks;
-10. run guarded load baseline and then higher pressure only with resource monitoring;
-11. prove fresh backup and clean restore/off-site evidence;
-12. only after explicit owner GO prepare controlled DNS/production switch.
+2. verify GitHub protection and Drive integrity gates;
+3. run release truth, host and environment preflight;
+4. preserve/checksum current legacy rollback and prove non-destructive restore;
+5. create persistent storage and private PostgreSQL;
+6. apply all 22 migrations using `prisma migrate deploy`;
+7. reconcile the canonical 84-room register to zero diff;
+8. build/deploy exact accepted release-boundary head `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4` to isolated HTTPS/WSS staging;
+9. verify Core/Public/Admin/Staff/Kitchen and secure network/session/realtime boundaries;
+10. run external business acceptance and real-device/provider checks;
+11. run guarded load baseline and only then higher pressure with resource monitoring;
+12. prove monitoring/restart/self-healing;
+13. prove fresh backup, clean restore and off-site evidence;
+14. record immutable SHA/image/runtime linkage and DNS rollback;
+15. only after explicit owner GO prepare controlled DNS/production switch.
 
 **EXTERNAL PRODUCTION CUTOVER STOP** remains in force.
