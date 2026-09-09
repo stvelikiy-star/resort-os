@@ -160,7 +160,7 @@ jobs:
       - name: Start Resort Core
         run: |
           python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/service-point-api.log 2>&1 &
-          echo $! > /tmp/service-point-api.pid
+          echo $! >/tmp/service-point-api.pid
           for i in {1..30}; do
             if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/service-point-ready.json 2>/dev/null; then break; fi
             if [ "$i" = "30" ]; then cat /tmp/service-point-api.log; exit 1; fi
@@ -185,3 +185,5 @@ jobs:
         run: |
           if [ -f /tmp/service-point-api.pid ]; then kill "$(cat /tmp/service-point-api.pid)" 2>/dev/null || true; fi
           if [ -f /tmp/service-point-paid-mocks.pid ]; then kill "$(cat /tmp/service-point-paid-mocks.pid)" 2>/dev/null || true; fi
+
+# Audit-only trigger: fresh current-main-equivalent QR -> bank bridge -> TTLock contract verification, 2026-09-09.
