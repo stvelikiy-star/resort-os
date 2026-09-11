@@ -12,7 +12,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/api/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 COPY packages/database/package.json packages/database/package-lock.json ./packages/database/
 RUN cd packages/database && npm ci --no-audit --no-fund
@@ -22,7 +22,7 @@ COPY services/api ./services/api
 COPY scripts ./scripts
 COPY data-intake ./data-intake
 
-RUN python - <<'PY'
+RUN /opt/venv/bin/python - <<'PY'
 from pathlib import Path
 p = Path('/app/services/api/app/stays.py')
 s = p.read_text()
@@ -34,4 +34,4 @@ PY
 
 EXPOSE 8000
 
-CMD ["sh","-lc","cd /app/packages/database && npx prisma migrate deploy && cd /app && python scripts/seed_from_intake.py && python scripts/bootstrap_owner.py && APP_ENV=staging python scripts/bootstrap_staging_staff.py && STAFF_USERNAME=\"$KITCHEN_USERNAME\" STAFF_PASSWORD=\"$KITCHEN_PASSWORD\" STAFF_DISPLAY_NAME='Test Kitchen' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py && STAFF_USERNAME=\"$WAITER_USERNAME\" STAFF_PASSWORD=\"$WAITER_PASSWORD\" STAFF_DISPLAY_NAME='Test Waiter' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py && exec python -m uvicorn app.app_entry:app --app-dir services/api --host 0.0.0.0 --port 8000 --proxy-headers"]
+CMD ["sh","-lc","cd /app/packages/database && npx prisma migrate deploy && cd /app && /opt/venv/bin/python scripts/seed_from_intake.py && /opt/venv/bin/python scripts/bootstrap_owner.py && APP_ENV=staging /opt/venv/bin/python scripts/bootstrap_staging_staff.py && STAFF_USERNAME=\"$KITCHEN_USERNAME\" STAFF_PASSWORD=\"$KITCHEN_PASSWORD\" STAFF_DISPLAY_NAME='Test Kitchen' STAFF_ROLE=DINING_STAFF /opt/venv/bin/python scripts/upsert_staff_user.py && STAFF_USERNAME=\"$WAITER_USERNAME\" STAFF_PASSWORD=\"$WAITER_PASSWORD\" STAFF_DISPLAY_NAME='Test Waiter' STAFF_ROLE=DINING_STAFF /opt/venv/bin/python scripts/upsert_staff_user.py && exec /opt/venv/bin/python -m uvicorn app.app_entry:app --app-dir services/api --host 0.0.0.0 --port 8000 --proxy-headers"]
