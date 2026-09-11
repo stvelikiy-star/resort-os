@@ -24,4 +24,4 @@ COPY data-intake ./data-intake
 
 EXPOSE 8000
 
-CMD ["sh","-lc","cd /app/packages/database && npx prisma migrate deploy && cd /app && python scripts/seed_from_intake.py && python scripts/bootstrap_owner.py && APP_ENV=staging python scripts/bootstrap_staging_staff.py && exec python -m uvicorn app.app_entry:app --app-dir services/api --host 0.0.0.0 --port 8000 --proxy-headers"]
+CMD ["sh","-lc","cd /app/packages/database && npx prisma migrate deploy && cd /app && python scripts/seed_from_intake.py && python scripts/bootstrap_owner.py && APP_ENV=staging python scripts/bootstrap_staging_staff.py && STAFF_USERNAME=\"$KITCHEN_USERNAME\" STAFF_PASSWORD=\"$KITCHEN_PASSWORD\" STAFF_DISPLAY_NAME='Test Kitchen' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py && STAFF_USERNAME=\"$WAITER_USERNAME\" STAFF_PASSWORD=\"$WAITER_PASSWORD\" STAFF_DISPLAY_NAME='Test Waiter' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py && exec python -m uvicorn app.app_entry:app --app-dir services/api --host 0.0.0.0 --port 8000 --proxy-headers"]
