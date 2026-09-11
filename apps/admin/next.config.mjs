@@ -9,6 +9,10 @@ const nextConfig = {
         source: "/core/:path*",
         destination: `${coreApiUrl}/:path*`,
       },
+      {
+        source: "/ws/:path*",
+        destination: `${coreApiUrl}/ws/:path*`,
+      },
     ];
   },
 };
