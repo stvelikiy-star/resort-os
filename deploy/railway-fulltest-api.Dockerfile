@@ -21,6 +21,7 @@ COPY packages/database ./packages/database
 COPY services/api ./services/api
 COPY scripts ./scripts
 COPY data-intake ./data-intake
+COPY deploy/prepare_railway_fulltest.py ./deploy/prepare_railway_fulltest.py
 
 RUN /opt/venv/bin/python - <<'PY'
 from pathlib import Path
@@ -34,4 +35,4 @@ PY
 
 EXPOSE 8000
 
-CMD ["sh","-lc","cd /app/packages/database && npx prisma migrate deploy && cd /app && /opt/venv/bin/python scripts/seed_from_intake.py && /opt/venv/bin/python scripts/bootstrap_owner.py && APP_ENV=staging /opt/venv/bin/python scripts/bootstrap_staging_staff.py && STAFF_USERNAME=\"$KITCHEN_USERNAME\" STAFF_PASSWORD=\"$KITCHEN_PASSWORD\" STAFF_DISPLAY_NAME='Test Kitchen' STAFF_ROLE=DINING_STAFF /opt/venv/bin/python scripts/upsert_staff_user.py && STAFF_USERNAME=\"$WAITER_USERNAME\" STAFF_PASSWORD=\"$WAITER_PASSWORD\" STAFF_DISPLAY_NAME='Test Waiter' STAFF_ROLE=DINING_STAFF /opt/venv/bin/python scripts/upsert_staff_user.py && exec /opt/venv/bin/python -m uvicorn app.app_entry:app --app-dir services/api --host 0.0.0.0 --port 8000 --proxy-headers"]
+CMD ["sh","-lc","cd /app/packages/database && npx prisma migrate deploy && cd /app && /opt/venv/bin/python scripts/seed_from_intake.py && /opt/venv/bin/python deploy/prepare_railway_fulltest.py && /opt/venv/bin/python scripts/bootstrap_owner.py && APP_ENV=staging /opt/venv/bin/python scripts/bootstrap_staging_staff.py && STAFF_USERNAME=\"$KITCHEN_USERNAME\" STAFF_PASSWORD=\"$KITCHEN_PASSWORD\" STAFF_DISPLAY_NAME='Test Kitchen' STAFF_ROLE=DINING_STAFF /opt/venv/bin/python scripts/upsert_staff_user.py && STAFF_USERNAME=\"$WAITER_USERNAME\" STAFF_PASSWORD=\"$WAITER_PASSWORD\" STAFF_DISPLAY_NAME='Test Waiter' STAFF_ROLE=DINING_STAFF /opt/venv/bin/python scripts/upsert_staff_user.py && exec /opt/venv/bin/python -m uvicorn app.app_entry:app --app-dir services/api --host 0.0.0.0 --port 8000 --proxy-headers"]
