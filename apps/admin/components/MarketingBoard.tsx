@@ -37,6 +37,28 @@ type Report = {
   };
 };
 
+type Campaign = {
+  id: string;
+  code: string;
+  title_ru: string;
+  action_type: "GUEST_REQUEST" | "EXTERNAL_URL" | "AI_PROMPT";
+  active_from?: string | null;
+  active_to?: string | null;
+  is_active: boolean;
+  analytics?: {
+    clicks?: number;
+    requests?: number;
+    external_opens?: number;
+    ai_prompts?: number;
+  };
+};
+
+type RecoveryItem = Lead & {
+  priority: number;
+  reason: string;
+  age_hours: number;
+};
+
 const LOST = new Set(["REJECTED", "CANCELLED", "EXPIRED"]);
 const ACTIVE = new Set(["NEW", "QUOTED", "AWAITING_PREPAYMENT"]);
 
@@ -59,6 +81,7 @@ function sourceLabel(value?: string | null) {
   const known: Record<string, string> = {
     WEBSITE: "Сайт",
     WEB: "Сайт",
+    SITE: "Сайт",
     WHATSAPP: "WhatsApp",
     INSTAGRAM: "Instagram",
     TELEGRAM: "Telegram",
@@ -75,10 +98,51 @@ function money(value?: number | null) {
   return `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 }
 
+function ageHours(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return 0;
+  return Math.max(Math.floor((Date.now() - time) / 3600000), 0);
+}
+
+function contactPriority(item: Lead): RecoveryItem | null {
+  const age = ageHours(item.updated_at || item.created_at);
+  if (item.status === "AWAITING_PREPAYMENT") {
+    return { ...item, priority: 100 + Math.min(age, 72), reason: "Предоплата не подтверждена", age_hours: age };
+  }
+  if (item.status === "QUOTED" && age >= 12) {
+    return { ...item, priority: 80 + Math.min(age, 72), reason: "Расчёт отправлен, нужен follow-up", age_hours: age };
+  }
+  if (item.status === "NEW") {
+    return { ...item, priority: 70 + Math.min(age, 48), reason: "Новая заявка — нужен первый контакт", age_hours: age };
+  }
+  if (LOST.has(item.status) && age <= 24 * 30) {
+    return { ...item, priority: 30, reason: "Потерянный лид — возможен ручной возврат", age_hours: age };
+  }
+  return null;
+}
+
+function phoneHref(phone: string) {
+  const cleaned = phone.replace(/[^\d+]/g, "");
+  return cleaned ? `tel:${cleaned}` : undefined;
+}
+
+function whatsappHref(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return digits ? `https://wa.me/${digits}` : undefined;
+}
+
+function campaignActionLabel(value: Campaign["action_type"]) {
+  if (value === "GUEST_REQUEST") return "Заявка гостя";
+  if (value === "EXTERNAL_URL") return "Внешняя ссылка";
+  return "AI-сценарий";
+}
+
 export default function MarketingBoard() {
   const [days, setDays] = useState(30);
   const [report, setReport] = useState<Report | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [segment, setSegment] = useState("ACTIVE");
@@ -91,16 +155,20 @@ export default function MarketingBoard() {
     from.setDate(from.getDate() - Math.max(days - 1, 0));
     const params = new URLSearchParams({ from_date: isoDate(from), to_date: isoDate(to) });
     try {
-      const [reportResponse, leadsResponse] = await Promise.all([
+      const [reportResponse, leadsResponse, campaignResponse] = await Promise.all([
         fetch(`/core/api/v1/admin/reports/overview?${params.toString()}`, { cache: "no-store" }),
         fetch("/core/api/v1/admin/booking/requests?limit=200", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/guest-offers", { cache: "no-store" }),
       ]);
       if (!reportResponse.ok) throw new Error("Не удалось загрузить маркетинговую аналитику");
       if (!leadsResponse.ok) throw new Error("Не удалось загрузить базу лидов");
+      if (!campaignResponse.ok) throw new Error("Не удалось загрузить действующие офферы");
       const reportBody = await reportResponse.json();
       const leadsBody = await leadsResponse.json();
+      const campaignBody = await campaignResponse.json();
       setReport(reportBody as Report);
       setLeads((leadsBody.items || []) as Lead[]);
+      setCampaigns((campaignBody.items || []) as Campaign[]);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки маркетинга");
     } finally {
@@ -121,8 +189,17 @@ export default function MarketingBoard() {
     return { ACTIVE: active, UNPAID: unpaid, CONVERTED: converted, LOST: lost, WEBSITE: website, WHATSAPP: whatsapp, INSTAGRAM: instagram };
   }, [leads]);
 
+  const recoveryQueue = useMemo(() => leads
+    .map(contactPriority)
+    .filter((item): item is RecoveryItem => Boolean(item))
+    .sort((a, b) => b.priority - a.priority)
+    .slice(0, 20), [leads]);
+
   const visible = (segments as Record<string, Lead[]>)[segment] || [];
   const quotedPipeline = visible.reduce((sum, item) => sum + Number(item.quoted_total_kgs || 0), 0);
+  const activeCampaigns = campaigns.filter((item) => item.is_active);
+  const campaignClicks = campaigns.reduce((sum, item) => sum + Number(item.analytics?.clicks || 0), 0);
+  const campaignRequests = campaigns.reduce((sum, item) => sum + Number(item.analytics?.requests || 0), 0);
 
   function exportAudience() {
     const header = ["Lead ID", "Имя", "Телефон", "Email", "Источник", "Статус", "Заезд", "Выезд", "Потенциал KGS"];
@@ -194,6 +271,30 @@ export default function MarketingBoard() {
           </article>
         </section>
 
+        <section className="marketing-panel marketing-recovery">
+          <div className="marketing-panel-head">
+            <div><p className="eyebrow">Sales recovery</p><h2>Очередь контактов</h2><p>Приоритет формируется из статуса и давности заявки. Это ручная очередь менеджера — автоматическая массовая отправка не выполняется.</p></div>
+            <span className="marketing-count-badge">{recoveryQueue.length} к контакту</span>
+          </div>
+          <div className="marketing-recovery-list">
+            {recoveryQueue.length === 0 && <div className="empty small">Срочных контактов сейчас нет.</div>}
+            {recoveryQueue.map((item) => {
+              const call = phoneHref(item.phone);
+              const whatsapp = whatsappHref(item.phone);
+              return <div className="marketing-recovery-row" key={item.id}>
+                <div className="marketing-recovery-main"><b>{item.guest_name}</b><small>{item.reason} · {item.age_hours} ч. без изменения</small></div>
+                <span>{sourceLabel(item.source)}</span>
+                <span>{money(item.quoted_total_kgs)}</span>
+                <div className="marketing-contact-actions">
+                  {call && <a href={call}>Позвонить</a>}
+                  {whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>}
+                  {item.email && <a href={`mailto:${item.email}`}>Email</a>}
+                </div>
+              </div>;
+            })}
+          </div>
+        </section>
+
         <section className="marketing-panel marketing-audience">
           <div className="marketing-panel-head">
             <div><p className="eyebrow">Audience</p><h2>Сегменты клиентской базы</h2><p>Сегменты строятся из реальных заявок. Массовая отправка не запускается без выбранного канала и согласия клиента.</p></div>
@@ -222,13 +323,32 @@ export default function MarketingBoard() {
           </div>
         </section>
 
-        <section className="marketing-panel">
-          <div className="marketing-panel-head"><div><p className="eyebrow">Campaigns</p><h2>Кампании и автоматические касания</h2></div></div>
-          <div className="marketing-roadmap">
-            <div><b>Этап 1 · готов</b><p>Аудитории, воронка, источники, конверсия и экспорт базы внутри PMS.</p></div>
-            <div><b>Этап 2 · подключение каналов</b><p>WhatsApp и Instagram/Meta: входящие лиды, единый источник и история контакта.</p></div>
-            <div><b>Этап 3 · автоматизация</b><p>n8n: неоплата, брошенная заявка, отзыв после выезда, возврат прошлогодних гостей.</p></div>
+        <section className="marketing-panel marketing-campaigns">
+          <div className="marketing-panel-head">
+            <div><p className="eyebrow">Existing campaign engine</p><h2>Офферы Guest OS</h2><p>Marketing использует уже существующий движок офферов Три Короны, а не создаёт второй независимый контур кампаний.</p></div>
+            <div className="marketing-campaign-stats"><span>Всего <b>{campaigns.length}</b></span><span>Активно <b>{activeCampaigns.length}</b></span><span>Клики <b>{campaignClicks}</b></span><span>Заявки <b>{campaignRequests}</b></span></div>
           </div>
+          <div className="marketing-campaign-list">
+            {campaigns.length === 0 && <div className="empty small">Офферы ещё не созданы.</div>}
+            {campaigns.slice(0, 20).map((campaign) => (
+              <div className="marketing-campaign-row" key={campaign.id}>
+                <div><b>{campaign.title_ru}</b><small>{campaign.code} · {campaignActionLabel(campaign.action_type)}</small></div>
+                <span className={campaign.is_active ? "marketing-state active" : "marketing-state"}>{campaign.is_active ? "Активна" : "Выключена"}</span>
+                <span>{campaign.analytics?.clicks ?? 0} кликов</span>
+                <strong>{campaign.analytics?.requests ?? 0} заявок</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="marketing-panel">
+          <div className="marketing-panel-head"><div><p className="eyebrow">Campaigns</p><h2>Контур автоматизации</h2></div></div>
+          <div className="marketing-roadmap">
+            <div><b>Этап 1 · готов</b><p>Аудитории, воронка, источники, конверсия, экспорт и очередь ручного возврата внутри PMS.</p></div>
+            <div><b>Этап 2 · в работе</b><p>Согласия на маркетинг, история касаний, UTM/source tracking и безопасные правила запуска кампаний.</p></div>
+            <div><b>Этап 3 · после каналов</b><p>n8n + WhatsApp/Meta: неоплата, брошенная заявка, отзыв после выезда и возврат прошлогодних гостей.</p></div>
+          </div>
+          <div className="marketing-consent-note"><b>Защита базы:</b> массовые внешние сообщения остаются заблокированными до появления явного marketing consent и журнала отправок. Текущие кнопки связи запускают только индивидуальное действие менеджера.</div>
         </section>
       </>}
     </main>
