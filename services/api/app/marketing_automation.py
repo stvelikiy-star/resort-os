@@ -29,9 +29,9 @@ async def automation_audience(
 ):
     """Return only contacts whose latest channel consent is OPTED_IN.
 
-    This is the n8n/provider handoff. It intentionally uses service auth rather
-    than a staff browser session and fails closed for missing consent or a later
-    opt-out/unsubscribe event.
+    The response includes read-only booking/stay lifecycle facts so n8n can build
+    review queues for payment reminders, expired leads and post-stay campaigns
+    without direct database access. Consent remains the outer fail-closed gate.
     """
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn)
@@ -46,9 +46,16 @@ async def automation_audience(
             )
             SELECT l."contactKey",l.channel,l."occurredAt",l."policyVersion",l.source,
                    rr.id AS request_id,rr."guestName",rr.phone,rr.email,rr.status::text AS request_status,
-                   rr."utmSource",rr."utmMedium",rr."utmCampaign",rr."utmContent",rr."utmTerm"
+                   rr."checkIn" AS request_check_in,rr."checkOut" AS request_check_out,
+                   rr."quotedTotalKgs",rr."requiredPrepaymentKgs",rr."createdAt" AS request_created_at,
+                   rr."utmSource",rr."utmMedium",rr."utmCampaign",rr."utmContent",rr."utmTerm",
+                   r.id AS reservation_id,r.status::text AS reservation_status,
+                   r."checkIn" AS reservation_check_in,r."checkOut" AS reservation_check_out,
+                   s.status::text AS stay_status,s."actualCheckInAt",s."actualCheckOutAt"
             FROM latest l
             LEFT JOIN reservation_requests rr ON rr.id=l."requestId" AND rr."propertyId"=$1
+            LEFT JOIN reservations r ON r."requestId"=rr.id AND r."propertyId"=$1
+            LEFT JOIN stays s ON s."reservationId"=r.id AND s."propertyId"=$1
             WHERE l.status='OPTED_IN'
             ORDER BY l."occurredAt" DESC
             LIMIT $3
@@ -71,6 +78,18 @@ async def automation_audience(
                 "phone": row["phone"],
                 "email": row["email"],
                 "request_status": row["request_status"],
+                "request_check_in": row["request_check_in"],
+                "request_check_out": row["request_check_out"],
+                "request_created_at": row["request_created_at"],
+                "quoted_total_kgs": row["quotedTotalKgs"],
+                "required_prepayment_kgs": row["requiredPrepaymentKgs"],
+                "reservation_id": str(row["reservation_id"]) if row["reservation_id"] else None,
+                "reservation_status": row["reservation_status"],
+                "reservation_check_in": row["reservation_check_in"],
+                "reservation_check_out": row["reservation_check_out"],
+                "stay_status": row["stay_status"],
+                "actual_check_in_at": row["actualCheckInAt"],
+                "actual_check_out_at": row["actualCheckOutAt"],
                 "consented_at": row["occurredAt"],
                 "policy_version": row["policyVersion"],
                 "consent_source": row["source"],
