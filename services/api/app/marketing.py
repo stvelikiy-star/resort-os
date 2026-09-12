@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import uuid
@@ -8,14 +9,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .service_auth import require_automation_service
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 DEFAULT_POLICY_VERSION = os.environ.get("MARKETING_POLICY_VERSION", "2026-09-12")
 
 router = APIRouter(prefix="/api/v1/admin/marketing", tags=["admin-marketing"])
+integration_router = APIRouter(prefix="/api/v1/integrations/marketing", tags=["marketing-integrations"])
 manager_access = require_roles("OWNER", "MANAGER")
 
 MarketingChannel = Literal["WHATSAPP", "EMAIL", "SMS", "TELEGRAM", "PHONE"]
+TouchpointChannel = Literal["WHATSAPP", "EMAIL", "SMS", "TELEGRAM", "PHONE", "OTHER"]
+ProviderEventType = Literal["SENT", "DELIVERED", "READ", "FAILED", "UNSUBSCRIBED"]
 
 
 class ConsentPayload(BaseModel):
@@ -27,12 +32,22 @@ class ConsentPayload(BaseModel):
 
 
 class TouchpointPayload(BaseModel):
-    channel: Literal["WHATSAPP", "EMAIL", "SMS", "TELEGRAM", "PHONE", "OTHER"]
+    channel: TouchpointChannel
     event_type: str = Field(min_length=2, max_length=80)
     direction: Literal["INBOUND", "OUTBOUND", "INTERNAL"] = "OUTBOUND"
     status: str = Field(default="RECORDED", min_length=2, max_length=80)
     campaign_code: str | None = Field(default=None, max_length=120)
     provider_message_id: str | None = Field(default=None, max_length=220)
+    metadata: dict[str, Any] | None = None
+
+
+class ProviderEventPayload(BaseModel):
+    request_id: uuid.UUID
+    channel: MarketingChannel
+    event_type: ProviderEventType
+    provider_message_id: str | None = Field(default=None, max_length=220)
+    campaign_code: str | None = Field(default=None, max_length=120)
+    provider: str = Field(min_length=2, max_length=80)
     metadata: dict[str, Any] | None = None
 
 
@@ -48,6 +63,14 @@ def normalize_phone(value: str) -> str:
     if not digits:
         raise HTTPException(status_code=422, detail="Lead has no usable phone number")
     return f"+{digits}"
+
+
+def contact_key_for(identity, channel: str) -> str:
+    if channel == "EMAIL":
+        if not identity["email"]:
+            raise HTTPException(status_code=422, detail="Lead has no email")
+        return identity["email"].strip().lower()
+    return normalize_phone(identity["phone"])
 
 
 async def request_identity(conn, pid: uuid.UUID, request_id: uuid.UUID):
@@ -82,6 +105,45 @@ def serialize_consent(row) -> dict[str, Any]:
     }
 
 
+async def insert_touchpoint(
+    conn,
+    *,
+    pid: uuid.UUID,
+    request_id: uuid.UUID,
+    guest_id,
+    channel: str,
+    event_type: str,
+    direction: str,
+    touchpoint_status: str,
+    campaign_code: str | None,
+    provider_message_id: str | None,
+    metadata: dict[str, Any] | None,
+    created_by_staff_id=None,
+) -> uuid.UUID:
+    touchpoint_id = uuid.uuid4()
+    await conn.execute(
+        '''
+        INSERT INTO marketing_touchpoints (
+          id,"propertyId","requestId","guestId","campaignCode",channel,direction,"eventType",status,
+          "providerMessageId","metadataJson","occurredAt","createdByStaffId","createdAt"
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,now(),$12,now())
+        ''',
+        touchpoint_id,
+        pid,
+        request_id,
+        guest_id,
+        campaign_code.strip() if campaign_code else None,
+        channel,
+        direction,
+        event_type.strip().upper(),
+        touchpoint_status.strip().upper(),
+        provider_message_id.strip() if provider_message_id else None,
+        None if metadata is None else json.dumps(metadata, ensure_ascii=False),
+        created_by_staff_id,
+    )
+    return touchpoint_id
+
+
 @router.post("/requests/{request_id}/consent", status_code=status.HTTP_201_CREATED)
 async def record_consent(
     request_id: uuid.UUID,
@@ -94,12 +156,7 @@ async def record_consent(
             pid = await property_id(conn)
             identity = await request_identity(conn, pid, request_id)
             channel = payload.channel.upper()
-            if channel == "EMAIL":
-                if not identity["email"]:
-                    raise HTTPException(status_code=422, detail="Lead has no email")
-                contact_key = identity["email"].strip().lower()
-            else:
-                contact_key = normalize_phone(identity["phone"])
+            contact_key = contact_key_for(identity, channel)
 
             consent_id = uuid.uuid4()
             consent_status = "OPTED_IN" if payload.opted_in else "OPTED_OUT"
@@ -155,26 +212,19 @@ async def record_touchpoint(
         async with conn.transaction():
             pid = await property_id(conn)
             identity = await request_identity(conn, pid, request_id)
-            touchpoint_id = uuid.uuid4()
-            await conn.execute(
-                '''
-                INSERT INTO marketing_touchpoints (
-                  id,"propertyId","requestId","guestId","campaignCode",channel,direction,"eventType",status,
-                  "providerMessageId","metadataJson","occurredAt","createdByStaffId","createdAt"
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,now(),$12,now())
-                ''',
-                touchpoint_id,
-                pid,
-                request_id,
-                identity["guest_id"],
-                payload.campaign_code.strip() if payload.campaign_code else None,
-                payload.channel,
-                payload.direction,
-                payload.event_type.strip().upper(),
-                payload.status.strip().upper(),
-                payload.provider_message_id.strip() if payload.provider_message_id else None,
-                None if payload.metadata is None else __import__("json").dumps(payload.metadata, ensure_ascii=False),
-                user["id"],
+            touchpoint_id = await insert_touchpoint(
+                conn,
+                pid=pid,
+                request_id=request_id,
+                guest_id=identity["guest_id"],
+                channel=payload.channel,
+                event_type=payload.event_type,
+                direction=payload.direction,
+                touchpoint_status=payload.status,
+                campaign_code=payload.campaign_code,
+                provider_message_id=payload.provider_message_id,
+                metadata=payload.metadata,
+                created_by_staff_id=user["id"],
             )
     return {"id": str(touchpoint_id), "recorded": True}
 
@@ -325,4 +375,87 @@ async def marketing_summary(
         "consents": [dict(row) for row in consent_rows],
         "touchpoints_30d": touchpoints_30d or 0,
         "attributed_leads_30d": attributed_30d or 0,
+    }
+
+
+@integration_router.post("/provider-events", status_code=status.HTTP_201_CREATED)
+async def provider_event(
+    payload: ProviderEventPayload,
+    request: Request,
+    service: dict[str, Any] = Depends(require_automation_service),
+):
+    """Record provider delivery state and fail closed on unsubscribe.
+
+    n8n/provider adapters call this endpoint after outbound messaging. UNSUBSCRIBED
+    creates an OPTED_OUT consent event immediately, so subsequent audience reads
+    exclude the contact without waiting for another workflow.
+    """
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn)
+            identity = await request_identity(conn, pid, payload.request_id)
+            provider = payload.provider.strip().upper()
+            event_type = payload.event_type.upper()
+            metadata = {"provider": provider, **(payload.metadata or {})}
+
+            touchpoint_id = await insert_touchpoint(
+                conn,
+                pid=pid,
+                request_id=payload.request_id,
+                guest_id=identity["guest_id"],
+                channel=payload.channel,
+                event_type=event_type,
+                direction="INBOUND" if event_type == "UNSUBSCRIBED" else "OUTBOUND",
+                touchpoint_status="FAILED" if event_type == "FAILED" else event_type,
+                campaign_code=payload.campaign_code,
+                provider_message_id=payload.provider_message_id,
+                metadata=metadata,
+                created_by_staff_id=None,
+            )
+
+            consent_id = None
+            if event_type == "UNSUBSCRIBED":
+                contact_key = contact_key_for(identity, payload.channel)
+                consent_id = uuid.uuid4()
+                await conn.execute(
+                    '''
+                    INSERT INTO marketing_consents (
+                      id,"propertyId","requestId","guestId","contactKey",channel,status,source,
+                      "policyVersion",proof,"occurredAt","createdByStaffId","createdAt"
+                    ) VALUES ($1,$2,$3,$4,$5,$6,'OPTED_OUT',$7,$8,$9,now(),NULL,now())
+                    ''',
+                    consent_id,
+                    pid,
+                    payload.request_id,
+                    identity["guest_id"],
+                    contact_key,
+                    payload.channel,
+                    f"PROVIDER:{provider}",
+                    DEFAULT_POLICY_VERSION,
+                    payload.provider_message_id,
+                )
+
+            await conn.execute(
+                '''
+                INSERT INTO audit_logs (
+                  id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
+                ) VALUES ($1,$2,'SERVICE',$3,'MARKETING_PROVIDER_EVENT','MarketingTouchpoint',$4,'AUTOMATION','SUCCESS',
+                  jsonb_build_object('request_id',$5::text,'channel',$6::text,'event_type',$7::text,'provider',$8::text,'consent_id',$9::text),now())
+                ''',
+                uuid.uuid4(),
+                pid,
+                service["actor_id"],
+                str(touchpoint_id),
+                str(payload.request_id),
+                payload.channel,
+                event_type,
+                provider,
+                str(consent_id) if consent_id else None,
+            )
+
+    return {
+        "recorded": True,
+        "touchpoint_id": str(touchpoint_id),
+        "opted_out": event_type == "UNSUBSCRIBED",
+        "consent_id": str(consent_id) if consent_id else None,
     }
