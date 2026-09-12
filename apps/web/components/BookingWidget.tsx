@@ -34,6 +34,8 @@ type AvailabilityResponse = {
 };
 type SearchState = { checkIn: string; checkOut: string; adults: number; children: number };
 
+const MARKETING_POLICY_VERSION = "2026-09-12";
+
 const COPY = {
   ru: {
     eyebrow: "Проверка наличия", title: "Найдите номер на ваши даты", live: "Наличие и стоимость обновляются из системы отеля",
@@ -46,6 +48,8 @@ const COPY = {
     free: "Свободно", yourDates: "На ваши даты", childrenReview: "детские места уточняются", fullPeriod: "за весь период", onRequest: "По запросу", managerPrice: "стоимость подтвердит менеджер",
     selected: "Выбрано", request: "Оставить заявку", askManager: "Уточнить у менеджера", requestEyebrow: "Заявка менеджеру", requestIntro: "Передадим выбранные даты и категорию. Менеджер согласует условия и предоплату.",
     name: "Имя", namePlaceholder: "Как к вам обращаться", phone: "Телефон", email: "Email, если нужен", sending: "Отправляем…", send: "Отправить заявку",
+    marketingConsent: "Хочу получать специальные предложения от «Три Короны» в WhatsApp.",
+    marketingOptional: "Необязательно. Согласие можно отозвать в любой момент.", privacy: "Политика конфиденциальности", consentDetails: "Условия согласия",
     disclaimer: "Отправка заявки не блокирует номер автоматически. Подтверждение брони делает менеджер после согласования условий и предоплаты.",
     breakfast: "Завтрак включён", noMeal: "Без питания", mixedMeal: "Условия питания меняются по датам", currency: "сом",
   },
@@ -60,6 +64,8 @@ const COPY = {
     free: "Бош", yourDates: "Сиздин даталарга", childrenReview: "балдардын орундары такталат", fullPeriod: "бүт мезгил үчүн", onRequest: "Суроо боюнча", managerPrice: "бааны менеджер ырастайт",
     selected: "Тандалды", request: "Өтүнмө калтыруу", askManager: "Менеджерден тактоо", requestEyebrow: "Менеджерге өтүнмө", requestIntro: "Тандалган даталарды жана категорияны өткөрүп беребиз. Менеджер шарттарды жана алдын ала төлөмдү макулдашат.",
     name: "Аты-жөнү", namePlaceholder: "Сизге кантип кайрылалы", phone: "Телефон", email: "Email, керек болсо", sending: "Жөнөтүлүүдө…", send: "Өтүнмө жөнөтүү",
+    marketingConsent: "«Три Короны» мейманканасынан WhatsApp аркылуу атайын сунуштарды алгым келет.",
+    marketingOptional: "Милдеттүү эмес. Макулдукту каалаган убакта жокко чыгарууга болот.", privacy: "Купуялык саясаты", consentDetails: "Макулдуктун шарттары",
     disclaimer: "Өтүнмө жөнөтүү номерди автоматтык түрдө кармабайт. Бронду менеджер шарттар жана алдын ала төлөм макулдашылгандан кийин ырастайт.",
     breakfast: "Эртең мененки тамак кирет", noMeal: "Тамак-ашсыз", mixedMeal: "Тамактануу шарттары даталарга жараша өзгөрөт", currency: "сом",
   },
@@ -74,6 +80,8 @@ const COPY = {
     free: "Available", yourDates: "For your dates", childrenReview: "children’s places to be confirmed", fullPeriod: "for the full stay", onRequest: "On request", managerPrice: "price will be confirmed by the manager",
     selected: "Selected", request: "Send request", askManager: "Ask the manager", requestEyebrow: "Request to manager", requestIntro: "We will pass on your selected dates and category. The manager will agree the terms and prepayment.",
     name: "Name", namePlaceholder: "How should we address you?", phone: "Phone", email: "Email, optional", sending: "Sending…", send: "Send request",
+    marketingConsent: "I want to receive special offers from Three Crowns via WhatsApp.",
+    marketingOptional: "Optional. You can withdraw consent at any time.", privacy: "Privacy notice", consentDetails: "Consent terms",
     disclaimer: "Submitting a request does not automatically hold a room. A manager confirms the reservation after the terms and prepayment are agreed.",
     breakfast: "Breakfast included", noMeal: "No meals", mixedMeal: "Meal terms vary by date", currency: "KGS",
   },
@@ -122,6 +130,20 @@ function mealLabel(nights: PricingNight[], locale: PublicLocale) {
 function priceSortValue(item: AvailabilityResult) {
   return !item.pricing.sellable || item.pricing.total_kgs == null ? Number.MAX_SAFE_INTEGER : item.pricing.total_kgs;
 }
+function currentAttribution() {
+  if (typeof window === "undefined") return {};
+  const query = new URLSearchParams(window.location.search);
+  const optional = (key: string) => query.get(key)?.trim() || null;
+  return {
+    utm_source: optional("utm_source"),
+    utm_medium: optional("utm_medium"),
+    utm_campaign: optional("utm_campaign"),
+    utm_content: optional("utm_content"),
+    utm_term: optional("utm_term"),
+    landing_page: window.location.href,
+    referrer: document.referrer || null,
+  };
+}
 
 export default function BookingWidget() {
   const [locale, setLocale] = useState<PublicLocale>("ru");
@@ -132,6 +154,7 @@ export default function BookingWidget() {
   const [guestName, setGuestName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -231,7 +254,7 @@ export default function BookingWidget() {
     event.preventDefault();
     if (!selected || !results) return;
 
-    const analyticsPayload = { room_type_code: selected.room_type_code, nights: results.nights, adults: results.adults, children: results.children, quoted_total_kgs: selected.pricing.total_kgs };
+    const analyticsPayload = { room_type_code: selected.room_type_code, nights: results.nights, adults: results.adults, children: results.children, quoted_total_kgs: selected.pricing.total_kgs, marketing_opt_in: marketingOptIn };
     trackPublicEvent("booking_request_started", analyticsPayload);
     setSending(true);
     setError(null);
@@ -245,6 +268,10 @@ export default function BookingWidget() {
           guest_name: guestName.trim(), phone: phone.trim(), email: email.trim() || null,
           check_in: results.check_in, check_out: results.check_out, adults: results.adults, children: results.children,
           room_type_code: selected.room_type_code, source: "WEB",
+          marketing_opt_in: marketingOptIn,
+          marketing_channels: marketingOptIn ? ["WHATSAPP"] : [],
+          marketing_policy_version: MARKETING_POLICY_VERSION,
+          ...currentAttribution(),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -252,7 +279,7 @@ export default function BookingWidget() {
       const payload = body as { id: string };
       trackPublicEvent("booking_request_succeeded", analyticsPayload);
       setSuccess(c.success(payload.id.slice(0, 8).toUpperCase()));
-      setGuestName(""); setPhone(""); setEmail(""); setSelected(null);
+      setGuestName(""); setPhone(""); setEmail(""); setMarketingOptIn(false); setSelected(null);
     } catch {
       trackPublicEvent("booking_request_failed", analyticsPayload);
       setError(c.submitError);
@@ -310,6 +337,12 @@ export default function BookingWidget() {
           <label><span>{c.name}</span><input value={guestName} onChange={(event) => setGuestName(event.target.value)} minLength={2} required placeholder={c.namePlaceholder} autoComplete="name" /></label>
           <label><span>{c.phone}</span><input value={phone} onChange={(event) => setPhone(event.target.value)} minLength={5} required placeholder="+996 …" autoComplete="tel" inputMode="tel" /></label>
           <label><span>{c.email}</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" autoComplete="email" /></label>
+          <label style={{ gridColumn: "1 / -1", display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+            <input type="checkbox" checked={marketingOptIn} onChange={(event) => setMarketingOptIn(event.target.checked)} style={{ marginTop: 4, width: 18, height: 18, flex: "0 0 auto" }} />
+            <span style={{ fontSize: 14, lineHeight: 1.5 }}>
+              {c.marketingConsent} <small style={{ display: "block", opacity: 0.72 }}>{c.marketingOptional} <a href="/privacy" target="_blank" rel="noreferrer">{c.privacy}</a> · <a href="/marketing-consent" target="_blank" rel="noreferrer">{c.consentDetails}</a>.</small>
+            </span>
+          </label>
           <button className="button button-dark request-submit" type="submit" disabled={sending}>{sending ? c.sending : c.send}</button>
           <small className="request-disclaimer">{c.disclaimer}</small>
         </form>}
