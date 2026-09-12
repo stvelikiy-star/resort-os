@@ -16,7 +16,7 @@ ENV NODE_ENV=production \
     CORE_API_URL=${CORE_API_URL} \
     RELEASE_SHA=${RELEASE_SHA}
 WORKDIR /app
-COPY --from=build /app ./
+COPY --from=build --chown=node:node /app ./
 USER node
 EXPOSE 3000
 CMD ["npm", "run", "start"]
