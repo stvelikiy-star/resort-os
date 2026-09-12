@@ -47,6 +47,11 @@ def verify_n8n_contract() -> None:
     assert not any("greenApi" in str(node.get("type", "")) or "whatsApp" in str(node.get("type", "")) for node in nodes), (
         "audience handoff must not send messages before provider UAT"
     )
+    workflow_text = WORKFLOW.read_text(encoding="utf-8")
+    for scenario in ("PAYMENT_REMINDER", "LOST_LEAD_RECOVERY", "POST_STAY", "SEASONAL_RETURN"):
+        assert scenario in workflow_text, f"missing review scenario: {scenario}"
+    assert "send_enabled: false" in workflow_text, "provider send must stay disabled before UAT"
+    assert "review_required: true" in workflow_text, "candidate workflows must remain human-review queues"
 
 
 def main() -> None:
@@ -112,6 +117,9 @@ def main() -> None:
         assert request_id in by_request, before
         assert by_request[request_id]["phone"] == opted_phone, by_request[request_id]
         assert by_request[request_id]["utm_campaign"] == "consent-boundary", by_request[request_id]
+        assert "request_check_in" in by_request[request_id], by_request[request_id]
+        assert "reservation_status" in by_request[request_id], by_request[request_id]
+        assert "stay_status" in by_request[request_id], by_request[request_id]
         assert silent["id"] not in by_request, before
 
         unsubscribed = assert_ok(
@@ -137,6 +145,8 @@ def main() -> None:
         assert request_id not in remaining_request_ids, after
 
     print("PASS: inactive n8n audience workflow uses service auth and has no outbound provider node")
+    print("PASS: review queues cover payment reminder, lost lead, post-stay and seasonal return")
+    print("PASS: service audience exposes read-only booking/stay lifecycle facts")
     print("PASS: service audience rejects missing and invalid credentials")
     print("PASS: explicit WHATSAPP opt-in enters automation audience")
     print("PASS: no-consent booking request never enters automation audience")
