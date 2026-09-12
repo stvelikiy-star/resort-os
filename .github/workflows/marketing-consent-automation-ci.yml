@@ -12,6 +12,7 @@ on:
       - 'services/api/app/service_auth.py'
       - 'services/api/app/app_entry.py'
       - 'packages/database/**'
+      - 'automation/n8n/marketing-consent-audience.json'
       - 'scripts/apply_core_constraints.py'
       - 'scripts/seed_from_intake.py'
       - 'scripts/verify_marketing_consent_automation.py'
