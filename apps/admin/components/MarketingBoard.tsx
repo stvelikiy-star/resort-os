@@ -59,6 +59,12 @@ type RecoveryItem = Lead & {
   age_hours: number;
 };
 
+type MarketingSummary = {
+  consents: Array<{ channel: string; status: string; count: number }>;
+  touchpoints_30d: number;
+  attributed_leads_30d: number;
+};
+
 const LOST = new Set(["REJECTED", "CANCELLED", "EXPIRED"]);
 const ACTIVE = new Set(["NEW", "QUOTED", "AWAITING_PREPAYMENT"]);
 
@@ -117,7 +123,7 @@ function contactPriority(item: Lead): RecoveryItem | null {
     return { ...item, priority: 70 + Math.min(age, 48), reason: "Новая заявка — нужен первый контакт", age_hours: age };
   }
   if (LOST.has(item.status) && age <= 24 * 30) {
-    return { ...item, priority: 30, reason: "Потерянный лид — возможен ручной возврат", age_hours: age };
+    return { ...item, priority: 30, reason: "Потерянный лид — возврат только при marketing consent", age_hours: age };
   }
   return null;
 }
@@ -143,6 +149,9 @@ export default function MarketingBoard() {
   const [report, setReport] = useState<Report | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [marketingSummary, setMarketingSummary] = useState<MarketingSummary | null>(null);
+  const [safeWhatsappIds, setSafeWhatsappIds] = useState<Set<string>>(new Set());
+  const [safeEmailIds, setSafeEmailIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [segment, setSegment] = useState("ACTIVE");
@@ -155,20 +164,30 @@ export default function MarketingBoard() {
     from.setDate(from.getDate() - Math.max(days - 1, 0));
     const params = new URLSearchParams({ from_date: isoDate(from), to_date: isoDate(to) });
     try {
-      const [reportResponse, leadsResponse, campaignResponse] = await Promise.all([
+      const [reportResponse, leadsResponse, campaignResponse, summaryResponse, whatsappAudienceResponse, emailAudienceResponse] = await Promise.all([
         fetch(`/core/api/v1/admin/reports/overview?${params.toString()}`, { cache: "no-store" }),
         fetch("/core/api/v1/admin/booking/requests?limit=200", { cache: "no-store" }),
         fetch("/core/api/v1/admin/guest-offers", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/marketing/summary", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/marketing/audience?channel=WHATSAPP&limit=1000", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/marketing/audience?channel=EMAIL&limit=1000", { cache: "no-store" }),
       ]);
       if (!reportResponse.ok) throw new Error("Не удалось загрузить маркетинговую аналитику");
       if (!leadsResponse.ok) throw new Error("Не удалось загрузить базу лидов");
       if (!campaignResponse.ok) throw new Error("Не удалось загрузить действующие офферы");
+      if (!summaryResponse.ok || !whatsappAudienceResponse.ok || !emailAudienceResponse.ok) throw new Error("Не удалось загрузить consent-контур маркетинга");
       const reportBody = await reportResponse.json();
       const leadsBody = await leadsResponse.json();
       const campaignBody = await campaignResponse.json();
+      const summaryBody = await summaryResponse.json();
+      const whatsappBody = await whatsappAudienceResponse.json();
+      const emailBody = await emailAudienceResponse.json();
       setReport(reportBody as Report);
       setLeads((leadsBody.items || []) as Lead[]);
       setCampaigns((campaignBody.items || []) as Campaign[]);
+      setMarketingSummary(summaryBody as MarketingSummary);
+      setSafeWhatsappIds(new Set((whatsappBody.items || []).map((item: { request_id?: string | null }) => item.request_id).filter(Boolean)));
+      setSafeEmailIds(new Set((emailBody.items || []).map((item: { request_id?: string | null }) => item.request_id).filter(Boolean)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки маркетинга");
     } finally {
@@ -200,6 +219,17 @@ export default function MarketingBoard() {
   const activeCampaigns = campaigns.filter((item) => item.is_active);
   const campaignClicks = campaigns.reduce((sum, item) => sum + Number(item.analytics?.clicks || 0), 0);
   const campaignRequests = campaigns.reduce((sum, item) => sum + Number(item.analytics?.requests || 0), 0);
+  const whatsappOptIns = marketingSummary?.consents.find((item) => item.channel === "WHATSAPP" && item.status === "OPTED_IN")?.count ?? 0;
+  const emailOptIns = marketingSummary?.consents.find((item) => item.channel === "EMAIL" && item.status === "OPTED_IN")?.count ?? 0;
+
+  function logTouchpoint(item: Lead, channel: string, eventType: string) {
+    void fetch(`/core/api/v1/admin/marketing/requests/${item.id}/touchpoints`, {
+      method: "POST",
+      keepalive: true,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ channel, event_type: eventType, direction: "OUTBOUND", status: "OPENED_BY_MANAGER" }),
+    });
+  }
 
   function exportAudience() {
     const header = ["Lead ID", "Имя", "Телефон", "Email", "Источник", "Статус", "Заезд", "Выезд", "Потенциал KGS"];
@@ -210,7 +240,7 @@ export default function MarketingBoard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `three-crowns-marketing-${segment.toLowerCase()}-${isoDate(new Date())}.csv`;
+    link.download = `three-crowns-crm-${segment.toLowerCase()}-${isoDate(new Date())}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -261,19 +291,19 @@ export default function MarketingBoard() {
           </article>
 
           <article className="marketing-panel">
-            <div className="marketing-panel-head"><div><p className="eyebrow">Automation-ready</p><h2>Следующие сценарии</h2></div></div>
+            <div className="marketing-panel-head"><div><p className="eyebrow">Consent gate</p><h2>Разрешённая аудитория</h2></div></div>
             <div className="marketing-automation-list">
-              <div><b>Не оплачена бронь</b><span>{segments.UNPAID.length} лидов</span><small>напоминание после согласованного срока</small></div>
-              <div><b>Потерянные лиды</b><span>{segments.LOST.length} лидов</span><small>кампания возврата с новым предложением</small></div>
-              <div><b>После проживания</b><span>следующий этап</span><small>отзыв + повторное бронирование</small></div>
-              <div><b>Прошлый сезон</b><span>следующий этап</span><small>раннее бронирование для существующей базы</small></div>
+              <div><b>WhatsApp opt-in</b><span>{whatsappOptIns}</span><small>только последняя запись OPTED_IN</small></div>
+              <div><b>Email opt-in</b><span>{emailOptIns}</span><small>opt-out автоматически исключает контакт</small></div>
+              <div><b>Касания за 30 дней</b><span>{marketingSummary?.touchpoints_30d ?? 0}</span><small>журнал действий менеджеров и будущих отправок</small></div>
+              <div><b>UTM-лиды за 30 дней</b><span>{marketingSummary?.attributed_leads_30d ?? 0}</span><small>есть source/campaign attribution</small></div>
             </div>
           </article>
         </section>
 
         <section className="marketing-panel marketing-recovery">
           <div className="marketing-panel-head">
-            <div><p className="eyebrow">Sales recovery</p><h2>Очередь контактов</h2><p>Приоритет формируется из статуса и давности заявки. Это ручная очередь менеджера — автоматическая массовая отправка не выполняется.</p></div>
+            <div><p className="eyebrow">Sales recovery</p><h2>Очередь контактов</h2><p>Активная заявка допускает ручной операционный follow-up. Возврат потерянного лида доступен только при зафиксированном marketing consent.</p></div>
             <span className="marketing-count-badge">{recoveryQueue.length} к контакту</span>
           </div>
           <div className="marketing-recovery-list">
@@ -281,14 +311,18 @@ export default function MarketingBoard() {
             {recoveryQueue.map((item) => {
               const call = phoneHref(item.phone);
               const whatsapp = whatsappHref(item.phone);
+              const isLost = LOST.has(item.status);
+              const canWhatsapp = !isLost || safeWhatsappIds.has(item.id);
+              const canEmail = !isLost || safeEmailIds.has(item.id);
               return <div className="marketing-recovery-row" key={item.id}>
                 <div className="marketing-recovery-main"><b>{item.guest_name}</b><small>{item.reason} · {item.age_hours} ч. без изменения</small></div>
                 <span>{sourceLabel(item.source)}</span>
                 <span>{money(item.quoted_total_kgs)}</span>
                 <div className="marketing-contact-actions">
-                  {call && <a href={call}>Позвонить</a>}
-                  {whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer">Открыть WhatsApp</a>}
-                  {item.email && <a href={`mailto:${item.email}`}>Email</a>}
+                  {!isLost && call && <a href={call} onClick={() => logTouchpoint(item, "PHONE", "CALL_OPENED")}>Позвонить</a>}
+                  {whatsapp && canWhatsapp && <a href={whatsapp} target="_blank" rel="noreferrer" onClick={() => logTouchpoint(item, "WHATSAPP", "CHAT_OPENED")}>Открыть WhatsApp</a>}
+                  {item.email && canEmail && <a href={`mailto:${item.email}`} onClick={() => logTouchpoint(item, "EMAIL", "EMAIL_OPENED")}>Email</a>}
+                  {isLost && !safeWhatsappIds.has(item.id) && !safeEmailIds.has(item.id) && <span className="marketing-state">Нет consent</span>}
                 </div>
               </div>;
             })}
@@ -297,8 +331,8 @@ export default function MarketingBoard() {
 
         <section className="marketing-panel marketing-audience">
           <div className="marketing-panel-head">
-            <div><p className="eyebrow">Audience</p><h2>Сегменты клиентской базы</h2><p>Сегменты строятся из реальных заявок. Массовая отправка не запускается без выбранного канала и согласия клиента.</p></div>
-            <button className="btn" onClick={exportAudience} disabled={visible.length === 0}>Экспорт аудитории</button>
+            <div><p className="eyebrow">CRM working list</p><h2>Сегменты клиентской базы</h2><p>Это рабочий CRM-список, а не разрешение на рассылку. Для внешней маркетинговой отправки используется только consent-gated audience.</p></div>
+            <button className="btn" onClick={exportAudience} disabled={visible.length === 0}>Экспорт CRM</button>
           </div>
           <div className="marketing-segments">
             <button className={segment === "ACTIVE" ? "active" : ""} onClick={() => setSegment("ACTIVE")}>Активные · {segments.ACTIVE.length}</button>
@@ -344,11 +378,11 @@ export default function MarketingBoard() {
         <section className="marketing-panel">
           <div className="marketing-panel-head"><div><p className="eyebrow">Campaigns</p><h2>Контур автоматизации</h2></div></div>
           <div className="marketing-roadmap">
-            <div><b>Этап 1 · готов</b><p>Аудитории, воронка, источники, конверсия, экспорт и очередь ручного возврата внутри PMS.</p></div>
-            <div><b>Этап 2 · в работе</b><p>Согласия на маркетинг, история касаний, UTM/source tracking и безопасные правила запуска кампаний.</p></div>
-            <div><b>Этап 3 · после каналов</b><p>n8n + WhatsApp/Meta: неоплата, брошенная заявка, отзыв после выезда и возврат прошлогодних гостей.</p></div>
+            <div><b>Этап 1 · готов</b><p>Аудитории, воронка, источники, конверсия, CRM-экспорт и очередь ручного возврата внутри PMS.</p></div>
+            <div><b>Этап 2 · готово ядро</b><p>Marketing consent/opt-out, журнал касаний, UTM/source/campaign capture и consent-gated audience API.</p></div>
+            <div><b>Этап 3 · следующий</b><p>n8n + WhatsApp/Meta: только на разрешённую аудиторию, с записью delivery/failed/unsubscribe событий.</p></div>
           </div>
-          <div className="marketing-consent-note"><b>Защита базы:</b> массовые внешние сообщения остаются заблокированными до появления явного marketing consent и журнала отправок. Текущие кнопки связи только открывают выбранный канал для индивидуальной работы менеджера.</div>
+          <div className="marketing-consent-note"><b>Защита базы:</b> потерянный лид нельзя открывать для маркетингового WhatsApp/email без последнего OPTED_IN. Любой OPTED_OUT автоматически исключает контакт из безопасной аудитории.</div>
         </section>
       </>}
     </main>
