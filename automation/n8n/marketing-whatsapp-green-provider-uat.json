@@ -1,0 +1,164 @@
+{
+  "name": "Three Crowns - Marketing WhatsApp GREEN Provider UAT",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000001",
+      "name": "Manual UAT Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-760, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/integrations/marketing/audience?channel=WHATSAPP&limit=1000'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Resort-Service-Key",
+              "value": "={{$env.AUTOMATION_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": { "timeout": 15000 }
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000002",
+      "name": "Load Consent Gated Audience",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload=$json; if(payload.consent_required!==true||payload.service_authenticated!==true||!Array.isArray(payload.items)){throw new Error('Marketing audience contract failed closed');} const enabled=String($env.MARKETING_PROVIDER_UAT_SEND_ENABLED||'').toLowerCase()==='true'; const requestId=String($env.MARKETING_PROVIDER_UAT_REQUEST_ID||'').trim(); const message=String($env.MARKETING_PROVIDER_UAT_MESSAGE||'').trim(); const candidate=payload.items.find((item)=>String(item.request_id||'')===requestId); const digits=String(candidate?.phone||'').replace(/\\D/g,''); const configuredProvider=Boolean(String($env.GREEN_API_ID_INSTANCE||'').trim()&&String($env.GREEN_API_TOKEN_INSTANCE||'').trim()); const canSend=enabled&&Boolean(candidate)&&message.length>=3&&digits.length>=8&&configuredProvider; return [{json:{can_send:canSend,send_enabled:enabled,provider_configured:configuredProvider,target_found:Boolean(candidate),request_id:candidate?.request_id||requestId||null,guest_name:candidate?.guest_name||null,phone:candidate?.phone||null,chat_id:digits?digits+'@c.us':null,message:message||null,campaign_code:'UAT_WHATSAPP_GREEN',reason:canSend?'READY_TO_SEND':'BLOCKED_BY_UAT_GATE'}}];"
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000003",
+      "name": "Build Exact UAT Candidate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-280, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "uat-send-enabled",
+              "leftValue": "={{$json.can_send}}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000004",
+      "name": "Exact UAT Send Allowed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{($env.GREEN_API_URL || 'https://api.green-api.com') + '/waInstance' + $env.GREEN_API_ID_INSTANCE + '/sendMessage/' + $env.GREEN_API_TOKEN_INSTANCE}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chatId: $json.chat_id, message: $json.message }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000005",
+      "name": "GREEN Send One UAT Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const provider=$json; const source=$('Build Exact UAT Candidate').item.json; const providerMessageId=String(provider.idMessage||provider.id_message||provider.messageId||'').trim(); if(!providerMessageId){throw new Error('GREEN API did not return a provider message id');} return [{json:{...source,provider_message_id:providerMessageId,provider_response_received:true}}];"
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000006",
+      "name": "Require Provider Message Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, -100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/integrations/marketing/provider-events'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Resort-Service-Key", "value": "={{$env.AUTOMATION_SERVICE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ request_id: $json.request_id, channel: 'WHATSAPP', event_type: 'SENT', provider_message_id: $json.provider_message_id, campaign_code: $json.campaign_code, provider: 'GREEN_API', metadata: { uat: true, manual_gate: true } }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000007",
+      "name": "Record SENT In Resort Core",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{json:{...$json,uat_result:'NO_MESSAGE_SENT',instruction:'Set exact opted-in request id, message and MARKETING_PROVIDER_UAT_SEND_ENABLED=true only for a supervised provider UAT.'}}];"
+      },
+      "id": "8f1d9d66-0b58-4b31-b10c-000000000008",
+      "name": "Blocked Safe Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 120]
+    }
+  ],
+  "connections": {
+    "Manual UAT Trigger": {
+      "main": [[{ "node": "Load Consent Gated Audience", "type": "main", "index": 0 }]]
+    },
+    "Load Consent Gated Audience": {
+      "main": [[{ "node": "Build Exact UAT Candidate", "type": "main", "index": 0 }]]
+    },
+    "Build Exact UAT Candidate": {
+      "main": [[{ "node": "Exact UAT Send Allowed?", "type": "main", "index": 0 }]]
+    },
+    "Exact UAT Send Allowed?": {
+      "main": [
+        [{ "node": "GREEN Send One UAT Message", "type": "main", "index": 0 }],
+        [{ "node": "Blocked Safe Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "GREEN Send One UAT Message": {
+      "main": [[{ "node": "Require Provider Message Id", "type": "main", "index": 0 }]]
+    },
+    "Require Provider Message Id": {
+      "main": [[{ "node": "Record SENT In Resort Core", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bishkek"
+  },
+  "active": false,
+  "versionId": "8f1d9d66-0b58-4b31-b10c-000000009999",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
