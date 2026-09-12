@@ -11,6 +11,7 @@ import GuestServicesCenter from "./GuestServicesCenter";
 import GuestServiceSettingsBoard from "./GuestServiceSettingsBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
 import InboxBoard from "./InboxBoard";
+import MarketingBoard from "./MarketingBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV9";
 import RateManagementBoard from "./RateManagementBoard";
@@ -30,7 +31,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -155,6 +156,7 @@ export default function AdminShell() {
           {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
           {canUseReception && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
+          {isManager && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
           {canUseReception && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
@@ -178,6 +180,7 @@ export default function AdminShell() {
       {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
+      {tab === "MARKETING" && isManager && <MarketingBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
       {tab === "DINING" && canUseReception && <DiningManagementBoard />}

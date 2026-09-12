@@ -37,6 +37,9 @@ from .kitchen_arrivals import router as kitchen_arrivals_router
 from .kitchen_menu_management import router as kitchen_menu_management_router
 from .main import app
 from .manager_dashboard import router as manager_dashboard_router
+from .marketing import integration_router as marketing_integration_router
+from .marketing import router as marketing_router
+from .marketing_automation import router as marketing_automation_router
 from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
@@ -137,6 +140,11 @@ app.include_router(guest_crm_router)
 app.include_router(owner_pace_admin_router)
 app.include_router(growth_control_router)
 app.include_router(guest_offers_admin_router)
+# Marketing browser views remain OWNER/MANAGER-only. Automation reads and provider
+# callbacks are service-authenticated with X-Resort-Service-Key and fail closed.
+app.include_router(marketing_router)
+app.include_router(marketing_integration_router)
+app.include_router(marketing_automation_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)

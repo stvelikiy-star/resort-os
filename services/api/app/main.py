@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import date, timedelta
 from typing import Any
@@ -12,6 +13,8 @@ from .db import lifespan
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
+MARKETING_POLICY_VERSION = os.environ.get("MARKETING_POLICY_VERSION", "2026-09-12")
+MARKETING_CHANNELS = {"WHATSAPP", "EMAIL", "SMS", "TELEGRAM", "PHONE"}
 
 app = FastAPI(
     title="Three Crowns Resort Core API",
@@ -45,11 +48,33 @@ class ReservationRequestCreate(BaseModel):
     room_type_code: str | None = None
     source: str = Field(default="WEB", max_length=60)
     notes: str | None = Field(default=None, max_length=2000)
+    marketing_opt_in: bool = False
+    marketing_channels: list[str] = Field(default_factory=list, max_length=5)
+    marketing_policy_version: str = Field(default=MARKETING_POLICY_VERSION, min_length=2, max_length=80)
+    utm_source: str | None = Field(default=None, max_length=200)
+    utm_medium: str | None = Field(default=None, max_length=200)
+    utm_campaign: str | None = Field(default=None, max_length=240)
+    utm_content: str | None = Field(default=None, max_length=240)
+    utm_term: str | None = Field(default=None, max_length=240)
+    landing_page: str | None = Field(default=None, max_length=1000)
+    referrer: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
-    def validate_dates(self):
+    def validate_request(self):
         if self.check_out <= self.check_in:
             raise ValueError("check_out must be after check_in")
+        normalized_channels = []
+        for raw in self.marketing_channels:
+            channel = raw.strip().upper()
+            if channel not in MARKETING_CHANNELS:
+                raise ValueError(f"unsupported marketing channel: {raw}")
+            if channel not in normalized_channels:
+                normalized_channels.append(channel)
+        self.marketing_channels = normalized_channels
+        if self.marketing_opt_in and not self.marketing_channels:
+            raise ValueError("marketing_channels are required when marketing_opt_in=true")
+        if "EMAIL" in self.marketing_channels and not self.email:
+            raise ValueError("email is required for EMAIL marketing consent")
         return self
 
 
@@ -60,6 +85,11 @@ async def get_property_id(conn) -> uuid.UUID:
     if not property_id:
         raise HTTPException(status_code=503, detail="Property seed is not loaded")
     return property_id
+
+
+def normalize_phone(value: str) -> str:
+    digits = re.sub(r"\D", "", value or "")
+    return f"+{digits}" if digits else value.strip()
 
 
 def nights_between(check_in: date, check_out: date) -> list[date]:
@@ -234,60 +264,95 @@ async def check_availability(
 @app.post("/api/v1/booking/requests", status_code=201)
 async def create_reservation_request(payload: ReservationRequestCreate, request: Request):
     async with request.app.state.db.acquire() as conn:
-        property_id = await get_property_id(conn)
-        room_type_id = None
-        if payload.room_type_code:
-            room_type_id = await conn.fetchval(
-                'SELECT id FROM room_types WHERE "propertyId" = $1 AND code = $2',
-                property_id,
-                payload.room_type_code,
-            )
-            if not room_type_id:
-                raise HTTPException(status_code=422, detail="Unknown room_type_code")
+        async with conn.transaction():
+            property_id = await get_property_id(conn)
+            room_type_id = None
+            if payload.room_type_code:
+                room_type_id = await conn.fetchval(
+                    'SELECT id FROM room_types WHERE "propertyId" = $1 AND code = $2',
+                    property_id,
+                    payload.room_type_code,
+                )
+                if not room_type_id:
+                    raise HTTPException(status_code=422, detail="Unknown room_type_code")
 
-        request_id = uuid.uuid4()
-        await conn.execute(
-            '''
-            INSERT INTO reservation_requests (
-                id, "propertyId", status, source, "guestName", phone, email,
-                "checkIn", "checkOut", adults, children, "desiredRoomTypeId",
-                notes, "createdAt", "updatedAt"
-            ) VALUES (
-                $1, $2, 'NEW', $3, $4, $5, $6,
-                $7, $8, $9, $10, $11, $12, now(), now()
+            request_id = uuid.uuid4()
+            await conn.execute(
+                '''
+                INSERT INTO reservation_requests (
+                    id, "propertyId", status, source, "guestName", phone, email,
+                    "checkIn", "checkOut", adults, children, "desiredRoomTypeId", notes,
+                    "utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm", "landingPage", referrer,
+                    "createdAt", "updatedAt"
+                ) VALUES (
+                    $1, $2, 'NEW', $3, $4, $5, $6,
+                    $7, $8, $9, $10, $11, $12,
+                    $13, $14, $15, $16, $17, $18, $19,
+                    now(), now()
+                )
+                ''',
+                request_id,
+                property_id,
+                payload.source,
+                payload.guest_name,
+                payload.phone,
+                payload.email,
+                payload.check_in,
+                payload.check_out,
+                payload.adults,
+                payload.children,
+                room_type_id,
+                payload.notes,
+                payload.utm_source,
+                payload.utm_medium,
+                payload.utm_campaign,
+                payload.utm_content,
+                payload.utm_term,
+                payload.landing_page,
+                payload.referrer,
             )
-            ''',
-            request_id,
-            property_id,
-            payload.source,
-            payload.guest_name,
-            payload.phone,
-            payload.email,
-            payload.check_in,
-            payload.check_out,
-            payload.adults,
-            payload.children,
-            room_type_id,
-            payload.notes,
-        )
-        await conn.execute(
-            '''
-            INSERT INTO audit_logs (
-                id, "propertyId", "actorType", action, resource, "resourceId",
-                source, result, "afterJson", "createdAt"
-            ) VALUES ($1, $2, 'GUEST', 'CREATE', 'ReservationRequest', $3, $4, 'SUCCESS', $5::jsonb, now())
-            ''',
-            uuid.uuid4(),
-            property_id,
-            str(request_id),
-            payload.source,
-            payload.model_dump_json(),
-        )
+
+            if payload.marketing_opt_in:
+                for channel in payload.marketing_channels:
+                    if channel == "EMAIL":
+                        contact_key = (payload.email or "").strip().lower()
+                    else:
+                        contact_key = normalize_phone(payload.phone)
+                    await conn.execute(
+                        '''
+                        INSERT INTO marketing_consents (
+                          id,"propertyId","requestId","contactKey",channel,status,source,"policyVersion",proof,"occurredAt","createdAt"
+                        ) VALUES ($1,$2,$3,$4,$5,'OPTED_IN','PUBLIC_BOOKING',$6,'booking_form_checkbox',now(),now())
+                        ''',
+                        uuid.uuid4(),
+                        property_id,
+                        request_id,
+                        contact_key,
+                        channel,
+                        payload.marketing_policy_version,
+                    )
+
+            audit_payload = payload.model_dump(mode="json")
+            audit_payload["marketing_channels"] = payload.marketing_channels if payload.marketing_opt_in else []
+            await conn.execute(
+                '''
+                INSERT INTO audit_logs (
+                    id, "propertyId", "actorType", action, resource, "resourceId",
+                    source, result, "afterJson", "createdAt"
+                ) VALUES ($1, $2, 'GUEST', 'CREATE', 'ReservationRequest', $3, $4, 'SUCCESS', $5::jsonb, now())
+                ''',
+                uuid.uuid4(),
+                property_id,
+                str(request_id),
+                payload.source,
+                __import__("json").dumps(audit_payload, ensure_ascii=False),
+            )
 
     return {
         "id": str(request_id),
         "status": "NEW",
         "is_reservation": False,
+        "marketing_consent_recorded": payload.marketing_opt_in,
         "message": "Request received. Without confirmed prepayment this is not an active reservation.",
     }
 
