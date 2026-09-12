@@ -7,7 +7,7 @@
       "name": "Manual Review Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [-500, 0]
+      "position": [-420, 0]
     },
     {
       "parameters": {
@@ -27,27 +27,17 @@
       "name": "Load Consent Gated Audience",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-220, 0]
+      "position": [-140, 0]
     },
     {
       "parameters": {
-        "jsCode": "const payload = $json;\nif (payload.consent_required !== true || payload.service_authenticated !== true || !Array.isArray(payload.items)) {\n  throw new Error('Marketing audience contract failed closed');\n}\nreturn payload.items.map((item) => ({ json: { ...item, approved_for_automation: true, source_contract: 'LATEST_EXPLICIT_CONSENT', send_enabled: false } }));"
+        "jsCode": "const payload = $json;\nif (payload.consent_required !== true || payload.service_authenticated !== true || !Array.isArray(payload.items)) {\n  throw new Error('Marketing audience contract failed closed');\n}\nreturn payload.items.map((item) => ({ json: { ...item, approved_for_automation: true, source_contract: 'LATEST_EXPLICIT_CONSENT' } }));"
       },
       "id": "ca9908f1-b326-4f34-9f80-5f5200000003",
       "name": "Assert Consent Contract",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [60, 0]
-    },
-    {
-      "parameters": {
-        "jsCode": "const DAY = 24 * 60 * 60 * 1000;\nconst now = Date.now();\nconst output = [];\nfor (const input of $input.all()) {\n  const item = input.json;\n  const scenarios = [];\n  if (item.request_status === 'AWAITING_PREPAYMENT') scenarios.push('PAYMENT_REMINDER');\n  if (item.request_status === 'EXPIRED') scenarios.push('LOST_LEAD_RECOVERY');\n  const checkoutRaw = item.actual_check_out_at || item.reservation_check_out || item.request_check_out;\n  const checkout = checkoutRaw ? new Date(checkoutRaw).getTime() : NaN;\n  const checkedOut = item.stay_status === 'CHECKED_OUT' || item.reservation_status === 'CHECKED_OUT';\n  if (checkedOut && Number.isFinite(checkout) && checkout <= now) {\n    scenarios.push('POST_STAY');\n    if (now - checkout >= 60 * DAY) scenarios.push('SEASONAL_RETURN');\n  }\n  for (const scenario of scenarios) {\n    output.push({ json: { ...item, scenario, send_enabled: false, review_required: true } });\n  }\n}\nreturn output;"
-      },
-      "id": "ca9908f1-b326-4f34-9f80-5f5200000004",
-      "name": "Build Review Queues",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [340, 0]
+      "position": [140, 0]
     }
   ],
   "connections": {
@@ -56,9 +46,6 @@
     },
     "Load Consent Gated Audience": {
       "main": [[{"node": "Assert Consent Contract", "type": "main", "index": 0}]]
-    },
-    "Assert Consent Contract": {
-      "main": [[{"node": "Build Review Queues", "type": "main", "index": 0}]]
     }
   },
   "pinData": {},
@@ -67,7 +54,7 @@
     "timezone": "Asia/Bishkek"
   },
   "active": false,
-  "versionId": "ca9908f1-b326-4f34-9f80-5f5200000100",
+  "versionId": "ca9908f1-b326-4f34-9f80-5f5200000099",
   "meta": {
     "templateCredsSetupCompleted": false
   },
