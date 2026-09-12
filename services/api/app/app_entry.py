@@ -75,6 +75,7 @@ from .staff_voice import router as staff_voice_router
 from .stays import router as stays_router
 from .telegram_auth import router as telegram_auth_router
 from .telegram_sales import router as telegram_sales_router
+from .ttlock_diagnostics import router as ttlock_diagnostics_router
 
 install_observability(app)
 
@@ -154,6 +155,9 @@ app.include_router(pms_bulk_tasks_router)
 app.include_router(guest_os_admin_router)
 app.include_router(service_points_admin_router)
 app.include_router(service_point_payments_admin_router)
+# Read-only provider diagnostics verify the configured TTLock + gateway without
+# actuating a physical lock. Secrets remain environment-only.
+app.include_router(ttlock_diagnostics_router)
 app.include_router(guest_service_settings_router)
 app.include_router(guest_services_router)
 app.include_router(housekeeping_schedule_router)
