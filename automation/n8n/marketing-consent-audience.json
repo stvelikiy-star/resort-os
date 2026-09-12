@@ -1,0 +1,62 @@
+{
+  "name": "Three Crowns - Marketing Consent Audience",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ca9908f1-b326-4f34-9f80-5f5200000001",
+      "name": "Manual Review Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-420, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.RESORT_CORE_URL + '/api/v1/integrations/marketing/audience?channel=WHATSAPP&limit=250'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Resort-Service-Key",
+              "value": "={{$env.AUTOMATION_SERVICE_KEY}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ca9908f1-b326-4f34-9f80-5f5200000002",
+      "name": "Load Consent Gated Audience",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-140, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json;\nif (payload.consent_required !== true || payload.service_authenticated !== true || !Array.isArray(payload.items)) {\n  throw new Error('Marketing audience contract failed closed');\n}\nreturn payload.items.map((item) => ({ json: { ...item, approved_for_automation: true, source_contract: 'LATEST_EXPLICIT_CONSENT' } }));"
+      },
+      "id": "ca9908f1-b326-4f34-9f80-5f5200000003",
+      "name": "Assert Consent Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [140, 0]
+    }
+  ],
+  "connections": {
+    "Manual Review Trigger": {
+      "main": [[{"node": "Load Consent Gated Audience", "type": "main", "index": 0}]]
+    },
+    "Load Consent Gated Audience": {
+      "main": [[{"node": "Assert Consent Contract", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Bishkek"
+  },
+  "active": false,
+  "versionId": "ca9908f1-b326-4f34-9f80-5f5200000099",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
