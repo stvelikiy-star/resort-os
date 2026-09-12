@@ -287,7 +287,7 @@ export default function MarketingBoard() {
                 <span>{money(item.quoted_total_kgs)}</span>
                 <div className="marketing-contact-actions">
                   {call && <a href={call}>Позвонить</a>}
-                  {whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer">WhatsApp</a>}
+                  {whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer">Открыть WhatsApp</a>}
                   {item.email && <a href={`mailto:${item.email}`}>Email</a>}
                 </div>
               </div>;
@@ -348,7 +348,7 @@ export default function MarketingBoard() {
             <div><b>Этап 2 · в работе</b><p>Согласия на маркетинг, история касаний, UTM/source tracking и безопасные правила запуска кампаний.</p></div>
             <div><b>Этап 3 · после каналов</b><p>n8n + WhatsApp/Meta: неоплата, брошенная заявка, отзыв после выезда и возврат прошлогодних гостей.</p></div>
           </div>
-          <div className="marketing-consent-note"><b>Защита базы:</b> массовые внешние сообщения остаются заблокированными до появления явного marketing consent и журнала отправок. Текущие кнопки связи запускают только индивидуальное действие менеджера.</div>
+          <div className="marketing-consent-note"><b>Защита базы:</b> массовые внешние сообщения остаются заблокированными до появления явного marketing consent и журнала отправок. Текущие кнопки связи только открывают выбранный канал для индивидуальной работы менеджера.</div>
         </section>
       </>}
     </main>
