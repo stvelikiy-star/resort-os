@@ -3,7 +3,7 @@ name: Marketing Site Consent CI
 on:
   pull_request:
     branches:
-      - feat/three-crowns-marketing
+      - main
     paths:
       - 'apps/web/**'
       - '.github/workflows/marketing-site-consent-ci.yml'
