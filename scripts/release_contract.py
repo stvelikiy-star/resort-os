@@ -32,6 +32,7 @@ EXPECTED_MIGRATIONS = (
     "z19_dining_table_status_guard_20260905",
     "z20_dining_active_table_unique_20260906",
     "z21_dining_production_snapshots_20260906",
+    "z99_marketing_consent_attribution_20260912",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
