@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
 import time
+from pathlib import Path
 
 import httpx
 
 BASE = os.environ.get("CORE_API_URL", "http://127.0.0.1:8000").rstrip("/")
 SERVICE_KEY = os.environ.get("AUTOMATION_SERVICE_KEY", "ci-marketing-service-key")
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / "automation" / "n8n" / "marketing-consent-audience.json"
 
 
 def assert_ok(response: httpx.Response, label: str) -> dict:
@@ -24,7 +28,29 @@ def audience(client: httpx.Client, key: str | None) -> dict:
     )
 
 
+def verify_n8n_contract() -> None:
+    workflow = json.loads(WORKFLOW.read_text(encoding="utf-8"))
+    assert workflow.get("active") is False, "marketing workflow must remain inactive until provider UAT"
+    nodes = workflow.get("nodes") or []
+    http_nodes = [node for node in nodes if node.get("type") == "n8n-nodes-base.httpRequest"]
+    assert len(http_nodes) == 1, "marketing audience workflow must have exactly one HTTP handoff"
+    http = http_nodes[0]
+    params = http.get("parameters") or {}
+    assert "/api/v1/integrations/marketing/audience" in str(params.get("url")), params
+    headers = ((params.get("headerParameters") or {}).get("parameters") or [])
+    assert any(
+        h.get("name") == "X-Resort-Service-Key" and "AUTOMATION_SERVICE_KEY" in str(h.get("value"))
+        for h in headers
+    ), headers
+    forbidden_types = {"n8n-nodes-base.postgres", "n8n-nodes-base.mysql", "n8n-nodes-base.microsoftSql"}
+    assert not any(node.get("type") in forbidden_types for node in nodes), "workflow must not write DB directly"
+    assert not any("greenApi" in str(node.get("type", "")) or "whatsApp" in str(node.get("type", "")) for node in nodes), (
+        "audience handoff must not send messages before provider UAT"
+    )
+
+
 def main() -> None:
+    verify_n8n_contract()
     suffix = str(int(time.time() * 1000))[-9:]
     opted_phone = f"+996555{suffix[-6:]}"
     silent_phone = f"+996700{suffix[-6:]}"
@@ -110,6 +136,7 @@ def main() -> None:
         remaining_request_ids = {item["request_id"] for item in after["items"]}
         assert request_id not in remaining_request_ids, after
 
+    print("PASS: inactive n8n audience workflow uses service auth and has no outbound provider node")
     print("PASS: service audience rejects missing and invalid credentials")
     print("PASS: explicit WHATSAPP opt-in enters automation audience")
     print("PASS: no-consent booking request never enters automation audience")
