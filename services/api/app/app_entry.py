@@ -196,4 +196,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Paid Service Point QR
 # does not reactivate NFC and cannot mutate accommodation payment truth.
-app.version = "0.63.0"
+app.version = "0.62.2"
