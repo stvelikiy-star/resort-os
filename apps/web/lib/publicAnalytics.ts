@@ -29,6 +29,7 @@ type PublicAnalyticsPayloads = {
     adults: number;
     children: number;
     quoted_total_kgs: number | null;
+    marketing_opt_in: boolean;
   };
   booking_request_succeeded: {
     room_type_code: string;
@@ -36,6 +37,7 @@ type PublicAnalyticsPayloads = {
     adults: number;
     children: number;
     quoted_total_kgs: number | null;
+    marketing_opt_in: boolean;
   };
   booking_request_failed: {
     room_type_code: string;
@@ -43,6 +45,7 @@ type PublicAnalyticsPayloads = {
     adults: number;
     children: number;
     quoted_total_kgs: number | null;
+    marketing_opt_in: boolean;
   };
 };
 
@@ -69,9 +72,9 @@ const ALLOWED_PAYLOAD_KEYS = {
   ],
   booking_search_failed: ["adults", "children"],
   booking_room_selected: ["room_type_code", "sellable", "quoted_total_kgs", "available_count"],
-  booking_request_started: ["room_type_code", "nights", "adults", "children", "quoted_total_kgs"],
-  booking_request_succeeded: ["room_type_code", "nights", "adults", "children", "quoted_total_kgs"],
-  booking_request_failed: ["room_type_code", "nights", "adults", "children", "quoted_total_kgs"],
+  booking_request_started: ["room_type_code", "nights", "adults", "children", "quoted_total_kgs", "marketing_opt_in"],
+  booking_request_succeeded: ["room_type_code", "nights", "adults", "children", "quoted_total_kgs", "marketing_opt_in"],
+  booking_request_failed: ["room_type_code", "nights", "adults", "children", "quoted_total_kgs", "marketing_opt_in"],
 } as const satisfies {
   [Event in PublicAnalyticsEvent]: readonly (keyof PublicAnalyticsPayloads[Event])[];
 };
@@ -83,6 +86,10 @@ const ALLOWED_PAYLOAD_KEYS = {
  * phone, email, free-text notes, request ids and exact travel dates have no
  * allowed payload key and therefore cannot be emitted silently, including
  * when a future caller passes a wider object at runtime.
+ *
+ * marketing_opt_in is allowed only as a boolean funnel metric. It contains no
+ * contact identifier and does not replace the authoritative server-side
+ * marketing consent ledger.
  */
 export function trackPublicEvent<Event extends PublicAnalyticsEvent>(
   event: Event,
