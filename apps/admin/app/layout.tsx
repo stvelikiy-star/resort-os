@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AdminExperienceRuntime from "../components/AdminExperienceRuntime";
 import AdminLocaleSanitizer from "../components/AdminLocaleSanitizer";
+import AdminNavLocaleCoverage from "../components/AdminNavLocaleCoverage";
 import "./globals.css";
 import "./auth.css";
 import "./admin-nav-polish.css";
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body><AdminExperienceRuntime /><AdminLocaleSanitizer />{children}</body>
+      <body><AdminExperienceRuntime /><AdminNavLocaleCoverage /><AdminLocaleSanitizer />{children}</body>
     </html>
   );
 }
