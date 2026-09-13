@@ -50,6 +50,9 @@ jobs:
       - name: Verify Marketing management contour
         run: python scripts/verify_management_marketing_acceptance.py
 
+      - name: Verify Admin navigation RU KG EN coverage
+        run: python scripts/verify_admin_nav_i18n.py
+
       - name: Run strict internal hardening assertions
         run: python scripts/verify_internal_hardening.py
 
@@ -85,4 +88,4 @@ jobs:
           npm run build
 
       - name: Acceptance summary
-        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_MARKETING_AND_INTERNAL_HARDENING_PASS'
+        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_MARKETING_I18N_AND_INTERNAL_HARDENING_PASS'
