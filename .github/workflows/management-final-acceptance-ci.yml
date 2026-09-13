@@ -33,19 +33,22 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Enforce frozen public website scope
+      - name: Keep final PMS revision management-only
         if: github.event_name == 'pull_request'
         run: |
           git fetch origin "${{ github.base_ref }}" --depth=1
           changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
           echo "$changed"
           if printf '%s\n' "$changed" | grep -q '^apps/web/'; then
-            echo 'BLOCKED: apps/web is frozen by owner scope during management hardening.' >&2
+            echo 'BLOCKED: the public site is already finalized; PMS final-revision PRs must not modify apps/web.' >&2
             exit 1
           fi
 
       - name: Run management final truth assertions
         run: python scripts/verify_management_final_acceptance.py
+
+      - name: Verify Marketing management contour
+        run: python scripts/verify_management_marketing_acceptance.py
 
       - name: Run strict internal hardening assertions
         run: python scripts/verify_internal_hardening.py
@@ -82,4 +85,4 @@ jobs:
           npm run build
 
       - name: Acceptance summary
-        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_AND_INTERNAL_HARDENING_PASS'
+        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_MARKETING_AND_INTERNAL_HARDENING_PASS'
