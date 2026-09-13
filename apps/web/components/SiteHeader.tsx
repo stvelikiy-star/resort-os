@@ -38,6 +38,7 @@ export default function SiteHeader() {
     const selected: Locale = query === "kg" || query === "en" || query === "ru" ? query : stored === "kg" || stored === "en" || stored === "ru" ? stored : "ru";
     setLocale(selected);
     window.localStorage.setItem("three-crowns-site-language", selected);
+    document.documentElement.lang = selected === "kg" ? "ky" : selected;
   }, []);
 
   useEffect(() => {
@@ -69,12 +70,13 @@ export default function SiteHeader() {
 
   function switchLanguage(next: Locale) {
     window.localStorage.setItem("three-crowns-site-language", next);
+    document.documentElement.lang = next === "kg" ? "ky" : next;
     const url = new URL(window.location.href);
     if (next === "ru") url.searchParams.delete("lang"); else url.searchParams.set("lang", next);
     window.location.href = `${url.pathname}${url.search}${url.hash}`;
   }
 
-  const languageControl = (className: string) => <div className={`site-language-switcher ${className}`} aria-label={copy.language}><button className={locale === "ru" ? "active" : ""} onClick={() => switchLanguage("ru")} type="button">RU</button><button className={locale === "kg" ? "active" : ""} onClick={() => switchLanguage("kg")} type="button">KG</button><button className={locale === "en" ? "active" : ""} onClick={() => switchLanguage("en")} type="button">EN</button></div>;
+  const languageControl = (className: string, interactive = true) => <div className={`site-language-switcher ${className}`} aria-label={copy.language}><button className={locale === "ru" ? "active" : ""} onClick={() => switchLanguage("ru")} type="button" tabIndex={interactive ? undefined : -1}>RU</button><button className={locale === "kg" ? "active" : ""} onClick={() => switchLanguage("kg")} type="button" tabIndex={interactive ? undefined : -1}>KG</button><button className={locale === "en" ? "active" : ""} onClick={() => switchLanguage("en")} type="button" tabIndex={interactive ? undefined : -1}>EN</button></div>;
 
   return (
     <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
@@ -88,7 +90,7 @@ export default function SiteHeader() {
         <a className="header-book desktop-only" href={withLanguage("/#booking")}>{copy.book}</a>
         <button className="menu-toggle" type="button" aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? copy.menuClose : copy.menuOpen} onClick={() => setOpen((value) => !value)}><span /><span /></button>
       </div>
-      <div className={`mobile-menu ${open ? "is-open" : ""}`} id="mobile-menu" aria-hidden={!open}><nav className="wrap" aria-label={copy.mobileNav}>{languageControl("mobile-language")}{links.map(([href,label]) => <a key={href} href={href} onClick={closeMenu}>{label}</a>)}<a className="button button-accent" href={withLanguage("/#booking")} onClick={closeMenu}>{copy.book}</a></nav></div>
+      <div className={`mobile-menu ${open ? "is-open" : ""}`} id="mobile-menu" aria-hidden={!open}><nav className="wrap" aria-label={copy.mobileNav}>{languageControl("mobile-language", open)}{links.map(([href,label]) => <a key={href} href={href} onClick={closeMenu} tabIndex={open ? undefined : -1}>{label}</a>)}<a className="button button-accent" href={withLanguage("/#booking")} onClick={closeMenu} tabIndex={open ? undefined : -1}>{copy.book}</a></nav></div>
     </header>
   );
 }
