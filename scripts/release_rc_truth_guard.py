@@ -33,6 +33,7 @@ ALLOWED_HYGIENE_PATHS = {
     "scripts/verify_internal_hardening.py",
     ".github/workflows/release-rc-truth-ci.yml",
     ".github/workflows/launch-acceptance-ci.yml",
+    ".github/workflows/fulltest-external-smoke.yml",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
