@@ -1,59 +1,57 @@
 # RESORT OS — CURRENT STATE
 
-Version: 6.3  
-Date: 2026-09-08  
-Status: RESORT OS 0.62.2 INTERNAL RC FROZEN / REPOSITORY GREEN / EXTERNAL PRODUCTION CUTOVER STOP  
+Version: 6.4  
+Date: 2026-09-14  
+Status: RESORT OS 0.62.2 INTERNAL RC REFROZEN / FULL TEST DEPLOYED / EXTERNAL PRODUCTION CUTOVER STOP  
 Canonical: YES
 
-**IMPLEMENTED != EXTERNAL VERIFIED != PRODUCTION VERIFIED.**
+**IMPLEMENTED != FULL TEST VERIFIED != EXTERNAL PRODUCTION VERIFIED.**
 
 ## Release identity
 
 Repository: `stvelikiy-star/resort-os`.  
-Accepted security source PR: `#143` — `audit/request-body-limits-v2-20260907 -> main`.  
-Accepted executable/release-boundary head: `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`.  
-Observed tree-equivalent main merge: `c931b7e12973ecb62b8f9595d60f0d7947e7ad8e`.  
+Accepted source PR: `#157` — `feat/owner-ops-corrections-20260914 -> main`.  
+Accepted executable/release-boundary head: `7ae394bbb549bb6200c84e9c46d47ed5cd45499a`.  
+Observed tree-equivalent main merge: `b13bacad3f2e923f51354b1839371d07179b2e8c`.  
 Production source branch: `main`.
 
 Evidence:
-- PR #143 exact tested head: **24/24 workflows SUCCESS, 0 failures, 0 cancellations**;
-- accepted head and observed merge are tree-equivalent; GitHub compare reports zero changed files;
-- observed main merge: **23/23 applicable non-truth workflows SUCCESS**;
-- one additional `Release RC Truth CI` push run failed closed because the previous 0.62.2 manifest correctly detected executable/security drift after the older frozen boundary; this same-version refreeze is the controlled correction.
+- PR #157 exact tested head: **52/52 pull-request workflows SUCCESS, 0 failures**;
+- accepted head and observed merge use the same Git tree `f8991f2f65d837dd16745b43582b5c97292548b6`;
+- first merge push: **37/39 workflows SUCCESS**; the only two failures were `Release RC Truth CI` and `Launch Acceptance CI`, both correctly failing closed because the previous frozen manifest still pointed at the 2026-09-07 release boundary;
+- this same-version refreeze updates release truth without weakening the fail-closed controls.
 
-Machine authority: `release/current-rc.json`.
+Machine authority: `release/current-rc.json`.  
+Strict guard: `scripts/release_rc_truth_guard.py`.
 
-## Hardening accepted in the final 0.62.2 boundary
+## Final accepted product contour
 
-All prior 0.62.2 domain, mutation, migration, route-uniqueness, localhost-only CI and guarded load-test controls remain in force. The current refreeze additionally accepts the audited security changes from PRs #137-#143:
-
-- production runtime images are exactly pinned to the audited security baseline;
-- authenticated browser WebSockets use same-origin host routing rather than broad cross-subdomain cookies;
-- PMS/Dining WebSocket handshakes enforce browser Origin policy in production;
-- Telegram public webhook request bodies are bounded at the edge;
-- generic public/admin/staff/API request bodies are bounded at the edge;
-- CMS media upload has a dedicated 8 MB edge boundary aligned with FastAPI validation;
-- Caddy/realtime/body-limit regression guards are included in CI;
-- the browser topology guard distinguishes dedicated Admin media routing from the generic Admin Next proxy;
-- active FastAPI runtime version remains `0.62.2`.
-
-The guarded k6 harness remains restricted to `ci|test|staging`, explicitly blocks `3korony.com` / `www.3korony.com`, and does not mutate reservations, payments, stays or provider state. Real capacity is **not** claimed until isolated external staging is load-tested with resource observations.
-
-## Architecture authority
+Architecture authority:
 
 `PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
-`ReservationRequest != Reservation`. OWNER/MANAGER retain reservation and payment authority. AI/n8n cannot confirm payment, guarantee reservations, invent payment policy, check in/out, refund, bypass Core pricing/availability or write generic business truth directly to PostgreSQL.
+The accepted contour includes:
+- Public site with server-confirmed booking-request success state, current mobile/i18n/media work and marketing consent/privacy surface;
+- Admin/PMS with Dashboard, supershakhmatka, Rates/Seasons, Group Booking, CRM/Requests, Reception, Guest Services, Guest history, Offers, Finance, Reports/Analytics, Operations, Staff/RBAC and Inbox;
+- **Marketing remains part of the final Admin/Core**, including the marketing consent/attribution and automation contour;
+- Agent CRM: cards, booking linkage, period filtering/reporting, booked value, received payments, room nights, contact history and next-contact tracking;
+- Reception agent filter and agent context on reservations;
+- dated `MAINTENANCE` and `MANUAL` room holds for owner/staff/guest/service/other use;
+- safe booking move/reschedule flow: drag/drop -> Resort Core preview -> explicit `Подтвердить и сохранить график` -> commit;
+- extra-bed Core rule: forbidden for `DOUBLE_STANDARD_BASEMENT`, `DOUBLE_IMPROVED`, `TWO_ROOM_STANDARD`; allowed for other categories with server recalculation;
+- returning guest accommodation discount: automatic **10%** after a prior `CHECKED_OUT` stay; alternative manager discount remains explicit and auditable;
+- Guest OS, Staff/housekeeping/maintenance/voice, Kitchen/Dining, Service Point QR, realtime/WebSocket, backup/restore and release gates.
+
+`ReservationRequest != Reservation`. OWNER/MANAGER retain reservation/payment authority. AI/n8n cannot confirm payment, guarantee reservations, invent pricing/payment policy, check in/out, refund, bypass Core availability/pricing or write generic business truth directly to PostgreSQL.
 
 Real bank/TTLock remains provider-gated. NFC acquiring/wallet remains outside active V1.
 
 ## Database/property release contract
 
-Release 0.62.2 retains **22 committed migrations / 87 critical domain constraints**.  
-Canonical property baseline remains **84 rooms / 12 room categories / 48 rate rows**.  
-Rooms 501/502 remain owner-approved two-person basement rooms above the laundry.
+Release 0.62.2 now has **24 committed migrations / 93 critical domain constraints**.  
+Canonical property baseline remains **84 rooms / 12 room categories / 48 rate rows**.
 
-Canonical 22-migration ledger:
+Canonical 24-migration ledger:
 1. `0_init`
 2. `1_site_content`
 3. `2_guest_service_tasks`
@@ -76,30 +74,38 @@ Canonical 22-migration ledger:
 20. `z19_dining_table_status_guard_20260905`
 21. `z20_dining_active_table_unique_20260906`
 22. `z21_dining_production_snapshots_20260906`
+23. `z99_marketing_consent_attribution_20260912`
+24. `zz100_owner_ops_corrections_20260914`
 
-External staging/production schema changes use `npx prisma migrate deploy`; never use `prisma db push` as release evidence.
+The `zz100` prefix is intentional so Prisma lexical ordering applies it after the `z99` Marketing migration. External staging/production schema changes use only `npx prisma migrate deploy`; `prisma db push` is not release evidence.
 
-## Repository-verified management contour
+## Railway Full Test evidence
 
-Verified repository contours include Dashboard, PMS/supershakhmatka, Rates/Seasons, Group Booking, CRM, Reception, Guest Services, Guest OS, Dining/Kitchen, Service Settings, Guests/History, Guest Offers, QR, Growth, Finance, Reports/Analytics, Operations, Staff/RBAC, Inbox, automation contracts, backup/restore, release/staging/package gates, guarded load-test contract, production runtime pinning, same-origin browser realtime, WebSocket Origin security and request-body limits.
+Project `Three Crowns Full Test` has API, Web, Admin and Staff deployed from main merge SHA `b13bacad3f2e923f51354b1839371d07179b2e8c`; all four latest deployments are `SUCCESS`.
 
-The public website is frozen by owner instruction. PRs #137-#143 accept **zero `apps/web/**` product-source changes**; Public Web is built only as compatibility evidence.
+API startup evidence on 2026-09-14:
+- found 24 migrations;
+- successfully applied `z99_marketing_consent_attribution_20260912`;
+- successfully applied `zz100_owner_ops_corrections_20260914`;
+- seed verified 84 rooms / 12 room types / 48 rate rows;
+- existing Full Test reservation/stay data was preserved rather than reset;
+- `/health/ready` returned HTTP 200.
+
+This proves the integrated Full Test contour. It does **not** authorize real hotel production cutover.
 
 ## Current external boundary
 
-The following are still not production-verified:
+Still not production-verified/closed:
+- GitHub `main` branch protection and required checks;
+- removal/downgrade of public Google Drive writer grants;
+- authorized real Beget/VPS/production execution path and target reconciliation;
+- executable legacy rollback package and restore rehearsal;
+- external production HTTPS/WSS and real-device acceptance;
+- launch-enabled real bank/MKassa/TTLock E2E where applicable;
+- actual load/stress execution with CPU/RAM/PostgreSQL/network observations;
+- production monitoring, alerts and restart/self-healing evidence;
+- fresh actual-target backup -> clean restore -> off-site copy evidence;
+- immutable release/image/runtime linkage and DNS rollback;
+- explicit owner GO for production/DNS/provider activation.
 
-- GitHub `main` branch protection / required checks;
-- removal or downgrade of public Google Drive writer grants;
-- authorized Beget/VPS execution path;
-- real legacy-live rollback package and restore rehearsal;
-- exact 22 migrations and zero-diff 84-room reconciliation on the target database;
-- external HTTPS/WSS staging;
-- real iPhone/Android/desktop/Staff/Kitchen device acceptance;
-- launch-enabled bank/TTLock provider E2E, if those providers are enabled;
-- real load/stress execution with CPU/RAM/PostgreSQL/Caddy observations;
-- production monitoring/alerts and restart/self-healing evidence;
-- fresh backup -> clean restore -> off-site copy evidence;
-- immutable release/image/runtime linkage and DNS rollback.
-
-External production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all required evidence and explicit owner GO are complete.
+**EXTERNAL PRODUCTION CUTOVER STOP** remains in force.

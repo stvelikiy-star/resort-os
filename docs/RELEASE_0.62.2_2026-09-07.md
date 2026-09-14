@@ -1,56 +1,59 @@
 # Resort OS 0.62.2 — 2026-09-07
 
-Refreeze evidence updated: **2026-09-08**.  
-Status: **INTERNAL RC FROZEN / EXTERNAL PRODUCTION CUTOVER STOP**
+Refreeze evidence updated: **2026-09-14**.  
+Status: **INTERNAL RC REFROZEN / FULL TEST VERIFIED / EXTERNAL PRODUCTION CUTOVER STOP**
 
-Accepted executable/release-boundary head: `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`.  
-Observed tree-equivalent main merge: `c931b7e12973ecb62b8f9595d60f0d7947e7ad8e`.  
+Accepted executable/release-boundary head: `7ae394bbb549bb6200c84e9c46d47ed5cd45499a`.  
+Observed tree-equivalent main merge: `b13bacad3f2e923f51354b1839371d07179b2e8c`.  
 Production source branch: `main`.
 
-## Why the same-version security refreeze exists
+## Why the same-version refreeze exists
 
-The active application runtime remains 0.62.2. After the previous 0.62.2 load-test freeze, strict audit work accepted additional security controls in PRs #137-#143 without changing the public website or the hotel domain model. Because those controls affect production images, Caddy routing/security and executable release guards, `Release RC Truth` correctly failed closed after merge and required a new same-version boundary.
+The active application runtime remains `0.62.2`. Since the 2026-09-08 security refreeze, the repository accepted final public-site Marketing/consent work and the owner-approved PMS operations corrections in PR #157. Those changes alter executable product code and the PostgreSQL release ledger, so the old frozen release truth correctly failed closed after merge. This record is the controlled same-version refreeze; the guard is updated to the new tested executable tree rather than bypassed.
 
-## Security hardening now included
+## Accepted product additions
 
-- exact audited runtime image pins for production/Beget, including n8n/PostgreSQL/Caddy;
-- host-only authenticated sessions retained; broad cross-subdomain cookie expansion remains forbidden;
-- Admin and Staff browser WebSockets routed same-origin to Core;
-- PMS/Dining production WebSocket Origin validation;
-- Telegram public webhook request body capped at the edge;
-- generic public/admin/staff/API request bodies capped at 2 MB at the edge;
-- Admin CMS media upload receives a dedicated 8 MB edge limit aligned with FastAPI MIME/magic/SHA/RBAC validation;
-- production-package/Beget guards fail closed if the audited topology or runtime pins regress;
-- browser realtime topology CI distinguishes the dedicated CMS media route from the generic Admin Next proxy.
+The accepted boundary now includes:
+- final **Marketing** surface in Admin and Resort Core, plus marketing consent/attribution migration and automation contracts;
+- Agent CRM cards, reservation linkage, period reports, booked amount vs received payments, room nights, interactions and next-contact tracking;
+- Reception agent filter;
+- dated `MAINTENANCE` and `MANUAL` room holds for owner/staff/guest/service/other use;
+- extra-bed server rule: forbidden for `DOUBLE_STANDARD_BASEMENT`, `DOUBLE_IMPROVED`, `TWO_ROOM_STANDARD`; allowed categories recalculate through Resort Core;
+- automatic **10% accommodation discount** for a returning guest with a prior `CHECKED_OUT` stay, while alternate manager discounts remain explicit/auditable;
+- safe PMS move flow: drag/drop -> Core preview -> explicit `Подтвердить и сохранить график` -> commit;
+- public request success state remains server-confirmed.
 
-All earlier 0.62.2 mutation-safety, Kitchen route/RBAC, migration, route-uniqueness and guarded k6 controls remain in force.
+All prior security, RBAC, Kitchen/Dining, Guest OS, mutation-safety, route-uniqueness, backup/restore and guarded load-test controls remain in force.
 
 ## Evidence
 
-PR #143 exact tested head `ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4`: **24/24 workflows SUCCESS, 0 failures, 0 cancellations**.  
-Observed main merge `c931b7e12973ecb62b8f9595d60f0d7947e7ad8e` is tree-equivalent; GitHub compare reports zero changed files between tested head and merge.  
-Observed main merge: **23/23 applicable non-truth push workflows SUCCESS**.  
-One additional `Release RC Truth CI` push run failed closed because the previous frozen manifest correctly detected executable/security drift; this record and manifest are the controlled correction.
+PR #157 exact tested head `7ae394bbb549bb6200c84e9c46d47ed5cd45499a`: **52/52 pull-request workflows SUCCESS, 0 failures**.  
+Observed main merge `b13bacad3f2e923f51354b1839371d07179b2e8c` is tree-equivalent to the tested head; both resolve to tree `f8991f2f65d837dd16745b43582b5c97292548b6`.  
+First main push: **37/39 workflows SUCCESS**. The only two failures were `Release RC Truth CI` and `Launch Acceptance CI`, both failing at the old frozen-truth boundary before this controlled refreeze.
 
-During PR #143, Browser Realtime Topology CI initially exposed a verifier ambiguity introduced by the dedicated media-upload route. The underlying Caddy WebSocket order remained correct; the verifier was corrected to identify the generic Next proxy explicitly, and the new exact head then passed the complete 24-workflow suite.
+Railway `Three Crowns Full Test` deployed API, Web, Admin and Staff from merge SHA `b13bacad3f2e923f51354b1839371d07179b2e8c`. API successfully found **24 migrations**, applied `z99_marketing_consent_attribution_20260912` and `zz100_owner_ops_corrections_20260914`, verified the 84-room / 12-category / 48-rate seed and returned `/health/ready` HTTP 200.
 
 ## Frozen contracts
 
-- **22 committed migrations**;
-- **87 critical constraints**;
+- **24 committed migrations**;
+- **93 critical constraints**;
 - **84 rooms**;
 - **12 room categories**;
 - **48 rate rows**;
 - `ReservationRequest != Reservation`;
 - PostgreSQL/Core remain transaction authority;
-- OWNER/MANAGER retain reservation/payment authority;
-- bank/TTLock remain provider-gated;
+- OWNER/MANAGER retain commercial authority;
+- Marketing remains part of the final Admin/Core contour;
+- real bank/MKassa/TTLock remain provider-gated until real provider acceptance;
 - NFC remains outside active V1;
-- public website source remains frozen;
 - release runtime remains `0.62.2`.
+
+The final migrations are:
+23. `z99_marketing_consent_attribution_20260912`;
+24. `zz100_owner_ops_corrections_20260914`.
 
 ## External boundary
 
-Repository green status is not production verification. The following remain launch work: protected GitHub `main`, Google Drive public-writer remediation, authorized Beget/VPS access, external HTTPS/WSS, real legacy rollback, target migrations/reconciliation, real devices/providers, actual load execution, monitoring/restart evidence, fresh backup/clean restore/off-site evidence, immutable deployment linkage and DNS rollback.
+Repository and Full Test green status are not real production verification. The following remain launch work: protected GitHub `main`, Google Drive public-writer remediation, authorized production host path, real rollback, target migration/room reconciliation, external HTTPS/WSS, real devices/providers, actual load execution, monitoring/restart evidence, fresh actual-target backup/clean restore/off-site evidence, immutable deployment linkage and DNS rollback.
 
-**EXTERNAL PRODUCTION CUTOVER STOP** remains active. No production deployment is claimed by this release record.
+**EXTERNAL PRODUCTION CUTOVER STOP** remains active. No real production/DNS cutover is claimed by this release record.
