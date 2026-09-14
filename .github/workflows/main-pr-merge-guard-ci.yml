@@ -1,0 +1,38 @@
+name: Main PR Merge Guard CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'scripts/main_pr_merge_guard.py'
+      - '.github/workflows/main-pr-merge-guard-ci.yml'
+      - 'scripts/release_rc_truth_guard.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  main-pr-merge-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile guard
+        run: python -m py_compile scripts/main_pr_merge_guard.py
+      - name: Verify main only advances through canonical PR merge commits
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: python scripts/main_pr_merge_guard.py
+      - name: Validate guard on PR/manual without enforcing candidate HEAD
+        if: github.event_name != 'push'
+        run: |
+          GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge python scripts/main_pr_merge_guard.py
