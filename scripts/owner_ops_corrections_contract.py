@@ -64,14 +64,14 @@ def main() -> int:
     require("Подтвердить и сохранить график" in builder, "Explicit move/save confirmation missing")
 
     # Public request success remains server-confirmed and visible to the guest.
-    require("Заявка ${id} принята" in web_booking, "Server-confirmed public request success notification missing")
+    require("Заявка отправлена. Номер заявки ${id}." in web_booking, "Server-confirmed public request sent notification missing")
 
     print("PASS: final Admin retains Marketing and adds Agents")
     print("PASS: Core enforces owner-approved extra-bed and returning-guest pricing rules")
     print("PASS: Reception period maintenance/manual holds use canonical inventory")
     print("PASS: Agents have CRM/reporting plus convenient reception filtering")
     print("PASS: booking drag/drop remains preview + explicit-confirmation only")
-    print("PASS: public site keeps server-confirmed request success notification")
+    print("PASS: public site shows exact server-confirmed request sent notification")
     return 0
 
 
