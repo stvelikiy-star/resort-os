@@ -4,6 +4,7 @@ import { Rate, Trend } from 'k6/metrics';
 
 const baseUrl = (__ENV.LOAD_BASE_URL || '').replace(/\/$/, '');
 const declaredEnv = (__ENV.LOAD_TEST_ENV || '').toLowerCase();
+const explicitTestHost = (__ENV.LOAD_EXPLICIT_TEST_HOST || '').trim().toLowerCase();
 const ownerUsername = __ENV.LOAD_OWNER_USERNAME || '';
 const ownerPassword = __ENV.LOAD_OWNER_PASSWORD || '';
 const enableAuthGrid = (__ENV.LOAD_AUTH_GRID || 'false').toLowerCase() === 'true';
@@ -28,11 +29,15 @@ const explicitlyBlockedHosts = new Set([
 if (explicitlyBlockedHosts.has(hostname)) {
   failClosed('public production hostname is explicitly blocked');
 }
+if (explicitTestHost && explicitlyBlockedHosts.has(explicitTestHost)) {
+  failClosed('public production hostname cannot be allowlisted');
+}
 
 const isLoopback = ['127.0.0.1', 'localhost'].includes(hostname);
 const stagingMarker = hostname.includes('staging') || hostname.includes('test') || hostname.endsWith('.invalid');
-if (!isLoopback && !stagingMarker) {
-  failClosed('non-loopback target must contain staging/test marker or use an .invalid host');
+const exactExternalTestTarget = ['test', 'staging'].includes(declaredEnv) && explicitTestHost && hostname === explicitTestHost;
+if (!isLoopback && !stagingMarker && !exactExternalTestTarget) {
+  failClosed('non-loopback target must contain staging/test marker or exactly match LOAD_EXPLICIT_TEST_HOST under test/staging');
 }
 
 if (enableAuthGrid && (!ownerUsername || !ownerPassword)) {
