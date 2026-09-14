@@ -19,6 +19,8 @@ def main() -> int:
     pricing = text("services/api/app/pms_reservation_create.py")
     modal = text("apps/admin/components/PMSNewReservationModal.tsx")
     reception = text("apps/admin/components/ReceptionWorkspace.tsx")
+    reception_board = text("apps/admin/components/ReceptionBoard.tsx")
+    agent_context = text("services/api/app/agent_context.py")
     block_panel = text("apps/admin/components/RoomBlocksPanel.tsx")
     agents = text("apps/admin/components/AgentsBoard.tsx")
     builder = text("apps/admin/components/ReservationScheduleBuilder.tsx")
@@ -34,6 +36,7 @@ def main() -> int:
     require("app.include_router(marketing_integration_router)" in app_entry, "Marketing integration router not composed")
     require("app.include_router(marketing_automation_router)" in app_entry, "Marketing automation router not composed")
     require("app.include_router(owner_corrections_router)" in app_entry, "Owner corrections router not composed")
+    require("app.include_router(agent_context_router)" in app_entry, "Agent reservation context router not composed")
 
     # Owner-approved extra-bed and returning-guest rules must live in Core.
     for code in ("DOUBLE_STANDARD_BASEMENT", "DOUBLE_IMPROVED", "TWO_ROOM_STANDARD"):
@@ -48,9 +51,11 @@ def main() -> int:
     require('block_type: "MAINTENANCE" | "MANUAL"' in block_panel, "Maintenance/manual period block UI missing")
     require("booking_agents" in migration and '"usageCategory"' in migration, "Owner correction migration missing agent/block metadata")
 
-    # Agent CRM must have period filters, reports and interactions.
+    # Agent CRM must have period filters, reports, interactions and a reception filter.
     require("fromDate" in agents and "toDate" in agents and "loadReport" in agents, "Agent period report/filter missing")
     require("interactions" in agents and "nextContactAt" in agents, "Agent interaction history missing")
+    require("/agents-context/reservations" in reception_board and 'value="DIRECT"' in reception_board, "Reception agent filter missing")
+    require('SELECT r.id AS reservation_id' in agent_context and 'r."agentId"' in agent_context, "Reservation-to-agent context missing")
 
     # Drag/drop must never directly commit. It opens builder -> preview -> explicit confirmation -> commit.
     require("/schedule/preview" in builder, "Reservation schedule preview endpoint missing")
@@ -64,6 +69,7 @@ def main() -> int:
     print("PASS: final Admin retains Marketing and adds Agents")
     print("PASS: Core enforces owner-approved extra-bed and returning-guest pricing rules")
     print("PASS: Reception period maintenance/manual holds use canonical inventory")
+    print("PASS: Agents have CRM/reporting plus convenient reception filtering")
     print("PASS: booking drag/drop remains preview + explicit-confirmation only")
     print("PASS: public site keeps server-confirmed request success notification")
     return 0
