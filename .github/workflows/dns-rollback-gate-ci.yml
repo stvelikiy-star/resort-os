@@ -1,0 +1,41 @@
+name: DNS Rollback Gate CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/dns_rollback_capture.py'
+      - 'scripts/dns_rollback_gate.py'
+      - 'scripts/dns_rollback_contract_test.py'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - 'release/launch-evidence.example.json'
+      - '.github/workflows/dns-rollback-gate-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/dns_rollback_capture.py'
+      - 'scripts/dns_rollback_gate.py'
+      - 'scripts/dns_rollback_contract_test.py'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - 'release/launch-evidence.example.json'
+      - '.github/workflows/dns-rollback-gate-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile DNS rollback tools
+        run: |
+          python -m py_compile \
+            scripts/dns_rollback_capture.py \
+            scripts/dns_rollback_gate.py \
+            scripts/dns_rollback_contract_test.py
+      - name: Prove fail-closed DNS rollback contract
+        run: python scripts/dns_rollback_contract_test.py
