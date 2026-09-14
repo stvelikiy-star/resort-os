@@ -39,9 +39,17 @@ jobs:
           git fetch origin "${{ github.base_ref }}" --depth=1
           changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
           echo "$changed"
-          if printf '%s\n' "$changed" | grep -q '^apps/web/'; then
-            echo 'BLOCKED: apps/web is frozen by owner scope during management hardening.' >&2
-            exit 1
+          web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
+          if [ -n "$web_changed" ]; then
+            if [ "$web_changed" != 'apps/web/components/BookingWidget.tsx' ]; then
+              echo 'BLOCKED: apps/web remains frozen except the owner-approved BookingWidget confirmation copy.' >&2
+              exit 1
+            fi
+            if ! printf '%s\n' "$changed" | grep -qx 'scripts/owner_ops_corrections_contract.py'; then
+              echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2
+              exit 1
+            fi
+            python scripts/owner_ops_corrections_contract.py
           fi
 
       - name: Run management final truth assertions
