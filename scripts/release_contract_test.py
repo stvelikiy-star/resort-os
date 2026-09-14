@@ -15,16 +15,17 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 23
-    assert EXPECTED_MIGRATIONS[-6:] == (
+    assert len(EXPECTED_MIGRATIONS) == 24
+    assert EXPECTED_MIGRATIONS[-7:] == (
         "z17_dining_floor_layout_20260905",
         "z18_site_media_slots_20260905",
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
         "z99_marketing_consent_attribution_20260912",
+        "z100_owner_ops_corrections_20260914",
     )
-    assert len(CRITICAL_CONSTRAINTS) == 87
+    assert len(CRITICAL_CONSTRAINTS) == 93
     assert {
         "service_points_category_check",
         "service_point_qrs_revocation_check",
@@ -65,12 +66,18 @@ def main() -> int:
         "dining_production_snapshots_entitlement_count_check",
         "dining_production_snapshots_fingerprint_check",
         "dining_production_snapshots_reason_check",
+        "booking_agents_status_check",
+        "booking_agent_interactions_kind_check",
+        "reservations_extra_bed_count_check",
+        "reservations_extra_bed_unit_check",
+        "reservations_discount_percent_check",
+        "inventory_blocks_usage_category_check",
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact 23-migration current candidate ledger is fail-closed")
-    print("PASS: current Dining, Guest, CMS, Group Booking, Service Point and Marketing boundaries are canonical")
-    print("PASS: current critical constraint fingerprint contains 87 constraints")
+    print("PASS: exact 24-migration current candidate ledger is fail-closed")
+    print("PASS: current Dining, Guest, CMS, Group Booking, Service Point, Marketing and Owner Operations boundaries are canonical")
+    print("PASS: current critical constraint fingerprint contains 93 constraints")
     return 0
 
 
