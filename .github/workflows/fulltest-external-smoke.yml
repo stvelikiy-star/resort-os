@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '17 */6 * * *'
+    - cron: '47 0 * * *'
   push:
     branches:
       - main
@@ -20,17 +21,17 @@ concurrency:
   group: fulltest-external-smoke
   cancel-in-progress: true
 
+env:
+  CORE_URL: https://api-production-f1171.up.railway.app
+  PUBLIC_URL: https://web-production-b7d1e.up.railway.app
+  ADMIN_URL: https://admin-production-80a1.up.railway.app
+  STAFF_URL: https://staff-production-69f6.up.railway.app
+
 jobs:
   external-smoke:
     name: external-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 6
-    env:
-      CORE_URL: https://api-production-f1171.up.railway.app
-      PUBLIC_URL: https://web-production-b7d1e.up.railway.app
-      ADMIN_URL: https://admin-production-80a1.up.railway.app
-      STAFF_URL: https://staff-production-69f6.up.railway.app
-
     steps:
       - name: Verify external HTTPS surfaces
         shell: bash
@@ -114,4 +115,97 @@ jobs:
           Full Test only.
           Read-only external monitoring: no reservation, payment, room-state, dining, provider, or lock mutations.
           This workflow is not external hotel production acceptance and does not authorize DNS/provider cutover.
+          EOF
+
+  browser-smoke:
+    name: daily-browser-smoke
+    needs: external-smoke
+    if: ${{ needs.external-smoke.result == 'success' && (github.event_name != 'schedule' || github.event.schedule == '47 0 * * *') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install pinned Playwright Chromium
+        run: |
+          npm install --no-audit --no-fund --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Verify public SSR desktop mobile hydration and local media
+        env:
+          PUBLIC_BASE_URL: ${{ env.PUBLIC_URL }}
+        run: node scripts/public_browser_acceptance.mjs
+
+      - name: Verify Admin and Staff hydrated login shells without credentials
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+
+          const targets = [
+            {
+              label: 'Admin',
+              url: process.env.ADMIN_URL,
+              heading: 'Вход в управление',
+              passwordSelector: 'input[type="password"]',
+            },
+            {
+              label: 'Staff',
+              url: process.env.STAFF_URL,
+              heading: 'Моя смена',
+              passwordSelector: 'input[type="password"]',
+            },
+          ];
+
+          function assert(condition, message) {
+            if (!condition) throw new Error(message);
+          }
+
+          const browser = await chromium.launch({ headless: true });
+          try {
+            for (const target of targets) {
+              const context = await browser.newContext({ viewport: { width: 1365, height: 900 } });
+              const page = await context.newPage();
+              const pageErrors = [];
+              const assetFailures = [];
+
+              page.on('pageerror', (error) => pageErrors.push(error.message));
+              page.on('requestfailed', (request) => {
+                if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
+                  assetFailures.push(`${request.resourceType()} ${request.url()} :: ${request.failure()?.errorText || 'failed'}`);
+                }
+              });
+              page.on('response', (response) => {
+                const type = response.request().resourceType();
+                if (['document', 'script', 'stylesheet'].includes(type) && response.status() >= 400) {
+                  assetFailures.push(`${type} ${response.url()} :: HTTP ${response.status()}`);
+                }
+              });
+
+              const response = await page.goto(target.url, { waitUntil: 'networkidle', timeout: 30000 });
+              assert(response?.ok(), `${target.label}: main document failed with HTTP ${response?.status()}`);
+              await page.getByRole('heading', { name: target.heading, exact: true }).waitFor({ state: 'visible', timeout: 15000 });
+              assert(await page.locator(target.passwordSelector).isVisible(), `${target.label}: password input is not visible after hydration`);
+              assert(pageErrors.length === 0, `${target.label}: pageerror: ${pageErrors.join(' | ')}`);
+              assert(assetFailures.length === 0, `${target.label}: document/script/stylesheet failures: ${assetFailures.join(' | ')}`);
+              console.log(`PASS: ${target.label} hydrated login shell`);
+              await context.close();
+            }
+          } finally {
+            await browser.close();
+          }
+          NODE
+
+      - name: Record browser boundary
+        run: |
+          cat <<'EOF'
+          Full Test browser acceptance only.
+          No credentials are submitted to Admin or Staff.
+          Public booking Core requests are mocked by the existing acceptance harness, so no booking mutation occurs.
+          This does not replace real-device or hotel-production acceptance.
           EOF
