@@ -1,18 +1,18 @@
 # Three Crowns — production database migration gate
 
 Date: 2026-09-14  
-Release: `0.62.2` owner-operations/marketing refreeze  
+Release: `0.62.2` owner-operations/marketing/public-confirmation refreeze  
 Status: **COMMITTED / CLEAN-DEPLOY + BACKUP-RESTORE VERIFIED IN CI / RAILWAY FULL TEST VERIFIED / EXTERNAL PRODUCTION CUTOVER STOP**
 
 This document defines the current database release boundary. It does not prove real hotel production migration and does not authorize production cutover.
 
 ## Release identity
 
-Accepted executable head: `7ae394bbb549bb6200c84e9c46d47ed5cd45499a`.  
-Tree-equivalent main merge: `b13bacad3f2e923f51354b1839371d07179b2e8c`.  
+Accepted executable head: `61bd40d7592e842a4d52cfb343483065afb378cb`.  
+Observed main merge: `94c849a0833079627b47db1e25869096191424bc`.  
 Production source branch: `main`.
 
-PR #157 passed 52/52 pull-request workflows before merge. The first main push produced 37/39 successes; the two failures were the old frozen release-truth checks intentionally rejecting the new boundary before this controlled refreeze.
+PR #164 passed **26/26** pull-request workflows before merge. The first main push produced **25/26** successes; the sole failure was the old frozen Release RC Truth intentionally rejecting the new Public boundary before this controlled refreeze. No database migration changed in PR #164.
 
 ## Canonical migration ledger
 
@@ -43,22 +43,15 @@ The current release contains exactly **24 committed migrations**, in this exact 
 23. `z99_marketing_consent_attribution_20260912`
 24. `zz100_owner_ops_corrections_20260914`
 
-The `zz100_...` prefix is intentional: Prisma migration directories are ordered lexicographically, so this name guarantees that the owner-operations migration runs after the existing `z99` Marketing migration.
+The `zz100_...` prefix is intentional: Prisma migration directories are ordered lexicographically, so the owner-operations migration runs after the existing `z99` Marketing migration.
 
-The shared release contract fingerprints **93 critical domain constraints** through `scripts/release_contract.py`. The six owner-operations additions are:
-
-- `booking_agents_status_check`
-- `booking_agent_interactions_kind_check`
-- `reservations_extra_bed_count_check`
-- `reservations_extra_bed_unit_check`
-- `reservations_discount_percent_check`
-- `inventory_blocks_usage_category_check`
+The shared release contract fingerprints **93 critical domain constraints** through `scripts/release_contract.py`.
 
 ## Canonical property baseline
 
-- 84 physical rooms;
-- 12 room categories;
-- 48 rate rows;
+- **84 physical rooms**;
+- **12 room categories**;
+- **48 rate rows**;
 - rooms 501/502 remain owner-approved two-person basement inventory above the laundry.
 
 Physical room intake is closed. Real target reconciliation remains an external evidence step.
@@ -71,15 +64,9 @@ Repository CI has successfully proved:
 - exact 93-constraint release fingerprint;
 - Production Migration Baseline;
 - PostgreSQL backup -> clean restore -> migration/constraint comparison;
-- Release Gate and Full Staging Gate on the accepted executable tree.
+- Release Gate and Full Staging Gate.
 
-Railway `Three Crowns Full Test` API on merge SHA `b13bacad3f2e923f51354b1839371d07179b2e8c` additionally logged:
-- `24 migrations found in prisma/migrations`;
-- successful application of `z99_marketing_consent_attribution_20260912`;
-- successful application of `zz100_owner_ops_corrections_20260914`;
-- `All migrations have been successfully applied`;
-- canonical seed 84 rooms / 12 room types / 48 rate rows;
-- readiness HTTP 200.
+Railway `Three Crowns Full Test` additionally proved all 24 migrations and canonical seed can start together and pass readiness. The later Public confirmation copy does not alter the database boundary.
 
 This Full Test evidence is not actual production migration evidence.
 
@@ -90,7 +77,7 @@ This Full Test evidence is not actual production migration evidence.
 3. Never use destructive reset against production.
 4. Never use `migrate resolve` to hide schema drift.
 5. Every forward migration must update the release contract and backup/restore verification.
-6. The Prisma schema must remain synchronized with the committed migration truth.
+6. The Prisma schema must remain synchronized with committed migration truth.
 7. A fresh real backup and isolated restore verification are required immediately before cutover.
 
 ## Fresh staging / production database
@@ -122,7 +109,7 @@ RESTORE_DATABASE_URL=postgresql://.../resort_os_restore \
 python scripts/database_restore_verify.py
 ```
 
-Repository CI proves the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires a fresh actual-target backup, checksum, timestamp, off-site copy and restore evidence.
+Repository CI proves the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires a fresh actual-target backup, checksum, timestamp, verified off-site copy and isolated restore evidence.
 
 ## Production boundary
 

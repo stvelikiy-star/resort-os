@@ -71,15 +71,25 @@ def main() -> int:
 
     rc = json.loads(read("release/current-rc.json"))
     ok(rc["release_version"] == "0.62.2", "release 0.62.2")
-    ok(rc["accepted_executable_head"] == "7ae394bbb549bb6200c84e9c46d47ed5cd45499a", "accepted owner-ops boundary SHA")
-    ok(rc["observed_merge_commit"] == "b13bacad3f2e923f51354b1839371d07179b2e8c", "observed owner-ops merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 52, "success": 52, "failures": 0}, "52/52 accepted workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 39, "success": 37, "failures": 2}, "37/39 first merge workflows with two expected frozen-truth fail-closes")
-    ok(rc["postmerge_truth_workflows"] == {"triggered": 39, "success": 37, "failures": 2}, "pre-refreeze postmerge truth captured exactly")
+    ok(rc["accepted_executable_head"] == "61bd40d7592e842a4d52cfb343483065afb378cb", "accepted public confirmation boundary SHA")
+    ok(rc["observed_merge_commit"] == "94c849a0833079627b47db1e25869096191424bc", "observed PR #164 merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 26, "success": 26, "failures": 0}, "26/26 accepted workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 26, "success": 25, "failures": 1}, "25/26 first merge workflows with expected frozen-truth fail-close")
+    ok(rc["postmerge_truth_workflows"] == {"triggered": 26, "success": 25, "failures": 1}, "pre-refreeze postmerge truth captured exactly")
+    ok(rc["observed_merge_tree_equivalent"] is False, "PR #164 merge tree difference recorded")
+    ok(rc["observed_merge_allowed_hygiene_only"] is True, "PR #164 merge drift limited to accepted hygiene")
+    ok(set(rc["observed_merge_allowed_hygiene_paths"]) == {
+        ".github/workflows/main-pr-merge-guard-ci.yml",
+        "scripts/main_pr_merge_guard.py",
+        "scripts/release_rc_truth_guard.py",
+    }, "exact PR #163 hygiene drift recorded")
     ok(rc["migration_count"] == 24 and rc["critical_constraint_count"] == 93, "24 migrations / 93 constraints")
     ok(rc["canonical_property_seed"] == {"rooms": 84, "room_categories": 12, "rate_rows": 48}, "canonical property seed")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
         ok(rc[key] is False, f"{key} remains fail-closed")
+
+    web_booking = read("apps/web/components/BookingWidget.tsx")
+    ok("Заявка отправлена. Номер заявки ${id}." in web_booking, "exact owner-approved public confirmation copy")
 
     room_rows = rows("data-intake/rooms.csv")
     ok(len(room_rows) == 84, "84 physical rooms")
@@ -150,7 +160,7 @@ def main() -> int:
 
     ok(passed >= 108, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
-    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core repository contour accepted; Railway Full Test is verified; real external production cutover remains STOP")
+    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core/Public repository contour accepted; Railway Full Test is verified; real external production cutover remains STOP")
     return 0
 
 

@@ -1,6 +1,6 @@
 # THREE CROWNS RESORT OS — LAUNCH ACCEPTANCE
 
-Version: 6.4  
+Version: 6.5  
 Date: 2026-09-14  
 Status: RESORT OS 0.62.2 INTERNAL RC REFROZEN / FULL TEST VERIFIED / EXTERNAL PRODUCTION CUTOVER STOP  
 Canonical: YES
@@ -11,16 +11,17 @@ Repository/CI and Railway Full Test evidence are not real hotel production evide
 
 Repository: `stvelikiy-star/resort-os`.  
 Release: `0.62.2`.  
-Accepted source PR: `#157` — `feat/owner-ops-corrections-20260914 -> main`.  
-Accepted executable/release-boundary head: `7ae394bbb549bb6200c84e9c46d47ed5cd45499a`.  
-Observed tree-equivalent main merge: `b13bacad3f2e923f51354b1839371d07179b2e8c`.  
+Accepted source PR: `#164` — `fix/public-request-sent-copy-20260914 -> main`.  
+Accepted executable/release-boundary head: `61bd40d7592e842a4d52cfb343483065afb378cb`.  
+Observed main merge: `94c849a0833079627b47db1e25869096191424bc`.  
 Production source branch: `main`.
 
 Evidence:
-- accepted PR #157 head: **52/52 workflows SUCCESS, 0 failures**;
-- accepted head and merge are tree-equivalent;
-- first main push: **37/39 workflows SUCCESS**;
-- `Release RC Truth CI` and `Launch Acceptance CI` failed closed only because the prior 2026-09-07 frozen manifest did not accept the new executable/product boundary; this controlled refreeze updates that truth without bypassing the guard.
+- accepted PR #164 head: **26/26 workflows SUCCESS, 0 failures**;
+- first main push: **25/26 workflows SUCCESS**;
+- the only failed workflow was `Release RC Truth CI`, correctly rejecting the previous frozen boundary before this refreeze;
+- PR #164 head and merge are not tree-equivalent only because PR #163 landed in `main` while #164 was open; the exact allowed drift is `.github/workflows/main-pr-merge-guard-ci.yml`, `scripts/main_pr_merge_guard.py`, `scripts/release_rc_truth_guard.py`;
+- no other tested-head -> merge drift is accepted.
 
 Machine truth: `release/current-rc.json`. Guard: `scripts/release_rc_truth_guard.py`.
 
@@ -30,16 +31,16 @@ Machine truth: `release/current-rc.json`. Guard: `scripts/release_rc_truth_guard
 
 `ReservationRequest != Reservation`. OWNER/MANAGER retain reservation/payment authority. AI/n8n cannot confirm payment/reservation, invent policy, check guests in/out, refund or bypass Core pricing/availability.
 
-The accepted final contour includes Marketing in Admin/Core, agent CRM/reporting, server-enforced extra-bed rules, returning-guest 10% accommodation discount, dated maintenance/manual room holds and explicit confirmation before schedule commit after booking drag/drop.
+The accepted final contour includes Marketing in Admin/Core, Agent CRM/reporting, server-enforced extra-bed rules, returning-guest 10% accommodation discount, dated maintenance/manual room holds, explicit confirmation before schedule commit after drag/drop and the exact public server-confirmed Russian request-sent message.
 
-Real bank/MKassa/TTLock remains provider-gated until real provider acceptance. NFC remains outside active V1.
+Real bank/MKassa/TTHotel/TTLock remains provider-gated until real provider/hardware acceptance. NFC remains outside active V1.
 
 ## 3. Database/property contract
 
 Frozen release boundary: **24 committed migrations / 93 critical domain constraints**.  
 Canonical property seed: **84 rooms / 12 categories / 48 rate rows**.
 
-The final two migrations are:
+The final migrations remain:
 - `z99_marketing_consent_attribution_20260912`;
 - `zz100_owner_ops_corrections_20260914`.
 
@@ -47,29 +48,35 @@ External staging/production migration uses only `npx prisma migrate deploy`; `pr
 
 ## 4. Repository and Full Test verification
 
-The accepted 0.62.2 boundary has repository verification for PMS/chessboard, Rates/Seasons, Reception, CRM, Agents, Marketing, Guest OS/Services/Offers, housekeeping/maintenance, Finance, Reports/Analytics, Staff/RBAC, Kitchen/Dining, QR/service points, Inbox, automation contracts, backup/restore, production package, staging/release gates, active-route uniqueness, mutating-CI safety and guarded load testing.
+Repository verification covers PMS/chessboard, Rates/Seasons, Reception, CRM, Agents, Marketing, Guest OS/Services/Offers, housekeeping/maintenance, Finance, Reports/Analytics, Staff/RBAC, Kitchen/Dining, QR/service points, Inbox, automation contracts, backup/restore, production package, release/staging gates, active-route uniqueness, mutating-CI safety and guarded load testing.
 
-Railway `Three Crowns Full Test` additionally proves the integrated merge SHA `b13bacad3f2e923f51354b1839371d07179b2e8c` can deploy API/Web/Admin/Staff together. API applied all **24** migrations, including Marketing and Owner Operations, and passed readiness. This is Full Test evidence, not production cutover evidence.
+Railway `Three Crowns Full Test` verification additionally includes:
+- external HTTPS health for API/Public/Admin/Staff and WSS-path reachability;
+- scheduled external smoke every 6 hours;
+- daily Chromium Public/Admin/Staff acceptance without business mutation;
+- API/Web/Admin/Staff `ON_FAILURE` restart policy;
+- read-only load baseline through 50 VU: **32,229 requests, 0% HTTP failures, p95 38.49 ms overall and 42.25 ms availability**;
+- repository PostgreSQL backup -> isolated restore CI.
+
+These are Full Test results, not production cutover evidence.
 
 ## 5. Remaining external launch gate
 
 Production cutover remains **STOP** until real evidence exists for:
-- protected GitHub `main` with required checks;
-- removal/downgrade of public Google Drive writer grants;
+- platform-level protected GitHub `main` with required checks;
+- removal/downgrade of unsafe public Google Drive writer grants if present;
 - authorized real production host/runtime path;
 - actual legacy-live rollback package plus restore rehearsal;
 - target room reconciliation and exact 24 migrations;
-- external production HTTPS/WSS;
-- real iPhone/Android/desktop/Staff/Kitchen acceptance;
-- real launch-enabled bank/MKassa/TTLock provider checks;
-- real load/stress run with resource observations;
-- monitoring/restart/self-healing acceptance;
-- fresh actual-target backup -> clean restore plus off-site copy;
+- final production HTTPS/WSS on hotel domains;
+- real iPhone/Android/desktop/Staff/Kitchen acceptance against the actual production-like target;
+- real launch-enabled MKassa/TTHotel/TTLock provider checks;
+- fresh actual-target backup -> clean restore plus verified off-site copy;
 - exact immutable release/image/deployment linkage;
-- DNS rollback;
+- tested DNS rollback;
 - explicit owner GO.
 
-No CI or Full Test result alone authorizes DNS or provider cutover.
+Full Test load, monitoring and restart/self-healing are proven and no longer count as open Full Test blockers. They must still be re-observed on the actual production host before cutover.
 
 ## 6. Repository gates
 
@@ -84,25 +91,25 @@ Final structural cutover evidence check must use the accepted executable SHA:
 python scripts/verify_launch_acceptance.py \
   --mode cutover \
   --manifest /secure/path/launch-evidence.json \
-  --release-sha 7ae394bbb549bb6200c84e9c46d47ed5cd45499a
+  --release-sha 61bd40d7592e842a4d52cfb343483065afb378cb
 ```
 
 ## 7. Final external sequence
 
-1. verify `main`, the 0.62.2 manifest and merge `b13bacad3f2e923f51354b1839371d07179b2e8c`;
+1. verify `main`, release `0.62.2`, accepted head `61bd40d7592e842a4d52cfb343483065afb378cb` and observed merge `94c849a0833079627b47db1e25869096191424bc`;
 2. verify GitHub protection and Drive integrity gates;
 3. run release truth, host and environment preflight;
 4. preserve/checksum current legacy rollback and prove restore ownership;
 5. create persistent storage and private PostgreSQL;
 6. apply all **24** migrations using `prisma migrate deploy`;
-7. reconcile the canonical 84-room register to zero diff;
-8. build/deploy accepted executable head `7ae394bbb549bb6200c84e9c46d47ed5cd45499a` or its tree-equivalent signed merge to isolated HTTPS/WSS production-like staging;
-9. verify Core/Public/Admin/Staff/Kitchen, Marketing/Agents and secure session/realtime boundaries;
-10. run external business acceptance and real-device/provider checks;
-11. run guarded load baseline with resource monitoring;
-12. prove monitoring/restart/self-healing;
-13. prove fresh backup, clean restore and off-site evidence;
-14. record immutable SHA/image/runtime linkage and DNS rollback;
+7. reconcile canonical **84 rooms / 12 categories / 48 rates** to zero diff;
+8. deploy the accepted executable product boundary plus the exact accepted ops-only merge drift to isolated production-like HTTPS/WSS staging;
+9. verify Core/Public/Admin/Staff/Kitchen, Marketing/Agents, secure session and realtime boundaries;
+10. run real-device and provider checks;
+11. re-run guarded load observation on the actual target;
+12. prove target monitoring/restart/self-healing;
+13. take fresh backup, prove isolated clean restore and off-site copy;
+14. record immutable SHA/image/runtime linkage and tested DNS rollback;
 15. only after explicit owner GO prepare controlled production/DNS switch.
 
 **EXTERNAL PRODUCTION CUTOVER STOP** remains in force.
