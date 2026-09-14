@@ -267,7 +267,7 @@ export default function PMSNewReservationModal({
                 <input type="number" min={0} max={10} value={extraBedCount} onChange={(event) => setExtraBedCount(Number(event.target.value))} aria-label="Количество дополнительных мест" />
                 <input inputMode="numeric" value={extraBedUnit} disabled={extraBedCount === 0} onChange={(event) => setExtraBedUnit(event.target.value)} placeholder="Цена 1 допместа / ночь" />
               </div>}
-              {preview && <div className="owner-nightly-prices"><span>Допместа: {money(preview.pricing.extra_beds_total_kgs)}</span><span>Вместимость: {preview.room.effective_capacity_adults}</span></div>}
+              {preview && <div className="owner-commercial-prices"><span>Допместа: {money(preview.pricing.extra_beds_total_kgs)}</span><span>Вместимость: {preview.room.effective_capacity_adults}</span></div>}
             </section>
 
             <section className="owner-price-card ready">
@@ -300,7 +300,7 @@ export default function PMSNewReservationModal({
                 </div>
               )}
               {preview?.pricing.source === "MANAGER_OVERRIDE" && <b className="owner-override-badge">Базовая цена подтверждена менеджером</b>}
-              {preview && <div className="owner-nightly-prices">
+              {preview && <div className="owner-commercial-prices">
                 <span>База: {money(preview.pricing.base_total_kgs)}</span>
                 <span>Допместа: {money(preview.pricing.extra_beds_total_kgs)}</span>
                 <span>Скидка {preview.pricing.discount_percent}%: −{money(preview.pricing.discount_kgs)}</span>
