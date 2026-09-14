@@ -1,7 +1,9 @@
+import json
 import uuid
 from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
+from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
@@ -20,14 +22,29 @@ async def _property_id(conn, property_code: str) -> uuid.UUID:
     return value
 
 
-async def _audit(conn, *, property_id: uuid.UUID, user: dict[str, Any], action: str, resource: str, resource_id: str, after: dict[str, Any]):
+async def _audit(
+    conn,
+    *,
+    property_id: uuid.UUID,
+    user: dict[str, Any],
+    action: str,
+    resource: str,
+    resource_id: str,
+    after: dict[str, Any],
+):
     await conn.execute(
         '''
         INSERT INTO audit_logs (
           id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt"
         ) VALUES ($1,$2,'STAFF',$3,$4,$5,$6,'OWNER_CORRECTIONS','SUCCESS',$7::jsonb,now())
         ''',
-        uuid.uuid4(), property_id, user["id"], action, resource, resource_id, __import__("json").dumps(after, ensure_ascii=False),
+        uuid.uuid4(),
+        property_id,
+        user["id"],
+        action,
+        resource,
+        resource_id,
+        json.dumps(after, ensure_ascii=False),
     )
 
 
@@ -73,13 +90,18 @@ async def list_agents(
             '''
             SELECT a.id,a.name,a."contactName",a.phone,a.whatsapp,a.email,a.notes,a.status,a."createdAt",a."updatedAt",
                    count(r.id)::int AS reservations,
-                   coalesce(sum(CASE WHEN r.status NOT IN ('CANCELLED','NO_SHOW') THEN r."totalKgs" ELSE 0 END),0)::bigint AS revenue_kgs,
+                   coalesce(sum(CASE WHEN r.status NOT IN ('CANCELLED','NO_SHOW') THEN r."totalKgs" ELSE 0 END),0)::bigint AS booked_kgs,
+                   coalesce(sum(pay.received_kgs),0)::bigint AS received_kgs,
                    coalesce(sum(CASE WHEN r.status NOT IN ('CANCELLED','NO_SHOW') THEN (r."checkOut"-r."checkIn") ELSE 0 END),0)::int AS room_nights,
                    max(r."checkIn") AS last_check_in
             FROM booking_agents a
             LEFT JOIN reservations r ON r."agentId"=a.id
               AND ($4::date IS NULL OR r."checkIn">=$4::date)
               AND ($5::date IS NULL OR r."checkIn"<=$5::date)
+            LEFT JOIN LATERAL (
+              SELECT coalesce(sum(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS received_kgs
+              FROM payments p WHERE p."reservationId"=r.id
+            ) pay ON true
             WHERE a."propertyId"=$1
               AND ($2::boolean OR a.status='ACTIVE')
               AND ($3='' OR lower(a.name) LIKE '%'||lower($3)||'%' OR lower(coalesce(a."contactName",'')) LIKE '%'||lower($3)||'%'
@@ -87,15 +109,28 @@ async def list_agents(
             GROUP BY a.id
             ORDER BY a.status,a.name
             ''',
-            property_id, include_inactive, search.strip(), from_date, to_date,
+            property_id,
+            include_inactive,
+            search.strip(),
+            from_date,
+            to_date,
         )
         return {
             "items": [
                 {
-                    "id": str(row["id"]), "name": row["name"], "contact_name": row["contactName"],
-                    "phone": row["phone"], "whatsapp": row["whatsapp"], "email": row["email"], "notes": row["notes"],
-                    "status": row["status"], "reservations": row["reservations"], "revenue_kgs": int(row["revenue_kgs"] or 0),
-                    "room_nights": row["room_nights"], "last_check_in": row["last_check_in"].isoformat() if row["last_check_in"] else None,
+                    "id": str(row["id"]),
+                    "name": row["name"],
+                    "contact_name": row["contactName"],
+                    "phone": row["phone"],
+                    "whatsapp": row["whatsapp"],
+                    "email": row["email"],
+                    "notes": row["notes"],
+                    "status": row["status"],
+                    "reservations": row["reservations"],
+                    "booked_kgs": int(row["booked_kgs"] or 0),
+                    "received_kgs": int(row["received_kgs"] or 0),
+                    "room_nights": row["room_nights"],
+                    "last_check_in": row["last_check_in"].isoformat() if row["last_check_in"] else None,
                 }
                 for row in rows
             ]
@@ -111,19 +146,38 @@ async def create_agent(payload: AgentCreate, request: Request, user: dict[str, A
             await conn.execute(
                 '''INSERT INTO booking_agents (id,"propertyId",name,"contactName",phone,whatsapp,email,notes,status,"createdAt","updatedAt")
                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACTIVE',now(),now())''',
-                agent_id, property_id, payload.name.strip(), payload.contact_name, payload.phone, payload.whatsapp,
-                str(payload.email) if payload.email else None, payload.notes,
+                agent_id,
+                property_id,
+                payload.name.strip(),
+                payload.contact_name,
+                payload.phone,
+                payload.whatsapp,
+                str(payload.email) if payload.email else None,
+                payload.notes,
             )
         except Exception as exc:
-            if "booking_agents_propertyId_name_key" in str(exc) or "unique" in str(exc).lower():
+            if "unique" in str(exc).lower():
                 raise HTTPException(status_code=409, detail="Агент с таким названием уже существует") from exc
             raise
-        await _audit(conn, property_id=property_id, user=user, action="AGENT_CREATE", resource="BookingAgent", resource_id=str(agent_id), after=payload.model_dump(mode="json"))
+        await _audit(
+            conn,
+            property_id=property_id,
+            user=user,
+            action="AGENT_CREATE",
+            resource="BookingAgent",
+            resource_id=str(agent_id),
+            after=payload.model_dump(mode="json"),
+        )
     return {"id": str(agent_id), "status": "ACTIVE"}
 
 
 @router.patch("/agents/{agent_id}")
-async def update_agent(agent_id: uuid.UUID, payload: AgentUpdate, request: Request, user: dict[str, Any] = Depends(manager_access)):
+async def update_agent(
+    agent_id: uuid.UUID,
+    payload: AgentUpdate,
+    request: Request,
+    user: dict[str, Any] = Depends(manager_access),
+):
     values = payload.model_dump(exclude_unset=True)
     if not values:
         raise HTTPException(status_code=422, detail="No changes")
@@ -142,14 +196,35 @@ async def update_agent(agent_id: uuid.UUID, payload: AgentUpdate, request: Reque
         await conn.execute(
             '''UPDATE booking_agents SET name=$3,"contactName"=$4,phone=$5,whatsapp=$6,email=$7,notes=$8,status=$9,"updatedAt"=now()
                WHERE id=$1 AND "propertyId"=$2''',
-            agent_id, property_id, name, contact_name, phone, whatsapp, str(email) if email else None, notes, status_value,
+            agent_id,
+            property_id,
+            name,
+            contact_name,
+            phone,
+            whatsapp,
+            str(email) if email else None,
+            notes,
+            status_value,
         )
-        await _audit(conn, property_id=property_id, user=user, action="AGENT_UPDATE", resource="BookingAgent", resource_id=str(agent_id), after={**values, "status": status_value})
+        await _audit(
+            conn,
+            property_id=property_id,
+            user=user,
+            action="AGENT_UPDATE",
+            resource="BookingAgent",
+            resource_id=str(agent_id),
+            after={**values, "status": status_value},
+        )
     return {"id": str(agent_id), "status": status_value}
 
 
 @router.post("/agents/{agent_id}/interactions", status_code=status.HTTP_201_CREATED)
-async def create_agent_interaction(agent_id: uuid.UUID, payload: AgentInteractionCreate, request: Request, user: dict[str, Any] = Depends(commercial_access)):
+async def create_agent_interaction(
+    agent_id: uuid.UUID,
+    payload: AgentInteractionCreate,
+    request: Request,
+    user: dict[str, Any] = Depends(commercial_access),
+):
     interaction_id = uuid.uuid4()
     async with request.app.state.db.acquire() as conn:
         property_id = await _property_id(conn, user["property_code"])
@@ -159,9 +234,23 @@ async def create_agent_interaction(agent_id: uuid.UUID, payload: AgentInteractio
         await conn.execute(
             '''INSERT INTO booking_agent_interactions (id,"propertyId","agentId",kind,note,"nextContactAt","createdBy","createdAt")
                VALUES ($1,$2,$3,$4,$5,$6,$7,now())''',
-            interaction_id, property_id, agent_id, payload.kind, payload.note.strip(), payload.next_contact_at, user["id"],
+            interaction_id,
+            property_id,
+            agent_id,
+            payload.kind,
+            payload.note.strip(),
+            payload.next_contact_at,
+            user["id"],
         )
-        await _audit(conn, property_id=property_id, user=user, action="AGENT_INTERACTION_CREATE", resource="BookingAgentInteraction", resource_id=str(interaction_id), after=payload.model_dump(mode="json"))
+        await _audit(
+            conn,
+            property_id=property_id,
+            user=user,
+            action="AGENT_INTERACTION_CREATE",
+            resource="BookingAgentInteraction",
+            resource_id=str(interaction_id),
+            after=payload.model_dump(mode="json"),
+        )
     return {"id": str(interaction_id)}
 
 
@@ -185,52 +274,90 @@ async def agent_report(
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r.adults,r.children,r."totalKgs",
                    r."discountPercent",r."discountReason",r."extraBedCount",r."extraBedUnitKgs",
                    trim(concat_ws(' ',g."firstName",g."lastName")) AS guest_name,g.phone,
-                   string_agg(DISTINCT room.code,', ' ORDER BY room.code) AS rooms
+                   string_agg(DISTINCT room.code,', ' ORDER BY room.code) AS rooms,
+                   coalesce(pay.received_kgs,0)::bigint AS received_kgs
             FROM reservations r
             LEFT JOIN guests g ON g.id=r."primaryGuestId"
             LEFT JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib.active=true AND ib."blockType"='RESERVATION'
             LEFT JOIN rooms room ON room.id=ib."roomId"
+            LEFT JOIN LATERAL (
+              SELECT coalesce(sum(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS received_kgs
+              FROM payments p WHERE p."reservationId"=r.id
+            ) pay ON true
             WHERE r."propertyId"=$1 AND r."agentId"=$2
               AND ($3::date IS NULL OR r."checkIn">=$3::date)
               AND ($4::date IS NULL OR r."checkIn"<=$4::date)
-            GROUP BY r.id,g.id
+            GROUP BY r.id,g.id,pay.received_kgs
             ORDER BY r."checkIn" DESC,r."createdAt" DESC
             ''',
-            property_id, agent_id, from_date, to_date,
+            property_id,
+            agent_id,
+            from_date,
+            to_date,
         )
         interactions = await conn.fetch(
             '''SELECT id,kind,note,"nextContactAt","createdAt" FROM booking_agent_interactions
                WHERE "propertyId"=$1 AND "agentId"=$2 ORDER BY "createdAt" DESC LIMIT 200''',
-            property_id, agent_id,
+            property_id,
+            agent_id,
         )
         effective = [row for row in reservations if row["status"] not in {"CANCELLED", "NO_SHOW"}]
-        revenue = sum(int(row["totalKgs"] or 0) for row in effective)
+        booked_kgs = sum(int(row["totalKgs"] or 0) for row in effective)
+        received_kgs = sum(int(row["received_kgs"] or 0) for row in reservations)
         nights = sum((row["checkOut"] - row["checkIn"]).days for row in effective)
         return {
             "agent": {
-                "id": str(agent["id"]), "name": agent["name"], "contact_name": agent["contactName"], "phone": agent["phone"],
-                "whatsapp": agent["whatsapp"], "email": agent["email"], "notes": agent["notes"], "status": agent["status"],
+                "id": str(agent["id"]),
+                "name": agent["name"],
+                "contact_name": agent["contactName"],
+                "phone": agent["phone"],
+                "whatsapp": agent["whatsapp"],
+                "email": agent["email"],
+                "notes": agent["notes"],
+                "status": agent["status"],
             },
-            "period": {"from": from_date.isoformat() if from_date else None, "to": to_date.isoformat() if to_date else None},
+            "period": {
+                "from": from_date.isoformat() if from_date else None,
+                "to": to_date.isoformat() if to_date else None,
+            },
             "summary": {
-                "reservations": len(reservations), "effective_reservations": len(effective), "revenue_kgs": revenue,
-                "room_nights": nights, "average_check_kgs": round(revenue / len(effective)) if effective else 0,
+                "reservations": len(reservations),
+                "effective_reservations": len(effective),
+                "booked_kgs": booked_kgs,
+                "received_kgs": received_kgs,
+                "room_nights": nights,
+                "average_booking_kgs": round(booked_kgs / len(effective)) if effective else 0,
                 "cancelled_or_no_show": len(reservations) - len(effective),
             },
             "reservations": [
                 {
-                    "id": str(row["id"]), "booking_number": row["bookingNumber"], "status": row["status"],
-                    "check_in": row["checkIn"].isoformat(), "check_out": row["checkOut"].isoformat(), "adults": row["adults"], "children": row["children"],
-                    "total_kgs": row["totalKgs"], "discount_percent": row["discountPercent"], "discount_reason": row["discountReason"],
-                    "extra_bed_count": row["extraBedCount"], "extra_bed_unit_kgs": row["extraBedUnitKgs"],
-                    "guest_name": row["guest_name"] or None, "guest_phone": row["phone"], "rooms": row["rooms"],
+                    "id": str(row["id"]),
+                    "booking_number": row["bookingNumber"],
+                    "status": row["status"],
+                    "check_in": row["checkIn"].isoformat(),
+                    "check_out": row["checkOut"].isoformat(),
+                    "adults": row["adults"],
+                    "children": row["children"],
+                    "total_kgs": row["totalKgs"],
+                    "received_kgs": int(row["received_kgs"] or 0),
+                    "discount_percent": row["discountPercent"],
+                    "discount_reason": row["discountReason"],
+                    "extra_bed_count": row["extraBedCount"],
+                    "extra_bed_unit_kgs": row["extraBedUnitKgs"],
+                    "guest_name": row["guest_name"] or None,
+                    "guest_phone": row["phone"],
+                    "rooms": row["rooms"],
                 }
                 for row in reservations
             ],
             "interactions": [
-                {"id": str(row["id"]), "kind": row["kind"], "note": row["note"],
-                 "next_contact_at": row["nextContactAt"].isoformat() if row["nextContactAt"] else None,
-                 "created_at": row["createdAt"].isoformat()}
+                {
+                    "id": str(row["id"]),
+                    "kind": row["kind"],
+                    "note": row["note"],
+                    "next_contact_at": row["nextContactAt"].isoformat() if row["nextContactAt"] else None,
+                    "created_at": row["createdAt"].isoformat(),
+                }
                 for row in interactions
             ],
         }
@@ -274,7 +401,8 @@ async def room_blocks_context(
         rooms = await conn.fetch(
             '''SELECT room.id,room.code,rt.name AS room_type_name,room."operationalState"::text AS operational_state
                FROM rooms room JOIN room_types rt ON rt.id=room."roomTypeId"
-               WHERE room."propertyId"=$1 ORDER BY room.code''', property_id,
+               WHERE room."propertyId"=$1 ORDER BY room.code''',
+            property_id,
         )
         blocks = await conn.fetch(
             '''
@@ -285,78 +413,169 @@ async def room_blocks_context(
               AND ($2='ALL' OR ib."blockType"::text=$2)
               AND daterange(ib."startDate",ib."endDate",'[)') && daterange($3::date,$4::date,'[)')
             ORDER BY ib."startDate",room.code
-            ''', property_id, block_type, start, end,
+            ''',
+            property_id,
+            block_type,
+            start,
+            end,
         )
         return {
-            "from_date": start, "to_date": end,
-            "rooms": [{"id": str(row["id"]), "code": row["code"], "room_type_name": row["room_type_name"], "operational_state": row["operational_state"]} for row in rooms],
-            "blocks": [{"id": str(row["id"]), "room_id": str(row["roomId"]), "room_code": row["room_code"], "block_type": row["block_type"],
-                        "start_date": row["startDate"].isoformat(), "end_date": row["endDate"].isoformat(), "reason": row["reason"],
-                        "usage_category": row["usageCategory"], "usage_label": row["usageLabel"]} for row in blocks],
+            "from_date": start,
+            "to_date": end,
+            "rooms": [
+                {
+                    "id": str(row["id"]),
+                    "code": row["code"],
+                    "room_type_name": row["room_type_name"],
+                    "operational_state": row["operational_state"],
+                }
+                for row in rooms
+            ],
+            "blocks": [
+                {
+                    "id": str(row["id"]),
+                    "room_id": str(row["roomId"]),
+                    "room_code": row["room_code"],
+                    "block_type": row["block_type"],
+                    "start_date": row["startDate"].isoformat(),
+                    "end_date": row["endDate"].isoformat(),
+                    "reason": row["reason"],
+                    "usage_category": row["usageCategory"],
+                    "usage_label": row["usageLabel"],
+                }
+                for row in blocks
+            ],
         }
 
 
 @router.post("/room-blocks", status_code=status.HTTP_201_CREATED)
-async def create_room_block(payload: RoomBlockCreate, request: Request, user: dict[str, Any] = Depends(commercial_access)):
+async def create_room_block(
+    payload: RoomBlockCreate,
+    request: Request,
+    user: dict[str, Any] = Depends(commercial_access),
+):
     block_id = uuid.uuid4()
     async with request.app.state.db.acquire() as conn:
-        property_id = await _property_id(conn, user["property_code"])
-        room = await conn.fetchrow('SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', payload.room_id, property_id)
-        if not room:
-            raise HTTPException(status_code=404, detail="Room not found")
-        conflicts = await conn.fetch(
-            '''SELECT ib.id,ib."blockType"::text AS block_type,ib."startDate",ib."endDate",ib.reason,r."bookingNumber"
-               FROM inventory_blocks ib LEFT JOIN reservations r ON r.id=ib."reservationId"
-               WHERE ib."roomId"=$1 AND ib.active=true
-                 AND daterange(ib."startDate",ib."endDate",'[)') && daterange($2::date,$3::date,'[)')''',
-            payload.room_id, payload.start_date, payload.end_date,
-        )
-        if conflicts:
-            raise HTTPException(status_code=409, detail={"code": "ROOM_BLOCK_CONFLICT", "room_code": room["code"], "conflicts": [
-                {"id": str(row["id"]), "block_type": row["block_type"], "start": row["startDate"].isoformat(), "end": row["endDate"].isoformat(),
-                 "reason": row["reason"], "booking_number": row["bookingNumber"]} for row in conflicts]})
-        await conn.execute(
-            '''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"usageCategory","usageLabel","createdAt","updatedAt")
-               VALUES ($1,$2,$3::"InventoryBlockType",$4,$5,true,$6,$7,$8,now(),now())''',
-            block_id, payload.room_id, payload.block_type, payload.start_date, payload.end_date, payload.reason.strip(), payload.usage_category, payload.usage_label,
-        )
-        await _audit(conn, property_id=property_id, user=user, action="ROOM_PERIOD_BLOCK_CREATE", resource="InventoryBlock", resource_id=str(block_id), after={**payload.model_dump(mode="json"), "room_code": room["code"]})
+        try:
+            async with conn.transaction():
+                property_id = await _property_id(conn, user["property_code"])
+                room = await conn.fetchrow(
+                    'SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
+                    payload.room_id,
+                    property_id,
+                )
+                if not room:
+                    raise HTTPException(status_code=404, detail="Room not found")
+                conflicts = await conn.fetch(
+                    '''SELECT ib.id,ib."blockType"::text AS block_type,ib."startDate",ib."endDate",ib.reason,r."bookingNumber"
+                       FROM inventory_blocks ib LEFT JOIN reservations r ON r.id=ib."reservationId"
+                       WHERE ib."roomId"=$1 AND ib.active=true
+                         AND daterange(ib."startDate",ib."endDate",'[)') && daterange($2::date,$3::date,'[)')''',
+                    payload.room_id,
+                    payload.start_date,
+                    payload.end_date,
+                )
+                if conflicts:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={
+                            "code": "ROOM_BLOCK_CONFLICT",
+                            "room_code": room["code"],
+                            "conflicts": [
+                                {
+                                    "id": str(row["id"]),
+                                    "block_type": row["block_type"],
+                                    "start": row["startDate"].isoformat(),
+                                    "end": row["endDate"].isoformat(),
+                                    "reason": row["reason"],
+                                    "booking_number": row["bookingNumber"],
+                                }
+                                for row in conflicts
+                            ],
+                        },
+                    )
+                await conn.execute(
+                    '''INSERT INTO inventory_blocks (id,"roomId","blockType","startDate","endDate",active,reason,"usageCategory","usageLabel","createdAt","updatedAt")
+                       VALUES ($1,$2,$3::"InventoryBlockType",$4,$5,true,$6,$7,$8,now(),now())''',
+                    block_id,
+                    payload.room_id,
+                    payload.block_type,
+                    payload.start_date,
+                    payload.end_date,
+                    payload.reason.strip(),
+                    payload.usage_category,
+                    payload.usage_label,
+                )
+                await _audit(
+                    conn,
+                    property_id=property_id,
+                    user=user,
+                    action="ROOM_PERIOD_BLOCK_CREATE",
+                    resource="InventoryBlock",
+                    resource_id=str(block_id),
+                    after={**payload.model_dump(mode="json"), "room_code": room["code"]},
+                )
+        except ExclusionViolationError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "ROOM_BLOCK_CONFLICT_RACE", "message": "Room availability changed before commit."},
+            ) from exc
     return {"id": str(block_id), "room_code": room["code"], "status": "ACTIVE"}
 
 
 @router.delete("/room-blocks/{block_id}")
-async def deactivate_room_block(block_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(commercial_access)):
+async def deactivate_room_block(
+    block_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(commercial_access),
+):
     async with request.app.state.db.acquire() as conn:
-        property_id = await _property_id(conn, user["property_code"])
-        row = await conn.fetchrow(
-            '''SELECT ib.id,ib."blockType"::text AS block_type,room.code FROM inventory_blocks ib
-               JOIN rooms room ON room.id=ib."roomId"
-               WHERE ib.id=$1 AND room."propertyId"=$2 AND ib.active=true AND ib."blockType" IN ('MAINTENANCE','MANUAL') FOR UPDATE''',
-            block_id, property_id,
-        )
-        if not row:
-            raise HTTPException(status_code=404, detail="Active room block not found")
-        await conn.execute('UPDATE inventory_blocks SET active=false,"updatedAt"=now() WHERE id=$1', block_id)
-        await _audit(conn, property_id=property_id, user=user, action="ROOM_PERIOD_BLOCK_DEACTIVATE", resource="InventoryBlock", resource_id=str(block_id), after={"room_code": row["code"], "block_type": row["block_type"], "active": False})
+        async with conn.transaction():
+            property_id = await _property_id(conn, user["property_code"])
+            row = await conn.fetchrow(
+                '''SELECT ib.id,ib."blockType"::text AS block_type,room.code FROM inventory_blocks ib
+                   JOIN rooms room ON room.id=ib."roomId"
+                   WHERE ib.id=$1 AND room."propertyId"=$2 AND ib.active=true AND ib."blockType" IN ('MAINTENANCE','MANUAL') FOR UPDATE''',
+                block_id,
+                property_id,
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail="Active room block not found")
+            await conn.execute('UPDATE inventory_blocks SET active=false,"updatedAt"=now() WHERE id=$1', block_id)
+            await _audit(
+                conn,
+                property_id=property_id,
+                user=user,
+                action="ROOM_PERIOD_BLOCK_DEACTIVATE",
+                resource="InventoryBlock",
+                resource_id=str(block_id),
+                after={"room_code": row["code"], "block_type": row["block_type"], "active": False},
+            )
     return {"id": str(block_id), "status": "INACTIVE"}
 
 
 @router.get("/guest-status")
 async def guest_status(phone: str, request: Request, user: dict[str, Any] = Depends(commercial_access)):
-    normalized = ''.join(ch for ch in phone if ch.isdigit())
+    normalized = "".join(ch for ch in phone if ch.isdigit())
     if len(normalized) < 5:
         return {"returning_guest": False, "discount_percent": 0, "previous_stays": 0}
     async with request.app.state.db.acquire() as conn:
         property_id = await _property_id(conn, user["property_code"])
         rows = await conn.fetch(
             '''SELECT g.id FROM guests g WHERE g."propertyId"=$1 AND regexp_replace(coalesce(g.phone,''),'\\D','','g')=$2''',
-            property_id, normalized,
+            property_id,
+            normalized,
         )
         if not rows:
             return {"returning_guest": False, "discount_percent": 0, "previous_stays": 0}
         guest_ids = [row["id"] for row in rows]
         previous = await conn.fetchval(
             '''SELECT count(*)::int FROM reservations r WHERE r."propertyId"=$1 AND r."primaryGuestId"=ANY($2::uuid[]) AND r.status='CHECKED_OUT' ''',
-            property_id, guest_ids,
+            property_id,
+            guest_ids,
         ) or 0
-        return {"returning_guest": previous > 0, "discount_percent": 10 if previous > 0 else 0, "previous_stays": previous}
+        return {
+            "returning_guest": previous > 0,
+            "discount_percent": 10 if previous > 0 else 0,
+            "previous_stays": previous,
+        }
