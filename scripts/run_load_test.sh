@@ -23,6 +23,32 @@ case "${LOAD_EXPLICIT_TEST_HOST:-}" in
     ;;
 esac
 
+url_without_scheme="${LOAD_BASE_URL#*://}"
+host_with_port="${url_without_scheme%%/*}"
+load_host="${host_with_port%%:*}"
+
+is_loopback=false
+if [[ "${load_host}" == "127.0.0.1" || "${load_host}" == "localhost" ]]; then
+  is_loopback=true
+fi
+
+has_test_marker=false
+if [[ "${load_host}" == *staging* || "${load_host}" == *test* || "${load_host}" == *.invalid ]]; then
+  has_test_marker=true
+fi
+
+is_exact_external_test=false
+if [[ ("${LOAD_TEST_ENV}" == "test" || "${LOAD_TEST_ENV}" == "staging") \
+   && -n "${LOAD_EXPLICIT_TEST_HOST:-}" \
+   && "${load_host}" == "${LOAD_EXPLICIT_TEST_HOST}" ]]; then
+  is_exact_external_test=true
+fi
+
+if [[ "${is_loopback}" != true && "${has_test_marker}" != true && "${is_exact_external_test}" != true ]]; then
+  echo "LOAD TEST BLOCKED: non-loopback target must contain staging/test marker or exactly match LOAD_EXPLICIT_TEST_HOST under test/staging" >&2
+  exit 2
+fi
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required for the pinned k6 runner." >&2
   exit 3
@@ -30,7 +56,6 @@ fi
 
 K6_IMAGE="${K6_IMAGE:-grafana/k6:0.54.0}"
 
-# Loopback URLs must be reachable from the k6 container through host networking.
 network_args=()
 if [[ "${LOAD_BASE_URL}" == http://127.0.0.1:* || "${LOAD_BASE_URL}" == http://localhost:* ]]; then
   if [[ "$(uname -s)" == "Linux" ]]; then
