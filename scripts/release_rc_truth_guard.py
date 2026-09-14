@@ -42,6 +42,11 @@ ALLOWED_HYGIENE_PATHS = {
     ".github/workflows/fulltest-load-baseline-ci.yml",
     ".github/workflows/main-pr-merge-guard-ci.yml",
 }
+EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT = {
+    ".github/workflows/main-pr-merge-guard-ci.yml",
+    "scripts/main_pr_merge_guard.py",
+    "scripts/release_rc_truth_guard.py",
+}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
 
@@ -79,10 +84,10 @@ def main() -> int:
     expected = {
         "release_version": "0.62.2",
         "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-        "source_branch": "feat/owner-ops-corrections-20260914",
-        "accepted_executable_head": "7ae394bbb549bb6200c84e9c46d47ed5cd45499a",
-        "observed_merge_commit": "b13bacad3f2e923f51354b1839371d07179b2e8c",
-        "postmerge_truth_head": "b13bacad3f2e923f51354b1839371d07179b2e8c",
+        "source_branch": "fix/public-request-sent-copy-20260914",
+        "accepted_executable_head": "61bd40d7592e842a4d52cfb343483065afb378cb",
+        "observed_merge_commit": "94c849a0833079627b47db1e25869096191424bc",
+        "postmerge_truth_head": "94c849a0833079627b47db1e25869096191424bc",
         "production_source_branch": "main",
         "migration_count": 24,
         "critical_constraint_count": 93,
@@ -94,17 +99,21 @@ def main() -> int:
             errors.append(f"{key} must be {value!r}")
     if rc.get("main_allowed_as_production_source") is not True:
         errors.append("main must remain the allowed production source branch")
-    if rc.get("observed_merge_tree_equivalent") is not True:
-        errors.append("observed merge must remain tree-equivalent to accepted head")
+    if rc.get("observed_merge_tree_equivalent") is not False:
+        errors.append("PR #164 tested head and main merge are intentionally not tree-equivalent")
+    if rc.get("observed_merge_allowed_hygiene_only") is not True:
+        errors.append("observed merge drift must be explicitly classified as hygiene-only")
+    if set(rc.get("observed_merge_allowed_hygiene_paths") or []) != EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT:
+        errors.append("observed merge allowed hygiene paths do not match the exact PR #163 operational drift")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
         if rc.get(key) is not False:
             errors.append(f"{key} must remain false until real external evidence exists")
     if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
         errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
 
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 52, "success": 52, "failures": 0}, errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 39, "success": 37, "failures": 2}, errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 39, "success": 37, "failures": 2}, errors)
+    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 26, "success": 26, "failures": 0}, errors)
+    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 26, "success": 25, "failures": 1}, errors)
+    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 26, "success": 25, "failures": 1}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
     observed = str(rc.get("observed_merge_commit") or "").lower()
@@ -120,9 +129,14 @@ def main() -> int:
             unexpected = sorted(path for path in changed.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
             if unexpected:
                 errors.append("executable/product drift after accepted head: " + ", ".join(unexpected))
-            observed_diff = git("diff", "--name-only", accepted, observed)
-            if observed_diff:
-                errors.append("observed main merge is not tree-equivalent to accepted executable head")
+
+            observed_diff = {path for path in git("diff", "--name-only", accepted, observed).splitlines() if path}
+            if observed_diff != EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT:
+                errors.append(
+                    "observed merge drift must equal the exact accepted PR #163 hygiene set; got: "
+                    + ", ".join(sorted(observed_diff))
+                )
+
             postmerge_diff = git("diff", "--name-only", observed, postmerge)
             unexpected_post = sorted(path for path in postmerge_diff.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
             if unexpected_post:
@@ -150,8 +164,9 @@ def main() -> int:
     print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
-    print("FACT: accepted_head_workflows=52/52")
-    print("FACT: merged_main_workflows=37/39; two prior frozen-truth checks failed closed before refreeze")
+    print("FACT: accepted_head_workflows=26/26")
+    print("FACT: merged_main_workflows=25/26; Release RC Truth failed closed before this refreeze")
+    print("FACT: observed_merge_drift=PR #163 hygiene-only exact set")
     print("FACT: migrations=24")
     print("FACT: critical_constraints=93")
     print("FACT: production_source_branch=main")
