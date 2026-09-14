@@ -22,6 +22,7 @@ ALLOWED_HYGIENE_PATHS = {
     "docs/DEPLOYMENT_RUNBOOK.md",
     "docs/PRODUCTION_DATABASE_MIGRATIONS.md",
     "docs/DEMO_ACCEPTANCE_2026-08-26.md",
+    "docs/LOAD_TESTING.md",
     "docs/RELEASE_0.60.0_2026-09-05.md",
     "docs/RELEASE_0.61.0_2026-09-06.md",
     "docs/RELEASE_0.62.0_2026-09-07.md",
@@ -30,10 +31,14 @@ ALLOWED_HYGIENE_PATHS = {
     "docs/README.md",
     "docs/STAGING_RUNBOOK_2026-08-28.md",
     "scripts/release_rc_truth_guard.py",
+    "scripts/run_load_test.sh",
     "scripts/verify_internal_hardening.py",
+    "tests/load/resort_core_read.k6.js",
     ".github/workflows/release-rc-truth-ci.yml",
     ".github/workflows/launch-acceptance-ci.yml",
     ".github/workflows/fulltest-external-smoke.yml",
+    ".github/workflows/load-test-contract-ci.yml",
+    ".github/workflows/fulltest-load-baseline-ci.yml",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"

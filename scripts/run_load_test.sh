@@ -16,6 +16,13 @@ case "${LOAD_BASE_URL}" in
     ;;
 esac
 
+case "${LOAD_EXPLICIT_TEST_HOST:-}" in
+  3korony.com|www.3korony.com)
+    echo "LOAD TEST BLOCKED: public production hostname cannot be allowlisted" >&2
+    exit 2
+    ;;
+esac
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required for the pinned k6 runner." >&2
   exit 3
@@ -38,6 +45,7 @@ exec docker run --rm \
   "${network_args[@]}" \
   -e LOAD_BASE_URL \
   -e LOAD_TEST_ENV \
+  -e LOAD_EXPLICIT_TEST_HOST \
   -e LOAD_OWNER_USERNAME \
   -e LOAD_OWNER_PASSWORD \
   -e LOAD_AUTH_GRID \

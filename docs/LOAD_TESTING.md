@@ -18,8 +18,12 @@ The script fails closed unless:
 
 - `LOAD_TEST_ENV` is exactly `ci`, `test`, or `staging`;
 - `LOAD_BASE_URL` is provided;
-- the target is loopback or clearly marked as staging/test;
-- `3korony.com` and `www.3korony.com` are rejected explicitly.
+- the target is loopback or clearly marked as staging/test; or
+- under `test`/`staging`, the target hostname exactly matches `LOAD_EXPLICIT_TEST_HOST`.
+
+`3korony.com` and `www.3korony.com` are always rejected and cannot be re-enabled through `LOAD_EXPLICIT_TEST_HOST`.
+
+`LOAD_EXPLICIT_TEST_HOST` exists only for externally hosted integration environments whose generated provider hostname does not contain `test` or `staging`. It must be the exact hostname from `LOAD_BASE_URL`; it is not a suffix, wildcard or domain pattern.
 
 Authorized PMS-grid pressure is off by default. To enable it, set `LOAD_AUTH_GRID=true` plus staging-only owner credentials. Never commit those credentials.
 
@@ -52,7 +56,18 @@ export LOAD_BASE_URL=https://staging.example.invalid
 bash scripts/run_load_test.sh
 ```
 
-Optional authenticated PMS-grid read pressure:
+For the verified Railway **Three Crowns Full Test** API only, the generated hostname contains the word `production` even though the project is an integration/test environment. Authorize it by exact hostname, not by weakening the global guard:
+
+```bash
+export LOAD_TEST_ENV=test
+export LOAD_BASE_URL=https://api-production-f1171.up.railway.app
+export LOAD_EXPLICIT_TEST_HOST=api-production-f1171.up.railway.app
+bash scripts/run_load_test.sh
+```
+
+The repository workflow `.github/workflows/fulltest-load-baseline-ci.yml` runs this exact Full Test target with the default 10 -> 25 -> 50 VU read-only profile. No PMS credentials are supplied, so it exercises only readiness and public availability reads.
+
+Optional authenticated PMS-grid pressure:
 
 ```bash
 export LOAD_AUTH_GRID=true
