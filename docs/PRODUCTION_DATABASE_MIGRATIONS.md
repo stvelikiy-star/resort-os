@@ -1,22 +1,18 @@
 # Three Crowns — production database migration gate
 
-Date: 2026-09-07  
-Release: `0.62.2`  
-Status: **COMMITTED / CLEAN-DEPLOY VERIFIED IN REPOSITORY CI / BACKUP-RESTORE VERIFIED IN CI / EXTERNAL PRODUCTION NOT EXECUTED**
+Date: 2026-09-14  
+Candidate: PR `#157` — owner PMS corrections, agents and period room holds  
+Status: **RELEASE CANDIDATE / REPOSITORY CI REQUIRED / EXTERNAL PRODUCTION NOT EXECUTED**
 
-This document defines the database migration boundary. It does not prove real production migration.
+This document defines the current candidate database migration boundary. It does not prove real production migration and does not authorize production cutover.
 
 ## Release identity
 
-Accepted executable head: `b79e22ee56c43e5f9146df7597d4c9e5e4124afa`.  
-Observed tree-equivalent main merge: `731e81c2d2a4ccc91fae319b73f0d4b8eb9979b5`.  
-Production source branch: `main`.
-
-Repository acceptance on the accepted head is **41/41 workflows SUCCESS**. The observed merge retained the same tree and produced **32/32 eligible successful product/security/migration/staging workflows**; the previous 0.62.1 Release RC guard failed closed before this controlled 0.62.2 refreeze.
+Production source branch remains `main`. PR #157 extends the canonical database boundary only after all repository release gates pass and the PR is merged. No external production database migration is part of this candidate verification.
 
 ## Canonical migration ledger
 
-Release 0.62.2 retains exactly **22 committed migrations**:
+The current candidate contains exactly **24 committed migrations**, in this exact deployment order:
 
 1. `0_init`
 2. `1_site_content`
@@ -40,8 +36,19 @@ Release 0.62.2 retains exactly **22 committed migrations**:
 20. `z19_dining_table_status_guard_20260905`
 21. `z20_dining_active_table_unique_20260906`
 22. `z21_dining_production_snapshots_20260906`
+23. `z99_marketing_consent_attribution_20260912`
+24. `zz100_owner_ops_corrections_20260914`
 
-The shared release contract fingerprints **87 critical domain constraints** through `scripts/release_contract.py`.
+The `zz100_...` prefix is intentional: Prisma migration directories are ordered lexicographically, so this name guarantees that the owner-operations migration runs after the existing `z99` marketing migration.
+
+The shared release contract fingerprints **93 critical domain constraints** through `scripts/release_contract.py`. The six owner-operations additions are:
+
+- `booking_agents_status_check`
+- `booking_agent_interactions_kind_check`
+- `reservations_extra_bed_count_check`
+- `reservations_extra_bed_unit_check`
+- `reservations_discount_percent_check`
+- `inventory_blocks_usage_category_check`
 
 ## Canonical property baseline
 
@@ -59,7 +66,8 @@ Physical room intake is closed. Real target reconciliation remains an external e
 3. Never use destructive reset against production.
 4. Never use `migrate resolve` to hide schema drift.
 5. Every forward migration must update the release contract and backup/restore verification.
-6. A fresh real backup and isolated restore verification are required before cutover.
+6. The Prisma schema must remain synchronized with the committed migration truth.
+7. A fresh real backup and isolated restore verification are required before cutover.
 
 ## Fresh staging / production database
 
@@ -90,8 +98,8 @@ RESTORE_DATABASE_URL=postgresql://.../resort_os_restore \
 python scripts/database_restore_verify.py
 ```
 
-Repository CI proves the mechanism against the 22-migration / 87-constraint contract. Production still requires a fresh actual-target backup, checksum, timestamp, off-site copy and restore evidence.
+Repository CI must prove the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires a fresh actual-target backup, checksum, timestamp, off-site copy and restore evidence.
 
 ## Production boundary
 
-Database engineering is repository-ready. External production migration remains **EXTERNAL PRODUCTION CUTOVER STOP** until the actual target has exact accepted SHA/image linkage, fresh backup, successful migrate deploy/status, readiness/smoke, tested restore/rollback and verified off-site copy. Beget/VPS remains deferred to the final owner-approved phase.
+The candidate remains **EXTERNAL PRODUCTION CUTOVER STOP** until repository CI is green, PR #157 is merged to `main`, and the actual target has exact accepted SHA/image linkage, fresh backup, successful migrate deploy/status, readiness/smoke, tested restore/rollback and verified off-site copy. Beget/VPS/Railway production changes require a separate owner-approved cutover action.
