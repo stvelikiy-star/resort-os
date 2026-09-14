@@ -1,0 +1,63 @@
+name: Full Test Read-Only Load Baseline
+
+on:
+  pull_request:
+    paths:
+      - 'tests/load/**'
+      - 'scripts/run_load_test.sh'
+      - 'docs/LOAD_TESTING.md'
+      - '.github/workflows/load-test-contract-ci.yml'
+      - '.github/workflows/fulltest-load-baseline-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: three-crowns-fulltest-readonly-load
+  cancel-in-progress: false
+
+jobs:
+  fulltest-readonly-baseline:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull pinned k6 image with bounded retry
+        run: |
+          for attempt in 1 2 3; do
+            if docker pull grafana/k6:0.54.0; then
+              exit 0
+            fi
+            if test "$attempt" = "3"; then
+              echo 'k6 image pull failed after 3 attempts' >&2
+              exit 1
+            fi
+            sleep $((attempt * 3))
+          done
+
+      - name: Run exact-host read-only Full Test baseline 10 -> 25 -> 50 VU
+        env:
+          LOAD_TEST_ENV: test
+          LOAD_BASE_URL: https://api-production-f1171.up.railway.app
+          LOAD_EXPLICIT_TEST_HOST: api-production-f1171.up.railway.app
+          LOAD_AUTH_GRID: 'false'
+          LOAD_VUS_1: '10'
+          LOAD_VUS_2: '25'
+          LOAD_VUS_3: '50'
+          LOAD_STAGE_1: 30s
+          LOAD_STAGE_2: 60s
+          LOAD_STAGE_3: 60s
+          LOAD_STAGE_4: 30s
+          LOAD_SLEEP_SECONDS: '0.2'
+        run: |
+          set -o pipefail
+          bash scripts/run_load_test.sh 2>&1 | tee /tmp/three-crowns-fulltest-k6.log
+
+      - name: Confirm baseline remained non-mutating
+        run: |
+          ! grep -E '/confirm-payment|/check-in|/check-out|POST.+booking/requests|PATCH|DELETE' tests/load/resort_core_read.k6.js
+          grep -q '/ready' tests/load/resort_core_read.k6.js
+          grep -q '/api/v1/booking/check-availability' tests/load/resort_core_read.k6.js
