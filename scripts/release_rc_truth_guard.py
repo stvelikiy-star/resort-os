@@ -71,13 +71,13 @@ def main() -> int:
     expected = {
         "release_version": "0.62.2",
         "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-        "source_branch": "audit/request-body-limits-v2-20260907",
-        "accepted_executable_head": "ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4",
-        "observed_merge_commit": "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e",
-        "postmerge_truth_head": "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e",
+        "source_branch": "feat/owner-ops-corrections-20260914",
+        "accepted_executable_head": "7ae394bbb549bb6200c84e9c46d47ed5cd45499a",
+        "observed_merge_commit": "b13bacad3f2e923f51354b1839371d07179b2e8c",
+        "postmerge_truth_head": "b13bacad3f2e923f51354b1839371d07179b2e8c",
         "production_source_branch": "main",
-        "migration_count": 22,
-        "critical_constraint_count": 87,
+        "migration_count": 24,
+        "critical_constraint_count": 93,
     }
     if rc.get("schema_version") != 1:
         errors.append("unsupported RC manifest schema")
@@ -94,9 +94,9 @@ def main() -> int:
     if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
         errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
 
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 24, "success": 24, "failures": 0}, errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 23, "success": 23, "failures": 0}, errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 23, "success": 23, "failures": 0}, errors)
+    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 52, "success": 52, "failures": 0}, errors)
+    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 39, "success": 37, "failures": 2}, errors)
+    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 39, "success": 37, "failures": 2}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
     observed = str(rc.get("observed_merge_commit") or "").lower()
@@ -122,7 +122,7 @@ def main() -> int:
         except subprocess.CalledProcessError as exc:
             errors.append(f"cannot validate frozen release tree: {exc}")
 
-    required_markers = ("0.62.2", accepted, observed, "22", "87", "main", "EXTERNAL", "STOP")
+    required_markers = ("0.62.2", accepted, observed, "24", "93", "main", "EXTERNAL", "STOP")
     for doc in DOCS:
         try:
             text = doc.read_text(encoding="utf-8")
@@ -142,12 +142,10 @@ def main() -> int:
     print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
-    print("FACT: accepted_head_workflows=24/24")
-    print("FACT: merged_main_eligible_workflows=23/23")
-    print("FACT: pre_refreeze_release_control_failure=Release RC Truth CI")
-    print("FACT: security_boundary=runtime_pins_same_origin_ws_origin_and_body_limits")
-    print("FACT: migrations=22")
-    print("FACT: critical_constraints=87")
+    print("FACT: accepted_head_workflows=52/52")
+    print("FACT: merged_main_workflows=37/39; two prior frozen-truth checks failed closed before refreeze")
+    print("FACT: migrations=24")
+    print("FACT: critical_constraints=93")
     print("FACT: production_source_branch=main")
     print("FACT: production_cutover_authorized=false")
     if allow_non_accepted_head:
