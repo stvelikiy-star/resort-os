@@ -25,7 +25,7 @@ def main() -> int:
     agents = text("apps/admin/components/AgentsBoard.tsx")
     builder = text("apps/admin/components/ReservationScheduleBuilder.tsx")
     web_booking = text("apps/web/components/BookingWidget.tsx")
-    migration = text("packages/database/prisma/migrations/z100_owner_ops_corrections_20260914/migration.sql")
+    migration = text("packages/database/prisma/migrations/zz100_owner_ops_corrections_20260914/migration.sql")
 
     # Final admin must retain Marketing while adding Agents.
     require('import MarketingBoard from "./MarketingBoard"' in admin, "MarketingBoard missing from final AdminShell")
