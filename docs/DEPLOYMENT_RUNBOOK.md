@@ -28,6 +28,13 @@ Authority: `PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> 
 
 Authenticated browser realtime must remain same-origin on Admin/Staff hosts. PostgreSQL must remain private. Production runtime images must use exact audited pins; floating `latest` is not release evidence.
 
+Current production TLS/DNS topology is exactly:
+- `3korony.com` — Public;
+- `api.3korony.com` — Resort Core;
+- `admin.3korony.com` — Admin/PMS;
+- `staff.3korony.com` — Staff/Kitchen;
+- `automation.3korony.com` — n8n when enabled.
+
 ## 3. Host preflight
 
 Before mutating a real host run `bash scripts/host_preflight.sh`. Do not proceed on `BLOCKED`. Recommended initial target remains Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 120–160 GB SSD/NVMe, static IPv4, sudo/root SSH, Docker Engine + Compose plugin. PostgreSQL must never be publicly exposed.
@@ -36,7 +43,31 @@ Before mutating a real host run `bash scripts/host_preflight.sh`. Do not proceed
 
 Use `/srv/three-crowns` with persistent PostgreSQL, n8n, public/private media and backups. Repository checkout may be replaced; persistent data/backups must not be deleted with it.
 
-Before DNS/apex or web-server changes: record DNS/IP/TTL, capture current web root/config, archive files/media, dump legacy DB if present, checksum artifacts, verify off-site copy, document rollback action/owner and keep current live site serving until acceptance passes.
+Before DNS or web-server changes, two independent rollback evidence sets are mandatory:
+1. the legacy site rollback package (`legacy_rollback_capture.py` -> restore rehearsal -> `legacy_rollback_gate.py`), covering current web root/config/media/database and the legacy apex DNS snapshot;
+2. the dedicated production DNS rollback package covering **all five production hostnames**, including records that existed before cutover and hostnames that were previously `NXDOMAIN` or had no A/AAAA/CNAME records.
+
+The DNS capture is read-only and must query the authoritative nameservers directly. Resolver fallback is not accepted. Capture it immediately before routing changes:
+
+```bash
+python scripts/dns_rollback_capture.py \
+  --output-dir /secure/path/dns-rollback-$(date -u +%Y%m%dT%H%M%SZ) \
+  --offsite-dir /mounted/restricted-offsite-copy \
+  --rollback-owner OWNER
+```
+
+Then require the fail-closed gate before any DNS mutation:
+
+```bash
+python scripts/dns_rollback_gate.py \
+  /secure/path/dns-rollback-YYYYMMDDTHHMMSSZ \
+  --max-age-hours 24 \
+  --output /secure/path/dns-rollback-evidence.json
+```
+
+`DNS_ROLLBACK_GATE_GREEN` is required before `dns_rollback_capture` may be marked VERIFIED in launch evidence. The gate validates the exact five-host topology, authoritative nameserver consensus, TTL/class syntax, apex NS/SOA, prior PRESENT/NO_WEB_RECORDS/NXDOMAIN state, freshness, named rollback owner, and byte-identical off-site evidence. The capture/gate never changes DNS.
+
+Keep the current live site serving until acceptance passes. Do not edit DNS merely to test rollback tooling.
 
 ## 5. Environment and secrets
 
@@ -120,7 +151,7 @@ These results guide sizing and procedure but must be re-observed on the actual p
 2. run `python scripts/release_rc_truth_guard.py`;
 3. verify GitHub/Drive launch-security gates;
 4. run host/environment preflight;
-5. preserve and checksum the live rollback package;
+5. preserve, checksum, restore-rehearse and off-site-copy the legacy live rollback package;
 6. create persistent directories and staging secrets;
 7. start private PostgreSQL;
 8. apply all **24** migrations;
@@ -135,9 +166,11 @@ These results guide sizing and procedure but must be re-observed on the actual p
 17. re-run guarded load baseline with target resource observations;
 18. prove monitoring/restart/self-healing on the target;
 19. take a fresh target backup, make a byte-identical restricted off-site copy, run `database_restore_evidence.py` against an isolated restore database, then require `pre_cutover_backup_gate.py` to return `PRE_CUTOVER_BACKUP_GATE_GREEN`;
-20. record immutable SHA/image/runtime linkage and DNS rollback evidence.
+20. run `dns_rollback_capture.py` and require `dns_rollback_gate.py` to return `DNS_ROLLBACK_GATE_GREEN` for all five production hostnames;
+21. record immutable SHA/image/runtime linkage;
+22. only after every required launch gate is VERIFIED and explicit owner GO exists, perform the separately authorized DNS cutover.
 
-The exact backup/restore/off-site command sequence is canonical in `docs/PRODUCTION_DATABASE_MIGRATIONS.md`. A launch-evidence JSON entry alone is not sufficient evidence for `pre_cutover_backup`.
+The exact backup/restore/off-site command sequence is canonical in `docs/PRODUCTION_DATABASE_MIGRATIONS.md`. Launch-evidence JSON entries alone are not sufficient evidence for `pre_cutover_backup` or `dns_rollback_capture`.
 
 ## 10. Current blockers
 
@@ -148,7 +181,8 @@ Before production cutover:
 - prove target rollback and exact migration/room reconciliation;
 - prove final production HTTPS/WSS and real-device/provider behavior;
 - execute the fresh actual-target backup/clean-restore/off-site gate;
-- record immutable deployment linkage and tested DNS rollback.
+- execute the authoritative five-host DNS rollback capture/gate on the real zone immediately before routing changes;
+- record immutable deployment linkage.
 
 ## 11. Production cutover gate
 
