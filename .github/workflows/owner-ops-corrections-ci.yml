@@ -34,6 +34,7 @@ jobs:
       - name: Compile changed backend modules
         run: |
           python -m py_compile \
+            services/api/app/agent_context.py \
             services/api/app/owner_corrections.py \
             services/api/app/pms_reservation_create.py \
             services/api/app/app_entry.py
