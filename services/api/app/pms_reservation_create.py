@@ -344,13 +344,23 @@ async def commit_grid_reservation(
                         status_code=409,
                         detail={"code": "PRICING_SOURCE_CHANGED", "current": preview["pricing"]["source"]},
                     )
-                if int(preview["pricing"]["total_kgs"]) != payload.expected_total_kgs:
+
+                committed_total_kgs = int(preview["pricing"]["total_kgs"])
+                auto_discount_discovered_at_commit = (
+                    payload.guest_phone is None
+                    and payload.discount_percent is None
+                    and bool(preview["pricing"].get("returning_guest"))
+                    and int(preview["pricing"].get("discount_percent") or 0) == RETURNING_GUEST_DISCOUNT_PERCENT
+                    and int(preview["pricing"].get("subtotal_kgs") or 0) == payload.expected_total_kgs
+                    and committed_total_kgs < payload.expected_total_kgs
+                )
+                if committed_total_kgs != payload.expected_total_kgs and not auto_discount_discovered_at_commit:
                     raise HTTPException(
                         status_code=409,
                         detail={
                             "code": "PRICE_CHANGED",
                             "expected_total_kgs": payload.expected_total_kgs,
-                            "current_total_kgs": int(preview["pricing"]["total_kgs"]),
+                            "current_total_kgs": committed_total_kgs,
                         },
                     )
 
@@ -388,7 +398,7 @@ async def commit_grid_reservation(
                     payload.adults,
                     payload.children,
                     uuid.UUID(room["room_type_id"]),
-                    payload.expected_total_kgs,
+                    committed_total_kgs,
                     payload.notes,
                     agent_id,
                 )
@@ -410,7 +420,7 @@ async def commit_grid_reservation(
                     payload.check_out,
                     payload.adults,
                     payload.children,
-                    payload.expected_total_kgs,
+                    committed_total_kgs,
                     payload.notes,
                     agent_id,
                     payload.extra_bed_count,
@@ -458,7 +468,8 @@ async def commit_grid_reservation(
                         'pricing_source',$21::text,
                         'core_total_kgs',$22::integer,
                         'payment_created',false,
-                        'guest_id',$23::text
+                        'guest_id',$23::text,
+                        'price_adjusted_at_commit',$24::boolean
                       ),now())
                     ''',
                     uuid.uuid4(),
@@ -471,7 +482,7 @@ async def commit_grid_reservation(
                     payload.check_in.isoformat(),
                     payload.check_out.isoformat(),
                     preview["nights"],
-                    payload.expected_total_kgs,
+                    committed_total_kgs,
                     preview["pricing"].get("base_total_kgs"),
                     payload.extra_bed_count,
                     payload.extra_bed_unit_kgs,
@@ -484,6 +495,7 @@ async def commit_grid_reservation(
                     preview["pricing"]["source"],
                     preview["pricing"].get("core_total_kgs"),
                     str(identity["guest_id"]),
+                    auto_discount_discovered_at_commit,
                 )
         except ExclusionViolationError as exc:
             raise HTTPException(
@@ -501,7 +513,7 @@ async def commit_grid_reservation(
         "check_in": payload.check_in,
         "check_out": payload.check_out,
         "nights": preview["nights"],
-        "total_kgs": payload.expected_total_kgs,
+        "total_kgs": committed_total_kgs,
         "base_total_kgs": preview["pricing"].get("base_total_kgs"),
         "extra_bed_count": payload.extra_bed_count,
         "extra_beds_total_kgs": preview["pricing"].get("extra_beds_total_kgs"),
@@ -510,6 +522,7 @@ async def commit_grid_reservation(
         "returning_guest": preview["pricing"].get("returning_guest"),
         "agent_id": str(payload.agent_id) if payload.agent_id else None,
         "pricing_source": preview["pricing"]["source"],
+        "price_adjusted_at_commit": auto_discount_discovered_at_commit,
         "payment_created": False,
         "payment_terms": "MANAGER_CONTROLLED",
     }
