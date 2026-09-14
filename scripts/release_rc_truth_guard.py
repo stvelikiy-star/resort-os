@@ -41,6 +41,7 @@ ALLOWED_HYGIENE_PATHS = {
     ".github/workflows/load-test-contract-ci.yml",
     ".github/workflows/fulltest-load-baseline-ci.yml",
     ".github/workflows/main-pr-merge-guard-ci.yml",
+    ".github/workflows/management-final-acceptance-ci.yml",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
@@ -79,10 +80,10 @@ def main() -> int:
     expected = {
         "release_version": "0.62.2",
         "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-        "source_branch": "feat/owner-ops-corrections-20260914",
-        "accepted_executable_head": "7ae394bbb549bb6200c84e9c46d47ed5cd45499a",
-        "observed_merge_commit": "b13bacad3f2e923f51354b1839371d07179b2e8c",
-        "postmerge_truth_head": "b13bacad3f2e923f51354b1839371d07179b2e8c",
+        "source_branch": "fix/public-request-sent-copy-20260914",
+        "accepted_executable_head": "94c849a0833079627b47db1e25869096191424bc",
+        "observed_merge_commit": "94c849a0833079627b47db1e25869096191424bc",
+        "postmerge_truth_head": "94c849a0833079627b47db1e25869096191424bc",
         "production_source_branch": "main",
         "migration_count": 24,
         "critical_constraint_count": 93,
@@ -102,9 +103,9 @@ def main() -> int:
     if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
         errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
 
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 52, "success": 52, "failures": 0}, errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 39, "success": 37, "failures": 2}, errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 39, "success": 37, "failures": 2}, errors)
+    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 26, "success": 26, "failures": 0}, errors)
+    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 26, "success": 25, "failures": 1}, errors)
+    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 26, "success": 25, "failures": 1}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
     observed = str(rc.get("observed_merge_commit") or "").lower()
@@ -150,8 +151,8 @@ def main() -> int:
     print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: observed_merge_commit={observed}")
-    print("FACT: accepted_head_workflows=52/52")
-    print("FACT: merged_main_workflows=37/39; two prior frozen-truth checks failed closed before refreeze")
+    print("FACT: accepted_boundary_workflows=26/26")
+    print("FACT: merged_main_workflows=25/26; prior frozen Release RC Truth failed closed before refreeze")
     print("FACT: migrations=24")
     print("FACT: critical_constraints=93")
     print("FACT: production_source_branch=main")
