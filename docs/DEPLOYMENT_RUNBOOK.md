@@ -134,8 +134,10 @@ These results guide sizing and procedure but must be re-observed on the actual p
 16. run real-device/provider checks;
 17. re-run guarded load baseline with target resource observations;
 18. prove monitoring/restart/self-healing on the target;
-19. take fresh target backup and perform clean restore plus off-site verification;
+19. take a fresh target backup, make a byte-identical restricted off-site copy, run `database_restore_evidence.py` against an isolated restore database, then require `pre_cutover_backup_gate.py` to return `PRE_CUTOVER_BACKUP_GATE_GREEN`;
 20. record immutable SHA/image/runtime linkage and DNS rollback evidence.
+
+The exact backup/restore/off-site command sequence is canonical in `docs/PRODUCTION_DATABASE_MIGRATIONS.md`. A launch-evidence JSON entry alone is not sufficient evidence for `pre_cutover_backup`.
 
 ## 10. Current blockers
 
@@ -145,7 +147,7 @@ Before production cutover:
 - obtain an authorized real production execution path;
 - prove target rollback and exact migration/room reconciliation;
 - prove final production HTTPS/WSS and real-device/provider behavior;
-- prove actual-target backup/restore/off-site evidence;
+- execute the fresh actual-target backup/clean-restore/off-site gate;
 - record immutable deployment linkage and tested DNS rollback.
 
 ## 11. Production cutover gate

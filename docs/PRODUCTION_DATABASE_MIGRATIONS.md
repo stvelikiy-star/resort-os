@@ -94,22 +94,40 @@ python scripts/production_preflight.py
 
 ## Backup / restore gate
 
-Create backup:
+Create the fresh actual-target backup:
 
 ```bash
 BACKUP_DIR=/secure/path python scripts/database_backup.py
 ```
 
-Verify isolated restore:
+Copy the resulting `.dump` and `.manifest.json` byte-for-byte to a restricted off-site destination before continuing.
+
+Verify a clean isolated restore and emit machine evidence only if the restore succeeds:
 
 ```bash
 BACKUP_FILE=/secure/path/three-crowns-....dump \
 BACKUP_MANIFEST=/secure/path/three-crowns-....manifest.json \
 RESTORE_DATABASE_URL=postgresql://.../resort_os_restore \
-python scripts/database_restore_verify.py
+python scripts/database_restore_evidence.py \
+  --output /secure/path/restore-evidence.json
 ```
 
-Repository CI proves the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires a fresh actual-target backup, checksum, timestamp, verified off-site copy and isolated restore evidence.
+Then run the fail-closed pre-cutover gate:
+
+```bash
+python scripts/pre_cutover_backup_gate.py \
+  --backup-file /secure/path/three-crowns-....dump \
+  --manifest /secure/path/three-crowns-....manifest.json \
+  --offsite-dir /mounted/restricted-offsite-copy \
+  --restore-evidence /secure/path/restore-evidence.json \
+  --restore-owner OWNER \
+  --max-age-hours 6 \
+  --output /secure/path/pre-cutover-backup-evidence.json
+```
+
+The gate rejects stale backups, non-v3 manifests, wrong property baseline, migration/constraint drift, local/off-site checksum differences, restore evidence that does not belong to the same backup, or a missing restore owner. `PRE_CUTOVER_BACKUP_GATE_GREEN` is required before the `pre_cutover_backup` launch-evidence item may be marked VERIFIED.
+
+Repository CI proves the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires this procedure to be executed on the fresh actual-target backup.
 
 ## Production boundary
 

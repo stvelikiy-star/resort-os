@@ -1,0 +1,47 @@
+name: Pre-Cutover Backup Gate CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/pre_cutover_backup_gate.py'
+      - 'scripts/pre_cutover_backup_contract_test.py'
+      - 'scripts/database_restore_evidence.py'
+      - 'scripts/database_restore_verify.py'
+      - 'scripts/database_backup.py'
+      - 'scripts/release_contract.py'
+      - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - '.github/workflows/pre-cutover-backup-gate-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/pre_cutover_backup_gate.py'
+      - 'scripts/pre_cutover_backup_contract_test.py'
+      - 'scripts/database_restore_evidence.py'
+      - 'scripts/database_restore_verify.py'
+      - 'scripts/database_backup.py'
+      - 'scripts/release_contract.py'
+      - 'docs/PRODUCTION_DATABASE_MIGRATIONS.md'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - '.github/workflows/pre-cutover-backup-gate-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile backup evidence tools
+        run: |
+          python -m py_compile \
+            scripts/pre_cutover_backup_gate.py \
+            scripts/pre_cutover_backup_contract_test.py \
+            scripts/database_restore_evidence.py
+      - name: Prove fail-closed pre-cutover backup contract
+        run: python scripts/pre_cutover_backup_contract_test.py
