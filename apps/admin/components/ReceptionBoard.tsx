@@ -24,6 +24,10 @@ type Reservation = {
   has_room_move: boolean;
 };
 
+type AgentOption = { id: string; name: string; status: string };
+type AgentMapping = { reservation_id: string; agent_id: string; agent_name: string };
+type AgentContext = { agents?: AgentOption[]; reservations?: AgentMapping[] };
+
 type ScheduleSegment = {
   inventory_block_id: string;
   room_id: string;
@@ -50,6 +54,7 @@ type Detail = {
 };
 
 type Filter = "ACTIVE" | "ARRIVALS_TODAY" | "DEPARTURES_TODAY" | "GUARANTEED" | "CHECKED_IN" | "CHECKED_OUT" | "ALL";
+type AgentFilter = "ALL" | "DIRECT" | string;
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const statusLabel: Record<string, string> = { GUARANTEED: "Гарантирована", CHECKED_IN: "Проживает", CHECKED_OUT: "Выехал", CANCELLED: "Отменена", NO_SHOW: "Не заехал" };
@@ -76,6 +81,9 @@ export default function ReceptionBoard() {
   const [items, setItems] = useState<Reservation[]>([]);
   const [localDate, setLocalDate] = useState<string>("");
   const [filter, setFilter] = useState<Filter>("ACTIVE");
+  const [agentFilter, setAgentFilter] = useState<AgentFilter>("ALL");
+  const [agents, setAgents] = useState<AgentOption[]>([]);
+  const [agentMappings, setAgentMappings] = useState<AgentMapping[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,11 +95,22 @@ export default function ReceptionBoard() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.detail || "Не удалось загрузить брони");
-      setItems(body.items || []);
-      setLocalDate(body.local_date || "");
+      const [reservationsResponse, agentsResponse] = await Promise.all([
+        fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" }),
+        fetch("/core/api/v1/admin/agents-context/reservations", { cache: "no-store" }),
+      ]);
+      const reservationsBody = await reservationsResponse.json().catch(() => ({}));
+      const agentsBody = await agentsResponse.json().catch(() => ({})) as AgentContext;
+      if (!reservationsResponse.ok) throw new Error(reservationsBody.detail || "Не удалось загрузить брони");
+      setItems(reservationsBody.items || []);
+      setLocalDate(reservationsBody.local_date || "");
+      if (agentsResponse.ok) {
+        setAgents((agentsBody.agents || []).filter((agent) => agent.status === "ACTIVE"));
+        setAgentMappings(agentsBody.reservations || []);
+      } else {
+        setAgents([]);
+        setAgentMappings([]);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка загрузки");
     } finally {
@@ -100,6 +119,8 @@ export default function ReceptionBoard() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const agentByReservation = useMemo(() => new Map(agentMappings.map((item) => [item.reservation_id, item])), [agentMappings]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,10 +131,15 @@ export default function ReceptionBoard() {
       else if (filter === "DEPARTURES_TODAY") statusMatch = item.status === "CHECKED_IN" && Boolean(localDate) && item.checkOut === localDate;
       else if (filter !== "ALL") statusMatch = item.status === filter;
       if (!statusMatch) return false;
+
+      const mappedAgent = agentByReservation.get(item.id);
+      if (agentFilter === "DIRECT" && mappedAgent) return false;
+      if (agentFilter !== "ALL" && agentFilter !== "DIRECT" && mappedAgent?.agent_id !== agentFilter) return false;
+
       if (!q) return true;
-      return [item.bookingNumber, item.firstName, item.phone, item.room_code, item.room_type_name].some((value) => value?.toLowerCase().includes(q));
+      return [item.bookingNumber, item.firstName, item.phone, item.room_code, item.room_type_name, mappedAgent?.agent_name].some((value) => value?.toLowerCase().includes(q));
     });
-  }, [items, filter, query, localDate]);
+  }, [items, filter, agentFilter, agentByReservation, query, localDate]);
 
   async function transition(item: Reservation, action: "check-in" | "check-out") {
     const prompt = action === "check-in"
@@ -153,12 +179,12 @@ export default function ReceptionBoard() {
 
   return <main className="work-shell reception-shell">
     <div className="work-head">
-      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, оплаты, folio и история размещения берутся из Resort Core.</p></div>
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, оплаты, folio, агент и история размещения берутся из Resort Core.</p></div>
       <button className="btn" onClick={load}>Обновить</button>
     </div>
 
     <div className="reception-controls">
-      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Гость, телефон, номер, бронь…" />
+      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Гость, телефон, номер, бронь, агент…" />
       <select value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
         <option value="ACTIVE">Активные</option>
         <option value="ARRIVALS_TODAY">Заезды сегодня</option>
@@ -168,24 +194,32 @@ export default function ReceptionBoard() {
         <option value="CHECKED_OUT">Выехали</option>
         <option value="ALL">Все</option>
       </select>
+      <select value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)} aria-label="Фильтр по агенту">
+        <option value="ALL">Все агенты / источники</option>
+        <option value="DIRECT">Без агента / прямые</option>
+        {agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}
+      </select>
       <span>{localDate ? `Дата отеля: ${localDate}` : ""}</span>
     </div>
 
     {error && <div className="error-box">{error}</div>}
     {loading ? <div className="loading">Загрузка броней…</div> : <div className="reception-list">
       {visible.length === 0 && <div className="empty">По выбранному фильтру броней нет.</div>}
-      {visible.map((item) => <article className="reception-card" key={item.id}>
-        <div><span className={`status-pill s-${item.status}`}>{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong>{item.has_room_move && <small className="room-move-note">Переселение · {item.schedule_segments} сегм.</small>}</div>
-        <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
-        <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small>{item.room_state && <small>{roomStateLabel[item.room_state] || item.room_state}</small>}</div>
-        <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
-        <div className="reception-finance"><span className="field-label">Оплата проживания</span><b>{money(item.paidKgs)} / {money(item.totalKgs)}</b><small className={item.remainingKgs > 0 ? "balance-due" : "balance-ok"}>{item.remainingKgs > 0 ? `Без доп. услуг: остаток ${money(item.remainingKgs)}` : "Проживание оплачено"}</small></div>
-        <div className="reception-actions">
-          <button className="btn" onClick={() => openDetail(item.id)} disabled={detailLoading}>Карточка</button>
-          {item.status === "GUARANTEED" && <button className="btn primary" onClick={() => transition(item, "check-in")} disabled={busy === item.id}>Заезд</button>}
-          {item.status === "CHECKED_IN" && <button className="btn primary" onClick={() => transition(item, "check-out")} disabled={busy === item.id}>Выезд</button>}
-        </div>
-      </article>)}
+      {visible.map((item) => {
+        const mappedAgent = agentByReservation.get(item.id);
+        return <article className="reception-card" key={item.id}>
+          <div><span className={`status-pill s-${item.status}`}>{statusLabel[item.status] || item.status}</span><strong className="reception-booking">{item.bookingNumber}</strong>{mappedAgent && <small className="room-move-note">Агент · {mappedAgent.agent_name}</small>}{item.has_room_move && <small className="room-move-note">Переселение · {item.schedule_segments} сегм.</small>}</div>
+          <div><span className="field-label">Гость</span><b>{item.firstName || "Без имени"}</b>{item.phone && <a href={`tel:${item.phone}`}>{item.phone}</a>}</div>
+          <div><span className="field-label">{item.status === "GUARANTEED" ? "Номер на заезд" : item.status === "CHECKED_IN" ? "Текущий номер" : "Последний номер"}</span><b>{item.room_code || "—"}</b><small>{item.room_type_name || ""}</small>{item.room_state && <small>{roomStateLabel[item.room_state] || item.room_state}</small>}</div>
+          <div><span className="field-label">Даты</span><b>{item.checkIn} → {item.checkOut}</b><small>{item.adults} взр. · {item.children} дет.</small></div>
+          <div className="reception-finance"><span className="field-label">Оплата проживания</span><b>{money(item.paidKgs)} / {money(item.totalKgs)}</b><small className={item.remainingKgs > 0 ? "balance-due" : "balance-ok"}>{item.remainingKgs > 0 ? `Без доп. услуг: остаток ${money(item.remainingKgs)}` : "Проживание оплачено"}</small></div>
+          <div className="reception-actions">
+            <button className="btn" onClick={() => openDetail(item.id)} disabled={detailLoading}>Карточка</button>
+            {item.status === "GUARANTEED" && <button className="btn primary" onClick={() => transition(item, "check-in")} disabled={busy === item.id}>Заезд</button>}
+            {item.status === "CHECKED_IN" && <button className="btn primary" onClick={() => transition(item, "check-out")} disabled={busy === item.id}>Выезд</button>}
+          </div>
+        </article>;
+      })}
     </div>}
 
     {detail && <div className="detail-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setDetail(null); }}>
@@ -196,7 +230,7 @@ export default function ReceptionBoard() {
           <div><span>Гость</span><strong>{[detail.guest.first_name, detail.guest.last_name].filter(Boolean).join(" ") || "Без имени"}</strong>{detail.guest.phone && <a href={`tel:${detail.guest.phone}`}>{detail.guest.phone}</a>}{detail.guest.email && <small>{detail.guest.email}</small>}</div>
           <div><span>Текущий/рабочий номер</span><strong>{detail.room?.code || "—"}</strong><small>{detail.room?.room_type_name || ""}{detail.room?.area ? ` · ${detail.room.area}` : ""}</small><small>{detail.room?.state ? roomStateLabel[detail.room.state] || detail.room.state : "Назначение не найдено"}</small></div>
           <div><span>Проживание</span><strong>{detail.reservation.check_in} → {detail.reservation.check_out}</strong><small>{detail.reservation.adults} взр. · {detail.reservation.children} дет.</small></div>
-          <div><span>Источник</span><strong>{detail.source.channel || "—"}</strong><small>{detail.source.request_id ? `Request ${detail.source.request_id.slice(0, 8)}…` : ""}</small></div>
+          <div><span>Источник</span><strong>{agentByReservation.get(detail.reservation.id)?.agent_name || detail.source.channel || "—"}</strong><small>{detail.source.request_id ? `Request ${detail.source.request_id.slice(0, 8)}…` : ""}</small></div>
         </div>
 
         <section className="detail-section"><h3>График проживания</h3>{detail.schedule.length === 0 ? <p className="detail-muted">У брони нет активного графика размещения.</p> : <div className="stay-schedule-list">{detail.schedule.map((segment) => <div key={segment.inventory_block_id} className={segment.is_working_room ? "working-room-segment" : ""}><strong>№ {segment.room_code}{segment.is_working_room ? " · сейчас" : ""}</strong><span>{segment.start} → {segment.end}</span><small>{segment.room_type_name}{segment.room_state ? ` · ${roomStateLabel[segment.room_state] || segment.room_state}` : ""}</small></div>)}</div>}</section>

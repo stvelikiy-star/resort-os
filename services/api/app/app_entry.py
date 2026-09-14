@@ -1,3 +1,4 @@
+from .agent_context import router as agent_context_router
 from .ai_sales import router as ai_sales_router
 from .analytics_reports import router as analytics_reports_router
 from .automation import router as automation_router
@@ -44,6 +45,7 @@ from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
 from .operations_history import router as operations_history_router
+from .owner_corrections import router as owner_corrections_router
 from .owner_intelligence import router as owner_intelligence_router
 from .owner_operations_analytics import router as owner_operations_analytics_router
 from .owner_pace import admin_router as owner_pace_admin_router
@@ -140,11 +142,15 @@ app.include_router(guest_crm_router)
 app.include_router(owner_pace_admin_router)
 app.include_router(growth_control_router)
 app.include_router(guest_offers_admin_router)
-# Marketing browser views remain OWNER/MANAGER-only. Automation reads and provider
-# callbacks are service-authenticated with X-Resort-Service-Key and fail closed.
+# Marketing is part of the final management contour. Browser views remain
+# OWNER/MANAGER-only; automation/provider callbacks remain service-authenticated.
 app.include_router(marketing_router)
 app.include_router(marketing_integration_router)
 app.include_router(marketing_automation_router)
+# Owner-requested operational corrections: agent CRM, dated maintenance holds,
+# staff/owner/guest room holds and returning-guest lookup.
+app.include_router(owner_corrections_router)
+app.include_router(agent_context_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)

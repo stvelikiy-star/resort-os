@@ -33,6 +33,7 @@ EXPECTED_MIGRATIONS = (
     "z20_dining_active_table_unique_20260906",
     "z21_dining_production_snapshots_20260906",
     "z99_marketing_consent_attribution_20260912",
+    "zz100_owner_ops_corrections_20260914",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -128,6 +129,12 @@ CRITICAL_CONSTRAINTS = frozenset(
         "dining_production_snapshots_entitlement_count_check",
         "dining_production_snapshots_fingerprint_check",
         "dining_production_snapshots_reason_check",
+        "booking_agents_status_check",
+        "booking_agent_interactions_kind_check",
+        "reservations_extra_bed_count_check",
+        "reservations_extra_bed_unit_check",
+        "reservations_discount_percent_check",
+        "inventory_blocks_usage_category_check",
     }
 )
 

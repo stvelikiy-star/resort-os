@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import ReceptionBoard from "./ReceptionBoard";
+import RoomBlocksPanel from "./RoomBlocksPanel";
 
 type Arrival = {
   id: string;
@@ -96,6 +97,7 @@ export default function ReceptionWorkspace({ userRole, onNavigate }: { userRole:
   const isManager = userRole === "OWNER" || userRole === "MANAGER";
 
   return <>
+    <RoomBlocksPanel />
     <section className="reception-readiness" aria-label="Готовность ближайших заездов">
       <div className="reception-readiness-head">
         <div><p className="eyebrow">До заселения · контроль готовности</p><h2>Ближайшие заезды без статуса «Готов»</h2><span>Показываем сегодня + 2 дня. Core по-прежнему не разрешит заезд, пока номер не CLEAN.</span></div>

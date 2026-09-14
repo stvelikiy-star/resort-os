@@ -1,0 +1,59 @@
+name: Owner Ops Corrections CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'apps/web/components/BookingWidget.tsx'
+      - 'services/api/**'
+      - 'packages/database/prisma/migrations/**'
+      - 'scripts/owner_ops_corrections_contract.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - '.github/workflows/owner-ops-corrections-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/admin/**'
+      - 'apps/web/components/BookingWidget.tsx'
+      - 'services/api/**'
+      - 'packages/database/prisma/migrations/**'
+      - 'scripts/owner_ops_corrections_contract.py'
+      - 'scripts/release_contract.py'
+      - 'scripts/release_contract_test.py'
+      - '.github/workflows/owner-ops-corrections-ci.yml'
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile changed backend modules
+        run: |
+          python -m py_compile \
+            services/api/app/agent_context.py \
+            services/api/app/owner_corrections.py \
+            services/api/app/pms_reservation_create.py \
+            services/api/app/app_entry.py
+      - name: Verify owner corrections contract
+        run: python scripts/owner_ops_corrections_contract.py
+      - name: Verify release database contract
+        run: python scripts/release_contract_test.py
+
+  admin-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
