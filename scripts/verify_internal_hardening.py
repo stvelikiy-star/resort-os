@@ -45,6 +45,8 @@ def main() -> int:
         'const isManager = ["OWNER", "MANAGER"].includes(user.role)', 'type="password"', 'minLength={8}',
     ):
         ok(marker in shell, f"admin auth/RBAC marker: {marker}")
+    ok('>Маркетинг</button>' in shell and 'tab === "MARKETING"' in shell, "final Admin retains Marketing")
+    ok('>Агенты</button>' in shell and 'tab === "AGENTS"' in shell, "final Admin includes Agents")
 
     auth = read("services/api/app/auth.py")
     for marker in (
@@ -69,12 +71,12 @@ def main() -> int:
 
     rc = json.loads(read("release/current-rc.json"))
     ok(rc["release_version"] == "0.62.2", "release 0.62.2")
-    ok(rc["accepted_executable_head"] == "ac1a45e4cf3ef0e40a7fea6be75c81999e9af0b4", "accepted security-boundary SHA")
-    ok(rc["observed_merge_commit"] == "c931b7e12973ecb62b8f9595d60f0d7947e7ad8e", "observed security-boundary merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 24, "success": 24, "failures": 0}, "24/24 accepted workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 eligible merge workflows")
-    ok(rc["postmerge_truth_workflows"] == {"triggered": 23, "success": 23, "failures": 0}, "23/23 postmerge non-truth workflows")
-    ok(rc["migration_count"] == 22 and rc["critical_constraint_count"] == 87, "22 migrations / 87 constraints")
+    ok(rc["accepted_executable_head"] == "7ae394bbb549bb6200c84e9c46d47ed5cd45499a", "accepted owner-ops boundary SHA")
+    ok(rc["observed_merge_commit"] == "b13bacad3f2e923f51354b1839371d07179b2e8c", "observed owner-ops merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 52, "success": 52, "failures": 0}, "52/52 accepted workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 39, "success": 37, "failures": 2}, "37/39 first merge workflows with two expected frozen-truth fail-closes")
+    ok(rc["postmerge_truth_workflows"] == {"triggered": 39, "success": 37, "failures": 2}, "pre-refreeze postmerge truth captured exactly")
+    ok(rc["migration_count"] == 24 and rc["critical_constraint_count"] == 93, "24 migrations / 93 constraints")
     ok(rc["canonical_property_seed"] == {"rooms": 84, "room_categories": 12, "rate_rows": 48}, "canonical property seed")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
         ok(rc[key] is False, f"{key} remains fail-closed")
@@ -132,6 +134,7 @@ def main() -> int:
     ok('(\"PATCH\", \"/api/v1/kitchen/menu/{item_id}\")' in app_entry, "legacy Kitchen patch blocked in operational router")
     ok("_strip_legacy_kitchen_menu_mutations()" in app_entry, "Kitchen route canonicalization executes before composition")
     ok('app.include_router(kitchen_menu_management_router)' in app_entry and 'app.include_router(kitchen_admin_router)' in app_entry, "canonical manager and operational Kitchen routers composed")
+    ok('app.include_router(marketing_router)' in app_entry and 'app.include_router(owner_corrections_router)' in app_entry, "Marketing and owner corrections routers composed")
     ok('app.version = "0.62.2"' in app_entry, "runtime version matches 0.62.2 release")
     route_guard = read("scripts/verify_active_route_uniqueness.py")
     ok("DUPLICATE_ROUTE" in route_guard and "app.routes" in route_guard, "active API route uniqueness guard present")
@@ -145,9 +148,9 @@ def main() -> int:
     ):
         ok(marker in staging, f"external fail-closed marker: {marker}")
 
-    ok(passed >= 106, f"hardening suite too small: {passed}")
+    ok(passed >= 108, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
-    print("BOUNDARY: management/admin/staff/Core only; apps/web is frozen; external Beget/VPS cutover remains STOP")
+    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core repository contour accepted; Railway Full Test is verified; real external production cutover remains STOP")
     return 0
 
 
