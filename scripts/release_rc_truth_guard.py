@@ -32,6 +32,7 @@ ALLOWED_HYGIENE_PATHS = {
     "docs/STAGING_RUNBOOK_2026-08-28.md",
     "scripts/release_rc_truth_guard.py",
     "scripts/run_load_test.sh",
+    "scripts/main_pr_merge_guard.py",
     "scripts/verify_internal_hardening.py",
     "tests/load/resort_core_read.k6.js",
     ".github/workflows/release-rc-truth-ci.yml",
@@ -39,6 +40,7 @@ ALLOWED_HYGIENE_PATHS = {
     ".github/workflows/fulltest-external-smoke.yml",
     ".github/workflows/load-test-contract-ci.yml",
     ".github/workflows/fulltest-load-baseline-ci.yml",
+    ".github/workflows/main-pr-merge-guard-ci.yml",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
