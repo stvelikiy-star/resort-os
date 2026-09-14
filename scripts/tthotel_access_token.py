@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from typing import NoReturn
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -14,7 +15,7 @@ PASSWORD = os.environ.get("TTHOTEL_PASSWORD", "").strip()
 STATIC_TOKEN = os.environ.get("TTLOCK_ACCESS_TOKEN", "").strip()
 
 
-def _fail(message: str, *, detail: str | None = None) -> "NoReturn":
+def _fail(message: str, *, detail: str | None = None) -> NoReturn:
     print(f"TTHOTEL_AUTH_ERROR: {message}", file=sys.stderr)
     if detail:
         print(detail[:500], file=sys.stderr)
