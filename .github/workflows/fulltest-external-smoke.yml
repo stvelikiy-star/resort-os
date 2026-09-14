@@ -1,0 +1,117 @@
+name: Three Crowns Full Test External Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fulltest-external-smoke.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/fulltest-external-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fulltest-external-smoke
+  cancel-in-progress: true
+
+jobs:
+  external-smoke:
+    name: external-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CORE_URL: https://api-production-f1171.up.railway.app
+      PUBLIC_URL: https://web-production-b7d1e.up.railway.app
+      ADMIN_URL: https://admin-production-80a1.up.railway.app
+      STAFF_URL: https://staff-production-69f6.up.railway.app
+
+    steps:
+      - name: Verify external HTTPS surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          check_https() {
+            local label="$1"
+            local url="$2"
+            local body
+            body="$(mktemp)"
+            local code
+
+            code="$(curl \
+              --silent \
+              --show-error \
+              --location \
+              --output "$body" \
+              --write-out '%{http_code}' \
+              --connect-timeout 10 \
+              --max-time 25 \
+              --retry 3 \
+              --retry-delay 1 \
+              --retry-all-errors \
+              "$url")"
+
+            if [[ "$code" != "200" ]]; then
+              echo "FAIL: $label returned HTTP $code from $url" >&2
+              head -c 1000 "$body" >&2 || true
+              echo >&2
+              exit 1
+            fi
+
+            echo "PASS: $label HTTP 200 — $url"
+            rm -f "$body"
+          }
+
+          check_https core-ready "$CORE_URL/health/ready"
+          check_https public-web "$PUBLIC_URL/"
+          check_https admin "$ADMIN_URL/"
+          check_https staff "$STAFF_URL/"
+
+      - name: Verify WebSocket HTTPS upgrade route is reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          body="$(mktemp)"
+          code="$(curl \
+            --silent \
+            --show-error \
+            --http1.1 \
+            --output "$body" \
+            --write-out '%{http_code}' \
+            --connect-timeout 10 \
+            --max-time 12 \
+            -H 'Connection: Upgrade' \
+            -H 'Upgrade: websocket' \
+            -H 'Sec-WebSocket-Version: 13' \
+            -H 'Sec-WebSocket-Key: dGhyZWUtY3Jvd25zLXNtb2tl' \
+            "$CORE_URL/ws/pms/grid" || true)"
+
+          case "$code" in
+            101|401|403)
+              echo "PASS: WSS upgrade path is externally reachable (HTTP $code without authenticated session)"
+              ;;
+            *)
+              echo "FAIL: unexpected WSS handshake status HTTP $code" >&2
+              head -c 1000 "$body" >&2 || true
+              echo >&2
+              exit 1
+              ;;
+          esac
+
+          rm -f "$body"
+
+      - name: Record smoke boundary
+        shell: bash
+        run: |
+          cat <<'EOF'
+          Full Test only.
+          Read-only external monitoring: no reservation, payment, room-state, dining, provider, or lock mutations.
+          This workflow is not external hotel production acceptance and does not authorize DNS/provider cutover.
+          EOF
