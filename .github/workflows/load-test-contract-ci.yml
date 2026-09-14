@@ -7,6 +7,8 @@ on:
       - 'scripts/run_load_test.sh'
       - 'docs/LOAD_TESTING.md'
       - '.github/workflows/load-test-contract-ci.yml'
+      - '.github/workflows/fulltest-load-baseline-ci.yml'
+      - 'scripts/release_rc_truth_guard.py'
   workflow_dispatch:
 
 permissions:
@@ -25,11 +27,26 @@ jobs:
       - name: Verify production hostname is fail-closed before Docker execution
         run: |
           set +e
-          LOAD_TEST_ENV=staging LOAD_BASE_URL=https://3korony.com bash scripts/run_load_test.sh >/tmp/load-prod.out 2>&1
+          LOAD_TEST_ENV=staging \
+          LOAD_BASE_URL=https://3korony.com \
+          LOAD_EXPLICIT_TEST_HOST=3korony.com \
+          bash scripts/run_load_test.sh >/tmp/load-prod.out 2>&1
           code=$?
           set -e
           test "$code" = "2"
           grep -q 'public production hostname is forbidden' /tmp/load-prod.out
+
+      - name: Verify production hostname cannot be allowlisted
+        run: |
+          set +e
+          LOAD_TEST_ENV=staging \
+          LOAD_BASE_URL=https://not-production.example \
+          LOAD_EXPLICIT_TEST_HOST=www.3korony.com \
+          bash scripts/run_load_test.sh >/tmp/load-prod-allow.out 2>&1
+          code=$?
+          set -e
+          test "$code" = "2"
+          grep -q 'public production hostname cannot be allowlisted' /tmp/load-prod-allow.out
 
       - name: Verify unknown environment is fail-closed
         run: |
@@ -62,6 +79,32 @@ jobs:
             -e LOAD_TEST_ENV=ci \
             /tests/load/resort_core_read.k6.js >/tmp/k6-inspect.txt
           grep -q 'ramping-vus' /tmp/k6-inspect.txt
+
+      - name: Verify mismatched exact external test host is blocked
+        run: |
+          set +e
+          docker run --rm \
+            -v "$PWD/tests/load:/tests/load:ro" \
+            grafana/k6:0.54.0 inspect \
+            -e LOAD_BASE_URL=https://api-production-f1171.up.railway.app \
+            -e LOAD_TEST_ENV=test \
+            -e LOAD_EXPLICIT_TEST_HOST=another-test.example \
+            /tests/load/resort_core_read.k6.js >/tmp/k6-mismatch.out 2>&1
+          code=$?
+          set -e
+          test "$code" != "0"
+          grep -q 'exactly match LOAD_EXPLICIT_TEST_HOST' /tmp/k6-mismatch.out
+
+      - name: Verify exact Full Test host can be explicitly authorized without sending traffic
+        run: |
+          docker run --rm \
+            -v "$PWD/tests/load:/tests/load:ro" \
+            grafana/k6:0.54.0 inspect \
+            -e LOAD_BASE_URL=https://api-production-f1171.up.railway.app \
+            -e LOAD_TEST_ENV=test \
+            -e LOAD_EXPLICIT_TEST_HOST=api-production-f1171.up.railway.app \
+            /tests/load/resort_core_read.k6.js >/tmp/k6-fulltest-inspect.txt
+          grep -q 'ramping-vus' /tmp/k6-fulltest-inspect.txt
 
       - name: Assert non-mutating route surface
         run: |
