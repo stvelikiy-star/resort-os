@@ -17,36 +17,33 @@ If a dated historical document conflicts with a source above, the current source
 ## Current release identity
 
 Release: **Resort OS 0.62.2**.  
-Accepted executable head: `7ae394bbb549bb6200c84e9c46d47ed5cd45499a`.  
-Observed tree-equivalent main merge: `b13bacad3f2e923f51354b1839371d07179b2e8c`.  
+Accepted executable head: `61bd40d7592e842a4d52cfb343483065afb378cb`.  
+Observed main merge: `94c849a0833079627b47db1e25869096191424bc`.  
 Production source branch: `main`.
 
-Accepted PR #157 head passed **52/52 workflows** with zero failures. The observed merge retained the same tree. Its first push produced **37/39 successful workflows**; `Release RC Truth CI` and `Launch Acceptance CI` correctly failed closed against the older 2026-09-07 frozen manifest. The 2026-09-14 same-version refreeze is the controlled correction.
+Accepted PR #164 head passed **26/26 workflows** with zero failures. The first main push passed **25/26**; `Release RC Truth CI` correctly failed closed against the older boundary. The merge differs from the tested head only by the exact already-accepted PR #163 operational merge-guard files recorded in `release/current-rc.json`.
 
 ## Current product delta
 
+- Public booking request now shows the exact owner-approved server-confirmed Russian message: `Заявка отправлена. Номер заявки <id>. Менеджер свяжется с вами для согласования условий и предоплаты.`
+- The Public flow still states that a request is not yet a confirmed reservation.
 - Marketing remains part of final Admin/Core and includes consent/attribution and automation contracts.
-- Agent CRM/reporting and Reception agent filtering are active in the accepted contour.
+- Agent CRM/reporting and Reception agent filtering are active.
 - Dated maintenance/manual room holds are part of Reception operations.
 - Extra-bed restrictions are enforced in Resort Core for the three owner-approved denied room categories.
 - Returning guests with a prior completed stay receive the automatic 10% accommodation discount; alternative discounts remain auditable.
 - Booking schedule drag/drop remains preview + explicit confirmation before commit.
-- Public booking-request success remains server-confirmed.
-- Existing security, Kitchen/Dining, Guest OS, realtime, backup/restore and release hardening remains active.
+- Existing security, Kitchen/Dining, Guest OS, realtime, backup/restore and release hardening remain active.
 
 ## Property/database authority
 
-Canonical property truth remains **84 rooms / 12 categories / 48 rates**. Rooms 501/502 remain owner-approved two-person basement inventory above the laundry.
-
-Frozen database boundary is **24 committed migrations / 93 critical domain constraints**, ending with:
-- `z99_marketing_consent_attribution_20260912`;
-- `zz100_owner_ops_corrections_20260914`.
+Canonical property truth remains **84 rooms / 12 categories / 48 rates**. Frozen database boundary remains **24 committed migrations / 93 critical domain constraints**.
 
 External staging/production uses `npx prisma migrate deploy`, never `prisma db push` as release evidence.
 
 ## Full Test evidence
 
-Railway `Three Crowns Full Test` has API/Web/Admin/Staff deployed from merge SHA `b13bacad3f2e923f51354b1839371d07179b2e8c`; all four latest deployments are successful. API applied the full 24-migration chain and passed readiness. This is integration evidence, not real production cutover evidence.
+Railway `Three Crowns Full Test` has successful application services and PostgreSQL. Verified operational evidence includes external HTTPS/WSS smoke, scheduled browser acceptance, explicit application restart policy and a read-only 50-VU load baseline of **32,229 HTTP requests with 0% failures**. This remains Full Test evidence, not real hotel production cutover evidence.
 
 ## Product authority boundaries
 
@@ -55,12 +52,12 @@ Railway `Three Crowns Full Test` has API/Web/Admin/Staff deployed from merge SHA
 - AI/n8n do not confirm payment or guarantee reservations.
 - Kitchen/Dining totals do not automatically create Hotel Payments.
 - Room QR/PIN is not a physical lock credential.
-- Real bank/MKassa/TTLock remain provider/hardware gated.
+- Real MKassa/TTHotel/TTLock remain provider/hardware gated.
 - NFC acquiring/wallet remains deferred outside active V1.
 - Google Drive/Sheets are control/archive/mirror surfaces, not transaction truth.
 
 ## External production remains fail-closed
 
-Repository and Full Test green do not mean live production. Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until real target-host, branch-protection/permissions, rollback, HTTPS/WSS, device/provider, monitoring, backup/restore/off-site, immutable deployment linkage, DNS rollback and explicit owner GO evidence exists.
+Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until real target-host, platform branch protection/permissions, rollback, final production HTTPS/WSS, device/provider, fresh backup/restore/off-site, immutable deployment linkage, DNS rollback and explicit owner GO evidence exists.
 
 Historical release files remain reference evidence only and do not override the current machine manifest and canonical state documents.
