@@ -1,0 +1,29 @@
+name: TTLock Diagnostics CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'services/api/app/ttlock_diagnostics.py'
+      - 'services/api/app/app_entry.py'
+      - 'scripts/verify_ttlock_diagnostics_contract.py'
+      - '.github/workflows/ttlock-diagnostics-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile diagnostics module
+        run: python -m py_compile services/api/app/ttlock_diagnostics.py
+      - name: Verify read-only safety contract
+        run: python scripts/verify_ttlock_diagnostics_contract.py
