@@ -2,25 +2,25 @@
   "schema_version": 1,
   "release_version": "0.62.2",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "feat/owner-ops-corrections-20260914",
-  "accepted_executable_head": "7ae394bbb549bb6200c84e9c46d47ed5cd45499a",
-  "observed_merge_commit": "b13bacad3f2e923f51354b1839371d07179b2e8c",
+  "source_branch": "fix/public-request-sent-copy-20260914",
+  "accepted_executable_head": "94c849a0833079627b47db1e25869096191424bc",
+  "observed_merge_commit": "94c849a0833079627b47db1e25869096191424bc",
   "observed_merge_tree_equivalent": true,
   "accepted_head_workflows": {
-    "triggered": 52,
-    "success": 52,
+    "triggered": 26,
+    "success": 26,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 39,
-    "success": 37,
-    "failures": 2
+    "triggered": 26,
+    "success": 25,
+    "failures": 1
   },
-  "postmerge_truth_head": "b13bacad3f2e923f51354b1839371d07179b2e8c",
+  "postmerge_truth_head": "94c849a0833079627b47db1e25869096191424bc",
   "postmerge_truth_workflows": {
-    "triggered": 39,
-    "success": 37,
-    "failures": 2
+    "triggered": 26,
+    "success": 25,
+    "failures": 1
   },
   "production_source_branch": "main",
   "main_allowed_as_production_source": true,
@@ -35,14 +35,15 @@
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS runtime version remains 0.62.2; this is a controlled same-version owner-operations and marketing refreeze, not a runtime version bump.",
-    "PR #157 exact tested head 7ae394bbb549bb6200c84e9c46d47ed5cd45499a completed 52/52 pull-request workflows successfully with zero failures.",
-    "Observed main merge b13bacad3f2e923f51354b1839371d07179b2e8c is tree-equivalent to the tested head; both point to tree f8991f2f65d837dd16745b43582b5c97292548b6.",
-    "The first main push completed 37/39 workflows successfully. Release RC Truth CI and Launch Acceptance CI failed closed because the prior frozen 0.62.2 manifest still pointed at the 2026-09-07 boundary; this refreeze is the controlled correction and does not weaken those guards.",
-    "The accepted boundary includes final Marketing in Admin/Core, agent CRM/reporting, dated maintenance/manual room holds, owner-approved extra-bed restrictions, returning-guest 10% accommodation discount, server-authoritative pricing and explicit booking-move confirmation.",
-    "Database release ledger is 24 committed migrations and 93 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Railway Three Crowns Full Test deployed API, Web, Admin and Staff from merge SHA b13bacad3f2e923f51354b1839371d07179b2e8c; API applied z99_marketing_consent_attribution_20260912 and zz100_owner_ops_corrections_20260914 successfully and passed /health/ready.",
-    "Full Test deployment evidence is not real hotel production evidence. GitHub main protection, Google Drive public-writer remediation, authorized Beget/VPS cutover, real-device/provider E2E, monitoring, actual production backup/restore/off-site evidence, immutable release linkage and DNS rollback remain external launch work.",
+    "Resort OS runtime version remains 0.62.2; this is a controlled same-version refreeze after the owner-approved public booking confirmation correction.",
+    "PR #164 was validated by 26/26 pull-request workflows with zero failures before merge, including Public Browser Acceptance, Owner Ops, Management Final Acceptance, Resort Core, Full Staging and Release Gate.",
+    "Accepted executable boundary is the canonical main merge 94c849a0833079627b47db1e25869096191424bc, which contains the exact Russian server-confirmed success text 'Заявка отправлена. Номер заявки <id>...' while retaining the disclaimer that a request is not yet a confirmed reservation.",
+    "The first main push on 94c849a0833079627b47db1e25869096191424bc completed 25/26 workflows successfully. The only failure was Release RC Truth CI, which correctly rejected the newly changed Public product tree against the previous frozen boundary before this refreeze.",
+    "Database release truth is unchanged at 24 committed migrations and 93 critical domain constraints; canonical property seed remains 84 rooms / 12 categories / 48 rate rows.",
+    "Operational hardening merged before this boundary includes external HTTPS/WSS smoke, guarded 10->25->50 VU Full Test load baseline, daily Chromium browser smoke and the fail-closed Main PR Merge Guard. These controls do not substitute for actual GitHub branch protection.",
+    "Real GitHub main protection remains externally unresolved; the repository CI merge guard only makes direct/squash/rebase pushes fail visibly and cannot physically block them.",
+    "Railway Three Crowns Full Test remains staging/integration evidence only. Real hotel production host, off-site backup/restore, DNS rollback and provider/device acceptance are still external launch work.",
+    "Real bank/MKassa/TTHotel/TTLock activation remains deferred to the final provider stage; physical lock 4245 has not been production-unlocked by this release work.",
     "Production cutover remains unauthorized until every external launch gate is proven and explicit owner GO is recorded."
   ]
 }
