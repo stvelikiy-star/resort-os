@@ -1,3 +1,4 @@
+from .agent_context import router as agent_context_router
 from .ai_sales import router as ai_sales_router
 from .analytics_reports import router as analytics_reports_router
 from .automation import router as automation_router
@@ -149,6 +150,7 @@ app.include_router(marketing_automation_router)
 # Owner-requested operational corrections: agent CRM, dated maintenance holds,
 # staff/owner/guest room holds and returning-guest lookup.
 app.include_router(owner_corrections_router)
+app.include_router(agent_context_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)
