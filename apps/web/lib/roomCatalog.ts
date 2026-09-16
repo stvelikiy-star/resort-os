@@ -6,6 +6,7 @@ export type RoomCategory = {
   area: string;
   summary: string;
   mediaKey?: string;
+  image?: string;
   rates: {
     early: number;
     peak: number;
@@ -64,6 +65,7 @@ export const roomCategories: RoomCategory[] = [
     area: "27 м²",
     summary: "Двухместная категория в коттеджном доме площадью 27 м².",
     mediaKey: "cottage-double-standard",
+    image: "/media/three-crowns/rooms/cottage-double-standard.webp",
     rates: { early: 6000, peak: 8000, late: 6000 },
   },
   {
@@ -112,6 +114,7 @@ export const roomCategories: RoomCategory[] = [
     area: "30 м²",
     summary: "Двухкомнатный стандарт для размещения до четырёх гостей.",
     mediaKey: "corpus-1-two-room",
+    image: "/media/three-crowns/rooms/two-room-standard.webp",
     rates: { early: 9500, peak: 12000, late: 9500 },
   },
   {
@@ -131,6 +134,7 @@ export const roomCategories: RoomCategory[] = [
     area: "55–65 м²",
     summary: "Апартаменты с кухней площадью 55–65 м² для размещения до четырёх гостей.",
     mediaKey: "corpus-1-three-room-kitchen",
+    image: "/media/three-crowns/rooms/apartments-with-kitchen.webp",
     rates: { early: 13000, peak: 15500, late: 13000 },
   },
 ];
