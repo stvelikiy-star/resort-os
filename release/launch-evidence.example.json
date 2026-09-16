@@ -94,13 +94,13 @@
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Fresh actual-target backup immediately before cutover with timestamp, checksum, off-site copy and restore owner."
+      "note": "Fresh actual-target backup immediately before cutover must pass scripts/pre_cutover_backup_gate.py with checksum, byte-identical restricted off-site copy, clean restore evidence and named restore owner."
     },
     "dns_rollback_capture": {
       "status": "NOT_VERIFIED",
       "evidence_ref": null,
       "verified_at": null,
-      "note": "Capture current DNS/TTL and exact rollback values before any production routing change."
+      "note": "Before any production DNS change, scripts/dns_rollback_capture.py and scripts/dns_rollback_gate.py must capture and verify authoritative TTL/rollback state for 3korony.com plus api/admin/staff/automation.3korony.com, including prior NXDOMAIN/no-record states and byte-identical off-site evidence."
     },
     "owner_cutover_approval": {
       "status": "NOT_VERIFIED",
