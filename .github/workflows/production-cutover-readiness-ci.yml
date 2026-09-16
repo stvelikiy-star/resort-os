@@ -1,0 +1,54 @@
+name: Production Cutover Readiness Contract CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/production_cutover_readiness.py'
+      - 'scripts/production_endpoint_probe.py'
+      - 'scripts/production_cutover_readiness_contract_test.py'
+      - 'scripts/release_rc_truth_guard.py'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - '.github/workflows/production-cutover-readiness-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/production_cutover_readiness.py'
+      - 'scripts/production_endpoint_probe.py'
+      - 'scripts/production_cutover_readiness_contract_test.py'
+      - 'scripts/release_rc_truth_guard.py'
+      - 'docs/DEPLOYMENT_RUNBOOK.md'
+      - '.github/workflows/production-cutover-readiness-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile readiness tools
+        run: |
+          python -m py_compile \
+            scripts/production_endpoint_probe.py \
+            scripts/production_cutover_readiness.py \
+            scripts/production_cutover_readiness_contract_test.py
+          bash -n scripts/host_preflight.sh
+      - name: Prove fail-closed readiness contract
+        run: python scripts/production_cutover_readiness_contract_test.py
+      - name: Verify frozen release boundary accepts only this exact ops layer
+        run: python scripts/release_rc_truth_guard.py --allow-non-accepted-head
+      - name: Verify repository launch contract remains fail-closed
+        run: python scripts/verify_launch_acceptance.py --mode repository
+      - name: Record safety boundary
+        run: |
+          cat <<'EOF'
+          Contract CI only.
+          This workflow does not contact production, change DNS, activate providers, write hotel business data, or record owner GO.
+          Real cutover remains blocked until actual-target evidence exists and the owner explicitly approves the final switch.
+          EOF

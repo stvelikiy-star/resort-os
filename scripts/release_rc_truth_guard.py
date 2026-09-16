@@ -40,6 +40,9 @@ ALLOWED_HYGIENE_PATHS = {
     "scripts/dns_rollback_capture.py",
     "scripts/dns_rollback_gate.py",
     "scripts/dns_rollback_contract_test.py",
+    "scripts/production_endpoint_probe.py",
+    "scripts/production_cutover_readiness.py",
+    "scripts/production_cutover_readiness_contract_test.py",
     "tests/load/resort_core_read.k6.js",
     ".github/workflows/release-rc-truth-ci.yml",
     ".github/workflows/launch-acceptance-ci.yml",
@@ -49,6 +52,7 @@ ALLOWED_HYGIENE_PATHS = {
     ".github/workflows/main-pr-merge-guard-ci.yml",
     ".github/workflows/pre-cutover-backup-gate-ci.yml",
     ".github/workflows/dns-rollback-gate-ci.yml",
+    ".github/workflows/production-cutover-readiness-ci.yml",
 }
 EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT = {
     ".github/workflows/main-pr-merge-guard-ci.yml",
