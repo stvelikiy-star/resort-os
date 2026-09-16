@@ -85,7 +85,8 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
         <div className="wrap room-catalog-grid">
           {roomCategories.map((room) => {
             const localized = getLocalizedRoomCopy(room.slug, locale) ?? { name: room.name, capacity: room.capacity, summary: room.summary };
-            return <article className="room-catalog-card" key={room.slug}>
+            return <article className={`room-catalog-card${room.image ? " room-catalog-card-with-photo" : ""}`} key={room.slug}>
+              {room.image ? <div className="room-catalog-media"><Image src={room.image} alt={localized.name} width={800} height={600} sizes="(max-width: 680px) 86vw, (max-width: 980px) 50vw, 33vw" /></div> : null}
               <div className="room-catalog-card-top"><span className="room-catalog-index">{room.index}</span><span className="room-catalog-meta">{localized.capacity} · {room.area}</span></div>
               <h2>{localized.name}</h2>
               <p>{localized.summary}</p>
