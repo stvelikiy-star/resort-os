@@ -7,6 +7,7 @@ on:
       - 'packages/database/prisma/migrations/**'
       - 'services/api/app/service_points.py'
       - 'services/api/app/service_point_payments.py'
+      - 'services/api/app/mkassa_payment_bridge.py'
       - 'services/api/app/service_auth.py'
       - 'services/api/app/app_entry.py'
       - 'services/api/app/operations.py'
@@ -17,6 +18,7 @@ on:
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/service-points.css'
       - 'apps/admin/app/layout.tsx'
+      - 'scripts/tthotel_access_token.py'
       - 'scripts/verify_service_point_qr.py'
       - 'scripts/verify_service_point_paid_access.py'
       - 'scripts/mock_service_point_paid_access.py'
@@ -31,6 +33,7 @@ on:
       - 'packages/database/prisma/migrations/**'
       - 'services/api/app/service_points.py'
       - 'services/api/app/service_point_payments.py'
+      - 'services/api/app/mkassa_payment_bridge.py'
       - 'services/api/app/service_auth.py'
       - 'services/api/app/app_entry.py'
       - 'services/api/app/operations.py'
@@ -41,6 +44,7 @@ on:
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/service-points.css'
       - 'apps/admin/app/layout.tsx'
+      - 'scripts/tthotel_access_token.py'
       - 'scripts/verify_service_point_qr.py'
       - 'scripts/verify_service_point_paid_access.py'
       - 'scripts/mock_service_point_paid_access.py'
@@ -139,7 +143,7 @@ jobs:
       - name: Install and compile Resort Core and verifiers
         run: |
           pip install -r services/api/requirements.txt
-          python -m compileall services/api/app scripts/verify_service_point_qr.py scripts/verify_service_point_paid_access.py scripts/mock_service_point_paid_access.py scripts/upsert_staff_user.py
+          python -m compileall services/api/app scripts/tthotel_access_token.py scripts/verify_service_point_qr.py scripts/verify_service_point_paid_access.py scripts/mock_service_point_paid_access.py scripts/upsert_staff_user.py
 
       - name: Seed hotel and Service Point test roles
         run: |
