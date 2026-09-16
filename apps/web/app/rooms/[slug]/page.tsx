@@ -43,6 +43,7 @@ export async function generateMetadata({ params, searchParams }: RoomPageProps):
   const localized = getLocalizedRoomCopy(slug, locale) ?? { name: room.name, capacity: room.capacity, summary: room.summary };
   const url = locale === "ru" ? `/rooms/${room.slug}` : `/rooms/${room.slug}?lang=${locale}`;
   const description = `${localized.name} · ${copy.brand}: ${localized.capacity}, ${room.area}. ${String(copy.descriptionTail)}`;
+  const roomImage = room.image ?? ROOM_MEDIA_FALLBACK;
   return {
     title: localized.name,
     description,
@@ -59,7 +60,7 @@ export async function generateMetadata({ params, searchParams }: RoomPageProps):
       description: `${localized.capacity} · ${room.area}. ${String(copy.openGraphTail)}`,
       url,
       locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : "ru_RU",
-      images: [{ url: ROOM_MEDIA_FALLBACK, alt: String(copy.imageAlt) }],
+      images: [{ url: roomImage, alt: room.image ? localized.name : String(copy.imageAlt) }],
     },
   };
 }
@@ -71,12 +72,13 @@ export default async function RoomCategoryPage({ params, searchParams }: RoomPag
   const locale = await pageLocale(searchParams);
   const copy = COPY[locale];
   const localized = getLocalizedRoomCopy(slug, locale) ?? { name: room.name, capacity: room.capacity, summary: room.summary };
+  const roomImage = room.image ?? ROOM_MEDIA_FALLBACK;
 
   return <>
     <SiteHeader />
     <main className="rooms-page" id="top">
       <section className="room-detail-hero" aria-labelledby="room-detail-title">
-        <div className="room-detail-hero-media" aria-hidden="true"><Image src={ROOM_MEDIA_FALLBACK} alt="" fill priority sizes="100vw" /></div>
+        <div className="room-detail-hero-media" aria-hidden="true"><Image src={roomImage} alt="" fill priority sizes="100vw" /></div>
         <div className="room-detail-hero-shade" aria-hidden="true" />
         <div className="wrap room-detail-hero-content">
           <Link className="room-detail-back" href={withPublicLocale("/rooms", locale)}>{String(copy.all)}</Link>
