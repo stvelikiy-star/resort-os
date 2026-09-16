@@ -1,7 +1,7 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 6.5  
-Date: 2026-09-14  
+Version: 6.6  
+Date: 2026-09-16  
 Status: RESORT OS 0.62.2 INTERNAL RC REFROZEN / FULL TEST VERIFIED / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment. It is not evidence that real hotel production cutover has happened.
@@ -172,7 +172,53 @@ These results guide sizing and procedure but must be re-observed on the actual p
 
 The exact backup/restore/off-site command sequence is canonical in `docs/PRODUCTION_DATABASE_MIGRATIONS.md`. Launch-evidence JSON entries alone are not sufficient evidence for `pre_cutover_backup` or `dns_rollback_capture`.
 
-## 10. Current blockers
+## 10. Unified technical cutover-readiness gate
+
+After the external staging sequence is complete and the manual governance/device prerequisites are already VERIFIED, run one final **read-only** technical readiness pass from the current ops checkout. Keep a separate clean product checkout pinned to the accepted executable SHA; the gate verifies that the running API/Web/Admin/Staff images carry that same revision.
+
+Example shape:
+
+```bash
+python scripts/production_cutover_readiness.py \
+  --release-sha 61bd40d7592e842a4d52cfb343483065afb378cb \
+  --launch-manifest /secure/launch-evidence.json \
+  --product-repo-root /srv/three-crowns/product-release \
+  --rollback-evidence-dir /secure/legacy-rollback \
+  --dns-evidence-dir /secure/dns-rollback \
+  --backup-file /secure/pre-cutover/postgres.dump \
+  --backup-manifest /secure/pre-cutover/manifest.json \
+  --backup-offsite-dir /mounted/restricted-offsite-copy/pre-cutover \
+  --restore-evidence /secure/pre-cutover/restore-evidence.json \
+  --restore-owner OWNER \
+  --env-file /srv/three-crowns/.env.production \
+  --backup-dir /srv/three-crowns/backups \
+  --disk-path /srv/three-crowns \
+  --public-url https://3korony.com \
+  --core-url https://api.3korony.com \
+  --admin-url https://admin.3korony.com \
+  --staff-url https://staff.3korony.com \
+  --wss-url wss://api.3korony.com/ws/pms/grid \
+  --output-dir /secure/readiness-final
+```
+
+The gate runs, in order: host preflight, release truth, legacy rollback gate, authoritative DNS rollback gate, pre-cutover DB backup gate, immutable deployment linkage, production monitoring, canonical HTTPS/WSS probe and external public truth probe. It is fail-fast and writes SHA256-addressed stdout/stderr plus machine evidence under the requested output directory.
+
+The launch manifest must already prove these manual/external prerequisites before this command can turn green: GitHub branch protection, Drive permission remediation, room reconciliation, external HTTPS/WSS staging and real-device acceptance. If a provider is launch-enabled, provider acceptance must also already be VERIFIED.
+
+**Safety boundary:** `owner_cutover_approval` must still be `NOT_VERIFIED` while this gate runs. `PRODUCTION_CUTOVER_TECHNICAL_READINESS_GREEN` means only that technical evidence is ready for owner review. It does not change DNS, enable MKassa/TTHotel/TTLock, write hotel business data, or authorize production.
+
+After reviewing the generated evidence, and only after explicit owner GO, update the launch evidence with final verified references and run:
+
+```bash
+python scripts/verify_launch_acceptance.py \
+  --mode cutover \
+  --manifest /secure/launch-evidence.json \
+  --release-sha 61bd40d7592e842a4d52cfb343483065afb378cb
+```
+
+Only `STRUCTURAL LAUNCH EVIDENCE COMPLETE` **after explicit owner GO** permits the separately authorized DNS/provider cutover procedure.
+
+## 11. Current blockers
 
 Before production cutover:
 - enable real GitHub `main` branch protection/required checks; the current CI merge guard is not a platform protection substitute;
@@ -182,8 +228,10 @@ Before production cutover:
 - prove final production HTTPS/WSS and real-device/provider behavior;
 - execute the fresh actual-target backup/clean-restore/off-site gate;
 - execute the authoritative five-host DNS rollback capture/gate on the real zone immediately before routing changes;
-- record immutable deployment linkage.
+- record immutable deployment linkage;
+- run the unified technical cutover-readiness gate and review its evidence;
+- record explicit owner GO only after every preceding item is complete.
 
-## 11. Production cutover gate
+## 12. Production cutover gate
 
-Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all actual-target evidence exists and explicit owner GO is recorded. No CI or Railway Full Test success alone authorizes DNS switching or provider activation.
+Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all actual-target evidence exists and explicit owner GO is recorded. No CI, Railway Full Test success, or technical readiness script alone authorizes DNS switching or provider activation.
