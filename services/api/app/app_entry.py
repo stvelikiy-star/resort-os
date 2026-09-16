@@ -41,6 +41,7 @@ from .manager_dashboard import router as manager_dashboard_router
 from .marketing import integration_router as marketing_integration_router
 from .marketing import router as marketing_router
 from .marketing_automation import router as marketing_automation_router
+from .mkassa_payment_bridge import router as mkassa_payment_bridge_router
 from .observability import install_observability
 from .operations import router as operations_router
 from .operations_assignment import router as operations_assignment_router
@@ -125,6 +126,7 @@ app.include_router(service_points_public_router)
 # It may unlock a configured TTLock only after a provider-confirmed payment event.
 app.include_router(service_point_payments_public_router)
 app.include_router(service_point_payments_integration_router)
+app.include_router(mkassa_payment_bridge_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reception_readiness_router)
