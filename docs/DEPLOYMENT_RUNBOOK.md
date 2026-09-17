@@ -1,8 +1,8 @@
 # THREE CROWNS RESORT OS — DEPLOYMENT RUNBOOK
 
-Version: 6.6  
-Date: 2026-09-16  
-Status: RESORT OS 0.62.2 INTERNAL RC REFROZEN / FULL TEST VERIFIED / EXTERNAL CUTOVER STOP
+Version: 6.7  
+Date: 2026-09-18  
+Status: RESORT OS 0.62.2 INTERNAL RC FROZEN / FULL_NO_PAYMENTS / INTERNAL CI GREEN / EXTERNAL CUTOVER STOP
 
 This runbook defines controlled external deployment. It is not evidence that real hotel production cutover has happened.
 
@@ -13,41 +13,88 @@ Canonical machine manifest: `release/current-rc.json`.
 ## 1. Release boundary
 
 Release: `0.62.2`.  
-Accepted source PR: `#164`.  
-Accepted executable/release-boundary head: `61bd40d7592e842a4d52cfb343483065afb378cb`.  
-Observed main merge: `94c849a0833079627b47db1e25869096191424bc`.  
+Launch profile: `FULL_NO_PAYMENTS`.  
+Accepted executable source PR: `#176`.  
+Exact tested PR #176 head: `a3ff4c847c66cd64a7cca92ccec613f23917f62d`.  
+Accepted executable/release-boundary head: `a53850983d8fc6e1f1997199049a5b071511ed80`.  
+Current governance/main head: `b20ea27d9fd7950e0a22f164413156e8b62355ec` (PR #177 controlled refreeze).  
 Production source branch: `main`.
 
-PR #164 head passed **26/26 workflows**. Its first main push passed **25/26**; only `Release RC Truth CI` failed closed because the frozen manifest still pointed at the prior executable boundary. The head and merge differ only by the exact already-accepted PR #163 operational merge-guard files. Runtime remains `0.62.2`.
+Evidence:
+- PR #176: **29/29 workflows SUCCESS**;
+- first main push for accepted executable: **25/26 SUCCESS**; only `Release RC Truth CI` correctly failed closed against the previous frozen boundary;
+- PR #177 release/governance refreeze: **25/25 PR workflows SUCCESS**;
+- post-refreeze main: **24/24 SUCCESS**, including Release RC Truth and Resort OS Release Gate.
+
+The product runtime boundary is `a5385098...`. Later governance/docs-only merges do not replace that executable boundary unless a controlled refreeze explicitly says so.
 
 ## 2. Approved topology
 
-Single-server V1: Caddy HTTPS/WSS edge, PostgreSQL 16 private network, FastAPI Resort Core, Public Next.js, Admin/PMS Next.js, Staff/Kitchen PWA, pinned n8n when enabled, persistent database/media/n8n storage and local + off-site verified backup.
+Single-server V1: Caddy HTTPS/WSS edge, PostgreSQL 16 private network, FastAPI Resort Core, Public Next.js, Admin/PMS Next.js, Staff/Kitchen PWA, pinned n8n when enabled, persistent database/media/n8n storage and local + restricted off-site verified backup.
 
-Authority: `PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`.
+Authority:
+
+`PUBLIC SITE / PMS / STAFF / KITCHEN / n8n -> FASTAPI RESORT CORE -> POSTGRESQL`
 
 Authenticated browser realtime must remain same-origin on Admin/Staff hosts. PostgreSQL must remain private. Production runtime images must use exact audited pins; floating `latest` is not release evidence.
 
-Current production TLS/DNS topology is exactly:
+Production hostname plan:
 - `3korony.com` — Public;
 - `api.3korony.com` — Resort Core;
 - `admin.3korony.com` — Admin/PMS;
 - `staff.3korony.com` — Staff/Kitchen;
 - `automation.3korony.com` — n8n when enabled.
 
-## 3. Host preflight
+## 3. Launch capability contract
 
-Before mutating a real host run `bash scripts/host_preflight.sh`. Do not proceed on `BLOCKED`. Recommended initial target remains Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 120–160 GB SSD/NVMe, static IPv4, sudo/root SSH, Docker Engine + Compose plugin. PostgreSQL must never be publicly exposed.
+External staging/production for this release must preserve `FULL_NO_PAYMENTS`.
 
-## 4. Persistent layout and rollback
+Required enabled contours:
+- Public Web;
+- PMS / Reception;
+- CRM / Agents / Marketing;
+- Staff / housekeeping / maintenance / voice;
+- Guest OS;
+- Kitchen / Dining;
+- automation / AI sales within authority limits;
+- realtime / WebSocket.
+
+Required fail-closed contours:
+- payment mutation routes;
+- bank/provider acquiring;
+- Service Point payment QR operations;
+- MKassa;
+- NFC wallet/acquiring.
+
+Guest OS room QR/PIN remains allowed as a non-payment guest-service surface. It is not a payment QR and not a physical smart-lock credential.
+
+TTLock/TTHotel provider authorization is deferred under issue #154 and is not an active launch gate for `FULL_NO_PAYMENTS`.
+
+Never enable dormant payment/provider code merely to make a staging check pass.
+
+## 4. Host preflight
+
+Before mutating a real host run:
+
+```bash
+bash scripts/host_preflight.sh
+```
+
+Do not proceed on `BLOCKED`.
+
+Recommended initial target remains Ubuntu 24.04 LTS, 4 vCPU, 8 GB RAM, 120–160 GB SSD/NVMe, static IPv4, sudo/root SSH, Docker Engine + Compose plugin. PostgreSQL must never be publicly exposed.
+
+Secure host access must be authorized and must keep private keys/passwords/secrets outside chat and source control.
+
+## 5. Persistent layout and rollback
 
 Use `/srv/three-crowns` with persistent PostgreSQL, n8n, public/private media and backups. Repository checkout may be replaced; persistent data/backups must not be deleted with it.
 
 Before DNS or web-server changes, two independent rollback evidence sets are mandatory:
-1. the legacy site rollback package (`legacy_rollback_capture.py` -> restore rehearsal -> `legacy_rollback_gate.py`), covering current web root/config/media/database and the legacy apex DNS snapshot;
-2. the dedicated production DNS rollback package covering **all five production hostnames**, including records that existed before cutover and hostnames that were previously `NXDOMAIN` or had no A/AAAA/CNAME records.
+1. legacy site rollback package (`legacy_rollback_capture.py` -> restore rehearsal -> `legacy_rollback_gate.py`) covering current web root/config/media/database and legacy DNS state;
+2. production DNS rollback package covering all five planned production hostnames, including previously absent records.
 
-The DNS capture is read-only and must query the authoritative nameservers directly. Resolver fallback is not accepted. Capture it immediately before routing changes:
+Capture DNS immediately before routing changes:
 
 ```bash
 python scripts/dns_rollback_capture.py \
@@ -56,7 +103,7 @@ python scripts/dns_rollback_capture.py \
   --rollback-owner OWNER
 ```
 
-Then require the fail-closed gate before any DNS mutation:
+Then require:
 
 ```bash
 python scripts/dns_rollback_gate.py \
@@ -65,17 +112,36 @@ python scripts/dns_rollback_gate.py \
   --output /secure/path/dns-rollback-evidence.json
 ```
 
-`DNS_ROLLBACK_GATE_GREEN` is required before `dns_rollback_capture` may be marked VERIFIED in launch evidence. The gate validates the exact five-host topology, authoritative nameserver consensus, TTL/class syntax, apex NS/SOA, prior PRESENT/NO_WEB_RECORDS/NXDOMAIN state, freshness, named rollback owner, and byte-identical off-site evidence. The capture/gate never changes DNS.
+`DNS_ROLLBACK_GATE_GREEN` is required before any production DNS mutation. The capture/gate never changes DNS.
 
-Keep the current live site serving until acceptance passes. Do not edit DNS merely to test rollback tooling.
+Keep the current live site serving until external acceptance passes. Do not edit DNS merely to test rollback tooling.
 
-## 5. Environment and secrets
+## 6. Environment and secrets
 
-Create `.env.production` only on the server from the example. Generate independent strong secrets. Never commit production secrets. Keep audited runtime pins. Mutating CI/demo utilities are not deployment tools.
+Create `.env.production` only on the server from `.env.production.example`. Generate independent strong secrets. Never commit production secrets.
+
+Required launch flags for this release:
+
+```dotenv
+LAUNCH_PROFILE=FULL_NO_PAYMENTS
+ENABLE_PUBLIC_SITE=true
+ENABLE_PMS=true
+ENABLE_CRM=true
+ENABLE_STAFF=true
+ENABLE_GUEST_OS=true
+ENABLE_KITCHEN=true
+ENABLE_AUTOMATION=true
+ENABLE_AI_SALES=true
+ENABLE_PAYMENT_OPERATIONS=false
+ENABLE_SERVICE_POINT_QR=false
+ENABLE_MKASSA=false
+```
+
+Keep NFC wallet/acquiring disabled.
 
 Do not broaden `COOKIE_DOMAIN` to make realtime work. Keep host-only sessions, same-origin Admin/Staff WebSocket routing, Origin enforcement and request-body limits.
 
-## 6. Database contract
+## 7. Database contract
 
 Release boundary: **24 migrations / 93 critical constraints / 84 rooms / 12 categories / 48 rates**.
 
@@ -107,6 +173,8 @@ Canonical migration ledger, in exact deployment order:
 23. `z99_marketing_consent_attribution_20260912`
 24. `zz100_owner_ops_corrections_20260914`
 
+Historical migration names containing payment/service-point tables do not enable those runtime capabilities.
+
 Apply only committed migrations:
 
 ```bash
@@ -120,67 +188,81 @@ cd ../..
 
 Never use `prisma db push` for external staging/production.
 
-## 7. Product acceptance required after deployment
+## 8. Product acceptance required after deployment
 
 At minimum verify:
+- `GET /api/v1/runtime/capabilities` reports launch profile `FULL_NO_PAYMENTS` and required operational contours enabled;
+- payment mutation/provider routes are absent or fail-closed under the launch profile;
+- Admin payment-mutation UI is hidden/blocked while historical/control finance reads remain available;
 - Public booking request shows exactly `Заявка отправлена. Номер заявки <id>. Менеджер свяжется с вами для согласования условий и предоплаты.` only after the server accepts the request, and still states that the request is not yet a confirmed reservation;
+- Public submission does not create a fake payment or provider payment QR;
 - Admin contains **Маркетинг** and **Агенты**;
 - PMS drag/drop does not commit before explicit schedule confirmation;
 - extra beds are rejected by Core for `DOUBLE_STANDARD_BASEMENT`, `DOUBLE_IMPROVED`, `TWO_ROOM_STANDARD` and recalculate for allowed room types;
 - returning guest with prior `CHECKED_OUT` stay receives automatic 10% accommodation discount;
-- Reception filters by agent and agent reports separate booked amount from actual received payments;
+- Reception filters by agent and agent reports separate booked amount from actual received-payment history;
 - Reception can create dated maintenance/manual holds for owner/staff/guest/service/other use;
-- Guest OS, Staff/housekeeping/maintenance, Kitchen/Dining, Finance and realtime pass their acceptance flows;
-- no fake payment is created by reservation creation.
+- Admin/Staff date-only hotel workflows use `Asia/Bishkek` business date semantics;
+- Guest OS, Staff/housekeeping/maintenance, Kitchen/Dining and realtime pass their acceptance flows;
+- Guest OS room QR/PIN remains non-payment and is not presented as a physical lock credential.
 
-## 8. Verified Full Test operational evidence
+## 9. Internal operational evidence
 
-Railway `Three Crowns Full Test` has already proved:
-- API/Public/Admin/Staff external HTTPS and WSS-path reachability;
-- daily Chromium acceptance and 6-hour external smoke;
-- explicit `ON_FAILURE` self-healing for application services;
-- read-only k6 load through 50 VU: **32,229 HTTP requests, 0% failures, overall p95 38.49 ms, availability p95 42.25 ms**;
-- recovery after the load test with observed API/PostgreSQL resource headroom;
-- repository PostgreSQL backup -> clean restore CI.
+Current internal release evidence proves:
+- clean 24-migration / 93-constraint database contract;
+- canonical 84/12/48 seed;
+- Core compile and active-route uniqueness;
+- Admin/Public/Staff builds;
+- Site/PMS/CMS smoke;
+- full-domain E2E;
+- Dining/Kitchen acceptance;
+- root control-center verification;
+- backup/restore mechanism CI;
+- release truth and launch acceptance;
+- hotel business-date contract;
+- `FULL_NO_PAYMENTS` route-surface contract.
 
-These results guide sizing and procedure but must be re-observed on the actual production host.
+These results guide external deployment but must be re-observed on the actual hotel target.
 
-## 9. First external production-like staging sequence
+## 10. First external production-like staging sequence
 
-1. check out `main` and verify release `0.62.2`, accepted head `61bd40d7592e842a4d52cfb343483065afb378cb` and observed merge `94c849a0833079627b47db1e25869096191424bc`;
-2. run `python scripts/release_rc_truth_guard.py`;
-3. verify GitHub/Drive launch-security gates;
-4. run host/environment preflight;
-5. preserve, checksum, restore-rehearse and off-site-copy the legacy live rollback package;
-6. create persistent directories and staging secrets;
-7. start private PostgreSQL;
-8. apply all **24** migrations;
-9. run production/database preflight;
-10. reconcile canonical **84 rooms / 12 categories / 48 rates** to zero diff;
-11. build/deploy the accepted product boundary plus exact accepted ops-only merge drift;
-12. start Core/Public/Admin/Staff/Kitchen and n8n only after Core readiness;
-13. verify HTTPS/WSS, secure host-only cookies, CORS, WebSocket Origin policy, same-origin realtime and private PostgreSQL;
-14. verify request-body limits and media-upload boundary;
-15. run business acceptance, including Marketing/Agents/room holds/pricing corrections and exact Public confirmation copy;
-16. run real-device/provider checks;
-17. re-run guarded load baseline with target resource observations;
-18. prove monitoring/restart/self-healing on the target;
-19. take a fresh target backup, make a byte-identical restricted off-site copy, run `database_restore_evidence.py` against an isolated restore database, then require `pre_cutover_backup_gate.py` to return `PRE_CUTOVER_BACKUP_GATE_GREEN`;
-20. run `dns_rollback_capture.py` and require `dns_rollback_gate.py` to return `DNS_ROLLBACK_GATE_GREEN` for all five production hostnames;
-21. record immutable SHA/image/runtime linkage;
-22. only after every required launch gate is VERIFIED and explicit owner GO exists, perform the separately authorized DNS cutover.
+1. use a clean product checkout pinned to accepted executable `a53850983d8fc6e1f1997199049a5b071511ed80`;
+2. use a separate current ops/governance checkout only where release/readiness tooling requires it;
+3. run `python scripts/release_rc_truth_guard.py`;
+4. verify GitHub branch-protection and Drive-integrity launch gates;
+5. run host/environment preflight;
+6. preserve, checksum, restore-rehearse and off-site-copy the legacy live rollback package;
+7. create persistent directories and server-side secrets;
+8. start private PostgreSQL;
+9. apply all **24** migrations;
+10. run production/database preflight;
+11. reconcile canonical **84 rooms / 12 categories / 48 rates** to zero unexplained diff;
+12. build/deploy API/Web/Admin/Staff images from exact accepted executable `a5385098...`;
+13. start Core/Public/Admin/Staff/Kitchen and n8n only after Core readiness;
+14. verify runtime capabilities exactly match `FULL_NO_PAYMENTS`;
+15. verify HTTPS/WSS, secure host-only cookies, CORS, WebSocket Origin policy, same-origin realtime and private PostgreSQL;
+16. verify request-body limits and media-upload boundary;
+17. run business acceptance across Public/PMS/CRM/Agents/Marketing/Guest OS/Staff/Kitchen/Dining/realtime;
+18. run real iPhone Safari / Android Chrome / desktop / Staff-Kitchen device acceptance;
+19. observe target load/resource behavior without enabling deferred provider/payment contours;
+20. prove monitoring/restart/self-healing on the target;
+21. take a fresh target backup, make a byte-identical restricted off-site copy, run isolated restore evidence, then require `PRE_CUTOVER_BACKUP_GATE_GREEN`;
+22. run DNS rollback capture/gate immediately before routing changes and require `DNS_ROLLBACK_GATE_GREEN`;
+23. record immutable accepted executable SHA/image/runtime linkage;
+24. run unified technical readiness;
+25. only after every required launch gate is VERIFIED and explicit owner GO exists, perform the separately authorized DNS cutover.
 
-The exact backup/restore/off-site command sequence is canonical in `docs/PRODUCTION_DATABASE_MIGRATIONS.md`. Launch-evidence JSON entries alone are not sufficient evidence for `pre_cutover_backup` or `dns_rollback_capture`.
+The exact backup/restore/off-site command sequence is canonical in `docs/PRODUCTION_DATABASE_MIGRATIONS.md`.
 
-## 10. Unified technical cutover-readiness gate
+## 11. Unified technical cutover-readiness gate
 
-After the external staging sequence is complete and the manual governance/device prerequisites are already VERIFIED, run one final **read-only** technical readiness pass from the current ops checkout. Keep a separate clean product checkout pinned to the accepted executable SHA; the gate verifies that the running API/Web/Admin/Staff images carry that same revision.
+After external staging is complete and manual governance/device prerequisites are already VERIFIED, run one final **read-only** technical readiness pass from the current ops checkout. Keep a separate clean product checkout pinned to accepted executable SHA `a5385098...`; the gate verifies running API/Web/Admin/Staff images carry that same revision.
 
-Example shape:
+Example:
 
 ```bash
 python scripts/production_cutover_readiness.py \
-  --release-sha 61bd40d7592e842a4d52cfb343483065afb378cb \
+  --release-sha a53850983d8fc6e1f1997199049a5b071511ed80 \
   --launch-manifest /secure/launch-evidence.json \
   --product-repo-root /srv/three-crowns/product-release \
   --rollback-evidence-dir /secure/legacy-rollback \
@@ -201,37 +283,42 @@ python scripts/production_cutover_readiness.py \
   --output-dir /secure/readiness-final
 ```
 
-The gate runs, in order: host preflight, release truth, legacy rollback gate, authoritative DNS rollback gate, pre-cutover DB backup gate, immutable deployment linkage, production monitoring, canonical HTTPS/WSS probe and external public truth probe. It is fail-fast and writes SHA256-addressed stdout/stderr plus machine evidence under the requested output directory.
+The launch manifest must already prove manual/external prerequisites before this command can turn green: GitHub branch protection, Drive permission integrity, room reconciliation, external HTTPS/WSS staging and real-device acceptance.
 
-The launch manifest must already prove these manual/external prerequisites before this command can turn green: GitHub branch protection, Drive permission remediation, room reconciliation, external HTTPS/WSS staging and real-device acceptance. If a provider is launch-enabled, provider acceptance must also already be VERIFIED.
+For `FULL_NO_PAYMENTS`, provider-payment/TTLock acceptance is not required and those capabilities must remain disabled. If a future launch profile enables a provider, that provider's real acceptance becomes mandatory for that future profile.
 
-**Safety boundary:** `owner_cutover_approval` must still be `NOT_VERIFIED` while this gate runs. `PRODUCTION_CUTOVER_TECHNICAL_READINESS_GREEN` means only that technical evidence is ready for owner review. It does not change DNS, enable MKassa/TTHotel/TTLock, write hotel business data, or authorize production.
+**Safety boundary:** `owner_cutover_approval` must still be `NOT_VERIFIED` while this gate runs. `PRODUCTION_CUTOVER_TECHNICAL_READINESS_GREEN` means only that technical evidence is ready for owner review. It does not change DNS, enable payments/MKassa/TTLock, write hotel business data or authorize production.
 
-After reviewing the generated evidence, and only after explicit owner GO, update the launch evidence with final verified references and run:
+After reviewing generated evidence, and only after explicit owner GO, update launch evidence and run:
 
 ```bash
 python scripts/verify_launch_acceptance.py \
   --mode cutover \
   --manifest /secure/launch-evidence.json \
-  --release-sha 61bd40d7592e842a4d52cfb343483065afb378cb
+  --release-sha a53850983d8fc6e1f1997199049a5b071511ed80
 ```
 
-Only `STRUCTURAL LAUNCH EVIDENCE COMPLETE` **after explicit owner GO** permits the separately authorized DNS/provider cutover procedure.
+Only `STRUCTURAL LAUNCH EVIDENCE COMPLETE` **after explicit owner GO** permits the separately authorized DNS cutover procedure.
 
-## 11. Current blockers
+## 12. Current blockers
 
 Before production cutover:
-- enable real GitHub `main` branch protection/required checks; the current CI merge guard is not a platform protection substitute;
-- verify/remediate public Google Drive writer grants if present;
-- obtain an authorized real production execution path;
-- prove target rollback and exact migration/room reconciliation;
-- prove final production HTTPS/WSS and real-device/provider behavior;
-- execute the fresh actual-target backup/clean-restore/off-site gate;
-- execute the authoritative five-host DNS rollback capture/gate on the real zone immediately before routing changes;
-- record immutable deployment linkage;
-- run the unified technical cutover-readiness gate and review its evidence;
+- enable real GitHub `main` branch protection/required checks (#91);
+- verify/remediate Google Drive permissions (#100);
+- obtain authorized real Beget/VPS execution path (#72);
+- prove isolated external target runtime (#28);
+- prove target rollback and exact migration/room reconciliation (#8);
+- prove final production HTTPS/WSS and real-device behavior;
+- execute fresh actual-target backup/clean-restore/restricted off-site gate;
+- execute authoritative DNS rollback capture/gate on the real zone immediately before routing changes;
+- record immutable accepted executable deployment linkage (#40);
+- run unified technical cutover-readiness gate and review evidence;
 - record explicit owner GO only after every preceding item is complete.
 
-## 12. Production cutover gate
+Deferred payment/MKassa/NFC/TTLock work is not a blocker for the current `FULL_NO_PAYMENTS` profile.
 
-Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all actual-target evidence exists and explicit owner GO is recorded. No CI, Railway Full Test success, or technical readiness script alone authorizes DNS switching or provider activation.
+## 13. Production cutover gate
+
+Production remains **EXTERNAL PRODUCTION CUTOVER STOP** until all actual-target evidence exists and explicit owner GO is recorded.
+
+No CI success, synthetic Full Test result or technical readiness script alone authorizes DNS switching or provider activation.
