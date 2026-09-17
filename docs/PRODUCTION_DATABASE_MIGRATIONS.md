@@ -1,18 +1,21 @@
 # Three Crowns — production database migration gate
 
-Date: 2026-09-14  
-Release: `0.62.2` owner-operations/marketing/public-confirmation refreeze  
-Status: **COMMITTED / CLEAN-DEPLOY + BACKUP-RESTORE VERIFIED IN CI / RAILWAY FULL TEST VERIFIED / EXTERNAL PRODUCTION CUTOVER STOP**
+Date: 2026-09-18  
+Release: `0.62.2` / `FULL_NO_PAYMENTS`  
+Status: **COMMITTED / CLEAN-DEPLOY + BACKUP-RESTORE VERIFIED IN CI / INTERNAL RELEASE GATES GREEN / EXTERNAL PRODUCTION CUTOVER STOP**
 
 This document defines the current database release boundary. It does not prove real hotel production migration and does not authorize production cutover.
 
 ## Release identity
 
-Accepted executable head: `61bd40d7592e842a4d52cfb343483065afb378cb`.  
-Observed main merge: `94c849a0833079627b47db1e25869096191424bc`.  
+Exact tested PR #176 head: `a3ff4c847c66cd64a7cca92ccec613f23917f62d`.  
+Accepted executable head: `a53850983d8fc6e1f1997199049a5b071511ed80`.  
+Current governance/main head: `b20ea27d9fd7950e0a22f164413156e8b62355ec`.  
 Production source branch: `main`.
 
-PR #164 passed **26/26** pull-request workflows before merge. The first main push produced **25/26** successes; the sole failure was the old frozen Release RC Truth intentionally rejecting the new Public boundary before this controlled refreeze. No database migration changed in PR #164.
+PR #176 passed **29/29** pull-request workflows before merge. Its first main push produced **25/26** successes; the sole failure was the old frozen Release RC Truth intentionally rejecting the new executable boundary before controlled refreeze. PR #177 then refroze release truth and the resulting main passed **24/24** post-merge workflows.
+
+No database migration changed in PR #176 or PR #177. The database boundary remains unchanged.
 
 ## Canonical migration ledger
 
@@ -47,6 +50,8 @@ The `zz100_...` prefix is intentional: Prisma migration directories are ordered 
 
 The shared release contract fingerprints **93 critical domain constraints** through `scripts/release_contract.py`.
 
+Historical migration names for Service Point/payment data do not mean payment capabilities are launch-enabled. Runtime composition under `FULL_NO_PAYMENTS` remains authoritative: payment mutations/acquiring/MKassa/NFC wallet are fail-closed for launch.
+
 ## Canonical property baseline
 
 - **84 physical rooms**;
@@ -56,19 +61,17 @@ The shared release contract fingerprints **93 critical domain constraints** thro
 
 Physical room intake is closed. Real target reconciliation remains an external evidence step.
 
-## Verified evidence
+## Verified internal evidence
 
-Repository CI has successfully proved:
+Repository CI has proved:
 - Prisma schema validation/generation;
 - clean application of the exact 24-migration chain;
 - exact 93-constraint release fingerprint;
 - Production Migration Baseline;
 - PostgreSQL backup -> clean restore -> migration/constraint comparison;
-- Release Gate and Full Staging Gate.
+- current Release Gate and launch acceptance contracts.
 
-Railway `Three Crowns Full Test` additionally proved all 24 migrations and canonical seed can start together and pass readiness. The later Public confirmation copy does not alter the database boundary.
-
-This Full Test evidence is not actual production migration evidence.
+Current accepted executable/release CI also proves the canonical seed and active `FULL_NO_PAYMENTS` route surface. This is not actual production migration evidence.
 
 ## Production rules
 
@@ -79,6 +82,7 @@ This Full Test evidence is not actual production migration evidence.
 5. Every forward migration must update the release contract and backup/restore verification.
 6. The Prisma schema must remain synchronized with committed migration truth.
 7. A fresh real backup and isolated restore verification are required immediately before cutover.
+8. Runtime capability flags must preserve `FULL_NO_PAYMENTS`; database presence alone never enables dormant financial/provider functions.
 
 ## Fresh staging / production database
 
@@ -127,8 +131,10 @@ python scripts/pre_cutover_backup_gate.py \
 
 The gate rejects stale backups, non-v3 manifests, wrong property baseline, migration/constraint drift, local/off-site checksum differences, restore evidence that does not belong to the same backup, or a missing restore owner. `PRE_CUTOVER_BACKUP_GATE_GREEN` is required before the `pre_cutover_backup` launch-evidence item may be marked VERIFIED.
 
-Repository CI proves the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires this procedure to be executed on the fresh actual-target backup.
+Repository CI proves the mechanism against the exact **24-migration / 93-constraint** contract. Production still requires this procedure on the fresh actual-target backup.
 
 ## Production boundary
 
-Database engineering and Full Test are green, but real production remains **EXTERNAL PRODUCTION CUTOVER STOP** until the actual target has accepted SHA/image linkage, fresh backup, successful `migrate deploy/status`, zero-diff room reconciliation, readiness/smoke, tested rollback/restore and verified off-site copy. No Railway Full Test result by itself authorizes DNS or provider cutover.
+Database engineering and internal release gates are green, but real production remains **EXTERNAL PRODUCTION CUTOVER STOP** until the actual target has accepted executable SHA/image linkage, fresh backup, successful `migrate deploy/status`, zero-diff room reconciliation, readiness/smoke, tested rollback/restore and verified restricted off-site copy.
+
+No internal CI result by itself authorizes DNS switching or provider activation.
