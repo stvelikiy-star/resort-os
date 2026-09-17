@@ -39,8 +39,7 @@ room_blocks = (ROOT / "apps/admin/components/RoomBlocksPanel.tsx").read_text(enc
 assert "Date.UTC(y, m - 1, d + amount)" in room_blocks
 
 # Public Web is release-frozen by Management Final Acceptance and is intentionally
-# not modified by this operational Admin/Staff timezone hardening PR.
-public_widget = ROOT / "apps/web/components/AiAdministratorWidget.tsx"
-assert public_widget.exists()
+# excluded from this operational Admin/Staff timezone hardening PR.
+assert not (ROOT / "apps/web/lib/hotelDate.ts").exists()
 
 print("hotel business date contract: OK")
