@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 
@@ -55,6 +54,19 @@ def main() -> int:
         require(env.get(key) == "false", f"{key} must stay disabled until explicit owner approval")
         require(key in compose, f"compose must pass {key} to Resort Core")
         require(key in capabilities, f"runtime capability surface must expose {key}")
+
+    require('PAYMENT_OPERATIONS_ENABLED = env_flag("ENABLE_PAYMENT_OPERATIONS", False)' in entry,
+            "reservation payments must default to disabled when env is missing")
+    require('SERVICE_POINT_QR_ENABLED = env_flag("ENABLE_SERVICE_POINT_QR", False)' in entry,
+            "service-point payment QR must default to disabled when env is missing")
+    require('MKASSA_ENABLED = env_flag("ENABLE_MKASSA", False)' in entry,
+            "MKassa must default to disabled when env is missing")
+    require('"payment_operations": env_flag("ENABLE_PAYMENT_OPERATIONS", False)' in capabilities,
+            "runtime capabilities must report payments disabled by default")
+    require('"service_point_qr": env_flag("ENABLE_SERVICE_POINT_QR", False)' in capabilities,
+            "runtime capabilities must report service-point payment QR disabled by default")
+    require('"mkassa": env_flag("ENABLE_MKASSA", False)' in capabilities,
+            "runtime capabilities must report MKassa disabled by default")
 
     require('if PAYMENT_OPERATIONS_ENABLED:\n    app.include_router(reservation_payments_router)' in entry,
             "reservation payment router must be composed only behind ENABLE_PAYMENT_OPERATIONS")
