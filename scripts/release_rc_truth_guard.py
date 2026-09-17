@@ -18,8 +18,8 @@ ALLOWED_HYGIENE_PATHS = {
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
 
-EXPECTED_ACCEPTED = "7b14e32dbf64ffd617a5c7720f98add24efd1341"
-EXPECTED_TESTED_PR_HEAD = "5c606e5447958595f52c9d7dbacdb177e010cb4c"
+EXPECTED_ACCEPTED = "a53850983d8fc6e1f1997199049a5b071511ed80"
+EXPECTED_TESTED_PR_HEAD = "a3ff4c847c66cd64a7cca92ccec613f23917f62d"
 
 
 def git(*args: str) -> str:
@@ -50,7 +50,7 @@ def main() -> int:
         "source_branch": "main",
         "accepted_executable_head": EXPECTED_ACCEPTED,
         "tested_pr_head": EXPECTED_TESTED_PR_HEAD,
-        "tested_pr_number": 172,
+        "tested_pr_number": 176,
         "observed_merge_commit": EXPECTED_ACCEPTED,
         "postmerge_truth_head": EXPECTED_ACCEPTED,
         "production_source_branch": "main",
@@ -76,11 +76,11 @@ def main() -> int:
     if rc.get("observed_merge_allowed_hygiene_paths") != []:
         errors.append("accepted main boundary must not carry unclassified merge drift")
 
-    if rc.get("accepted_head_workflows") != {"triggered": 48, "success": 48, "failures": 0}:
-        errors.append("accepted PR #172 workflow evidence must remain 48/48 SUCCESS")
-    expected_main = {"triggered": 39, "success": 37, "failures": 1, "other_completed": 1}
+    if rc.get("accepted_head_workflows") != {"triggered": 29, "success": 29, "failures": 0}:
+        errors.append("accepted PR #176 workflow evidence must remain 29/29 SUCCESS")
+    expected_main = {"triggered": 26, "success": 25, "failures": 1, "other_completed": 0}
     if rc.get("merged_main_workflows") != expected_main:
-        errors.append("first main-push workflow evidence does not match the recorded post-merge observation")
+        errors.append("Bishkek-date main-push workflow evidence does not match the recorded post-merge observation")
     if rc.get("postmerge_truth_workflows") != expected_main:
         errors.append("postmerge truth workflow evidence does not match the recorded post-merge observation")
 
@@ -115,7 +115,7 @@ def main() -> int:
         "0.62.2",
         EXPECTED_ACCEPTED,
         EXPECTED_TESTED_PR_HEAD,
-        "48/48",
+        "29/29",
         "FULL_NO_PAYMENTS",
         "24 migrations",
         "93 critical constraints",
@@ -136,7 +136,7 @@ def main() -> int:
     print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
     print(f"FACT: tested_pr_head={tested}")
-    print("FACT: tested_pr_workflows=48/48")
+    print("FACT: tested_pr_workflows=29/29")
     print("FACT: launch_profile=FULL_NO_PAYMENTS")
     print("FACT: payment_operations_enabled=false")
     print("FACT: migrations=24")
