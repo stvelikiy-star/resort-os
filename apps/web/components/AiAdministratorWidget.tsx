@@ -2,8 +2,6 @@
 
 import { FormEvent, useMemo, useState } from "react";
 
-import { shiftHotelDateIso } from "../lib/hotelDate";
-
 type Role = "user" | "assistant";
 type Message = { role: Role; content: string };
 type AvailabilityOption = {
@@ -26,7 +24,14 @@ type AssistantResponse = {
   } | null;
 };
 
-const todayIso = (offset = 0) => shiftHotelDateIso(offset);
+function todayIso(offset = 0) {
+  const now = new Date();
+  const value = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 export default function AiAdministratorWidget() {
   const [open, setOpen] = useState(false);
