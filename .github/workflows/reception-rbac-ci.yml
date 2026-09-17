@@ -55,6 +55,9 @@ jobs:
       BOOTSTRAP_OWNER_USERNAME: reception-rbac-ci-owner
       BOOTSTRAP_OWNER_PASSWORD: Reception-RBAC-CI-Owner-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: Reception RBAC CI Owner
+      # The RBAC fixture records a Payment fact to prove role boundaries.
+      # Production FULL_NO_PAYMENTS keeps this route disabled.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4
