@@ -101,6 +101,10 @@ jobs:
       TTLOCK_CLIENT_ID: ttlock-ci-client
       TTLOCK_ACCESS_TOKEN: ttlock-ci-token
       PAID_ACCESS_MOCK_LOG: /tmp/service-point-paid-access-mock.jsonl
+      # Production profile remains OFF. This workflow opts in only so the dormant
+      # Service Point payment implementation remains regression-tested with mocks.
+      ENABLE_SERVICE_POINT_QR: true
+      ENABLE_MKASSA: false
 
     steps:
       - uses: actions/checkout@v4
