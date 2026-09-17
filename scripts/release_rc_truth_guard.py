@@ -8,59 +8,18 @@ import sys
 from pathlib import Path
 
 RC_PATH = Path("release/current-rc.json")
-DOCS = (
-    Path("knowledge/04_CURRENT_STATE.md"),
-    Path("knowledge/09_LAUNCH_ACCEPTANCE.md"),
-    Path("docs/DEPLOYMENT_RUNBOOK.md"),
-    Path("docs/RELEASE_0.62.2_2026-09-07.md"),
-)
+RELEASE_DOC = Path("docs/RELEASE_0.62.2_REFREEZE_2026-09-17.md")
 ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
-    "release/launch-evidence.example.json",
-    "knowledge/04_CURRENT_STATE.md",
-    "knowledge/09_LAUNCH_ACCEPTANCE.md",
-    "docs/DEPLOYMENT_RUNBOOK.md",
-    "docs/PRODUCTION_DATABASE_MIGRATIONS.md",
-    "docs/DEMO_ACCEPTANCE_2026-08-26.md",
-    "docs/LOAD_TESTING.md",
-    "docs/RELEASE_0.60.0_2026-09-05.md",
-    "docs/RELEASE_0.61.0_2026-09-06.md",
-    "docs/RELEASE_0.62.0_2026-09-07.md",
-    "docs/RELEASE_0.62.1_2026-09-07.md",
-    "docs/RELEASE_0.62.2_2026-09-07.md",
-    "docs/README.md",
-    "docs/STAGING_RUNBOOK_2026-08-28.md",
+    "docs/RELEASE_0.62.2_REFREEZE_2026-09-17.md",
     "scripts/release_rc_truth_guard.py",
-    "scripts/run_load_test.sh",
-    "scripts/main_pr_merge_guard.py",
     "scripts/verify_internal_hardening.py",
-    "scripts/pre_cutover_backup_gate.py",
-    "scripts/pre_cutover_backup_contract_test.py",
-    "scripts/database_restore_evidence.py",
-    "scripts/dns_rollback_capture.py",
-    "scripts/dns_rollback_gate.py",
-    "scripts/dns_rollback_contract_test.py",
-    "scripts/production_endpoint_probe.py",
-    "scripts/production_cutover_readiness.py",
-    "scripts/production_cutover_readiness_contract_test.py",
-    "tests/load/resort_core_read.k6.js",
-    ".github/workflows/release-rc-truth-ci.yml",
-    ".github/workflows/launch-acceptance-ci.yml",
-    ".github/workflows/fulltest-external-smoke.yml",
-    ".github/workflows/load-test-contract-ci.yml",
-    ".github/workflows/fulltest-load-baseline-ci.yml",
-    ".github/workflows/main-pr-merge-guard-ci.yml",
-    ".github/workflows/pre-cutover-backup-gate-ci.yml",
-    ".github/workflows/dns-rollback-gate-ci.yml",
-    ".github/workflows/production-cutover-readiness-ci.yml",
-}
-EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT = {
-    ".github/workflows/main-pr-merge-guard-ci.yml",
-    "scripts/main_pr_merge_guard.py",
-    "scripts/release_rc_truth_guard.py",
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
+
+EXPECTED_ACCEPTED = "7b14e32dbf64ffd617a5c7720f98add24efd1341"
+EXPECTED_TESTED_PR_HEAD = "5c606e5447958595f52c9d7dbacdb177e010cb4c"
 
 
 def git(*args: str) -> str:
@@ -69,14 +28,6 @@ def git(*args: str) -> str:
 
 def fail(message: str) -> None:
     print(f"FAIL: {message}")
-
-
-def validate_workflows(label: str, evidence: object, expected: dict[str, int], errors: list[str]) -> None:
-    if not isinstance(evidence, dict):
-        errors.append(f"{label} must be an object")
-        return
-    if evidence != expected:
-        errors.append(f"{label} must equal {expected}, got {evidence}")
 
 
 def main() -> int:
@@ -96,41 +47,52 @@ def main() -> int:
     expected = {
         "release_version": "0.62.2",
         "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-        "source_branch": "fix/public-request-sent-copy-20260914",
-        "accepted_executable_head": "61bd40d7592e842a4d52cfb343483065afb378cb",
-        "observed_merge_commit": "94c849a0833079627b47db1e25869096191424bc",
-        "postmerge_truth_head": "94c849a0833079627b47db1e25869096191424bc",
+        "source_branch": "main",
+        "accepted_executable_head": EXPECTED_ACCEPTED,
+        "tested_pr_head": EXPECTED_TESTED_PR_HEAD,
+        "tested_pr_number": 172,
+        "observed_merge_commit": EXPECTED_ACCEPTED,
+        "postmerge_truth_head": EXPECTED_ACCEPTED,
         "production_source_branch": "main",
         "migration_count": 24,
         "critical_constraint_count": 93,
+        "launch_profile": "FULL_NO_PAYMENTS",
+        "payment_operations_enabled": False,
+        "nfc_wallet_enabled": False,
+        "mkassa_enabled": False,
     }
     if rc.get("schema_version") != 1:
         errors.append("unsupported RC manifest schema")
     for key, value in expected.items():
         if rc.get(key) != value:
             errors.append(f"{key} must be {value!r}")
+
     if rc.get("main_allowed_as_production_source") is not True:
         errors.append("main must remain the allowed production source branch")
-    if rc.get("observed_merge_tree_equivalent") is not False:
-        errors.append("PR #164 tested head and main merge are intentionally not tree-equivalent")
+    if rc.get("observed_merge_tree_equivalent") is not True:
+        errors.append("accepted executable head and observed merge must be the same main boundary")
     if rc.get("observed_merge_allowed_hygiene_only") is not True:
-        errors.append("observed merge drift must be explicitly classified as hygiene-only")
-    if set(rc.get("observed_merge_allowed_hygiene_paths") or []) != EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT:
-        errors.append("observed merge allowed hygiene paths do not match the exact PR #163 operational drift")
+        errors.append("post-boundary drift must remain hygiene-only")
+    if rc.get("observed_merge_allowed_hygiene_paths") != []:
+        errors.append("accepted main boundary must not carry unclassified merge drift")
+
+    if rc.get("accepted_head_workflows") != {"triggered": 48, "success": 48, "failures": 0}:
+        errors.append("accepted PR #172 workflow evidence must remain 48/48 SUCCESS")
+    expected_main = {"triggered": 39, "success": 37, "failures": 1, "other_completed": 1}
+    if rc.get("merged_main_workflows") != expected_main:
+        errors.append("first main-push workflow evidence does not match the recorded post-merge observation")
+    if rc.get("postmerge_truth_workflows") != expected_main:
+        errors.append("postmerge truth workflow evidence does not match the recorded post-merge observation")
+
+    if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
+        errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
         if rc.get(key) is not False:
             errors.append(f"{key} must remain false until real external evidence exists")
-    if rc.get("canonical_property_seed") != {"rooms": 84, "room_categories": 12, "rate_rows": 48}:
-        errors.append("canonical property seed must remain 84 rooms / 12 categories / 48 rates")
-
-    validate_workflows("accepted_head_workflows", rc.get("accepted_head_workflows"), {"triggered": 26, "success": 26, "failures": 0}, errors)
-    validate_workflows("merged_main_workflows", rc.get("merged_main_workflows"), {"triggered": 26, "success": 25, "failures": 1}, errors)
-    validate_workflows("postmerge_truth_workflows", rc.get("postmerge_truth_workflows"), {"triggered": 26, "success": 25, "failures": 1}, errors)
 
     accepted = str(rc.get("accepted_executable_head") or "").lower()
-    observed = str(rc.get("observed_merge_commit") or "").lower()
-    postmerge = str(rc.get("postmerge_truth_head") or "").lower()
-    for label, value in (("accepted_executable_head", accepted), ("observed_merge_commit", observed), ("postmerge_truth_head", postmerge)):
+    tested = str(rc.get("tested_pr_head") or "").lower()
+    for label, value in (("accepted_executable_head", accepted), ("tested_pr_head", tested)):
         if not SHA_RE.fullmatch(value):
             errors.append(f"{label} is not an exact 40-character Git SHA")
 
@@ -141,31 +103,29 @@ def main() -> int:
             unexpected = sorted(path for path in changed.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
             if unexpected:
                 errors.append("executable/product drift after accepted head: " + ", ".join(unexpected))
-
-            observed_diff = {path for path in git("diff", "--name-only", accepted, observed).splitlines() if path}
-            if observed_diff != EXPECTED_OBSERVED_MERGE_HYGIENE_DRIFT:
-                errors.append(
-                    "observed merge drift must equal the exact accepted PR #163 hygiene set; got: "
-                    + ", ".join(sorted(observed_diff))
-                )
-
-            postmerge_diff = git("diff", "--name-only", observed, postmerge)
-            unexpected_post = sorted(path for path in postmerge_diff.splitlines() if path and path not in ALLOWED_HYGIENE_PATHS)
-            if unexpected_post:
-                errors.append("post-merge truth head contains executable/product drift: " + ", ".join(unexpected_post))
         except subprocess.CalledProcessError as exc:
             errors.append(f"cannot validate frozen release tree: {exc}")
 
-    required_markers = ("0.62.2", accepted, observed, "24", "93", "main", "EXTERNAL", "STOP")
-    for doc in DOCS:
-        try:
-            text = doc.read_text(encoding="utf-8")
-        except Exception as exc:
-            errors.append(f"cannot read {doc}: {exc}")
-            continue
-        for marker in required_markers:
-            if marker not in text:
-                errors.append(f"{doc} missing release marker {marker!r}")
+    try:
+        release_doc = RELEASE_DOC.read_text(encoding="utf-8")
+    except Exception as exc:
+        errors.append(f"cannot read {RELEASE_DOC}: {exc}")
+        release_doc = ""
+    for marker in (
+        "0.62.2",
+        EXPECTED_ACCEPTED,
+        EXPECTED_TESTED_PR_HEAD,
+        "48/48",
+        "FULL_NO_PAYMENTS",
+        "24 migrations",
+        "93 critical constraints",
+        "84 rooms",
+        "12 categories",
+        "EXTERNAL",
+        "STOP",
+    ):
+        if marker not in release_doc:
+            errors.append(f"{RELEASE_DOC} missing release marker {marker!r}")
 
     if errors:
         for error in errors:
@@ -175,10 +135,10 @@ def main() -> int:
 
     print("FACT: release_version=0.62.2")
     print(f"FACT: accepted_executable_head={accepted}")
-    print(f"FACT: observed_merge_commit={observed}")
-    print("FACT: accepted_head_workflows=26/26")
-    print("FACT: merged_main_workflows=25/26; Release RC Truth failed closed before this refreeze")
-    print("FACT: observed_merge_drift=PR #163 hygiene-only exact set")
+    print(f"FACT: tested_pr_head={tested}")
+    print("FACT: tested_pr_workflows=48/48")
+    print("FACT: launch_profile=FULL_NO_PAYMENTS")
+    print("FACT: payment_operations_enabled=false")
     print("FACT: migrations=24")
     print("FACT: critical_constraints=93")
     print("FACT: production_source_branch=main")
