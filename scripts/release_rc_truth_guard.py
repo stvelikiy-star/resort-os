@@ -150,8 +150,6 @@ def main() -> int:
         "FULL_NO_PAYMENTS",
         "24",
         "93",
-        "84 rooms",
-        "12 categories",
         "STOP",
     )
     for path in CANONICAL_CURRENT_DOCS:
@@ -163,6 +161,10 @@ def main() -> int:
         for marker in canonical_markers:
             if marker not in content:
                 errors.append(f"{path} missing canonical release marker {marker!r}")
+        if "84 rooms" not in content and "84 physical rooms" not in content:
+            errors.append(f"{path} missing canonical 84-room property marker")
+        if "12 categories" not in content and "12 room categories" not in content:
+            errors.append(f"{path} missing canonical 12-category property marker")
         for stale in STALE_EXECUTABLE_BOUNDARIES:
             if stale in content:
                 errors.append(f"{path} contains stale executable/release boundary {stale}")
