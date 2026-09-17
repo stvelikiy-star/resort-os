@@ -1,0 +1,42 @@
+name: No Payment Launch Profile CI
+
+on:
+  pull_request:
+    paths:
+      - '.env.production.example'
+      - 'compose.production.yaml'
+      - 'services/api/app/app_entry.py'
+      - 'services/api/app/runtime_capabilities.py'
+      - 'apps/admin/components/ReservationFolioPanel.tsx'
+      - 'scripts/no_payment_launch_profile_contract_test.py'
+      - '.github/workflows/no-payment-launch-profile-ci.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - '.env.production.example'
+      - 'compose.production.yaml'
+      - 'services/api/app/app_entry.py'
+      - 'services/api/app/runtime_capabilities.py'
+      - 'apps/admin/components/ReservationFolioPanel.tsx'
+      - 'scripts/no_payment_launch_profile_contract_test.py'
+      - '.github/workflows/no-payment-launch-profile-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile changed Core modules
+        run: |
+          python -m py_compile services/api/app/app_entry.py services/api/app/runtime_capabilities.py
+      - name: Guard launch profile
+        run: python scripts/no_payment_launch_profile_contract_test.py
+      - name: Validate production compose syntax
+        run: docker compose --env-file .env.production.example -f compose.production.yaml config >/dev/null
