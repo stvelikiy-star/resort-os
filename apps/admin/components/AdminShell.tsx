@@ -36,6 +36,7 @@ type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "R
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
+const SESSION_CHECK_INTERVAL_MS = 30_000;
 
 function canEnterAdmin(role?: string | null): boolean {
   return Boolean(role && ADMIN_ROLES.has(role));
@@ -46,6 +47,16 @@ function initialTab(role?: string | null): Tab {
   if (role === "RECEPTION") return "RESERVATIONS";
   if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";
   return "DASHBOARD";
+}
+
+function coreApiRequest(input: RequestInfo | URL): boolean {
+  const raw = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+  try {
+    const url = new URL(raw, window.location.origin);
+    return url.origin === window.location.origin && url.pathname.startsWith("/core/api/v1/");
+  } catch {
+    return false;
+  }
 }
 
 export default function AdminShell() {
@@ -75,6 +86,67 @@ export default function AdminShell() {
       .catch(() => setUser(null))
       .finally(() => setChecking(false));
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const nativeFetch = window.fetch.bind(window);
+    const authAwareFetch: typeof window.fetch = async (...args) => {
+      const response = await nativeFetch(...args);
+      const input = args[0];
+      if ((response.status === 401 || response.status === 403) && coreApiRequest(input)) {
+        setUser(null);
+      }
+      return response;
+    };
+
+    window.fetch = authAwareFetch;
+    return () => {
+      if (window.fetch === authAwareFetch) window.fetch = nativeFetch;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let disposed = false;
+    const validateSession = async () => {
+      try {
+        const response = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
+        if (disposed) return;
+        if (response.status === 401 || response.status === 403) {
+          setUser(null);
+          return;
+        }
+        if (!response.ok) return;
+        const payload = (await response.json()) as User;
+        if (!canEnterAdmin(payload.role)) {
+          setUser(null);
+          return;
+        }
+        if (payload.id !== user.id || payload.role !== user.role || payload.display_name !== user.display_name) {
+          setUser(payload);
+        }
+      } catch {
+        // A transient network failure is not proof that the session expired.
+      }
+    };
+
+    const timer = window.setInterval(() => void validateSession(), SESSION_CHECK_INTERVAL_MS);
+    const onFocus = () => void validateSession();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void validateSession();
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [user?.id, user?.role, user?.display_name]);
 
   useEffect(() => {
     if (!user || !HOUSEKEEPING_SYNC_ROLES.has(user.role)) return;
