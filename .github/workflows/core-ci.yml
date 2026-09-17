@@ -50,7 +50,6 @@ jobs:
       RATE_PLAN_CODE: DIRECT_2026_27
       CORE_API_URL: http://127.0.0.1:8000
       BOOTSTRAP_OWNER_USERNAME: ci-owner
-      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
 
@@ -80,6 +79,18 @@ jobs:
               for i in range(6):
                   f.write(f'D{i}={(today + timedelta(days=i)).isoformat()}\n')
           PY
+
+      - name: Generate isolated synthetic owner credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          owner_pass="$(python -c 'import secrets; print(secrets.token_urlsafe(24))')"
+          echo "::add-mask::${owner_pass}"
+          {
+            echo "BOOTSTRAP_OWNER_PASSWORD=${owner_pass}"
+            echo "SMOKE_OWNER_USERNAME=${BOOTSTRAP_OWNER_USERNAME}"
+            echo "SMOKE_OWNER_PASSWORD=${owner_pass}"
+          } >> "$GITHUB_ENV"
 
       - name: Validate and create development schema
         working-directory: packages/database
@@ -127,6 +138,8 @@ jobs:
           python scripts/bootstrap_owner.py
 
       - name: Start Resort Core
+        env:
+          ENABLE_PAYMENT_OPERATIONS: 'true'
         run: |
           python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/resort-api.log 2>&1 &
           echo $! > /tmp/resort-api.pid
@@ -158,16 +171,17 @@ jobs:
         run: |
           CODE=$(curl -sS -o /tmp/pms-unauth.json -w '%{http_code}' "http://127.0.0.1:8000/api/v1/pms/grid?start=$D0&end=$D5")
           test "$CODE" = "401"
+          python - <<'PY' > /tmp/login-payload.json
+          import json, os
+          print(json.dumps({'username': os.environ['BOOTSTRAP_OWNER_USERNAME'], 'password': os.environ['BOOTSTRAP_OWNER_PASSWORD']}))
+          PY
           curl --fail -sS -c /tmp/resort-cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
             -H 'Content-Type: application/json' \
-            -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json
+            --data-binary @/tmp/login-payload.json > /tmp/login.json
           curl --fail -sS -b /tmp/resort-cookies.txt http://127.0.0.1:8000/api/v1/auth/me > /tmp/me.json
           python -c 'import json; d=json.load(open("/tmp/me.json")); assert d["role"]=="OWNER"'
 
       - name: Verify unified Site CMS CRM PMS contour
-        env:
-          SMOKE_OWNER_USERNAME: ci-owner
-          SMOKE_OWNER_PASSWORD: CI-Only-Strong-Password-2026
         run: python scripts/site_pms_cms_smoke.py
 
       - name: Quote stay without automatic prepayment rule
