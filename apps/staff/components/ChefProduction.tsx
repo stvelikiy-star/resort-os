@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { shiftHotelDateIso } from "../lib/hotelDate";
+
 import styles from "./ChefProduction.module.css";
 
 type GuestLine = {
@@ -53,12 +55,7 @@ type Props = { userRole: string };
 
 const mealLabel = { BREAKFAST: "Завтрак", LUNCH: "Обед", DINNER: "Ужин" } as const;
 
-function localIso(offset = 0) {
-  const value = new Date();
-  value.setDate(value.getDate() + offset);
-  const shifted = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 10);
-}
+const localIso = (offset = 0) => shiftHotelDateIso(offset);
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { hotelDateIso } from "../lib/hotelDate";
+
 import styles from "./DiningDayPlanner.module.css";
 
 type User = { id: string; display_name: string; role: string };
@@ -40,11 +42,7 @@ const categoryLabel: Record<string, string> = {
   DRINK: "Напитки",
 };
 
-function todayIso() {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-}
+const todayIso = hotelDateIso;
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });

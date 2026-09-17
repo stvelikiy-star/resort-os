@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { hotelDateIso } from "../lib/hotelDate";
+
 import styles from "./DiningManagementBoard.module.css";
 
 type StayItem = {
@@ -32,11 +34,7 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-function todayIso() {
-  const now = new Date();
-  const shifted = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 10);
-}
+const todayIso = hotelDateIso;
 
 export default function DiningManagementBoard() {
   const [stays, setStays] = useState<StayItem[]>([]);

@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { hotelDateIso, hotelMonthStartIso } from "../lib/hotelDate";
+
 type Agent = {
   id: string;
   name: string;
@@ -47,8 +49,8 @@ type AgentReport = {
 };
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
-const todayIso = () => new Date().toISOString().slice(0, 10);
-const monthStartIso = () => `${todayIso().slice(0, 8)}01`;
+const todayIso = hotelDateIso;
+const monthStartIso = hotelMonthStartIso;
 
 export default function AgentsBoard() {
   const [items, setItems] = useState<Agent[]>([]);

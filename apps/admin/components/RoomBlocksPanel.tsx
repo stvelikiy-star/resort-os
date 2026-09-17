@@ -2,11 +2,13 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { hotelDateIso } from "../lib/hotelDate";
+
 type Room = { id: string; code: string; room_type_name: string; operational_state: string };
 type Block = { id: string; room_id: string; room_code: string; block_type: "MAINTENANCE" | "MANUAL"; start_date: string; end_date: string; reason: string; usage_category?: string | null; usage_label?: string | null };
 type Context = { rooms: Room[]; blocks: Block[] };
 
-const isoToday = () => new Date().toISOString().slice(0, 10);
+const isoToday = hotelDateIso;
 const addDays = (iso: string, amount: number) => {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + amount)).toISOString().slice(0, 10);
