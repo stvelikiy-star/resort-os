@@ -50,6 +50,9 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
       CORE_API_URL: http://127.0.0.1:8000
+      # This isolated invariant test creates an immutable Payment fact before
+      # resizing a reservation. Production FULL_NO_PAYMENTS keeps this false.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4
