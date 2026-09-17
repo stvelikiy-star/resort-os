@@ -84,9 +84,11 @@ from .telegram_sales import router as telegram_sales_router
 
 install_observability(app)
 
-PAYMENT_OPERATIONS_ENABLED = env_flag("ENABLE_PAYMENT_OPERATIONS", True)
-SERVICE_POINT_QR_ENABLED = env_flag("ENABLE_SERVICE_POINT_QR", True)
-MKASSA_ENABLED = env_flag("ENABLE_MKASSA", True)
+# Payment integrations must stay fail-closed when a deployment omits a flag.
+# The current production profile explicitly sets all three flags to false.
+PAYMENT_OPERATIONS_ENABLED = env_flag("ENABLE_PAYMENT_OPERATIONS", False)
+SERVICE_POINT_QR_ENABLED = env_flag("ENABLE_SERVICE_POINT_QR", False)
+MKASSA_ENABLED = env_flag("ENABLE_MKASSA", False)
 
 
 def _strip_legacy_kitchen_menu_mutations() -> None:
@@ -222,4 +224,4 @@ app.include_router(manager_dashboard_router)
 # intentionally not composed into the active application. Payment/QR providers
 # are additionally gated by explicit runtime flags for the current no-payment
 # launch profile.
-app.version = "0.62.3"
+app.version = "0.62.2"
