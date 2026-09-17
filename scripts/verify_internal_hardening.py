@@ -71,18 +71,20 @@ def main() -> int:
 
     rc = json.loads(read("release/current-rc.json"))
     ok(rc["release_version"] == "0.62.2", "release 0.62.2")
-    ok(rc["accepted_executable_head"] == "61bd40d7592e842a4d52cfb343483065afb378cb", "accepted public confirmation boundary SHA")
-    ok(rc["observed_merge_commit"] == "94c849a0833079627b47db1e25869096191424bc", "observed PR #164 merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 26, "success": 26, "failures": 0}, "26/26 accepted workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 26, "success": 25, "failures": 1}, "25/26 first merge workflows with expected frozen-truth fail-close")
-    ok(rc["postmerge_truth_workflows"] == {"triggered": 26, "success": 25, "failures": 1}, "pre-refreeze postmerge truth captured exactly")
-    ok(rc["observed_merge_tree_equivalent"] is False, "PR #164 merge tree difference recorded")
-    ok(rc["observed_merge_allowed_hygiene_only"] is True, "PR #164 merge drift limited to accepted hygiene")
-    ok(set(rc["observed_merge_allowed_hygiene_paths"]) == {
-        ".github/workflows/main-pr-merge-guard-ci.yml",
-        "scripts/main_pr_merge_guard.py",
-        "scripts/release_rc_truth_guard.py",
-    }, "exact PR #163 hygiene drift recorded")
+    ok(rc["accepted_executable_head"] == "7b14e32dbf64ffd617a5c7720f98add24efd1341", "accepted no-payment main boundary SHA")
+    ok(rc["tested_pr_head"] == "5c606e5447958595f52c9d7dbacdb177e010cb4c", "PR #172 exact tested head")
+    ok(rc["tested_pr_number"] == 172, "PR #172 recorded")
+    ok(rc["observed_merge_commit"] == "7b14e32dbf64ffd617a5c7720f98add24efd1341", "observed no-payment main merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 48, "success": 48, "failures": 0}, "48/48 accepted PR workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 39, "success": 37, "failures": 1, "other_completed": 1}, "first no-payment main push evidence recorded")
+    ok(rc["postmerge_truth_workflows"] == {"triggered": 39, "success": 37, "failures": 1, "other_completed": 1}, "postmerge truth evidence recorded")
+    ok(rc["observed_merge_tree_equivalent"] is True, "accepted main boundary is self-equivalent")
+    ok(rc["observed_merge_allowed_hygiene_only"] is True, "future release drift limited to hygiene")
+    ok(rc["observed_merge_allowed_hygiene_paths"] == [], "accepted main boundary has no unclassified drift")
+    ok(rc["launch_profile"] == "FULL_NO_PAYMENTS", "full no-payment launch profile")
+    ok(rc["payment_operations_enabled"] is False, "payment operations disabled")
+    ok(rc["nfc_wallet_enabled"] is False, "NFC wallet disabled")
+    ok(rc["mkassa_enabled"] is False, "MKassa disabled")
     ok(rc["migration_count"] == 24 and rc["critical_constraint_count"] == 93, "24 migrations / 93 constraints")
     ok(rc["canonical_property_seed"] == {"rooms": 84, "room_categories": 12, "rate_rows": 48}, "canonical property seed")
     for key in ("external_beget_staging_verified", "legacy_live_rollback_verified", "production_cutover_authorized"):
@@ -160,7 +162,7 @@ def main() -> int:
 
     ok(passed >= 108, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
-    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core/Public repository contour accepted; Railway Full Test is verified; real external production cutover remains STOP")
+    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core/Public no-payment contour accepted; external production cutover remains STOP")
     return 0
 
 
