@@ -19,8 +19,6 @@ import RateManagementBoard from "./RateManagementBoard";
 import ReceptionWorkspace from "./ReceptionWorkspace";
 import ReportsBoard from "./ReportsBoard";
 import RequestsBoard from "./RequestsBoard";
-import RoomQrBoard from "./RoomQrBoard";
-import ServicePointsBoard from "./ServicePointsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 
@@ -32,7 +30,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "INBOX" | "OPS" | "STAFF";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -144,7 +142,6 @@ export default function AdminShell() {
   const isManager = ["OWNER", "MANAGER"].includes(user.role);
   const isReception = user.role === "RECEPTION";
   const canUseReception = isManager || isReception;
-  const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
   const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);
 
   return (
@@ -165,8 +162,6 @@ export default function AdminShell() {
           {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
           {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
           {isManager && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Офферы гостю</button>}
-          {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
-          {isManager && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
           {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
@@ -177,6 +172,7 @@ export default function AdminShell() {
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
+      <div className="owner-note" role="status">QR, касса и платёжные интеграции временно отключены. Брони, PMS, CRM, гости, персонал и операционные модули работают независимо от них.</div>
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "RATES" && isManager && <RateManagementBoard />}
@@ -190,8 +186,6 @@ export default function AdminShell() {
       {tab === "SERVICE_SETTINGS" && isManager && <GuestServiceSettingsBoard />}
       {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
       {tab === "OFFERS" && isManager && <GuestOffersBoard />}
-      {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
-      {tab === "POINT_QR" && isManager && <ServicePointsBoard />}
       {tab === "GROWTH" && isManager && <GrowthControlBoard />}
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
       {tab === "REPORTS" && isManager && <ReportsBoard />}
