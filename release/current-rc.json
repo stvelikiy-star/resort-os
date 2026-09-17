@@ -51,6 +51,7 @@
     "The first main push for this boundary triggered 26 workflows: 25 succeeded and only Release RC Truth CI failed closed because the frozen manifest still pointed at the prior executable boundary. Resort OS Release Gate and all functional post-merge checks completed successfully.",
     "FULL_NO_PAYMENTS keeps Public/PMS/CRM/Staff/Guest OS/Kitchen/n8n/AI/realtime active while payment mutation routes, bank/MKassa acquiring and NFC wallet remain disabled in the production launch profile.",
     "Database release ledger remains 24 committed migrations and 93 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Production cutover remains unauthorized. Beget/VPS, rollback, actual-target backup/restore, GitHub branch protection, Drive permissions, DNS and real device/provider acceptance remain external launch gates."
+    "Canonical operational documentation may advance after the accepted executable commit only as verified governance hygiene and must remain bound to this same executable/tested release truth.",
+    "Production cutover remains unauthorized. Beget/VPS, rollback, actual-target backup/restore, GitHub branch protection, Drive permissions, DNS and real-device acceptance remain external launch gates. Provider/payment/TTLock acceptance is deferred and becomes mandatory only for a future launch profile that explicitly enables those capabilities."
   ]
 }
