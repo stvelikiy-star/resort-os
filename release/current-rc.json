@@ -2,31 +2,31 @@
   "schema_version": 1,
   "release_version": "0.62.2",
   "status": "INTERNAL_RC_FROZEN_EXTERNAL_EVIDENCE_PENDING",
-  "source_branch": "fix/public-request-sent-copy-20260914",
-  "accepted_executable_head": "61bd40d7592e842a4d52cfb343483065afb378cb",
-  "observed_merge_commit": "94c849a0833079627b47db1e25869096191424bc",
-  "observed_merge_tree_equivalent": false,
+  "source_branch": "main",
+  "accepted_executable_head": "7b14e32dbf64ffd617a5c7720f98add24efd1341",
+  "tested_pr_head": "5c606e5447958595f52c9d7dbacdb177e010cb4c",
+  "tested_pr_number": 172,
+  "observed_merge_commit": "7b14e32dbf64ffd617a5c7720f98add24efd1341",
+  "observed_merge_tree_equivalent": true,
   "observed_merge_allowed_hygiene_only": true,
-  "observed_merge_allowed_hygiene_paths": [
-    ".github/workflows/main-pr-merge-guard-ci.yml",
-    "scripts/main_pr_merge_guard.py",
-    "scripts/release_rc_truth_guard.py"
-  ],
+  "observed_merge_allowed_hygiene_paths": [],
   "accepted_head_workflows": {
-    "triggered": 26,
-    "success": 26,
+    "triggered": 48,
+    "success": 48,
     "failures": 0
   },
   "merged_main_workflows": {
-    "triggered": 26,
-    "success": 25,
-    "failures": 1
+    "triggered": 39,
+    "success": 37,
+    "failures": 1,
+    "other_completed": 1
   },
-  "postmerge_truth_head": "94c849a0833079627b47db1e25869096191424bc",
+  "postmerge_truth_head": "7b14e32dbf64ffd617a5c7720f98add24efd1341",
   "postmerge_truth_workflows": {
-    "triggered": 26,
-    "success": 25,
-    "failures": 1
+    "triggered": 39,
+    "success": 37,
+    "failures": 1,
+    "other_completed": 1
   },
   "production_source_branch": "main",
   "main_allowed_as_production_source": true,
@@ -37,18 +37,20 @@
     "room_categories": 12,
     "rate_rows": 48
   },
+  "launch_profile": "FULL_NO_PAYMENTS",
+  "payment_operations_enabled": false,
+  "nfc_wallet_enabled": false,
+  "mkassa_enabled": false,
   "external_beget_staging_verified": false,
   "legacy_live_rollback_verified": false,
   "production_cutover_authorized": false,
   "notes": [
-    "Resort OS runtime version remains 0.62.2; this is a controlled same-version refreeze after the owner-approved public booking confirmation wording change in PR #164.",
-    "PR #164 exact tested head 61bd40d7592e842a4d52cfb343483065afb378cb completed 26/26 pull-request workflows successfully with zero failures.",
-    "Observed main merge 94c849a0833079627b47db1e25869096191424bc includes the tested PR #164 product change plus only the already accepted PR #163 operational merge-guard drift: .github/workflows/main-pr-merge-guard-ci.yml, scripts/main_pr_merge_guard.py and scripts/release_rc_truth_guard.py.",
-    "The first main push completed 25/26 workflows successfully. Release RC Truth CI was the only failure and correctly failed closed because the frozen manifest still pointed at the prior PR #157 executable boundary.",
-    "The accepted product boundary includes the exact server-confirmed Russian public message: Заявка отправлена. Номер заявки <id>. Менеджер свяжется с вами для согласования условий и предоплаты.",
-    "All previously accepted owner-operations, Marketing, Agents, room holds, extra-bed rules, returning-guest discount and explicit booking-move confirmation remain part of the boundary.",
+    "Controlled same-version refreeze after PR #172 established the FULL_NO_PAYMENTS operational launch profile.",
+    "PR #172 exact tested head 5c606e5447958595f52c9d7dbacdb177e010cb4c completed 48/48 pull-request workflows successfully with zero failures.",
+    "The accepted executable boundary is the merged main commit 7b14e32dbf64ffd617a5c7720f98add24efd1341, which includes the separately verified Admin session-expiry fix from PR #171 and the fully verified PR #172 no-payment launch profile.",
+    "The first main push triggered 39 workflows: 37 succeeded, Release RC Truth CI failed closed against the prior frozen boundary, and one workflow completed with a non-success/non-failure conclusion. No fresh functional regression was identified by the post-merge suite.",
+    "FULL_NO_PAYMENTS keeps Public/PMS/CRM/Staff/Guest OS/Kitchen/n8n/AI/realtime active while payment mutation routes, bank/MKassa acquiring and NFC wallet remain disabled in the production launch profile.",
     "Database release ledger remains 24 committed migrations and 93 critical domain constraints; canonical seed remains 84 rooms / 12 categories / 48 rate rows.",
-    "Railway Three Crowns Full Test remains integration evidence only; real hotel production backup/rollback, immutable deployment linkage, branch protection, DNS and provider/hardware acceptance remain external launch work.",
-    "Production cutover remains unauthorized until every external launch gate is proven and explicit owner GO is recorded."
+    "Production cutover remains unauthorized. Beget/VPS, rollback, actual-target backup/restore, branch protection, DNS and real device/provider acceptance remain external launch gates."
   ]
 }
