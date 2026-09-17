@@ -6,7 +6,11 @@ import re
 import subprocess
 import sys
 
-MERGE_MESSAGE_RE = re.compile(r"^Merge PR #(\d+):\s+.+")
+MERGE_MESSAGE_PATTERNS = (
+    re.compile(r"^Merge PR #(\d+):\s+.+$"),
+    re.compile(r"^Merge pull request #(\d+)(?:\s+from\s+.+)?$"),
+    re.compile(r"^.+\s+\(#(\d+)\)$"),
+)
 
 
 def git(*args: str) -> str:
@@ -19,7 +23,38 @@ def fail(message: str) -> int:
     return 1
 
 
+def pull_request_number(first_line: str) -> str | None:
+    for pattern in MERGE_MESSAGE_PATTERNS:
+        match = pattern.match(first_line)
+        if match:
+            return match.group(1)
+    return None
+
+
+def verify_message_parser_contract() -> None:
+    accepted = {
+        "Merge PR #172: feat: full operational launch profile without payments": "172",
+        "Merge pull request #174 from stvelikiy-star/release/refreeze-no-payments-20260917": "174",
+        "release: refreeze 0.62.2 on FULL_NO_PAYMENTS boundary (#174)": "174",
+    }
+    rejected = (
+        "direct commit on main",
+        "release: refreeze 0.62.2 on FULL_NO_PAYMENTS boundary",
+        "(#174)",
+    )
+
+    for message, expected in accepted.items():
+        actual = pull_request_number(message)
+        if actual != expected:
+            raise AssertionError(f"merge parser rejected canonical PR message: {message!r}")
+    for message in rejected:
+        if pull_request_number(message) is not None:
+            raise AssertionError(f"merge parser accepted non-canonical message: {message!r}")
+
+
 def main() -> int:
+    verify_message_parser_contract()
+
     ref = os.environ.get("GITHUB_REF", "")
     event = os.environ.get("GITHUB_EVENT_NAME", "")
 
@@ -39,12 +74,12 @@ def main() -> int:
         return fail(f"main head {head} is not a merge commit; direct/squash/rebase push is not accepted")
 
     first_line = message.splitlines()[0] if message else ""
-    match = MERGE_MESSAGE_RE.match(first_line)
-    if not match:
+    pr_number = pull_request_number(first_line)
+    if pr_number is None:
         return fail(f"main merge commit message is not canonical PR merge form: {first_line!r}")
 
     print(f"FACT: main_head={head}")
-    print(f"FACT: pull_request_number={match.group(1)}")
+    print(f"FACT: pull_request_number={pr_number}")
     print(f"FACT: parent_count={len(parents) - 1}")
     print("RESULT: MAIN PR MERGE GUARD GREEN")
     return 0
