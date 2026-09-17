@@ -73,6 +73,9 @@ jobs:
       BOOTSTRAP_OWNER_USERNAME: ci-owner
       BOOTSTRAP_OWNER_PASSWORD: CI-Owner-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      # Owner Intelligence builds historical reservations through confirm-payment.
+      # Production FULL_NO_PAYMENTS keeps payment mutations disabled.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4
