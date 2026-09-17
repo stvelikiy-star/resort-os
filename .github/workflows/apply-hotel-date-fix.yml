@@ -1,0 +1,36 @@
+name: Apply Hotel Date Fix
+
+on:
+  push:
+    branches:
+      - fix/hotel-date-asia-bishkek-20260917
+    paths:
+      - .github/workflows/apply-hotel-date-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/hotel-date-asia-bishkek-20260917
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply precise hotel-date patch
+        run: python scripts/apply_hotel_date_fix.py
+      - name: Verify patch contract and whitespace
+        run: |
+          python scripts/hotel_business_date_contract_test.py
+          git diff --check
+      - name: Commit clean feature diff
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: use Bishkek hotel business dates"
+          git push origin HEAD:fix/hotel-date-asia-bishkek-20260917
