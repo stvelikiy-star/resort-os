@@ -229,4 +229,4 @@ app.include_router(manager_dashboard_router)
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
 # intentionally not composed into the active application. Payment/QR routes are
 # likewise fail-closed unless PAYMENT_ROUTES_ENABLED is explicitly enabled.
-app.version = "0.62.3"
+app.version = "0.62.2"
