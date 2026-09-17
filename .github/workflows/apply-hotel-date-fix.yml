@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Apply precise hotel-date patch
-        run: python scripts/apply_hotel_date_fix.py
+        run: python scripts/apply_hotel_date_fix_v2.py
       - name: Verify patch contract and whitespace
         run: |
           python scripts/hotel_business_date_contract_test.py
