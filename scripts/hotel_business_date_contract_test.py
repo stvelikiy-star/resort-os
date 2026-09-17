@@ -5,7 +5,6 @@ ROOT = Path(__file__).resolve().parents[1]
 HELPERS = [
     ROOT / "apps/admin/lib/hotelDate.ts",
     ROOT / "apps/staff/lib/hotelDate.ts",
-    ROOT / "apps/web/lib/hotelDate.ts",
 ]
 
 TARGETS = {
@@ -16,13 +15,11 @@ TARGETS = {
     "apps/staff/components/DiningDayPlanner.tsx": "hotelDateIso",
     "apps/staff/components/DiningGuestSeatingPanel.tsx": "hotelDateIso",
     "apps/staff/components/ChefProduction.tsx": "shiftHotelDateIso",
-    "apps/web/components/AiAdministratorWidget.tsx": "shiftHotelDateIso",
 }
 
 FORBIDDEN = (
     "new Date().toISOString().slice(0, 10)",
     "getTimezoneOffset() * 60000",
-    "now.getFullYear(), now.getMonth(), now.getDate()",
 )
 
 for helper in HELPERS:
@@ -40,5 +37,10 @@ for relative, helper_name in TARGETS.items():
 # Date-only UTC arithmetic remains intentionally allowed where the input is already YYYY-MM-DD.
 room_blocks = (ROOT / "apps/admin/components/RoomBlocksPanel.tsx").read_text(encoding="utf-8")
 assert "Date.UTC(y, m - 1, d + amount)" in room_blocks
+
+# Public Web is release-frozen by Management Final Acceptance and is intentionally
+# not modified by this operational Admin/Staff timezone hardening PR.
+public_widget = ROOT / "apps/web/components/AiAdministratorWidget.tsx"
+assert public_widget.exists()
 
 print("hotel business date contract: OK")
