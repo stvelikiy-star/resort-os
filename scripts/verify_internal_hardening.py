@@ -71,13 +71,13 @@ def main() -> int:
 
     rc = json.loads(read("release/current-rc.json"))
     ok(rc["release_version"] == "0.62.2", "release 0.62.2")
-    ok(rc["accepted_executable_head"] == "7b14e32dbf64ffd617a5c7720f98add24efd1341", "accepted no-payment main boundary SHA")
-    ok(rc["tested_pr_head"] == "5c606e5447958595f52c9d7dbacdb177e010cb4c", "PR #172 exact tested head")
-    ok(rc["tested_pr_number"] == 172, "PR #172 recorded")
-    ok(rc["observed_merge_commit"] == "7b14e32dbf64ffd617a5c7720f98add24efd1341", "observed no-payment main merge SHA")
-    ok(rc["accepted_head_workflows"] == {"triggered": 48, "success": 48, "failures": 0}, "48/48 accepted PR workflows")
-    ok(rc["merged_main_workflows"] == {"triggered": 39, "success": 37, "failures": 1, "other_completed": 1}, "first no-payment main push evidence recorded")
-    ok(rc["postmerge_truth_workflows"] == {"triggered": 39, "success": 37, "failures": 1, "other_completed": 1}, "postmerge truth evidence recorded")
+    ok(rc["accepted_executable_head"] == "a53850983d8fc6e1f1997199049a5b071511ed80", "accepted Bishkek-date main boundary SHA")
+    ok(rc["tested_pr_head"] == "a3ff4c847c66cd64a7cca92ccec613f23917f62d", "PR #176 exact tested head")
+    ok(rc["tested_pr_number"] == 176, "PR #176 recorded")
+    ok(rc["observed_merge_commit"] == "a53850983d8fc6e1f1997199049a5b071511ed80", "observed Bishkek-date main merge SHA")
+    ok(rc["accepted_head_workflows"] == {"triggered": 29, "success": 29, "failures": 0}, "29/29 accepted PR workflows")
+    ok(rc["merged_main_workflows"] == {"triggered": 26, "success": 25, "failures": 1, "other_completed": 0}, "Bishkek-date main push evidence recorded")
+    ok(rc["postmerge_truth_workflows"] == {"triggered": 26, "success": 25, "failures": 1, "other_completed": 0}, "postmerge truth evidence recorded")
     ok(rc["observed_merge_tree_equivalent"] is True, "accepted main boundary is self-equivalent")
     ok(rc["observed_merge_allowed_hygiene_only"] is True, "future release drift limited to hygiene")
     ok(rc["observed_merge_allowed_hygiene_paths"] == [], "accepted main boundary has no unclassified drift")
@@ -162,7 +162,7 @@ def main() -> int:
 
     ok(passed >= 108, f"hardening suite too small: {passed}")
     print(f"INTERNAL_HARDENING_PASS checks={passed}")
-    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core/Public no-payment contour accepted; external production cutover remains STOP")
+    print("BOUNDARY: final Admin/PMS/Marketing/Staff/Core/Public no-payment contour accepted; Asia/Bishkek Admin/Staff business dates verified; external production cutover remains STOP")
     return 0
 
 
