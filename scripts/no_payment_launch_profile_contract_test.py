@@ -74,6 +74,12 @@ def main() -> int:
             "service-point public payment routes must be gated")
     require('if SERVICE_POINT_QR_ENABLED and MKASSA_ENABLED:\n    app.include_router(mkassa_payment_bridge_router)' in entry,
             "MKassa bridge must require both QR and MKassa flags")
+    require('def _strip_disabled_booking_payment_mutations()' in entry,
+            "legacy booking payment mutation must be stripped in no-payment mode")
+    require('/api/v1/admin/booking/requests/{request_id}/confirm-payment' in entry,
+            "booking confirm-payment route must be explicitly named in the stripping guard")
+    require('_strip_disabled_booking_payment_mutations()' in entry,
+            "booking payment stripping guard must execute before router composition")
     require('app.include_router(runtime_capabilities_router)' in entry,
             "runtime capabilities endpoint must be active")
 
@@ -107,7 +113,7 @@ def main() -> int:
 
     print("NO_PAYMENT_LAUNCH_PROFILE=PASS")
     print("Operational contours: ON")
-    print("Payment mutations / Service Point QR / MKassa / NFC: OFF")
+    print("Booking payment mutation / payment routes / Service Point QR / MKassa / NFC: OFF")
     return 0
 
 
