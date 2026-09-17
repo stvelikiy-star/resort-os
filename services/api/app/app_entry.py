@@ -114,7 +114,32 @@ def _strip_legacy_kitchen_menu_mutations() -> None:
     kitchen_admin_router.routes[:] = kept
 
 
+def _strip_disabled_booking_payment_mutations() -> None:
+    """Remove legacy booking payment mutation routes when payments are disabled.
+
+    `booking_admin` contains the historical confirm-payment -> reservation conversion
+    endpoint. Keeping the router active is required for request listing and quoting,
+    so the no-payment launch profile strips only the payment mutation before the
+    router is composed. Isolated payment CI opts in with ENABLE_PAYMENT_OPERATIONS.
+    """
+    if PAYMENT_OPERATIONS_ENABLED:
+        return
+
+    blocked = {
+        ("POST", "/api/v1/admin/booking/requests/{request_id}/confirm-payment"),
+    }
+    kept = []
+    for route in booking_admin_router.routes:
+        path = getattr(route, "path", None)
+        methods = set(getattr(route, "methods", set()) or set())
+        if any((method, path) in blocked for method in methods):
+            continue
+        kept.append(route)
+    booking_admin_router.routes[:] = kept
+
+
 _strip_legacy_kitchen_menu_mutations()
+_strip_disabled_booking_payment_mutations()
 
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
