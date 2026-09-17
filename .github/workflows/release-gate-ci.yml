@@ -54,13 +54,16 @@ jobs:
       RATE_PLAN_CODE: DIRECT_2026_27
       CORE_API_URL: http://127.0.0.1:8000
       BOOTSTRAP_OWNER_USERNAME: ci-owner
-      BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
+      BOOTSTRAP_OWNER_PASSWORD: CI_ONLY_FIXTURE_OWNER_PASSWORD_2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       SMOKE_OWNER_USERNAME: ci-owner
-      SMOKE_OWNER_PASSWORD: CI-Only-Strong-Password-2026
-      AUTOMATION_SERVICE_KEY: CI-RELEASE-GATE-AUTOMATION-KEY-2026-THREE-CROWNS
+      SMOKE_OWNER_PASSWORD: CI_ONLY_FIXTURE_OWNER_PASSWORD_2026
+      AUTOMATION_SERVICE_KEY: CI_ONLY_FIXTURE_AUTOMATION_KEY_2026_THREE_CROWNS
       AUTOMATION_SERVICE_NAME: ci-release-gate
       COOKIE_SECURE: false
+      # The full-domain regression preserves historical folio/payment invariants.
+      # Production FULL_NO_PAYMENTS keeps payment mutation routes disabled.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4

@@ -13,6 +13,14 @@ type Folio = {
 };
 
 type AuthMe = { role?: string | null };
+type RuntimeCapabilities = {
+  profile?: string;
+  capabilities?: {
+    payment_operations?: boolean;
+    service_point_qr?: boolean;
+    mkassa?: boolean;
+  };
+};
 
 const METHODS = [
   ["CASH", "Наличные"],
@@ -40,6 +48,8 @@ async function api(path: string, init?: RequestInit) {
 export default function ReservationFolioPanel({ reservationId, onChanged }: { reservationId: string; onChanged?: () => void | Promise<void> }) {
   const [folio, setFolio] = useState<Folio | null>(null);
   const [viewerRole, setViewerRole] = useState<string | null>(null);
+  const [launchProfile, setLaunchProfile] = useState<string>("FULL");
+  const [paymentOperationsEnabled, setPaymentOperationsEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,16 +81,26 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     let active = true;
-    fetch("/core/api/v1/auth/me", { cache: "no-store" })
-      .then(async (response) => response.ok ? await response.json() as AuthMe : null)
-      .then((payload) => { if (active) setViewerRole(payload?.role || null); })
-      .catch(() => { if (active) setViewerRole(null); });
+    Promise.all([
+      fetch("/core/api/v1/auth/me", { cache: "no-store" }).then(async (response) => response.ok ? await response.json() as AuthMe : null),
+      fetch("/core/api/v1/runtime/capabilities", { cache: "no-store" }).then(async (response) => response.ok ? await response.json() as RuntimeCapabilities : null),
+    ])
+      .then(([auth, runtime]) => {
+        if (!active) return;
+        setViewerRole(auth?.role || null);
+        setLaunchProfile(runtime?.profile || "FULL");
+        setPaymentOperationsEnabled(runtime?.capabilities?.payment_operations !== false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setViewerRole(null);
+        setPaymentOperationsEnabled(false);
+      });
     return () => { active = false; };
   }, []);
 
-  const openCharges = useMemo(() => folio?.charges.filter((item) => item.status === "OPEN") ?? [], [folio]);
-  const canManagePayments = viewerRole === "OWNER" || viewerRole === "MANAGER";
-  const canCloseCharges = canManagePayments;
+  const canManagePayments = paymentOperationsEnabled && (viewerRole === "OWNER" || viewerRole === "MANAGER");
+  const canCloseCharges = viewerRole === "OWNER" || viewerRole === "MANAGER";
 
   async function recordPayment(event: FormEvent) {
     event.preventDefault();
@@ -164,8 +184,8 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
         <div className={styles.two}><label>Чек / транзакция<input value={externalRef} maxLength={180} onChange={(e) => setExternalRef(e.target.value)} placeholder="необязательно" /></label><label>Комментарий<input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="необязательно" /></label></div>
         <button className={styles.primary} disabled={busy === "payment"}>{busy === "payment" ? "Записываю…" : "Принять оплату"}</button>
       </form> : <div className={styles.card}>
-        <div className={styles.cardHead}><div><small>Финансовые права</small><h4>Оплаты — только просмотр</h4></div></div>
-        <p className={styles.hint}>Ресепшен видит историю и остаток. Запись факта получения денег и списание начислений доступны OWNER / MANAGER.</p>
+        <div className={styles.cardHead}><div><small>{paymentOperationsEnabled ? "Финансовые права" : launchProfile}</small><h4>{paymentOperationsEnabled ? "Оплаты — только просмотр" : "Оплаты временно отключены"}</h4></div></div>
+        <p className={styles.hint}>{paymentOperationsEnabled ? "Ресепшен видит историю и остаток. Запись факта получения денег доступна OWNER / MANAGER." : "По текущему плану QR, касса и запись новых оплат не подключаются. Существующая финансовая история остаётся доступна для просмотра; остальные функции PMS продолжают работать."}</p>
       </div>}
 
       <form className={styles.card} onSubmit={createCharge}>

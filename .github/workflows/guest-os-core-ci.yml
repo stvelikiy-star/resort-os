@@ -60,6 +60,10 @@ jobs:
       BOOTSTRAP_OWNER_USERNAME: guest-os-ci-owner
       BOOTSTRAP_OWNER_PASSWORD: Guest-OS-CI-Owner-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: Guest OS CI Owner
+      # Guest OS lifecycle fixture historically converts a quoted request through
+      # confirm-payment to create a reservation/stay. This is CI-only; production
+      # FULL_NO_PAYMENTS keeps the mutation route absent.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4

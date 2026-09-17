@@ -67,11 +67,14 @@ jobs:
       PROPERTY_CODE: THREE_CROWNS
       RATE_PLAN_CODE: DIRECT_2026_27
       COOKIE_SECURE: false
-      AUTOMATION_SERVICE_KEY: owner-control-v2-ci-service-key
+      AUTOMATION_SERVICE_KEY: CI_ONLY_FIXTURE_KEY_NOT_A_SECRET_00000001
       AUTOMATION_SERVICE_NAME: owner-control-v2-ci
       BOOTSTRAP_OWNER_USERNAME: ci-owner
-      BOOTSTRAP_OWNER_PASSWORD: CI-Owner-Strong-Password-2026
+      BOOTSTRAP_OWNER_PASSWORD: CI_ONLY_FIXTURE_OWNER_PASSWORD_2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
+      # Owner Control fixtures create reservations via historical payment conversion.
+      # Production FULL_NO_PAYMENTS keeps payment mutations disabled.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4

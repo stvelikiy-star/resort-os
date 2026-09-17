@@ -1,3 +1,5 @@
+import os
+
 from .agent_context import router as agent_context_router
 from .ai_sales import router as ai_sales_router
 from .analytics_reports import router as analytics_reports_router
@@ -64,6 +66,7 @@ from .reception_reservations import router as reception_reservations_router
 from .reservation_detail import router as reservation_detail_router
 from .reservation_payments import router as reservation_payments_router
 from .room_detail import router as room_detail_router
+from .runtime_capabilities import env_flag, router as runtime_capabilities_router
 from .service_point_payments import admin_router as service_point_payments_admin_router
 from .service_point_payments import integration_router as service_point_payments_integration_router
 from .service_point_payments import public_router as service_point_payments_public_router
@@ -80,6 +83,12 @@ from .telegram_auth import router as telegram_auth_router
 from .telegram_sales import router as telegram_sales_router
 
 install_observability(app)
+
+# Payment integrations must stay fail-closed when a deployment omits a flag.
+# The current production profile explicitly sets all three flags to false.
+PAYMENT_OPERATIONS_ENABLED = env_flag("ENABLE_PAYMENT_OPERATIONS", False)
+SERVICE_POINT_QR_ENABLED = env_flag("ENABLE_SERVICE_POINT_QR", False)
+MKASSA_ENABLED = env_flag("ENABLE_MKASSA", False)
 
 
 def _strip_legacy_kitchen_menu_mutations() -> None:
@@ -105,11 +114,37 @@ def _strip_legacy_kitchen_menu_mutations() -> None:
     kitchen_admin_router.routes[:] = kept
 
 
+def _strip_disabled_booking_payment_mutations() -> None:
+    """Remove legacy booking payment mutation routes when payments are disabled.
+
+    `booking_admin` contains the historical confirm-payment -> reservation conversion
+    endpoint. Keeping the router active is required for request listing and quoting,
+    so the no-payment launch profile strips only the payment mutation before the
+    router is composed. Isolated payment CI opts in with ENABLE_PAYMENT_OPERATIONS.
+    """
+    if PAYMENT_OPERATIONS_ENABLED:
+        return
+
+    blocked = {
+        ("POST", "/api/v1/admin/booking/requests/{request_id}/confirm-payment"),
+    }
+    kept = []
+    for route in booking_admin_router.routes:
+        path = getattr(route, "path", None)
+        methods = set(getattr(route, "methods", set()) or set())
+        if any((method, path) in blocked for method in methods):
+            continue
+        kept.append(route)
+    booking_admin_router.routes[:] = kept
+
+
 _strip_legacy_kitchen_menu_mutations()
+_strip_disabled_booking_payment_mutations()
 
 # Composition layer keeps the public baseline routes stable while allowing
 # domain modules to evolve independently.
 app.include_router(health_router)
+app.include_router(runtime_capabilities_router)
 app.include_router(site_content_router)
 app.include_router(site_media_router)
 app.include_router(public_ai_admin_router)
@@ -122,16 +157,20 @@ app.include_router(guest_marketplace_router)
 # confirm price, availability, payment or provider execution on their own.
 app.include_router(guest_offers_guest_router)
 app.include_router(service_points_public_router)
-# Paid service-point access is separate from room finance and dormant NFC code.
-# It may unlock a configured TTLock only after a provider-confirmed payment event.
-app.include_router(service_point_payments_public_router)
-app.include_router(service_point_payments_integration_router)
-app.include_router(mkassa_payment_bridge_router)
+# Paid service-point access is intentionally optional. The no-payment launch
+# profile keeps informational service-point routes but does not compose payment,
+# callback or MKassa handlers at all.
+if SERVICE_POINT_QR_ENABLED:
+    app.include_router(service_point_payments_public_router)
+    app.include_router(service_point_payments_integration_router)
+if SERVICE_POINT_QR_ENABLED and MKASSA_ENABLED:
+    app.include_router(mkassa_payment_bridge_router)
 app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reception_readiness_router)
 app.include_router(reservation_detail_router)
-app.include_router(reservation_payments_router)
+if PAYMENT_OPERATIONS_ENABLED:
+    app.include_router(reservation_payments_router)
 app.include_router(folio_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
@@ -161,7 +200,8 @@ app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)
 app.include_router(guest_os_admin_router)
 app.include_router(service_points_admin_router)
-app.include_router(service_point_payments_admin_router)
+if SERVICE_POINT_QR_ENABLED:
+    app.include_router(service_point_payments_admin_router)
 app.include_router(guest_service_settings_router)
 app.include_router(guest_services_router)
 app.include_router(housekeeping_schedule_router)
@@ -206,6 +246,7 @@ app.include_router(realtime_router)
 app.include_router(manager_dashboard_router)
 
 # Legacy NFC wallet/acquiring implementation remains dormant in source and is
-# intentionally not composed into the active application. Paid Service Point QR
-# does not reactivate NFC and cannot mutate accommodation payment truth.
+# intentionally not composed into the active application. Payment/QR providers
+# are additionally gated by explicit runtime flags for the current no-payment
+# launch profile.
 app.version = "0.62.2"

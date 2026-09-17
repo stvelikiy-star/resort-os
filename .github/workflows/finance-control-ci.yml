@@ -73,6 +73,9 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: Finance CI Owner
       FINANCE_RECEPTION_USERNAME: finance-ci-reception
       FINANCE_RECEPTION_PASSWORD: Finance-Reception-CI-2026
+      # Finance reconciliation intentionally exercises the dormant payment ledger
+      # in isolated CI. Production FULL_NO_PAYMENTS keeps this flag false.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4

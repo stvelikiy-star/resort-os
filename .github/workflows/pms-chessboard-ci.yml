@@ -53,6 +53,9 @@ jobs:
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
       CORE_API_URL: http://127.0.0.1:8000
+      # This mutation E2E creates a guaranteed reservation through the historical
+      # payment conversion endpoint. Production FULL_NO_PAYMENTS keeps it disabled.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4
