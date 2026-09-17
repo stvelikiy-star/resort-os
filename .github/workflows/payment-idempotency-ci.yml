@@ -69,6 +69,9 @@ jobs:
       BOOTSTRAP_OWNER_PASSWORD: CI-Only-Strong-Password-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: CI Owner
       COOKIE_SECURE: false
+      # Production defaults remain OFF. This isolated CI explicitly enables the
+      # reservation-payment router so dormant payment code is still regression-tested.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4
