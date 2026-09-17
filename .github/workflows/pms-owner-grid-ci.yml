@@ -51,6 +51,9 @@ jobs:
       CORE_API_URL: http://127.0.0.1:8000
       RESORT_CORE_TEST_URL: http://127.0.0.1:8000
       ADMIN_BASE_URL: http://127.0.0.1:3001
+      # Browser acceptance records a historical Payment fact for the reservation.
+      # Production FULL_NO_PAYMENTS keeps payment mutations disabled.
+      ENABLE_PAYMENT_OPERATIONS: true
 
     steps:
       - uses: actions/checkout@v4
