@@ -2,6 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { shiftHotelDateIso } from "../lib/hotelDate";
+
 import styles from "./GroupBookingBoard.module.css";
 
 type Room = {
@@ -16,12 +18,7 @@ type Props = { userRole: string };
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 
-function dateOffset(days: number) {
-  const value = new Date();
-  value.setDate(value.getDate() + days);
-  const shifted = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
-  return shifted.toISOString().slice(0, 10);
-}
+const dateOffset = (days: number) => shiftHotelDateIso(days);
 
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
