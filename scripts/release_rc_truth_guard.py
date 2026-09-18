@@ -9,17 +9,29 @@ from pathlib import Path
 
 RC_PATH = Path("release/current-rc.json")
 RELEASE_DOC = Path("docs/RELEASE_0.62.2_REFREEZE_2026-09-17.md")
+CANONICAL_CURRENT_DOCS = (
+    Path("knowledge/04_CURRENT_STATE.md"),
+    Path("knowledge/09_LAUNCH_ACCEPTANCE.md"),
+    Path("docs/README.md"),
+    Path("docs/PRODUCTION_DATABASE_MIGRATIONS.md"),
+    Path("docs/DEPLOYMENT_RUNBOOK.md"),
+)
 ALLOWED_HYGIENE_PATHS = {
     "release/current-rc.json",
     "docs/RELEASE_0.62.2_REFREEZE_2026-09-17.md",
     "scripts/release_rc_truth_guard.py",
     "scripts/verify_internal_hardening.py",
+    *(str(path) for path in CANONICAL_CURRENT_DOCS),
 }
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOW_NON_ACCEPTED_HEAD_FLAG = "--allow-non-accepted-head"
 
 EXPECTED_ACCEPTED = "a53850983d8fc6e1f1997199049a5b071511ed80"
 EXPECTED_TESTED_PR_HEAD = "a3ff4c847c66cd64a7cca92ccec613f23917f62d"
+STALE_EXECUTABLE_BOUNDARIES = (
+    "61bd40d7592e842a4d52cfb343483065afb378cb",
+    "94c849a0833079627b47db1e25869096191424bc",
+)
 
 
 def git(*args: str) -> str:
@@ -127,6 +139,36 @@ def main() -> int:
         if marker not in release_doc:
             errors.append(f"{RELEASE_DOC} missing release marker {marker!r}")
 
+    # Canonical operational documentation is allowed to evolve after the frozen
+    # executable commit, but only as governance/documentation hygiene. Keep it
+    # bound to the same machine release truth so docs-only merges cannot silently
+    # rewrite the accepted product boundary or re-enable deferred payment/provider scope.
+    canonical_markers = (
+        "0.62.2",
+        EXPECTED_ACCEPTED,
+        EXPECTED_TESTED_PR_HEAD,
+        "FULL_NO_PAYMENTS",
+        "24",
+        "93",
+        "STOP",
+    )
+    for path in CANONICAL_CURRENT_DOCS:
+        try:
+            content = path.read_text(encoding="utf-8")
+        except Exception as exc:
+            errors.append(f"cannot read canonical release doc {path}: {exc}")
+            continue
+        for marker in canonical_markers:
+            if marker not in content:
+                errors.append(f"{path} missing canonical release marker {marker!r}")
+        if "84 rooms" not in content and "84 physical rooms" not in content:
+            errors.append(f"{path} missing canonical 84-room property marker")
+        if "12 categories" not in content and "12 room categories" not in content:
+            errors.append(f"{path} missing canonical 12-category property marker")
+        for stale in STALE_EXECUTABLE_BOUNDARIES:
+            if stale in content:
+                errors.append(f"{path} contains stale executable/release boundary {stale}")
+
     if errors:
         for error in errors:
             fail(error)
@@ -142,6 +184,7 @@ def main() -> int:
     print("FACT: migrations=24")
     print("FACT: critical_constraints=93")
     print("FACT: production_source_branch=main")
+    print("FACT: canonical_current_docs=verified_release_hygiene")
     print("FACT: production_cutover_authorized=false")
     if allow_non_accepted_head:
         print("RESULT: RELEASE RC CONTRACT GREEN; CANDIDATE HYGIENE HEAD ALLOWED")
