@@ -81,6 +81,7 @@ export default function ServicePointRuntime({ token }: { token: string }) {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const paymentRequestIdRef = useRef<string | null>(null);
+  const autoPaymentStartedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -146,9 +147,17 @@ export default function ServicePointRuntime({ token }: { token: string }) {
 
   function retryPayment() {
     paymentRequestIdRef.current = null;
+    autoPaymentStartedRef.current = false;
     setIntent(null);
     setError(null);
   }
+
+  useEffect(() => {
+    if (!access || intent || paying || autoPaymentStartedRef.current) return;
+    if (access.mode !== "PAID_LOCK" || !access.is_active || !access.runtime.ready) return;
+    autoPaymentStartedRef.current = true;
+    void startPayment();
+  }, [access, intent, paying]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -197,10 +206,10 @@ export default function ServicePointRuntime({ token }: { token: string }) {
 
         {!access.runtime.ready && <div className="spqr-error">Оплата временно недоступна: {errorLabels[access.runtime.code] || access.runtime.code}</div>}
 
-        {access.runtime.ready && !intent && <>
-          <p className="spqr-copy">Нажмите «Оплатить». Система создаст отдельную банковскую операцию. Замок откроется только после подтверждения оплаты банком.</p>
-          <button className="spqr-pay-button" type="button" disabled={paying} onClick={() => void startPayment()}>{paying ? "Создаём оплату…" : `Оплатить ${access.amount_kgs} сом`}</button>
-        </>}
+        {access.runtime.ready && !intent && <div className="spqr-payment-state">
+          <div className="spqr-state-line"><span>Оплата</span><strong>{paying ? "Создаём QR MKassa…" : "Подготавливаем QR MKassa…"}</strong></div>
+          <p>Платёж на {access.amount_kgs} сом создаётся автоматически сразу после открытия страницы. Дополнительных заявок и подтверждений не требуется.</p>
+        </div>}
 
         {intent && <div className="spqr-payment-state">
           <div className="spqr-state-line"><span>Статус</span><strong>{intent.status}</strong></div>
@@ -216,29 +225,31 @@ export default function ServicePointRuntime({ token }: { token: string }) {
         </div>}
       </section>}
 
-      <p className="spqr-copy">Если в этой зоне нужна уборка, ремонт или помощь, отправьте анонимную заявку ниже. Имя, номер комнаты и данные бронирования не требуются.</p>
+      {!paidLock && <>
+        <p className="spqr-copy">Если в этой зоне нужна уборка, ремонт или помощь, отправьте анонимную заявку ниже. Имя, номер комнаты и данные бронирования не требуются.</p>
 
-      {created ? <div className="spqr-success">
-        <strong>Заявка принята</strong>
-        <p>{created.title}</p>
-        <small>Статус: {created.status} · № {created.task_id.slice(0, 8)}</small>
-        <button type="button" onClick={() => setCreated(null)}>Сообщить ещё</button>
-      </div> : point.request_options.length ? <form onSubmit={submit} className="spqr-form">
-        <label>
-          Что требуется
-          <select value={requestCode} onChange={(event) => editRequest(() => setRequestCode(event.target.value))} required>
-            {point.request_options.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
-          </select>
-        </label>
-        <label>
-          Комментарий <span>необязательно</span>
-          <textarea value={description} onChange={(event) => editRequest(() => setDescription(event.target.value))} maxLength={1200} rows={4} placeholder={selectedLabel ? `Уточните: ${selectedLabel.toLowerCase()}` : "Опишите проблему"} />
-        </label>
-        {error && <div className="spqr-error">{error}</div>}
-        <button type="submit" disabled={sending}>{sending ? "Отправляем…" : "Отправить заявку"}</button>
-      </form> : <div className="spqr-error">Для этой зоны сейчас нет доступных типов обращений. Обратитесь к администратору.</div>}
+        {created ? <div className="spqr-success">
+          <strong>Заявка принята</strong>
+          <p>{created.title}</p>
+          <small>Статус: {created.status} · № {created.task_id.slice(0, 8)}</small>
+          <button type="button" onClick={() => setCreated(null)}>Сообщить ещё</button>
+        </div> : point.request_options.length ? <form onSubmit={submit} className="spqr-form">
+          <label>
+            Что требуется
+            <select value={requestCode} onChange={(event) => editRequest(() => setRequestCode(event.target.value))} required>
+              {point.request_options.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+            </select>
+          </label>
+          <label>
+            Комментарий <span>необязательно</span>
+            <textarea value={description} onChange={(event) => editRequest(() => setDescription(event.target.value))} maxLength={1200} rows={4} placeholder={selectedLabel ? `Уточните: ${selectedLabel.toLowerCase()}` : "Опишите проблему"} />
+          </label>
+          {error && <div className="spqr-error">{error}</div>}
+          <button type="submit" disabled={sending}>{sending ? "Отправляем…" : "Отправить заявку"}</button>
+        </form> : <div className="spqr-error">Для этой зоны сейчас нет доступных типов обращений. Обратитесь к администратору.</div>}
+      </>}
 
-      <p className="spqr-privacy">QR этой точки не раскрывает данные гостей. Платный доступ отделён от оплаты проживания: дверь открывается только после подтверждённого банковского события.</p>
+      <p className="spqr-privacy">{paidLock ? "Сканирование QR сразу создаёт платёж MKassa. После подтверждённой оплаты дверь открывается автоматически." : "QR этой точки не раскрывает данные гостей."}</p>
     </section>
   </main>;
 }
