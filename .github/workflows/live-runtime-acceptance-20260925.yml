@@ -120,4 +120,6 @@ jobs:
           check_ws staff-same-origin "$STAFF_URL/ws/pms/grid"
 
       - name: Read-only acceptance boundary
-        run: echo "PASS: no reservation/payment/room-state/provider/lock mutation executed"
+        shell: bash
+        run: |
+          echo "PASS: no reservation/payment/room-state/provider/lock mutation executed"
