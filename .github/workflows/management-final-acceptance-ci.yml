@@ -41,15 +41,26 @@ jobs:
           echo "$changed"
           web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
           if [ -n "$web_changed" ]; then
-            if [ "$web_changed" != 'apps/web/components/BookingWidget.tsx' ]; then
-              echo 'BLOCKED: apps/web remains frozen except the owner-approved BookingWidget confirmation copy.' >&2
-              exit 1
-            fi
-            if ! printf '%s\n' "$changed" | grep -qx 'scripts/owner_ops_corrections_contract.py'; then
-              echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2
-              exit 1
-            fi
-            python scripts/owner_ops_corrections_contract.py
+            blocked=0
+            while IFS= read -r path; do
+              [ -z "$path" ] && continue
+              case "$path" in
+                "apps/web/app/page.tsx"|"apps/web/app/rooms-premium.css"|"apps/web/app/rooms/page.tsx"|"apps/web/app/rooms/[slug]/page.tsx"|"apps/web/components/BookingWidget.tsx"|"apps/web/lib/roomMedia.ts"|apps/web/public/media/three-crowns/rooms/*)
+                  ;;
+                *)
+                  echo "BLOCKED: public website path is outside the owner-approved room-media scope: $path" >&2
+                  blocked=1
+                  ;;
+              esac
+            done <<< "$web_changed"
+            [ "$blocked" -eq 0 ] || exit 1
+            for contract in scripts/public_browser_acceptance.mjs scripts/public_media_integrity_guard.py; do
+              if ! printf '%s\n' "$changed" | grep -qx "$contract"; then
+                echo "BLOCKED: room-media change requires regression contract update: $contract" >&2
+                exit 1
+              fi
+            done
+            python scripts/public_media_integrity_guard.py
           fi
 
       - name: Run management final truth assertions
