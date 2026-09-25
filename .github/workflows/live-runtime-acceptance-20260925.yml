@@ -1,0 +1,123 @@
+name: Three Crowns Live Runtime Acceptance 2026-09-25
+
+on:
+  push:
+    branches:
+      - audit/live-runtime-acceptance-20260925
+    paths:
+      - '.github/workflows/live-runtime-acceptance-20260925.yml'
+
+permissions:
+  contents: read
+
+env:
+  CORE_URL: https://api-production-f1171.up.railway.app
+  PUBLIC_URL: https://web-production-b7d1e.up.railway.app
+  ADMIN_URL: https://admin-production-80a1.up.railway.app
+  STAFF_URL: https://staff-production-69f6.up.railway.app
+
+jobs:
+  read-only-live-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Core readiness and live database inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --max-time 20 "$CORE_URL/health/ready")"
+          echo "HEALTH_READY=$body"
+          HEALTH_READY="$body" python3 - <<'PY'
+          import json, os
+          body=json.loads(os.environ["HEALTH_READY"])
+          assert body["status"] == "ready", body
+          assert body["property"] == "THREE_CROWNS", body
+          assert body["timezone"] == "Asia/Bishkek", body
+          assert body["room_count"] == 84, body
+          assert body["room_type_count"] == 12, body
+          print("PASS: live DB readiness THREE_CROWNS / Asia-Bishkek / 84 rooms / 12 categories")
+          PY
+
+      - name: Runtime launch profile must remain FULL_NO_PAYMENTS
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --max-time 20 "$CORE_URL/api/v1/runtime/capabilities")"
+          echo "RUNTIME_CAPABILITIES=$body"
+          RUNTIME_CAPABILITIES="$body" python3 - <<'PY'
+          import json, os
+          body=json.loads(os.environ["RUNTIME_CAPABILITIES"])
+          c=body["capabilities"]
+          assert body["profile"] == "FULL_NO_PAYMENTS", body
+          for key in ("public_site","pms","crm","staff","guest_os","kitchen","automation","ai_sales"):
+              assert c[key] is True, (key, body)
+          for key in ("payment_operations","service_point_qr","mkassa","nfc_wallet"):
+              assert c[key] is False, (key, body)
+          assert body["financial_integrations_enabled"] is False, body
+          print("PASS: FULL_NO_PAYMENTS active; payment/MKassa/NFC fail-closed")
+          PY
+
+      - name: Public availability is live and read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$CORE_URL/api/v1/booking/check-availability?check_in=2026-10-10&check_out=2026-10-12&adults=2&children=0"
+          body="$(curl --fail --silent --show-error --max-time 20 "$url")"
+          AVAILABILITY="$body" python3 - <<'PY'
+          import json, os
+          body=json.loads(os.environ["AVAILABILITY"])
+          rows=body.get("results")
+          assert isinstance(rows, list), body
+          sellable=[r for r in rows if r.get("available_count",0)>0 and r.get("pricing",{}).get("sellable")]
+          print(f"PASS: availability HTTP 200; results={len(rows)} sellable={len(sellable)}")
+          if sellable:
+              row=sellable[0]
+              print("SAMPLE:", row.get("room_type",{}).get("name") or row.get("room_type_name") or row.get("category_name"), row.get("pricing",{}).get("total_kgs"))
+          PY
+
+      - name: HTTPS surfaces and UI shells
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_page() {
+            label="$1"; url="$2"; marker="$3"; body="$(mktemp)"
+            code="$(curl --silent --show-error --location --output "$body" --write-out '%{http_code}' --max-time 20 "$url")"
+            test "$code" = "200"
+            grep -Fq "$marker" "$body"
+            echo "PASS: $label HTTP 200 marker=$marker"
+          }
+          check_page public "$PUBLIC_URL/" "Три Короны"
+          check_page admin "$ADMIN_URL/" "Вход в управление"
+          check_page staff "$STAFF_URL/" "Моя смена"
+
+      - name: Same-origin Core proxy and unauthenticated auth boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          proxy_code="$(curl --silent --show-error --output /tmp/caps.json --write-out '%{http_code}' --max-time 20 "$PUBLIC_URL/core/api/v1/runtime/capabilities")"
+          test "$proxy_code" = "200"
+          for target in "$ADMIN_URL/core/api/v1/auth/me" "$STAFF_URL/core/api/v1/auth/me"; do
+            code="$(curl --silent --show-error --output /tmp/auth.json --write-out '%{http_code}' --max-time 20 "$target")"
+            test "$code" = "401"
+            echo "PASS: unauthenticated auth boundary HTTP 401 — $target"
+          done
+          echo "PASS: public same-origin Core proxy HTTP 200"
+
+      - name: Direct and same-origin WebSocket routes are externally reachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_ws() {
+            label="$1"; url="$2"
+            code="$(curl --silent --show-error --http1.1 --output /tmp/ws-body --write-out '%{http_code}' --connect-timeout 10 --max-time 12               -H 'Connection: Upgrade' -H 'Upgrade: websocket' -H 'Sec-WebSocket-Version: 13'               -H 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==' "$url" || true)"
+            case "$code" in
+              101|401|403) echo "PASS: $label WSS route reachable HTTP $code" ;;
+              *) echo "FAIL: $label WSS unexpected HTTP $code"; cat /tmp/ws-body || true; exit 1 ;;
+            esac
+          }
+          check_ws core "$CORE_URL/ws/pms/grid"
+          check_ws admin-same-origin "$ADMIN_URL/ws/pms/grid"
+          check_ws staff-same-origin "$STAFF_URL/ws/pms/grid"
+
+      - name: Read-only acceptance boundary
+        run: echo "PASS: no reservation/payment/room-state/provider/lock mutation executed"
