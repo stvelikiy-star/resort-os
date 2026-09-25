@@ -171,7 +171,7 @@ export default function KitchenAdmin() {
 
   return <main className={styles.shell}>
     <header className={styles.header}>
-      <div><p>Три Короны · Resort OS</p><h1>Kitchen Admin</h1><span>{user.display_name} · {user.role}</span></div>
+      <div><p>MARINA SMART · Hotel OS</p><h1>Kitchen Admin</h1><span>{user.display_name} · {user.role}</span></div>
       <a href="/">Моя смена</a>
     </header>
 
