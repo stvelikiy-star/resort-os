@@ -150,6 +150,112 @@ jobs:
           } finally { await browser.close(); }
           NODE
 
+
+      - name: Capture live public-site visual audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/site-visual-audit/rooms
+          cd /tmp/resort-os
+          PUBLIC_URL="$PUBLIC_URL" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import { chromium } from 'playwright';
+
+          const base = process.env.PUBLIC_URL;
+          const out = '/tmp/site-visual-audit';
+          const browser = await chromium.launch({ headless: true });
+          const report = { base, desktop: {}, mobile: {}, roomPages: [], brokenImages: [] };
+
+          async function inspect(viewport, label) {
+            const context = await browser.newContext({ viewport });
+            const page = await context.newPage();
+            const pageErrors = [];
+            page.on('pageerror', e => pageErrors.push(e.message));
+            const response = await page.goto(base, { waitUntil: 'networkidle', timeout: 30000 });
+            if (!response?.ok()) throw new Error(`${label}: HTTP ${response?.status()}`);
+            await page.screenshot({ path: `${out}/public-${label}-full.png`, fullPage: true });
+
+            const rooms = page.locator('#rooms');
+            await rooms.scrollIntoViewIfNeeded();
+            await rooms.screenshot({ path: `${out}/rooms-${label}.png` });
+
+            const cards = await page.locator('#rooms .v3-room-card').evaluateAll(cards => cards.map((card, index) => {
+              const img = card.querySelector('img');
+              return {
+                index: index + 1,
+                href: card.getAttribute('href'),
+                title: card.querySelector('h3')?.textContent?.trim() || '',
+                summary: card.querySelector('.v3-room-card-body > p')?.textContent?.trim() || '',
+                meta: Array.from(card.querySelectorAll('.v3-room-card-top span')).map(x => x.textContent?.trim() || ''),
+                price: card.querySelector('.v3-room-card-price strong')?.textContent?.trim() || '',
+                imageSrc: img?.getAttribute('src') || '',
+                imageCurrentSrc: img?.currentSrc || '',
+                naturalWidth: img?.naturalWidth || 0,
+                naturalHeight: img?.naturalHeight || 0,
+              };
+            }));
+
+            const images = await page.locator('img').evaluateAll(imgs => imgs.map(img => ({
+              alt: img.getAttribute('alt') || '',
+              src: img.currentSrc || img.getAttribute('src') || '',
+              naturalWidth: img.naturalWidth,
+              naturalHeight: img.naturalHeight,
+            })).filter(x => !x.naturalWidth || !x.naturalHeight));
+
+            report[label] = { cards, pageErrors, brokenImageCount: images.length };
+            report.brokenImages.push(...images.map(x => ({...x, surface: label})));
+            await context.close();
+            return cards;
+          }
+
+          const desktopCards = await inspect({ width: 1440, height: 1000 }, 'desktop');
+          await inspect({ width: 390, height: 844 }, 'mobile');
+
+          const detailContext = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+          const detailPage = await detailContext.newPage();
+          for (const card of desktopCards) {
+            if (!card.href) continue;
+            const url = new URL(card.href, base).toString();
+            const response = await detailPage.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+            const slug = new URL(url).pathname.split('/').filter(Boolean).pop() || `room-${card.index}`;
+            const imageFacts = await detailPage.locator('img').evaluateAll(imgs => imgs.map(img => ({
+              alt: img.getAttribute('alt') || '',
+              src: img.currentSrc || img.getAttribute('src') || '',
+              naturalWidth: img.naturalWidth,
+              naturalHeight: img.naturalHeight,
+            })));
+            const h1 = await detailPage.locator('h1').first().textContent().catch(() => null);
+            await detailPage.screenshot({ path: `${out}/rooms/${String(card.index).padStart(2,'0')}-${slug}.png`, fullPage: true });
+            report.roomPages.push({
+              index: card.index,
+              title: card.title,
+              url,
+              http: response?.status() || 0,
+              h1: h1?.trim() || '',
+              imageCount: imageFacts.length,
+              healthyImageCount: imageFacts.filter(x => x.naturalWidth > 0 && x.naturalHeight > 0).length,
+              images: imageFacts,
+            });
+          }
+          await detailContext.close();
+          await browser.close();
+          fs.writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
+          console.log(JSON.stringify({
+            roomCards: report.desktop.cards.length,
+            desktopBrokenImages: report.desktop.brokenImageCount,
+            mobileBrokenImages: report.mobile.brokenImageCount,
+            roomPages: report.roomPages.map(x => ({title:x.title,http:x.http,imageCount:x.imageCount,healthyImageCount:x.healthyImageCount}))
+          }, null, 2));
+          NODE
+
+      - name: Upload live visual audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: three-crowns-live-visual-audit
+          path: /tmp/site-visual-audit
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Read-only acceptance boundary
         shell: bash
         run: |
