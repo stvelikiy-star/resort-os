@@ -7,10 +7,9 @@ import BookingWidget from "../../../components/BookingWidget";
 import SiteHeader from "../../../components/SiteHeader";
 import { formatPublicNumber, getLocalizedRoomCopy, normalizePublicLocale, PublicLocale, withPublicLocale } from "../../../lib/publicLocale";
 import { getRoomCategory, publicRatePeriods, roomCategories } from "../../../lib/roomCatalog";
+import { getRoomHero, getRoomMedia, ROOM_MEDIA_FALLBACK } from "../../../lib/roomMedia";
 
 type RoomPageProps = { params: Promise<{ slug: string }>; searchParams: Promise<{ lang?: string | string[] }> };
-
-const ROOM_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
 
 const COPY = {
   ru: {
@@ -59,7 +58,7 @@ export async function generateMetadata({ params, searchParams }: RoomPageProps):
       description: `${localized.capacity} · ${room.area}. ${String(copy.openGraphTail)}`,
       url,
       locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : "ru_RU",
-      images: [{ url: ROOM_MEDIA_FALLBACK, alt: String(copy.imageAlt) }],
+      images: [{ url: getRoomHero(room.slug), alt: localized.name }],
     },
   };
 }
@@ -71,12 +70,14 @@ export default async function RoomCategoryPage({ params, searchParams }: RoomPag
   const locale = await pageLocale(searchParams);
   const copy = COPY[locale];
   const localized = getLocalizedRoomCopy(slug, locale) ?? { name: room.name, capacity: room.capacity, summary: room.summary };
+  const roomMedia = getRoomMedia(room.slug);
+  const roomHero = getRoomHero(room.slug);
 
   return <>
     <SiteHeader />
     <main className="rooms-page" id="top">
       <section className="room-detail-hero" aria-labelledby="room-detail-title">
-        <div className="room-detail-hero-media" aria-hidden="true"><Image src={ROOM_MEDIA_FALLBACK} alt="" fill priority sizes="100vw" /></div>
+        <div className="room-detail-hero-media" aria-hidden="true"><Image src={roomHero} alt="" fill priority sizes="100vw" /></div>
         <div className="room-detail-hero-shade" aria-hidden="true" />
         <div className="wrap room-detail-hero-content">
           <Link className="room-detail-back" href={withPublicLocale("/rooms", locale)}>{String(copy.all)}</Link>
@@ -104,6 +105,18 @@ export default async function RoomCategoryPage({ params, searchParams }: RoomPag
           </aside>
         </div>
       </section>
+
+      {roomMedia && <section className="room-detail-gallery-section" aria-label={`${localized.name}: фотографии`}>
+        <div className="wrap room-detail-gallery-head">
+          <div><p className="eyebrow">Фотографии категории</p><h2 className="display-title">Посмотрите номер<br />до бронирования.</h2></div>
+          <p>Используем только обработанные и подтверждённые фотографии этой категории.</p>
+        </div>
+        <div className="wrap room-detail-gallery">
+          {roomMedia.gallery.map((src, index) => <figure className={index === 0 ? "gallery-item gallery-item-main" : "gallery-item"} key={src}>
+            <Image src={src} alt={`${localized.name} — фото ${index + 1}`} fill sizes={index === 0 ? "(max-width: 820px) 100vw, 66vw" : "(max-width: 820px) 50vw, 33vw"} />
+          </figure>)}
+        </div>
+      </section>}
 
       <div className="wrap room-detail-booking"><BookingWidget /></div>
     </main>
