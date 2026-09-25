@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { formatPublicDate, formatPublicNumber, localizeRoomTypeName, localeIntl, PublicLocale, resolveClientLocale } from "../lib/publicLocale";
 import { trackPublicEvent } from "../lib/publicAnalytics";
+import { getRoomMediaByCode } from "../lib/roomMedia";
 
 type AvailableRoom = { id: string; code: string };
 type PricingNight = { date: string; price_kgs: number | null; meal_included?: string; status: string };
@@ -320,7 +322,9 @@ export default function BookingWidget() {
               const meal = mealLabel(item.pricing.nights, locale);
               const isSelected = selected?.room_type_id === item.room_type_id;
               const roomName = localizeRoomTypeName(item.room_type_name, locale);
+              const roomMedia = getRoomMediaByCode(item.room_type_code);
               return <article className={`availability-card ${isSelected ? "selected" : ""}`} key={item.room_type_id}>
+                {roomMedia && <div className="availability-card-photo" style={{ position: "relative", aspectRatio: "4 / 3", margin: "-1px -1px 18px", overflow: "hidden" }}><Image src={roomMedia.hero} alt={roomName} fill sizes="(max-width: 760px) 100vw, 33vw" style={{ objectFit: "cover" }} /></div>}
                 <div className="availability-card-top"><span className="availability-count">{c.free}: {item.available_count}</span><span className="availability-code">{c.yourDates}</span></div>
                 <h3>{roomName}</h3>
                 <p className="availability-meta">{adultsLabel(item.capacity_adults, locale)}{item.area ? ` · ${item.area} м²` : ""}{results.children > 0 && !item.children_capacity_confirmed ? ` · ${c.childrenReview}` : ""}</p>
