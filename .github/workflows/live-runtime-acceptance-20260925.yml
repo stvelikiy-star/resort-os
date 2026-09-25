@@ -223,6 +223,8 @@ jobs:
               const r=await page.goto(process.env.PUBLIC_URL+'/rooms',{waitUntil:'networkidle',timeout:30000});
               const grid=page.locator('.room-catalog-grid');
               await grid.scrollIntoViewIfNeeded();
+              await page.waitForTimeout(900);
+              await page.locator('.room-catalog-card').last().scrollIntoViewIfNeeded();
               await page.waitForTimeout(1200);
               const state=await page.locator('.room-catalog-card').evaluateAll(cards=>cards.map((card,index)=>{
                 const s=getComputedStyle(card);
