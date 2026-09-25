@@ -90,7 +90,7 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
     <main className="work-shell dashboard-shell">
       <div className="work-head">
         <div>
-          <p className="eyebrow">Три Короны · управление</p>
+          <p className="eyebrow">MARINA SMART · управление</p>
           <h1>Command Center</h1>
           <p className="subtitle">{data.property.local_date} · данные Resort Core · {data.property.timezone}</p>
         </div>
@@ -142,7 +142,7 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
             <div><span>Нужен ответ</span><strong>{data.communications.needs_reply}</strong></div>
             <div><span>Самое долгое ожидание</span><strong>{waitingLabel(data.communications.oldest_waiting_seconds)}</strong></div>
           </div>
-          <p className="command-note">Клиентские каналы V1 ведёт n8n. Resort OS хранит только доступные факты/аудит; SLA-порог не выдумывается.</p>
+          <p className="command-note">Клиентские каналы V1 ведёт n8n. Hotel OS хранит только доступные факты/аудит; SLA-порог не выдумывается.</p>
         </article>
 
         <article className="command-panel">

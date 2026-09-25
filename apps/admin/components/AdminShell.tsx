@@ -194,14 +194,14 @@ export default function AdminShell() {
   }
 
   if (checking) {
-    return <main className="login-screen"><div className="login-card"><p className="eyebrow">Resort OS</p><h1>Проверяю доступ…</h1></div></main>;
+    return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
 
   if (!user) {
     return (
       <main className="login-screen">
         <form className="login-card" onSubmit={login}>
-          <p className="eyebrow">Три Короны · Resort OS</p>
+          <p className="eyebrow">MARINA SMART · Hotel OS</p>
           <h1>Вход в управление</h1>
           <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
@@ -222,7 +222,7 @@ export default function AdminShell() {
   return (
     <>
       <div className="auth-toolbar admin-nav">
-        <div className="admin-identity"><strong>Три Короны · Resort OS</strong><span>{user.display_name} · {user.role}</span></div>
+        <div className="admin-identity"><img className="marina-brand-logo-small" src="/marina-smart-logo.webp" alt="" /><div><strong>MARINA SMART · Hotel OS</strong><span>{user.display_name} · {user.role}</span></div></div>
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
