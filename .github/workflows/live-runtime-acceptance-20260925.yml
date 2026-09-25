@@ -223,10 +223,15 @@ jobs:
               const r=await page.goto(process.env.PUBLIC_URL+'/rooms',{waitUntil:'networkidle',timeout:30000});
               const grid=page.locator('.room-catalog-grid');
               await grid.scrollIntoViewIfNeeded();
+              await page.waitForTimeout(700);
+              const cardsLoc=page.locator('.room-catalog-card');
+              const cardCount=await cardsLoc.count();
+              for (let i=0;i<cardCount;i++) {
+                await cardsLoc.nth(i).scrollIntoViewIfNeeded();
+                await page.waitForTimeout(160);
+              }
               await page.waitForTimeout(900);
-              await page.locator('.room-catalog-card').last().scrollIntoViewIfNeeded();
-              await page.waitForTimeout(1200);
-              const state=await page.locator('.room-catalog-card').evaluateAll(cards=>cards.map((card,index)=>{
+              const state=await cardsLoc.evaluateAll(cards=>cards.map((card,index)=>{
                 const s=getComputedStyle(card);
                 return {index:index+1,opacity:s.opacity,visibility:s.visibility,display:s.display,revealed:card.classList.contains('is-revealed'),top:card.getBoundingClientRect().top};
               }));
