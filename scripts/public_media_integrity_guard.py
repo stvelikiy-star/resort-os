@@ -12,6 +12,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "apps/web"
 VERIFIED_FALLBACK = WEB / "public/media/three-crowns/hero-resort.webp"
+ROOM_MEDIA = WEB / "public/media/three-crowns/rooms"
+APPROVED_ROOM_MEDIA = {
+    "05": ("cottage-double-standard", 9),
+    "10": ("two-room-standard", 6),
+    "12": ("apartment-kitchen", 8),
+}
 PUBLIC_SOURCE_FILES = [
     WEB / "app/page.tsx",
     WEB / "app/layout.tsx",
@@ -56,6 +62,27 @@ def main() -> int:
     if "<source src=" in home:
         errors.append("home page must not request repository video placeholders until valid MP4 binaries are materialized")
 
+    room_media_source = (WEB / "lib/roomMedia.ts").read_text(encoding="utf-8")
+    approved_expected = {
+        "cottage-double-standard",
+        "two-room-standard",
+        "apartments-with-kitchen",
+    }
+    for slug in approved_expected:
+        if slug not in room_media_source:
+            errors.append(f"approved room media slug missing from roomMedia.ts: {slug}")
+    for forbidden in ("single-basement", "double-standard-basement", "single-improved", "double-improved", "junior-suite-no-balcony", "double-suite", "triple-suite", "two-room-junior-suite", "apartments"):
+        if f'"{forbidden}": media(' in room_media_source:
+            errors.append(f"unconfirmed category was published as approved room media: {forbidden}")
+
+    approved_file_count = 0
+    for folder, (prefix, count) in APPROVED_ROOM_MEDIA.items():
+        for index in range(1, count + 1):
+            path = ROOM_MEDIA / folder / f"{prefix}-{index:02d}.webp"
+            approved_file_count += 1
+            if not valid_webp(path):
+                errors.append(f"approved processed room image is missing or invalid WEBP: {path.relative_to(ROOT)}")
+
     rooms = (WEB / "app/rooms/page.tsx").read_text(encoding="utf-8")
     detail = (WEB / "app/rooms/[slug]/page.tsx").read_text(encoding="utf-8")
     for label, text in [("rooms index", rooms), ("room detail", detail)]:
@@ -66,6 +93,7 @@ def main() -> int:
     print(f"FACT: verified_fallback_webp={valid_webp(VERIFIED_FALLBACK)}")
     print(f"FACT: protected_public_sources={len(PUBLIC_SOURCE_FILES)}")
     print(f"FACT: known_corrupt_paths={len(KNOWN_CORRUPT_PUBLIC_PATHS)}")
+    print(f"FACT: approved_processed_room_images={approved_file_count}")
 
     if errors:
         for error in errors:
@@ -73,7 +101,7 @@ def main() -> int:
         print("RESULT: PUBLIC MEDIA INTEGRITY DRIFT")
         return 1
 
-    print("PASS: public surfaces do not reference known-corrupt media placeholders")
+    print("PASS: public surfaces use only verified fallback plus explicitly approved processed room media")
     return 0
 
 
