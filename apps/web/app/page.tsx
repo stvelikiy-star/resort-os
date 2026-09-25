@@ -5,6 +5,7 @@ import BookingWidget from "../components/BookingWidget";
 import SiteHeader from "../components/SiteHeader";
 import { ownerApprovedGuestFacts, TWO_GIS_REVIEWS_URL } from "../lib/ownerApprovedGuestFacts";
 import { formatKgs, roomCategories } from "../lib/roomCatalog";
+import { getRoomHero } from "../lib/roomMedia";
 
 const ownerFacts = ownerApprovedGuestFacts.ru;
 const VERIFIED_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
