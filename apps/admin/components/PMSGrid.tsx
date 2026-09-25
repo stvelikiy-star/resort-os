@@ -205,7 +205,7 @@ export default function PMSGrid() {
     <main className="shell">
       <div className="topbar">
         <div>
-          <p className="eyebrow">Resort OS · Three Crowns</p>
+          <p className="eyebrow">Hotel OS · MARINA SMART</p>
           <h1>Шахматка номеров</h1>
           <p className="subtitle">Нажмите на бронь: перенос, даты, переселение, заезд и выезд проходят через безопасную проверку Core.</p>
         </div>

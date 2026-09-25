@@ -210,7 +210,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
 
   return <main className="work-shell staff-shell management-shell">
     <div className="work-head">
-      <div><p className="eyebrow">Отель · персонал</p><h1>Персонал и доступы</h1><p className="subtitle">Фактические задачи и учётные записи Resort OS · {data.local_date} · {data.timezone}</p></div>
+      <div><p className="eyebrow">Отель · персонал</p><h1>Персонал и доступы</h1><p className="subtitle">Фактические задачи и учётные записи Hotel OS · {data.local_date} · {data.timezone}</p></div>
       <div className="management-head-actions">
         {canManage && <button className="btn primary" onClick={() => setShowCreate((value) => !value)}>{showCreate ? "Закрыть форму" : "+ Создать сотрудника"}</button>}
         <button className="btn" onClick={load} disabled={loading}>{loading ? "Обновляю…" : "Обновить"}</button>
@@ -272,7 +272,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
       </article>)}
     </section>
 
-    <p className="staff-truth">Это контроль задач и использования Resort OS. Он не является табелем рабочего времени, расчётом зарплаты или рейтингом эффективности.</p>
+    <p className="staff-truth">Это контроль задач и использования Hotel OS. Он не является табелем рабочего времени, расчётом зарплаты или рейтингом эффективности.</p>
 
     {editing && canManage && <div className="management-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setEditing(null); }}>
       <form className="management-modal" onSubmit={saveEdit}>

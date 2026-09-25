@@ -359,7 +359,7 @@ export default function MarketingBoard() {
 
         <section className="marketing-panel marketing-campaigns">
           <div className="marketing-panel-head">
-            <div><p className="eyebrow">Existing campaign engine</p><h2>Офферы Guest OS</h2><p>Marketing использует уже существующий движок офферов Три Короны, а не создаёт второй независимый контур кампаний.</p></div>
+            <div><p className="eyebrow">Existing campaign engine</p><h2>Офферы Guest OS</h2><p>Marketing использует уже существующий движок офферов MARINA SMART, а не создаёт второй независимый контур кампаний.</p></div>
             <div className="marketing-campaign-stats"><span>Всего <b>{campaigns.length}</b></span><span>Активно <b>{activeCampaigns.length}</b></span><span>Клики <b>{campaignClicks}</b></span><span>Заявки <b>{campaignRequests}</b></span></div>
           </div>
           <div className="marketing-campaign-list">

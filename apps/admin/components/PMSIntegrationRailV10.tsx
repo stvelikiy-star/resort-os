@@ -120,7 +120,7 @@ export default function PMSIntegrationRailV10() {
           <p className="eyebrow">PMS V10 · Unified Control</p>
           <h2>Сайт → Core → бронь → проживание → услуги → финансы</h2>
           <span>
-            Единая рабочая цепочка Resort OS. Сайт создаёт ReservationRequest, подтверждение брони остаётся за менеджером,
+            Единая рабочая цепочка Hotel OS. Сайт создаёт ReservationRequest, подтверждение брони остаётся за менеджером,
             а шахматка и операционные модули читают фактическое состояние из Resort Core/PostgreSQL.
           </span>
         </div>
