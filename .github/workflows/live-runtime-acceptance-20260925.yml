@@ -151,6 +151,58 @@ jobs:
           NODE
 
 
+      - name: Verify published room media slots
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --max-time 20 "$PUBLIC_URL/core/api/v1/site/media-config")"
+          ROOM_MEDIA="$body" python3 - <<'PY'
+          import json, os
+          body=json.loads(os.environ['ROOM_MEDIA'])
+          slots=body.get('slots') or {}
+          rows=[]
+          for key in sorted(k for k in slots if k.startswith('ROOM_')):
+              x=slots[key]
+              rows.append({
+                  'slot': key,
+                  'filename': x.get('filename'),
+                  'asset_id': (x.get('asset_id') or '')[:8],
+                  'published_at': x.get('published_at'),
+              })
+          print('PUBLISHED_ROOM_MEDIA='+json.dumps(rows, ensure_ascii=False))
+          print(f'PUBLISHED_ROOM_MEDIA_COUNT={len(rows)}/12')
+          PY
+
+      - name: Capture rooms catalogue desktop and mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/site-visual-audit
+          cd /tmp/resort-os
+          PUBLIC_URL="$PUBLIC_URL" node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          try {
+            for (const target of [
+              {label:'desktop', viewport:{width:1440,height:1000}},
+              {label:'mobile', viewport:{width:390,height:844}},
+            ]) {
+              const context=await browser.newContext({viewport:target.viewport});
+              const page=await context.newPage();
+              const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+              const r=await page.goto(process.env.PUBLIC_URL+'/rooms',{waitUntil:'networkidle',timeout:30000});
+              if (!r?.ok()) throw new Error('/rooms HTTP '+r?.status());
+              await page.waitForTimeout(1000);
+              const cards=await page.locator('.room-catalog-card').count();
+              const imgs=await page.locator('.room-catalog-card img').count();
+              const h1=(await page.locator('h1').first().textContent())?.trim() || '';
+              await page.screenshot({path:'/tmp/site-visual-audit/rooms-catalog-'+target.label+'.png',fullPage:true});
+              console.log(JSON.stringify({surface:'/rooms',viewport:target.label,http:r.status(),h1,cards,cardImages:imgs,pageErrors:errors}));
+              await context.close();
+            }
+          } finally { await browser.close(); }
+          NODE
+
       - name: Capture live public-site visual audit
         shell: bash
         run: |
