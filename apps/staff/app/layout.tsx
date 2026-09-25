@@ -4,8 +4,8 @@ import "./globals.css";
 import "./shift-v2.css";
 
 export const metadata: Metadata = {
-  title: "Три Короны · Моя смена",
-  description: "Мобильный операционный интерфейс Resort OS для персонала",
+  title: "MARINA SMART · Моя смена",
+  description: "Мобильный операционный интерфейс Hotel OS для персонала",
   manifest: "/manifest.webmanifest",
 };
 
