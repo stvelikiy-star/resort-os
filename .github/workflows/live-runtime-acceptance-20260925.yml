@@ -151,6 +151,22 @@ jobs:
           NODE
 
 
+      - name: Inspect approved room photo derivatives from photo branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/stvelikiy-star/resort-os.git /tmp/photo-audit-repo
+          cd /tmp/photo-audit-repo
+          git fetch --depth=1 origin feat/public-room-photos-20260916
+          for file in \
+            apps/web/public/media/three-crowns/rooms/cottage-double-standard.webp \
+            apps/web/public/media/three-crowns/rooms/two-room-standard.webp \
+            apps/web/public/media/three-crowns/rooms/apartments-with-kitchen.webp; do
+            out="/tmp/$(basename "$file")"
+            git show FETCH_HEAD:"$file" > "$out"
+            echo "APPROVED_DERIVATIVE $(basename "$file") bytes=$(wc -c < "$out") info=$(file -b "$out")"
+          done
+
       - name: Verify published room media slots
         shell: bash
         run: |
