@@ -6,6 +6,7 @@ import BookingWidget from "../../components/BookingWidget";
 import SiteHeader from "../../components/SiteHeader";
 import { formatPublicNumber, getLocalizedRoomCopy, normalizePublicLocale, PublicLocale, withPublicLocale } from "../../lib/publicLocale";
 import { roomCategories } from "../../lib/roomCatalog";
+import { getRoomHero } from "../../lib/roomMedia";
 
 type RoomsPageProps = { searchParams: Promise<{ lang?: string | string[] }> };
 
@@ -86,6 +87,9 @@ export default async function RoomsPage({ searchParams }: RoomsPageProps) {
           {roomCategories.map((room) => {
             const localized = getLocalizedRoomCopy(room.slug, locale) ?? { name: room.name, capacity: room.capacity, summary: room.summary };
             return <article className="room-catalog-card" key={room.slug}>
+              <Link className="room-catalog-photo" href={withPublicLocale(`/rooms/${room.slug}`, locale)} aria-label={localized.name}>
+                <Image src={getRoomHero(room.slug)} alt={localized.name} fill sizes="(max-width: 620px) 86vw, (max-width: 1080px) 50vw, 33vw" />
+              </Link>
               <div className="room-catalog-card-top"><span className="room-catalog-index">{room.index}</span><span className="room-catalog-meta">{localized.capacity} · {room.area}</span></div>
               <h2>{localized.name}</h2>
               <p>{localized.summary}</p>

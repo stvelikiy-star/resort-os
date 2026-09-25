@@ -40,6 +40,48 @@ async function verifyServerHtml() {
   assert(!/30\s*%[^<]{0,120}предоплат|предоплат[^<]{0,120}30\s*%/i.test(html), "SSR home contains forbidden fixed 30% prepayment claim");
 }
 
+
+async function resolvedImagePath(locator) {
+  const src = await locator.getAttribute("src");
+  assert(src, "Expected image src");
+  const url = new URL(src, BASE_URL);
+  return url.pathname === "/_next/image" ? (url.searchParams.get("url") || "") : url.pathname;
+}
+
+async function verifyApprovedRoomMedia(page) {
+  await page.goto(`${BASE_URL}/?lang=ru`, { waitUntil: "networkidle" });
+  const homeCards = page.locator(".v3-room-card");
+  assert((await homeCards.count()) === 12, "Home must render 12 room cards");
+  const home05 = await resolvedImagePath(homeCards.nth(4).locator("img"));
+  const home10 = await resolvedImagePath(homeCards.nth(9).locator("img"));
+  const home12 = await resolvedImagePath(homeCards.nth(11).locator("img"));
+  const home06 = await resolvedImagePath(homeCards.nth(5).locator("img"));
+  assert(home05.includes("/rooms/05/cottage-double-standard-01.webp"), `Category 05 must use approved processed media, got ${home05}`);
+  assert(home10.includes("/rooms/10/two-room-standard-01.webp"), `Category 10 must use approved processed media, got ${home10}`);
+  assert(home12.includes("/rooms/12/apartment-kitchen-01.webp"), `Category 12 must use approved processed media, got ${home12}`);
+  assert(home06.endsWith("/media/three-crowns/hero-resort.webp"), `Unconfirmed category 06 must stay on verified fallback, got ${home06}`);
+
+  await page.goto(`${BASE_URL}/rooms?lang=ru`, { waitUntil: "networkidle" });
+  const catalogCards = page.locator(".room-catalog-card");
+  assert((await catalogCards.count()) === 12, "Room catalogue must render 12 categories");
+  const catalog05 = await resolvedImagePath(catalogCards.nth(4).locator(".room-catalog-photo img"));
+  const catalog10 = await resolvedImagePath(catalogCards.nth(9).locator(".room-catalog-photo img"));
+  const catalog12 = await resolvedImagePath(catalogCards.nth(11).locator(".room-catalog-photo img"));
+  assert(catalog05.includes("/rooms/05/cottage-double-standard-01.webp"), "Catalogue category 05 media mismatch");
+  assert(catalog10.includes("/rooms/10/two-room-standard-01.webp"), "Catalogue category 10 media mismatch");
+  assert(catalog12.includes("/rooms/12/apartment-kitchen-01.webp"), "Catalogue category 12 media mismatch");
+
+  await page.goto(`${BASE_URL}/rooms/cottage-double-standard?lang=ru`, { waitUntil: "networkidle" });
+  assert((await page.locator(".room-detail-gallery .gallery-item").count()) === 9, "Category 05 must render all 9 approved processed photos");
+  const detailHero = await resolvedImagePath(page.locator(".room-detail-hero-media img"));
+  assert(detailHero.includes("/rooms/05/cottage-double-standard-01.webp"), "Category 05 hero must use approved processed media");
+
+  await page.goto(`${BASE_URL}/rooms/junior-suite-no-balcony?lang=ru`, { waitUntil: "networkidle" });
+  assert((await page.locator(".room-detail-gallery .gallery-item").count()) === 0, "Unconfirmed category 06 must not publish a gallery");
+  const pendingHero = await resolvedImagePath(page.locator(".room-detail-hero-media img"));
+  assert(pendingHero.endsWith("/media/three-crowns/hero-resort.webp"), "Unconfirmed category 06 must use verified fallback");
+}
+
 async function installCoreMocks(page) {
   await page.route("**/core/api/v1/booking/check-availability**", async (route) => {
     const url = new URL(route.request().url());
@@ -124,6 +166,7 @@ async function verifyDesktop(browser) {
   await installCoreMocks(page);
 
   await assertServiceOrderAndLocale(page, "ru", "ru");
+  await verifyApprovedRoomMedia(page);
   assert(await page.locator(".desktop-nav").isVisible(), "Desktop navigation is not visible");
   assert(await page.locator("#booking").isVisible(), "Booking widget is not visible on desktop");
 
