@@ -203,6 +203,41 @@ jobs:
           } finally { await browser.close(); }
           NODE
 
+      - name: Verify room catalogue reveal after real scroll
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/site-visual-audit
+          cd /tmp/resort-os
+          PUBLIC_URL="$PUBLIC_URL" node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          try {
+            for (const target of [
+              {label:'desktop', viewport:{width:1440,height:1000}},
+              {label:'mobile', viewport:{width:390,height:844}},
+            ]) {
+              const context=await browser.newContext({viewport:target.viewport});
+              const page=await context.newPage();
+              const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+              const r=await page.goto(process.env.PUBLIC_URL+'/rooms',{waitUntil:'networkidle',timeout:30000});
+              const grid=page.locator('.room-catalog-grid');
+              await grid.scrollIntoViewIfNeeded();
+              await page.waitForTimeout(1200);
+              const state=await page.locator('.room-catalog-card').evaluateAll(cards=>cards.map((card,index)=>{
+                const s=getComputedStyle(card);
+                return {index:index+1,opacity:s.opacity,visibility:s.visibility,display:s.display,revealed:card.classList.contains('is-revealed'),top:card.getBoundingClientRect().top};
+              }));
+              await grid.screenshot({path:'/tmp/site-visual-audit/rooms-catalog-scrolled-'+target.label+'.png'});
+              console.log('ROOM_CATALOG_REVEAL_'+target.label.toUpperCase()+'='+JSON.stringify({http:r?.status(),pageErrors:errors,state}));
+              if (state.length !== 12) throw new Error('Expected 12 room cards, got '+state.length);
+              const visible=state.filter(x=>Number(x.opacity)>0.9 && x.visibility!=='hidden' && x.display!=='none');
+              if (visible.length !== 12) throw new Error('Only '+visible.length+'/12 cards visible after scroll');
+              await context.close();
+            }
+          } finally { await browser.close(); }
+          NODE
+
       - name: Capture live public-site visual audit
         shell: bash
         run: |
