@@ -6,9 +6,11 @@ import BookingWidget from "../../components/BookingWidget";
 import SiteHeader from "../../components/SiteHeader";
 import { formatPublicNumber, getLocalizedRoomCopy, normalizePublicLocale, PublicLocale, withPublicLocale } from "../../lib/publicLocale";
 import { roomCategories } from "../../lib/roomCatalog";
-import { getRoomHero, ROOM_MEDIA_FALLBACK } from "../../lib/roomMedia";
+import { getRoomHero } from "../../lib/roomMedia";
 
 type RoomsPageProps = { searchParams: Promise<{ lang?: string | string[] }> };
+
+const ROOM_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
 
 const COPY = {
   ru: {
