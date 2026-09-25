@@ -75,20 +75,20 @@ jobs:
               print("SAMPLE:", row.get("room_type",{}).get("name") or row.get("room_type_name") or row.get("category_name"), row.get("pricing",{}).get("total_kgs"))
           PY
 
-      - name: HTTPS surfaces and UI shells
+      - name: HTTPS surfaces
         shell: bash
         run: |
           set -euo pipefail
           check_page() {
-            label="$1"; url="$2"; marker="$3"; body="$(mktemp)"
+            label="$1"; url="$2"; body="$(mktemp)"
             code="$(curl --silent --show-error --location --output "$body" --write-out '%{http_code}' --max-time 20 "$url")"
             test "$code" = "200"
-            grep -Fq "$marker" "$body"
-            echo "PASS: $label HTTP 200 marker=$marker"
+            test -s "$body"
+            echo "PASS: $label HTTP 200 non-empty body"
           }
-          check_page public "$PUBLIC_URL/" "Три Короны"
-          check_page admin "$ADMIN_URL/" "Вход в управление"
-          check_page staff "$STAFF_URL/" "Моя смена"
+          check_page public "$PUBLIC_URL/"
+          check_page admin "$ADMIN_URL/"
+          check_page staff "$STAFF_URL/"
 
       - name: Same-origin Core proxy and unauthenticated auth boundary
         shell: bash
@@ -118,6 +118,37 @@ jobs:
           check_ws core "$CORE_URL/ws/pms/grid"
           check_ws admin-same-origin "$ADMIN_URL/ws/pms/grid"
           check_ws staff-same-origin "$STAFF_URL/ws/pms/grid"
+
+      - name: Hydrated browser acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch main https://github.com/stvelikiy-star/resort-os.git /tmp/resort-os
+          cd /tmp/resort-os
+          npm install --no-audit --no-fund --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          PUBLIC_BASE_URL="$PUBLIC_URL" node scripts/public_browser_acceptance.mjs
+          ADMIN_URL="$ADMIN_URL" STAFF_URL="$STAFF_URL" node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true });
+          try {
+            for (const target of [
+              {label:'Admin', url:process.env.ADMIN_URL, heading:'Вход в управление'},
+              {label:'Staff', url:process.env.STAFF_URL, heading:'Моя смена'},
+            ]) {
+              const context=await browser.newContext({viewport:{width:1365,height:900}});
+              const page=await context.newPage();
+              const errors=[];
+              page.on('pageerror', e=>errors.push(e.message));
+              const response=await page.goto(target.url,{waitUntil:'networkidle',timeout:30000});
+              if (!response?.ok()) throw new Error(`${target.label} HTTP ${response?.status()}`);
+              await page.getByRole('heading',{name:target.heading,exact:true}).waitFor({state:'visible',timeout:15000});
+              if (errors.length) throw new Error(`${target.label} pageerror: ${errors.join(' | ')}`);
+              console.log(`PASS: ${target.label} hydrated heading visible`);
+              await context.close();
+            }
+          } finally { await browser.close(); }
+          NODE
 
       - name: Read-only acceptance boundary
         shell: bash
