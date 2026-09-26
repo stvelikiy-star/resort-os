@@ -409,6 +409,7 @@ async def get_modules(request: Request, user: dict[str, Any] = Depends(module_re
         "available_modules": sorted(OPTIONAL_MODULES),
         "hotel_logo_url": settings["hotel_logo_url"],
         "property_name": prop["name"],
+        "hotel_name": prop["name"],
     }
 
 
