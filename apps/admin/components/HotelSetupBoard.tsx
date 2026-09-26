@@ -115,6 +115,12 @@ const MODULE_LABELS: Record<string, { title: string; copy: string }> = {
   INBOX: { title: "Сообщения", copy: "Единый inbox клиентских коммуникаций." },
 };
 
+const MODULE_PRESETS = [
+  { key: "MINI", title: "Мини-отель", copy: "Простой PMS + гостевой QR.", modules: ["ROOM_QR"] },
+  { key: "HOTEL", title: "Отель", copy: "Питание, QR и работа с агентами.", modules: ["DINING", "ROOM_QR", "AGENTS"] },
+  { key: "RESORT", title: "Курорт", copy: "Группы, агенты, питание, офферы, QR зон, отзывы и сообщения.", modules: ["GROUPS", "AGENTS", "DINING", "OFFERS", "GROWTH", "ROOM_QR", "POINT_QR", "INBOX"] },
+] as const;
+
 export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onModulesChanged?: (modules: string[]) => void; onNavigate?: (destination: "RATES" | "STAFF") => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -542,6 +548,12 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onMo
       <section className="hotel-setup-panel">
         <div className="hotel-setup-section-title"><div><small>06 · Модули</small><h2>Что показывать в системе</h2></div><span>ядро всегда включено</span></div>
         <p className="management-truth compact">Главная, шахматка, брони, CRM, финансы, сервис, операции, отчёты и настройки остаются всегда. Дополнительные модули можно скрывать без удаления данных и кода.</p>
+        <div className="hotel-module-presets">
+          {MODULE_PRESETS.map((preset) => {
+            const active = preset.modules.length === enabledModules.length && preset.modules.every((module) => enabledModules.includes(module));
+            return <button type="button" key={preset.key} className={active ? "active" : ""} disabled={busy === "modules"} onClick={() => void saveModules([...preset.modules])}><strong>{preset.title}</strong><small>{preset.copy}</small></button>;
+          })}
+        </div>
         <div className="hotel-module-grid">
           {data.product_settings.available_modules.map((module) => {
             const meta = MODULE_LABELS[module] || { title: module, copy: "" };
