@@ -74,6 +74,14 @@ const emptyRoom: RoomDraft = {
   notes: "",
 };
 
+const ROOM_STATE_LABELS: Record<string, string> = {
+  CLEAN: "Готов",
+  DIRTY: "Нужна уборка",
+  IN_INSPECTION: "Проверка",
+  TECH_BLOCK: "Ремонт / закрыт",
+  UNKNOWN: "Не задан",
+};
+
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     cache: "no-store",
@@ -500,7 +508,7 @@ export default function HotelSetupBoard({ onModulesChanged }: { onModulesChanged
             <span>{room.room_type_name}</span>
             <span>{[room.building_or_zone, room.floor_label].filter(Boolean).join(" · ") || "—"}</span>
             <span>{room.bed_configuration || "—"}</span>
-            <span><b className={`hotel-state state-${room.operational_state.toLowerCase()}`}>{room.operational_state === "CLEAN" ? "Готов" : room.operational_state === "TECH_BLOCK" ? "Закрыт" : room.operational_state}</b></span>
+            <span><b className={`hotel-state state-${room.operational_state.toLowerCase()}`}>{ROOM_STATE_LABELS[room.operational_state] || room.operational_state}</b></span>
             <span className="hotel-row-actions"><button className="btn mini secondary" onClick={() => openRoom(room)}>Изменить</button><button className="btn mini secondary" disabled={busy === `room-state-${room.id}`} onClick={() => void toggleRoom(room)}>{room.operational_state === "TECH_BLOCK" ? "Открыть" : "Закрыть"}</button><button className="btn mini danger-ghost" disabled={busy === `room-delete-${room.id}`} onClick={() => void removeRoom(room)}>Удалить</button></span>
           </div>)}
         </div>
