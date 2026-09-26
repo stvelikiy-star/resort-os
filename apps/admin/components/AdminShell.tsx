@@ -70,6 +70,8 @@ export default function AdminShell() {
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<Tab>("DASHBOARD");
   const [enabledModules, setEnabledModules] = useState<string[]>(DEFAULT_ENABLED_MODULES);
+  const [hotelName, setHotelName] = useState<string>("");
+  const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
 
   useEffect(() => {
     fetch("/core/api/v1/auth/me", { cache: "no-store" })
@@ -162,10 +164,13 @@ export default function AdminShell() {
     fetch("/core/api/v1/admin/hotel-setup/modules", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return null;
-        return await response.json() as { enabled_modules?: string[] };
+        return await response.json() as { enabled_modules?: string[]; hotel_name?: string; hotel_logo_url?: string | null };
       })
       .then((body) => {
-        if (!cancelled && body?.enabled_modules) setEnabledModules(body.enabled_modules);
+        if (cancelled || !body) return;
+        if (body.enabled_modules) setEnabledModules(body.enabled_modules);
+        setHotelName(body.hotel_name || "");
+        setHotelLogoUrl(body.hotel_logo_url || "");
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
@@ -243,7 +248,11 @@ export default function AdminShell() {
   return (
     <>
       <div className="auth-toolbar admin-nav">
-        <div className="admin-identity"><img className="marina-brand-logo-small" src="/marina-smart-logo.webp" alt="" /><div><strong>MARINA SMART · Hotel OS</strong><span>{user.display_name} · {user.role}</span></div></div>
+        <div className="admin-identity">
+          <img className="marina-brand-logo-small" src="/marina-smart-logo.webp" alt="MARINA SMART" />
+          {hotelLogoUrl && <img className="hotel-brand-logo-small" src={hotelLogoUrl} alt={hotelName || "Логотип отеля"} />}
+          <div><strong>MARINA SMART · Hotel OS</strong><span>{hotelName ? `${hotelName} · ` : ""}{user.display_name} · {user.role}</span></div>
+        </div>
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
@@ -298,7 +307,11 @@ export default function AdminShell() {
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
       {tab === "INBOX" && isManager && moduleEnabled("INBOX") && <InboxBoard />}
-      {tab === "SETTINGS" && isManager && <HotelSetupBoard onModulesChanged={setEnabledModules} onNavigate={(destination) => setTab(destination)} />}
+      {tab === "SETTINGS" && isManager && <HotelSetupBoard
+        onModulesChanged={setEnabledModules}
+        onNavigate={(destination) => setTab(destination)}
+        onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
+      />}
     </>
   );
 }
