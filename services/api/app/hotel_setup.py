@@ -11,6 +11,11 @@ from .auth import require_roles
 router = APIRouter(prefix="/api/v1/admin/hotel-setup", tags=["hotel-setup"])
 manager_access = require_roles("OWNER", "MANAGER")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
+OPTIONAL_MODULES = {
+    "GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS",
+    "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX",
+}
+DEFAULT_MODULES = ["GROUPS", "AGENTS", "DINING", "ROOM_QR"]
 
 RoomState = Literal["UNKNOWN", "CLEAN", "DIRTY", "IN_INSPECTION", "TECH_BLOCK"]
 
@@ -19,6 +24,8 @@ class PropertyPatch(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=180)
     timezone: str | None = Field(default=None, min_length=2, max_length=80)
     currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
+    check_in_time: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+    check_out_time: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
 
     @model_validator(mode="after")
     def validate_change(self):
@@ -102,6 +109,49 @@ class BulkRoomsCreate(BaseModel):
 
 class DemoLayoutRequest(BaseModel):
     confirmation: Literal["CREATE_COMPACT_DEMO"]
+
+
+class ModulesPatch(BaseModel):
+    enabled_modules: list[str]
+
+    @model_validator(mode="after")
+    def validate_modules(self):
+        normalized = []
+        for value in self.enabled_modules:
+            module = value.strip().upper()
+            if module not in OPTIONAL_MODULES:
+                raise ValueError(f"Unknown module: {module}")
+            if module not in normalized:
+                normalized.append(module)
+        self.enabled_modules = normalized
+        return self
+
+
+async def _ensure_product_settings(conn, property_id: uuid.UUID):
+    await conn.execute(
+        '''INSERT INTO property_product_settings (
+             id,"propertyId","checkInTime","checkOutTime","enabledModules","createdAt","updatedAt"
+           ) VALUES ($1,$2,TIME '14:00',TIME '12:00',$3::jsonb,now(),now())
+           ON CONFLICT ("propertyId") DO NOTHING''',
+        uuid.uuid4(), property_id, json.dumps(DEFAULT_MODULES),
+    )
+    row = await conn.fetchrow(
+        '''SELECT id,
+                  to_char("checkInTime",'HH24:MI') AS check_in_time,
+                  to_char("checkOutTime",'HH24:MI') AS check_out_time,
+                  "enabledModules"
+           FROM property_product_settings WHERE "propertyId"=$1''',
+        property_id,
+    )
+    modules_raw = row["enabledModules"]
+    modules = json.loads(modules_raw) if isinstance(modules_raw, str) else list(modules_raw or [])
+    modules = [str(value) for value in modules if str(value) in OPTIONAL_MODULES]
+    return {
+        "id": row["id"],
+        "check_in_time": row["check_in_time"],
+        "check_out_time": row["check_out_time"],
+        "enabled_modules": modules,
+    }
 
 
 async def _property(conn, property_code: str):
@@ -247,10 +297,17 @@ async def overview(request: Request, user: dict[str, Any] = Depends(manager_acce
             ''',
             prop["id"],
         )
+        product_settings = await _ensure_product_settings(conn, prop["id"])
     return {
         "property": {
             "id": str(prop["id"]), "code": prop["code"], "name": prop["name"],
             "timezone": prop["timezone"], "currency": prop["currency"], "updated_at": prop["updatedAt"],
+        },
+        "product_settings": {
+            "check_in_time": product_settings["check_in_time"],
+            "check_out_time": product_settings["check_out_time"],
+            "enabled_modules": product_settings["enabled_modules"],
+            "available_modules": sorted(OPTIONAL_MODULES),
         },
         "summary": {
             "room_types": len(room_types),
@@ -283,15 +340,62 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
                 timezone_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=$1)", timezone)
                 if not timezone_exists:
                     raise HTTPException(status_code=422, detail="Unknown timezone")
+            product = await _ensure_product_settings(conn, prop["id"])
+            check_in_time = payload.check_in_time if "check_in_time" in supplied and payload.check_in_time is not None else product["check_in_time"]
+            check_out_time = payload.check_out_time if "check_out_time" in supplied and payload.check_out_time is not None else product["check_out_time"]
+            if check_in_time == check_out_time:
+                raise HTTPException(status_code=422, detail="Check-in and check-out time must differ")
             row = await conn.fetchrow(
                 '''UPDATE properties SET name=$2,timezone=$3,currency=$4,"updatedAt"=now()
                    WHERE id=$1 RETURNING id,code,name,timezone,currency,"updatedAt"''',
                 prop["id"], name, timezone, currency,
             )
-            after = {"name": row["name"], "timezone": row["timezone"], "currency": row["currency"]}
+            await conn.execute(
+                '''UPDATE property_product_settings
+                   SET "checkInTime"=$2::time,"checkOutTime"=$3::time,"updatedAt"=now()
+                   WHERE "propertyId"=$1''',
+                prop["id"], check_in_time, check_out_time,
+            )
+            after = {
+                "name": row["name"], "timezone": row["timezone"], "currency": row["currency"],
+                "check_in_time": check_in_time, "check_out_time": check_out_time,
+            }
             await _audit(conn, property_id=prop["id"], user=user, action="UPDATE_PROPERTY",
                          resource="Property", resource_id=str(prop["id"]), before=before, after=after)
     return {**after, "id": str(row["id"]), "code": row["code"], "updated_at": row["updatedAt"]}
+
+
+@router.get("/modules")
+async def get_modules(request: Request, user: dict[str, Any] = Depends(manager_access)):
+    async with request.app.state.db.acquire() as conn:
+        prop = await _property(conn, user["property_code"])
+        settings = await _ensure_product_settings(conn, prop["id"])
+    return {
+        "enabled_modules": settings["enabled_modules"],
+        "available_modules": sorted(OPTIONAL_MODULES),
+    }
+
+
+@router.patch("/modules")
+async def patch_modules(payload: ModulesPatch, request: Request, user: dict[str, Any] = Depends(manager_access)):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            prop = await _property(conn, user["property_code"])
+            settings = await _ensure_product_settings(conn, prop["id"])
+            before = {"enabled_modules": settings["enabled_modules"]}
+            await conn.execute(
+                '''UPDATE property_product_settings SET "enabledModules"=$2::jsonb,"updatedAt"=now()
+                   WHERE "propertyId"=$1''',
+                prop["id"], json.dumps(payload.enabled_modules),
+            )
+            after = {"enabled_modules": payload.enabled_modules}
+            await _audit(conn, property_id=prop["id"], user=user, action="UPDATE_ENABLED_MODULES",
+                         resource="PropertyProductSettings", resource_id=str(settings["id"]),
+                         before=before, after=after)
+    return {
+        "enabled_modules": payload.enabled_modules,
+        "available_modules": sorted(OPTIONAL_MODULES),
+    }
 
 
 @router.post("/room-types", status_code=status.HTTP_201_CREATED)
