@@ -124,7 +124,7 @@ export default function StaffRoleGateway() {
         if (link?.ok) setTelegramNotice("Telegram привязан. Следующий вход будет автоматическим.");
       }
     } catch {
-      setError("Resort Core недоступен");
+      setError("MARINA SMART недоступен");
     }
   }
 
