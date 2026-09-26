@@ -133,6 +133,7 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onMo
   const [currency, setCurrency] = useState("KGS");
   const [checkInTime, setCheckInTime] = useState("14:00");
   const [checkOutTime, setCheckOutTime] = useState("12:00");
+  const [hotelLogoUrl, setHotelLogoUrl] = useState("");
   const [enabledModules, setEnabledModules] = useState<string[]>([]);
 
   const [typeCode, setTypeCode] = useState("");
@@ -168,6 +169,7 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onMo
       setCurrency(body.property.currency);
       setCheckInTime(body.product_settings.check_in_time);
       setCheckOutTime(body.product_settings.check_out_time);
+      setHotelLogoUrl(body.product_settings.hotel_logo_url || "");
       setEnabledModules(body.product_settings.enabled_modules);
       if (!roomDraft.room_type_id && body.room_types[0]) {
         setRoomDraft((current) => ({ ...current, room_type_id: body.room_types[0].id }));
@@ -205,7 +207,7 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onMo
     try {
       await api("/core/api/v1/admin/hotel-setup/property", {
         method: "PATCH",
-        body: JSON.stringify({ name: propertyName, timezone, currency, check_in_time: checkInTime, check_out_time: checkOutTime }),
+        body: JSON.stringify({ name: propertyName, timezone, currency, check_in_time: checkInTime, check_out_time: checkOutTime, hotel_logo_url: hotelLogoUrl || null }),
       });
       await load();
       done("Данные объекта сохранены.");
@@ -475,6 +477,8 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onMo
           <label><span>Валюта</span><input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} required /></label>
           <label><span>Check-in</span><input type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} required /></label>
           <label><span>Check-out</span><input type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} required /></label>
+          <label className="hotel-logo-field"><span>Логотип отеля — URL</span><input type="url" value={hotelLogoUrl} onChange={(e) => setHotelLogoUrl(e.target.value)} placeholder="https://hotel.kg/logo.png" /></label>
+          <div className="hotel-logo-preview">{hotelLogoUrl ? <img src={hotelLogoUrl} alt="Логотип отеля" /> : <span>Логотип отеля не задан</span>}</div>
           <div className="hotel-setup-submit"><button className="btn primary" disabled={busy === "property"}>Сохранить объект</button></div>
         </form>
       </section>
