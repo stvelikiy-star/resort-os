@@ -300,6 +300,24 @@ async def overview(request: Request, user: dict[str, Any] = Depends(manager_acce
             prop["id"],
         )
         product_settings = await _ensure_product_settings(conn, prop["id"])
+        readiness = await conn.fetchrow(
+            '''SELECT
+                 (SELECT count(*)::int FROM rate_periods rp
+                    JOIN rate_plans plan ON plan.id=rp."ratePlanId"
+                    WHERE plan."propertyId"=$1) AS rate_periods,
+                 (SELECT count(*)::int FROM staff_users su
+                    WHERE su."propertyId"=$1 AND su."isActive"=true) AS active_staff''',
+            prop["id"],
+        )
+    room_count = len(rooms)
+    room_type_count = len(room_types)
+    setup_steps = {
+        "property": bool(prop["name"] and prop["timezone"] and prop["currency"]),
+        "room_types": room_type_count > 0,
+        "rooms": room_count > 0,
+        "rates": int(readiness["rate_periods"] or 0) > 0,
+        "staff": int(readiness["active_staff"] or 0) > 0,
+    }
     return {
         "property": {
             "id": str(prop["id"]), "code": prop["code"], "name": prop["name"],
@@ -312,10 +330,18 @@ async def overview(request: Request, user: dict[str, Any] = Depends(manager_acce
             "available_modules": sorted(OPTIONAL_MODULES),
         },
         "summary": {
-            "room_types": len(room_types),
-            "rooms": len(rooms),
+            "room_types": room_type_count,
+            "rooms": room_count,
             "ready": sum(1 for row in rooms if row["operational_state"] == "CLEAN"),
             "blocked": sum(1 for row in rooms if row["operational_state"] == "TECH_BLOCK"),
+        },
+        "onboarding": {
+            "ready": all(setup_steps.values()),
+            "completed": sum(1 for value in setup_steps.values() if value),
+            "total": len(setup_steps),
+            "steps": setup_steps,
+            "rate_periods": int(readiness["rate_periods"] or 0),
+            "active_staff": int(readiness["active_staff"] or 0),
         },
         "room_types": [_room_type_payload(row) for row in room_types],
         "rooms": [_room_payload(row) for row in rooms],
