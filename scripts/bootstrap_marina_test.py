@@ -5,9 +5,9 @@ from datetime import date
 
 import asyncpg
 
-PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
+PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "MARINA_TEST")
 PROPERTY_NAME = os.environ.get("MARINA_PROPERTY_NAME", "MARINA SMART TEST HOTEL")
-RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
+RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "MARINA_DIRECT")
 
 
 def database_url() -> str:
