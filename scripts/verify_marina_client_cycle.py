@@ -152,7 +152,7 @@ def main() -> None:
 
     issued = expect(
         owner.post(f"/api/v1/admin/guest-os/room-qrs/{chosen['id']}/issue"),
-        200,
+        201,
         "room QR",
     )
     token = issued["token"]
