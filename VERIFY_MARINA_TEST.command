@@ -11,7 +11,7 @@ echo
 
 rooms="$(docker compose -f compose.marina-test.yaml exec -T postgres sh -lc 'psql -U marina_test -d marina_smart_test -tAc "SELECT count(*) FROM rooms;"' | tr -d '[:space:]')"
 types="$(docker compose -f compose.marina-test.yaml exec -T postgres sh -lc 'psql -U marina_test -d marina_smart_test -tAc "SELECT count(*) FROM room_types;"' | tr -d '[:space:]')"
-property="$(docker compose -f compose.marina-test.yaml exec -T postgres sh -lc 'psql -U marina_test -d marina_smart_test -tAc "SELECT name FROM properties WHERE code='\''THREE_CROWNS'\'';"' | sed 's/^ *//;s/ *$//')"
+property="$(docker compose -f compose.marina-test.yaml exec -T postgres sh -lc 'psql -U marina_test -d marina_smart_test -tAc "SELECT name FROM properties WHERE code='\''MARINA_TEST'\'';"' | sed 's/^ *//;s/ *$//')"
 
 echo "Property: $property"
 echo "Rooms: $rooms"
