@@ -202,6 +202,46 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate, onIdenti
     window.setTimeout(() => setNotice(null), 3500);
   }
 
+  async function uploadHotelLogo(file: File | null) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Логотип: разрешены JPEG, PNG и WebP.");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Логотип не должен превышать 8 МБ.");
+      return;
+    }
+    setBusy("logo-upload");
+    setError(null);
+    try {
+      const response = await fetch("/core/api/v1/admin/site/media", {
+        method: "POST",
+        headers: {
+          "content-type": file.type,
+          "x-filename": encodeURIComponent(file.name),
+          "x-alt-text": encodeURIComponent(`${propertyName || "Отель"} — логотип`),
+        },
+        body: await file.arrayBuffer(),
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok || !body?.asset?.url) throw new Error(body?.detail?.code || "Не удалось загрузить логотип");
+      const logoUrl = String(body.asset.url);
+      setHotelLogoUrl(logoUrl);
+      const saved = await api("/core/api/v1/admin/hotel-setup/property", {
+        method: "PATCH",
+        body: JSON.stringify({ hotel_logo_url: logoUrl }),
+      });
+      onIdentityChanged?.({ name: saved.name, logo_url: saved.hotel_logo_url || null });
+      await load();
+      done("Логотип отеля загружен и сохранён.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось загрузить логотип");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function saveProperty(event: FormEvent) {
     event.preventDefault();
     setBusy("property");
@@ -479,7 +519,11 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate, onIdenti
           <label><span>Валюта</span><input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} required /></label>
           <label><span>Check-in</span><input type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} required /></label>
           <label><span>Check-out</span><input type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} required /></label>
-          <label className="hotel-logo-field"><span>Логотип отеля — URL</span><input type="url" value={hotelLogoUrl} onChange={(e) => setHotelLogoUrl(e.target.value)} placeholder="https://hotel.kg/logo.png" /></label>
+          <label className="hotel-logo-field"><span>Логотип отеля</span><input type="url" value={hotelLogoUrl} onChange={(e) => setHotelLogoUrl(e.target.value)} placeholder="URL или загрузите файл ниже" /></label>
+          <div className="hotel-logo-actions">
+            <label className="btn secondary hotel-logo-upload"><span>{busy === "logo-upload" ? "Загрузка…" : "Загрузить файл"}</span><input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy === "logo-upload"} onChange={(e) => { void uploadHotelLogo(e.target.files?.[0] || null); e.currentTarget.value = ""; }} /></label>
+            {hotelLogoUrl && <button type="button" className="btn secondary" onClick={() => setHotelLogoUrl("")}>Убрать</button>}
+          </div>
           <div className="hotel-logo-preview">{hotelLogoUrl ? <img src={hotelLogoUrl} alt="Логотип отеля" /> : <span>Логотип отеля не задан</span>}</div>
           <div className="hotel-setup-submit"><button className="btn primary" disabled={busy === "property"}>Сохранить объект</button></div>
         </form>
