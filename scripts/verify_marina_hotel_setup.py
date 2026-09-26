@@ -192,6 +192,27 @@ def main() -> None:
         assert not any(item["id"] == type_id for item in final["room_types"])
         assert not any(item["code"] == room_code or item["code"].startswith(prefix) for item in final["rooms"])
 
+        compact = expect(
+            client.post(
+                "/api/v1/admin/hotel-setup/compact-demo",
+                json={"confirmation": "CREATE_COMPACT_DEMO"},
+            ),
+            200,
+            "rebuild compact demo",
+        )
+        assert compact["rooms"] == 12
+        assert compact["room_types"] == 3
+
+        compact_overview = expect(client.get("/api/v1/admin/hotel-setup"), 200, "compact overview")
+        assert compact_overview["summary"]["rooms"] == 12
+        assert compact_overview["summary"]["room_types"] == 3
+        assert {item["code"] for item in compact_overview["room_types"]} == {"STANDARD", "COMFORT", "SUITE"}
+        assert {item["code"] for item in compact_overview["rooms"]} == {
+            "101", "102", "103", "104",
+            "201", "202", "203", "204",
+            "301", "302", "303", "304",
+        }
+
     print("MARINA_HOTEL_SETUP_VERIFY_PASS")
 
 
