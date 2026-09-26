@@ -353,7 +353,7 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
             )
             await conn.execute(
                 '''UPDATE property_product_settings
-                   SET "checkInTime"=$2::time,"checkOutTime"=$3::time,"updatedAt"=now()
+                   SET "checkInTime"=$2::text::time,"checkOutTime"=$3::text::time,"updatedAt"=now()
                    WHERE "propertyId"=$1''',
                 prop["id"], check_in_time, check_out_time,
             )
