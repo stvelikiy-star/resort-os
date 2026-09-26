@@ -30,7 +30,7 @@ const mealLabels: Record<string, string> = { BREAKFAST: "Завтрак", LUNCH:
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || "Ошибка MARINA SMART");
   return body;
 }
 
@@ -132,7 +132,7 @@ export default function DiningManagementBoard() {
 
   return <main className={styles.shell}>
     <header className={styles.head}>
-      <div><p>Resort Core · Dining</p><h1>Питание / ресторан</h1><span>План питания проживающих, кухня и зал работают из одного источника данных. Включённое питание не создаёт платёж.</span></div>
+      <div><p>MARINA SMART · Питание</p><h1>Питание / ресторан</h1><span>План питания проживающих, кухня и зал работают из одного источника данных. Включённое питание не создаёт платёж.</span></div>
       <button onClick={() => void load()} disabled={loading}>↻ Обновить</button>
     </header>
 
