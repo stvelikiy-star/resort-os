@@ -45,6 +45,7 @@ type Overview = {
     available_modules: string[];
   };
   summary: { room_types: number; rooms: number; ready: number; blocked: number };
+  onboarding: { ready: boolean; completed: number; total: number; rate_periods: number; active_staff: number; steps: { property: boolean; room_types: boolean; rooms: boolean; rates: boolean; staff: boolean } };
   room_types: RoomType[];
   rooms: Room[];
   rules: { demo_layout_enabled?: boolean; delete_room_only_without_history?: boolean; delete_room_type_only_when_unused?: boolean; tech_block_means_temporarily_not_sellable?: boolean; bulk_create_limit?: number };
@@ -434,6 +435,26 @@ export default function HotelSetupBoard({ onModulesChanged }: { onModulesChanged
         <article><strong>{data.summary.room_types}</strong><span>категорий</span></article>
         <article><strong>{data.summary.ready}</strong><span>готовы</span></article>
         <article><strong>{data.summary.blocked}</strong><span>временно закрыты</span></article>
+      </section>
+
+      <section className="hotel-setup-panel hotel-onboarding">
+        <div className="hotel-setup-section-title">
+          <div><small>Готовность запуска</small><h2>{data.onboarding.ready ? "Отель настроен" : "Завершите базовую настройку"}</h2></div>
+          <span>{data.onboarding.completed}/{data.onboarding.total}</span>
+        </div>
+        <div className="hotel-onboarding-steps">
+          {[
+            ["property", "Объект"],
+            ["room_types", "Категории"],
+            ["rooms", "Номера"],
+            ["rates", "Тарифы"],
+            ["staff", "Персонал"],
+          ].map(([key, label]) => {
+            const complete = data.onboarding.steps[key as keyof typeof data.onboarding.steps];
+            return <div className={complete ? "complete" : ""} key={key}><b>{complete ? "✓" : "○"}</b><span>{label}</span></div>;
+          })}
+        </div>
+        {!data.onboarding.ready && <p className="hotel-onboarding-copy">MARINA SMART подсказывает только базовые обязательные шаги. Дополнительные модули можно включить позже.</p>}
       </section>
 
       <section className="hotel-setup-panel">
