@@ -47,6 +47,7 @@ type Overview = {
   summary: { room_types: number; rooms: number; ready: number; blocked: number };
   room_types: RoomType[];
   rooms: Room[];
+  rules: { demo_layout_enabled?: boolean; delete_room_only_without_history?: boolean; delete_room_type_only_when_unused?: boolean; tech_block_means_temporarily_not_sellable?: boolean; bulk_create_limit?: number };
 };
 
 type RoomDraft = {
@@ -414,7 +415,7 @@ export default function HotelSetupBoard({ onModulesChanged }: { onModulesChanged
     <main className="work-shell hotel-setup-shell">
       <header className="work-head hotel-setup-head">
         <div><p className="eyebrow">MARINA SMART · Конструктор Hotel OS</p><h1>Настройка отеля</h1><p>Объект, категории и физический номерной фонд — без программиста.</p></div>
-        <div className="work-actions"><button className="btn secondary" onClick={() => void load()}>Обновить</button><button className="btn" disabled={busy === "demo"} onClick={() => void compactDemo()}>12 номеров для теста</button></div>
+        <div className="work-actions"><button className="btn secondary" onClick={() => void load()}>Обновить</button>{data.rules?.demo_layout_enabled && <button className="btn" disabled={busy === "demo"} onClick={() => void compactDemo()}>12 номеров для теста</button>}</div>
       </header>
 
       {error && <div className="error-box">{error}</div>}
