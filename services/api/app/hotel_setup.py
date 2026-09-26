@@ -28,6 +28,7 @@ class PropertyPatch(BaseModel):
     currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
     check_in_time: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
     check_out_time: str | None = Field(default=None, pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
+    hotel_logo_url: str | None = Field(default=None, max_length=500)
 
     @model_validator(mode="after")
     def validate_change(self):
@@ -141,7 +142,7 @@ async def _ensure_product_settings(conn, property_id: uuid.UUID):
         '''SELECT id,
                   to_char("checkInTime",'HH24:MI') AS check_in_time,
                   to_char("checkOutTime",'HH24:MI') AS check_out_time,
-                  "enabledModules"
+                  "enabledModules","hotelLogoUrl"
            FROM property_product_settings WHERE "propertyId"=$1''',
         property_id,
     )
@@ -153,6 +154,7 @@ async def _ensure_product_settings(conn, property_id: uuid.UUID):
         "check_in_time": row["check_in_time"],
         "check_out_time": row["check_out_time"],
         "enabled_modules": modules,
+        "hotel_logo_url": row["hotelLogoUrl"],
     }
 
 
@@ -328,6 +330,7 @@ async def overview(request: Request, user: dict[str, Any] = Depends(manager_acce
             "check_out_time": product_settings["check_out_time"],
             "enabled_modules": product_settings["enabled_modules"],
             "available_modules": sorted(OPTIONAL_MODULES),
+            "hotel_logo_url": product_settings["hotel_logo_url"],
         },
         "summary": {
             "room_types": room_type_count,
@@ -360,7 +363,8 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             prop = await _property(conn, user["property_code"])
-            before = {"name": prop["name"], "timezone": prop["timezone"], "currency": prop["currency"]}
+            product = await _ensure_product_settings(conn, prop["id"])
+            before = {"name": prop["name"], "timezone": prop["timezone"], "currency": prop["currency"], "hotel_logo_url": product["hotel_logo_url"]}
             supplied = payload.model_fields_set
             name = payload.name.strip() if "name" in supplied and payload.name is not None else prop["name"]
             timezone = payload.timezone.strip() if "timezone" in supplied and payload.timezone is not None else prop["timezone"]
@@ -369,7 +373,6 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
                 timezone_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=$1)", timezone)
                 if not timezone_exists:
                     raise HTTPException(status_code=422, detail="Unknown timezone")
-            product = await _ensure_product_settings(conn, prop["id"])
             check_in_time = payload.check_in_time if "check_in_time" in supplied and payload.check_in_time is not None else product["check_in_time"]
             check_out_time = payload.check_out_time if "check_out_time" in supplied and payload.check_out_time is not None else product["check_out_time"]
             if check_in_time == check_out_time:
@@ -379,15 +382,17 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
                    WHERE id=$1 RETURNING id,code,name,timezone,currency,"updatedAt"''',
                 prop["id"], name, timezone, currency,
             )
+            hotel_logo_url = _clean(payload.hotel_logo_url) if "hotel_logo_url" in supplied else product["hotel_logo_url"]
             await conn.execute(
                 '''UPDATE property_product_settings
-                   SET "checkInTime"=$2::text::time,"checkOutTime"=$3::text::time,"updatedAt"=now()
+                   SET "checkInTime"=$2::text::time,"checkOutTime"=$3::text::time,"hotelLogoUrl"=$4,"updatedAt"=now()
                    WHERE "propertyId"=$1''',
-                prop["id"], check_in_time, check_out_time,
+                prop["id"], check_in_time, check_out_time, hotel_logo_url,
             )
             after = {
                 "name": row["name"], "timezone": row["timezone"], "currency": row["currency"],
                 "check_in_time": check_in_time, "check_out_time": check_out_time,
+                "hotel_logo_url": hotel_logo_url,
             }
             await _audit(conn, property_id=prop["id"], user=user, action="UPDATE_PROPERTY",
                          resource="Property", resource_id=str(prop["id"]), before=before, after=after)
@@ -402,6 +407,8 @@ async def get_modules(request: Request, user: dict[str, Any] = Depends(module_re
     return {
         "enabled_modules": settings["enabled_modules"],
         "available_modules": sorted(OPTIONAL_MODULES),
+        "hotel_logo_url": settings["hotel_logo_url"],
+        "property_name": prop["name"],
     }
 
 
