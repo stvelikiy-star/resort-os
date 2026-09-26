@@ -27,9 +27,9 @@ services:
     environment:
       APP_ENV: staging
       DATABASE_URL: "postgresql://marina_test:MarinaLocalDB2026!@postgres:5432/marina_smart_test?schema=public"
-      PROPERTY_CODE: THREE_CROWNS
+      PROPERTY_CODE: MARINA_TEST
       MARINA_PROPERTY_NAME: MARINA SMART TEST HOTEL
-      RATE_PLAN_CODE: DIRECT_2026_27
+      RATE_PLAN_CODE: MARINA_DIRECT
       CORS_ORIGINS: http://127.0.0.1:13101,http://localhost:13101,http://127.0.0.1:13102,http://localhost:13102
       SESSION_TTL_HOURS: "24"
       COOKIE_SECURE: "false"
