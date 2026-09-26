@@ -324,6 +324,7 @@ async def overview(request: Request, user: dict[str, Any] = Depends(manager_acce
             "delete_room_type_only_when_unused": True,
             "tech_block_means_temporarily_not_sellable": True,
             "bulk_create_limit": 200,
+            "demo_layout_enabled": DEMO_LAYOUT_ENABLED,
         },
     }
 
