@@ -92,7 +92,7 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
         <div>
           <p className="eyebrow">MARINA SMART · управление</p>
           <h1>Command Center</h1>
-          <p className="subtitle">{data.property.local_date} · данные Resort Core · {data.property.timezone}</p>
+          <p className="subtitle">{data.property.local_date} · данные MARINA SMART · {data.property.timezone}</p>
         </div>
         <button className="btn" onClick={load}>Обновить</button>
       </div>
