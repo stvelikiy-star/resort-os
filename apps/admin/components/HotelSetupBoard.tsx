@@ -121,7 +121,7 @@ const MODULE_PRESETS = [
   { key: "RESORT", title: "Курорт", copy: "Группы, агенты, питание, офферы, QR зон, отзывы и сообщения.", modules: ["GROUPS", "AGENTS", "DINING", "OFFERS", "GROWTH", "ROOM_QR", "POINT_QR", "INBOX"] },
 ] as const;
 
-export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onModulesChanged?: (modules: string[]) => void; onNavigate?: (destination: "RATES" | "STAFF") => void }) {
+export default function HotelSetupBoard({ onModulesChanged, onNavigate, onIdentityChanged }: { onModulesChanged?: (modules: string[]) => void; onNavigate?: (destination: "RATES" | "STAFF") => void; onIdentityChanged?: (identity: { name: string; logo_url: string | null }) => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -205,10 +205,11 @@ export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onMo
     event.preventDefault();
     setBusy("property");
     try {
-      await api("/core/api/v1/admin/hotel-setup/property", {
+      const saved = await api("/core/api/v1/admin/hotel-setup/property", {
         method: "PATCH",
         body: JSON.stringify({ name: propertyName, timezone, currency, check_in_time: checkInTime, check_out_time: checkOutTime, hotel_logo_url: hotelLogoUrl || null }),
       });
+      onIdentityChanged?.({ name: saved.name, logo_url: saved.hotel_logo_url || null });
       await load();
       done("Данные объекта сохранены.");
     } catch (cause) {
