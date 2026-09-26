@@ -61,5 +61,6 @@ echo "kitchen   / MarinaDemo2026!"
 echo "housemaid / MarinaDemo2026!"
 echo
 echo "Проверка без сброса базы: ./VERIFY_MARINA_TEST.command"
+echo "Полный клиентский E2E:   ./ACCEPT_MARINA_TEST.command"
 echo "Полный сброс тестовой базы: ./RESET_MARINA_TEST.command"
 echo "======================================================"
