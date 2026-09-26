@@ -110,12 +110,12 @@ export function PMSControlSnapshotProviderV9({ children }: { children: ReactNode
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Snapshot HTTP ${response.status}`);
       if (body.complete !== true || !Array.isArray(body.rooms) || !Array.isArray(body.reservations) || !Array.isArray(body.tasks)) {
-        throw new Error("Resort Core вернул неполный V9 control snapshot");
+        throw new Error("MARINA SMART вернула неполные оперативные данные");
       }
       setSnapshot(body as ControlSnapshotV9);
     } catch (cause) {
       setSnapshot(null);
-      setError(cause instanceof Error ? cause.message : "V9 control snapshot недоступен");
+      setError(cause instanceof Error ? cause.message : "Оперативные данные недоступны");
     } finally {
       setRefreshing(false);
       setLoading(false);
