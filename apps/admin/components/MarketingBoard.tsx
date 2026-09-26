@@ -240,7 +240,7 @@ export default function MarketingBoard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `three-crowns-crm-${segment.toLowerCase()}-${isoDate(new Date())}.csv`;
+    link.download = `marina-smart-crm-${segment.toLowerCase()}-${isoDate(new Date())}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
