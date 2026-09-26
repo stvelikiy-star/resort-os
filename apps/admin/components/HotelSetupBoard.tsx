@@ -38,6 +38,12 @@ type Room = {
 
 type Overview = {
   property: PropertyInfo;
+  product_settings: {
+    check_in_time: string;
+    check_out_time: string;
+    enabled_modules: string[];
+    available_modules: string[];
+  };
   summary: { room_types: number; rooms: number; ready: number; blocked: number };
   room_types: RoomType[];
   rooms: Room[];
@@ -86,7 +92,20 @@ async function api(path: string, init?: RequestInit) {
   return body;
 }
 
-export default function HotelSetupBoard() {
+const MODULE_LABELS: Record<string, { title: string; copy: string }> = {
+  GROUPS: { title: "Групповые брони", copy: "Заезды групп, распределение по номерам." },
+  AGENTS: { title: "Агенты / туроператоры", copy: "Отдельный агентский контур и CRM." },
+  MARKETING: { title: "Маркетинг", copy: "Кампании и согласия гостей." },
+  DINING: { title: "Питание / ресторан", copy: "Меню, зал, кухня и заказы." },
+  OFFERS: { title: "Офферы гостю", copy: "Дополнительные предложения во время проживания." },
+  GROWTH: { title: "Отзывы / рост", copy: "Контроль отзывов и возвратных гостей." },
+  CONTENT: { title: "Сайт / контент", copy: "Управление контентом публичного сайта." },
+  ROOM_QR: { title: "QR номеров", copy: "Постоянный QR и гостевой кабинет." },
+  POINT_QR: { title: "QR зон", copy: "QR-коды общественных зон и сервисных точек." },
+  INBOX: { title: "Сообщения", copy: "Единый inbox клиентских коммуникаций." },
+};
+
+export default function HotelSetupBoard({ onModulesChanged }: { onModulesChanged?: (modules: string[]) => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -96,6 +115,9 @@ export default function HotelSetupBoard() {
   const [propertyName, setPropertyName] = useState("");
   const [timezone, setTimezone] = useState("Asia/Bishkek");
   const [currency, setCurrency] = useState("KGS");
+  const [checkInTime, setCheckInTime] = useState("14:00");
+  const [checkOutTime, setCheckOutTime] = useState("12:00");
+  const [enabledModules, setEnabledModules] = useState<string[]>([]);
 
   const [typeCode, setTypeCode] = useState("");
   const [typeName, setTypeName] = useState("");
@@ -128,6 +150,9 @@ export default function HotelSetupBoard() {
       setPropertyName(body.property.name);
       setTimezone(body.property.timezone);
       setCurrency(body.property.currency);
+      setCheckInTime(body.product_settings.check_in_time);
+      setCheckOutTime(body.product_settings.check_out_time);
+      setEnabledModules(body.product_settings.enabled_modules);
       if (!roomDraft.room_type_id && body.room_types[0]) {
         setRoomDraft((current) => ({ ...current, room_type_id: body.room_types[0].id }));
       }
@@ -164,13 +189,35 @@ export default function HotelSetupBoard() {
     try {
       await api("/core/api/v1/admin/hotel-setup/property", {
         method: "PATCH",
-        body: JSON.stringify({ name: propertyName, timezone, currency }),
+        body: JSON.stringify({ name: propertyName, timezone, currency, check_in_time: checkInTime, check_out_time: checkOutTime }),
       });
       await load();
       done("Данные объекта сохранены.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка сохранения объекта");
     } finally { setBusy(null); }
+  }
+
+  async function saveModules(next: string[]) {
+    setBusy("modules");
+    try {
+      const result = await api("/core/api/v1/admin/hotel-setup/modules", {
+        method: "PATCH",
+        body: JSON.stringify({ enabled_modules: next }),
+      });
+      setEnabledModules(result.enabled_modules || []);
+      onModulesChanged?.(result.enabled_modules || []);
+      done("Набор модулей сохранён.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось сохранить модули");
+    } finally { setBusy(null); }
+  }
+
+  function toggleModule(module: string) {
+    const next = enabledModules.includes(module)
+      ? enabledModules.filter((item) => item !== module)
+      : [...enabledModules, module];
+    void saveModules(next);
   }
 
   async function createType(event: FormEvent) {
@@ -386,6 +433,8 @@ export default function HotelSetupBoard() {
           <label><span>Название отеля</span><input value={propertyName} onChange={(e) => setPropertyName(e.target.value)} required /></label>
           <label><span>Часовой пояс</span><input value={timezone} onChange={(e) => setTimezone(e.target.value)} placeholder="Asia/Bishkek" required /></label>
           <label><span>Валюта</span><input value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} maxLength={3} required /></label>
+          <label><span>Check-in</span><input type="time" value={checkInTime} onChange={(e) => setCheckInTime(e.target.value)} required /></label>
+          <label><span>Check-out</span><input type="time" value={checkOutTime} onChange={(e) => setCheckOutTime(e.target.value)} required /></label>
           <div className="hotel-setup-submit"><button className="btn primary" disabled={busy === "property"}>Сохранить объект</button></div>
         </form>
       </section>
@@ -453,6 +502,22 @@ export default function HotelSetupBoard() {
             <span><b className={`hotel-state state-${room.operational_state.toLowerCase()}`}>{room.operational_state === "CLEAN" ? "Готов" : room.operational_state === "TECH_BLOCK" ? "Закрыт" : room.operational_state}</b></span>
             <span className="hotel-row-actions"><button className="btn mini secondary" onClick={() => openRoom(room)}>Изменить</button><button className="btn mini secondary" disabled={busy === `room-state-${room.id}`} onClick={() => void toggleRoom(room)}>{room.operational_state === "TECH_BLOCK" ? "Открыть" : "Закрыть"}</button><button className="btn mini danger-ghost" disabled={busy === `room-delete-${room.id}`} onClick={() => void removeRoom(room)}>Удалить</button></span>
           </div>)}
+        </div>
+      </section>
+
+      <section className="hotel-setup-panel">
+        <div className="hotel-setup-section-title"><div><small>06 · Модули</small><h2>Что показывать в системе</h2></div><span>ядро всегда включено</span></div>
+        <p className="management-truth compact">Главная, шахматка, брони, CRM, финансы, сервис, операции, отчёты и настройки остаются всегда. Дополнительные модули можно скрывать без удаления данных и кода.</p>
+        <div className="hotel-module-grid">
+          {data.product_settings.available_modules.map((module) => {
+            const meta = MODULE_LABELS[module] || { title: module, copy: "" };
+            const active = enabledModules.includes(module);
+            return <button type="button" key={module} className={`hotel-module-card ${active ? "active" : ""}`} disabled={busy === "modules"} onClick={() => toggleModule(module)}>
+              <span className="hotel-module-check">{active ? "✓" : "○"}</span>
+              <strong>{meta.title}</strong>
+              <small>{meta.copy}</small>
+            </button>;
+          })}
         </div>
       </section>
 
