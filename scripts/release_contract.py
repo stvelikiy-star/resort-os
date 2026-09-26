@@ -34,6 +34,7 @@ EXPECTED_MIGRATIONS = (
     "z21_dining_production_snapshots_20260906",
     "z99_marketing_consent_attribution_20260912",
     "zz100_owner_ops_corrections_20260914",
+    "zz101_marina_product_settings_20260926",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
