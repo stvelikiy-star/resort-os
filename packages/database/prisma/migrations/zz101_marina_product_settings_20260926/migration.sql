@@ -4,6 +4,7 @@ CREATE TABLE "property_product_settings" (
   "checkInTime" TIME NOT NULL DEFAULT TIME '14:00',
   "checkOutTime" TIME NOT NULL DEFAULT TIME '12:00',
   "enabledModules" JSONB NOT NULL DEFAULT '["AGENTS","DINING","ROOM_QR"]'::jsonb,
+  "hotelLogoUrl" TEXT,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT "property_product_settings_pkey" PRIMARY KEY ("id"),
