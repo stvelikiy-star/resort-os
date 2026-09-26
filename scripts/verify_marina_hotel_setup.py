@@ -39,6 +39,11 @@ def main() -> None:
         assert isinstance(overview["room_types"], list)
         assert overview["product_settings"]["check_in_time"]
         assert overview["product_settings"]["check_out_time"]
+        assert overview["onboarding"]["total"] == 5
+        assert set(overview["onboarding"]["steps"]) == {"property", "room_types", "rooms", "rates", "staff"}
+        assert overview["onboarding"]["completed"] == sum(
+            1 for value in overview["onboarding"]["steps"].values() if value
+        )
 
         original_modules = list(overview["product_settings"]["enabled_modules"])
         modules = expect(
