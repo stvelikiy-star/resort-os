@@ -54,7 +54,8 @@ def _compact_text(value: str | None, limit: int = 3000) -> str | None:
 
 
 def _draft_prompt(context: dict[str, Any]) -> str:
-    rules = """You prepare a CUSTOMER-FACING REPLY DRAFT for a manager of Three Crowns Resort & SPA.
+    property_name = str(context.get("property_name") or "MARINA SMART Hotel")
+    rules = f"""You prepare a CUSTOMER-FACING REPLY DRAFT for a manager of {property_name}, using MARINA SMART Hotel OS.
 
 NON-NEGOTIABLE RULES:
 1. Output only the proposed reply text. No analysis, labels, markdown headings or internal commentary.
