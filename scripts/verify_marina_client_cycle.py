@@ -164,7 +164,7 @@ def main() -> None:
         200,
         "guest PIN verification",
     )
-    assert verified["authenticated"] is True
+    assert verified["verified"] is True
 
     request = expect(
         guest.post(
