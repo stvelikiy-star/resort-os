@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     environment:
       APP_ENV: staging
+      MARINA_ALLOW_DEMO_RESET: "true"
       DATABASE_URL: "postgresql://marina_test:MarinaLocalDB2026!@postgres:5432/marina_smart_test?schema=public"
       PROPERTY_CODE: MARINA_TEST
       MARINA_PROPERTY_NAME: MARINA SMART TEST HOTEL
