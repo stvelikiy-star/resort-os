@@ -182,7 +182,7 @@ export default function StaffShiftV2() {
         if (link?.ok) setTelegramNotice("Telegram привязан. Следующий вход — автоматически.");
       }
     } catch {
-      setLoginError("Resort Core недоступен");
+      setLoginError("MARINA SMART недоступен");
     }
   }
 
