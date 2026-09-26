@@ -9,3 +9,12 @@
 @media(max-width:900px){.hotel-onboarding-steps{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.hotel-onboarding-steps{grid-template-columns:1fr}}
 .hotel-onboarding-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+.hotel-module-presets{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:10px;margin:12px 0}
+.hotel-module-presets button{display:grid;gap:4px;text-align:left;padding:13px 14px;border:1px solid var(--line);border-radius:12px;background:#f8faf9;color:inherit;cursor:pointer}
+.hotel-module-presets button:hover{border-color:#9fb7aa}
+.hotel-module-presets button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.hotel-module-presets strong{font-size:13px}
+.hotel-module-presets small{font-size:10px;line-height:1.4;color:var(--muted)}
+.hotel-module-presets button.active small{color:rgba(255,255,255,.78)}
+@media(max-width:760px){.hotel-module-presets{grid-template-columns:1fr}}
