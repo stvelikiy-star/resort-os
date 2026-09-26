@@ -43,6 +43,7 @@ type Overview = {
     check_out_time: string;
     enabled_modules: string[];
     available_modules: string[];
+    hotel_logo_url: string | null;
   };
   summary: { room_types: number; rooms: number; ready: number; blocked: number };
   onboarding: { ready: boolean; completed: number; total: number; rate_periods: number; active_staff: number; steps: { property: boolean; room_types: boolean; rooms: boolean; rates: boolean; staff: boolean } };
