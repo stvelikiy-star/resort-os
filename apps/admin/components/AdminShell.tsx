@@ -220,6 +220,7 @@ export default function AdminShell() {
     return (
       <main className="login-screen">
         <form className="login-card" onSubmit={login}>
+          <img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" />
           <p className="eyebrow">MARINA SMART · Hotel OS</p>
           <h1>Вход в управление</h1>
           <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
