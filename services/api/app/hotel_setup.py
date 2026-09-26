@@ -10,6 +10,7 @@ from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/hotel-setup", tags=["hotel-setup"])
 manager_access = require_roles("OWNER", "MANAGER")
+module_read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 OPTIONAL_MODULES = {
     "GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS",
@@ -366,7 +367,7 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
 
 
 @router.get("/modules")
-async def get_modules(request: Request, user: dict[str, Any] = Depends(manager_access)):
+async def get_modules(request: Request, user: dict[str, Any] = Depends(module_read_access)):
     async with request.app.state.db.acquire() as conn:
         prop = await _property(conn, user["property_code"])
         settings = await _ensure_product_settings(conn, prop["id"])
