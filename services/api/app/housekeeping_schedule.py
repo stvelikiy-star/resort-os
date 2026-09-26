@@ -81,15 +81,15 @@ async def ensure_due_housekeeping_tasks(conn, property_id: uuid.UUID) -> int:
             INSERT INTO operational_tasks (
               id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,description,
               "createdByType","createdById",source,
-              "chargeKgs","chargeStatus","chargeSource","afterJson","createdAt","updatedAt"
+              "chargeKgs","chargeStatus","chargeSource","createdAt","updatedAt"
             )
             SELECT $1,$2,$3,$4,$5,'HOUSEKEEPING','OPEN','NORMAL',$6,$7,
                    'SYSTEM',NULL,'HOUSEKEEPING_SCHEDULE',
-                   NULL,'NONE','INCLUDED_IN_STAY',jsonb_build_object('scheduled_service_date',$8::text),now(),now()
+                   NULL,'NONE','INCLUDED_IN_STAY',now(),now()
             WHERE NOT EXISTS (
               SELECT 1 FROM operational_tasks
               WHERE "stayId"=$5 AND source='HOUSEKEEPING_SCHEDULE'
-                AND "afterJson"->>'scheduled_service_date'=$8::text
+                AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
             )
             RETURNING id
             ''',
