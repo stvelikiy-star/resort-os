@@ -177,7 +177,7 @@ export default function SiteContentBoard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `three-crowns-site-content-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `marina-smart-site-content-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
   }
