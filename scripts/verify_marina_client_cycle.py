@@ -192,7 +192,7 @@ def main() -> None:
     crm = expect(owner.get(f"/api/v1/admin/guest-crm/{guest_id}"), 200, "guest CRM")
     assert crm["guest"]["first_name"] == "MARINA Client Test"
     assert any(item["id"] == stay_id for item in crm["stays"])
-    assert any(item["id"] == request_id for item in crm["requests"])
+    assert any(item["id"] == request_id for stay in crm["stays"] for item in stay["requests"])
 
     kitchen = login(KITCHEN_USERNAME, KITCHEN_PASSWORD)
     kitchen_menu = expect(kitchen.get("/api/v1/kitchen/menu"), 200, "Kitchen menu access")
