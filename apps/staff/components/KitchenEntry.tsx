@@ -24,7 +24,7 @@ const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
 async function json(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка MARINA SMART");
   return body;
 }
 
