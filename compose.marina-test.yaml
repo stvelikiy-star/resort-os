@@ -33,6 +33,7 @@ services:
       RATE_PLAN_CODE: MARINA_DIRECT
       CORS_ORIGINS: http://127.0.0.1:13101,http://localhost:13101,http://127.0.0.1:13102,http://localhost:13102
       GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:18100
+      EXPECTED_GUEST_BASE_URL: http://127.0.0.1:18100
       SERVICE_POINT_PUBLIC_BASE_URL: http://127.0.0.1:18100
       SESSION_TTL_HOURS: "24"
       COOKIE_SECURE: "false"
