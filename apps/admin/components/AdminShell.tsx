@@ -38,7 +38,7 @@ type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "R
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const SESSION_CHECK_INTERVAL_MS = 30_000;
-const DEFAULT_ENABLED_MODULES = ["GROUPS", "AGENTS", "DINING", "ROOM_QR"];
+const DEFAULT_ENABLED_MODULES = ["AGENTS", "DINING", "ROOM_QR"];
 
 function canEnterAdmin(role?: string | null): boolean {
   return Boolean(role && ADMIN_ROLES.has(role));
