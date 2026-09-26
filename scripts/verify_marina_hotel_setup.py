@@ -1,5 +1,6 @@
 import os
 import secrets
+from datetime import date, timedelta
 
 import httpx
 
@@ -129,6 +130,20 @@ def main() -> None:
             "create room",
         )
         room_id = room["id"]
+
+        grid_start = date.today()
+        grid_end = grid_start + timedelta(days=7)
+        grid = expect(
+            client.get(
+                "/api/v1/pms/grid",
+                params={"start": grid_start.isoformat(), "end": grid_end.isoformat()},
+            ),
+            200,
+            "PMS grid after room create",
+        )
+        assert any(item["id"] == room_id and item["code"] == room_code for item in grid["rooms"]), (
+            "new room did not appear in PMS grid without manual synchronization"
+        )
 
         duplicate = client.post(
             "/api/v1/admin/hotel-setup/rooms",
