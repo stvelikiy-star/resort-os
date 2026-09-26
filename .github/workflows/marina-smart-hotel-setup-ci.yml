@@ -189,6 +189,10 @@ jobs:
           assert "12 номеров для теста" in setup
           assert "Создать диапазон номеров" in setup
           assert "Что показывать в системе" in setup
+          assert "Загрузить файл" in setup
+          assert "hotel_logo_url" in setup
+          assert "hotelLogoUrl" in shell
+          assert "hotelName" in shell
           assert "Мини-отель" in setup
           assert "Отель" in setup
           assert "Курорт" in setup
