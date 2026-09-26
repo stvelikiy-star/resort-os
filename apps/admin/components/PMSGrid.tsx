@@ -240,7 +240,7 @@ export default function PMSGrid() {
           <div className="legend" aria-label="Легенда блоков"><span className="legend-item" style={{ "--legend": "var(--reservation)" } as React.CSSProperties}>Бронь</span><span className="legend-item" style={{ "--legend": "var(--maintenance)" } as React.CSSProperties}>Ремонт</span><span className="legend-item" style={{ "--legend": "var(--manual)" } as React.CSSProperties}>Ручной блок</span></div>
         </div>
 
-        {error && <div className="error-box">{error}. Проверьте Resort Core и повторите.</div>}
+        {error && <div className="error-box">{error}. Проверьте MARINA SMART и повторите.</div>}
         {loading && !data ? <div className="loading">Загружаю номера…</div> : rooms.length === 0 ? <div className="empty">По выбранным фильтрам номеров нет.</div> : (
           <div className="grid-scroll">
             <table className="pms-table">
