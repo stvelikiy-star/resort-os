@@ -8,3 +8,4 @@
 .hotel-onboarding-copy{margin:10px 0 0;color:var(--muted);font-size:11px}
 @media(max-width:900px){.hotel-onboarding-steps{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:520px){.hotel-onboarding-steps{grid-template-columns:1fr}}
+.hotel-onboarding-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
