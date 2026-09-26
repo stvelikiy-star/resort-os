@@ -11,7 +11,8 @@ from .auth import require_roles
 router = APIRouter(prefix="/api/v1/admin/hotel-setup", tags=["hotel-setup"])
 manager_access = require_roles("OWNER", "MANAGER")
 module_read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN")
-RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
+RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "MARINA_DIRECT")
+DEMO_LAYOUT_ENABLED = os.environ.get("MARINA_ALLOW_DEMO_RESET", "false").strip().lower() in {"1", "true", "yes", "on"}
 OPTIONAL_MODULES = {
     "GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS",
     "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX",
@@ -599,6 +600,8 @@ async def bulk_create_rooms(payload: BulkRoomsCreate, request: Request,
 @router.post("/compact-demo")
 async def compact_demo_layout(payload: DemoLayoutRequest, request: Request,
                               user: dict[str, Any] = Depends(manager_access)):
+    if not DEMO_LAYOUT_ENABLED:
+        raise HTTPException(status_code=403, detail={"code": "DEMO_LAYOUT_DISABLED"})
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             prop = await _property(conn, user["property_code"])
