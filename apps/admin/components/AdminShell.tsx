@@ -11,6 +11,7 @@ import GuestOffersBoard from "./GuestOffersBoard";
 import GuestServicesCenter from "./GuestServicesCenter";
 import GuestServiceSettingsBoard from "./GuestServiceSettingsBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
+import HotelSetupBoard from "./HotelSetupBoard";
 import InboxBoard from "./InboxBoard";
 import MarketingBoard from "./MarketingBoard";
 import OperationsBoard from "./OperationsBoard";
@@ -32,7 +33,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -226,26 +227,32 @@ export default function AdminShell() {
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
-          {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
-          {canUseReception && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
+          {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Брони / Ресепшен</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
-          {isManager && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агенты</button>}
-          {isManager && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
-          {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
-          {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
-          {canUseReception && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
-          {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
-          {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
-          {isManager && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Офферы гостю</button>}
-          {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
-          {isManager && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
-          {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
-          {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
-          {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
-          {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
-          {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
-          {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
+          {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис</button>}
+          {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Операции</button>}
+          {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты</button>}
+          {isManager && <button className={`admin-settings-button ${tab === "SETTINGS" ? "active" : ""}`} onClick={() => setTab("SETTINGS")}>Настройки</button>}
+          <details className="admin-more-menu">
+            <summary>Ещё</summary>
+            <div className="admin-more-panel">
+              {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
+              {canUseReception && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
+              {isManager && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агенты</button>}
+              {isManager && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
+              {canUseReception && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
+              {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
+              {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
+              {isManager && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Офферы гостю</button>}
+              {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
+              {isManager && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
+              {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
+              {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
+              {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
+              {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
+            </div>
+          </details>
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
@@ -271,6 +278,7 @@ export default function AdminShell() {
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
       {tab === "INBOX" && isManager && <InboxBoard />}
+      {tab === "SETTINGS" && isManager && <HotelSetupBoard />}
     </>
   );
 }
