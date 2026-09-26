@@ -197,7 +197,7 @@ export default function AdminShell() {
       setTab(initialTab(payload.role));
       setPassword("");
     } catch {
-      setError("Сервис входа недоступен. Проверьте Resort Core.");
+      setError("Сервис входа MARINA SMART недоступен. Проверьте API.");
     } finally {
       setSubmitting(false);
     }
