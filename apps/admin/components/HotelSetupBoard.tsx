@@ -115,7 +115,7 @@ const MODULE_LABELS: Record<string, { title: string; copy: string }> = {
   INBOX: { title: "Сообщения", copy: "Единый inbox клиентских коммуникаций." },
 };
 
-export default function HotelSetupBoard({ onModulesChanged }: { onModulesChanged?: (modules: string[]) => void }) {
+export default function HotelSetupBoard({ onModulesChanged, onNavigate }: { onModulesChanged?: (modules: string[]) => void; onNavigate?: (destination: "RATES" | "STAFF") => void }) {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -455,6 +455,10 @@ export default function HotelSetupBoard({ onModulesChanged }: { onModulesChanged
           })}
         </div>
         {!data.onboarding.ready && <p className="hotel-onboarding-copy">MARINA SMART подсказывает только базовые обязательные шаги. Дополнительные модули можно включить позже.</p>}
+        {(!data.onboarding.steps.rates || !data.onboarding.steps.staff) && <div className="hotel-onboarding-actions">
+          {!data.onboarding.steps.rates && <button className="btn secondary" onClick={() => onNavigate?.("RATES")}>Настроить тарифы</button>}
+          {!data.onboarding.steps.staff && <button className="btn secondary" onClick={() => onNavigate?.("STAFF")}>Настроить персонал</button>}
+        </div>}
       </section>
 
       <section className="hotel-setup-panel">
