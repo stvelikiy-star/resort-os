@@ -80,16 +80,16 @@ async def ensure_due_housekeeping_tasks(conn, property_id: uuid.UUID) -> int:
             '''
             INSERT INTO operational_tasks (
               id,"propertyId","roomId","reservationId","stayId",type,status,priority,title,description,
-              "serviceCode","serviceDate","createdByType","createdById",source,
+              "createdByType","createdById",source,
               "chargeKgs","chargeStatus","chargeSource","createdAt","updatedAt"
             )
             SELECT $1,$2,$3,$4,$5,'HOUSEKEEPING','OPEN','NORMAL',$6,$7,
-                   'SCHEDULED_HOUSEKEEPING',$8,'SYSTEM',NULL,'HOUSEKEEPING_SCHEDULE',
+                   'SYSTEM',NULL,'HOUSEKEEPING_SCHEDULE',
                    NULL,'NONE','INCLUDED_IN_STAY',now(),now()
             WHERE NOT EXISTS (
               SELECT 1 FROM operational_tasks
               WHERE "stayId"=$5 AND source='HOUSEKEEPING_SCHEDULE'
-                AND "serviceCode"='SCHEDULED_HOUSEKEEPING' AND "serviceDate"=$8
+                AND "createdAt"::date=$8
             )
             RETURNING id
             ''',
