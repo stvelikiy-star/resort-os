@@ -25,7 +25,7 @@ async function api(path: string, init?: RequestInit) {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = body?.detail;
-    throw new Error(typeof detail === "string" ? detail : detail?.code || "Ошибка Resort Core");
+    throw new Error(typeof detail === "string" ? detail : detail?.code || "Ошибка MARINA SMART");
   }
   return body;
 }
