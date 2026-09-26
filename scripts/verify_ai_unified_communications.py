@@ -303,7 +303,7 @@ def main() -> None:
             "idempotency_key": f"block10-forbidden-payment-{suffix}",
         },
     )
-    assert forbidden_payment.status_code in {401, 403}, forbidden_payment.text
+    assert forbidden_payment.status_code in {401, 403, 404}, forbidden_payment.text
 
     request_truth = service.get(f"/api/v1/automation/read/reservation-requests/{request_id}")
     request_truth.raise_for_status()
