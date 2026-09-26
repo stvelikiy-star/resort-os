@@ -8,6 +8,8 @@ on:
       - 'apps/admin/**'
       - 'scripts/bootstrap_marina_test.py'
       - 'scripts/verify_marina_hotel_setup.py'
+      - 'scripts/verify_marina_client_cycle.py'
+      - 'scripts/verify_marina_client_cycle.py'
       - 'deploy/marina-test-api.Dockerfile'
       - 'compose.marina-test.yaml'
       - '.github/workflows/marina-smart-hotel-setup-ci.yml'
@@ -63,6 +65,15 @@ jobs:
       BOOTSTRAP_OWNER_USERNAME: marina-ci-owner
       BOOTSTRAP_OWNER_PASSWORD: Marina-CI-Owner-Strong-2026
       BOOTSTRAP_OWNER_DISPLAY_NAME: MARINA SMART CI Owner
+      APP_ENV: staging
+      MAID_USERNAME: marina-ci-housemaid
+      MAID_PASSWORD: Marina-CI-Housemaid-2026
+      MAID_DISPLAY_NAME: MARINA SMART CI Housemaid
+      DINING_STAFF_USERNAME: marina-ci-kitchen
+      DINING_STAFF_PASSWORD: Marina-CI-Kitchen-2026
+      DINING_STAFF_DISPLAY_NAME: MARINA SMART CI Kitchen
+      KITCHEN_USERNAME: marina-ci-kitchen
+      KITCHEN_PASSWORD: Marina-CI-Kitchen-2026
       COOKIE_SECURE: false
       REQUIRE_COOKIE_DOMAIN: false
       AUTH_TRUST_PROXY_HEADERS: false
@@ -114,6 +125,7 @@ jobs:
         run: |
           python scripts/bootstrap_marina_test.py
           python scripts/bootstrap_owner.py
+          python scripts/bootstrap_staging_staff.py
           python - <<'PY'
           import asyncio, os
           import asyncpg
@@ -158,6 +170,9 @@ jobs:
 
       - name: Verify self-service hotel setup
         run: python scripts/verify_marina_hotel_setup.py
+
+      - name: Verify complete compact MARINA client cycle
+        run: python scripts/verify_marina_client_cycle.py
 
       - name: Verify branding and compact navigation contracts
         run: |
