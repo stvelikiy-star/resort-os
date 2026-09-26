@@ -1,3 +1,4 @@
+import base64
 import os
 import secrets
 from datetime import date, timedelta
@@ -98,6 +99,42 @@ def main() -> None:
         )
         changed = expect(client.get("/api/v1/admin/hotel-setup"), 200, "overview after property patch")
         assert changed["product_settings"]["hotel_logo_url"] == "https://example.test/marina-hotel-logo.png"
+
+        logo_bytes = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZvlwAAAAASUVORK5CYII="
+        )
+        uploaded = expect(
+            client.post(
+                "/api/v1/admin/site/media",
+                content=logo_bytes,
+                headers={
+                    "content-type": "image/png",
+                    "x-filename": "marina-hotel-test.png",
+                    "x-alt-text": "MARINA SMART test hotel logo",
+                },
+            ),
+            201,
+            "upload hotel logo",
+        )
+        logo_url = uploaded["asset"]["url"]
+        assert logo_url.startswith("/core/api/v1/site/media/")
+        media = client.get(logo_url.replace("/core", ""))
+        assert media.status_code == 200
+        assert media.headers["content-type"].startswith("image/png")
+        assert media.content == logo_bytes
+
+        saved_logo = expect(
+            client.patch(
+                "/api/v1/admin/hotel-setup/property",
+                json={"hotel_logo_url": logo_url},
+            ),
+            200,
+            "assign uploaded hotel logo",
+        )
+        assert saved_logo["hotel_logo_url"] == logo_url
+        changed_logo = expect(client.get("/api/v1/admin/hotel-setup"), 200, "overview after logo upload")
+        assert changed_logo["product_settings"]["hotel_logo_url"] == logo_url
+
         bad_timezone = client.patch(
             "/api/v1/admin/hotel-setup/property",
             json={"timezone": "Invalid/Timezone"},
