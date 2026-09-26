@@ -59,6 +59,18 @@ def main() -> None:
         )
         assert bad_module.status_code == 422
 
+        for label, preset in {
+            "mini": ["ROOM_QR"],
+            "hotel": ["DINING", "ROOM_QR", "AGENTS"],
+            "resort": ["GROUPS", "AGENTS", "DINING", "OFFERS", "GROWTH", "ROOM_QR", "POINT_QR", "INBOX"],
+        }.items():
+            applied = expect(
+                client.patch("/api/v1/admin/hotel-setup/modules", json={"enabled_modules": preset}),
+                200,
+                f"module preset {label}",
+            )
+            assert applied["enabled_modules"] == preset
+
         expect(
             client.patch("/api/v1/admin/hotel-setup/modules", json={"enabled_modules": original_modules}),
             200,
