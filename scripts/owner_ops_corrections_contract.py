@@ -60,7 +60,7 @@ def main() -> int:
     # Drag/drop must never directly commit. It opens builder -> preview -> explicit confirmation -> commit.
     require("/schedule/preview" in builder, "Reservation schedule preview endpoint missing")
     require("/schedule/commit" in builder, "Reservation schedule commit endpoint missing")
-    require("Проверить в Resort Core" in builder, "Explicit server preview action missing")
+    require("Проверить в MARINA SMART" in builder, "Explicit server preview action missing")
     require("Подтвердить и сохранить график" in builder, "Explicit move/save confirmation missing")
 
     # Public request success remains server-confirmed and visible to the guest.

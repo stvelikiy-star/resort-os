@@ -545,7 +545,7 @@ async def export_xlsx(
     stream = BytesIO()
     wb.save(stream)
     stream.seek(0)
-    filename = f"three-crowns-owner-report-{from_date.isoformat()}-{to_date.isoformat()}.xlsx"
+    filename = f"marina-smart-owner-report-{from_date.isoformat()}-{to_date.isoformat()}.xlsx"
     return StreamingResponse(
         stream,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

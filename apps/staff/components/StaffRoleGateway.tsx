@@ -124,7 +124,7 @@ export default function StaffRoleGateway() {
         if (link?.ok) setTelegramNotice("Telegram привязан. Следующий вход будет автоматическим.");
       }
     } catch {
-      setError("Resort Core недоступен");
+      setError("MARINA SMART недоступен");
     }
   }
 
@@ -140,7 +140,7 @@ export default function StaffRoleGateway() {
   if (!user) {
     return <main className="shift-center"><form className="shift-login" onSubmit={login}>
       <div className="shift-crown">III</div>
-      <p className="shift-eyebrow">Три Короны · Resort OS</p>
+      <p className="shift-eyebrow">MARINA SMART · Hotel OS</p>
       <h1>Моя смена</h1>
       <p>{telegramInitData ? "Первый вход — рабочий логин и пароль. После привязки Telegram вход будет автоматическим." : "Войдите под рабочей учётной записью."}</p>
       {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
@@ -162,14 +162,14 @@ export default function StaffRoleGateway() {
     <main className="shift-shell">
       <header className="shift-head">
         <div>
-          <p className="shift-eyebrow">Три Короны · Моя смена</p>
+          <p className="shift-eyebrow">MARINA SMART · Моя смена</p>
           <h1>{user.display_name}</h1>
           <span>{roleLabel[user.role]}{telegramNotice ? " · Telegram" : ""}</span>
         </div>
         <button className="shift-ghost" onClick={() => void logout()}>Выйти</button>
       </header>
       {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
-      {user.role === "STORE_STAFF" && <div className="shift-empty"><strong>Смена магазина подключена к Resort OS.</strong><span>Финансовые операции магазина будут включены только через отдельный Core-контур, без прямых записей вне учёта.</span></div>}
+      {user.role === "STORE_STAFF" && <div className="shift-empty"><strong>Смена магазина подключена к Hotel OS.</strong><span>Финансовые операции магазина будут включены только через отдельный Core-контур, без прямых записей вне учёта.</span></div>}
       {user.role === "DINING_STAFF" && <div className="shift-empty"><strong>Kitchen Admin готов к работе.</strong><span>Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.</span><a className="shift-primary" href="/kitchen">Открыть Kitchen Admin</a></div>}
       {user.role === "RECEPTION" && <div className="shift-empty"><strong>Рабочая очередь ниже обновляется автоматически.</strong><span>Берите заявку в работу и закрывайте её после фактического выполнения.</span></div>}
     </main>

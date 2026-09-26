@@ -182,7 +182,7 @@ export default function StaffShiftV2() {
         if (link?.ok) setTelegramNotice("Telegram привязан. Следующий вход — автоматически.");
       }
     } catch {
-      setLoginError("Resort Core недоступен");
+      setLoginError("MARINA SMART недоступен");
     }
   }
 
@@ -251,7 +251,7 @@ export default function StaffShiftV2() {
 
   if (!user) return <main className="shift-center"><form className="shift-login" onSubmit={login}>
     <div className="shift-crown">III</div>
-    <p className="shift-eyebrow">Три Короны · Resort OS</p>
+    <p className="shift-eyebrow">MARINA SMART · Hotel OS</p>
     <h1>Моя смена</h1>
     <p>{telegramDetected ? "Первый вход: рабочий логин и пароль. После привязки Telegram вход будет автоматическим." : "Войдите под рабочей учётной записью."}</p>
     {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
@@ -268,7 +268,7 @@ export default function StaffShiftV2() {
 
   return <main className="shift-shell">
     <header className="shift-head">
-      <div><p className="shift-eyebrow">Три Короны · Моя смена</p><h1>{user.display_name}</h1><span>{roleLabel[user.role]}{telegramDetected ? " · Telegram" : ""}</span></div>
+      <div><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>{user.display_name}</h1><span>{roleLabel[user.role]}{telegramDetected ? " · Telegram" : ""}</span></div>
       <button className="shift-ghost" onClick={logout}>Выйти</button>
     </header>
 

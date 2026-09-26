@@ -21,7 +21,7 @@ const RESERVATION_LABEL: Record<string, string> = { BOOKED: "Заброниро�
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || "Ошибка MARINA SMART");
   return body;
 }
 
@@ -236,10 +236,10 @@ export default function WaiterEntry() {
   }
 
   if (checking) return <main className={styles.center}>Открываю зал…</main>;
-  if (!user) return <main className={styles.login}><form onSubmit={login}><div className={styles.crown}>III</div><p>Три Короны · отдельный вход</p><h1>Официант / зал</h1><span>Столы, брони, заказы и выдача кухни в одном окне.</span><label>Логин<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label><label>Пароль<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={8} required /></label>{error && <div className={styles.error}>{error}</div>}<button disabled={submitting}>{submitting ? "Входим…" : "Войти в зал"}</button><a href="/kitchen">Вход кухни</a></form></main>;
+  if (!user) return <main className={styles.login}><form onSubmit={login}><img src="/marina-smart-logo.webp" alt="MARINA SMART" style={{width:96,height:96,objectFit:"contain",display:"block",margin:"0 auto 12px"}} /><p>MARINA SMART · отдельный вход</p><h1>Официант / зал</h1><span>Столы, брони, заказы и выдача кухни в одном окне.</span><label>Логин<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label><label>Пароль<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={8} required /></label>{error && <div className={styles.error}>{error}</div>}<button disabled={submitting}>{submitting ? "Входим…" : "Войти в зал"}</button><a href="/kitchen">Вход кухни</a></form></main>;
 
   return <main className={styles.shell}>
-    <header className={styles.header}><div><p>Три Короны · Dining Floor</p><h1>Официант / зал</h1><span>{user.display_name} · {floor?.service_date || "сегодня"}</span></div><nav><a href="/kitchen">Кухня</a><a href="/kitchen/today">Меню сегодня</a><button onClick={() => void logout()}>Выйти</button></nav></header>
+    <header className={styles.header}><div><p>MARINA SMART · Dining Floor</p><h1>Официант / зал</h1><span>{user.display_name} · {floor?.service_date || "сегодня"}</span></div><nav><a href="/kitchen">Кухня</a><a href="/kitchen/today">Меню сегодня</a><button onClick={() => void logout()}>Выйти</button></nav></header>
     {error && <div className={styles.error}>{error}</div>}
 
     <section className={styles.metrics}>

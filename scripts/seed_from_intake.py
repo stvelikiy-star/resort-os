@@ -13,7 +13,7 @@ ROOMS_CSV = ROOT / "data-intake" / "rooms.csv"
 RATES_CSV = ROOT / "data-intake" / "rates.csv"
 
 PROPERTY_CODE = "THREE_CROWNS"
-PROPERTY_NAME = "Три Короны"
+PROPERTY_NAME = "MARINA SMART TEST HOTEL"
 RATE_PLAN_CODE = "DIRECT_2026_27"
 RATE_PLAN_NAME = "Direct official tariff 2026/27"
 

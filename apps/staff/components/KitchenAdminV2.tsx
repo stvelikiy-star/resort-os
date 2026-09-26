@@ -25,7 +25,7 @@ async function api(path: string, init?: RequestInit) {
   const body = await response.json().catch(() => null);
   if (!response.ok) {
     const detail = body?.detail;
-    throw new Error(typeof detail === "string" ? detail : detail?.code || "Ошибка Resort Core");
+    throw new Error(typeof detail === "string" ? detail : detail?.code || "Ошибка MARINA SMART");
   }
   return body;
 }
@@ -115,7 +115,7 @@ export default function KitchenAdminV2() {
   }
 
   return <main className={styles.shell}>
-    <header className={styles.header}><div><p>Три Короны · Resort OS</p><h1>Kitchen Admin</h1><span>{user?.display_name || "—"} · {user?.role || "—"}</span></div><button onClick={() => void loadAll()}>Обновить</button></header>
+    <header className={styles.header}><div><p>MARINA SMART · Hotel OS</p><h1>Kitchen Admin</h1><span>{user?.display_name || "—"} · {user?.role || "—"}</span></div><button onClick={() => void loadAll()}>Обновить</button></header>
     <section className={styles.stats}><div><strong>{orders.length}</strong><span>активных заказов</span></div><div><strong>{activeTables.filter((t) => t.status === "OCCUPIED").length}</strong><span>занятых столов</span></div><div><strong>{arrivals.length}</strong><span>новых заездов</span></div><div><strong>{approvedMenu.length}</strong><span>утверждённых позиций</span></div></section>
     <nav className={styles.tabs}>{(["orders", "tables", "menu", "arrivals"] as Tab[]).map((item) => <button key={item} className={tab === item ? styles.active : ""} onClick={() => setTab(item)}>{item === "orders" ? "Заказы" : item === "tables" ? "Столы" : item === "menu" ? "Меню" : `Заезды${arrivals.length ? ` · ${arrivals.length}` : ""}`}</button>)}</nav>
     {error && <div className={styles.error}>{error}</div>}

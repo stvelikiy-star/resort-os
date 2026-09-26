@@ -17,7 +17,7 @@ MARKETING_POLICY_VERSION = os.environ.get("MARKETING_POLICY_VERSION", "2026-09-1
 MARKETING_CHANNELS = {"WHATSAPP", "EMAIL", "SMS", "TELEGRAM", "PHONE"}
 
 app = FastAPI(
-    title="Three Crowns Resort Core API",
+    title="MARINA SMART Core API",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -163,7 +163,7 @@ async def price_room_type(conn, room_type_id, check_in: date, check_out: date) -
 async def health(request: Request):
     async with request.app.state.db.acquire() as conn:
         await conn.fetchval("SELECT 1")
-    return {"status": "ok", "service": "three-crowns-core"}
+    return {"status": "ok", "service": "marina-smart-core"}
 
 
 @app.get("/api/v1/booking/check-availability")

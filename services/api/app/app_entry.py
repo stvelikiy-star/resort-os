@@ -33,6 +33,7 @@ from .guest_service_settings import router as guest_service_settings_router
 from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
+from .hotel_setup import router as hotel_setup_router
 from .housekeeping_schedule import router as housekeeping_schedule_router
 from .inbox import router as inbox_router
 from .kitchen import admin_router as kitchen_admin_router
@@ -175,6 +176,7 @@ app.include_router(folio_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(rate_management_router)
+app.include_router(hotel_setup_router)
 app.include_router(hotel_finance_router)
 app.include_router(analytics_reports_router)
 app.include_router(owner_intelligence_router)

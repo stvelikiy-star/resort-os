@@ -1,0 +1,222 @@
+name: MARINA SMART Hotel Setup CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'apps/admin/**'
+      - 'scripts/bootstrap_marina_test.py'
+      - 'scripts/verify_marina_hotel_setup.py'
+      - 'scripts/verify_marina_client_cycle.py'
+      - 'scripts/verify_marina_client_cycle.py'
+      - 'deploy/marina-test-api.Dockerfile'
+      - 'compose.marina-test.yaml'
+      - '.github/workflows/marina-smart-hotel-setup-ci.yml'
+  push:
+    branches:
+      - marina-smart/live-base-20260925
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'apps/admin/**'
+      - 'scripts/bootstrap_marina_test.py'
+      - 'scripts/verify_marina_hotel_setup.py'
+      - 'deploy/marina-test-api.Dockerfile'
+      - 'compose.marina-test.yaml'
+      - '.github/workflows/marina-smart-hotel-setup-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-smart-hotel-setup-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hotel-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_smart_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: marina_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_smart_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://marina_ci:marina_ci_password@127.0.0.1:5432/marina_smart_ci?schema=public
+      PROPERTY_CODE: MARINA_TEST
+      MARINA_PROPERTY_NAME: MARINA SMART TEST HOTEL
+      MARINA_ALLOW_DEMO_RESET: true
+      VERIFY_COMPACT_DEMO: true
+      RATE_PLAN_CODE: MARINA_DIRECT
+      CORE_API_URL: http://127.0.0.1:8000
+      GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:8000
+      EXPECTED_GUEST_BASE_URL: http://127.0.0.1:8000
+      BOOTSTRAP_OWNER_USERNAME: marina-ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: Marina-CI-Owner-Strong-2026
+      BOOTSTRAP_OWNER_DISPLAY_NAME: MARINA SMART CI Owner
+      APP_ENV: staging
+      MAID_USERNAME: marina-ci-housemaid
+      MAID_PASSWORD: Marina-CI-Housemaid-2026
+      MAID_DISPLAY_NAME: MARINA SMART CI Housemaid
+      DINING_STAFF_USERNAME: marina-ci-kitchen
+      DINING_STAFF_PASSWORD: Marina-CI-Kitchen-2026
+      DINING_STAFF_DISPLAY_NAME: MARINA SMART CI Kitchen
+      KITCHEN_USERNAME: marina-ci-kitchen
+      KITCHEN_PASSWORD: Marina-CI-Kitchen-2026
+      COOKIE_SECURE: false
+      REQUIRE_COOKIE_DOMAIN: false
+      AUTH_TRUST_PROXY_HEADERS: false
+      REQUIRE_AUTOMATION_SERVICE: false
+      ENABLE_PAYMENT_OPERATIONS: false
+      ENABLE_SERVICE_POINT_QR: false
+      ENABLE_MKASSA: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            packages/database/package-lock.json
+            apps/admin/package-lock.json
+
+      - name: Validate database schema and apply migrations
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+
+      - name: Build Admin
+        working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/api/requirements.txt
+
+      - name: Install and compile Core
+        run: |
+          pip install -r services/api/requirements.txt
+          python -m compileall -q services/api/app scripts
+
+      - name: Bootstrap generic MARINA SMART test hotel
+        run: |
+          python scripts/bootstrap_marina_test.py
+          python scripts/bootstrap_owner.py
+          python scripts/bootstrap_staging_staff.py
+          python - <<'PY'
+          import asyncio, os
+          import asyncpg
+
+          async def main():
+              conn = await asyncpg.connect(os.environ["DATABASE_URL"].split("?")[0])
+              try:
+                  row = await conn.fetchrow(
+                      """
+                      SELECT p.name,
+                             (SELECT count(*)::int FROM rooms r WHERE r."propertyId"=p.id) rooms,
+                             (SELECT count(*)::int FROM room_types rt WHERE rt."propertyId"=p.id) room_types
+                      FROM properties p
+                      WHERE p.code=$1
+                      """,
+                      os.environ["PROPERTY_CODE"],
+                  )
+                  assert row
+                  assert row["name"] == "MARINA SMART TEST HOTEL", row
+                  assert row["rooms"] == 12, row
+                  assert row["room_types"] == 3, row
+                  print("MARINA_COMPACT_BOOTSTRAP_PASS")
+              finally:
+                  await conn.close()
+
+          asyncio.run(main())
+          PY
+
+      - name: Start Core
+        run: |
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 >/tmp/marina-core.log 2>&1 &
+          echo $! >/tmp/marina-core.pid
+          for i in $(seq 1 30); do
+            if curl --fail -sS http://127.0.0.1:8000/health/ready >/tmp/ready.json 2>/dev/null; then
+              cat /tmp/ready.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/marina-core.log
+          exit 1
+
+      - name: Verify self-service hotel setup
+        run: python scripts/verify_marina_hotel_setup.py
+
+      - name: Verify complete compact MARINA client cycle
+        run: python scripts/verify_marina_client_cycle.py
+
+      - name: Verify branding and compact navigation contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          shell = Path("apps/admin/components/AdminShell.tsx").read_text()
+          layout = Path("apps/admin/app/layout.tsx").read_text()
+          setup = Path("apps/admin/components/HotelSetupBoard.tsx").read_text()
+          assert "MARINA SMART · Hotel OS" in shell
+          assert "marina-smart-logo.webp" in shell
+          assert "Три Короны" not in shell
+          assert "Three Crowns" not in shell
+          for label in (
+              "Главная",
+              "Супершахматка",
+              "Ресепшен / Брони",
+              "CRM / Заявки",
+              "Финансы",
+              "Сервис гостя",
+              "Уборка / Ремонт",
+              "Отчёты / Аналитика",
+              "Настройки",
+              "Ещё",
+          ):
+              assert label in shell, label
+          assert "MARINA SMART — Hotel OS" in layout
+          assert "Настройка отеля" in setup
+          assert "12 номеров для теста" in setup
+          assert "Создать диапазон номеров" in setup
+          assert "Что показывать в системе" in setup
+          assert "Загрузить файл" in setup
+          assert "hotel_logo_url" in setup
+          assert "hotelLogoUrl" in shell
+          assert "hotelName" in shell
+          assert "Мини-отель" in setup
+          assert "Отель" in setup
+          assert "Курорт" in setup
+          print("MARINA_BRAND_NAV_CONTRACT_PASS")
+          PY
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          cat /tmp/marina-core.log 2>/dev/null || true

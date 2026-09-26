@@ -155,7 +155,7 @@ export default function RoomQrBoard() {
               <article key={item.qr_id} className="room-qr-print-card">
                 <img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(item.qr_svg)}`} alt={`QR номера ${item.room_code}`} />
                 <strong>Номер {item.room_code}</strong>
-                <span>Три Короны · Guest OS</span>
+                <span>MARINA SMART · Guest OS</span>
                 <small>{item.public_url}</small>
               </article>
             ))}

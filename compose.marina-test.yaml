@@ -1,0 +1,130 @@
+name: marina-smart-live-test
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marina_smart_test
+      POSTGRES_USER: marina_test
+      POSTGRES_PASSWORD: "MarinaLocalDB2026!"
+    volumes:
+      - marina_smart_live_test_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marina_test -d marina_smart_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    ports:
+      - "127.0.0.1:15433:5432"
+    networks: [marina-test]
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/marina-test-api.Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: staging
+      MARINA_ALLOW_DEMO_RESET: "true"
+      DATABASE_URL: "postgresql://marina_test:MarinaLocalDB2026!@postgres:5432/marina_smart_test?schema=public"
+      PROPERTY_CODE: MARINA_TEST
+      MARINA_PROPERTY_NAME: MARINA SMART TEST HOTEL
+      RATE_PLAN_CODE: MARINA_DIRECT
+      CORS_ORIGINS: http://127.0.0.1:13101,http://localhost:13101,http://127.0.0.1:13102,http://localhost:13102
+      GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:18100
+      EXPECTED_GUEST_BASE_URL: http://127.0.0.1:18100
+      SERVICE_POINT_PUBLIC_BASE_URL: http://127.0.0.1:18100
+      SESSION_TTL_HOURS: "24"
+      COOKIE_SECURE: "false"
+      REQUIRE_COOKIE_DOMAIN: "false"
+      COOKIE_DOMAIN: ""
+      REQUIRE_AUTOMATION_SERVICE: "false"
+      AUTOMATION_SERVICE_KEY: local-marina-test-only-key-2026
+      AUTOMATION_SERVICE_NAME: marina-local-test
+      REQUIRE_MIGRATION_HISTORY: "false"
+      REQUIRE_RECENT_BACKUP: "false"
+      ENABLE_PAYMENT_OPERATIONS: "false"
+      ENABLE_SERVICE_POINT_QR: "false"
+      ENABLE_MKASSA: "false"
+      BOOTSTRAP_OWNER_USERNAME: marina
+      BOOTSTRAP_OWNER_PASSWORD: MarinaDemo2026!
+      BOOTSTRAP_OWNER_DISPLAY_NAME: MARINA SMART Owner
+      RECEPTION_USERNAME: admin
+      RECEPTION_PASSWORD: MarinaDemo2026!
+      RECEPTION_DISPLAY_NAME: Administrator
+      DINING_STAFF_USERNAME: kitchen
+      DINING_STAFF_PASSWORD: MarinaDemo2026!
+      DINING_STAFF_DISPLAY_NAME: Kitchen
+      MAID_USERNAME: housemaid
+      MAID_PASSWORD: MarinaDemo2026!
+      MAID_DISPLAY_NAME: Housemaid
+      KITCHEN_USERNAME: kitchen
+      KITCHEN_PASSWORD: MarinaDemo2026!
+      WAITER_USERNAME: waiter
+      WAITER_PASSWORD: MarinaDemo2026!
+      TEST_GUEST_FIXED_PIN: "306306"
+      TTLOCK_CLIENT_ID: ""
+      TTHOTEL_CLIENT_SECRET: ""
+      TTHOTEL_ACCOUNT: ""
+      TTHOTEL_PASSWORD: ""
+      MKASSA_API_KEY: ""
+      OPENAI_API_KEY: ""
+      TELEGRAM_BOT_TOKEN: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "127.0.0.1:18100:8000"
+    networks: [marina-test]
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        NEXT_PUBLIC_CORE_WS_URL: ""
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "127.0.0.1:13101:3001"
+    networks: [marina-test]
+
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "127.0.0.1:13102:3002"
+    networks: [marina-test]
+
+networks:
+  marina-test:
+    driver: bridge
+
+volumes:
+  marina_smart_live_test_pgdata:

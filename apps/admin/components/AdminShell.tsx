@@ -11,6 +11,7 @@ import GuestOffersBoard from "./GuestOffersBoard";
 import GuestServicesCenter from "./GuestServicesCenter";
 import GuestServiceSettingsBoard from "./GuestServiceSettingsBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
+import HotelSetupBoard from "./HotelSetupBoard";
 import InboxBoard from "./InboxBoard";
 import MarketingBoard from "./MarketingBoard";
 import OperationsBoard from "./OperationsBoard";
@@ -32,11 +33,12 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const SESSION_CHECK_INTERVAL_MS = 30_000;
+const DEFAULT_ENABLED_MODULES = ["AGENTS", "DINING", "ROOM_QR"];
 
 function canEnterAdmin(role?: string | null): boolean {
   return Boolean(role && ADMIN_ROLES.has(role));
@@ -67,6 +69,9 @@ export default function AdminShell() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<Tab>("DASHBOARD");
+  const [enabledModules, setEnabledModules] = useState<string[]>(DEFAULT_ENABLED_MODULES);
+  const [hotelName, setHotelName] = useState<string>("");
+  const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
 
   useEffect(() => {
     fetch("/core/api/v1/auth/me", { cache: "no-store" })
@@ -153,6 +158,25 @@ export default function AdminShell() {
     void fetch("/core/api/v1/ops/housekeeping/schedule/ensure", { method: "POST" }).catch(() => undefined);
   }, [user?.id, user?.role]);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/core/api/v1/admin/hotel-setup/modules", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return await response.json() as { enabled_modules?: string[]; hotel_name?: string; property_name?: string; hotel_logo_url?: string | null };
+      })
+      .then((body) => {
+        if (cancelled || !body) return;
+        if (body.enabled_modules) setEnabledModules(body.enabled_modules);
+        setHotelName(body.hotel_name || body.property_name || "");
+        setHotelLogoUrl(body.hotel_logo_url || "");
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role]);
+
+
   async function login(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
@@ -178,7 +202,7 @@ export default function AdminShell() {
       setTab(initialTab(payload.role));
       setPassword("");
     } catch {
-      setError("Сервис входа недоступен. Проверьте Resort Core.");
+      setError("Сервис входа MARINA SMART недоступен. Проверьте API.");
     } finally {
       setSubmitting(false);
     }
@@ -194,14 +218,15 @@ export default function AdminShell() {
   }
 
   if (checking) {
-    return <main className="login-screen"><div className="login-card"><p className="eyebrow">Resort OS</p><h1>Проверяю доступ…</h1></div></main>;
+    return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
 
   if (!user) {
     return (
       <main className="login-screen">
         <form className="login-card" onSubmit={login}>
-          <p className="eyebrow">Три Короны · Resort OS</p>
+          <img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" />
+          <p className="eyebrow">MARINA SMART · Hotel OS</p>
           <h1>Вход в управление</h1>
           <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
@@ -218,59 +243,75 @@ export default function AdminShell() {
   const canUseReception = isManager || isReception;
   const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
   const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);
+  const moduleEnabled = (module: string) => enabledModules.includes(module);
 
   return (
     <>
       <div className="auth-toolbar admin-nav">
-        <div className="admin-identity"><strong>Три Короны · Resort OS</strong><span>{user.display_name} · {user.role}</span></div>
+        <div className="admin-identity">
+          <img className="marina-brand-logo-small" src="/marina-smart-logo.webp" alt="MARINA SMART" />
+          {hotelLogoUrl && <img className="hotel-brand-logo-small" src={hotelLogoUrl} alt={hotelName || "Логотип отеля"} />}
+          <div><strong>MARINA SMART · Hotel OS</strong><span>{hotelName ? `${hotelName} · ` : ""}{user.display_name} · {user.role}</span></div>
+        </div>
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
-          {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
-          {canUseReception && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
-          {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
-          {isManager && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агенты</button>}
-          {isManager && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
-          {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
-          {canUseReception && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
-          {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
-          {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
-          {isManager && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Офферы гостю</button>}
-          {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
-          {isManager && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
-          {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
+          {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
-          {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
-          {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
+          {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
           {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
-          {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
-          {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
+          {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
+          {isManager && <button className={`admin-settings-button ${tab === "SETTINGS" ? "active" : ""}`} onClick={() => setTab("SETTINGS")}>Настройки</button>}
+          <details className="admin-more-menu">
+            <summary>Ещё</summary>
+            <div className="admin-more-panel">
+              {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
+              {canUseReception && moduleEnabled("GROUPS") && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
+              {isManager && moduleEnabled("AGENTS") && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агенты</button>}
+              {isManager && moduleEnabled("MARKETING") && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
+              {canUseReception && moduleEnabled("DINING") && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
+              {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
+              {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
+              {isManager && moduleEnabled("OFFERS") && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Офферы гостю</button>}
+              {canManageRoomQr && moduleEnabled("ROOM_QR") && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
+              {isManager && moduleEnabled("POINT_QR") && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
+              {isManager && moduleEnabled("GROWTH") && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
+              {isManager && moduleEnabled("CONTENT") && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
+              {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
+              {isManager && moduleEnabled("INBOX") && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
+            </div>
+          </details>
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && isManager && <PMSGrid />}
       {tab === "RATES" && isManager && <RateManagementBoard />}
-      {tab === "GROUPS" && canUseReception && <GroupBookingBoard userRole={user.role} />}
+      {tab === "GROUPS" && canUseReception && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "AGENTS" && isManager && <AgentsBoard />}
-      {tab === "MARKETING" && isManager && <MarketingBoard />}
+      {tab === "AGENTS" && isManager && moduleEnabled("AGENTS") && <AgentsBoard />}
+      {tab === "MARKETING" && isManager && moduleEnabled("MARKETING") && <MarketingBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
-      {tab === "DINING" && canUseReception && <DiningManagementBoard />}
+      {tab === "DINING" && canUseReception && moduleEnabled("DINING") && <DiningManagementBoard />}
       {tab === "SERVICE_SETTINGS" && isManager && <GuestServiceSettingsBoard />}
       {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
-      {tab === "OFFERS" && isManager && <GuestOffersBoard />}
-      {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
-      {tab === "POINT_QR" && isManager && <ServicePointsBoard />}
-      {tab === "GROWTH" && isManager && <GrowthControlBoard />}
+      {tab === "OFFERS" && isManager && moduleEnabled("OFFERS") && <GuestOffersBoard />}
+      {tab === "ROOM_QR" && canManageRoomQr && moduleEnabled("ROOM_QR") && <RoomQrBoard />}
+      {tab === "POINT_QR" && isManager && moduleEnabled("POINT_QR") && <ServicePointsBoard />}
+      {tab === "GROWTH" && isManager && moduleEnabled("GROWTH") && <GrowthControlBoard />}
       {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
       {tab === "REPORTS" && isManager && <ReportsBoard />}
-      {tab === "CONTENT" && isManager && <SiteContentBoard />}
+      {tab === "CONTENT" && isManager && moduleEnabled("CONTENT") && <SiteContentBoard />}
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
-      {tab === "INBOX" && isManager && <InboxBoard />}
+      {tab === "INBOX" && isManager && moduleEnabled("INBOX") && <InboxBoard />}
+      {tab === "SETTINGS" && isManager && <HotelSetupBoard
+        onModulesChanged={setEnabledModules}
+        onNavigate={(destination) => setTab(destination)}
+        onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
+      />}
     </>
   );
 }
