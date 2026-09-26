@@ -23,6 +23,7 @@ import "./reception-readiness.css";
 import "./inbox.css";
 import "./staff.css";
 import "./management-control.css";
+import "./hotel-setup.css";
 import "./room-detail.css";
 import "./room-qr.css";
 import "./service-points.css";
