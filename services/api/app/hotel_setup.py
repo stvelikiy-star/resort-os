@@ -629,6 +629,16 @@ async def compact_demo_layout(payload: DemoLayoutRequest, request: Request,
             await conn.execute('DELETE FROM operational_tasks WHERE "propertyId"=$1', prop["id"])
             await conn.execute('DELETE FROM room_qrs WHERE "propertyId"=$1', prop["id"])
             await conn.execute('DELETE FROM rooms WHERE "propertyId"=$1', prop["id"])
+
+            # Rate periods reference room types. Remove only this property's rate
+            # periods before replacing the catalogue; keep the rate plan itself so
+            # its identity remains stable for the rest of the system.
+            await conn.execute(
+                '''DELETE FROM rate_periods rp
+                   USING rate_plans plan
+                   WHERE rp."ratePlanId"=plan.id AND plan."propertyId"=$1''',
+                prop["id"],
+            )
             await conn.execute('DELETE FROM room_types WHERE "propertyId"=$1', prop["id"])
 
             plan = await conn.fetchrow(
