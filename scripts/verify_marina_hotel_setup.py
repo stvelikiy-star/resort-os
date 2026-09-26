@@ -169,6 +169,24 @@ def main() -> None:
         )
         assert blocked["operational_state"] == "TECH_BLOCK"
 
+        sale_start = date.today() + timedelta(days=1)
+        sale_end = sale_start + timedelta(days=1)
+        blocked_availability = expect(
+            client.get(
+                "/api/v1/booking/check-availability",
+                params={
+                    "check_in": sale_start.isoformat(),
+                    "check_out": sale_end.isoformat(),
+                    "adults": 1,
+                    "children": 0,
+                    "room_type_code": type_code,
+                },
+            ),
+            200,
+            "blocked room availability",
+        )
+        assert blocked_availability["results"] == [], "TECH_BLOCK room leaked into sellable inventory"
+
         reopened = expect(
             client.patch(
                 f"/api/v1/admin/hotel-setup/rooms/{room_id}",
@@ -179,6 +197,23 @@ def main() -> None:
         )
         assert reopened["operational_state"] == "CLEAN"
         assert reopened["floor_label"] == "10"
+
+        reopened_availability = expect(
+            client.get(
+                "/api/v1/booking/check-availability",
+                params={
+                    "check_in": sale_start.isoformat(),
+                    "check_out": sale_end.isoformat(),
+                    "adults": 1,
+                    "children": 0,
+                    "room_type_code": type_code,
+                },
+            ),
+            200,
+            "reopened room availability",
+        )
+        assert len(reopened_availability["results"]) == 1
+        assert reopened_availability["results"][0]["available_count"] == 1
 
         bulk = expect(
             client.post(
