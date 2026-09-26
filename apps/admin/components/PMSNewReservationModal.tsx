@@ -284,7 +284,7 @@ export default function PMSNewReservationModal({
 
             <section className={`owner-price-card ${preview?.pricing.sellable ? "ready" : "needs-manager"}`}>
               <div>
-                <span>Расчёт Resort Core</span>
+                <span>Расчёт MARINA SMART</span>
                 {loading ? <strong>Проверяем…</strong> : preview?.pricing.core_sellable ? <strong>{money(preview.pricing.core_total_kgs)}</strong> : <strong>Требует подтверждения менеджера</strong>}
                 {preview?.pricing.core_reason && <small>{preview.pricing.core_reason}</small>}
               </div>
