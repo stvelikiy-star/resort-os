@@ -164,12 +164,12 @@ export default function AdminShell() {
     fetch("/core/api/v1/admin/hotel-setup/modules", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return null;
-        return await response.json() as { enabled_modules?: string[]; hotel_name?: string; hotel_logo_url?: string | null };
+        return await response.json() as { enabled_modules?: string[]; hotel_name?: string; property_name?: string; hotel_logo_url?: string | null };
       })
       .then((body) => {
         if (cancelled || !body) return;
         if (body.enabled_modules) setEnabledModules(body.enabled_modules);
-        setHotelName(body.hotel_name || "");
+        setHotelName(body.hotel_name || body.property_name || "");
         setHotelLogoUrl(body.hotel_logo_url || "");
       })
       .catch(() => undefined);
