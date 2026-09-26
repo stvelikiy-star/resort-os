@@ -20,3 +20,5 @@
 @media(max-width:760px){.hotel-module-presets{grid-template-columns:1fr}}
 
 .hotel-logo-field{grid-column:span 2}.hotel-logo-preview{min-height:74px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:12px;background:#fafcfb;padding:8px;color:var(--muted);font-size:11px}.hotel-logo-preview img{display:block;max-width:160px;max-height:58px;object-fit:contain}@media(max-width:720px){.hotel-logo-field{grid-column:auto}}
+
+.hotel-logo-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.hotel-logo-upload{position:relative;overflow:hidden;cursor:pointer}.hotel-logo-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
