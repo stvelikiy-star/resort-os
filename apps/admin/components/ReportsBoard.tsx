@@ -190,7 +190,7 @@ export default function ReportsBoard() {
         <div>
           <p className="eyebrow">OWNER CONTROL · RESORT CORE</p>
           <h1>Отчёты и аналитика</h1>
-          <p>Загрузка, продажи, деньги, категории, каналы, задолженность, операции и история номерного фонда — из одной базы Resort Core.</p>
+          <p>Загрузка, продажи, деньги, категории, каналы, задолженность, операции и история номерного фонда — из единой базы MARINA SMART.</p>
         </div>
         <div className="reports-actions">
           <button className="btn" onClick={() => preset(7)}>7 дней</button>
@@ -208,7 +208,7 @@ export default function ReportsBoard() {
         <label><span>С</span><input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></label>
         <label><span>По</span><input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></label>
         <label className="reports-compare-toggle"><input type="checkbox" checked={compareEnabled} onChange={(e) => setCompareEnabled(e.target.checked)} /><span>Сравнить с предыдущим периодом</span></label>
-        {report && <small>{report.range.days} календарных дней · данные Resort Core</small>}
+        {report && <small>{report.range.days} календарных дней · данные MARINA SMART</small>}
       </section>
 
       {error && <div className="error-box">{error}</div>}
