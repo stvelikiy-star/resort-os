@@ -3,8 +3,6 @@ import os
 import uuid
 from datetime import date
 from typing import Any, Literal
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
@@ -26,11 +24,6 @@ class PropertyPatch(BaseModel):
     def validate_change(self):
         if not self.model_fields_set:
             raise ValueError("At least one property field is required")
-        if self.timezone:
-            try:
-                ZoneInfo(self.timezone)
-            except ZoneInfoNotFoundError as exc:
-                raise ValueError("Unknown timezone") from exc
         return self
 
 
@@ -286,6 +279,10 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
             name = payload.name.strip() if "name" in supplied and payload.name is not None else prop["name"]
             timezone = payload.timezone.strip() if "timezone" in supplied and payload.timezone is not None else prop["timezone"]
             currency = payload.currency.upper() if "currency" in supplied and payload.currency is not None else prop["currency"]
+            if "timezone" in supplied:
+                timezone_exists = await conn.fetchval("SELECT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=$1)", timezone)
+                if not timezone_exists:
+                    raise HTTPException(status_code=422, detail="Unknown timezone")
             row = await conn.fetchrow(
                 '''UPDATE properties SET name=$2,timezone=$3,currency=$4,"updatedAt"=now()
                    WHERE id=$1 RETURNING id,code,name,timezone,currency,"updatedAt"''',
@@ -505,7 +502,10 @@ async def compact_demo_layout(payload: DemoLayoutRequest, request: Request,
                   (SELECT count(*) FROM reservations WHERE "propertyId"=$1)::int AS reservations,
                   (SELECT count(*) FROM stays WHERE "propertyId"=$1)::int AS stays,
                   (SELECT count(*) FROM reservation_requests WHERE "propertyId"=$1)::int AS requests,
-                  (SELECT count(*) FROM payments WHERE "propertyId"=$1)::int AS payments,
+                  (SELECT count(*) FROM payments p
+                     LEFT JOIN reservation_requests rr ON rr.id=p."requestId"
+                     LEFT JOIN reservations r ON r.id=p."reservationId"
+                     WHERE rr."propertyId"=$1 OR r."propertyId"=$1)::int AS payments,
                   (SELECT count(*) FROM kitchen_orders WHERE "propertyId"=$1)::int AS kitchen_orders''',
                 prop["id"],
             )
