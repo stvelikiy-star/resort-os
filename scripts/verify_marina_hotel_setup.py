@@ -80,6 +80,7 @@ def main() -> None:
         prop = overview["property"]
         current_in = overview["product_settings"]["check_in_time"]
         current_out = overview["product_settings"]["check_out_time"]
+        current_logo = overview["product_settings"].get("hotel_logo_url")
         expect(
             client.patch(
                 "/api/v1/admin/hotel-setup/property",
@@ -89,11 +90,14 @@ def main() -> None:
                     "currency": prop["currency"],
                     "check_in_time": "15:00",
                     "check_out_time": "11:00",
+                    "hotel_logo_url": "https://example.test/marina-hotel-logo.png",
                 },
             ),
             200,
             "patch property",
         )
+        changed = expect(client.get("/api/v1/admin/hotel-setup"), 200, "overview after property patch")
+        assert changed["product_settings"]["hotel_logo_url"] == "https://example.test/marina-hotel-logo.png"
         bad_timezone = client.patch(
             "/api/v1/admin/hotel-setup/property",
             json={"timezone": "Invalid/Timezone"},
@@ -108,6 +112,7 @@ def main() -> None:
                     "currency": prop["currency"],
                     "check_in_time": current_in,
                     "check_out_time": current_out,
+                    "hotel_logo_url": current_logo,
                 },
             ),
             200,
