@@ -22,12 +22,13 @@ services:
   api:
     build:
       context: .
-      dockerfile: deploy/railway-fulltest-api.Dockerfile
+      dockerfile: deploy/marina-test-api.Dockerfile
     restart: unless-stopped
     environment:
       APP_ENV: staging
       DATABASE_URL: "postgresql://marina_test:MarinaLocalDB2026!@postgres:5432/marina_smart_test?schema=public"
       PROPERTY_CODE: THREE_CROWNS
+      MARINA_PROPERTY_NAME: MARINA SMART TEST HOTEL
       RATE_PLAN_CODE: DIRECT_2026_27
       CORS_ORIGINS: http://127.0.0.1:13101,http://localhost:13101,http://127.0.0.1:13102,http://localhost:13102
       SESSION_TTL_HOURS: "24"
@@ -37,8 +38,6 @@ services:
       REQUIRE_AUTOMATION_SERVICE: "false"
       AUTOMATION_SERVICE_KEY: local-marina-test-only-key-2026
       AUTOMATION_SERVICE_NAME: marina-local-test
-      EXPECTED_ROOM_COUNT: "84"
-      EXPECTED_ROOM_TYPE_COUNT: "12"
       REQUIRE_MIGRATION_HISTORY: "false"
       REQUIRE_RECENT_BACKUP: "false"
       ENABLE_PAYMENT_OPERATIONS: "false"
