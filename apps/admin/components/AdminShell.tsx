@@ -298,7 +298,7 @@ export default function AdminShell() {
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
       {tab === "INBOX" && isManager && moduleEnabled("INBOX") && <InboxBoard />}
-      {tab === "SETTINGS" && isManager && <HotelSetupBoard onModulesChanged={setEnabledModules} />}
+      {tab === "SETTINGS" && isManager && <HotelSetupBoard onModulesChanged={setEnabledModules} onNavigate={(destination) => setTab(destination)} />}
     </>
   );
 }
