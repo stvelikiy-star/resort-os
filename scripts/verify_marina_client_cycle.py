@@ -16,6 +16,7 @@ MAID_USERNAME = os.environ.get("MAID_USERNAME", "housemaid")
 MAID_PASSWORD = os.environ.get("MAID_PASSWORD", "MarinaDemo2026!")
 KITCHEN_USERNAME = os.environ.get("KITCHEN_USERNAME", "kitchen")
 KITCHEN_PASSWORD = os.environ.get("KITCHEN_PASSWORD", "MarinaDemo2026!")
+EXPECTED_GUEST_BASE_URL = os.environ.get("EXPECTED_GUEST_BASE_URL", "").rstrip("/")
 
 
 def expect(response: httpx.Response, status: int | tuple[int, ...], label: str):
@@ -157,6 +158,9 @@ def main() -> None:
     )
     token = issued["token"]
     assert issued["token_display_once"] is True
+    if EXPECTED_GUEST_BASE_URL:
+        assert issued["public_url"].startswith(EXPECTED_GUEST_BASE_URL + "/g/"), issued["public_url"]
+    assert "3korony.com" not in issued["public_url"], issued["public_url"]
 
     guest = httpx.Client(base_url=BASE_URL, timeout=30.0, follow_redirects=True)
     verified = expect(
