@@ -10,7 +10,7 @@ from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/hotel-setup", tags=["hotel-setup"])
 manager_access = require_roles("OWNER", "MANAGER")
-module_read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN")
+module_read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "MARINA_DIRECT")
 DEMO_LAYOUT_ENABLED = os.environ.get("MARINA_ALLOW_DEMO_RESET", "false").strip().lower() in {"1", "true", "yes", "on"}
 OPTIONAL_MODULES = {
