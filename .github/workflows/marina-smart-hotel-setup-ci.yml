@@ -76,6 +76,12 @@ jobs:
       DINING_STAFF_DISPLAY_NAME: MARINA SMART CI Kitchen
       KITCHEN_USERNAME: marina-ci-kitchen
       KITCHEN_PASSWORD: Marina-CI-Kitchen-2026
+      WAITER_USERNAME: marina-ci-waiter
+      WAITER_PASSWORD: Marina-CI-Waiter-2026
+      WAITER_DISPLAY_NAME: MARINA SMART CI Waiter
+      TECHNICIAN_USERNAME: marina-ci-technician
+      TECHNICIAN_PASSWORD: Marina-CI-Technician-2026
+      TECHNICIAN_DISPLAY_NAME: MARINA SMART CI Technician
       COOKIE_SECURE: false
       REQUIRE_COOKIE_DOMAIN: false
       AUTH_TRUST_PROXY_HEADERS: false
@@ -213,6 +219,8 @@ jobs:
           assert "Мини-отель" in setup
           assert "Отель" in setup
           assert "Курорт" in setup
+          assert "Полный" in setup
+          assert "Все модули MARINA SMART без урезания функциональности." in setup
           print("MARINA_BRAND_NAV_CONTRACT_PASS")
           PY
 

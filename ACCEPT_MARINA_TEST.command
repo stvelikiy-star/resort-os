@@ -31,6 +31,10 @@ docker compose -f compose.marina-test.yaml exec -T api \
       MAID_PASSWORD='MarinaDemo2026!' \
       KITCHEN_USERNAME=kitchen \
       KITCHEN_PASSWORD='MarinaDemo2026!' \
+      WAITER_USERNAME=waiter \
+      WAITER_PASSWORD='MarinaDemo2026!' \
+      TECHNICIAN_USERNAME=technician \
+      TECHNICIAN_PASSWORD='MarinaDemo2026!' \
   python scripts/verify_marina_client_cycle.py
 
 echo
