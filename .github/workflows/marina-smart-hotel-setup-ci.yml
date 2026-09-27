@@ -82,6 +82,10 @@ jobs:
       TECHNICIAN_USERNAME: marina-ci-technician
       TECHNICIAN_PASSWORD: Marina-CI-Technician-2026
       TECHNICIAN_DISPLAY_NAME: MARINA SMART CI Technician
+      AGENT_USERNAME: marina-ci-agent
+      AGENT_PASSWORD: Marina-CI-Agent-2026
+      AGENT_DISPLAY_NAME: MARINA SMART CI Agent
+      BOOKING_AGENT_NAME: MARINA SMART CI Agency
       COOKIE_SECURE: false
       REQUIRE_COOKIE_DOMAIN: false
       AUTH_TRUST_PROXY_HEADERS: false
