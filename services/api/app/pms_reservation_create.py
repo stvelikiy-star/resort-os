@@ -1,3 +1,4 @@
+import json
 import re
 import secrets
 import uuid
@@ -74,7 +75,7 @@ async def load_room(conn, property_id: uuid.UUID, room_id: uuid.UUID, lock: bool
     return await conn.fetchrow(
         f'''
         SELECT room.id,room.code,room.name,room."operationalState"::text AS operational_state,
-               room."bedConfiguration",room."buildingOrZone",room."floorLabel",room."roomTypeId",
+               room."bedConfiguration",room."buildingOrZone",room."floorLabel",room."roomTypeId",room.notes,
                rt.code AS room_type_code,rt.name AS room_type_name,
                rt."capacityAdults",rt."capacityChildren"
         FROM rooms room
@@ -242,6 +243,20 @@ def pricing_result(
     }
 
 
+def confirmed_room_max_capacity(room) -> int | None:
+    raw = room.get("notes")
+    if not raw:
+        return None
+    try:
+        metadata = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    value = metadata.get("max_capacity")
+    if isinstance(value, int) and value > 0:
+        return value
+    return None
+
+
 async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPreviewPayload, *, lock: bool = False):
     room = await load_room(conn, property_id, payload.room_id, lock=lock)
     if not room:
@@ -252,7 +267,13 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
             detail={"code": "TARGET_ROOM_TECH_BLOCK", "room_code": room["code"]},
         )
 
+    base_adult_capacity = int(room["capacityAdults"])
+    confirmed_max_capacity = confirmed_room_max_capacity(room)
+    max_extra_bed_count = None if confirmed_max_capacity is None else max(0, confirmed_max_capacity - base_adult_capacity)
     extra_allowed = room["room_type_code"] not in EXTRA_BED_DENIED_ROOM_TYPES
+    if max_extra_bed_count is not None:
+        extra_allowed = extra_allowed and max_extra_bed_count > 0
+
     if payload.extra_bed_count > 0 and not extra_allowed:
         raise HTTPException(
             status_code=409,
@@ -261,9 +282,20 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
                 "room_code": room["code"],
                 "room_type_code": room["room_type_code"],
                 "room_type_name": room["room_type_name"],
+                "max_extra_bed_count": max_extra_bed_count,
             },
         )
-    effective_adult_capacity = int(room["capacityAdults"]) + (payload.extra_bed_count if extra_allowed else 0)
+    if max_extra_bed_count is not None and payload.extra_bed_count > max_extra_bed_count:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EXTRA_BED_LIMIT_EXCEEDED",
+                "room_code": room["code"],
+                "max_extra_bed_count": max_extra_bed_count,
+                "requested_extra_bed_count": payload.extra_bed_count,
+            },
+        )
+    effective_adult_capacity = base_adult_capacity + (payload.extra_bed_count if extra_allowed else 0)
     if effective_adult_capacity < payload.adults:
         raise HTTPException(
             status_code=409,
@@ -310,8 +342,10 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
             "building_or_zone": room["buildingOrZone"],
             "floor": room["floorLabel"],
             "operational_state": room["operational_state"],
-            "capacity_adults": int(room["capacityAdults"]),
+            "capacity_adults": base_adult_capacity,
             "capacity_children": room["capacityChildren"],
+            "max_capacity_adults": confirmed_max_capacity,
+            "max_extra_bed_count": max_extra_bed_count,
             "extra_bed_allowed": extra_allowed,
             "effective_capacity_adults": effective_adult_capacity,
         },
