@@ -63,6 +63,10 @@ services:
       KITCHEN_PASSWORD: MarinaDemo2026!
       WAITER_USERNAME: waiter
       WAITER_PASSWORD: MarinaDemo2026!
+      WAITER_DISPLAY_NAME: Waiter
+      TECHNICIAN_USERNAME: technician
+      TECHNICIAN_PASSWORD: MarinaDemo2026!
+      TECHNICIAN_DISPLAY_NAME: Technician
       TEST_GUEST_FIXED_PIN: "306306"
       TTLOCK_CLIENT_ID: ""
       TTHOTEL_CLIENT_SECRET: ""
