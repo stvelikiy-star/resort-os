@@ -37,7 +37,7 @@ def main() -> int:
         'user.role',
         'isManager',
         'isReception',
-        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);',
+        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);',
         'if (payload && !canEnterAdmin(payload.role))',
         'if (!canEnterAdmin(payload.role))',
         'Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.',
