@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import uuid
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 
 import asyncpg
@@ -145,7 +145,7 @@ async def main() -> None:
                           "updatedAt"=now()
                         """,
                         uuid.uuid4(), plan_id, type_ids[code], period["label"],
-                        period["valid_from"], period["valid_to"], int(price[field]),
+                        date.fromisoformat(period["valid_from"]), date.fromisoformat(period["valid_to"]), int(price[field]),
                         "AK BERMET owner-confirmed 2026 tariff snapshot",
                     )
 
