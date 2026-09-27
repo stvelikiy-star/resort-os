@@ -61,6 +61,21 @@ const OWNER_GROUP: Record<string, string> = {
   "Квартиры / апартаменты с кухней": "Новый корпус квартиры апартаменты",
 };
 
+const AK_BERMET_STAFF_GROUP_ORDER = [
+  "Корпус №1",
+  "Корпус №2",
+  "Корпус №3",
+  "GARDEN",
+  "Кирпичные",
+  "Деревянные",
+  "Сруб",
+];
+
+function akBermetGroupRank(label: string) {
+  const index = AK_BERMET_STAFF_GROUP_ORDER.indexOf(label);
+  return index === -1 ? AK_BERMET_STAFF_GROUP_ORDER.length : index;
+}
+
 const ROOM_STATE: Record<Room["operational_state"], string> = {
   UNKNOWN: "—",
   CLEAN: "Готов",
@@ -234,7 +249,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
       current.push(room);
       map.set(label, current);
     });
-    return Array.from(map.entries()).map(([label, items]) => ({
+    const groups = Array.from(map.entries()).map(([label, items]) => ({
       label,
       rooms: items.sort((left, right) =>
         akBermetMode
@@ -242,6 +257,13 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
           : naturalRoomCode(left, right),
       ),
     }));
+    if (akBermetMode) {
+      groups.sort((left, right) =>
+        akBermetGroupRank(left.label) - akBermetGroupRank(right.label) ||
+        left.label.localeCompare(right.label, "ru", { numeric: true }),
+      );
+    }
+    return groups;
   }, [data, query, category, akBermetMode]);
 
   const allRooms = useMemo(() => data?.rooms || [], [data]);
