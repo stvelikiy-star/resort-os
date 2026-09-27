@@ -54,8 +54,9 @@ try {
 
   const facts = await page.locator(".owner-stay-facts").innerText();
   assert(/Ночей\s*1/.test(facts), `one square must represent one night: ${facts}`);
-  await page.locator(".owner-price-card").waitFor({ state: "visible", timeout: 10000 });
-  assert(await page.locator(".owner-price-card").count() === 1, "sellable AK BERMET room must load a price preview");
+  const priceCard = page.locator(".owner-price-card", { hasText: "Расчёт MARINA SMART" });
+  await priceCard.waitFor({ state: "visible", timeout: 10000 });
+  assert(await priceCard.count() === 1, "sellable AK BERMET room must load exactly one MARINA SMART price preview");
 
   await page.locator(".owner-booking-head .owner-quiet-btn").click();
   await page.locator(".owner-booking-modal").waitFor({ state: "detached" });
