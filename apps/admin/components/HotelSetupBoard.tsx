@@ -120,6 +120,7 @@ const MODULE_PRESETS = [
   { key: "MINI", title: "Мини-отель", copy: "Простой PMS + гостевой QR.", modules: ["ROOM_QR"] },
   { key: "HOTEL", title: "Отель", copy: "Питание, QR и работа с агентами.", modules: ["DINING", "ROOM_QR", "AGENTS"] },
   { key: "RESORT", title: "Курорт", copy: "Группы, агенты, питание, офферы, QR зон, отзывы и сообщения.", modules: ["GROUPS", "AGENTS", "DINING", "OFFERS", "GROWTH", "ROOM_QR", "POINT_QR", "INBOX"] },
+  { key: "FULL", title: "Полный", copy: "Все модули MARINA SMART без урезания функциональности.", modules: ["GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"] },
 ] as const;
 
 export default function HotelSetupBoard({ onModulesChanged, onNavigate, onIdentityChanged }: { onModulesChanged?: (modules: string[]) => void; onNavigate?: (destination: "RATES" | "STAFF") => void; onIdentityChanged?: (identity: { name: string; logo_url: string | null }) => void }) {
