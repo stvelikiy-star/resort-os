@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
-import { pmsRoomDisplayNumber } from "./PMSRoomDisplayLabel";
+import { pmsRoomDisplayNumber, pmsStaffBuildingLabel } from "./PMSRoomDisplayLabel";
 import RoomDetailModal from "./RoomDetailModal";
 
 type Block = {
@@ -26,6 +26,7 @@ type Room = {
   room_type_name: string;
   building_or_zone: string | null;
   floor: string | null;
+  beds_raw?: string | null;
   operational_state: "UNKNOWN" | "CLEAN" | "DIRTY" | "IN_INSPECTION" | "TECH_BLOCK";
   blocks: Block[];
 };
@@ -178,8 +179,8 @@ function paymentClass(item?: ReceptionItem) {
   return "unpaid";
 }
 
-function groupValue(room: Room, mode: GroupMode) {
-  if (mode === "BUILDING") return room.building_or_zone || "Без корпуса";
+function groupValue(room: Room, mode: GroupMode, propertyCode?: string | null) {
+  if (mode === "BUILDING") return pmsStaffBuildingLabel(room.building_or_zone, propertyCode);
   if (mode === "FLOOR") return room.floor ? `${room.floor} этаж` : "Этаж не указан";
   if (mode === "CATEGORY") return room.room_type_name;
   return "";
@@ -440,8 +441,8 @@ export default function PMSUniversalBoard() {
     });
 
     return list.sort((a, b) => {
-      const aGroup = groupValue(a, groupMode);
-      const bGroup = groupValue(b, groupMode);
+      const aGroup = groupValue(a, groupMode, data?.property);
+      const bGroup = groupValue(b, groupMode, data?.property);
       return aGroup.localeCompare(bGroup, "ru") || a.code.localeCompare(b.code, "ru", { numeric: true });
     });
   }, [data, filters, financeState, groupMode, quickMatch, roomHasToday, roomReservations, today]);
@@ -451,12 +452,12 @@ export default function PMSUniversalBoard() {
     let lastGroup = "";
     const counts = new Map<string, number>();
     filteredRooms.forEach((room) => {
-      const group = groupValue(room, groupMode);
+      const group = groupValue(room, groupMode, data?.property);
       counts.set(group, (counts.get(group) || 0) + 1);
     });
 
     filteredRooms.forEach((room) => {
-      const group = groupValue(room, groupMode);
+      const group = groupValue(room, groupMode, data?.property);
       if (groupMode !== "NONE" && group !== lastGroup) {
         result.push({ kind: "group", key: `group-${group}`, label: group, count: counts.get(group) || 0 });
         lastGroup = group;
@@ -926,7 +927,7 @@ export default function PMSUniversalBoard() {
                 >
                   <button className="v8-room-cell" onClick={() => setRoomId(room.id)}>
                     <strong>№ {pmsRoomDisplayNumber(room, data?.property)}</strong>
-                    <span>{room.room_type_name}</span>
+                    <span>{data?.property === "AK_BERMET_TEST" ? (room.beds_raw || room.room_type_name) : room.room_type_name}</span>
                     <small>{[room.building_or_zone, room.floor].filter(Boolean).join(" · ") || "—"}</small>
                   </button>
                   <div className="v8-state-cell">
