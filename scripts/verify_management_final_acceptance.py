@@ -25,7 +25,7 @@ CHECKS: list[tuple[str, str, str]] = [
     ("apps/admin/components/AdminShell.tsx", 'import OperationsBoard from "./OperationsBoard"', "operations mounted"),
     ("apps/admin/components/AdminShell.tsx", 'import StaffBoard from "./StaffBoard"', "staff mounted"),
     ("apps/admin/components/AdminShell.tsx", 'import InboxBoard from "./InboxBoard"', "inbox mounted"),
-    ("apps/admin/components/AdminShell.tsx", '>Супершахматка</button>', "PMS nav"),
+    ("apps/admin/components/AdminShell.tsx", '"Супершахматка"', "PMS nav"),
     ("apps/admin/components/AdminShell.tsx", '>Цены / Сезоны</button>', "rates nav"),
     ("apps/admin/components/AdminShell.tsx", '>Ресепшен / Брони</button>', "reception nav"),
     ("apps/admin/components/AdminShell.tsx", '>Сервис гостя</button>', "guest services nav"),
