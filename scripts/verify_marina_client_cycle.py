@@ -30,6 +30,10 @@ EXPECTED_ROOM_TYPE_COUNT = int(os.environ.get("EXPECTED_ROOM_TYPE_COUNT", "3"))
 EXPECTED_CLEAN_ROOM_COUNT = int(os.environ.get("EXPECTED_CLEAN_ROOM_COUNT", str(EXPECTED_ROOM_COUNT)))
 EXPECTED_BLOCKED_ROOM_COUNT = int(os.environ.get("EXPECTED_BLOCKED_ROOM_COUNT", "0"))
 EXPECTED_PUBLIC_AVAILABLE_COUNT = int(os.environ.get("EXPECTED_PUBLIC_AVAILABLE_COUNT", str(EXPECTED_CLEAN_ROOM_COUNT)))
+PREPAYMENT_POLICY = os.environ.get(
+    "PREPAYMENT_POLICY",
+    "FIRST_NIGHT" if PROPERTY_CODE == "AK_BERMET_TEST" else "MANAGER_DECIDES",
+).strip().upper()
 EXPECTED_ROOM_TYPE_CODES = {
     value.strip()
     for value in os.environ.get("EXPECTED_ROOM_TYPE_CODES", "STANDARD,COMFORT,SUITE").split(",")
@@ -220,8 +224,38 @@ def main() -> None:
         200,
         "owner quote for public site request",
     )
-    assert quoted_site_request["status"] in {"QUOTED", "AWAITING_PREPAYMENT"}
     assert int(quoted_site_request["quoted_total_kgs"] or 0) > 0
+    if PREPAYMENT_POLICY == "FIRST_NIGHT":
+        assert quoted_site_request["status"] == "AWAITING_PREPAYMENT"
+        first_night_availability = expect(
+            owner.get(
+                "/api/v1/booking/check-availability",
+                params={
+                    "check_in": site_check_in.isoformat(),
+                    "check_out": (site_check_in + timedelta(days=1)).isoformat(),
+                    "adults": 1,
+                    "children": 0,
+                    "room_type_code": site_option["room_type_code"],
+                },
+            ),
+            200,
+            "first-night prepayment reference",
+        )
+        first_night_options = [
+            item for item in first_night_availability["results"]
+            if item.get("room_type_code") == site_option["room_type_code"] and item.get("pricing", {}).get("sellable")
+        ]
+        assert len(first_night_options) == 1, first_night_availability
+        first_night_kgs = int(first_night_options[0]["pricing"]["total_kgs"])
+        assert int(quoted_site_request["required_prepayment_kgs"] or 0) == first_night_kgs, {
+            "required": quoted_site_request["required_prepayment_kgs"],
+            "first_night": first_night_kgs,
+        }
+        assert quoted_site_request["prepayment_decided_by_manager"] is False
+    else:
+        assert quoted_site_request["status"] == "QUOTED"
+        assert quoted_site_request["required_prepayment_kgs"] is None
+        assert quoted_site_request["prepayment_decided_by_manager"] is True
     public.close()
 
     chosen = None
@@ -498,6 +532,7 @@ def main() -> None:
             "payment_profile": "NO_PAYMENTS",
             "reception_rbac": "PASS",
             "public_site_to_crm": "PASS",
+            "prepayment_policy": PREPAYMENT_POLICY,
         }
     )
 
