@@ -119,7 +119,7 @@ function compactMoney(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-export default function PMSOwnerGrid() {
+export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolean }) {
   const [start, setStart] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -150,22 +150,24 @@ export default function PMSOwnerGrid() {
     setError(null);
     try {
       const params = new URLSearchParams({ start: startIso, end: endIso });
-      const [gridResponse, financeResponse] = await Promise.all([
-        fetch(`/core/api/v1/pms/grid?${params}`, { cache: "no-store" }),
-        fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" }),
-      ]);
+      const gridResponse = await fetch(`/core/api/v1/pms/grid?${params}`, { cache: "no-store" });
       const gridBody = await gridResponse.json().catch(() => ({}));
       if (!gridResponse.ok) throw new Error(typeof gridBody.detail === "string" ? gridBody.detail : `Grid HTTP ${gridResponse.status}`);
       setData(gridBody as GridResponse);
-      const financeBody = await financeResponse.json().catch(() => ({}));
-      setFinance(financeResponse.ok && Array.isArray(financeBody.items) ? financeBody.items : []);
+      if (agentMode) {
+        setFinance([]);
+      } else {
+        const financeResponse = await fetch("/core/api/v1/admin/reception/reservations?limit=500", { cache: "no-store" });
+        const financeBody = await financeResponse.json().catch(() => ({}));
+        setFinance(financeResponse.ok && Array.isArray(financeBody.items) ? financeBody.items : []);
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить шахматку");
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [startIso, endIso]);
+  }, [startIso, endIso, agentMode]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -174,6 +176,10 @@ export default function PMSOwnerGrid() {
   }, [load]);
 
   useEffect(() => {
+    if (agentMode) {
+      setRealtime("offline");
+      return;
+    }
     const base = websocketBase();
     if (!base) return;
     let stopped = false;
@@ -208,7 +214,7 @@ export default function PMSOwnerGrid() {
       if (timer) window.clearTimeout(timer);
       socket?.close();
     };
-  }, [startIso, endIso]);
+  }, [startIso, endIso, agentMode]);
 
   const financeById = useMemo(() => new Map(finance.map((item) => [item.id, item])), [finance]);
   const categories = useMemo(() => Array.from(new Set((data?.rooms || []).map((room) => room.room_type_name))), [data]);
@@ -303,7 +309,7 @@ export default function PMSOwnerGrid() {
   }, [finishSelection]);
 
   function openReservation(block: Block) {
-    if (!block.reservation_id) return;
+    if (agentMode || !block.reservation_id) return;
     setBuilder({ reservationId: block.reservation_id, intent: { kind: "OPEN", segmentBlockId: block.id } });
   }
 
@@ -316,7 +322,7 @@ export default function PMSOwnerGrid() {
         <div>
           <p className="eyebrow">PMS · рабочая шахматка</p>
           <h1>Номер × ночь</h1>
-          <p>Выделите от одной до нужного количества свободных клеток. Цена и конфликты проверяются Resort Core до создания брони.</p>
+          <p>{agentMode ? "Показываются свободные/занятые ночи. Чужие гости и финансы скрыты. Новая бронь создаётся только по открытому тарифу." : "Выделите от одной до нужного количества свободных клеток. Цена и конфликты проверяются Resort Core до создания брони."}</p>
         </div>
         <div className={`owner-live ${realtime}`}><i />{realtime === "live" ? "LIVE" : realtime === "connecting" ? "CONNECT" : "HTTP"}</div>
       </header>
@@ -359,7 +365,7 @@ export default function PMSOwnerGrid() {
             <div className="owner-group-label"><strong>{group.label}</strong><span>{group.rooms.length}</span></div>
             {group.rooms.map((room) => (
               <div key={room.id} className={`owner-room-row state-${room.operational_state}`} style={{ gridTemplateColumns: template }}>
-                <button className="owner-room-label" onClick={() => setRoomId(room.id)} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
+                <button className="owner-room-label" onClick={() => { if (!agentMode) setRoomId(room.id); }} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
                   <strong>{pmsOwnerRoomDisplayLabel(room)}</strong>
                 </button>
                 <div className={`owner-room-state ${room.operational_state}`}>{ROOM_STATE[room.operational_state]}</div>
@@ -405,10 +411,10 @@ export default function PMSOwnerGrid() {
                       style={{ gridColumn: `${3 + startIndex} / ${3 + endIndex}`, gridRow: 1 }}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => { event.stopPropagation(); openReservation(block); }}
-                      title={`${block.guest_name || block.reason || block.type} · ${block.start} → ${block.end}${financeTitle}`}
+                      title={`${agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.reason || block.type)} · ${block.start} → ${block.end}${financeTitle}`}
                     >
-                      <strong>{block.guest_name || block.booking_number || block.reason || block.type}</strong>
-                      {financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>}
+                      <strong>{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
+                      {!agentMode && financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>
                     </button>
                   );
                 })}
@@ -426,9 +432,9 @@ export default function PMSOwnerGrid() {
         <span><i className="maintenance" /> ремонт / блок</span>
       </footer>
 
-      {createOpen && <PMSNewReservationModal {...createOpen} onClose={() => { setCreateOpen(null); setSelection(null); selectionRef.current = null; }} onCreated={() => { setSelection(null); selectionRef.current = null; void load(); }} />}
-      {builder && <ReservationScheduleBuilder reservationId={builder.reservationId} rooms={allRooms.map((room) => ({ id: room.id, code: room.code, room_type_code: room.room_type_code, room_type_name: room.room_type_name, operational_state: room.operational_state, building_or_zone: room.building_or_zone, floor: room.floor }))} intent={builder.intent} onClose={() => setBuilder(null)} onUpdated={() => void load()} />}
-      {roomId && <RoomDetailModal roomId={roomId} onClose={() => setRoomId(null)} onUpdated={() => void load()} />}
+      {createOpen && <PMSNewReservationModal {...createOpen} agentMode={agentMode} onClose={() => { setCreateOpen(null); setSelection(null); selectionRef.current = null; }} onCreated={() => { setSelection(null); selectionRef.current = null; void load(); }} />}
+      {!agentMode && builder && <ReservationScheduleBuilder reservationId={builder.reservationId} rooms={allRooms.map((room) => ({ id: room.id, code: room.code, room_type_code: room.room_type_code, room_type_name: room.room_type_name, operational_state: room.operational_state, building_or_zone: room.building_or_zone, floor: room.floor }))} intent={builder.intent} onClose={() => setBuilder(null)} onUpdated={() => void load()} />}
+      {!agentMode && roomId && <RoomDetailModal roomId={roomId} onClose={() => setRoomId(null)} onUpdated={() => void load()} />}
     </section>
   );
 }
