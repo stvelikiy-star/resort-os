@@ -18,6 +18,8 @@ type Agent = {
   received_kgs: number;
   room_nights: number;
   last_check_in?: string | null;
+  access_username?: string | null;
+  access_active?: boolean | null;
 };
 
 type AgentReport = {
@@ -52,7 +54,7 @@ const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)
 const todayIso = hotelDateIso;
 const monthStartIso = hotelMonthStartIso;
 
-export default function AgentsBoard() {
+export default function AgentsBoard({ userRole }: { userRole: string }) {
   const [items, setItems] = useState<Agent[]>([]);
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState(monthStartIso());
@@ -69,6 +71,11 @@ export default function AgentsBoard() {
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
+  const [accessUsername, setAccessUsername] = useState("");
+  const [accessPassword, setAccessPassword] = useState("");
+  const [editAccessUsername, setEditAccessUsername] = useState("");
+  const [editAccessPassword, setEditAccessPassword] = useState("");
+  const [editAccessActive, setEditAccessActive] = useState(true);
   const [interactionKind, setInteractionKind] = useState("NOTE");
   const [interactionNote, setInteractionNote] = useState("");
   const [nextContactAt, setNextContactAt] = useState("");
@@ -98,6 +105,9 @@ export default function AgentsBoard() {
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось загрузить отчёт агента");
       setReport(body as AgentReport);
       setSelectedId(agentId);
+      setEditAccessUsername(body.agent?.access_username || "");
+      setEditAccessPassword("");
+      setEditAccessActive(body.agent?.access_active !== false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить отчёт агента");
     }
@@ -139,6 +149,8 @@ export default function AgentsBoard() {
           whatsapp: whatsapp.trim() || null,
           email: email.trim() || null,
           notes: notes.trim() || null,
+          access_username: userRole === "OWNER" && accessUsername.trim() ? accessUsername.trim() : null,
+          access_password: userRole === "OWNER" && accessPassword ? accessPassword : null,
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -149,11 +161,49 @@ export default function AgentsBoard() {
       setWhatsapp("");
       setEmail("");
       setNotes("");
+      setAccessUsername("");
+      setAccessPassword("");
       setShowCreate(false);
       await load();
       await loadReport(body.id);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось создать агента");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveAgentAccess(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedId || userRole !== "OWNER") return;
+    if (!editAccessUsername.trim()) {
+      setError("Укажите логин агентства.");
+      return;
+    }
+    if (!report?.agent.access_username && !editAccessPassword) {
+      setError("Для нового доступа задайте пароль минимум 12 символов.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        username: editAccessUsername.trim(),
+        active: editAccessActive,
+      };
+      if (editAccessPassword) payload.password = editAccessPassword;
+      const response = await fetch(`/core/api/v1/admin/owner-corrections/agents/${selectedId}/access`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось обновить доступ агентства");
+      setEditAccessPassword("");
+      await load();
+      await loadReport(selectedId);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось обновить доступ агентства");
     } finally {
       setBusy(false);
     }
@@ -214,6 +264,8 @@ export default function AgentsBoard() {
       <div className="control"><label>WhatsApp</label><input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} /></div>
       <div className="control"><label>Email</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
       <div className="control"><label>Комментарий</label><input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+      {userRole === "OWNER" && <><div className="control"><label>Логин агентства</label><input pattern="[A-Za-z0-9._-]+" autoComplete="off" value={accessUsername} onChange={(e) => setAccessUsername(e.target.value)} placeholder="необязательно" /></div>
+      <div className="control"><label>Пароль доступа</label><input type="password" minLength={12} autoComplete="new-password" value={accessPassword} onChange={(e) => setAccessPassword(e.target.value)} placeholder="минимум 12 символов" /></div></>}
       <div className="date-actions"><button className="btn primary" disabled={busy}>{busy ? "Сохраняю…" : "Создать карточку"}</button></div>
     </form>}
 
@@ -224,7 +276,7 @@ export default function AgentsBoard() {
           <thead><tr><th>Агент</th><th>Контакт</th><th>Брони</th><th>Ночи</th><th>Забронировано</th><th>Получено</th><th>Последний заезд</th><th /></tr></thead>
           <tbody>{items.map((agent) => <tr key={agent.id} style={{ opacity: agent.status === "INACTIVE" ? .55 : 1 }}>
             <td><strong>{agent.name}</strong><br/><small>{agent.status === "ACTIVE" ? "Активен" : "Неактивен"}</small></td>
-            <td>{agent.contact_name || "—"}<br/><small>{agent.phone || agent.whatsapp || ""}</small></td>
+            <td>{agent.contact_name || "—"}<br/><small>{agent.phone || agent.whatsapp || ""}</small>{agent.access_username && <><br/><small>Доступ: @{agent.access_username} · {agent.access_active ? "включён" : "отключён"}</small></>}</td>
             <td>{agent.reservations}</td><td>{agent.room_nights}</td><td>{money(agent.booked_kgs)}</td><td>{money(agent.received_kgs)}</td><td>{agent.last_check_in || "—"}</td>
             <td><button className="btn" onClick={() => void loadReport(agent.id)}>Карточка / отчёт</button></td>
           </tr>)}</tbody>
@@ -237,6 +289,17 @@ export default function AgentsBoard() {
         <div><p className="eyebrow">Карточка агента</p><h2>{report.agent.name}</h2><p>{[report.agent.contact_name, report.agent.phone, report.agent.whatsapp, report.agent.email].filter(Boolean).join(" · ")}</p></div>
         <button className="btn" onClick={() => { setReport(null); setSelectedId(null); }}>Закрыть</button>
       </div>
+      {userRole === "OWNER" && <section className="pms-v2-card" style={{ marginBottom: 20 }}>
+        <h3>Доступ агентства к шахматке</h3>
+        <form className="controls" onSubmit={saveAgentAccess}>
+          <div className="control"><label>Логин</label><input required pattern="[A-Za-z0-9._-]+" value={editAccessUsername} onChange={(e) => setEditAccessUsername(e.target.value)} /></div>
+          <div className="control"><label>{report.agent.access_username ? "Новый пароль (если меняем)" : "Пароль *"}</label><input type="password" minLength={12} required={!report.agent.access_username} autoComplete="new-password" value={editAccessPassword} onChange={(e) => setEditAccessPassword(e.target.value)} /></div>
+          <div className="control"><label>Статус</label><select value={editAccessActive ? "ON" : "OFF"} onChange={(e) => setEditAccessActive(e.target.value === "ON")}><option value="ON">Доступ включён</option><option value="OFF">Доступ отключён</option></select></div>
+          <div className="date-actions"><button className="btn primary" disabled={busy}>{busy ? "Сохраняю…" : report.agent.access_username ? "Обновить доступ" : "Создать доступ"}</button></div>
+        </form>
+        <p className="subtitle">Пароль после сохранения не показывается. Агент видит только шахматку, свободные/занятые ночи и свои брони.</p>
+      </section>}
+
       <section className="summary">
         <div className="summary-card"><strong>{report.summary.effective_reservations}</strong><span>Действующих броней</span></div>
         <div className="summary-card"><strong>{report.summary.room_nights}</strong><span>Ночей</span></div>
