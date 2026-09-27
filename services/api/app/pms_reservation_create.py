@@ -244,7 +244,7 @@ def pricing_result(
 
 
 def confirmed_room_max_capacity(room) -> int | None:
-    raw = room.get("notes")
+    raw = room["notes"]
     if not raw:
         return None
     try:
