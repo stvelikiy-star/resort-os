@@ -206,6 +206,31 @@ async def main() -> None:
             if dict(db_counts) != {"rooms": 169, "clean": 137, "blocked": 32}:
                 raise RuntimeError(f"AK BERMET database verification failed: {dict(db_counts)}")
 
+            building_rows = await conn.fetch(
+                """
+                SELECT "buildingOrZone" AS building, count(*)::int AS rooms
+                FROM rooms
+                WHERE "propertyId"=$1
+                GROUP BY "buildingOrZone"
+                ORDER BY "buildingOrZone"
+                """,
+                property_id,
+            )
+            building_counts = {row["building"]: row["rooms"] for row in building_rows}
+            expected_building_counts = {
+                "Корпус №1": 24,
+                "Корпус №2": 56,
+                "Корпус №3": 40,
+                "GARDEN": 32,
+                "Кирпичные": 3,
+                "Деревянные": 12,
+                "Сруб": 2,
+            }
+            if building_counts != expected_building_counts:
+                raise RuntimeError(
+                    f"AK BERMET staff register grouping verification failed: {building_counts}"
+                )
+
             stale_types = await conn.fetchval(
                 'SELECT count(*) FROM room_types WHERE "propertyId"=$1 AND code <> ALL($2::text[])',
                 property_id, list(type_ids),
