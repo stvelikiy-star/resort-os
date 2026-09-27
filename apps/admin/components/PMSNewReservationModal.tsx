@@ -13,6 +13,8 @@ type Preview = {
     beds_raw?: string | null;
     operational_state: string;
     capacity_adults: number;
+    max_capacity_adults?: number | null;
+    max_extra_bed_count?: number | null;
     effective_capacity_adults: number;
     extra_bed_allowed: boolean;
   };
@@ -231,6 +233,7 @@ export default function PMSNewReservationModal({
   }
 
   const deniedExtraBeds = preview?.room.extra_bed_allowed === false;
+  const maxExtraBedCount = preview?.room.max_extra_bed_count ?? 10;
 
   return (
     <div className="owner-booking-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -274,10 +277,10 @@ export default function PMSNewReservationModal({
               <div>
                 <span>Дополнительные места</span>
                 {deniedExtraBeds ? <strong>Запрещены для этой категории</strong> : <strong>Разрешены</strong>}
-                {!deniedExtraBeds && <small>При добавлении места Core автоматически пересчитает весь период.</small>}
+                {!deniedExtraBeds && <small>При добавлении места Core автоматически пересчитает весь период.{preview?.room.max_extra_bed_count != null ? ` Максимум допмест: ${preview.room.max_extra_bed_count}.` : ""}</small>}
               </div>
               {!deniedExtraBeds && <div className="owner-manager-price">
-                <input type="number" min={0} max={10} value={extraBedCount} onChange={(event) => setExtraBedCount(Number(event.target.value))} aria-label="Количество дополнительных мест" />
+                <input type="number" min={0} max={maxExtraBedCount} value={extraBedCount} onChange={(event) => setExtraBedCount(Number(event.target.value))} aria-label="Количество дополнительных мест" />
                 <input inputMode="numeric" value={extraBedUnit} disabled={extraBedCount === 0} onChange={(event) => setExtraBedUnit(event.target.value)} placeholder="Цена 1 допместа / ночь" />
               </div>}
               {preview && <div className="owner-commercial-prices"><span>Допместа: {money(preview.pricing.extra_beds_total_kgs)}</span><span>Вместимость: {preview.room.effective_capacity_adults}</span></div>}
