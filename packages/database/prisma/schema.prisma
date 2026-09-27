@@ -168,6 +168,7 @@ model Property {
   roomTypes                RoomType[]
   rooms                    Room[]
   ratePlans                RatePlan[]
+  productSettings          PropertyProductSettings?
   guests                   Guest[]
   requests                 ReservationRequest[]
   reservations             Reservation[]
@@ -196,6 +197,20 @@ model Property {
   updatedAt                DateTime                  @updatedAt
 
   @@map("properties")
+}
+
+model PropertyProductSettings {
+  id             String   @id @default(uuid()) @db.Uuid
+  propertyId     String   @unique @db.Uuid
+  property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  checkInTime    DateTime @db.Time
+  checkOutTime   DateTime @db.Time
+  enabledModules Json
+  hotelLogoUrl   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("property_product_settings")
 }
 
 model RoomType {

@@ -84,7 +84,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = body?.detail;
-    const message = typeof detail === "string" ? detail : detail?.message || detail?.code || "Ошибка Resort Core";
+    const message = typeof detail === "string" ? detail : detail?.message || detail?.code || "Ошибка MARINA SMART";
     throw new Error(message);
   }
   return body as T;

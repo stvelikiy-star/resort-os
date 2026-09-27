@@ -41,7 +41,7 @@ function nowLocalInput() {
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.message || body?.detail?.code || "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.message || body?.detail?.code || "Ошибка MARINA SMART");
   return body;
 }
 
@@ -165,7 +165,7 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
   }
 
   return <section className={styles.shell}>
-    <div className={styles.head}><div><small>Guest folio · Resort Core</small><h3>Финансы гостя</h3><p>Проживание + дополнительные услуги = общий счёт. Payment появляется только когда деньги реально приняты.</p></div><button onClick={() => void load()} disabled={loading}>↻ Обновить</button></div>
+    <div className={styles.head}><div><small>Guest folio · MARINA SMART</small><h3>Финансы гостя</h3><p>Проживание + дополнительные услуги = общий счёт. Payment появляется только когда деньги реально приняты.</p></div><button onClick={() => void load()} disabled={loading}>↻ Обновить</button></div>
     {error && <div className={styles.error}>{error}</div>}{notice && <div className={styles.notice}>{notice}</div>}
 
     <div className={styles.totals}>

@@ -191,7 +191,7 @@ export default function ReservationQuickFacts({ reservationId, refreshKey }: { r
     </div>
 
     {showPaymentForm && <div className="chess-payment-form">
-      <div className="chess-payment-form-head"><div><strong>Фиксация внутренней оплаты</strong><span>Только факт денег, уже принятых менеджером. Resort OS не выбирает сумму и условия.</span></div><button className="btn" onClick={() => setShowPaymentForm(false)}>Закрыть</button></div>
+      <div className="chess-payment-form-head"><div><strong>Фиксация внутренней оплаты</strong><span>Только факт денег, уже принятых менеджером. Hotel OS не выбирает сумму и условия.</span></div><button className="btn" onClick={() => setShowPaymentForm(false)}>Закрыть</button></div>
       <div className="chess-payment-fields">
         <label><span>Получено, сом</span><input inputMode="numeric" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="Например 5000" /></label>
         <label><span>Способ</span><input value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} placeholder="Фактический способ оплаты" /></label>

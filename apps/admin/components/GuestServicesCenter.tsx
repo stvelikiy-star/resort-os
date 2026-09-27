@@ -232,7 +232,7 @@ export default function GuestServicesCenter({ user }: { user: UserContext }) {
   return <section className="v9-cockpit" id="guest-services-center">
     <header className="v9-head">
       <div>
-        <p className="eyebrow">Resort Core · Guest Services Center</p>
+        <p className="eyebrow">MARINA SMART · Сервис гостя</p>
         <h2>Единый центр сервиса гостя</h2>
         <span>Одна очередь для Guest OS, PMS и ресепшена. Исполнитель определяется типом услуги. Запрос не меняет цену проживания, Payment или физический статус номера автоматически.</span>
       </div>
@@ -252,7 +252,7 @@ export default function GuestServicesCenter({ user }: { user: UserContext }) {
     </div>
 
     <section className="v9-card">
-      <div className="v9-section-head"><div><strong>Фильтр очереди</strong><span>По фактическим данным Resort Core.</span></div></div>
+      <div className="v9-section-head"><div><strong>Фильтр очереди</strong><span>По актуальным данным MARINA SMART.</span></div></div>
       <div className="work-actions">
         <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
           <option value="ACTIVE">Активные</option><option value="OPEN">Новые</option><option value="IN_PROGRESS">В работе</option>

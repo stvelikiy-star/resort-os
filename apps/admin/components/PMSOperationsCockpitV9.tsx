@@ -61,8 +61,8 @@ export default function PMSOperationsCockpitV9() {
 
   return <section className="v9-cockpit">
     <header className="v9-head">
-      <div><p className="eyebrow">PMS Integration · V9</p><h2>Один Core · одна смена · одна шахматка</h2><span>Reception, оплаты, room-state и активные задачи используют один общий live snapshot. Изменения размещения выполняются в Universal Tape Chart через Core preview/commit.</span></div>
-      <div className="v9-actions"><span className={`v9-source ${snapshot ? "ok" : "bad"}`}>{snapshot ? `Core complete · ${snapshot.local_date}` : "Snapshot offline"}</span><button className="btn" onClick={() => void refresh()} disabled={refreshing}>↻ {refreshing ? "Обновляю" : "Обновить"}</button><button className="btn primary" onClick={jumpToTape}>К шахматке ↓</button></div>
+      <div><p className="eyebrow">MARINA SMART · Операционный центр</p><h2>Одна смена · одна шахматка · единые данные</h2><span>Reception, оплаты, room-state и активные задачи используют единое актуальное состояние. Изменения размещения выполняются в Universal Tape Chart с предварительной проверкой.</span></div>
+      <div className="v9-actions"><span className={`v9-source ${snapshot ? "ok" : "bad"}`}>{snapshot ? `Данные актуальны · ${snapshot.local_date}` : "Данные недоступны"}</span><button className="btn" onClick={() => void refresh()} disabled={refreshing}>↻ {refreshing ? "Обновляю" : "Обновить"}</button><button className="btn primary" onClick={jumpToTape}>К шахматке ↓</button></div>
     </header>
 
     {error && <div className="v9-error">{error}</div>}

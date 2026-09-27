@@ -219,7 +219,7 @@ export default function GuestHistoryBoard() {
       {error && <div className="error-box guest-error">{error}</div>}
 
       <section className="guest-history-kpis">
-        <article><span>Профилей всего</span><strong>{list?.total_profiles ?? "—"}</strong><small>в Resort Core</small></article>
+        <article><span>Профилей всего</span><strong>{list?.total_profiles ?? "—"}</strong><small>в MARINA SMART</small></article>
         <article><span>В выборке</span><strong>{list?.items.length ?? 0}</strong><small>{search ? `по запросу «${search}»` : "загружено для работы"}</small></article>
         <article><span>Повторные</span><strong>{loadedTotals.repeat}</strong><small>2+ броней в текущей выборке</small></article>
         <article><span>Ночей</span><strong>{loadedTotals.nights}</strong><small>по текущей выборке</small></article>

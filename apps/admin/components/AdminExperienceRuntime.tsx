@@ -93,7 +93,7 @@ const common: Phrase[] = [
   { ru: "Повторяющиеся поломки", kg: "Кайталанган бузулуулар", en: "Recurring faults" },
   { ru: "Номера с повторными ремонтами", kg: "Кайталанган оңдоосу бар бөлмөлөр", en: "Rooms with repeat repairs" },
   { ru: "Сервис, уборка и ремонты", kg: "Сервис, тазалоо жана оңдоо", en: "Service, housekeeping and maintenance" },
-  { ru: "только факты Resort Core", kg: "Resort Core фактылары гана", en: "Resort Core facts only" },
+  { ru: "только подтверждённые данные MARINA SMART", kg: "MARINA SMART тастыкталган маалыматтары гана", en: "MARINA SMART verified data only" },
   { ru: "СОЗДАНО", kg: "ТҮЗҮЛДҮ", en: "CREATED" },
   { ru: "АКТИВНЫЕ", kg: "АКТИВДҮҮ", en: "ACTIVE" },
   { ru: "ЗАВЕРШЕНО", kg: "БҮТТҮ", en: "COMPLETED" },

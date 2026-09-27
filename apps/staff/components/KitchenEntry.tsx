@@ -24,7 +24,7 @@ const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
 async function json(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка MARINA SMART");
   return body;
 }
 
@@ -129,13 +129,13 @@ export default function KitchenEntry() {
     };
   }, [pulse]);
 
-  if (checking) return <main className={styles.loginPage}><div className={styles.loginCard}><p>Три Короны · Resort OS</p><h1>Открываю кухню…</h1><span>Проверяю рабочую сессию.</span></div></main>;
+  if (checking) return <main className={styles.loginPage}><div className={styles.loginCard}><p>MARINA SMART · Hotel OS</p><h1>Открываю кухню…</h1><span>Проверяю рабочую сессию.</span></div></main>;
 
   if (!user) {
     return <main className={styles.loginPage}>
       <form className={styles.loginCard} onSubmit={login}>
         <div className={styles.mark}>III</div>
-        <p>Три Короны · отдельный вход</p>
+        <p>MARINA SMART · отдельный вход</p>
         <h1>Кухня</h1>
         <span>План порций, заказы кухни, меню, стоп-лист и новые заезды — в одном рабочем контуре.</span>
         <label>Логин<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required autoFocus /></label>

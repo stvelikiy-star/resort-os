@@ -156,7 +156,7 @@ export default function OwnerControlV2() {
         <div>
           <p className="eyebrow">OWNER CONTROL V2 · FORWARD VIEW</p>
           <h2>Что впереди и что требует решения</h2>
-          <p>{brief.property.local_date} · подтверждённые данные Resort Core · без выдуманного прогноза спроса</p>
+          <p>{brief.property.local_date} · подтверждённые данные MARINA SMART · без выдуманного прогноза спроса</p>
         </div>
         <div className="owner-v2-actions">
           <button className="btn" onClick={capture} disabled={capturing}>{capturing ? "Сохраняю…" : "Контрольный снимок"}</button>

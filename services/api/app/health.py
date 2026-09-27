@@ -9,7 +9,7 @@ router = APIRouter(tags=["health"])
 @router.get("/health/live")
 @router.get("/live", include_in_schema=False)
 async def live():
-    return {"status": "ok", "service": "three-crowns-core", "probe": "liveness"}
+    return {"status": "ok", "service": "marina-smart-core", "probe": "liveness"}
 
 
 @router.get("/health/ready")
@@ -37,7 +37,7 @@ async def ready(request: Request):
 
     return {
         "status": "ready",
-        "service": "three-crowns-core",
+        "service": "marina-smart-core",
         "probe": "readiness",
         "property": prop["code"],
         "timezone": prop["timezone"],

@@ -422,9 +422,9 @@ export default function PMSGridV2() {
   return <main className="shell pms-v2-shell">
     <div className="topbar">
       <div>
-        <p className="eyebrow">Resort OS · Three Crowns</p>
+        <p className="eyebrow">Hotel OS · MARINA SMART</p>
         <h1>Шахматка</h1>
-        <p className="subtitle">Перетащите будущую бронь на другой номер или дату; потяните внешний край для сокращения/продления. Resort Core всегда проверяет изменение до сохранения.</p>
+        <p className="subtitle">Перетащите будущую бронь на другой номер или дату; потяните внешний край для сокращения/продления. MARINA SMART проверяет изменение до сохранения.</p>
       </div>
       <div className={`connection ${error ? "error" : "ok"}`}>{error ? "Core недоступен" : realtime === "live" ? "Realtime" : realtime === "connecting" ? "Подключение…" : "HTTP режим"}</div>
     </div>

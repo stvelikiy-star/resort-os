@@ -155,7 +155,7 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
         </div>
 
         <section className="room-readiness-control" aria-label="Готовность номера">
-          <div className="room-readiness-head"><div><small>Быстрый статус</small><strong>Готовность номера</strong></div><span>Изменение сразу сохраняется в Resort Core</span></div>
+          <div className="room-readiness-head"><div><small>Быстрый статус</small><strong>Готовность номера</strong></div><span>Изменение сразу сохраняется в MARINA SMART</span></div>
           <div className="room-readiness-actions">
             {readinessActions.map((action) => <button key={action.state} type="button" className={`room-readiness-button ${action.state} ${data.room.operational_state === action.state ? "active" : ""}`} disabled={busyState !== null} onClick={() => void setReadiness(action.state)}><strong>{busyState === action.state ? "Сохраняю…" : action.label}</strong><small>{action.note}</small></button>)}
           </div>
@@ -200,7 +200,7 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
           </article>)}
         </div>}
 
-        <p className="room-detail-truth">Карточка показывает только сохранённые данные Resort Core. Пустые корпус, этаж, площадь или конфигурация не заполняются предположениями.</p>
+        <p className="room-detail-truth">Карточка показывает только сохранённые данные MARINA SMART. Пустые корпус, этаж, площадь или конфигурация не заполняются предположениями.</p>
       </>}
     </section>
   </div>;

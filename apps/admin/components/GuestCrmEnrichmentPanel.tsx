@@ -101,7 +101,7 @@ function eventSummary(event: EventItem) {
     const code = typeof payload.request_code === "string" ? payload.request_code : "";
     return requestLabels[code] || code || "Заявка гостя";
   }
-  return event.source || "Resort Core";
+  return event.source || "MARINA SMART";
 }
 
 export default function GuestCrmEnrichmentPanel({ guestId }: { guestId: string }) {

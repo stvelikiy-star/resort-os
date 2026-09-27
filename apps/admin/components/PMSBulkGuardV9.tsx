@@ -90,7 +90,7 @@ export default function PMSBulkGuardV9() {
   async function createTasks() {
     const chosen = candidates.filter((item) => selected.has(`${item.room.id}:${item.type}`));
     if (!chosen.length) return;
-    if (!window.confirm(`Создать ${chosen.length} недостающих задач? Resort Core повторно проверит активные задачи и заблокирует дубли.`)) return;
+    if (!window.confirm(`Создать ${chosen.length} недостающих задач? MARINA SMART повторно проверит активные задачи и заблокирует дубли.`)) return;
     setBusy(true);
     setError(null);
     setResult(null);
@@ -105,7 +105,7 @@ export default function PMSBulkGuardV9() {
             type: item.type,
             priority: item.type === "MAINTENANCE" ? "HIGH" : "NORMAL",
             title: item.type === "MAINTENANCE" ? `Ремонт · № ${item.room.code}` : `Уборка · № ${item.room.code}`,
-            description: "Создано из V9 после сверки room state с полным active-task snapshot.",
+            description: "Создано после сверки состояния номера с активными задачами.",
           })),
         }),
       });
@@ -129,7 +129,7 @@ export default function PMSBulkGuardV9() {
 
   return <section className="v9-bulk">
     <header className="v9-bulk-head">
-      <div><p className="eyebrow">Operations Guard · V9</p><h3>Недостающие задачи фонда</h3><span>Показываем только DIRTY без active HOUSEKEEPING и TECH_BLOCK без active MAINTENANCE. Перед записью Core снова блокирует комнаты и проверяет дубли.</span></div>
+      <div><p className="eyebrow">Контроль операций</p><h3>Недостающие задачи фонда</h3><span>Показываем только DIRTY без active HOUSEKEEPING и TECH_BLOCK без active MAINTENANCE. Перед записью система повторно проверяет комнаты и защищает от дублей.</span></div>
       <div className="v9-bulk-actions"><button className="btn" onClick={() => void load()} disabled={loading}>↻ Пересчитать</button><button className="btn primary" disabled={busy || selected.size === 0} onClick={() => void createTasks()}>{busy ? "Создаю…" : `Создать выбранные · ${selected.size}`}</button></div>
     </header>
     {error && <div className="v9-bulk-error">{error}</div>}{result && <div className="v9-bulk-result">{result}</div>}

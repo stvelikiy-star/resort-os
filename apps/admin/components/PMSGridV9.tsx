@@ -20,7 +20,7 @@ export default function PMSGridV9() {
             {operationsOpen ? "Скрыть операционный центр" : "Операционный центр"}
           </button>
           <button className={advancedOpen ? "active" : ""} onClick={() => setAdvancedOpen((value) => !value)}>
-            {advancedOpen ? "Скрыть расширенную V9" : "Перенос / разрез / расширенная V9"}
+            {advancedOpen ? "Скрыть расширенные операции" : "Перенос / Split Stay"}
           </button>
         </div>
 
@@ -34,7 +34,7 @@ export default function PMSGridV9() {
 
         {advancedOpen && <div className="owner-pms-advanced-panel">
           <div className="owner-pms-panel-head">
-            <div><strong>Расширенная шахматка V9</strong><span>Drag & drop, resize, Split Stay и полный фильтр остаются доступны здесь.</span></div>
+            <div><strong>Расширенная шахматка</strong><span>Drag & drop, resize, Split Stay и полный фильтр остаются доступны здесь.</span></div>
             <button onClick={() => setAdvancedOpen(false)}>Закрыть</button>
           </div>
           <PMSUniversalBoard />

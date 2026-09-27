@@ -358,7 +358,7 @@ export default function ReservationScheduleBuilder({
         <div className="v8-builder-head-actions"><button className="btn" onClick={resetDraft} disabled={!data || busy}>Сбросить</button><button className="btn" onClick={onClose}>Закрыть</button></div>
       </header>
 
-      {loading ? <div className="v8-builder-loading">Загрузка полного графика из Resort Core…</div> : !data ? <div className="v8-builder-error">{error || "График недоступен"}</div> : <>
+      {loading ? <div className="v8-builder-loading">Загрузка полного графика из MARINA SMART…</div> : !data ? <div className="v8-builder-error">{error || "График недоступен"}</div> : <>
         <div className="v8-builder-summary">
           <div><span>Статус</span><strong>{data.reservation.status}</strong></div>
           <div><span>Ночей</span><strong>{totalNights}</strong></div>
@@ -407,7 +407,7 @@ export default function ReservationScheduleBuilder({
 
         {error && <div className="v8-builder-error">{error}</div>}
 
-        <div className="v8-builder-preview-actions"><button className="btn primary" onClick={() => void runPreview()} disabled={busy || !draft.length}>{busy ? "Проверяю…" : "Проверить в Resort Core"}</button><span>Сначала preview: конфликты, категории, цена и версия брони. Только затем commit.</span></div>
+        <div className="v8-builder-preview-actions"><button className="btn primary" onClick={() => void runPreview()} disabled={busy || !draft.length}>{busy ? "Проверяю…" : "Проверить в MARINA SMART"}</button><span>Сначала preview: конфликты, категории, цена и версия брони. Только затем commit.</span></div>
 
         {preview && <section className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
           <header><div><strong>{preview.can_commit ? "График можно сохранить" : "Core запретил сохранение"}</strong><span>{preview.proposed_check_in} → {preview.proposed_check_out} · {preview.proposed_schedule.length} сегм.</span></div><b>{preview.category_changed ? "Категория меняется" : "Категория без изменения"}</b></header>

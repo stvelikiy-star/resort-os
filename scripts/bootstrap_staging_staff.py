@@ -31,6 +31,12 @@ STAFF = [
         "display_name": first_env("DINING_STAFF_DISPLAY_NAME", "STAGING_DINING_DISPLAY_NAME") or "Staging Dining",
     },
     {
+        "role": "DINING_STAFF",
+        "username": first_env("WAITER_USERNAME", "STAGING_WAITER_USERNAME"),
+        "password": first_env("WAITER_PASSWORD", "STAGING_WAITER_PASSWORD"),
+        "display_name": first_env("WAITER_DISPLAY_NAME", "STAGING_WAITER_DISPLAY_NAME") or "Staging Waiter",
+    },
+    {
         "role": "MAID",
         "username": first_env("MAID_USERNAME", "STAGING_MAID_USERNAME"),
         "password": first_env("MAID_PASSWORD", "STAGING_MAID_PASSWORD"),

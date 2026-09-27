@@ -149,7 +149,7 @@ async def _public_context(request: Request) -> dict[str, Any]:
             property_id,
         )
     return {
-        "property": dict(property_row) if property_row else {"code": "THREE_CROWNS", "name": "Три Короны"},
+        "property": dict(property_row) if property_row else {"code": "MARINA_TEST", "name": "MARINA SMART TEST HOTEL"},
         "inventory": [
             {
                 "code": row["code"],
@@ -167,7 +167,8 @@ async def _public_context(request: Request) -> dict[str, Any]:
 
 def _prompt(payload: PublicAiAdminRequest, context: dict[str, Any], availability: dict[str, Any] | None) -> str:
     language = {"ru": "Russian", "kg": "Kyrgyz", "en": "English"}[payload.locale]
-    rules = f"""You are the public AI administrator of Three Crowns Resort & SPA in Cholpon-Ata, Issyk-Kul.
+    property_name = str((context.get("property") or {}).get("name") or "MARINA SMART Hotel")
+    rules = f"""You are the public AI administrator for {property_name}, powered by MARINA SMART Hotel OS.
 Answer in {language}. Keep replies concise, warm and practical.
 
 NON-NEGOTIABLE RULES:
