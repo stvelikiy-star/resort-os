@@ -47,6 +47,19 @@ def room_type_capacity(room: dict, snapshot: dict) -> int:
     return int(room["official_capacity"])
 
 
+def staff_building_or_zone(room: dict) -> str:
+    """Use AK BERMET's familiar paper-register grouping in operational UI."""
+    raw = str(room.get("building") or "").strip()
+    number = str(room.get("room_number") or "").strip().lower()
+    if raw in {"Garden 1", "Garden 2"}:
+        return "GARDEN"
+    if raw == "Коттеджи кирпичные":
+        return "Кирпичные"
+    if raw == "Коттеджи деревянные / срубы":
+        return "Сруб" if number.startswith("сруб") else "Деревянные"
+    return raw
+
+
 async def main() -> None:
     snapshot = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
     rooms = snapshot["rooms"]
@@ -153,6 +166,7 @@ async def main() -> None:
                 code = room["external_id"].removeprefix("AKB-")
                 notes = json.dumps({
                     "source_external_id": room["external_id"],
+                    "source_building": room["building"],
                     "source_category": room["source_category"],
                     "official_capacity": room["official_capacity"],
                     "max_capacity": room["max_capacity"],
@@ -177,7 +191,7 @@ async def main() -> None:
                       "updatedAt"=now()
                     """,
                     uuid.uuid4(), property_id, type_ids[room_type_code(room)], code,
-                    room["room_number"], room["building"], room["source_category"], room["operational_state"], notes,
+                    room["room_number"], staff_building_or_zone(room), room["source_category"], room["operational_state"], notes,
                 )
 
             db_counts = await conn.fetchrow(
