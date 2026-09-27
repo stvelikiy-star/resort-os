@@ -33,14 +33,17 @@ try {
   assert(await blockedRows.count() === 32, `AK BERMET grid expected 32 TECH_BLOCK rooms, got ${await blockedRows.count()}`);
 
   const staffGroups = await page.locator(".owner-group-label strong").allTextContents();
-  for (const expected of ["Корпус №1", "GARDEN", "Корпус №2", "Корпус №3", "Кирпичные", "Деревянные"]) {
-    assert(staffGroups.includes(expected), `AK BERMET staff group missing: ${expected}; got ${JSON.stringify(staffGroups)}`);
-  }
+  const expectedGroups = ["Корпус №1", "Корпус №2", "Корпус №3", "GARDEN", "Кирпичные", "Деревянные", "Сруб"];
+  assert(
+    JSON.stringify(staffGroups) === JSON.stringify(expectedGroups),
+    `AK BERMET staff group order mismatch: expected ${JSON.stringify(expectedGroups)}, got ${JSON.stringify(staffGroups)}`,
+  );
   const roomLabels = await page.locator(".owner-room-label strong").allTextContents();
   assert(roomLabels.includes("101 · 4-х мест"), `AK BERMET familiar room label missing: ${JSON.stringify(roomLabels.slice(0, 20))}`);
   assert(roomLabels.includes("401 · одна"), "AK BERMET GARDEN room 401 must use the paper-style label");
   assert(roomLabels.some((label) => label.startsWith("5А · двухместный стандарт")), "AK BERMET brick room 5А must use the paper-style label");
   assert(roomLabels.some((label) => label.startsWith("дер1 · 8 мест")), "AK BERMET wooden room дер1 must use the paper-style label");
+  assert(roomLabels.some((label) => label.startsWith("сруб1 · 7 мест")), "AK BERMET сруб1 must use the paper-style label");
   assert(!roomLabels.some((label) => /AKB-|C1-|C2-|C3-|BR-|WD-/.test(label)), "Internal unique room codes must stay hidden from AK BERMET staff labels");
 
   const blockedFreeCells = blockedRows.locator('.owner-night-cell[data-free="true"]');
