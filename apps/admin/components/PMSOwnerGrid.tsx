@@ -414,7 +414,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
                       title={`${agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.reason || block.type)} · ${block.start} → ${block.end}${financeTitle}`}
                     >
                       <strong>{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
-                      {!agentMode && financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>
+                      {!agentMode && financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>}
                     </button>
                   );
                 })}
