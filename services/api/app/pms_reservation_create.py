@@ -14,7 +14,7 @@ from .main import price_room_type
 
 
 router = APIRouter(prefix="/api/v1/admin/pms/reservations", tags=["admin-pms-owner-grid"])
-manager_access = require_roles("OWNER", "MANAGER")
+manager_access = require_roles("OWNER", "MANAGER", "AGENT")
 
 # Owner-approved rule: these categories never accept extra places.
 EXTRA_BED_DENIED_ROOM_TYPES = {
@@ -139,6 +139,46 @@ async def returning_guest_context(conn, property_id: uuid.UUID, phone: str | Non
         "previous_stays": previous,
         "auto_discount_percent": RETURNING_GUEST_DISCOUNT_PERCENT if previous > 0 else 0,
     }
+
+
+async def linked_agent_id_for_user(conn, property_id: uuid.UUID, user: dict[str, Any]) -> uuid.UUID | None:
+    if user["role"] != "AGENT":
+        return None
+    row = await conn.fetchrow(
+        '''
+        SELECT su."bookingAgentId" AS agent_id, ba.status
+        FROM staff_users su
+        LEFT JOIN booking_agents ba ON ba.id=su."bookingAgentId" AND ba."propertyId"=su."propertyId"
+        WHERE su.id=$1 AND su."propertyId"=$2 AND su."isActive"=true
+        ''',
+        user["id"],
+        property_id,
+    )
+    if not row or not row["agent_id"] or row["status"] != "ACTIVE":
+        raise HTTPException(status_code=403, detail={"code": "AGENT_ACCOUNT_NOT_LINKED"})
+    return row["agent_id"]
+
+
+def enforce_agent_booking_scope(payload: GridReservationPreviewPayload, agent_id: uuid.UUID):
+    if payload.manager_total_kgs is not None:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_MANAGER_PRICE_FORBIDDEN"})
+    if payload.extra_bed_count:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_EXTRA_BED_FORBIDDEN"})
+    if payload.discount_percent not in (None, 0):
+        raise HTTPException(status_code=403, detail={"code": "AGENT_DISCOUNT_FORBIDDEN"})
+    if payload.agent_id is not None and payload.agent_id != agent_id:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_ID_OVERRIDE_FORBIDDEN"})
+    return payload.model_copy(
+        update={
+            "manager_total_kgs": None,
+            "extra_bed_count": 0,
+            "extra_bed_unit_kgs": None,
+            "discount_percent": 0,
+            "discount_reason": None,
+            "agent_id": agent_id,
+            "guest_phone": None,
+        }
+    )
 
 
 async def load_agent(conn, property_id: uuid.UUID, agent_id: uuid.UUID | None):
@@ -299,6 +339,9 @@ async def preview_grid_reservation(
 ):
     async with request.app.state.db.acquire() as conn:
         prop = await property_context(conn, user["property_code"])
+        if user["role"] == "AGENT":
+            linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
+            payload = enforce_agent_booking_scope(payload, linked_agent_id)
         return await build_preview(conn, prop["id"], payload)
 
 
@@ -317,11 +360,18 @@ async def commit_grid_reservation(
         try:
             async with conn.transaction():
                 prop = await property_context(conn, user["property_code"])
-                # Commit always prices against the canonical phone field, even if an older client omitted guest_phone.
+                is_agent = user["role"] == "AGENT"
+                if is_agent:
+                    linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
+                    payload = enforce_agent_booking_scope(payload, linked_agent_id)
+                    if payload.expected_pricing_source != "CORE_RATE":
+                        raise HTTPException(status_code=403, detail={"code": "AGENT_PRICING_SOURCE_FORBIDDEN"})
+                # Commit always prices against the canonical phone field for management.
+                # Agent pricing stays on the public/core rate and must not unlock returning-guest discounts.
                 commit_preview_payload = GridReservationPreviewPayload(
                     **{
                         **payload.model_dump(exclude={"guest_name", "phone", "email", "notes", "expected_total_kgs", "expected_pricing_source"}),
-                        "guest_phone": payload.phone,
+                        "guest_phone": None if is_agent else payload.phone,
                     }
                 )
                 preview = await build_preview(conn, prop["id"], commit_preview_payload, lock=True)
@@ -442,13 +492,15 @@ async def commit_grid_reservation(
                     payload.check_out,
                     booking_number,
                 )
+                audit_action = "AGENT_CREATE_RESERVATION_FROM_GRID" if is_agent else "MANAGER_CREATE_RESERVATION_FROM_GRID"
+                audit_source = "PMS_AGENT_GRID" if is_agent else "PMS_OWNER_GRID"
                 await conn.execute(
                     '''
                     INSERT INTO audit_logs (
                       id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,
                       "afterJson","createdAt"
-                    ) VALUES ($1,$2,'STAFF',$3,'MANAGER_CREATE_RESERVATION_FROM_GRID','Reservation',$4,
-                      'PMS_OWNER_GRID','SUCCESS',jsonb_build_object(
+                    ) VALUES ($1,$2,'STAFF',$3,$25,'Reservation',$4,
+                      $26,'SUCCESS',jsonb_build_object(
                         'booking_number',$5::text,
                         'room_id',$6::text,
                         'room_code',$7::text,
@@ -496,6 +548,8 @@ async def commit_grid_reservation(
                     preview["pricing"].get("core_total_kgs"),
                     str(identity["guest_id"]),
                     auto_discount_discovered_at_commit,
+                    audit_action,
+                    audit_source,
                 )
         except ExclusionViolationError as exc:
             raise HTTPException(
@@ -524,5 +578,5 @@ async def commit_grid_reservation(
         "pricing_source": preview["pricing"]["source"],
         "price_adjusted_at_commit": auto_discount_discovered_at_commit,
         "payment_created": False,
-        "payment_terms": "MANAGER_CONTROLLED",
+        "payment_terms": "AGENT_CORE_RATE" if user["role"] == "AGENT" else "MANAGER_CONTROLLED",
     }
