@@ -100,7 +100,7 @@ export default function AdminShell() {
     const authAwareFetch: typeof window.fetch = async (...args) => {
       const response = await nativeFetch(...args);
       const input = args[0];
-      if ((response.status === 401 || response.status === 403) && coreApiRequest(input)) {
+      if (response.status === 401 && coreApiRequest(input)) {
         setUser(null);
       }
       return response;
