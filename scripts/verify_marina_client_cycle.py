@@ -16,6 +16,10 @@ MAID_USERNAME = os.environ.get("MAID_USERNAME", "housemaid")
 MAID_PASSWORD = os.environ.get("MAID_PASSWORD", "MarinaDemo2026!")
 KITCHEN_USERNAME = os.environ.get("KITCHEN_USERNAME", "kitchen")
 KITCHEN_PASSWORD = os.environ.get("KITCHEN_PASSWORD", "MarinaDemo2026!")
+WAITER_USERNAME = os.environ.get("WAITER_USERNAME", "waiter")
+WAITER_PASSWORD = os.environ.get("WAITER_PASSWORD", "MarinaDemo2026!")
+TECHNICIAN_USERNAME = os.environ.get("TECHNICIAN_USERNAME", "technician")
+TECHNICIAN_PASSWORD = os.environ.get("TECHNICIAN_PASSWORD", "MarinaDemo2026!")
 EXPECTED_GUEST_BASE_URL = os.environ.get("EXPECTED_GUEST_BASE_URL", "").rstrip("/")
 
 
@@ -201,6 +205,15 @@ def main() -> None:
     kitchen = login(KITCHEN_USERNAME, KITCHEN_PASSWORD)
     kitchen_menu = expect(kitchen.get("/api/v1/kitchen/menu"), 200, "Kitchen menu access")
     assert isinstance(kitchen_menu.get("items"), list)
+
+    waiter = login(WAITER_USERNAME, WAITER_PASSWORD)
+    waiter_floor = expect(waiter.get("/api/v1/dining/floor"), 200, "Waiter dining floor access")
+    assert isinstance(waiter_floor, dict)
+
+    technician = login(TECHNICIAN_USERNAME, TECHNICIAN_PASSWORD)
+    technician_tasks = expect(technician.get("/api/v1/ops/tasks", params={"limit": 50}), 200, "Technician tasks access")
+    assert isinstance(technician_tasks.get("items"), list)
+
     denied_pms = kitchen.get("/api/v1/pms/grid", params={"start": today.isoformat(), "end": check_out.isoformat()})
     assert denied_pms.status_code == 403, denied_pms.text
 
@@ -233,6 +246,8 @@ def main() -> None:
     assert report["kpi"]["room_count"] == 12
 
     guest.close()
+    technician.close()
+    waiter.close()
     kitchen.close()
     maid.close()
     owner.close()
