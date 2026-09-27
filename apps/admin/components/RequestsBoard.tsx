@@ -296,6 +296,10 @@ export default function RequestsBoard() {
                 <div><span className={`status-pill s-${item.status}`}>{requestStatusLabel[item.status] || item.status}</span><h3>{item.guest_name}</h3><a href={`tel:${item.phone}`}>{item.phone}</a></div>
                 <div className="request-dates"><b>{item.check_in} → {item.check_out}</b><span>{item.adults} взр. · {item.children} дет.</span></div>
               </div>
+              {(item.source || item.notes) && <div className="request-site-context">
+                {item.source && <div><span>Источник</span><b>{item.source}</b></div>}
+                {item.notes && <div><span>Пожелания / данные с сайта</span><p>{item.notes}</p></div>}
+              </div>}
               <div className="request-money">
                 <div><span>Категория</span><b>{item.room_type_name || "не выбрана"}</b></div>
                 <div><span>Стоимость проживания</span><b>{fmt(item.quoted_total_kgs)}</b></div>
