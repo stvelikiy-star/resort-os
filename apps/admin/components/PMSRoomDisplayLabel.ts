@@ -1,8 +1,17 @@
 export type PmsRoomDisplayInput = {
   code: string;
+  name?: string | null;
   room_type_name: string;
   beds_raw?: string | null;
 };
+
+export function pmsRoomDisplayNumber(room: PmsRoomDisplayInput, propertyCode?: string | null) {
+  if (propertyCode === "AK_BERMET_TEST") {
+    const visible = room.name?.trim().replace(/^Номер\s+/i, "").trim();
+    if (visible) return visible;
+  }
+  return room.code;
+}
 
 function beds(room: PmsRoomDisplayInput) {
   return room.beds_raw?.trim() || "";
