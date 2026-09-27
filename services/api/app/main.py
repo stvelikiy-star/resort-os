@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import uuid
@@ -186,14 +187,19 @@ async def check_availability(
             '''
             SELECT rt.id, rt.code, rt.name, rt."capacityAdults", rt."capacityChildren", rt."areaLabel",
                    r.id AS room_id, r.code AS room_code, r."buildingOrZone", r."floorLabel",
-                   r."bedConfiguration", r."operationalState"
+                   r."bedConfiguration", r."operationalState", r.notes AS room_notes
             FROM room_types rt
             JOIN rooms r ON r."roomTypeId" = rt.id
             WHERE rt."propertyId" = $1
-              AND rt."capacityAdults" >= $2
               AND (
-                  $3::int = 0
-                  OR (rt."capacityChildren" IS NOT NULL AND rt."capacityChildren" >= $3)
+                  $7::boolean = true
+                  OR (
+                      rt."capacityAdults" >= $2
+                      AND (
+                          $3::int = 0
+                          OR (rt."capacityChildren" IS NOT NULL AND rt."capacityChildren" >= $3)
+                      )
+                  )
               )
               AND ($4::text IS NULL OR rt.code = $4)
               AND r."operationalState" <> 'TECH_BLOCK'
@@ -213,10 +219,21 @@ async def check_availability(
             room_type_code,
             check_in,
             check_out,
+            PROPERTY_CODE == "AK_BERMET_TEST",
         )
 
         grouped: dict[str, dict[str, Any]] = {}
         for row in rows:
+            room_max_capacity = None
+            if PROPERTY_CODE == "AK_BERMET_TEST":
+                try:
+                    metadata = json.loads(row["room_notes"] or "{}")
+                    room_max_capacity = int(metadata["max_capacity"])
+                except (TypeError, ValueError, KeyError, json.JSONDecodeError):
+                    continue
+                if adults + children > room_max_capacity:
+                    continue
+
             key = str(row["id"])
             if key not in grouped:
                 grouped[key] = {
@@ -237,6 +254,7 @@ async def check_availability(
                     "floor": row["floorLabel"],
                     "beds_raw": row["bedConfiguration"],
                     "operational_state": str(row["operationalState"]),
+                    "max_capacity": room_max_capacity,
                 }
             )
 
@@ -244,6 +262,15 @@ async def check_availability(
         for item in grouped.values():
             pricing = await price_room_type(conn, item["room_type_id"], check_in, check_out)
             item["available_count"] = len(item["available_rooms"])
+            manager_confirmation_required = (
+                PROPERTY_CODE == "AK_BERMET_TEST"
+                and (children > 0 or adults + children > int(item["capacity_adults"]))
+            )
+            pricing["manager_confirmation_required"] = manager_confirmation_required
+            if manager_confirmation_required:
+                pricing["confirmation_reason"] = (
+                    "AK_BERMET_CHILD_OR_EXTRA_PLACE_PRICING_REQUIRES_MANAGER_CONFIRMATION"
+                )
             item["pricing"] = pricing
             item["children_requested"] = children
             result.append(item)
@@ -255,7 +282,11 @@ async def check_availability(
         "nights": (check_out - check_in).days,
         "adults": adults,
         "children": children,
-        "children_capacity_policy": "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED",
+        "children_capacity_policy": (
+            "AK_BERMET_CONFIRMED_ROOM_MAX_CAPACITY"
+            if PROPERTY_CODE == "AK_BERMET_TEST"
+            else "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED"
+        ),
         "results": result,
         "rule": "Availability is informational until a paid reservation is created. An unpaid request is not a reservation.",
     }
