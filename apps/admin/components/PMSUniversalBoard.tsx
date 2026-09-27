@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
+import { pmsRoomDisplayNumber } from "./PMSRoomDisplayLabel";
 import RoomDetailModal from "./RoomDetailModal";
 
 type Block = {
@@ -924,7 +925,7 @@ export default function PMSUniversalBoard() {
                   onDrop={(event) => drop(room, event)}
                 >
                   <button className="v8-room-cell" onClick={() => setRoomId(room.id)}>
-                    <strong>№ {room.code}</strong>
+                    <strong>№ {pmsRoomDisplayNumber(room, data?.property)}</strong>
                     <span>{room.room_type_name}</span>
                     <small>{[room.building_or_zone, room.floor].filter(Boolean).join(" · ") || "—"}</small>
                   </button>
