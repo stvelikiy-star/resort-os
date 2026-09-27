@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import uuid
+from datetime import time
 from pathlib import Path
 
 import asyncpg
@@ -87,7 +88,7 @@ async def main() -> None:
                   "enabledModules"=EXCLUDED."enabledModules",
                   "updatedAt"=now()
                 """,
-                uuid.uuid4(), property_id, prop["check_in_time"], prop["check_out_time"], json.dumps(FULL_MODULES),
+                uuid.uuid4(), property_id, time.fromisoformat(prop["check_in_time"]), time.fromisoformat(prop["check_out_time"]), json.dumps(FULL_MODULES),
             )
 
             plan_id = await conn.fetchval(
