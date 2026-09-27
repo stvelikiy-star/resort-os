@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber } from "../apps/admin/components/PMSRoomDisplayLabel.ts";
+import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber, pmsStaffBuildingLabel } from "../apps/admin/components/PMSRoomDisplayLabel.ts";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -36,6 +36,10 @@ assert(
   pmsRoomDisplayNumber({ code: "112", name: "Номер 112", room_type_name: "Двухместный улучшенный" }, "THREE_CROWNS") === "112",
   "Other hotels must keep their existing room code semantics",
 );
+assert(pmsStaffBuildingLabel("Garden 1", "AK_BERMET_TEST") === "GARDEN", "AK BERMET Garden 1 must use staff GARDEN group");
+assert(pmsStaffBuildingLabel("Garden 2", "AK_BERMET_TEST") === "GARDEN", "AK BERMET Garden 2 must use staff GARDEN group");
+assert(pmsStaffBuildingLabel("Коттеджи кирпичные", "AK_BERMET_TEST") === "Кирпичные", "AK BERMET brick cottages staff label");
+assert(pmsStaffBuildingLabel("Коттеджи деревянные / срубы", "AK_BERMET_TEST") === "Деревянные", "AK BERMET wooden cottages staff label");
 
 for (const [room, expected] of cases) {
   const actual = pmsOwnerRoomDisplayLabel(room);
