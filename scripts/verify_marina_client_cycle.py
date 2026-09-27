@@ -485,12 +485,12 @@ def main() -> None:
     assert folio["totals"]["accommodation_kgs"] == committed["total_kgs"]
     assert folio["totals"]["paid_kgs"] == 0
 
-    reception = expect(
+    reception_reservations = expect(
         owner.get("/api/v1/admin/reception/reservations", params={"limit": 500}),
         200,
         "reception list",
     )
-    assert any(item["id"] == reservation_id for item in reception["items"])
+    assert any(item["id"] == reservation_id for item in reception_reservations["items"])
 
     checkin = expect(
         owner.post(f"/api/v1/admin/stays/reservations/{reservation_id}/check-in"),
