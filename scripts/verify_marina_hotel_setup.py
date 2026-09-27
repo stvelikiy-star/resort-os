@@ -47,6 +47,8 @@ def main() -> None:
         )
 
         original_modules = list(overview["product_settings"]["enabled_modules"])
+        full_modules = {"GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"}
+        assert set(original_modules) == full_modules, original_modules
         modules = expect(
             client.patch("/api/v1/admin/hotel-setup/modules", json={"enabled_modules": ["GROUPS", "AGENTS"]}),
             200,
@@ -64,6 +66,7 @@ def main() -> None:
             "mini": ["ROOM_QR"],
             "hotel": ["DINING", "ROOM_QR", "AGENTS"],
             "resort": ["GROUPS", "AGENTS", "DINING", "OFFERS", "GROWTH", "ROOM_QR", "POINT_QR", "INBOX"],
+            "full": ["GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"],
         }.items():
             applied = expect(
                 client.patch("/api/v1/admin/hotel-setup/modules", json={"enabled_modules": preset}),
