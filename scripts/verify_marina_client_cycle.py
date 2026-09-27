@@ -12,8 +12,8 @@ DATABASE_URL = os.environ["DATABASE_URL"].split("?", 1)[0]
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "MARINA_TEST")
 OWNER_USERNAME = os.environ.get("BOOTSTRAP_OWNER_USERNAME", "marina")
 OWNER_PASSWORD = os.environ.get("BOOTSTRAP_OWNER_PASSWORD", "MarinaDemo2026!")
-RECEPTION_USERNAME = os.environ.get("RECEPTION_USERNAME", "admin")
-RECEPTION_PASSWORD = os.environ.get("RECEPTION_PASSWORD", "MarinaDemo2026!")
+RECEPTION_USERNAME = os.environ.get("RECEPTION_USERNAME")
+RECEPTION_PASSWORD = os.environ.get("RECEPTION_PASSWORD")
 MAID_USERNAME = os.environ.get("MAID_USERNAME", "housemaid")
 MAID_PASSWORD = os.environ.get("MAID_PASSWORD", "MarinaDemo2026!")
 KITCHEN_USERNAME = os.environ.get("KITCHEN_USERNAME", "kitchen")
@@ -90,24 +90,26 @@ def main() -> None:
     check_out = today + timedelta(days=2)
 
     owner = login(OWNER_USERNAME, OWNER_PASSWORD)
-    reception = login(RECEPTION_USERNAME, RECEPTION_PASSWORD)
+    reception = None
+    if RECEPTION_USERNAME and RECEPTION_PASSWORD:
+        reception = login(RECEPTION_USERNAME, RECEPTION_PASSWORD)
 
-    reception_list = expect(
-        reception.get("/api/v1/admin/reception/reservations", params={"limit": 50}),
-        200,
-        "reception workspace access",
-    )
-    assert isinstance(reception_list.get("items"), list)
-    denied_reception_finance = reception.get(
-        "/api/v1/admin/finance/summary",
-        params={"from_date": today.isoformat(), "to_date": today.isoformat()},
-    )
-    assert denied_reception_finance.status_code == 403, denied_reception_finance.text
-    denied_reception_pms = reception.get(
-        "/api/v1/pms/grid",
-        params={"start": today.isoformat(), "end": (today + timedelta(days=2)).isoformat()},
-    )
-    assert denied_reception_pms.status_code == 403, denied_reception_pms.text
+        reception_list = expect(
+            reception.get("/api/v1/admin/reception/reservations", params={"limit": 50}),
+            200,
+            "reception workspace access",
+        )
+        assert isinstance(reception_list.get("items"), list)
+        denied_reception_finance = reception.get(
+            "/api/v1/admin/finance/summary",
+            params={"from_date": today.isoformat(), "to_date": today.isoformat()},
+        )
+        assert denied_reception_finance.status_code == 403, denied_reception_finance.text
+        denied_reception_pms = reception.get(
+            "/api/v1/pms/grid",
+            params={"start": today.isoformat(), "end": (today + timedelta(days=2)).isoformat()},
+        )
+        assert denied_reception_pms.status_code == 403, denied_reception_pms.text
 
     managed_agent_suffix = uuid.uuid4().hex[:8]
     managed_agent_username = f"agent-{managed_agent_suffix}"
@@ -593,7 +595,8 @@ def main() -> None:
 
     guest.close()
     agent.close()
-    reception.close()
+    if reception:
+        reception.close()
     technician.close()
     waiter.close()
     kitchen.close()
@@ -609,7 +612,7 @@ def main() -> None:
             "stay_id": stay_id,
             "guest_request_id": request_id,
             "payment_profile": "NO_PAYMENTS",
-            "reception_rbac": "PASS",
+            "reception_rbac": "PASS" if reception else "NOT_CONFIGURED",
             "public_site_to_crm": "PASS",
             "prepayment_policy": PREPAYMENT_POLICY,
             "ak_bermet_capacity_guard": "PASS" if PROPERTY_CODE == "AK_BERMET_TEST" else "N/A",
