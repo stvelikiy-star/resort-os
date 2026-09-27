@@ -244,6 +244,42 @@ def main() -> None:
     }
     assert all(item.get("pricing", {}).get("sellable") is True for item in public_availability["results"])
 
+    if PROPERTY_CODE == "AK_BERMET_TEST":
+        family_availability = expect(
+            owner.get(
+                "/api/v1/booking/check-availability",
+                params={
+                    "check_in": check_in.isoformat(),
+                    "check_out": check_out.isoformat(),
+                    "adults": 2,
+                    "children": 1,
+                },
+            ),
+            200,
+            "AK BERMET family availability",
+        )
+        assert family_availability["children_capacity_policy"] == "AK_BERMET_CONFIRMED_ROOM_MAX_CAPACITY"
+        assert family_availability["results"], "AK BERMET family search must use confirmed room maximums"
+        for option in family_availability["results"]:
+            assert option["pricing"]["manager_confirmation_required"] is True
+            assert option["available_rooms"]
+            assert all(int(room["max_capacity"]) >= 3 for room in option["available_rooms"])
+
+        impossible_family = expect(
+            owner.get(
+                "/api/v1/booking/check-availability",
+                params={
+                    "check_in": check_in.isoformat(),
+                    "check_out": check_out.isoformat(),
+                    "adults": 20,
+                    "children": 0,
+                },
+            ),
+            200,
+            "AK BERMET impossible occupancy",
+        )
+        assert impossible_family["results"] == []
+
     # Public-site contract: availability -> durable request -> owner CRM -> quote.
     site_check_in = today + timedelta(days=4)
     site_check_out = today + timedelta(days=6)
@@ -616,6 +652,7 @@ def main() -> None:
             "public_site_to_crm": "PASS",
             "prepayment_policy": PREPAYMENT_POLICY,
             "ak_bermet_capacity_guard": "PASS" if PROPERTY_CODE == "AK_BERMET_TEST" else "N/A",
+            "ak_bermet_family_availability": "PASS" if PROPERTY_CODE == "AK_BERMET_TEST" else "N/A",
         }
     )
 
