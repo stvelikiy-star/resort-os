@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PMSNewReservationModal from "./PMSNewReservationModal";
-import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber } from "./PMSRoomDisplayLabel";
+import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber, pmsStaffBuildingLabel } from "./PMSRoomDisplayLabel";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
 import RoomDetailModal from "./RoomDetailModal";
 
@@ -229,7 +229,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
     });
     const map = new Map<string, Room[]>();
     rooms.forEach((room) => {
-      const label = akBermetMode ? (room.building_or_zone || "Без корпуса") : (OWNER_GROUP[room.room_type_name] || room.room_type_name);
+      const label = akBermetMode ? pmsStaffBuildingLabel(room.building_or_zone, data?.property) : (OWNER_GROUP[room.room_type_name] || room.room_type_name);
       const current = map.get(label) || [];
       current.push(room);
       map.set(label, current);
