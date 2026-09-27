@@ -57,6 +57,7 @@ enum StaffRole {
   OWNER
   MANAGER
   RECEPTION
+  AGENT
   MAID
   TECHNICIAN
   STORE_STAFF
@@ -399,6 +400,7 @@ model BookingAgent {
   reservations Reservation[]
   requests     ReservationRequest[]
   interactions BookingAgentInteraction[]
+  staffUsers   StaffUser[]
   createdAt    DateTime                  @default(now())
   updatedAt    DateTime                  @updatedAt
 
@@ -658,6 +660,8 @@ model StaffUser {
   displayName              String
   passwordHash             String
   role                      StaffRole
+  bookingAgentId            String?                   @db.Uuid
+  bookingAgent              BookingAgent?             @relation(fields: [bookingAgentId], references: [id], onDelete: SetNull)
   isActive                 Boolean                   @default(true)
   telegramUserId           String?
   telegramUsername         String?
@@ -673,6 +677,7 @@ model StaffUser {
   @@unique([propertyId, username])
   @@unique([propertyId, telegramUserId])
   @@index([propertyId, role])
+  @@index([bookingAgentId])
   @@map("staff_users")
 }
 
