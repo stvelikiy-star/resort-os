@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PMSNewReservationModal from "./PMSNewReservationModal";
-import { pmsOwnerRoomDisplayLabel } from "./PMSRoomDisplayLabel";
+import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber } from "./PMSRoomDisplayLabel";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
 import RoomDetailModal from "./RoomDetailModal";
 
@@ -218,6 +218,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
 
   const financeById = useMemo(() => new Map(finance.map((item) => [item.id, item])), [finance]);
   const categories = useMemo(() => Array.from(new Set((data?.rooms || []).map((room) => room.room_type_name))), [data]);
+  const akBermetMode = data?.property === "AK_BERMET_TEST";
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -228,13 +229,20 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
     });
     const map = new Map<string, Room[]>();
     rooms.forEach((room) => {
-      const label = OWNER_GROUP[room.room_type_name] || room.room_type_name;
+      const label = akBermetMode ? (room.building_or_zone || "Без корпуса") : (OWNER_GROUP[room.room_type_name] || room.room_type_name);
       const current = map.get(label) || [];
       current.push(room);
       map.set(label, current);
     });
-    return Array.from(map.entries()).map(([label, items]) => ({ label, rooms: items.sort(naturalRoomCode) }));
-  }, [data, query, category]);
+    return Array.from(map.entries()).map(([label, items]) => ({
+      label,
+      rooms: items.sort((left, right) =>
+        akBermetMode
+          ? pmsRoomDisplayNumber(left, data?.property).localeCompare(pmsRoomDisplayNumber(right, data?.property), "ru", { numeric: true, sensitivity: "base" })
+          : naturalRoomCode(left, right),
+      ),
+    }));
+  }, [data, query, category, akBermetMode]);
 
   const allRooms = useMemo(() => data?.rooms || [], [data]);
   const roomById = useMemo(() => new Map(allRooms.map((room) => [room.id, room])), [allRooms]);
@@ -295,8 +303,8 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
       setSelection(null);
       return;
     }
-    setCreateOpen({ roomId: room.id, roomCode: room.code, bedsRaw: room.beds_raw, checkIn: selectedRange.checkIn, checkOut: selectedRange.checkOut });
-  }, [roomById]);
+    setCreateOpen({ roomId: room.id, roomCode: pmsRoomDisplayNumber(room, data?.property), bedsRaw: room.beds_raw, checkIn: selectedRange.checkIn, checkOut: selectedRange.checkOut });
+  }, [roomById, data?.property]);
 
   useEffect(() => {
     const finish = () => finishSelection();
@@ -366,7 +374,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
             {group.rooms.map((room) => (
               <div key={room.id} className={`owner-room-row state-${room.operational_state}`} style={{ gridTemplateColumns: template }}>
                 <button className="owner-room-label" onClick={() => { if (!agentMode) setRoomId(room.id); }} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
-                  <strong>{pmsOwnerRoomDisplayLabel(room)}</strong>
+                  <strong>{akBermetMode ? `${pmsRoomDisplayNumber(room, data?.property)}${room.beds_raw ? ` · ${room.beds_raw}` : ""}` : pmsOwnerRoomDisplayLabel(room)}</strong>
                 </button>
                 <div className={`owner-room-state ${room.operational_state}`}>{ROOM_STATE[room.operational_state]}</div>
 
@@ -377,7 +385,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
                     <button
                       key={key}
                       type="button"
-                      aria-label={`Номер ${room.code}, ночь ${key}${free ? ", свободно" : ", занято"}`}
+                      aria-label={`Номер ${pmsRoomDisplayNumber(room, data?.property)}, ночь ${key}${free ? ", свободно" : ", занято"}`}
                       data-room-code={room.code}
                       data-night={key}
                       data-free={free ? "true" : "false"}
