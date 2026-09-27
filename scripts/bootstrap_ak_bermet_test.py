@@ -177,7 +177,7 @@ async def main() -> None:
                       "updatedAt"=now()
                     """,
                     uuid.uuid4(), property_id, type_ids[room_type_code(room)], code,
-                    f"Номер {room['room_number']}", room["building"], room["source_category"], room["operational_state"], notes,
+                    room["room_number"], room["building"], room["source_category"], room["operational_state"], notes,
                 )
 
             db_counts = await conn.fetchrow(
