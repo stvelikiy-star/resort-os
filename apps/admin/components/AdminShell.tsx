@@ -292,7 +292,7 @@ export default function AdminShell() {
       {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "AGENTS" && isManager && moduleEnabled("AGENTS") && <AgentsBoard />}
+      {tab === "AGENTS" && isManager && moduleEnabled("AGENTS") && <AgentsBoard userRole={user.role} />}
       {tab === "MARKETING" && isManager && moduleEnabled("MARKETING") && <MarketingBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
