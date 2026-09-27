@@ -20,6 +20,8 @@ WAITER_USERNAME = os.environ.get("WAITER_USERNAME", "waiter")
 WAITER_PASSWORD = os.environ.get("WAITER_PASSWORD", "MarinaDemo2026!")
 TECHNICIAN_USERNAME = os.environ.get("TECHNICIAN_USERNAME", "technician")
 TECHNICIAN_PASSWORD = os.environ.get("TECHNICIAN_PASSWORD", "MarinaDemo2026!")
+AGENT_USERNAME = os.environ.get("AGENT_USERNAME", "agent")
+AGENT_PASSWORD = os.environ.get("AGENT_PASSWORD", "MarinaDemo2026!")
 EXPECTED_GUEST_BASE_URL = os.environ.get("EXPECTED_GUEST_BASE_URL", "").rstrip("/")
 
 
@@ -128,6 +130,100 @@ def main() -> None:
     assert committed["status"] == "GUARANTEED"
     assert committed["payment_created"] is False
     reservation_id = committed["reservation_id"]
+
+    agent = login(AGENT_USERNAME, AGENT_PASSWORD)
+    agent_grid = expect(
+        agent.get("/api/v1/pms/grid", params={"start": check_in.isoformat(), "end": check_out.isoformat()}),
+        200,
+        "agent PMS grid",
+    )
+    foreign_blocks = [block for room in agent_grid["rooms"] for block in room["blocks"]]
+    assert any(
+        block.get("reservation_id") is None
+        and block.get("guest_name") is None
+        and block.get("guest_phone") is None
+        for block in foreign_blocks
+    ), foreign_blocks
+
+    denied_finance = agent.get("/api/v1/admin/reception/reservations", params={"limit": 50})
+    assert denied_finance.status_code == 403, denied_finance.text
+
+    agent_chosen = None
+    agent_preview = None
+    for room in agent_grid["rooms"]:
+        if room["id"] == chosen["id"]:
+            continue
+        probe = agent.post(
+            "/api/v1/admin/pms/reservations/new/preview",
+            json={
+                "room_id": room["id"],
+                "check_in": check_in.isoformat(),
+                "check_out": check_out.isoformat(),
+                "adults": 1,
+                "children": 0,
+            },
+        )
+        if probe.status_code == 200 and probe.json().get("can_commit"):
+            agent_chosen = room
+            agent_preview = probe.json()
+            break
+    assert agent_chosen and agent_preview, "No sellable room for linked agent"
+    assert agent_preview["pricing"]["source"] == "CORE_RATE"
+    assert agent_preview["pricing"]["discount_percent"] == 0
+    assert agent_preview["agent"]["name"]
+
+    forbidden_override = agent.post(
+        "/api/v1/admin/pms/reservations/new/preview",
+        json={
+            "room_id": agent_chosen["id"],
+            "check_in": check_in.isoformat(),
+            "check_out": check_out.isoformat(),
+            "adults": 1,
+            "children": 0,
+            "manager_total_kgs": 1,
+        },
+    )
+    assert forbidden_override.status_code == 403, forbidden_override.text
+
+    agent_suffix = uuid.uuid4().hex[:8]
+    agent_committed = expect(
+        agent.post(
+            "/api/v1/admin/pms/reservations/new/commit",
+            json={
+                "room_id": agent_chosen["id"],
+                "check_in": check_in.isoformat(),
+                "check_out": check_out.isoformat(),
+                "adults": 1,
+                "children": 0,
+                "guest_name": "MARINA Agent Test",
+                "phone": "+996711" + agent_suffix[:6],
+                "email": f"marina-agent-{agent_suffix}@example.test",
+                "expected_total_kgs": agent_preview["pricing"]["total_kgs"],
+                "expected_pricing_source": "CORE_RATE",
+                "notes": "MARINA SMART agent booking acceptance",
+            },
+        ),
+        201,
+        "agent reservation commit",
+    )
+    assert agent_committed["agent_id"]
+    assert agent_committed["payment_terms"] == "AGENT_CORE_RATE"
+    assert agent_committed["discount_percent"] == 0
+
+    agent_grid_after = expect(
+        agent.get("/api/v1/pms/grid", params={"start": check_in.isoformat(), "end": check_out.isoformat()}),
+        200,
+        "agent PMS grid after own booking",
+    )
+    own_blocks = [
+        block
+        for room in agent_grid_after["rooms"]
+        for block in room["blocks"]
+        if block.get("booking_number") == agent_committed["booking_number"]
+    ]
+    assert len(own_blocks) == 1, own_blocks
+    assert own_blocks[0]["guest_name"] == "MARINA Agent Test"
+    assert own_blocks[0]["guest_phone"]
 
     folio = expect(
         owner.get(f"/api/v1/admin/folio/reservations/{reservation_id}"),
@@ -246,6 +342,7 @@ def main() -> None:
     assert report["kpi"]["room_count"] == 12
 
     guest.close()
+    agent.close()
     technician.close()
     waiter.close()
     kitchen.close()
