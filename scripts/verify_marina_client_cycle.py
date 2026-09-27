@@ -23,6 +23,16 @@ TECHNICIAN_PASSWORD = os.environ.get("TECHNICIAN_PASSWORD", "MarinaDemo2026!")
 AGENT_USERNAME = os.environ.get("AGENT_USERNAME", "agent")
 AGENT_PASSWORD = os.environ.get("AGENT_PASSWORD", "MarinaDemo2026!")
 EXPECTED_GUEST_BASE_URL = os.environ.get("EXPECTED_GUEST_BASE_URL", "").rstrip("/")
+EXPECTED_ROOM_COUNT = int(os.environ.get("EXPECTED_ROOM_COUNT", "12"))
+EXPECTED_ROOM_TYPE_COUNT = int(os.environ.get("EXPECTED_ROOM_TYPE_COUNT", "3"))
+EXPECTED_CLEAN_ROOM_COUNT = int(os.environ.get("EXPECTED_CLEAN_ROOM_COUNT", str(EXPECTED_ROOM_COUNT)))
+EXPECTED_BLOCKED_ROOM_COUNT = int(os.environ.get("EXPECTED_BLOCKED_ROOM_COUNT", "0"))
+EXPECTED_PUBLIC_AVAILABLE_COUNT = int(os.environ.get("EXPECTED_PUBLIC_AVAILABLE_COUNT", str(EXPECTED_CLEAN_ROOM_COUNT)))
+EXPECTED_ROOM_TYPE_CODES = {
+    value.strip()
+    for value in os.environ.get("EXPECTED_ROOM_TYPE_CODES", "STANDARD,COMFORT,SUITE").split(",")
+    if value.strip()
+}
 
 
 def expect(response: httpx.Response, status: int | tuple[int, ...], label: str):
@@ -94,16 +104,40 @@ def main() -> None:
 
     setup = expect(owner.get("/api/v1/admin/hotel-setup"), 200, "hotel setup")
     assert setup["property"]["code"] == PROPERTY_CODE
-    assert setup["summary"]["rooms"] == 12, setup["summary"]
-    assert setup["summary"]["room_types"] == 3, setup["summary"]
-    assert {item["code"] for item in setup["room_types"]} == {"STANDARD", "COMFORT", "SUITE"}
+    assert setup["summary"]["rooms"] == EXPECTED_ROOM_COUNT, setup["summary"]
+    assert setup["summary"]["room_types"] == EXPECTED_ROOM_TYPE_COUNT, setup["summary"]
+    assert setup["summary"]["ready"] == EXPECTED_CLEAN_ROOM_COUNT, setup["summary"]
+    assert setup["summary"]["blocked"] == EXPECTED_BLOCKED_ROOM_COUNT, setup["summary"]
+    if EXPECTED_ROOM_TYPE_CODES:
+        assert {item["code"] for item in setup["room_types"]} == EXPECTED_ROOM_TYPE_CODES
 
     grid = expect(
         owner.get("/api/v1/pms/grid", params={"start": check_in.isoformat(), "end": check_out.isoformat()}),
         200,
         "PMS grid",
     )
-    assert len(grid["rooms"]) == 12
+    assert len(grid["rooms"]) == EXPECTED_ROOM_COUNT
+
+    public_availability = expect(
+        owner.get(
+            "/api/v1/booking/check-availability",
+            params={
+                "check_in": check_in.isoformat(),
+                "check_out": check_out.isoformat(),
+                "adults": 1,
+                "children": 0,
+            },
+        ),
+        200,
+        "public availability count",
+    )
+    public_available_count = sum(int(item.get("available_count") or 0) for item in public_availability["results"])
+    assert public_available_count == EXPECTED_PUBLIC_AVAILABLE_COUNT, {
+        "expected": EXPECTED_PUBLIC_AVAILABLE_COUNT,
+        "actual": public_available_count,
+        "results": public_availability["results"],
+    }
+    assert all(item.get("pricing", {}).get("sellable") is True for item in public_availability["results"])
 
     chosen = None
     preview = None
@@ -357,7 +391,7 @@ def main() -> None:
         200,
         "owner report",
     )
-    assert report["kpi"]["room_count"] == 12
+    assert report["kpi"]["room_count"] == EXPECTED_ROOM_COUNT
 
     guest.close()
     agent.close()
