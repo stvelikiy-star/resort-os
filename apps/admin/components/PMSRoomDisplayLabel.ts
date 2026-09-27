@@ -13,6 +13,15 @@ export function pmsRoomDisplayNumber(room: PmsRoomDisplayInput, propertyCode?: s
   return room.code;
 }
 
+export function pmsStaffBuildingLabel(building: string | null | undefined, propertyCode?: string | null) {
+  const raw = building?.trim() || "Без корпуса";
+  if (propertyCode !== "AK_BERMET_TEST") return raw;
+  if (raw === "Garden 1" || raw === "Garden 2") return "GARDEN";
+  if (raw === "Коттеджи кирпичные") return "Кирпичные";
+  if (raw === "Коттеджи деревянные / срубы") return "Деревянные";
+  return raw;
+}
+
 function beds(room: PmsRoomDisplayInput) {
   return room.beds_raw?.trim() || "";
 }
