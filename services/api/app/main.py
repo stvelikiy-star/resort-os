@@ -364,15 +364,24 @@ async def pms_grid(
     end: date,
     room_type_code: str | None = None,
     operational_state: str | None = None,
-    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER")),
+    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", "AGENT")),
 ):
     if end <= start:
         raise HTTPException(status_code=422, detail="end must be after start")
     if (end - start).days > 62:
         raise HTTPException(status_code=422, detail="grid window is limited to 62 days")
 
+    linked_agent_id = None
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
+        if _user["role"] == "AGENT":
+            linked_agent_id = await conn.fetchval(
+                'SELECT "bookingAgentId" FROM staff_users WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
+                _user["id"],
+                property_id,
+            )
+            if not linked_agent_id:
+                raise HTTPException(status_code=403, detail="Agent account is not linked to an active booking agent")
         rooms = await conn.fetch(
             '''
             SELECT r.id, r.code, r.name, r."buildingOrZone", r."floorLabel",
@@ -394,6 +403,7 @@ async def pms_grid(
             '''
             SELECT ib.id, ib."roomId", ib."blockType", ib."startDate", ib."endDate", ib.reason,
                    res.id AS reservation_id, res."bookingNumber", res.status AS reservation_status,
+                   res."agentId" AS reservation_agent_id,
                    g."firstName", g."lastName", g.phone
             FROM inventory_blocks ib
             JOIN rooms r ON r.id = ib."roomId"
@@ -412,19 +422,25 @@ async def pms_grid(
     blocks_by_room: dict[str, list[dict[str, Any]]] = {}
     for block in blocks:
         room_id = str(block["roomId"])
-        guest_name = " ".join(filter(None, [block["firstName"], block["lastName"]])) or None
+        own_agent_booking = (
+            _user["role"] != "AGENT"
+            or (linked_agent_id is not None and block["reservation_agent_id"] == linked_agent_id)
+        )
+        guest_name = (
+            " ".join(filter(None, [block["firstName"], block["lastName"]])) or None
+        ) if own_agent_booking else None
         blocks_by_room.setdefault(room_id, []).append(
             {
                 "id": str(block["id"]),
                 "type": str(block["blockType"]),
                 "start": block["startDate"],
                 "end": block["endDate"],
-                "reason": block["reason"],
-                "reservation_id": str(block["reservation_id"]) if block["reservation_id"] else None,
-                "booking_number": block["bookingNumber"],
+                "reason": block["reason"] if _user["role"] != "AGENT" else None,
+                "reservation_id": str(block["reservation_id"]) if block["reservation_id"] and own_agent_booking else None,
+                "booking_number": block["bookingNumber"] if own_agent_booking else None,
                 "reservation_status": str(block["reservation_status"]) if block["reservation_status"] else None,
                 "guest_name": guest_name,
-                "guest_phone": block["phone"],
+                "guest_phone": block["phone"] if own_agent_booking else None,
             }
         )
 
