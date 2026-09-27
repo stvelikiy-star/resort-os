@@ -12,6 +12,8 @@ DATABASE_URL = os.environ["DATABASE_URL"].split("?", 1)[0]
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "MARINA_TEST")
 OWNER_USERNAME = os.environ.get("BOOTSTRAP_OWNER_USERNAME", "marina")
 OWNER_PASSWORD = os.environ.get("BOOTSTRAP_OWNER_PASSWORD", "MarinaDemo2026!")
+RECEPTION_USERNAME = os.environ.get("RECEPTION_USERNAME", "admin")
+RECEPTION_PASSWORD = os.environ.get("RECEPTION_PASSWORD", "MarinaDemo2026!")
 MAID_USERNAME = os.environ.get("MAID_USERNAME", "housemaid")
 MAID_PASSWORD = os.environ.get("MAID_PASSWORD", "MarinaDemo2026!")
 KITCHEN_USERNAME = os.environ.get("KITCHEN_USERNAME", "kitchen")
@@ -84,6 +86,24 @@ def main() -> None:
     check_out = today + timedelta(days=2)
 
     owner = login(OWNER_USERNAME, OWNER_PASSWORD)
+    reception = login(RECEPTION_USERNAME, RECEPTION_PASSWORD)
+
+    reception_list = expect(
+        reception.get("/api/v1/admin/reception/reservations", params={"limit": 50}),
+        200,
+        "reception workspace access",
+    )
+    assert isinstance(reception_list.get("items"), list)
+    denied_reception_finance = reception.get(
+        "/api/v1/admin/finance/summary",
+        params={"from_date": today.isoformat(), "to_date": today.isoformat()},
+    )
+    assert denied_reception_finance.status_code == 403, denied_reception_finance.text
+    denied_reception_pms = reception.get(
+        "/api/v1/pms/grid",
+        params={"start": today.isoformat(), "end": (today + timedelta(days=2)).isoformat()},
+    )
+    assert denied_reception_pms.status_code == 403, denied_reception_pms.text
 
     managed_agent_suffix = uuid.uuid4().hex[:8]
     managed_agent_username = f"agent-{managed_agent_suffix}"
@@ -138,6 +158,71 @@ def main() -> None:
         "results": public_availability["results"],
     }
     assert all(item.get("pricing", {}).get("sellable") is True for item in public_availability["results"])
+
+    # Public-site contract: availability -> durable request -> owner CRM -> quote.
+    site_check_in = today + timedelta(days=4)
+    site_check_out = today + timedelta(days=6)
+    site_availability = expect(
+        owner.get(
+            "/api/v1/booking/check-availability",
+            params={
+                "check_in": site_check_in.isoformat(),
+                "check_out": site_check_out.isoformat(),
+                "adults": 1,
+                "children": 0,
+            },
+        ),
+        200,
+        "site availability contract",
+    )
+    site_options = [item for item in site_availability["results"] if item.get("pricing", {}).get("sellable")]
+    assert site_options, "Public site must have at least one sellable AK BERMET/MARINA option"
+    site_option = site_options[0]
+    public = httpx.Client(base_url=BASE_URL, timeout=30.0, follow_redirects=True)
+    site_suffix = uuid.uuid4().hex[:8]
+    site_request = expect(
+        public.post(
+            "/api/v1/booking/requests",
+            json={
+                "guest_name": "MARINA Website Test",
+                "phone": "+996755" + site_suffix[:6],
+                "email": f"marina-site-{site_suffix}@example.test",
+                "check_in": site_check_in.isoformat(),
+                "check_out": site_check_out.isoformat(),
+                "adults": 1,
+                "children": 0,
+                "room_type_code": site_option["room_type_code"],
+                "source": "AK_BERMET_SITE_CI" if PROPERTY_CODE == "AK_BERMET_TEST" else "MARINA_SITE_CI",
+                "notes": "public site -> MARINA CRM acceptance",
+            },
+        ),
+        201,
+        "public site booking request",
+    )
+    assert site_request["status"] == "NEW" and site_request["is_reservation"] is False
+    site_request_id = site_request["id"]
+
+    crm_requests = expect(
+        owner.get("/api/v1/admin/booking/requests", params={"limit": 200}),
+        200,
+        "owner CRM requests",
+    )
+    crm_item = next((item for item in crm_requests["items"] if item["id"] == site_request_id), None)
+    assert crm_item, "Public site request must appear in MARINA CRM"
+    assert crm_item["status"] == "NEW"
+    assert crm_item["source"] == ("AK_BERMET_SITE_CI" if PROPERTY_CODE == "AK_BERMET_TEST" else "MARINA_SITE_CI")
+
+    quoted_site_request = expect(
+        owner.post(
+            f"/api/v1/admin/booking/requests/{site_request_id}/quote",
+            json={"room_type_code": site_option["room_type_code"]},
+        ),
+        200,
+        "owner quote for public site request",
+    )
+    assert quoted_site_request["status"] in {"QUOTED", "AWAITING_PREPAYMENT"}
+    assert int(quoted_site_request["quoted_total_kgs"] or 0) > 0
+    public.close()
 
     chosen = None
     preview = None
@@ -395,6 +480,7 @@ def main() -> None:
 
     guest.close()
     agent.close()
+    reception.close()
     technician.close()
     waiter.close()
     kitchen.close()
@@ -410,6 +496,8 @@ def main() -> None:
             "stay_id": stay_id,
             "guest_request_id": request_id,
             "payment_profile": "NO_PAYMENTS",
+            "reception_rbac": "PASS",
+            "public_site_to_crm": "PASS",
         }
     )
 
