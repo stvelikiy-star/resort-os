@@ -213,6 +213,8 @@ jobs:
           assert "Мини-отель" in setup
           assert "Отель" in setup
           assert "Курорт" in setup
+          assert "Полный" in setup
+          assert "Все модули MARINA SMART без урезания функциональности." in setup
           print("MARINA_BRAND_NAV_CONTRACT_PASS")
           PY
 
