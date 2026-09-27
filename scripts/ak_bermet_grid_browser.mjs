@@ -32,6 +32,17 @@ try {
   assert(await cleanRows.count() === 137, `AK BERMET grid expected 137 CLEAN rooms, got ${await cleanRows.count()}`);
   assert(await blockedRows.count() === 32, `AK BERMET grid expected 32 TECH_BLOCK rooms, got ${await blockedRows.count()}`);
 
+  const staffGroups = await page.locator(".owner-group-label strong").allTextContents();
+  for (const expected of ["Корпус №1", "GARDEN", "Корпус №2", "Корпус №3", "Кирпичные", "Деревянные"]) {
+    assert(staffGroups.includes(expected), `AK BERMET staff group missing: ${expected}; got ${JSON.stringify(staffGroups)}`);
+  }
+  const roomLabels = await page.locator(".owner-room-label strong").allTextContents();
+  assert(roomLabels.includes("101 · 4-х мест"), `AK BERMET familiar room label missing: ${JSON.stringify(roomLabels.slice(0, 20))}`);
+  assert(roomLabels.includes("401 · одна"), "AK BERMET GARDEN room 401 must use the paper-style label");
+  assert(roomLabels.some((label) => label.startsWith("5А · двухместный стандарт")), "AK BERMET brick room 5А must use the paper-style label");
+  assert(roomLabels.some((label) => label.startsWith("дер1 · 8 мест")), "AK BERMET wooden room дер1 must use the paper-style label");
+  assert(!roomLabels.some((label) => /AKB-|C1-|C2-|C3-|BR-|WD-/.test(label)), "Internal unique room codes must stay hidden from AK BERMET staff labels");
+
   const blockedFreeCells = blockedRows.locator('.owner-night-cell[data-free="true"]');
   assert(await blockedFreeCells.count() === 0, "TECH_BLOCK rooms must never render a free booking cell");
 
@@ -61,7 +72,7 @@ try {
   await page.locator(".owner-booking-head .owner-quiet-btn").click();
   await page.locator(".owner-booking-modal").waitFor({ state: "detached" });
 
-  console.log("AK_BERMET_GRID_BROWSER_PASS rooms=169 clean=137 blocked=32 window=31 one-night-preview=PASS");
+  console.log("AK_BERMET_GRID_BROWSER_PASS rooms=169 clean=137 blocked=32 staff-groups=PASS familiar-labels=PASS window=31 one-night-preview=PASS");
 } finally {
   await browser.close();
 }
