@@ -142,6 +142,85 @@ def main() -> None:
     )
     assert len(grid["rooms"]) == EXPECTED_ROOM_COUNT
 
+    if PROPERTY_CODE == "AK_BERMET_TEST":
+        no_extra_room = None
+        extra_room = None
+        extra_room_limit = None
+        for room in grid["rooms"]:
+            probe = owner.post(
+                "/api/v1/admin/pms/reservations/new/preview",
+                json={
+                    "room_id": room["id"],
+                    "check_in": check_in.isoformat(),
+                    "check_out": check_out.isoformat(),
+                    "adults": 1,
+                    "children": 0,
+                },
+            )
+            if probe.status_code != 200:
+                continue
+            probe_body = probe.json()
+            limit = probe_body.get("room", {}).get("max_extra_bed_count")
+            if limit == 0 and no_extra_room is None:
+                no_extra_room = room
+            if isinstance(limit, int) and limit >= 1 and extra_room is None:
+                extra_room = room
+                extra_room_limit = limit
+            if no_extra_room and extra_room:
+                break
+
+        assert no_extra_room, "AK BERMET must include a sellable room with zero additional places"
+        assert extra_room and extra_room_limit, "AK BERMET must include a sellable room with confirmed additional capacity"
+
+        denied_extra = owner.post(
+            "/api/v1/admin/pms/reservations/new/preview",
+            json={
+                "room_id": no_extra_room["id"],
+                "check_in": check_in.isoformat(),
+                "check_out": check_out.isoformat(),
+                "adults": 1,
+                "children": 0,
+                "extra_bed_count": 1,
+                "extra_bed_unit_kgs": 1,
+            },
+        )
+        assert denied_extra.status_code == 409, denied_extra.text
+        assert denied_extra.json().get("detail", {}).get("code") == "EXTRA_BED_NOT_ALLOWED", denied_extra.text
+
+        allowed_extra = expect(
+            owner.post(
+                "/api/v1/admin/pms/reservations/new/preview",
+                json={
+                    "room_id": extra_room["id"],
+                    "check_in": check_in.isoformat(),
+                    "check_out": check_out.isoformat(),
+                    "adults": 1,
+                    "children": 0,
+                    "extra_bed_count": 1,
+                    "extra_bed_unit_kgs": 1,
+                },
+            ),
+            200,
+            "AK BERMET confirmed extra place",
+        )
+        assert allowed_extra["room"]["max_extra_bed_count"] == extra_room_limit
+
+        if extra_room_limit < 10:
+            over_extra = owner.post(
+                "/api/v1/admin/pms/reservations/new/preview",
+                json={
+                    "room_id": extra_room["id"],
+                    "check_in": check_in.isoformat(),
+                    "check_out": check_out.isoformat(),
+                    "adults": 1,
+                    "children": 0,
+                    "extra_bed_count": extra_room_limit + 1,
+                    "extra_bed_unit_kgs": 1,
+                },
+            )
+            assert over_extra.status_code == 409, over_extra.text
+            assert over_extra.json().get("detail", {}).get("code") == "EXTRA_BED_LIMIT_EXCEEDED", over_extra.text
+
     public_availability = expect(
         owner.get(
             "/api/v1/booking/check-availability",
@@ -533,6 +612,7 @@ def main() -> None:
             "reception_rbac": "PASS",
             "public_site_to_crm": "PASS",
             "prepayment_policy": PREPAYMENT_POLICY,
+            "ak_bermet_capacity_guard": "PASS" if PROPERTY_CODE == "AK_BERMET_TEST" else "N/A",
         }
     )
 
