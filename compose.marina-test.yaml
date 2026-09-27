@@ -67,6 +67,10 @@ services:
       TECHNICIAN_USERNAME: technician
       TECHNICIAN_PASSWORD: MarinaDemo2026!
       TECHNICIAN_DISPLAY_NAME: Technician
+      AGENT_USERNAME: agent
+      AGENT_PASSWORD: MarinaDemo2026!
+      AGENT_DISPLAY_NAME: Demo Agent
+      BOOKING_AGENT_NAME: MARINA SMART Demo Agency
       TEST_GUEST_FIXED_PIN: "306306"
       TTLOCK_CLIENT_ID: ""
       TTHOTEL_CLIENT_SECRET: ""
