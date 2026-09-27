@@ -186,6 +186,22 @@ function groupValue(room: Room, mode: GroupMode, propertyCode?: string | null) {
   return "";
 }
 
+const AK_BERMET_STAFF_GROUP_ORDER = [
+  "Корпус №1",
+  "Корпус №2",
+  "Корпус №3",
+  "GARDEN",
+  "Кирпичные",
+  "Деревянные",
+  "Сруб",
+];
+
+function staffGroupRank(label: string, propertyCode?: string | null) {
+  if (propertyCode !== "AK_BERMET_TEST") return Number.MAX_SAFE_INTEGER;
+  const index = AK_BERMET_STAFF_GROUP_ORDER.indexOf(label);
+  return index === -1 ? AK_BERMET_STAFF_GROUP_ORDER.length : index;
+}
+
 export default function PMSUniversalBoard() {
   const [start, setStart] = useState(() => {
     const now = new Date();
@@ -340,7 +356,10 @@ export default function PMSUniversalBoard() {
     () =>
       Array.from(
         new Set((data?.rooms || []).map((room) => room.building_or_zone).filter((value): value is string => Boolean(value))),
-      ).sort(),
+      ).sort((a, b) => {
+        const rank = staffGroupRank(a, data?.property) - staffGroupRank(b, data?.property);
+        return rank || a.localeCompare(b, "ru", { numeric: true });
+      }),
     [data],
   );
 
@@ -443,7 +462,15 @@ export default function PMSUniversalBoard() {
     return list.sort((a, b) => {
       const aGroup = groupValue(a, groupMode, data?.property);
       const bGroup = groupValue(b, groupMode, data?.property);
-      return aGroup.localeCompare(bGroup, "ru") || a.code.localeCompare(b.code, "ru", { numeric: true });
+      const groupOrder =
+        groupMode === "BUILDING"
+          ? staffGroupRank(aGroup, data?.property) - staffGroupRank(bGroup, data?.property)
+          : 0;
+      return (
+        groupOrder ||
+        aGroup.localeCompare(bGroup, "ru", { numeric: true }) ||
+        pmsRoomDisplayNumber(a, data?.property).localeCompare(pmsRoomDisplayNumber(b, data?.property), "ru", { numeric: true })
+      );
     });
   }, [data, filters, financeState, groupMode, quickMatch, roomHasToday, roomReservations, today]);
 
