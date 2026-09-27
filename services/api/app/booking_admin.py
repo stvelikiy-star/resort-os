@@ -19,7 +19,10 @@ from .payment_idempotency import (
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 MANUAL_PAYMENT_PROVIDER = "MANAGER_MANUAL"
-PREPAYMENT_POLICY = os.environ.get("PREPAYMENT_POLICY", "MANAGER_DECIDES").strip().upper()
+PREPAYMENT_POLICY = os.environ.get(
+    "PREPAYMENT_POLICY",
+    "FIRST_NIGHT" if PROPERTY_CODE == "AK_BERMET_TEST" else "MANAGER_DECIDES",
+).strip().upper()
 SUPPORTED_PREPAYMENT_POLICIES = {"MANAGER_DECIDES", "FIRST_NIGHT"}
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-booking"])
