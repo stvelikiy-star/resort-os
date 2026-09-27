@@ -74,6 +74,24 @@ def main() -> None:
     check_out = today + timedelta(days=2)
 
     owner = login(OWNER_USERNAME, OWNER_PASSWORD)
+
+    managed_agent_suffix = uuid.uuid4().hex[:8]
+    managed_agent_username = f"agent-{managed_agent_suffix}"
+    managed_agent_created = expect(
+        owner.post(
+            "/api/v1/admin/owner-corrections/agents",
+            json={
+                "name": f"MARINA Managed Agency {managed_agent_suffix}",
+                "contact_name": "MARINA Agent Acceptance",
+                "access_username": managed_agent_username,
+                "access_password": AGENT_PASSWORD,
+            },
+        ),
+        201,
+        "create managed agent access",
+    )
+    assert managed_agent_created["access_username"] == managed_agent_username
+
     setup = expect(owner.get("/api/v1/admin/hotel-setup"), 200, "hotel setup")
     assert setup["property"]["code"] == PROPERTY_CODE
     assert setup["summary"]["rooms"] == 12, setup["summary"]
@@ -131,7 +149,7 @@ def main() -> None:
     assert committed["payment_created"] is False
     reservation_id = committed["reservation_id"]
 
-    agent = login(AGENT_USERNAME, AGENT_PASSWORD)
+    agent = login(managed_agent_username, AGENT_PASSWORD)
     agent_grid = expect(
         agent.get("/api/v1/pms/grid", params={"start": check_in.isoformat(), "end": check_out.isoformat()}),
         200,
