@@ -271,7 +271,7 @@ export default function RequestsBoard() {
         <div>
           <p className="eyebrow">Продажи · бронирование</p>
           <h1>Заявки гостей</h1>
-          <p className="subtitle">n8n/сайт доводят клиента до заявки. Размер, условия и способ предоплаты определяет менеджер вручную.</p>
+          <p className="subtitle">n8n/сайт доводят клиента до заявки. Требуемая предоплата применяется по правилам объекта; получение оплаты подтверждает менеджер.</p>
         </div>
         <div className="work-actions">
           <select value={filter} onChange={(e) => setFilter(e.target.value)}>
