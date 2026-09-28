@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 
 type PinPayload = {
   reservation_id?: string;
@@ -16,6 +16,108 @@ type PinPayload = {
 type Phrase = { ru: string; kg: string; en: string };
 
 const STORAGE_KEY = "three-crowns-admin-locale";
+
+
+const KZ_EXACT: Record<string, string> = {
+  "Главная": "Басты бет",
+  "Супершахматка": "Супершахматка",
+  "CRM / Заявки": "CRM / Өтінімдер",
+  "Ресепшен / Брони": "Ресепшен / Броньдар",
+  "Сервис гостя": "Қонақ сервисі",
+  "Гости / История": "Қонақтар / Тарих",
+  "QR номеров": "Бөлме QR",
+  "QR зон": "Аймақ QR",
+  "Рост / Отзывы": "Өсу / Пікірлер",
+  "Выйти": "Шығу",
+  "Обновить": "Жаңарту",
+  "Брони и проживание": "Броньдар және тұру",
+  "Карточка брони": "Бронь карточкасы",
+  "Закрыть": "Жабу",
+  "Гость": "Қонақ",
+  "Без имени": "Аты жоқ",
+  "Текущий/рабочий номер": "Ағымдағы бөлме",
+  "Проживание": "Тұру",
+  "Источник": "Дереккөз",
+  "График проживания": "Тұру кестесі",
+  "Внутренние платежи по брони": "Бронь бойынша ішкі төлемдер",
+  "Стоимость": "Құны",
+  "Подтверждено менеджером": "Менеджер растады",
+  "Остаток": "Қалдық",
+  "Задачи по номерам проживания": "Бөлмелер бойынша тапсырмалар",
+  "Журнал действий": "Әрекеттер журналы",
+  "Проблемные номера": "Мәселелі бөлмелер",
+  "Повторяющиеся поломки": "Қайталанатын ақаулар",
+  "Номера с повторными ремонтами": "Қайта жөнделген бөлмелер",
+  "Сервис, уборка и ремонты": "Сервис, тазалау және жөндеу",
+  "только факты Resort Core": "тек Resort Core деректері",
+  "СОЗДАНО": "ҚҰРЫЛДЫ",
+  "АКТИВНЫЕ": "БЕЛСЕНДІ",
+  "ЗАВЕРШЕНО": "АЯҚТАЛДЫ",
+  "СРОЧНО": "ШҰҒЫЛ",
+  "ПРОБЛЕМНЫЕ НОМЕРА": "МӘСЕЛЕЛІ БӨЛМЕЛЕР",
+  "ПОВТОРЯЮЩИЕСЯ ПОЛОМКИ": "ҚАЙТАЛАНАТЫН АҚАУЛАР",
+  "Заезд": "Келу",
+  "Выезд": "Шығу",
+  "Карточка": "Карточка",
+  "Оплата": "Төлем",
+  "Даты": "Күндер",
+  "Активные": "Белсенді",
+  "Заезды сегодня": "Бүгін келетіндер",
+  "Выезды сегодня": "Бүгін шығатындар",
+  "Ожидают заезд": "Келуді күтуде",
+  "Проживают": "Тұрып жатыр",
+  "Выехали": "Шығып кетті",
+  "Все": "Барлығы",
+  "Дата отеля": "Қонақүй күні",
+  "Номер на заезд": "Келу бөлмесі",
+  "Текущий номер": "Ағымдағы бөлме",
+  "Последний номер": "Соңғы бөлме",
+  "Оплачено полностью": "Толық төленді",
+  "Переселение": "Бөлме ауыстыру",
+  "Готов": "Дайын",
+  "Нужна уборка": "Тазалау қажет",
+  "На проверке": "Тексеруде",
+  "Ремонт": "Жөндеу",
+  "Не указан": "Көрсетілмеген",
+  "ВЛАДЕЛЕЦ": "ИЕСІ",
+  "МЕНЕДЖЕР": "МЕНЕДЖЕР",
+  "РЕСЕПШЕН": "РЕСЕПШЕН",
+  "ГОРНИЧНАЯ": "БӨЛМЕ ҚЫЗМЕТКЕРІ",
+  "ТЕХНИК": "ТЕХНИК",
+  "РЕСТОРАН": "МЕЙРАМХАНА",
+  "МАГАЗИН": "ДҮКЕН",
+  "Заявка": "Өтінім",
+  "ОПЕРАЦИИ ВЛАДЕЛЬЦА · С НАЧАЛА МЕСЯЦА": "ИЕСІНІҢ ОПЕРАЦИЯЛАРЫ · АЙ БАСЫНАН",
+  "СЕРВИС ГОСТЕЙ · СОЗДАНО": "ҚОНАҚ СЕРВИСІ · ҚҰРЫЛДЫ",
+  "СЕРВИС ГОСТЕЙ · АКТИВНЫЕ": "ҚОНАҚ СЕРВИСІ · БЕЛСЕНДІ",
+  "СРЕДНЕЕ ВРЕМЯ ЗАКРЫТИЯ СЕРВИСНЫХ ЗАЯВОК": "СЕРВИСТІК ӨТІНІМДЕРДІ ЖАБУДЫҢ ОРТАША УАҚЫТЫ",
+  "SLA СЕРВИСА ГОСТЕЙ": "ҚОНАҚ СЕРВИСІНІҢ SLA КӨРСЕТКІШІ",
+  "УБОРКА · ЗАВЕРШЕНО": "ТАЗАЛАУ · АЯҚТАЛДЫ",
+  "УБОРКА · СРОЧНО": "ТАЗАЛАУ · ШҰҒЫЛ",
+  "РЕМОНТ · ЗАВЕРШЕНО": "ЖӨНДЕУ · АЯҚТАЛДЫ",
+  "НЕ НАСТРОЕНО": "БАПТАЛМАҒАН",
+  "ИЗМЕНЕНИЕ ГРАФИКА В PMS": "PMS КЕСТЕСІН ӨЗГЕРТУ",
+  "МЕНЕДЖЕР СОЗДАЛ БРОНЬ ИЗ ШАХМАТКИ": "МЕНЕДЖЕР ШАХМАТКАДАН БРОНЬ ҚҰРДЫ",
+  "ЗАЕЗД": "КЕЛУ",
+  "ВЫЕЗД": "ШЫҒУ",
+  "ПЕРЕВЫДАЧА КОДА GUEST OS": "GUEST OS КОДЫН ҚАЙТА БЕРУ",
+  "УБОРКА": "ТАЗАЛАУ",
+  "РЕМОНТ": "ЖӨНДЕУ",
+  "В РАБОТЕ": "ЖҰМЫСТА",
+  "НА ПРОВЕРКЕ": "ТЕКСЕРУДЕ",
+  "ТЕХНИЧЕСКАЯ БЛОКИРОВКА": "ТЕХНИКАЛЫҚ БЛОК",
+  "НЕ УКАЗАНО": "КӨРСЕТІЛМЕГЕН",
+  "УСПЕШНО": "СӘТТІ",
+  "ОБЫЧНЫЙ": "ҚАЛЫПТЫ",
+  "ВЫСОКИЙ": "ЖОҒАРЫ",
+  "НИЗКИЙ": "ТӨМЕН",
+  "АКТИВНО": "БЕЛСЕНДІ",
+  "ГАРАНТИРОВАНА": "КЕПІЛДЕНГЕН",
+  "ПРОЖИВАЕТ": "ТҰРЫП ЖАТЫР",
+  "ВЫЕХАЛ": "ШЫҒЫП КЕТТІ",
+  "ОТМЕНЕНО": "БАС ТАРТЫЛДЫ",
+  "НЕ ЗАЕХАЛ": "КЕЛМЕДІ",
+};
 
 const exact: Record<string, Phrase> = {
   "OWNER OPERATIONS · MTD": { ru: "ОПЕРАЦИИ ВЛАДЕЛЬЦА · С НАЧАЛА МЕСЯЦА", kg: "ЭЭСИНИН ОПЕРАЦИЯЛАРЫ · АЙ БАШЫНАН", en: "OWNER OPERATIONS · MONTH TO DATE" },
@@ -165,6 +267,19 @@ const tokenReplacements: Record<Locale, Array<[RegExp, string]>> = {
     [/\bSUCCESS\b/g, "ИЙГИЛИКТҮҮ"],
     [/\bNORMAL\b/g, "КАДИМКИ"],
   ],
+  kz: [
+    [/\bGUEST SERVICES\b/g, "ҚОНАҚ СЕРВИСІ"],
+    [/\bHOUSEKEEPING\b/g, "ТАЗАЛАУ"],
+    [/\bMAINTENANCE\b/g, "ЖӨНДЕУ"],
+    [/\bNOT_CONFIGURED\b/g, "БАПТАЛМАҒАН"],
+    [/\bOWNER OPERATIONS\b/g, "ИЕСІНІҢ ОПЕРАЦИЯЛАРЫ"],
+    [/\bMTD\b/g, "АЙ БАСЫНАН"],
+    [/\bDONE\b/g, "АЯҚТАЛДЫ"],
+    [/\bIN_PROGRESS\b/g, "ЖҰМЫСТА"],
+    [/\bIN_INSPECTION\b/g, "ТЕКСЕРУДЕ"],
+    [/\bSUCCESS\b/g, "СӘТТІ"],
+    [/\bNORMAL\b/g, "ҚАЛЫПТЫ"],
+  ],
   en: [
     [/\bСЕРВИС ГОСТЕЙ\b/g, "GUEST SERVICES"],
     [/\bУБОРКА\b/g, "HOUSEKEEPING"],
@@ -184,8 +299,14 @@ function translateText(source: string, locale: Locale): string {
   const trimmed = source.trim();
   if (!trimmed) return source;
   const direct = phraseIndex.get(trimmed);
-  let translated = direct ? direct[locale] : trimmed;
-  if (!direct && exact[trimmed]) translated = exact[trimmed][locale];
+  let translated: string;
+  if (locale === "kz") {
+    const canonicalRu = direct?.ru ?? exact[trimmed]?.ru ?? trimmed;
+    translated = KZ_EXACT[canonicalRu] ?? KZ_EXACT[trimmed] ?? trimmed;
+  } else {
+    translated = direct ? direct[locale] : trimmed;
+    if (!direct && exact[trimmed]) translated = exact[trimmed][locale];
+  }
   for (const [pattern, replacement] of tokenReplacements[locale]) {
     translated = translated.replace(pattern, replacement);
   }
@@ -213,12 +334,12 @@ export default function AdminExperienceRuntime() {
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "ru" || stored === "kg" || stored === "en") setLocale(stored);
+    if (stored === "ru" || stored === "kg" || stored === "kz" || stored === "en") setLocale(stored);
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, locale);
-    document.documentElement.lang = locale === "kg" ? "ky" : locale;
+    document.documentElement.lang = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
   }, [locale]);
 
   useEffect(() => {
@@ -292,7 +413,7 @@ export default function AdminExperienceRuntime() {
 
   async function reissuePin() {
     if (!currentReservationId) return;
-    if (!window.confirm(locale === "en" ? "Issue a new Guest OS PIN? The previous PIN will stop working." : locale === "kg" ? "Жаңы Guest OS кодун бересизби? Мурунку код иштебей калат." : "Выдать новый код Guest OS? Предыдущий PIN перестанет работать.")) return;
+    if (!window.confirm(locale === "en" ? "Issue a new Guest OS PIN? The previous PIN will stop working." : locale === "kg" ? "Жаңы Guest OS кодун бересизби? Мурунку код иштебей калат." : locale === "kz" ? "Жаңа Guest OS PIN кодын бересіз бе? Алдыңғы PIN жұмысын тоқтатады." : "Выдать новый код Guest OS? Предыдущий PIN перестанет работать.")) return;
     setPinBusy(true);
     setPinError(null);
     try {
@@ -315,13 +436,14 @@ export default function AdminExperienceRuntime() {
   const labels = {
     ru: { language: "Язык", reissue: "Новый код Guest OS", title: "Код Guest OS выдан", room: "Номер", code: "Код гостя", valid: "Действует 24 часа", once: "Показывается только один раз. Передайте код гостю сейчас.", copy: "Скопировать код", close: "Закрыть", error: "Не удалось выдать новый код" },
     kg: { language: "Тил", reissue: "Жаңы Guest OS коду", title: "Guest OS коду берилди", room: "Бөлмө", code: "Конок коду", valid: "24 саат жарактуу", once: "Бир гана жолу көрсөтүлөт. Кодду конокко азыр бериңиз.", copy: "Кодду көчүрүү", close: "Жабуу", error: "Жаңы кодду берүү мүмкүн болгон жок" },
+    kz: { language: "Тіл", reissue: "Жаңа Guest OS PIN", title: "Guest OS PIN берілді", room: "Бөлме", code: "Қонақ PIN", valid: "24 сағат жарамды", once: "Тек бір рет көрсетіледі. PIN кодын қонаққа қазір беріңіз.", copy: "PIN көшіру", close: "Жабу", error: "Жаңа PIN беру мүмкін болмады" },
     en: { language: "Language", reissue: "New Guest OS PIN", title: "Guest OS PIN issued", room: "Room", code: "Guest PIN", valid: "Valid for 24 hours", once: "Shown only once. Give this PIN to the guest now.", copy: "Copy PIN", close: "Close", error: "Could not issue a new PIN" },
   }[locale];
 
   return <>
     <div className="admin-locale-switcher" data-i18n-skip>
       <span>{labels.language}</span>
-      {(["ru", "kg", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} onClick={() => setLocale(value)}>{value.toUpperCase()}</button>)}
+      {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} onClick={() => setLocale(value)}>{value.toUpperCase()}</button>)}
     </div>
 
     {detailOpen && currentReservationCheckedIn && <button type="button" className="guest-pin-reissue" data-i18n-skip onClick={reissuePin} disabled={pinBusy}>{pinBusy ? "…" : labels.reissue}</button>}
