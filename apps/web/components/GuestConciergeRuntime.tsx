@@ -76,15 +76,15 @@ const COPY = {
     cancel: "Отменить",
     close: "Закрыть",
     mealsTitle: "Питание",
-    mealsNote: "Выберите приём пищи и количество гостей. Конкретное меню подтверждает столовая.",
+    mealsNote: "Выберите приём пищи и количество гостей. Меню, доступность и стоимость подтверждает столовая.",
     meal: "Приём пищи",
     breakfast: "Завтрак",
     lunch: "Обед",
     dinner: "Ужин",
     adults: "Взрослые",
     children: "Дети",
-    estimated: "Расчёт по действующему прайсу",
-    mealWarning: "Включённое в проживание питание определяется вашей бронью. Здесь показана стоимость дополнительного питания.",
+    estimated: "Стоимость",
+    mealWarning: "Включённое в проживание питание определяется вашей бронью. Стоимость дополнительного питания подтверждает столовая.",
     transferTitle: "Трансфер",
     origin: "Откуда",
     destination: "Куда",
@@ -161,15 +161,15 @@ const COPY = {
     cancel: "Жокко чыгаруу",
     close: "Жабуу",
     mealsTitle: "Тамактануу",
-    mealsNote: "Тамактануу убактысын жана коноктордун санын тандаңыз. Так менюну ашкана ырастайт.",
+    mealsNote: "Тамактануу убактысын жана коноктордун санын тандаңыз. Менюну, жеткиликтүүлүктү жана бааны ашкана ырастайт.",
     meal: "Тамактануу",
     breakfast: "Эртең мененки тамак",
     lunch: "Түшкү тамак",
     dinner: "Кечки тамак",
     adults: "Чоңдор",
     children: "Балдар",
-    estimated: "Учурдагы баа боюнча эсеп",
-    mealWarning: "Жашоого кирген тамактануу сиздин бронуңуз боюнча аныкталат. Бул жерде кошумча тамактануунун баасы көрсөтүлөт.",
+    estimated: "Баасы",
+    mealWarning: "Жашоого кирген тамактануу сиздин бронуңуз боюнча аныкталат. Кошумча тамактануунун баасын ашкана ырастайт.",
     transferTitle: "Трансфер",
     origin: "Кайдан",
     destination: "Кайда",
@@ -246,15 +246,15 @@ const COPY = {
     cancel: "Cancel",
     close: "Close",
     mealsTitle: "Dining",
-    mealsNote: "Choose a meal and number of guests. The dining team confirms the actual menu.",
+    mealsNote: "Choose a meal and number of guests. The dining team confirms the menu, availability and price.",
     meal: "Meal",
     breakfast: "Breakfast",
     lunch: "Lunch",
     dinner: "Dinner",
     adults: "Adults",
     children: "Children",
-    estimated: "Estimate from the current price list",
-    mealWarning: "Meal inclusion depends on your reservation. The prices shown here are for additional meals.",
+    estimated: "Price",
+    mealWarning: "Meal inclusion depends on your reservation. The dining team confirms the price of additional meals.",
     transferTitle: "Transfer",
     origin: "From",
     destination: "To",
@@ -382,12 +382,6 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     finally { setChecking(false); }
   }
 
-  function mealPrice() {
-    const adult = meal === "breakfast" ? 500 : meal === "lunch" ? 750 : 650;
-    const child = meal === "breakfast" ? 400 : meal === "lunch" ? 550 : 450;
-    return adult * adults + child * children;
-  }
-
   function descriptionFor(code: RequestCode) {
     if (code === "MEALS") {
       const mealName = copy[meal];
@@ -463,7 +457,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     </>}
 
     {selected && <div className="concierge-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setSelected(null); }}><section className="concierge-modal" role="dialog" aria-modal="true"><div className="concierge-modal-head"><div><small>{copy.newRequest}</small><h2>{selected === "MEALS" ? copy.mealsTitle : selected === "TRANSFER" ? copy.transferTitle : copy.services[selected][0]}</h2></div><button onClick={() => setSelected(null)} aria-label={copy.close}>×</button></div><p>{selected === "MEALS" ? copy.mealsNote : selected === "TRANSFER" ? copy.serviceInfo : copy.services[selected][1]}</p><form onSubmit={sendRequest}>
-      {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{mealPrice().toLocaleString()} сом</strong><small>{copy.mealWarning}</small></div></>}
+      {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{copy.mealWarning}</strong></div></>}
       {selected === "TRANSFER" && <><div className="concierge-two"><label>{copy.origin}<select value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label><label>{copy.destination}<select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label></div><label>{copy.vehicle}<select value={vehicle} onChange={(e) => setVehicle(e.target.value)}><option value="sedan">{copy.sedan}</option><option value="minivan">{copy.minivan}</option></select></label></>}
       <div className="concierge-two"><label>{copy.date}<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label><label>{copy.time}<input type="time" value={serviceTime} onChange={(e) => setServiceTime(e.target.value)} /></label></div><label>{selected === "TRANSFER" ? copy.luggage : copy.comment}<textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={copy.commentPlaceholder} maxLength={1200} /></label>{notice && <div className="concierge-notice">{notice}</div>}<button className="concierge-submit" disabled={sending}>{sending ? copy.sending : copy.send}</button></form></section></div>}
   </main>;
