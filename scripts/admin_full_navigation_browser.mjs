@@ -73,6 +73,36 @@ async function assertHealthy(label) {
 try {
   await login(page);
 
+  const localeExpectations = [
+    { code: "RU", label: "Главная", finance: "Финансы", settings: "Настройки", more: "Ещё", rates: "Цены / Сезоны", htmlLang: "ru", stored: "ru" },
+    { code: "KG", label: "Башкы", finance: "Каржы", settings: "Жөндөөлөр", more: "Дагы", rates: "Баалар / Сезондор", htmlLang: "ky", stored: "kg" },
+    { code: "KZ", label: "Басты бет", finance: "Қаржы", settings: "Баптаулар", more: "Тағы", rates: "Бағалар / Маусымдар", htmlLang: "kk", stored: "kz" },
+    { code: "EN", label: "Home", finance: "Finance", settings: "Settings", more: "More", rates: "Rates / Seasons", htmlLang: "en", stored: "en" },
+  ];
+
+  for (const item of localeExpectations) {
+    const localeButton = page.locator(".admin-locale-switcher button", { hasText: item.code });
+    assert(await localeButton.count() === 1, item.code + ": locale button is missing or duplicated");
+    await localeButton.click();
+    await page.getByRole("button", { name: item.label, exact: true }).waitFor({ state: "visible" });
+    await page.getByRole("button", { name: item.finance, exact: true }).waitFor({ state: "visible" });
+    await page.getByRole("button", { name: item.settings, exact: true }).waitFor({ state: "visible" });
+    assert((await page.locator("details.admin-more-menu summary").innerText()).trim() === item.more, item.code + ": compact More label did not translate");
+    assert(await page.locator("details.admin-more-menu button").filter({ hasText: item.rates }).count() === 1, item.code + ": secondary Rates / Seasons label did not translate");
+    assert(await page.locator("html").getAttribute("lang") === item.htmlLang, item.code + ": unexpected html lang");
+    assert(await page.evaluate(() => localStorage.getItem("three-crowns-admin-locale")) === item.stored, item.code + ": locale persistence key mismatch");
+  }
+
+  await page.getByRole("button", { name: "KZ", exact: true }).click();
+  await page.getByRole("button", { name: "Басты бет", exact: true }).waitFor({ state: "visible" });
+  await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Басты бет", exact: true }).waitFor({ state: "visible" });
+  assert(await page.locator("html").getAttribute("lang") === "kk", "KZ: html lang was not restored after reload");
+  assert(await page.evaluate(() => localStorage.getItem("three-crowns-admin-locale")) === "kz", "KZ: locale was not restored after reload");
+
+  await page.getByRole("button", { name: "RU", exact: true }).click();
+  await page.getByRole("button", { name: "Главная", exact: true }).waitFor({ state: "visible" });
+
   for (const label of primaryTabs) {
     const button = page.getByRole("button", { name: label, exact: true });
     assert(await button.count() === 1, label + ": expected exactly one primary navigation button");
@@ -93,7 +123,7 @@ try {
     await assertHealthy(label);
   }
 
-  console.log("PASS: MARINA SMART owner navigation browser acceptance (" + primaryTabs.length + " primary + " + moreTabs.length + " secondary tabs; compact Ещё preserved; no React crash; no Core 5xx)");
+  console.log("PASS: MARINA SMART owner navigation + RU/KG/KZ/EN browser acceptance (" + primaryTabs.length + " primary + " + moreTabs.length + " secondary tabs; locale persistence verified; compact Ещё preserved; no React crash; no Core 5xx)");
 } finally {
   await browser.close();
 }
