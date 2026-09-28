@@ -1,0 +1,3 @@
+MARINA SMART AK BERMET Railway deployment trigger
+Target property: AK_BERMET_TEST
+Source baseline: marina-smart/agent-access-20260927 @ 73cc4979b5977e544fdf30cf92b5447a2fdbec3f
