@@ -10,8 +10,8 @@ import "../../guest-owner-corrections.css";
 type GuestOsPageProps = { params: Promise<{ token: string }> };
 
 export const metadata: Metadata = {
-  title: "AK BERMET — MARINA SMART · гостевой кабинет",
-  description: "Личный цифровой сервис гостя AK BERMET на платформе MARINA SMART.",
+  title: "Три Короны — цифровой консьерж",
+  description: "Личный цифровой сервис гостя курорта Три Короны.",
   robots: { index: false, follow: false, noarchive: true, nosnippet: true },
 };
 
