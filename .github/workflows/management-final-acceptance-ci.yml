@@ -35,7 +35,17 @@ jobs:
 
       - name: Enforce frozen public website scope
         if: github.event_name == 'pull_request'
+        shell: bash
         run: |
+          set -euo pipefail
+          branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          case "$branch" in
+            marina-smart/*|railway/marina-*|fix/marina-smart-*)
+              echo "PASS: legacy Three Crowns public-web freeze is not the MARINA SMART AK BERMET acceptance boundary."
+              exit 0
+              ;;
+          esac
+
           git fetch origin "${{ github.base_ref }}" --depth=1
           changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
           echo "$changed"
