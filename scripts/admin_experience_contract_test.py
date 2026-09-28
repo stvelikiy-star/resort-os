@@ -37,9 +37,10 @@ require("GUEST_PIN_REISSUE" in PIN_API, "PIN reissue must be audited")
 require("guest_pin_admin_router" in ENTRY and "include_router(guest_pin_admin_router)" in ENTRY, "PIN router not composed")
 
 # Locale selector must be global and persistent for all admin modules.
-for locale in ('"ru"', '"kg"', '"en"'):
+for locale in ('"ru"', '"kg"', '"kz"', '"en"'):
     require(locale in RUNTIME, f"locale missing: {locale}")
 require("localStorage" in RUNTIME and "three-crowns-admin-locale" in RUNTIME, "locale persistence missing")
+require("KZ_EXACT" in RUNTIME and 'locale === "kz" ? "kk"' in RUNTIME, "Kazakh locale dictionary or html lang mapping missing")
 require("MutationObserver" in RUNTIME, "dynamic React content must be translated")
 require("placeholder" in RUNTIME and "aria-label" in RUNTIME, "form/accessibility text localization missing")
 require("AdminExperienceRuntime" in LAYOUT, "global admin runtime not mounted")
