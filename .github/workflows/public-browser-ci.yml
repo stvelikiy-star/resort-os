@@ -53,9 +53,53 @@ jobs:
           exit 1
 
       - name: Run SSR desktop mobile and booking UX acceptance
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: node scripts/public_browser_acceptance.mjs
+
+      - name: Run MARINA SMART guest-web browser acceptance
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        env:
+          PUBLIC_BASE_URL: http://127.0.0.1:3000
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+          import fs from "node:fs";
+
+          const base = process.env.PUBLIC_BASE_URL;
+          const browser = await chromium.launch({ headless: true });
+          try {
+            for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+              const context = await browser.newContext({ viewport });
+              const page = await context.newPage();
+              const response = await page.goto(base + "/", { waitUntil: "networkidle" });
+              if (!response || response.status() !== 200) throw new Error("MARINA root did not return HTTP 200");
+              const body = await page.locator("body").innerText();
+              if (!body.includes("AK BERMET")) throw new Error("MARINA root is missing AK BERMET");
+              if (!body.includes("MARINA SMART")) throw new Error("MARINA root is missing MARINA SMART");
+              for (const forbidden of ["Три Короны", "Three Crowns", "3korony.com"]) {
+                if (body.includes(forbidden)) throw new Error("Legacy Three Crowns branding is visible: " + forbidden);
+              }
+              const title = await page.title();
+              if (!title.includes("AK BERMET") || !title.includes("MARINA SMART")) {
+                throw new Error("MARINA root metadata/title is incorrect: " + title);
+              }
+              await context.close();
+            }
+
+            const routeSource = fs.readFileSync("apps/web/app/g/[token]/page.tsx", "utf8");
+            if (!routeSource.includes("GuestConciergeRuntime token={token}")) {
+              throw new Error("Canonical guest QR route is not mounted");
+            }
+            if (!routeSource.includes("AK BERMET") || !routeSource.includes("MARINA SMART")) {
+              throw new Error("Guest QR route metadata is not MARINA SMART / AK BERMET branded");
+            }
+            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS");
+          } finally {
+            await browser.close();
+          }
+          NODE
 
       - name: Show public-site logs on failure
         if: failure()
