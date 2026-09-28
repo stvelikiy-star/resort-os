@@ -95,7 +95,28 @@ jobs:
             if (!routeSource.includes("AK BERMET") || !routeSource.includes("MARINA SMART")) {
               throw new Error("Guest QR route metadata is not MARINA SMART / AK BERMET branded");
             }
-            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS");
+
+            const concierge = fs.readFileSync("apps/web/components/GuestConciergeRuntime.tsx", "utf8");
+            for (const required of [
+              'property: "AK BERMET"',
+              'product: "MARINA SMART',
+              'const HOTEL_PHONE_E164 = "+996501772233"',
+              'Заезд с 13:00. Выезд до 11:00.',
+              'Check-in is from 13:00. Check-out is by 11:00.'
+            ]) {
+              if (!concierge.includes(required)) throw new Error("AK BERMET guest fact missing: " + required);
+            }
+            for (const forbidden of [
+              "Три Короны",
+              "Three Crowns",
+              "Үч Таажы",
+              "+996558085002",
+              'function mealPrice()',
+              '? 500 : meal === "lunch" ? 750 : 650'
+            ]) {
+              if (concierge.includes(forbidden)) throw new Error("Legacy guest fact still present: " + forbidden);
+            }
+            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS facts=PASS");
           } finally {
             await browser.close();
           }
