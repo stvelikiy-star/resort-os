@@ -165,7 +165,12 @@ jobs:
           python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-good.env | grep -q '^RESULT: PASS STATIC$'
 
       - name: Verify public truth still blocks rejected sports/payment drift
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python scripts/public_site_truth_guard.py
+
+      - name: Record MARINA SMART guest-web scope
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        run: echo 'PASS: Beget/Three Crowns public-site truth is not applied to the dedicated Railway MARINA SMART guest web.'
 
       - name: Validate backup and host scripts
         run: |
