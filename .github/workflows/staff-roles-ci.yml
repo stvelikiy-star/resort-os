@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'apps/staff/app/page.tsx'
+      - 'apps/staff/app/layout.tsx'
+      - 'apps/staff/components/StaffLocaleRuntime.tsx'
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'apps/staff/components/GuestRequestShiftPanel.tsx'
       - 'services/api/app/staff_guest_requests.py'
