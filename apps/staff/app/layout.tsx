@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import StaffLocaleRuntime from "../components/StaffLocaleRuntime";
 import "./globals.css";
 import "./shift-v2.css";
 
@@ -19,7 +20,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body><StaffLocaleRuntime />{children}</body>
       <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
     </html>
   );
