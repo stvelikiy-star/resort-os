@@ -88,7 +88,7 @@ try {
     await page.getByRole("button", { name: item.finance, exact: true }).waitFor({ state: "visible" });
     await page.getByRole("button", { name: item.settings, exact: true }).waitFor({ state: "visible" });
     assert((await page.locator("details.admin-more-menu summary").innerText()).trim() === item.more, item.code + ": compact More label did not translate");
-    assert(await page.getByRole("button", { name: item.rates, exact: true }).count() === 1, item.code + ": secondary Rates / Seasons label did not translate");
+    assert(await page.locator("details.admin-more-menu button").filter({ hasText: item.rates }).count() === 1, item.code + ": secondary Rates / Seasons label did not translate");
     assert(await page.locator("html").getAttribute("lang") === item.htmlLang, item.code + ": unexpected html lang");
     assert(await page.evaluate(() => localStorage.getItem("three-crowns-admin-locale")) === item.stored, item.code + ": locale persistence key mismatch");
   }
