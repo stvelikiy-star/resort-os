@@ -30,13 +30,13 @@ type Service = { code: RequestCode; icon: string; title: string; note: string };
 
 const STORAGE_KEY = "three-crowns-guest-language";
 const SITE_STORAGE_KEY = "three-crowns-site-language";
-const HOTEL_PHONE_E164 = "+996501772233";
-const HOTEL_WHATSAPP_URL = "https://wa.me/996501772233";
+const HOTEL_PHONE_E164 = "+996558085002";
+const HOTEL_WHATSAPP_URL = "https://wa.me/996558085002";
 
 const COPY = {
   ru: {
-    property: "AK BERMET",
-    product: "MARINA SMART · гостевой кабинет",
+    property: "Три Короны",
+    product: "Цифровой консьерж",
     language: "Язык",
     loading: "Открываем цифровой консьерж…",
     invalidTitle: "Код номера недоступен",
@@ -58,7 +58,7 @@ const COPY = {
     stay: "Ваше проживание",
     from: "с",
     to: "по",
-    checkout: "Выезд до 11:00",
+    checkout: "Выезд до 12:00",
     quick: "Что нужно сейчас?",
     quickNote: "Большинство услуг можно запросить за несколько нажатий.",
     myRequests: "Мои заявки",
@@ -76,15 +76,15 @@ const COPY = {
     cancel: "Отменить",
     close: "Закрыть",
     mealsTitle: "Питание",
-    mealsNote: "Выберите приём пищи и количество гостей. Меню, доступность и стоимость подтверждает столовая.",
+    mealsNote: "Выберите приём пищи и количество гостей. Конкретное меню подтверждает столовая.",
     meal: "Приём пищи",
     breakfast: "Завтрак",
     lunch: "Обед",
     dinner: "Ужин",
     adults: "Взрослые",
     children: "Дети",
-    estimated: "Стоимость",
-    mealWarning: "Подтверждает столовая",
+    estimated: "Расчёт по действующему прайсу",
+    mealWarning: "Включённое в проживание питание определяется вашей бронью. Здесь показана стоимость дополнительного питания.",
     transferTitle: "Трансфер",
     origin: "Откуда",
     destination: "Куда",
@@ -94,12 +94,12 @@ const COPY = {
     manas: "Аэропорт Манас",
     tamchy: "Аэропорт Тамчы",
     bishkek: "Бишкек",
-    hotel: "AK BERMET",
+    hotel: "Три Короны",
     other: "Другое место",
     luggage: "Багаж / особые пожелания",
     serviceInfo: "После отправки сотрудник подтвердит доступность, время и окончательные условия.",
     rules: "Правила и информация",
-    rulesText: "Заезд с 13:00. Выезд до 11:00. По вопросам проживания, услуг и безопасности обращайтесь на ресепшен.",
+    rulesText: "Заезд с 14:00. Выезд до 12:00. По вопросам проживания, услуг и безопасности обращайтесь на ресепшен.",
     contacts: "Связаться с отелем",
     call: "Позвонить на ресепшен",
     message: "Написать менеджеру",
@@ -120,8 +120,8 @@ const COPY = {
     },
   },
   kg: {
-    property: "AK BERMET",
-    product: "MARINA SMART · конок кабинети",
+    property: "Үч Таажы",
+    product: "Санарип жардамчы",
     language: "Тил",
     loading: "Санарип жардамчы ачылууда…",
     invalidTitle: "Бөлмө коду жеткиликсиз",
@@ -143,7 +143,7 @@ const COPY = {
     stay: "Сиздин жашооңуз",
     from: "баштап",
     to: "чейин",
-    checkout: "Чыгуу саат 11:00гө чейин",
+    checkout: "Чыгуу саат 12:00гө чейин",
     quick: "Азыр эмне керек?",
     quickNote: "Көпчүлүк кызматтарды бир нече басуу менен сураса болот.",
     myRequests: "Менин өтүнмөлөрүм",
@@ -161,15 +161,15 @@ const COPY = {
     cancel: "Жокко чыгаруу",
     close: "Жабуу",
     mealsTitle: "Тамактануу",
-    mealsNote: "Тамактануу убактысын жана коноктордун санын тандаңыз. Менюну, жеткиликтүүлүктү жана бааны ашкана ырастайт.",
+    mealsNote: "Тамактануу убактысын жана коноктордун санын тандаңыз. Так менюну ашкана ырастайт.",
     meal: "Тамактануу",
     breakfast: "Эртең мененки тамак",
     lunch: "Түшкү тамак",
     dinner: "Кечки тамак",
     adults: "Чоңдор",
     children: "Балдар",
-    estimated: "Баасы",
-    mealWarning: "Ашкана ырастайт",
+    estimated: "Учурдагы баа боюнча эсеп",
+    mealWarning: "Жашоого кирген тамактануу сиздин бронуңуз боюнча аныкталат. Бул жерде кошумча тамактануунун баасы көрсөтүлөт.",
     transferTitle: "Трансфер",
     origin: "Кайдан",
     destination: "Кайда",
@@ -179,12 +179,12 @@ const COPY = {
     manas: "Манас аэропорту",
     tamchy: "Тамчы аэропорту",
     bishkek: "Бишкек",
-    hotel: "AK BERMET",
+    hotel: "Үч Таажы",
     other: "Башка жер",
     luggage: "Жүк / өзгөчө каалоо",
     serviceInfo: "Жөнөткөндөн кийин кызматкер жеткиликтүүлүктү, убакытты жана акыркы шарттарды ырастайт.",
     rules: "Эрежелер жана маалымат",
-    rulesText: "Кирүү саат 13:00дөн. Чыгуу саат 11:00гө чейин. Жашоо, кызматтар жана коопсуздук боюнча ресепшенге кайрылыңыз.",
+    rulesText: "Кирүү саат 14:00дөн. Чыгуу саат 12:00гө чейин. Жашоо, кызматтар жана коопсуздук боюнча ресепшенге кайрылыңыз.",
     contacts: "Мейманкана менен байланыш",
     call: "Ресепшенге чалуу",
     message: "Менеджерге жазуу",
@@ -205,8 +205,8 @@ const COPY = {
     },
   },
   en: {
-    property: "AK BERMET",
-    product: "MARINA SMART · Guest area",
+    property: "Three Crowns",
+    product: "Digital concierge",
     language: "Language",
     loading: "Opening your digital concierge…",
     invalidTitle: "Room code unavailable",
@@ -228,7 +228,7 @@ const COPY = {
     stay: "Your stay",
     from: "from",
     to: "to",
-    checkout: "Check-out by 11:00",
+    checkout: "Check-out by 12:00",
     quick: "What do you need now?",
     quickNote: "Most hotel services can be requested in just a few taps.",
     myRequests: "My requests",
@@ -246,15 +246,15 @@ const COPY = {
     cancel: "Cancel",
     close: "Close",
     mealsTitle: "Dining",
-    mealsNote: "Choose a meal and number of guests. The dining team confirms the menu, availability and price.",
+    mealsNote: "Choose a meal and number of guests. The dining team confirms the actual menu.",
     meal: "Meal",
     breakfast: "Breakfast",
     lunch: "Lunch",
     dinner: "Dinner",
     adults: "Adults",
     children: "Children",
-    estimated: "Price",
-    mealWarning: "Confirmed by the dining team",
+    estimated: "Estimate from the current price list",
+    mealWarning: "Meal inclusion depends on your reservation. The prices shown here are for additional meals.",
     transferTitle: "Transfer",
     origin: "From",
     destination: "To",
@@ -264,12 +264,12 @@ const COPY = {
     manas: "Manas Airport",
     tamchy: "Tamchy Airport",
     bishkek: "Bishkek",
-    hotel: "AK BERMET",
+    hotel: "Three Crowns",
     other: "Other location",
     luggage: "Luggage / special request",
     serviceInfo: "After submission, staff will confirm availability, timing and final conditions.",
     rules: "Rules and information",
-    rulesText: "Check-in is from 13:00. Check-out is by 11:00. Contact reception for stay, service or safety questions.",
+    rulesText: "Check-in is from 14:00. Check-out is by 12:00. Contact reception for stay, service or safety questions.",
     contacts: "Contact the hotel",
     call: "Call reception",
     message: "Message manager",
@@ -382,6 +382,12 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     finally { setChecking(false); }
   }
 
+  function mealPrice() {
+    const adult = meal === "breakfast" ? 500 : meal === "lunch" ? 750 : 650;
+    const child = meal === "breakfast" ? 400 : meal === "lunch" ? 550 : 450;
+    return adult * adults + child * children;
+  }
+
   function descriptionFor(code: RequestCode) {
     if (code === "MEALS") {
       const mealName = copy[meal];
@@ -457,7 +463,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     </>}
 
     {selected && <div className="concierge-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setSelected(null); }}><section className="concierge-modal" role="dialog" aria-modal="true"><div className="concierge-modal-head"><div><small>{copy.newRequest}</small><h2>{selected === "MEALS" ? copy.mealsTitle : selected === "TRANSFER" ? copy.transferTitle : copy.services[selected][0]}</h2></div><button onClick={() => setSelected(null)} aria-label={copy.close}>×</button></div><p>{selected === "MEALS" ? copy.mealsNote : selected === "TRANSFER" ? copy.serviceInfo : copy.services[selected][1]}</p><form onSubmit={sendRequest}>
-      {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{copy.mealWarning}</strong></div></>}
+      {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{mealPrice().toLocaleString()} сом</strong><small>{copy.mealWarning}</small></div></>}
       {selected === "TRANSFER" && <><div className="concierge-two"><label>{copy.origin}<select value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label><label>{copy.destination}<select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label></div><label>{copy.vehicle}<select value={vehicle} onChange={(e) => setVehicle(e.target.value)}><option value="sedan">{copy.sedan}</option><option value="minivan">{copy.minivan}</option></select></label></>}
       <div className="concierge-two"><label>{copy.date}<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label><label>{copy.time}<input type="time" value={serviceTime} onChange={(e) => setServiceTime(e.target.value)} /></label></div><label>{selected === "TRANSFER" ? copy.luggage : copy.comment}<textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={copy.commentPlaceholder} maxLength={1200} /></label>{notice && <div className="concierge-notice">{notice}</div>}<button className="concierge-submit" disabled={sending}>{sending ? copy.sending : copy.send}</button></form></section></div>}
   </main>;
