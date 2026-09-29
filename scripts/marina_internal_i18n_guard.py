@@ -11,7 +11,7 @@ errors = []
 for snippet in [
     'type Locale = "ru" | "kg" | "kz" | "en"',
     '["ru", "kg", "kz", "en"]',
-    'next === "kz" ? "kk"',
+    'locale === "kz" ? "kk"',
 ]:
     if snippet not in ADMIN:
         errors.append(f"admin missing locale contract: {snippet}")
