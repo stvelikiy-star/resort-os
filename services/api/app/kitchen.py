@@ -15,21 +15,21 @@ guest_router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-kitchen"])
 kitchen_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
 
 DRAFT_MENU = [
-    ("SYRNIKI", "BREAKFAST", "Сырники со сметаной", "Каймак кошулган сырник", "Syrniki with sour cream", 280, 10),
-    ("OMELET", "BREAKFAST", "Омлет с овощами", "Жашылча кошулган омлет", "Vegetable omelette", 250, 20),
-    ("PORRIDGE", "BREAKFAST", "Овсяная каша с фруктами", "Мөмөлүү сулу боткосу", "Oatmeal with fruit", 190, 30),
-    ("SHORPO", "SOUP", "Шорпо", "Шорпо", "Shorpo soup", 340, 100),
-    ("LENTIL_SOUP", "SOUP", "Чечевичный крем-суп", "Жасмык крем-шорпосу", "Lentil cream soup", 270, 110),
-    ("FRESH_SALAD", "SALAD", "Свежий салат", "Жаңы жашылча салаты", "Fresh vegetable salad", 230, 200),
-    ("CAESAR_CHICKEN", "SALAD", "Цезарь с курицей", "Тоок эти менен Цезарь", "Chicken Caesar salad", 390, 210),
-    ("PLOV", "MAIN", "Плов", "Палоо", "Plov", 390, 300),
-    ("KUURDAK", "MAIN", "Куурдак", "Куурдак", "Kuurdak", 490, 310),
-    ("CHICKEN_CUTLET", "MAIN", "Куриная котлета с пюре", "Пюре менен тоок котлети", "Chicken cutlet with mashed potato", 360, 320),
-    ("GRILLED_TROUT", "MAIN", "Форель на гриле", "Гриль форель", "Grilled trout", 650, 330),
-    ("FRIES", "SIDE", "Картофель фри", "Фри картошка", "French fries", 220, 400),
-    ("CHEESECAKE", "DESSERT", "Чизкейк", "Чизкейк", "Cheesecake", 290, 500),
-    ("TEA_POT", "DRINK", "Чайник чая", "Чайнек чай", "Pot of tea", 150, 600),
-    ("COFFEE", "DRINK", "Кофе", "Кофе", "Coffee", 180, 610),
+    ("SYRNIKI", "BREAKFAST", "Сырники со сметаной", "Каймак кошулган сырник", "Қаймақ қосылған сырниктер", "Syrniki with sour cream", 280, 10),
+    ("OMELET", "BREAKFAST", "Омлет с овощами", "Жашылча кошулган омлет", "Көкөністі омлет", "Vegetable omelette", 250, 20),
+    ("PORRIDGE", "BREAKFAST", "Овсяная каша с фруктами", "Мөмөлүү сулу боткосу", "Жеміс қосылған сұлы ботқасы", "Oatmeal with fruit", 190, 30),
+    ("SHORPO", "SOUP", "Шорпо", "Шорпо", "Шорпо", "Shorpo soup", 340, 100),
+    ("LENTIL_SOUP", "SOUP", "Чечевичный крем-суп", "Жасмык крем-шорпосу", "Жасымық крем-сорпасы", "Lentil cream soup", 270, 110),
+    ("FRESH_SALAD", "SALAD", "Свежий салат", "Жаңы жашылча салаты", "Жаңа көкөніс салаты", "Fresh vegetable salad", 230, 200),
+    ("CAESAR_CHICKEN", "SALAD", "Цезарь с курицей", "Тоок эти менен Цезарь", "Тауық еті қосылған «Цезарь»", "Chicken Caesar salad", 390, 210),
+    ("PLOV", "MAIN", "Плов", "Палоо", "Палау", "Plov", 390, 300),
+    ("KUURDAK", "MAIN", "Куурдак", "Куурдак", "Қуырдақ", "Kuurdak", 490, 310),
+    ("CHICKEN_CUTLET", "MAIN", "Куриная котлета с пюре", "Пюре менен тоок котлети", "Картоп езбесі қосылған тауық котлеті", "Chicken cutlet with mashed potato", 360, 320),
+    ("GRILLED_TROUT", "MAIN", "Форель на гриле", "Гриль форель", "Грильдегі форель", "Grilled trout", 650, 330),
+    ("FRIES", "SIDE", "Картофель фри", "Фри картошка", "Фри картобы", "French fries", 220, 400),
+    ("CHEESECAKE", "DESSERT", "Чизкейк", "Чизкейк", "Чизкейк", "Cheesecake", 290, 500),
+    ("TEA_POT", "DRINK", "Чайник чая", "Чайнек чай", "Шәйнек шай", "Pot of tea", 150, 600),
+    ("COFFEE", "DRINK", "Кофе", "Кофе", "Кофе", "Coffee", 180, 610),
 ]
 
 ORDER_TRANSITIONS: dict[str, set[str]] = {
@@ -46,6 +46,7 @@ class MenuPatch(BaseModel):
     category: str | None = None
     name_ru: str | None = Field(default=None, min_length=1, max_length=160)
     name_kg: str | None = Field(default=None, min_length=1, max_length=160)
+    name_kz: str | None = Field(default=None, min_length=1, max_length=160)
     name_en: str | None = Field(default=None, min_length=1, max_length=160)
     price_kgs: int | None = Field(default=None, ge=0, le=100_000)
     is_active: bool | None = None
@@ -106,7 +107,7 @@ async def property_id(conn, property_code: str) -> uuid.UUID:
 def menu_item(row) -> dict[str, Any]:
     return {
         "id": str(row["id"]), "code": row["code"], "category": row["category"],
-        "name_ru": row["nameRu"], "name_kg": row["nameKg"], "name_en": row["nameEn"],
+        "name_ru": row["nameRu"], "name_kg": row["nameKg"], "name_kz": row["nameKz"], "name_en": row["nameEn"],
         "price_kgs": row["priceKgs"], "is_active": row["isActive"], "is_draft": row["isDraft"],
         "sort_order": row["sortOrder"],
     }
@@ -193,13 +194,13 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
-            for code, category, ru, kg, en, price, sort_order in DRAFT_MENU:
+            for code, category, ru, kg, kz, en, price, sort_order in DRAFT_MENU:
                 result = await conn.execute(
                     '''INSERT INTO kitchen_menu_items (
-                         id,"propertyId",code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
-                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,true,$9,now(),now())
+                         id,"propertyId",code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
+                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10,now(),now())
                        ON CONFLICT ("propertyId",code) DO NOTHING''',
-                    uuid.uuid4(), pid, code, category, ru, kg, en, price, sort_order,
+                    uuid.uuid4(), pid, code, category, ru, kg, kz, en, price, sort_order,
                 )
                 created += int(result.endswith("1"))
     return {"created": created, "draft": True, "truth": "Draft menu is replaceable from Kitchen Admin."}
@@ -210,7 +211,7 @@ async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_acc
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user["property_code"])
         rows = await conn.fetch(
-            '''SELECT id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"
+            '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
                FROM kitchen_menu_items WHERE "propertyId"=$1 ORDER BY "sortOrder",category,"nameRu"''', pid,
         )
     return {"items": [menu_item(row) for row in rows]}
@@ -227,11 +228,11 @@ async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, u
             row = await conn.fetchrow(
                 '''UPDATE kitchen_menu_items SET
                      category=COALESCE($3,category),"nameRu"=COALESCE($4,"nameRu"),"nameKg"=COALESCE($5,"nameKg"),
-                     "nameEn"=COALESCE($6,"nameEn"),"priceKgs"=COALESCE($7,"priceKgs"),"isActive"=COALESCE($8,"isActive"),
-                     "isDraft"=COALESCE($9,"isDraft"),"sortOrder"=COALESCE($10,"sortOrder"),"updatedAt"=now()
+                     "nameKz"=COALESCE($6,"nameKz"),"nameEn"=COALESCE($7,"nameEn"),"priceKgs"=COALESCE($8,"priceKgs"),"isActive"=COALESCE($9,"isActive"),
+                     "isDraft"=COALESCE($10,"isDraft"),"sortOrder"=COALESCE($11,"sortOrder"),"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2
                    RETURNING id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
-                item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_en,
+                item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_kz, payload.name_en,
                 payload.price_kgs, payload.is_active, payload.is_draft, payload.sort_order,
             )
             if not row:
@@ -480,7 +481,7 @@ async def guest_menu(token: str, request: Request, tc_guest_session: str | None 
     async with request.app.state.db.acquire() as conn:
         qr, _, _ = await authorized_context(conn, token, tc_guest_session)
         rows = await conn.fetch(
-            '''SELECT id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"
+            '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
                FROM kitchen_menu_items WHERE "propertyId"=$1 AND "isActive"=true ORDER BY "sortOrder",category,"nameRu"''', qr["propertyId"],
         )
     return {"items": [menu_item(row) for row in rows], "currency": "KGS"}
