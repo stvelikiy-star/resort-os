@@ -2,10 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "OTHER";
 type GuestContext = { authenticated: boolean; active_stay: boolean; room: { code: string }; guest: { first_name: string } | null };
-type MenuItem = { id: string; code: string; category: string; name_ru: string; name_kg: string; name_en: string; price_kgs: number; is_active: boolean; is_draft: boolean; sort_order: number; meal_types?: string[] };
+type MenuItem = { id: string; code: string; category: string; name_ru: string; name_kg: string; name_kz?: string; name_en: string; price_kgs: number; is_active: boolean; is_draft: boolean; sort_order: number; meal_types?: string[] };
 type MealWindow = { configured: boolean; open: boolean; start: string | null; cutoff_at: string | null; cutoff_minutes: number };
 type DeliveryConfig = { enabled: boolean; fee_kgs: number };
 type AiMessage = { role: "user" | "assistant"; content: string };
@@ -15,12 +15,15 @@ type OfferCampaign = {
   code: string;
   title_ru: string;
   title_kg: string;
+  title_kz?: string;
   title_en: string;
   hook_ru: string;
   hook_kg: string;
+  hook_kz?: string;
   hook_en: string;
   cta_ru: string;
   cta_kg: string;
+  cta_kz?: string;
   cta_en: string;
   image_url?: string | null;
   action_type: OfferAction;
@@ -98,6 +101,40 @@ const copy = {
     aiThinking: "Текшерип жатам…",
     aiError: "AI азыр жеткиликсиз. Администраторго өтүнмө жөнөтсөңүз болот.",
   },
+  kz: {
+    eyebrow: "Сіздің демалысыңыз үшін",
+    title: "Тапсырыс беруге болатынның бәрі — бір жерде",
+    intro: "Асүй мәзірі, қонақүй қызметтері және жеке ұсыныстар. Әр тапсырыс немесе өтінім Resort OS жүйесіне бірден түседі — қызметкер қолжетімділік пен шарттарды растайды.",
+    dining: "Бүгінгі мәзір",
+    diningNote: "Тамақтану уақытын таңдаңыз. Таңғы, түскі және кешкі асқа тапсырыс белгіленген басталу уақытынан 1 сағат бұрын жабылады.",
+    noMenu: "Асүй бүгінгі қолжетімді мәзірді әлі жарияламады. Әкімшіден нақтылаңыз.",
+    noMealItems: "Таңдалған тамақтану үшін қазір қолжетімді позициялар жоқ.",
+    guests: "Қонақтар",
+    comment: "Тапсырысқа пікір",
+    commentPlaceholder: "Мысалы: пиязсыз, екі адамға құралдар",
+    total: "Барлығы",
+    subtotal: "Тағамдар мен сусындар",
+    delivery: "Бөлмеге жеткізу",
+    pickup: "Жеткізусіз",
+    order: "Тапсырысты рәсімдеу",
+    ordering: "Тапсырыс жіберілуде…",
+    ordered: (number: string, total: number) => `Тапсырыс ${number} құрылды · ${total.toLocaleString("kk-KZ")} сом. Асүй оны кезекте көреді.`,
+    closed: "Тапсырыс қабылдау жабық",
+    notConfigured: "Тамақтану уақыты әкімші тарапынан әлі бапталмаған",
+    cutoff: (value: string) => `${value} дейін тапсырыс беруге болады`,
+    meals: { BREAKFAST: "Таңғы ас", LUNCH: "Түскі ас", DINNER: "Кешкі ас", OTHER: "Басқа мәзір" } as Record<MealType, string>,
+    offers: "Сізге арналған ұсыныстар",
+    offersNote: "Бұл ұсыныстарды қонақүй басқарады. Қызмет автоматты түрде расталмайды: қажет болған жағдайда қолжетімділікті, бағаны және соңғы шарттарды қызметкер растайды.",
+    requested: "Өтінім жіберілді",
+    opened: "Ашылуда…",
+    offerError: "Әрекетті орындау мүмкін болмады. Әкімшіге хабарласыңыз.",
+    aiTitle: "AI-консьерж",
+    aiNote: "Қонақүй, аумақ, демалыс және қызметтер туралы сұраңыз. AI тек Resort Core жүйесіндегі расталған деректер бойынша жауап береді.",
+    aiPlaceholder: "Мысалы: кешке не істеуге болады?",
+    aiSend: "Сұрау",
+    aiThinking: "Тексерілуде…",
+    aiError: "AI қазір қолжетімсіз. Әкімшіге өтінім жібере аласыз.",
+  },
   en: {
     eyebrow: "For your stay",
     title: "Everything you can request, in one place",
@@ -137,11 +174,12 @@ const copy = {
 function currentLocale(): Locale {
   if (typeof window === "undefined") return "ru";
   const stored = window.localStorage.getItem("three-crowns-guest-language") || window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" ? stored : "ru";
+  return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
 }
 
 function localized(item: OfferCampaign, locale: Locale) {
   if (locale === "kg") return { title: item.title_kg, hook: item.hook_kg, cta: item.cta_kg };
+  if (locale === "kz") return { title: item.title_kz?.trim() || item.title_ru, hook: item.hook_kz?.trim() || item.hook_ru, cta: item.cta_kz?.trim() || item.cta_ru };
   if (locale === "en") return { title: item.title_en, hook: item.hook_en, cta: item.cta_en };
   return { title: item.title_ru, hook: item.hook_ru, cta: item.cta_ru };
 }
@@ -156,7 +194,7 @@ function cutoffTime(value: string | null, locale: Locale) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(locale === "en" ? "en-GB" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU", { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function GuestMarketplace({ token }: { token: string }) {
@@ -275,7 +313,7 @@ export default function GuestMarketplace({ token }: { token: string }) {
       setQty({}); setNote("");
       await load();
     } catch (cause) {
-      setNotice(cause instanceof Error && cause.message !== "ORDER_FAILED" ? cause.message : (locale === "en" ? "The order could not be created. Please contact the administrator." : locale === "kg" ? "Заказ түзүлгөн жок. Администраторго кайрылыңыз." : "Не удалось создать заказ. Обратитесь к администратору."));
+      setNotice(cause instanceof Error && cause.message !== "ORDER_FAILED" ? cause.message : (locale === "en" ? "The order could not be created. Please contact the administrator." : locale === "kg" ? "Заказ түзүлгөн жок. Администраторго кайрылыңыз." : locale === "kz" ? "Тапсырысты құру мүмкін болмады. Әкімшіге хабарласыңыз." : "Не удалось создать заказ. Обратитесь к администратору."));
     } finally { setBusy(false); }
   }
 
@@ -365,11 +403,11 @@ export default function GuestMarketplace({ token }: { token: string }) {
         {!menu.length ? <div className="guest-market-empty">{c.noMenu}</div> : <form onSubmit={createOrder}>
           {!mealOpen && <div className="guest-market-notice">{activeWindow?.configured === false ? c.notConfigured : c.closed}{activeWindow?.start ? ` · ${c.meals[mealType]} ${activeWindow.start}` : ""}</div>}
           {mealOpen && !mealMenu.length && <div className="guest-market-empty">{c.noMealItems}</div>}
-          {mealOpen && mealMenu.length > 0 && <div className="guest-menu-groups">{grouped.map(([category, items]) => <section key={category}><div className="guest-menu-category">{category}</div>{items.map((item) => <label className="guest-menu-item" key={item.id}><span><strong>{locale === "kg" ? item.name_kg : locale === "en" ? item.name_en : item.name_ru}</strong><small>{item.price_kgs.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(event) => setQty((current) => ({ ...current, [item.id]: Math.max(0, Number(event.target.value) || 0) }))} /></label>)}</section>)}</div>}
+          {mealOpen && mealMenu.length > 0 && <div className="guest-menu-groups">{grouped.map(([category, items]) => <section key={category}><div className="guest-menu-category">{category}</div>{items.map((item) => <label className="guest-menu-item" key={item.id}><span><strong>{locale === "kg" ? item.name_kg : locale === "kz" ? (item.name_kz?.trim() || item.name_ru) : locale === "en" ? item.name_en : item.name_ru}</strong><small>{item.price_kgs.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(event) => setQty((current) => ({ ...current, [item.id]: Math.max(0, Number(event.target.value) || 0) }))} /></label>)}</section>)}</div>}
           <div className="guest-order-fields"><label>{c.guests}<input type="number" min="1" max="20" value={guestCount} onChange={(event) => setGuestCount(Math.max(1, Number(event.target.value) || 1))} /></label><label>{c.comment}<input value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} placeholder={c.commentPlaceholder} /></label></div>
-          {delivery.enabled && <label className="guest-room-delivery"><input type="checkbox" checked={deliveryToRoom} onChange={(event) => setDeliveryToRoom(event.target.checked)} /><span><strong>{c.delivery}</strong><small>+{delivery.fee_kgs.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</small></span></label>}
-          <div className="guest-order-breakdown"><div><span>{c.subtotal}</span><b>{subtotal.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</b></div><div><span>{deliveryToRoom && delivery.enabled ? c.delivery : c.pickup}</span><b>{deliveryFee.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</b></div></div>
-          <div className="guest-order-total"><span>{c.total}</span><strong>{total.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</strong></div>
+          {delivery.enabled && <label className="guest-room-delivery"><input type="checkbox" checked={deliveryToRoom} onChange={(event) => setDeliveryToRoom(event.target.checked)} /><span><strong>{c.delivery}</strong><small>+{delivery.fee_kgs.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</small></span></label>}
+          <div className="guest-order-breakdown"><div><span>{c.subtotal}</span><b>{subtotal.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</b></div><div><span>{deliveryToRoom && delivery.enabled ? c.delivery : c.pickup}</span><b>{deliveryFee.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</b></div></div>
+          <div className="guest-order-total"><span>{c.total}</span><strong>{total.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</strong></div>
           {cutoff && mealType !== "OTHER" && <div className="guest-order-cutoff">{c.cutoff(cutoff)} · {activeWindow?.cutoff_minutes ?? 60} min before start</div>}
           {notice && <div className="guest-market-notice">{notice}</div>}
           <button className="guest-market-primary" disabled={!selected.length || busy || !mealOpen}>{busy ? c.ordering : c.order}</button>
@@ -380,7 +418,7 @@ export default function GuestMarketplace({ token }: { token: string }) {
         <article className="guest-ai-card">
           <div className="guest-market-head"><div><small>AI · verified facts</small><h3>{c.aiTitle}</h3><p>{c.aiNote}</p></div><button className="guest-ai-toggle" onClick={() => setAiOpen((value) => !value)}>{aiOpen ? "×" : "AI"}</button></div>
           {aiOpen && <div className="guest-ai-body">
-            <div className="guest-ai-prompts">{(locale === "en" ? ["What can we do this evening?", "Tell me about the beach and spa", "Help plan tomorrow"] : locale === "kg" ? ["Кечинде эмне кылса болот?", "Пляж жана SPA тууралуу айтып бер", "Эртеңки күндү пландап бер"] : ["Что можно сделать вечером?", "Расскажи про пляж и SPA", "Помоги спланировать завтра"]).map((prompt) => <button key={prompt} onClick={() => setAiInput(prompt)}>{prompt}</button>)}</div>
+            <div className="guest-ai-prompts">{(locale === "en" ? ["What can we do this evening?", "Tell me about the beach and spa", "Help plan tomorrow"] : locale === "kg" ? ["Кечинде эмне кылса болот?", "Пляж жана SPA тууралуу айтып бер", "Эртеңки күндү пландап бер"] : locale === "kz" ? ["Кешке не істеуге болады?", "Жағажай мен SPA туралы айтып бер", "Ертеңгі күнді жоспарлауға көмектес"] : ["Что можно сделать вечером?", "Расскажи про пляж и SPA", "Помоги спланировать завтра"]).map((prompt) => <button key={prompt} onClick={() => setAiInput(prompt)}>{prompt}</button>)}</div>
             <div className="guest-ai-messages">{aiMessages.map((message, index) => <div key={`${message.role}-${index}`} data-role={message.role}>{message.content}</div>)}{aiBusy && <div data-role="assistant">{c.aiThinking}</div>}{aiError && <div className="guest-ai-error">{aiError}</div>}</div>
             <form onSubmit={askAi}><input value={aiInput} maxLength={1600} onChange={(event) => setAiInput(event.target.value)} placeholder={c.aiPlaceholder} /><button disabled={!aiInput.trim() || aiBusy}>{c.aiSend}</button></form>
           </div>}
