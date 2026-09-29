@@ -24,6 +24,12 @@ const COPY = {
     catalog: "Каталог", catalogTitle: <>12 категория.<br />Өзүңүздүкүн тандаңыз.</>, catalogCopy: "Сыйымдуулукту, аянтты жана сезондук бааны салыштырыңыз. Конкреттүү номердин деталдарын жана кошумча орундарды бронду ырастоодон мурун менеджерден тактоого болот.", peak: "Жогорку сезон", suffix: "сом / түн", details: "Категория жөнүндө толук →",
     truth1Title: "Баасы даталарга жараша өзгөрөт.", truth1: "Сезондук прайс категорияларды салыштырууга жардам берет, ал эми бүт мезгилдин так суммасы тандалган даталар текшерилгенден кийин көрсөтүлөт.", truth2Title: "Өтүнмө ≠ ырасталган бронь.", truth2: "Өтүнмө жөнөтүлгөндөн кийин номер автоматтык түрдө кармалбайт. Менеджер шарттарды жана алдын ала төлөмдү макулдашат; активдүү бронь менеджер ырастагандан кийин гана пайда болот.", footer: "Брондоо: +996 558 08 50 02", brand: "Үч Таажы · Resort & SPA",
   },
+  kz: {
+    title: "Бөлмелер мен апартаменттер", description: "Үш Тәж Resort & SPA қонақүйіндегі орналастырудың 12 санаты: аудан, сыйымдылық, маусымдық бағалар және таңдалған күндерге бос орындарды тексеру.",
+    heroEyebrow: "Орналастыру · 12 санат", heroTitle: <>Демалыс<br />ырғағыңызға сай бөлме</>, heroCopy: "Бір-екі қонаққа арналған ықшам нұсқалардан кең екі бөлмелі санаттар мен апартаменттерге дейін. Формат пен бағаны салыстырып, күндеріңізге не бос екенін тексеріңіз.", browse: "Санаттарды көру", dates: "Күндерді тексеру",
+    catalog: "Каталог", catalogTitle: <>12 санат.<br />Өзіңізге лайықтысын таңдаңыз.</>, catalogCopy: "Сыйымдылықты, ауданды және маусымдық бағаны салыстырыңыз. Нақты бөлме мәліметтері мен қосымша орындарды броньды растауға дейін менеджерден нақтылауға болады.", peak: "Жоғары маусым", suffix: "сом / түн", details: "Санат туралы толығырақ →",
+    truth1Title: "Баға күндерге байланысты.", truth1: "Маусымдық прайс санаттарды салыстыруға көмектеседі, ал бүкіл кезеңнің нақты сомасы таңдалған күндерді тексергеннен кейін көрсетіледі.", truth2Title: "Өтінім ≠ расталған бронь.", truth2: "Өтінім жіберілгеннен кейін бөлме автоматты түрде ұсталып тұрмайды. Менеджер шарттар мен алдын ала төлемді келіседі; белсенді бронь менеджер растағаннан кейін ғана пайда болады.", footer: "Брондау: +996 558 08 50 02", brand: "Үш Тәж · Resort & SPA",
+  },
   en: {
     title: "Rooms and Apartments", description: "12 accommodation categories at Three Crowns Resort & SPA with capacity, area, seasonal rates and live availability for selected dates.",
     heroEyebrow: "Accommodation · 12 categories", heroTitle: <>A room for your<br />holiday rhythm</>, heroCopy: "From compact options for one or two guests to spacious two-room categories and apartments. Compare the format and price, then check what is free for your dates.", browse: "Browse categories", dates: "Check dates",
@@ -48,10 +54,10 @@ export async function generateMetadata({ searchParams }: RoomsPageProps): Promis
     description,
     alternates: {
       canonical: locale === "ru" ? "/rooms" : `/rooms?lang=${locale}`,
-      languages: { "ru-RU": "/rooms", "ky-KG": "/rooms?lang=kg", "en-US": "/rooms?lang=en" },
+      languages: { "ru-RU": "/rooms", "ky-KG": "/rooms?lang=kg", "kk-KZ": "/rooms?lang=kz", "en-US": "/rooms?lang=en" },
     },
     openGraph: {
-      title: `${title} · ${locale === "en" ? "Three Crowns" : locale === "kg" ? "Үч Таажы" : "Три Короны"}`,
+      title: `${title} · ${locale === "en" ? "Three Crowns" : locale === "kg" ? "Үч Таажы" : locale === "kz" ? "Үш Тәж" : "Три Короны"}`,
       description,
       url: locale === "ru" ? "/rooms" : `/rooms?lang=${locale}`,
       locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : locale === "kz" ? "kk_KZ" : "ru_RU",
