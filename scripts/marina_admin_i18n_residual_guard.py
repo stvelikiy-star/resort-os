@@ -26,8 +26,10 @@ ADMIN_FILES = [
     "SiteMediaBoard.tsx","StaffBoard.tsx",
 ]
 STAFF_FILES = [
-    "StaffRoleGateway.tsx","StaffShiftV2.tsx","KitchenAdminV2.tsx","ChefProduction.tsx",
-    "DiningDayPlanner.tsx","DiningFloorPlan.tsx","WaiterEntry.tsx","WaiterWorkspace.tsx","BeachTerminal.tsx",
+    "BeachTerminal.tsx","ChefProduction.tsx","DiningDayPlanner.tsx","DiningFloorPlan.tsx",
+    "DiningFolioActions.tsx","DiningGuestSeatingPanel.tsx","DiningReadyRealtime.tsx",
+    "GuestRequestShiftPanel.tsx","KitchenAdmin.tsx","KitchenAdminV2.tsx","KitchenEntry.tsx",
+    "StaffRoleGateway.tsx","StaffShiftV2.tsx","WaiterEntry.tsx","WaiterWorkspace.tsx",
 ]
 
 # Legitimate values intentionally shown as language samples / multilingual content, not untranslated UI.
@@ -52,8 +54,24 @@ def residuals(path: Path, runtime: str) -> list[str]:
         found.append(value)
     return sorted(set(found))
 
+def kz_coverage_errors() -> list[str]:
+    errors: list[str] = []
+    # Every Russian phrase in a {ru,kg,en} common entry must have an explicit
+    # Kazakh mapping somewhere in the runtime. Otherwise KZ silently falls back to RU.
+    common_ru = re.findall(r'\{\s*ru:\s*"((?:\\.|[^"])*)",\s*kg:\s*"((?:\\.|[^"])*)",\s*en:\s*"((?:\\.|[^"])*)"', ADMIN_RUNTIME)
+    for ru, kg, en in common_ru:
+        if ru == kg or ru == en:
+            # Brand/product/code-like labels may legitimately be identical.
+            if ru not in {"MARINA SMART", "NFC", "PIN", "QR", "WhatsApp", "Telegram", "OWNER", "MANAGER", "RECEPTION", "AGENT"}:
+                errors.append(f"ADMIN suspicious untranslated KG/EN common phrase: {ru}")
+        key = '"' + ru.replace('\\', '\\\\').replace('"', '\\"') + '":'
+        if key not in ADMIN_RUNTIME:
+            errors.append(f"ADMIN missing explicit KZ mapping: {ru}")
+    return errors
+
 def main() -> int:
     errors: list[str] = []
+    errors.extend(kz_coverage_errors())
     for name in ADMIN_FILES:
         path = ROOT / "apps/admin/components" / name
         if not path.exists():
@@ -68,7 +86,7 @@ def main() -> int:
             errors.append(f"STAFF {name}: {value}")
 
     print("MARINA SMART static locale residual guard")
-    print(f"FACT: admin_files={len(ADMIN_FILES)} staff_files={len(STAFF_FILES)}")
+    print(f"FACT: admin_files={len(ADMIN_FILES)} staff_files={len(STAFF_FILES)} kz_explicit=required")
     if errors:
         for error in errors:
             print("FAIL:", error)
