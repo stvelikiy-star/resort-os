@@ -63,7 +63,13 @@ def dynamic_covered(template: str, runtime: str) -> bool:
         significant.append(normalized)
     if not significant:
         return True
-    return all(fragment in runtime for fragment in significant)
+    runtime_plain = runtime
+    for source, target in [
+        (r"\\s+", " "), (r"\\s*", " "), (r"\\.", "."), (r"\\?", "?"),
+        (r"\\(", "("), (r"\\)", ")"), (r"\\[", "["), (r"\\]", "]"),
+    ]:
+        runtime_plain = runtime_plain.replace(source, target)
+    return all(fragment in runtime_plain for fragment in significant)
 
 def residuals(path: Path, runtime: str) -> list[str]:
     text = path.read_text(encoding="utf-8")
