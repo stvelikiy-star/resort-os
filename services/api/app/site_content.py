@@ -13,7 +13,7 @@ from .auth import require_roles
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 SCOPE = "PUBLIC_SITE"
-SUPPORTED_LOCALES = ("ru", "kg", "en")
+SUPPORTED_LOCALES = ("ru", "kg", "kz", "en")
 DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "data" / "site_content_defaults.json"
 MAX_CONTENT_BYTES = 50_000
 MAX_FIELD_CHARS = 5_000
