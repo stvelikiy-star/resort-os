@@ -58,7 +58,7 @@ export async function generateMetadata({ params, searchParams }: RoomPageProps):
       title: `${localized.name} · ${String(copy.brand)}`,
       description: `${localized.capacity} · ${room.area}. ${String(copy.openGraphTail)}`,
       url,
-      locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : "ru_RU",
+      locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : locale === "kz" ? "kk_KZ" : "ru_RU",
       images: [{ url: ROOM_MEDIA_FALLBACK, alt: String(copy.imageAlt) }],
     },
   };
