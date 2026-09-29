@@ -117,10 +117,14 @@ jobs:
             ]) {
               if (!concierge.includes(required)) throw new Error("AK BERMET guest fact missing: " + required);
             }
-            if (!concierge.includes('(["ru", "kg", "kz", "en"] as Locale[])')) {
-              throw new Error("Guest language switcher is missing KZ");
+            if (!concierge.includes("MARINA_GUEST_LOCALES") || !concierge.includes("useMarinaGuestLocale")) {
+              throw new Error("Guest language switcher is not using the shared MARINA locale controller");
             }
-            if (!concierge.includes('document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next')) {
+            const localeSource = fs.readFileSync("apps/web/lib/marinaGuestLocale.ts", "utf8");
+            if (!localeSource.includes('export const MARINA_GUEST_LOCALES: MarinaGuestLocale[] = ["ru", "kg", "kz", "en"]')) {
+              throw new Error("Shared MARINA locale controller is missing RU/KG/KZ/EN");
+            }
+            if (!localeSource.includes('if (locale === "kz") return "kk"')) {
               throw new Error("Guest KZ html lang mapping is missing");
             }
             const landing = fs.readFileSync("apps/web/app/page.tsx", "utf8");
