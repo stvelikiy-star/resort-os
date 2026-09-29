@@ -47,7 +47,7 @@ class AvailabilitySearch(BaseModel):
 
 class PublicAiAdminRequest(BaseModel):
     messages: list[AssistantMessage] = Field(min_length=1, max_length=20)
-    locale: Literal["ru", "kg", "en"] = "ru"
+    locale: Literal["ru", "kg", "kz", "en"] = "ru"
     search: AvailabilitySearch | None = None
 
     @model_validator(mode="after")
@@ -166,7 +166,7 @@ async def _public_context(request: Request) -> dict[str, Any]:
 
 
 def _prompt(payload: PublicAiAdminRequest, context: dict[str, Any], availability: dict[str, Any] | None) -> str:
-    language = {"ru": "Russian", "kg": "Kyrgyz", "en": "English"}[payload.locale]
+    language = {"ru": "Russian", "kg": "Kyrgyz", "kz": "Kazakh", "en": "English"}[payload.locale]
     property_name = str((context.get("property") or {}).get("name") or "MARINA SMART Hotel")
     rules = f"""You are the public AI administrator for {property_name}, powered by MARINA SMART Hotel OS.
 Answer in {language}. Keep replies concise, warm and practical.
