@@ -409,9 +409,9 @@ Object.assign(COPY, {
     "en": "All day / other"
   },
   "Ошибка Resort Core": {
-    "kg": "Resort Core катасы",
-    "kz": "Resort Core қатесі",
-    "en": "Resort Core error"
+    "kg": "MARINA SMART катасы",
+    "kz": "MARINA SMART қатесі",
+    "en": "MARINA SMART error"
   },
   "Нет доступа к меню кухни": {
     "kg": "Ашкана менюсуна кирүү укугу жок",
