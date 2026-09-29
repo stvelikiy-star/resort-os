@@ -20,8 +20,9 @@ class MenuCreate(BaseModel):
     code: str = Field(min_length=2, max_length=60)
     category: Category
     name_ru: str = Field(min_length=1, max_length=160)
-    name_kg: str | None = Field(default=None, max_length=160)
-    name_en: str | None = Field(default=None, max_length=160)
+    name_kg: str = Field(min_length=1, max_length=160)
+    name_kz: str = Field(min_length=1, max_length=160)
+    name_en: str = Field(min_length=1, max_length=160)
     price_kgs: int = Field(ge=0, le=100_000)
     is_active: bool = True
     is_draft: bool = True
@@ -40,6 +41,7 @@ class MenuPatch(BaseModel):
     category: Category | None = None
     name_ru: str | None = Field(default=None, min_length=1, max_length=160)
     name_kg: str | None = Field(default=None, max_length=160)
+    name_kz: str | None = Field(default=None, max_length=160)
     name_en: str | None = Field(default=None, max_length=160)
     price_kgs: int | None = Field(default=None, ge=0, le=100_000)
     is_active: bool | None = None
@@ -61,6 +63,7 @@ def _item(row) -> dict[str, Any]:
         "category": row["category"],
         "name_ru": row["nameRu"],
         "name_kg": row["nameKg"],
+        "name_kz": row["nameKz"],
         "name_en": row["nameEn"],
         "price_kgs": row["priceKgs"],
         "is_active": row["isActive"],
@@ -95,13 +98,13 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await _property_id(conn, user["property_code"])
-            for code, category, ru, kg, en, price, sort_order in DRAFT_MENU:
+            for code, category, ru, kg, kz, en, price, sort_order in DRAFT_MENU:
                 result = await conn.execute(
                     '''INSERT INTO kitchen_menu_items (
-                         id,"propertyId",code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
-                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,true,$9,now(),now())
+                         id,"propertyId",code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
+                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10,now(),now())
                        ON CONFLICT ("propertyId",code) DO NOTHING''',
-                    uuid.uuid4(), pid, code, category, ru, kg, en, price, sort_order,
+                    uuid.uuid4(), pid, code, category, ru, kg, kz, en, price, sort_order,
                 )
                 created += int(result.endswith("1"))
     return {"created": created, "draft": True, "truth": "TEST_STAGING_BOOTSTRAP_ONLY"}
@@ -116,11 +119,11 @@ async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str
             try:
                 row = await conn.fetchrow(
                     '''INSERT INTO kitchen_menu_items (
-                         id,"propertyId",code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
-                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,now(),now())
-                       RETURNING id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
+                         id,"propertyId",code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
+                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,now(),now())
+                       RETURNING id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
                     item_id, pid, payload.code, payload.category, payload.name_ru,
-                    payload.name_kg or payload.name_ru, payload.name_en or payload.name_ru,
+                    payload.name_kg, payload.name_kz, payload.name_en,
                     payload.price_kgs, payload.is_active, payload.is_draft, payload.sort_order,
                 )
             except asyncpg.UniqueViolationError as exc:
@@ -140,7 +143,7 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
         async with conn.transaction():
             pid = await _property_id(conn, user["property_code"])
             before_row = await conn.fetchrow(
-                '''SELECT id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"
+                '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
                    FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 item_id, pid,
             )
@@ -149,11 +152,11 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
             row = await conn.fetchrow(
                 '''UPDATE kitchen_menu_items SET
                      category=COALESCE($3,category),"nameRu"=COALESCE($4,"nameRu"),"nameKg"=COALESCE($5,"nameKg"),
-                     "nameEn"=COALESCE($6,"nameEn"),"priceKgs"=COALESCE($7,"priceKgs"),"isActive"=COALESCE($8,"isActive"),
-                     "isDraft"=COALESCE($9,"isDraft"),"sortOrder"=COALESCE($10,"sortOrder"),"updatedAt"=now()
+                     "nameKz"=COALESCE($6,"nameKz"),"nameEn"=COALESCE($7,"nameEn"),"priceKgs"=COALESCE($8,"priceKgs"),"isActive"=COALESCE($9,"isActive"),
+                     "isDraft"=COALESCE($10,"isDraft"),"sortOrder"=COALESCE($11,"sortOrder"),"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2
                    RETURNING id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
-                item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_en,
+                item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_kz, payload.name_en,
                 payload.price_kgs, payload.is_active, payload.is_draft, payload.sort_order,
             )
             before = _item(before_row)
