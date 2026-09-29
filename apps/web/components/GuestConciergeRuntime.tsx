@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 type RequestCode = "HOUSEKEEPING" | "TOWELS" | "LINEN" | "MAINTENANCE" | "TRANSFER" | "MEALS" | "PARKING" | "SAUNA" | "BILLIARDS" | "EXCURSIONS" | "ADMIN";
 type RequestStatus = "OPEN" | "IN_PROGRESS" | "IN_INSPECTION" | "DONE" | "CANCELLED";
 
@@ -204,6 +204,91 @@ const COPY = {
       ADMIN: ["Жардам", "Администратор менен байланышуу"],
     },
   },
+  kz: {
+    property: "AK BERMET",
+    product: "MARINA SMART · қонақ кабинеті",
+    language: "Тіл",
+    loading: "Цифрлық консьерж ашылуда…",
+    invalidTitle: "Бөлме коды қолжетімсіз",
+    invalidText: "Код табылмады немесе ауыстырылды. Ресепшенге хабарласыңыз.",
+    noStayTitle: "Бөлме келесі қонаққа дайын",
+    noStayText: "Қазір бұл бөлмеге белсенді тұру тіркелмеген.",
+    room: "Бөлме",
+    verifyTitle: "Тұруыңызды растаңыз",
+    verifyText: "Орналасу кезінде ресепшеннен алған алты таңбалы кодты енгізіңіз.",
+    pin: "Қонақ коды",
+    open: "Кабинетті ашу",
+    checking: "Тексерілуде…",
+    wrong: "Код сәйкес келмеді. Сандарды тексеріңіз немесе ресепшенге хабарласыңыз.",
+    expired: "Кодтың мерзімі аяқталды. Ресепшеннен жаңа код сұраңыз.",
+    limited: "Әрекет саны тым көп. Кейінірек қайталаңыз немесе ресепшенге хабарласыңыз.",
+    error: "Кабинетті жүктеу мүмкін болмады. Байланысты тексеріп, қайта көріңіз.",
+    retry: "Қайталау",
+    hello: "Қош келдіңіз",
+    stay: "Сіздің тұруыңыз",
+    from: "бастап",
+    to: "дейін",
+    checkout: "Шығу 11:00-ге дейін",
+    quick: "Қазір не қажет?",
+    quickNote: "Қызметтердің көбін бірнеше рет басу арқылы сұратуға болады.",
+    myRequests: "Менің өтінімдерім",
+    noRequests: "Әзірге өтінімдер жоқ.",
+    refresh: "Жаңарту",
+    newRequest: "Жаңа өтінім",
+    service: "Қызмет",
+    date: "Күн",
+    time: "Уақыт",
+    comment: "Пікір",
+    commentPlaceholder: "Қажет болса, мәлімет қосыңыз",
+    send: "Жіберу",
+    sending: "Жіберілуде…",
+    sent: "Өтінім жіберілді. Күйі «Менің өтінімдерім» бөлімінде көрінеді.",
+    cancel: "Бас тарту",
+    close: "Жабу",
+    mealsTitle: "Тамақтану",
+    mealsNote: "Тамақтану уақытын және қонақтар санын таңдаңыз. Мәзірді, қолжетімділікті және құнын асхана растайды.",
+    meal: "Тамақтану",
+    breakfast: "Таңғы ас",
+    lunch: "Түскі ас",
+    dinner: "Кешкі ас",
+    adults: "Ересектер",
+    children: "Балалар",
+    estimated: "Құны",
+    mealWarning: "Тұруға кіретін тамақтану сіздің броніңізге байланысты. Қосымша тамақтану құнын асхана растайды.",
+    transferTitle: "Трансфер",
+    origin: "Қайдан",
+    destination: "Қайда",
+    vehicle: "Көлік",
+    sedan: "Седан",
+    minivan: "Минивэн",
+    manas: "Манас әуежайы",
+    tamchy: "Тамчы әуежайы",
+    bishkek: "Бішкек",
+    hotel: "AK BERMET",
+    other: "Басқа орын",
+    luggage: "Жүк / ерекше тілек",
+    serviceInfo: "Жіберілгеннен кейін қызметкер қолжетімділікті, уақытты және соңғы шарттарды растайды.",
+    rules: "Ережелер мен ақпарат",
+    rulesText: "Кіру 13:00-ден. Шығу 11:00-ге дейін. Тұру, қызметтер және қауіпсіздік мәселелері бойынша ресепшенге хабарласыңыз.",
+    contacts: "Қонақүймен байланысу",
+    call: "Ресепшенге қоңырау шалу",
+    message: "Менеджерге жазу",
+    signOut: "Қонақ қолжетімділігін жабу",
+    status: { OPEN: "Қабылданды", IN_PROGRESS: "Жұмыста", IN_INSPECTION: "Тексеруде", DONE: "Орындалды", CANCELLED: "Бас тартылды" },
+    services: {
+      HOUSEKEEPING: ["Тазалау", "Бөлмені ыңғайлы уақытта тазалау"],
+      TOWELS: ["Сүлгілер", "Таза сүлгі әкелу"],
+      LINEN: ["Төсек-орын", "Төсек-орынды ауыстыру"],
+      MAINTENANCE: ["Жөндеу", "Бөлмедегі мәселе туралы хабарлау"],
+      MEALS: ["Тамақтану", "Таңғы, түскі немесе кешкі ас"],
+      TRANSFER: ["Трансфер", "Әуежайға немесе қалаға бару"],
+      SAUNA: ["Сауна", "Ыңғайлы уақытты сұрату"],
+      BILLIARDS: ["Бильярд", "Келу уақытын сұрату"],
+      EXCURSIONS: ["Экскурсиялар", "Сапарды таңдау және сұрату"],
+      PARKING: ["Тұрақ", "Тұраққа көмектесу"],
+      ADMIN: ["Көмек", "Әкімшімен байланысу"],
+    },
+  },
   en: {
     property: "AK BERMET",
     product: "MARINA SMART · Guest area",
@@ -297,13 +382,13 @@ const SERVICE_ICONS: Record<RequestCode, string> = { MEALS: "🍽", HOUSEKEEPING
 function initialLocale(): Locale {
   if (typeof window === "undefined") return "ru";
   const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "ru" || query === "kg" || query === "en") return query;
+  if (query === "ru" || query === "kg" || query === "kz" || query === "en") return query;
   const local = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(SITE_STORAGE_KEY);
-  return local === "kg" || local === "en" ? local : "ru";
+  return local === "kg" || local === "kz" || local === "en" ? local : "ru";
 }
 
 function dateLabel(value: string, locale: Locale) {
-  const lang = locale === "kg" ? "ky-KG" : locale === "en" ? "en-GB" : "ru-RU";
+  const lang = locale === "kg" ? "ky-KG" : locale === "kz" ? "kk-KZ" : locale === "en" ? "en-GB" : "ru-RU";
   return new Date(`${value}T00:00:00`).toLocaleDateString(lang, { day: "numeric", month: "short" });
 }
 
@@ -335,7 +420,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     setLocale(next);
     window.localStorage.setItem(STORAGE_KEY, next);
     window.localStorage.setItem(SITE_STORAGE_KEY, next);
-    document.documentElement.lang = next === "kg" ? "ky" : next;
+    document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next;
   }
 
   const loadContext = useCallback(async () => {
@@ -427,7 +512,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   return <main className="concierge-page">
     <header className="concierge-topbar">
       <div className="concierge-brand"><span>III</span><div><strong>{copy.property}</strong><small>{copy.product}</small></div></div>
-      <div className="concierge-langs" aria-label={copy.language}>{(["ru", "kg", "en"] as Locale[]).map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
+      <div className="concierge-langs" aria-label={copy.language}>{(["ru", "kg", "kz", "en"] as Locale[]).map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
     </header>
 
     {state === "loading" && <section className="concierge-state">{copy.loading}</section>}
