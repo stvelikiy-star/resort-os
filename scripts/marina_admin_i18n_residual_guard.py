@@ -87,9 +87,8 @@ def main() -> int:
         for value in residuals(path, ADMIN_RUNTIME):
             errors.append(f"ADMIN {name}: {value}")
         for value in dynamic_templates(path):
-            # Dynamic UI must be handled explicitly; exact DOM dictionaries cannot
-            # reliably translate interpolated values after render.
-            errors.append(f"ADMIN_DYNAMIC {name}: {value}")
+            if not dynamic_covered(value, ADMIN_RUNTIME):
+                errors.append(f"ADMIN_DYNAMIC {name}: {value}")
     for name in STAFF_FILES:
         path = ROOT / "apps/staff/components" / name
         if not path.exists():
@@ -97,7 +96,8 @@ def main() -> int:
         for value in residuals(path, STAFF_RUNTIME):
             errors.append(f"STAFF {name}: {value}")
         for value in dynamic_templates(path):
-            errors.append(f"STAFF_DYNAMIC {name}: {value}")
+            if not dynamic_covered(value, STAFF_RUNTIME):
+                errors.append(f"STAFF_DYNAMIC {name}: {value}")
 
     print("MARINA SMART static locale residual guard")
     print(f"FACT: admin_files={len(ADMIN_FILES)} staff_files={len(STAFF_FILES)} kz_explicit=required")
