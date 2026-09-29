@@ -121,10 +121,10 @@ const KZ_EXACT: Record<string, string> = {
 
 const exact: Record<string, Phrase> = {
   "OWNER OPERATIONS · MTD": { ru: "ОПЕРАЦИИ ВЛАДЕЛЬЦА · С НАЧАЛА МЕСЯЦА", kg: "ЭЭСИНИН ОПЕРАЦИЯЛАРЫ · АЙ БАШЫНАН", en: "OWNER OPERATIONS · MONTH TO DATE" },
-  "GUEST SERVICES · СОЗДАНО": { ru: "СЕРВИС ГОСТЕЙ · СОЗДАНО", kg: "КОНок СЕРВИСИ · ТҮЗҮЛДҮ", en: "GUEST SERVICES · CREATED" },
-  "GUEST SERVICES · АКТИВНЫЕ": { ru: "СЕРВИС ГОСТЕЙ · АКТИВНЫЕ", kg: "КОНок СЕРВИСИ · АКТИВДҮҮ", en: "GUEST SERVICES · ACTIVE" },
+  "GUEST SERVICES · СОЗДАНО": { ru: "СЕРВИС ГОСТЕЙ · СОЗДАНО", kg: "КОНОК СЕРВИСИ · ТҮЗҮЛДҮ", en: "GUEST SERVICES · CREATED" },
+  "GUEST SERVICES · АКТИВНЫЕ": { ru: "СЕРВИС ГОСТЕЙ · АКТИВНЫЕ", kg: "КОНОК СЕРВИСИ · АКТИВДҮҮ", en: "GUEST SERVICES · ACTIVE" },
   "СРЕДНЕЕ ЗАКРЫТИЕ GUEST SERVICES": { ru: "СРЕДНЕЕ ВРЕМЯ ЗАКРЫТИЯ СЕРВИСНЫХ ЗАЯВОК", kg: "СЕРВИСТИК ӨТҮНМДӨРДҮ ЖАБУУНУН ОРТОЧО УБАКТЫСЫ", en: "AVERAGE GUEST SERVICE CLOSE TIME" },
-  "SLA GUEST SERVICES": { ru: "SLA СЕРВИСА ГОСТЕЙ", kg: "КОНок СЕРВИСИНИН SLA КӨРСӨТКҮЧҮ", en: "GUEST SERVICES SLA" },
+  "SLA GUEST SERVICES": { ru: "SLA СЕРВИСА ГОСТЕЙ", kg: "КОНОК СЕРВИСИНИН SLA КӨРСӨТКҮЧҮ", en: "GUEST SERVICES SLA" },
   "HOUSEKEEPING · ЗАВЕРШЕНО": { ru: "УБОРКА · ЗАВЕРШЕНО", kg: "ТАЗАЛОО · БҮТТҮ", en: "HOUSEKEEPING · COMPLETED" },
   "HOUSEKEEPING · СРОЧНО": { ru: "УБОРКА · СРОЧНО", kg: "ТАЗАЛОО · ШАШЫЛЫШ", en: "HOUSEKEEPING · URGENT" },
   "MAINTENANCE · ЗАВЕРШЕНО": { ru: "РЕМОНТ · ЗАВЕРШЕНО", kg: "ОҢДОО · БҮТТҮ", en: "MAINTENANCE · COMPLETED" },
