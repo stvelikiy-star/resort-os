@@ -54,8 +54,8 @@ export async function generateMetadata({ searchParams }: RoomsPageProps): Promis
       title: `${title} · ${locale === "en" ? "Three Crowns" : locale === "kg" ? "Үч Таажы" : "Три Короны"}`,
       description,
       url: locale === "ru" ? "/rooms" : `/rooms?lang=${locale}`,
-      locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : "ru_RU",
-      images: [{ url: ROOM_MEDIA_FALLBACK, alt: locale === "en" ? "Three Crowns Resort & SPA" : locale === "kg" ? "Үч Таажы Resort & SPA" : "Три Короны Resort & SPA" }],
+      locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : locale === "kz" ? "kk_KZ" : "ru_RU",
+      images: [{ url: ROOM_MEDIA_FALLBACK, alt: locale === "en" ? "Three Crowns Resort & SPA" : locale === "kg" ? "Үч Таажы Resort & SPA" : locale === "kz" ? "Үш Тәж Resort & SPA" : "Три Короны Resort & SPA" }],
     },
   };
 }
