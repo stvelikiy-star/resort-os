@@ -71,5 +71,4 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/external_public_truth_probe_test.py
       - name: Enforce RU KG KZ EN public locale contract
-        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/public_i18n_guard.py
