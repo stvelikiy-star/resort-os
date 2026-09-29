@@ -40,7 +40,7 @@ def main() -> int:
         'export type MarinaGuestLocale = "ru" | "kg" | "kz" | "en"',
         'MARINA_GUEST_LOCALE_EVENT = "marina-smart:guest-locale"',
         'MARINA_GUEST_LOCALE_KEY = "marina-smart-guest-locale"',
-        'next === "kz" ? "kk"',
+        'if (locale === "kz") return "kk";',
         'useMarinaGuestLocale',
     ], "marinaGuestLocale", errors)
     require(texts["landing"], ["AK BERMET", "MARINA SMART", "RU · KG · KZ · EN"], "landing", errors)
