@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 import { MARINA_GUEST_LOCALES, MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
 type Locale = MarinaGuestLocale;
