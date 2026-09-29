@@ -966,10 +966,314 @@ Object.assign(COPY, {
   }
 });
 
+
+type StaffDynamicFragment = { ru: string; kg: string; kz: string; en: string };
+const STAFF_DYNAMIC_FRAGMENTS: StaffDynamicFragment[] = [
+  {
+    "ru": "Списать ",
+    "kg": "Эсептен чыгаруу ",
+    "kz": "Шегеру ",
+    "en": "Charge "
+  },
+  {
+    "ru": " KGS",
+    "kg": " KGS",
+    "kz": " KGS",
+    "en": " KGS"
+  },
+  {
+    "ru": " зафиксировано ",
+    "kg": " бекитилди ",
+    "kz": " бекітілді ",
+    "en": " frozen "
+  },
+  {
+    "ru": " порций. Поздние изменения теперь показываются отдельно.",
+    "kg": " порция. Кеч өзгөрүүлөр эми өзүнчө көрсөтүлөт.",
+    "kz": " порция. Кеш өзгерістер енді бөлек көрсетіледі.",
+    "en": " portions. Late changes are now shown separately."
+  },
+  {
+    "ru": "План открыт до ",
+    "kg": "План ",
+    "kz": "Жоспар ",
+    "en": "Plan is open until "
+  },
+  {
+    "ru": ".",
+    "kg": ".",
+    "kz": ".",
+    "en": "."
+  },
+  {
+    "ru": "Позднее изменение: ",
+    "kg": "Кеч өзгөртүү: ",
+    "kz": "Кеш өзгеріс: ",
+    "en": "Late change: "
+  },
+  {
+    "ru": " порц.",
+    "kg": " порция",
+    "kz": " порция",
+    "en": " portions"
+  },
+  {
+    "ru": "Фиксация ",
+    "kg": "Бекитилген убакыт: ",
+    "kz": "Бекітілген уақыты: ",
+    "en": "Frozen at "
+  },
+  {
+    "ru": " · ",
+    "kg": " · ",
+    "kz": " · ",
+    "en": " · "
+  },
+  {
+    "ru": ": опубликовано ",
+    "kg": ": жарыяланды ",
+    "kz": ": жарияланды ",
+    "en": ": published "
+  },
+  {
+    "ru": " позиций.",
+    "kg": " позиция.",
+    "kz": " позиция.",
+    "en": " items."
+  },
+  {
+    "ru": "Опубликовать: ",
+    "kg": "Жарыялоо: ",
+    "kz": "Жариялау: ",
+    "en": "Publish: "
+  },
+  {
+    "ru": " мин",
+    "kg": " мүн",
+    "kz": " мин",
+    "en": " min"
+  },
+  {
+    "ru": " заказ.",
+    "kg": " буйрутма",
+    "kz": " тапсырыс",
+    "en": " orders"
+  },
+  {
+    "ru": "Официант: ",
+    "kg": "Официант: ",
+    "kz": "Даяшы: ",
+    "en": "Waiter: "
+  },
+  {
+    "ru": "Стол ",
+    "kg": "Стол ",
+    "kz": "Үстел ",
+    "en": "Table "
+  },
+  {
+    "ru": ": схема сохранена.",
+    "kg": ": схема сакталды.",
+    "kz": ": сызба сақталды.",
+    "en": ": layout saved."
+  },
+  {
+    "ru": ": начисление создано в Folio. Payment не создавался.",
+    "kg": ": Folio ичинде эсептөө түзүлдү. Төлөм түзүлгөн жок.",
+    "kz": ": Folio жүйесінде есептеу құрылды. Төлем жасалған жоқ.",
+    "en": ": charge created in Folio. No payment was created."
+  },
+  {
+    "ru": "Начислить ",
+    "kg": "Эсептөө ",
+    "kz": "Есептеу ",
+    "en": "Charge "
+  },
+  {
+    "ru": " KGS на счёт номера? Это создаст долг в Folio, но НЕ отметит оплату.",
+    "kg": " KGS бөлмө эсебине? Бул Folio ичинде карыз түзөт, бирок төлөм катары БЕЛГИЛЕБЕЙТ.",
+    "kz": " KGS бөлме шотына? Бұл Folio жүйесінде қарыз жасайды, бірақ төлем ретінде БЕЛГІЛЕМЕЙДІ.",
+    "en": " KGS to the room account? This creates a Folio balance but does NOT mark it as paid."
+  },
+  {
+    "ru": " мест",
+    "kg": " орун",
+    "kz": " орын",
+    "en": " seats"
+  },
+  {
+    "ru": "Гость пересажен за стол ",
+    "kg": "Конок ",
+    "kz": "Қонақ ",
+    "en": "Guest moved to table "
+  },
+  {
+    "ru": ". Официант сохранён.",
+    "kg": ". Официант сакталды.",
+    "kz": ". Даяшы сақталды.",
+    "en": ". Waiter assignment preserved."
+  },
+  {
+    "ru": "Куда пересадить ",
+    "kg": "Кайсы столго көчүрүү: ",
+    "kz": "Қай үстелге ауыстыру: ",
+    "en": "Where should "
+  },
+  {
+    "ru": "Введите номер варианта:",
+    "kg": "Варианттын номерин киргизиңиз:",
+    "kz": "Нұсқа нөмірін енгізіңіз:",
+    "en": "Enter the option number:"
+  },
+  {
+    "ru": "Realtime активен · READY: ",
+    "kg": "Realtime активдүү · READY: ",
+    "kz": "Realtime белсенді · READY: ",
+    "en": "Realtime active · READY: "
+  },
+  {
+    "ru": "Кухня: ",
+    "kg": "Ашкана: ",
+    "kz": "Асүй: ",
+    "en": "Kitchen: "
+  },
+  {
+    "ru": " готов",
+    "kg": " даяр",
+    "kz": " дайын",
+    "en": " ready"
+  },
+  {
+    "ru": "Гость: ",
+    "kg": "Конок: ",
+    "kz": "Қонақ: ",
+    "en": "Guest: "
+  },
+  {
+    "ru": "Номер ",
+    "kg": "Бөлмө ",
+    "kz": "Бөлме ",
+    "en": "Room "
+  },
+  {
+    "ru": "Заезды",
+    "kg": "Кирүүлөр",
+    "kz": "Келулер",
+    "en": "Arrivals"
+  },
+  {
+    "ru": "· номер ",
+    "kg": "· бөлмө ",
+    "kz": "· бөлме ",
+    "en": "· room "
+  },
+  {
+    "ru": "· стол",
+    "kg": "· стол",
+    "kz": "· үстел",
+    "en": "· table"
+  },
+  {
+    "ru": " гост.",
+    "kg": " конок",
+    "kz": " қонақ",
+    "en": " guests"
+  },
+  {
+    "ru": "Не удалось ",
+    "kg": "Ишке ашкан жок: ",
+    "kz": "Орындау мүмкін болмады: ",
+    "en": "Could not "
+  },
+  {
+    "ru": "Ресторан",
+    "kg": "Ресторан",
+    "kz": "Мейрамхана",
+    "en": "Restaurant"
+  },
+  {
+    "ru": "Заявки гостей",
+    "kg": "Коноктордун өтүнмөлөрү",
+    "kz": "Қонақ өтінімдері",
+    "en": "Guest requests"
+  },
+  {
+    "ru": "Замена белья",
+    "kg": "Төшөк жабдыгын алмаштыруу",
+    "kz": "Төсек-орынды ауыстыру",
+    "en": "Linen change"
+  },
+  {
+    "ru": "Поломка / ремонт",
+    "kg": "Бузулуу / оңдоо",
+    "kz": "Ақау / жөндеу",
+    "en": "Issue / repair"
+  },
+  {
+    "ru": "Полотенца",
+    "kg": "Сүлгүлөр",
+    "kz": "Сүлгілер",
+    "en": "Towels"
+  },
+  {
+    "ru": "Уборка по просьбе гостя",
+    "kg": "Коноктун өтүнүчү боюнча тазалоо",
+    "kz": "Қонақ өтініші бойынша тазалау",
+    "en": "Housekeeping on guest request"
+  },
+  {
+    "ru": "Экскурсии",
+    "kg": "Экскурсиялар",
+    "kz": "Экскурсиялар",
+    "en": "Excursions"
+  },
+  {
+    "ru": "Администратор",
+    "kg": "Администратор",
+    "kz": "Әкімші",
+    "en": "Administrator"
+  },
+  {
+    "ru": "Без номера",
+    "kg": "Бөлмөсүз",
+    "kz": "Бөлмесіз",
+    "en": "No room"
+  },
+  {
+    "ru": "Сауна",
+    "kg": "Сауна",
+    "kz": "Сауна",
+    "en": "Sauna"
+  },
+  {
+    "ru": "Трансфер",
+    "kg": "Трансфер",
+    "kz": "Трансфер",
+    "en": "Transfer"
+  },
+  {
+    "ru": "Бильярд",
+    "kg": "Бильярд",
+    "kz": "Бильярд",
+    "en": "Billiards"
+  }
+];
+
+function translateStaffDynamicFragments(value: string, locale: Locale): string {
+  if (locale === "ru") return value;
+  let result = value;
+  for (const fragment of STAFF_DYNAMIC_FRAGMENTS) {
+    if (result.includes(fragment.ru)) result = result.split(fragment.ru).join(fragment[locale]);
+  }
+  return result;
+}
+
 function translated(text: string, locale: Locale): string {
   if (locale === "ru") return text;
   const direct = COPY[text];
   if (direct) return direct[locale];
+  const dynamic = translateStaffDynamicFragments(text, locale);
+  if (dynamic !== text) return dynamic;
   const room = text.match(/^Номер\s+(.+)$/);
   if (room) return `${locale === "en" ? "Room" : locale === "kz" ? "Бөлме" : "Бөлмө"} ${room[1]}`;
   const waiter = text.match(/^Официант:\s*(.+)$/);
