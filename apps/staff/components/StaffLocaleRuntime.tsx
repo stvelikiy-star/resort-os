@@ -720,6 +720,28 @@ Object.assign(COPY, {
   }
 });
 
+// STAFF_I18N_AUDIT_V3
+Object.assign(COPY, {
+  "Сохраняю…": { kg: "Сактап жатам…", kz: "Сақтап жатырмын…", en: "Saving…" },
+  "· вручную": { kg: "· кол менен", kz: "· қолмен", en: "· manually" },
+  "· ВЫЕЗД": { kg: "· ЧЫГУУ", kz: "· ШЫҒУ", en: "· CHECK-OUT" },
+  "Входим…": { kg: "Кирип жатабыз…", kz: "Кіріп жатырмыз…", en: "Signing in…" },
+  "Телефон прочитал NFC-метку, но не передал серийный номер. Используйте ручной ввод UID.": {
+    kg: "Телефон NFC-белгини окуду, бирок сериялык номерди берген жок. UID'ди кол менен киргизиңиз.",
+    kz: "Телефон NFC белгісін оқыды, бірақ сериялық нөмірді бермеді. UID кодын қолмен енгізіңіз.",
+    en: "The phone read the NFC tag but did not provide the serial number. Enter the UID manually."
+  },
+  "Связь прервалась до подтверждения результата. Нажмите «Повторить безопасно» — тот же ключ не позволит списать дважды.": {
+    kg: "Натыйжа ырасталганга чейин байланыш үзүлдү. «Коопсуз кайталоо» баскычын басыңыз — ошол эле ачкыч эки жолу эсептен чыгарууга жол бербейт.",
+    kz: "Нәтиже расталғанға дейін байланыс үзілді. «Қауіпсіз қайталау» түймесін басыңыз — сол кілт екі рет шегеруге жол бермейді.",
+    en: "The connection dropped before the result was confirmed. Select Retry safely — the same key prevents a duplicate charge."
+  },
+  "RU": { kg: "RU", kz: "RU", en: "RU" },
+  "KG": { kg: "KG", kz: "KG", en: "KG" },
+  "KZ": { kg: "KZ", kz: "KZ", en: "KZ" },
+  "EN": { kg: "EN", kz: "EN", en: "EN" }
+});
+
 function translated(text: string, locale: Locale): string {
   if (locale === "ru") return text;
   const direct = COPY[text];
