@@ -50,6 +50,21 @@ def dynamic_templates(path: Path) -> list[str]:
         found.append(value)
     return sorted(set(found))
 
+
+def dynamic_covered(template: str, runtime: str) -> bool:
+    parts = re.split(r"\$\{[^}]+\}", template)
+    significant: list[str] = []
+    for part in parts:
+        normalized = re.sub(r"\s+", " ", part).strip(" .,:;!?()[]{}«»—–-")
+        if not re.search(r"[А-Яа-яЁё]", normalized):
+            continue
+        if len(normalized) <= 3:
+            continue
+        significant.append(normalized)
+    if not significant:
+        return True
+    return all(fragment in runtime for fragment in significant)
+
 def residuals(path: Path, runtime: str) -> list[str]:
     text = path.read_text(encoding="utf-8")
     found: list[str] = []
