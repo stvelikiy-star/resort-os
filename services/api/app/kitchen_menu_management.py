@@ -149,6 +149,13 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
             )
             if not before_row:
                 raise HTTPException(status_code=404, detail="Menu item not found")
+            next_name_kz = payload.name_kz if payload.name_kz is not None else before_row["nameKz"]
+            publishing = payload.is_draft is False or payload.is_active is True
+            if publishing and not str(next_name_kz or "").strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "KITCHEN_MENU_TRANSLATIONS_INCOMPLETE", "missing": ["name_kz"]},
+                )
             row = await conn.fetchrow(
                 '''UPDATE kitchen_menu_items SET
                      category=COALESCE($3,category),"nameRu"=COALESCE($4,"nameRu"),"nameKg"=COALESCE($5,"nameKg"),
