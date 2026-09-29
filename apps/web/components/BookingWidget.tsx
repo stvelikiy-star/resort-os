@@ -69,6 +69,22 @@ const COPY = {
     disclaimer: "Өтүнмө жөнөтүү номерди автоматтык түрдө кармабайт. Бронду менеджер шарттар жана алдын ала төлөм макулдашылгандан кийин ырастайт.",
     breakfast: "Эртең мененки тамак кирет", noMeal: "Тамак-ашсыз", mixedMeal: "Тамактануу шарттары даталарга жараша өзгөрөт", currency: "сом",
   },
+  kz: {
+    eyebrow: "Бос орындарды тексеру", title: "Күндеріңізге сай бөлме табыңыз", live: "Бос орындар мен бағалар қонақүй жүйесінен жаңартылады",
+    checkIn: "Келу", checkOut: "Кету", adults: "Ересектер", children: "Балалар", checking: "Тексерілуде…", find: "Бөлме табу",
+    dateError: "Келу және кету күндерін тексеріңіз.", searchError: "Бос орындарды тексеру мүмкін болмады. Қайта көріңіз немесе менеджерге хабарласыңыз.",
+    submitError: "Өтінімді жіберу мүмкін болмады. Қайта көріңіз немесе менеджерге қоңырау шалыңыз.",
+    success: (id: string) => `Өтінім ${id} қабылданды. Менеджер шарттар мен алдын ала төлемді келісу үшін сізбен хабарласады.`,
+    notReservation: "Өтінім әлі расталған бронь болып саналмайды.", available: "Бос нұсқалар", childConfirm: "балалар орындары менеджер растауымен",
+    noRooms: "Таңдалған күндерге сай бос бөлмелер табылмады.", tryDates: "Жақын күндерді тексеріңіз немесе брондау бөліміне қоңырау шалыңыз.",
+    free: "Бос", yourDates: "Сіздің күндеріңізге", childrenReview: "балалар орындары нақтыланады", fullPeriod: "бүкіл кезең үшін", onRequest: "Сұрау бойынша", managerPrice: "бағаны менеджер растайды",
+    selected: "Таңдалды", request: "Өтінім қалдыру", askManager: "Менеджерден нақтылау", requestEyebrow: "Менеджерге өтінім", requestIntro: "Таңдалған күндер мен санатты жібереміз. Менеджер шарттар мен алдын ала төлемді келіседі.",
+    name: "Аты-жөні", namePlaceholder: "Сізге қалай жүгінейік", phone: "Телефон", email: "Email, міндетті емес", sending: "Жіберілуде…", send: "Өтінімді жіберу",
+    marketingConsent: "«Үш Тәж» қонақүйінен WhatsApp арқылы арнайы ұсыныстар алғым келеді.",
+    marketingOptional: "Міндетті емес. Келісімді кез келген уақытта қайтарып алуға болады.", privacy: "Құпиялылық саясаты", consentDetails: "Келісім шарттары",
+    disclaimer: "Өтінім жіберу бөлмені автоматты түрде ұстап тұрмайды. Броньды менеджер шарттар мен алдын ала төлем келісілгеннен кейін растайды.",
+    breakfast: "Таңғы ас кіреді", noMeal: "Тамақсыз", mixedMeal: "Тамақтану шарттары күндерге қарай өзгереді", currency: "сом",
+  },
   en: {
     eyebrow: "Live availability", title: "Find a room for your dates", live: "Availability and pricing are updated from the hotel system",
     checkIn: "Check-in", checkOut: "Check-out", adults: "Adults", children: "Children", checking: "Checking…", find: "Find a room",
@@ -101,6 +117,7 @@ const addDays = (iso: string, days: number) => {
 function nightsLabel(value: number, locale: PublicLocale) {
   if (locale === "en") return `${value} ${value === 1 ? "night" : "nights"}`;
   if (locale === "kg") return `${value} түн`;
+  if (locale === "kz") return `${value} түн`;
   const mod10 = value % 10;
   const mod100 = value % 100;
   if (mod10 === 1 && mod100 !== 11) return `${value} ночь`;
@@ -110,11 +127,13 @@ function nightsLabel(value: number, locale: PublicLocale) {
 function adultsLabel(value: number, locale: PublicLocale) {
   if (locale === "en") return `${value} ${value === 1 ? "adult" : "adults"}`;
   if (locale === "kg") return `${value} чоң киши`;
+  if (locale === "kz") return `${value} ересек`;
   return value === 1 ? "1 взрослый" : `${value} взрослых`;
 }
 function childrenLabel(value: number, locale: PublicLocale) {
   if (locale === "en") return `${value} ${value === 1 ? "child" : "children"}`;
   if (locale === "kg") return `${value} бала`;
+  if (locale === "kz") return `${value} бала`;
   if (value === 1) return "1 ребёнок";
   if (value >= 2 && value <= 4) return `${value} ребёнка`;
   return `${value} детей`;
