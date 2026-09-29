@@ -155,7 +155,7 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
                      "nameKz"=COALESCE($6,"nameKz"),"nameEn"=COALESCE($7,"nameEn"),"priceKgs"=COALESCE($8,"priceKgs"),"isActive"=COALESCE($9,"isActive"),
                      "isDraft"=COALESCE($10,"isDraft"),"sortOrder"=COALESCE($11,"sortOrder"),"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2
-                   RETURNING id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
+                   RETURNING id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
                 item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_kz, payload.name_en,
                 payload.price_kgs, payload.is_active, payload.is_draft, payload.sort_order,
             )
