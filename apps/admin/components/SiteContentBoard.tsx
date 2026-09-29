@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import SiteMediaBoard from "./SiteMediaBoard";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 type Content = Record<string, Record<string, string>>;
 type ContentItem = {
   locale: Locale;
@@ -19,6 +19,7 @@ type ContentItem = {
 const LOCALES: { code: Locale; label: string }[] = [
   { code: "ru", label: "Русский" },
   { code: "kg", label: "Кыргызча" },
+  { code: "kz", label: "Қазақша" },
   { code: "en", label: "English" },
 ];
 
@@ -186,8 +187,8 @@ export default function SiteContentBoard() {
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text()) as Record<Locale, Content>;
-      if (!parsed.ru || !parsed.kg || !parsed.en) throw new Error("LOCALES");
-      setDrafts({ ru: parsed.ru, kg: parsed.kg, en: parsed.en });
+      if (!parsed.ru || !parsed.kg || !parsed.kz || !parsed.en) throw new Error("LOCALES");
+      setDrafts({ ru: parsed.ru, kg: parsed.kg, kz: parsed.kz, en: parsed.en });
       setMessage("JSON загружен в редактор. Нажмите «Сохранить» или «Опубликовать» для каждого языка.");
     } catch {
       setError("Неверный JSON контента.");
