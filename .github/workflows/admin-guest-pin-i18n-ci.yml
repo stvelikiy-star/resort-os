@@ -8,6 +8,7 @@ on:
       - "services/api/app/app_entry.py"
       - "services/api/app/stays.py"
       - "scripts/admin_experience_contract_test.py"
+      - "scripts/marina_internal_i18n_guard.py"
       - ".github/workflows/admin-guest-pin-i18n-ci.yml"
   push:
     branches:
@@ -33,6 +34,8 @@ jobs:
         run: python -m py_compile services/api/app/guest_pin_admin.py services/api/app/app_entry.py
       - name: Run adversarial admin experience contract
         run: python scripts/admin_experience_contract_test.py
+      - name: Run MARINA SMART internal i18n guard
+        run: python scripts/marina_internal_i18n_guard.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

@@ -1,11 +1,12 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = MarinaGuestLocale;
 type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "OTHER";
 type GuestContext = { authenticated: boolean; active_stay: boolean; room: { code: string }; guest: { first_name: string } | null };
-type MenuItem = { id: string; code: string; category: string; name_ru: string; name_kg: string; name_en: string; price_kgs: number; is_active: boolean; is_draft: boolean; sort_order: number; meal_types?: string[] };
+type MenuItem = { id: string; code: string; category: string; name_ru: string; name_kg: string; name_kz?: string; name_en: string; price_kgs: number; is_active: boolean; is_draft: boolean; sort_order: number; meal_types?: string[] };
 type MealWindow = { configured: boolean; open: boolean; start: string | null; cutoff_at: string | null; cutoff_minutes: number };
 type DeliveryConfig = { enabled: boolean; fee_kgs: number };
 type AiMessage = { role: "user" | "assistant"; content: string };
@@ -15,12 +16,15 @@ type OfferCampaign = {
   code: string;
   title_ru: string;
   title_kg: string;
+  title_kz?: string;
   title_en: string;
   hook_ru: string;
   hook_kg: string;
+  hook_kz?: string;
   hook_en: string;
   cta_ru: string;
   cta_kg: string;
+  cta_kz?: string;
   cta_en: string;
   image_url?: string | null;
   action_type: OfferAction;
@@ -33,7 +37,7 @@ const copy = {
   ru: {
     eyebrow: "Для вашего отдыха",
     title: "Всё, что можно заказать — в одном месте",
-    intro: "Меню кухни, услуги отеля и персональные предложения. Заказ или заявка сразу попадает в Resort OS — сотрудник подтверждает доступность и условия.",
+    intro: "Меню кухни, услуги отеля и персональные предложения. Заказ или заявка сразу попадает в MARINA SMART — сотрудник подтверждает доступность и условия.",
     dining: "Меню на сегодня",
     diningNote: "Выберите приём пищи. Завтрак, обед и ужин можно заказать не позднее чем за 1 час до настроенного времени начала.",
     noMenu: "Кухня ещё не опубликовала доступное меню на сегодня. Уточните у администратора.",
@@ -58,50 +62,99 @@ const copy = {
     opened: "Открываем…",
     offerError: "Не удалось выполнить действие. Обратитесь к администратору.",
     aiTitle: "AI-консьерж",
-    aiNote: "Спросите об отеле, территории, отдыхе и услугах. AI отвечает только по подтверждённым данным Resort Core.",
+    aiNote: "Спросите об отеле, территории, отдыхе и услугах. AI отвечает только по подтверждённым данным MARINA SMART.",
     aiPlaceholder: "Например: что можно сделать вечером?",
     aiSend: "Спросить",
     aiThinking: "Проверяю…",
     aiError: "AI сейчас недоступен. Можно отправить заявку администратору.",
+    orderFailed: "Не удалось создать заказ. Обратитесь к администратору.",
+    kitchenSystem: "Кухня · MARINA SMART",
+    aiSystem: "AI · проверенные данные",
+    minutesBeforeStart: (minutes: number) => `${minutes} мин до начала`,
+    categories: { BREAKFAST: "Завтрак", SOUP: "Супы", SALAD: "Салаты", MAIN: "Основные блюда", SIDE: "Гарниры", DESSERT: "Десерты", DRINK: "Напитки" } as Record<string, string>,
   },
   kg: {
     eyebrow: "Эс алууңуз үчүн",
-    title: "Заказ кылууга боло турган нерселердин баары бир жерде",
-    intro: "Ашкана менюсу, мейманкана кызматтары жана жеке сунуштар. Заказ же өтүнмө Resort OS системасына түшөт — кызматкер жеткиликтүүлүктү жана шарттарды ырастайт.",
+    title: "Буйрутма берүүгө боло турган кызматтардын баары бир жерде",
+    intro: "Ашкана менюсу, мейманкана кызматтары жана жеке сунуштар. Буйрутма же өтүнмө дароо MARINA SMART системасына түшөт — кызматкер жеткиликтүүлүктү жана шарттарды ырастайт.",
     dining: "Бүгүнкү меню",
-    diningNote: "Тамактанууну тандаңыз. Эртең мененки, түшкү жана кечки тамакты белгиленген башталыш убактысына 1 саат калганда гана заказ кылууга болот.",
+    diningNote: "Тамактануу түрүн тандаңыз. Эртең мененки, түшкү жана кечки тамакка буйрутма белгиленген башталыш убактысына 1 саат калганда жабылат.",
     noMenu: "Ашкана бүгүнкү жеткиликтүү менюну азырынча жарыялаган жок. Администратордон тактаңыз.",
-    noMealItems: "Тандалган тамактануу үчүн азыр жеткиликтүү позициялар жок.",
+    noMealItems: "Тандалган тамактануу үчүн азыр жеткиликтүү тамактар жок.",
     guests: "Коноктор",
-    comment: "Заказга комментарий",
-    commentPlaceholder: "Мисалы: пиязсыз, эки кишиге прибор",
+    comment: "Буйрутмага түшүндүрмө",
+    commentPlaceholder: "Мисалы: пиязсыз, эки кишиге ашкана аспаптары",
     total: "Жыйынтык",
     subtotal: "Тамак жана суусундук",
     delivery: "Бөлмөгө жеткирүү",
     pickup: "Жеткирүүсүз",
-    order: "Заказ берүү",
-    ordering: "Заказ жөнөтүлүүдө…",
-    ordered: (number: string, total: number) => `Заказ ${number} түзүлдү · ${total.toLocaleString("ru-RU")} сом. Ашкана аны кезекте көрөт.`,
-    closed: "Заказ кабыл алуу жабык",
+    order: "Буйрутма берүү",
+    ordering: "Буйрутма жөнөтүлүүдө…",
+    ordered: (number: string, total: number) => `Буйрутма ${number} түзүлдү · ${total.toLocaleString("ky-KG")} сом. Ашкана аны кезекте көрөт.`,
+    closed: "Буйрутма кабыл алуу жабык",
     notConfigured: "Тамактануу убактысы администратор тарабынан азырынча коюлган жок",
-    cutoff: (value: string) => `${value} чейин заказ кылууга болот`,
+    cutoff: (value: string) => `${value} чейин буйрутма берүүгө болот`,
     meals: { BREAKFAST: "Эртең мененки", LUNCH: "Түшкү", DINNER: "Кечки", OTHER: "Башка меню" } as Record<MealType, string>,
     offers: "Сиз үчүн сунуштар",
     offersNote: "Бул сунуштарды мейманкана башкарат. Кызмат автоматтык түрдө ырасталбайт; керек болгон жерде бааны, жеткиликтүүлүктү жана акыркы шарттарды кызматкер ырастайт.",
     requested: "Өтүнмө жөнөтүлдү",
-    opened: "Ачылууда…",
+    opened: "Ачып жатабыз…",
     offerError: "Аракет аткарылган жок. Администраторго кайрылыңыз.",
     aiTitle: "AI-консьерж",
-    aiNote: "Мейманкана, аймак, эс алуу жана кызматтар тууралуу сураңыз. AI Resort Core'догу ырасталган маалыматтар боюнча гана жооп берет.",
+    aiNote: "Мейманкана, аймак, эс алуу жана кызматтар тууралуу сураңыз. AI MARINA SMART системасындагы ырасталган маалыматтар боюнча гана жооп берет.",
     aiPlaceholder: "Мисалы: кечинде эмне кылса болот?",
     aiSend: "Суроо берүү",
     aiThinking: "Текшерип жатам…",
     aiError: "AI азыр жеткиликсиз. Администраторго өтүнмө жөнөтсөңүз болот.",
+    orderFailed: "Буйрутма түзүлгөн жок. Администраторго кайрылыңыз.",
+    kitchenSystem: "Ашкана · MARINA SMART",
+    aiSystem: "AI · текшерилген маалымат",
+    minutesBeforeStart: (minutes: number) => `Башталышына ${minutes} мүнөт калды`,
+    categories: { BREAKFAST: "Эртең мененки тамак", SOUP: "Шорполор", SALAD: "Салаттар", MAIN: "Негизги тамактар", SIDE: "Гарнирлер", DESSERT: "Десерттер", DRINK: "Суусундуктар" } as Record<string, string>,
+  },
+  kz: {
+    eyebrow: "Сіздің демалысыңыз үшін",
+    title: "Тапсырыс беруге болатынның бәрі — бір жерде",
+    intro: "Асүй мәзірі, қонақүй қызметтері және жеке ұсыныстар. Әр тапсырыс немесе өтінім бірден MARINA SMART жүйесіне түседі — қызметкер қолжетімділік пен шарттарды растайды.",
+    dining: "Бүгінгі мәзір",
+    diningNote: "Тамақтану түрін таңдаңыз. Таңғы, түскі және кешкі асқа тапсырыс қабылдау белгіленген басталу уақытынан 1 сағат бұрын жабылады.",
+    noMenu: "Асүй бүгінгі қолжетімді мәзірді әлі жарияламады. Әкімшіден нақтылаңыз.",
+    noMealItems: "Таңдалған ас уақытына қазір қолжетімді тағам жоқ.",
+    guests: "Қонақтар",
+    comment: "Тапсырысқа түсініктеме",
+    commentPlaceholder: "Мысалы: пиязсыз, екі адамға ас құралдары",
+    total: "Барлығы",
+    subtotal: "Тағамдар мен сусындар",
+    delivery: "Бөлмеге жеткізу",
+    pickup: "Жеткізусіз",
+    order: "Тапсырысты рәсімдеу",
+    ordering: "Тапсырыс жіберілуде…",
+    ordered: (number: string, total: number) => `Тапсырыс ${number} құрылды · ${total.toLocaleString("kk-KZ")} сом. Асүй оны кезекте көреді.`,
+    closed: "Тапсырыс қабылдау жабық",
+    notConfigured: "Тамақтану уақыты әкімші тарапынан әлі белгіленбеген",
+    cutoff: (value: string) => `${value} дейін тапсырыс беруге болады`,
+    meals: { BREAKFAST: "Таңғы ас", LUNCH: "Түскі ас", DINNER: "Кешкі ас", OTHER: "Басқа мәзір" } as Record<MealType, string>,
+    offers: "Сізге арналған ұсыныстар",
+    offersNote: "Бұл ұсыныстарды қонақүй басқарады. Қызмет автоматты түрде расталмайды: қажет болған жағдайда қолжетімділікті, бағаны және соңғы шарттарды қызметкер нақтылайды.",
+    requested: "Өтінім жіберілді",
+    opened: "Ашылуда…",
+    offerError: "Әрекетті орындау мүмкін болмады. Әкімшіге хабарласыңыз.",
+    aiTitle: "AI-консьерж",
+    aiNote: "Қонақүй, аумақ, демалыс және қызметтер туралы сұраңыз. AI тек MARINA SMART жүйесіндегі расталған мәліметтерге сүйеніп жауап береді.",
+    aiPlaceholder: "Мысалы: кешке не істеуге болады?",
+    aiSend: "Сұрау",
+    aiThinking: "Тексеріп жатырмын…",
+    aiError: "AI қазір қолжетімсіз. Әкімшіге өтінім жібере аласыз.",
+    orderFailed: "Тапсырысты құру мүмкін болмады. Әкімшіге хабарласыңыз.",
+    kitchenSystem: "Асүй · MARINA SMART",
+    aiSystem: "AI · тексерілген деректер",
+    minutesBeforeStart: (minutes: number) => `Басталуына ${minutes} минут қалды`,
+    categories: { BREAKFAST: "Таңғы ас", SOUP: "Сорпалар", SALAD: "Салаттар", MAIN: "Негізгі тағамдар", SIDE: "Гарнирлер", DESSERT: "Десерттер", DRINK: "Сусындар" } as Record<string, string>,
   },
   en: {
     eyebrow: "For your stay",
     title: "Everything you can request, in one place",
-    intro: "Kitchen menu, hotel services and personal offers. Every order or request goes straight into Resort OS for staff confirmation.",
+    intro: "Kitchen menu, hotel services and personal offers. Every order or request goes straight into MARINA SMART for staff confirmation.",
     dining: "Today’s menu",
     diningNote: "Choose a meal. Breakfast, lunch and dinner orders close one hour before the configured meal start.",
     noMenu: "The kitchen has not published an available guest menu for today yet. Please ask the administrator.",
@@ -126,22 +179,22 @@ const copy = {
     opened: "Opening…",
     offerError: "The action could not be completed. Please contact the administrator.",
     aiTitle: "AI concierge",
-    aiNote: "Ask about the hotel, resort, stay and services. AI answers only from verified Resort Core facts.",
+    aiNote: "Ask about the hotel, resort, stay and services. AI answers only from verified MARINA SMART data.",
     aiPlaceholder: "For example: what can we do this evening?",
     aiSend: "Ask",
     aiThinking: "Checking…",
     aiError: "AI is unavailable right now. You can send an administrator request.",
+    orderFailed: "The order could not be created. Please contact the administrator.",
+    kitchenSystem: "Kitchen · MARINA SMART",
+    aiSystem: "AI · verified data",
+    minutesBeforeStart: (minutes: number) => `${minutes} min before start`,
+    categories: { BREAKFAST: "Breakfast", SOUP: "Soups", SALAD: "Salads", MAIN: "Main dishes", SIDE: "Side dishes", DESSERT: "Desserts", DRINK: "Drinks" } as Record<string, string>,
   },
 } as const;
 
-function currentLocale(): Locale {
-  if (typeof window === "undefined") return "ru";
-  const stored = window.localStorage.getItem("three-crowns-guest-language") || window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" ? stored : "ru";
-}
-
 function localized(item: OfferCampaign, locale: Locale) {
   if (locale === "kg") return { title: item.title_kg, hook: item.hook_kg, cta: item.cta_kg };
+  if (locale === "kz") return { title: item.title_kz?.trim() || "", hook: item.hook_kz?.trim() || "", cta: item.cta_kz?.trim() || "" };
   if (locale === "en") return { title: item.title_en, hook: item.hook_en, cta: item.cta_en };
   return { title: item.title_ru, hook: item.hook_ru, cta: item.cta_ru };
 }
@@ -156,11 +209,11 @@ function cutoffTime(value: string | null, locale: Locale) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(marinaGuestIntlLocale(locale), { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function GuestMarketplace({ token }: { token: string }) {
-  const [locale, setLocale] = useState<Locale>("ru");
+  const [locale] = useMarinaGuestLocale();
   const [authenticated, setAuthenticated] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [serviceDate, setServiceDate] = useState<string | null>(null);
@@ -182,13 +235,6 @@ export default function GuestMarketplace({ token }: { token: string }) {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
-
-  useEffect(() => {
-    const sync = () => setLocale(currentLocale());
-    sync();
-    window.addEventListener("three-crowns:content-ready", sync);
-    return () => window.removeEventListener("three-crowns:content-ready", sync);
-  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -234,7 +280,7 @@ export default function GuestMarketplace({ token }: { token: string }) {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  const mealMenu = useMemo(() => menu.filter((item) => item.meal_types?.includes(mealType)), [menu, mealType]);
+  const mealMenu = useMemo(() => menu.filter((item) => item.meal_types?.includes(mealType) && (locale !== "kz" || Boolean(item.name_kz?.trim()))), [menu, mealType, locale]);
   const selected = useMemo(() => mealMenu.filter((item) => (qty[item.id] ?? 0) > 0), [mealMenu, qty]);
   const subtotal = selected.reduce((sum, item) => sum + item.price_kgs * (qty[item.id] ?? 0), 0);
   const deliveryFee = deliveryToRoom && delivery.enabled ? delivery.fee_kgs : 0;
@@ -269,13 +315,13 @@ export default function GuestMarketplace({ token }: { token: string }) {
         const code = body?.detail?.code;
         if (code === "GUEST_MEAL_ORDER_CLOSED") throw new Error(c.closed);
         if (code === "GUEST_MEAL_TIME_NOT_CONFIGURED") throw new Error(c.notConfigured);
-        throw new Error(typeof body?.detail === "string" ? body.detail : "ORDER_FAILED");
+        throw new Error("ORDER_FAILED");
       }
       setNotice(c.ordered(body.order_number || "—", Number(body.total_kgs || total)));
       setQty({}); setNote("");
       await load();
     } catch (cause) {
-      setNotice(cause instanceof Error && cause.message !== "ORDER_FAILED" ? cause.message : (locale === "en" ? "The order could not be created. Please contact the administrator." : locale === "kg" ? "Заказ түзүлгөн жок. Администраторго кайрылыңыз." : "Не удалось создать заказ. Обратитесь к администратору."));
+      setNotice(cause instanceof Error && cause.message !== "ORDER_FAILED" ? cause.message : c.orderFailed);
     } finally { setBusy(false); }
   }
 
@@ -356,7 +402,7 @@ export default function GuestMarketplace({ token }: { token: string }) {
 
     <div className="guest-marketplace-grid">
       <article className="guest-dining-market">
-        <div className="guest-market-head"><div><small>Kitchen · Resort Core{serviceDate ? ` · ${serviceDate}` : ""}</small><h3>{c.dining}</h3><p>{c.diningNote}</p></div><b>{mealMenu.length}</b></div>
+        <div className="guest-market-head"><div><small>{c.kitchenSystem}{serviceDate ? ` · ${serviceDate}` : ""}</small><h3>{c.dining}</h3><p>{c.diningNote}</p></div><b>{mealMenu.length}</b></div>
         <div className="guest-meal-tabs">{(["BREAKFAST", "LUNCH", "DINNER", "OTHER"] as MealType[]).map((item) => {
           const window = mealOrdering[item];
           const unavailable = item !== "OTHER" && window?.configured === false;
@@ -365,12 +411,12 @@ export default function GuestMarketplace({ token }: { token: string }) {
         {!menu.length ? <div className="guest-market-empty">{c.noMenu}</div> : <form onSubmit={createOrder}>
           {!mealOpen && <div className="guest-market-notice">{activeWindow?.configured === false ? c.notConfigured : c.closed}{activeWindow?.start ? ` · ${c.meals[mealType]} ${activeWindow.start}` : ""}</div>}
           {mealOpen && !mealMenu.length && <div className="guest-market-empty">{c.noMealItems}</div>}
-          {mealOpen && mealMenu.length > 0 && <div className="guest-menu-groups">{grouped.map(([category, items]) => <section key={category}><div className="guest-menu-category">{category}</div>{items.map((item) => <label className="guest-menu-item" key={item.id}><span><strong>{locale === "kg" ? item.name_kg : locale === "en" ? item.name_en : item.name_ru}</strong><small>{item.price_kgs.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(event) => setQty((current) => ({ ...current, [item.id]: Math.max(0, Number(event.target.value) || 0) }))} /></label>)}</section>)}</div>}
+          {mealOpen && mealMenu.length > 0 && <div className="guest-menu-groups">{grouped.map(([category, items]) => <section key={category}><div className="guest-menu-category">{c.categories[category] || category}</div>{items.map((item) => <label className="guest-menu-item" key={item.id}><span><strong>{locale === "kg" ? item.name_kg : locale === "kz" ? (item.name_kz?.trim() || "") : locale === "en" ? item.name_en : item.name_ru}</strong><small>{item.price_kgs.toLocaleString(marinaGuestIntlLocale(locale))} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(event) => setQty((current) => ({ ...current, [item.id]: Math.max(0, Number(event.target.value) || 0) }))} /></label>)}</section>)}</div>}
           <div className="guest-order-fields"><label>{c.guests}<input type="number" min="1" max="20" value={guestCount} onChange={(event) => setGuestCount(Math.max(1, Number(event.target.value) || 1))} /></label><label>{c.comment}<input value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} placeholder={c.commentPlaceholder} /></label></div>
-          {delivery.enabled && <label className="guest-room-delivery"><input type="checkbox" checked={deliveryToRoom} onChange={(event) => setDeliveryToRoom(event.target.checked)} /><span><strong>{c.delivery}</strong><small>+{delivery.fee_kgs.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</small></span></label>}
-          <div className="guest-order-breakdown"><div><span>{c.subtotal}</span><b>{subtotal.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</b></div><div><span>{deliveryToRoom && delivery.enabled ? c.delivery : c.pickup}</span><b>{deliveryFee.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</b></div></div>
-          <div className="guest-order-total"><span>{c.total}</span><strong>{total.toLocaleString(locale === "en" ? "en-US" : "ru-RU")} KGS</strong></div>
-          {cutoff && mealType !== "OTHER" && <div className="guest-order-cutoff">{c.cutoff(cutoff)} · {activeWindow?.cutoff_minutes ?? 60} min before start</div>}
+          {delivery.enabled && <label className="guest-room-delivery"><input type="checkbox" checked={deliveryToRoom} onChange={(event) => setDeliveryToRoom(event.target.checked)} /><span><strong>{c.delivery}</strong><small>+{delivery.fee_kgs.toLocaleString(marinaGuestIntlLocale(locale))} KGS</small></span></label>}
+          <div className="guest-order-breakdown"><div><span>{c.subtotal}</span><b>{subtotal.toLocaleString(marinaGuestIntlLocale(locale))} KGS</b></div><div><span>{deliveryToRoom && delivery.enabled ? c.delivery : c.pickup}</span><b>{deliveryFee.toLocaleString(marinaGuestIntlLocale(locale))} KGS</b></div></div>
+          <div className="guest-order-total"><span>{c.total}</span><strong>{total.toLocaleString(marinaGuestIntlLocale(locale))} KGS</strong></div>
+          {cutoff && mealType !== "OTHER" && <div className="guest-order-cutoff">{c.cutoff(cutoff)} · {c.minutesBeforeStart(activeWindow?.cutoff_minutes ?? 60)}</div>}
           {notice && <div className="guest-market-notice">{notice}</div>}
           <button className="guest-market-primary" disabled={!selected.length || busy || !mealOpen}>{busy ? c.ordering : c.order}</button>
         </form>}
@@ -378,9 +424,9 @@ export default function GuestMarketplace({ token }: { token: string }) {
 
       <aside className="guest-market-side">
         <article className="guest-ai-card">
-          <div className="guest-market-head"><div><small>AI · verified facts</small><h3>{c.aiTitle}</h3><p>{c.aiNote}</p></div><button className="guest-ai-toggle" onClick={() => setAiOpen((value) => !value)}>{aiOpen ? "×" : "AI"}</button></div>
+          <div className="guest-market-head"><div><small>{c.aiSystem}</small><h3>{c.aiTitle}</h3><p>{c.aiNote}</p></div><button className="guest-ai-toggle" onClick={() => setAiOpen((value) => !value)}>{aiOpen ? "×" : "AI"}</button></div>
           {aiOpen && <div className="guest-ai-body">
-            <div className="guest-ai-prompts">{(locale === "en" ? ["What can we do this evening?", "Tell me about the beach and spa", "Help plan tomorrow"] : locale === "kg" ? ["Кечинде эмне кылса болот?", "Пляж жана SPA тууралуу айтып бер", "Эртеңки күндү пландап бер"] : ["Что можно сделать вечером?", "Расскажи про пляж и SPA", "Помоги спланировать завтра"]).map((prompt) => <button key={prompt} onClick={() => setAiInput(prompt)}>{prompt}</button>)}</div>
+            <div className="guest-ai-prompts">{(locale === "en" ? ["What can we do this evening?", "Tell me about the beach and spa", "Help plan tomorrow"] : locale === "kg" ? ["Кечинде эмне кылса болот?", "Пляж жана SPA тууралуу айтып бер", "Эртеңки күндү пландап бер"] : locale === "kz" ? ["Кешке не істеуге болады?", "Жағажай мен SPA туралы айтып бер", "Ертеңгі күнді жоспарлауға көмектес"] : ["Что можно сделать вечером?", "Расскажи про пляж и SPA", "Помоги спланировать завтра"]).map((prompt) => <button key={prompt} onClick={() => setAiInput(prompt)}>{prompt}</button>)}</div>
             <div className="guest-ai-messages">{aiMessages.map((message, index) => <div key={`${message.role}-${index}`} data-role={message.role}>{message.content}</div>)}{aiBusy && <div data-role="assistant">{c.aiThinking}</div>}{aiError && <div className="guest-ai-error">{aiError}</div>}</div>
             <form onSubmit={askAi}><input value={aiInput} maxLength={1600} onChange={(event) => setAiInput(event.target.value)} placeholder={c.aiPlaceholder} /><button disabled={!aiInput.trim() || aiBusy}>{c.aiSend}</button></form>
           </div>}
@@ -391,7 +437,7 @@ export default function GuestMarketplace({ token }: { token: string }) {
     {offers.length > 0 && <>
       <div className="guest-offers-head"><div><p>{c.eyebrow}</p><h3>{c.offers}</h3></div><span>{c.offersNote}</span></div>
       {offerError && <div className="guest-market-notice guest-offer-action-error">{offerError}</div>}
-      <div className="guest-offer-grid">{offers.map((offer) => {
+      <div className="guest-offer-grid">{offers.filter((offer) => locale !== "kz" || Boolean(offer.title_kz?.trim() && offer.hook_kz?.trim() && offer.cta_kz?.trim())).map((offer) => {
         const content = localized(offer, locale);
         return <article key={offer.id} className="guest-managed-offer">
           {offer.image_url && <div className="guest-managed-offer-image" style={{ backgroundImage: `url(${offer.image_url})` }} aria-hidden="true" />}
