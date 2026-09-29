@@ -807,6 +807,9 @@ common.push(
 );
 
 const KZ_AUDIT_V2: Record<string, string> = {
+  "ГОТОВ": "ДАЙЫН",
+  "НУЖНА УБОРКА": "ТАЗАЛАУ ҚАЖЕТ",
+  "только подтверждённые данные MARINA SMART": "тек MARINA SMART жүйесінде расталған деректер",
   "Ошибка Growth Control": "Growth Control қатесі",
   "DIRTY без active task": "DIRTY — белсенді тапсырмасыз",
   "TECH_BLOCK без active task": "TECH_BLOCK — белсенді тапсырмасыз",
