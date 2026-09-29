@@ -229,6 +229,22 @@ async def toggle_campaign(campaign_id: uuid.UUID, payload: CampaignToggle, reque
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
+            if payload.is_active:
+                current = await conn.fetchrow(
+                    '''SELECT "titleRu","titleKg","titleKz","titleEn","hookRu","hookKg","hookKz","hookEn",
+                              "ctaRu","ctaKg","ctaKz","ctaEn"
+                       FROM guest_offer_campaigns WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                    campaign_id, pid,
+                )
+                if not current:
+                    raise HTTPException(status_code=404, detail="Guest offer campaign not found")
+                required = ("titleRu","titleKg","titleKz","titleEn","hookRu","hookKg","hookKz","hookEn","ctaRu","ctaKg","ctaKz","ctaEn")
+                missing = [field for field in required if not str(current[field] or "").strip()]
+                if missing:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"code": "GUEST_OFFER_TRANSLATIONS_INCOMPLETE", "missing": missing},
+                    )
             row = await conn.fetchrow(
                 '''UPDATE guest_offer_campaigns SET "isActive"=$3,"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2 RETURNING *''',
