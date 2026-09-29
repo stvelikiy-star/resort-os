@@ -2077,6 +2077,23 @@ const KZ_AUDIT_V4: Record<string, string> = {
   "Номер, кровати, категория…": "Бөлме, төсектер, санат…",
 };
 
+
+// MARINA_I18N_AUDIT_V5
+common.push(
+  { ru: "Ошибка Resort Core", kg: "Resort Core катасы", en: "Resort Core error" },
+  { ru: "Внешний HTTPS-каталог", kg: "Тышкы HTTPS-каталог", en: "External HTTPS catalogue" },
+  { ru: "AI-сценарий", kg: "AI-сценарий", en: "AI workflow" },
+  { ru: "Оффер создан. Перед включением проверьте RU/KG/KZ/EN, действие, период и ссылку.", kg: "Сунуш түзүлдү. Күйгүзөрдөн мурун RU/KG/KZ/EN, аракетти, мезгилди жана шилтемени текшериңиз.", en: "Offer created. Before enabling it, check RU/KG/KZ/EN, action, period and link." },
+  { ru: "Помоги гостю выбрать вечерний сценарий отдыха на основе подтверждённых сервисов отеля.", kg: "Конокко мейманкананын ырасталган кызматтарынын негизинде кечки эс алуу сценарийин тандоого жардам бер.", en: "Help the guest choose an evening plan based on confirmed hotel services." }
+);
+const KZ_AUDIT_V5: Record<string, string> = {
+  "Ошибка Resort Core": "Resort Core қатесі",
+  "Внешний HTTPS-каталог": "Сыртқы HTTPS-каталог",
+  "AI-сценарий": "AI-сценарий",
+  "Оффер создан. Перед включением проверьте RU/KG/KZ/EN, действие, период и ссылку.": "Ұсыныс құрылды. Қоспас бұрын RU/KG/KZ/EN, әрекетті, кезеңді және сілтемені тексеріңіз.",
+  "Помоги гостю выбрать вечерний сценарий отдыха на основе подтверждённых сервисов отеля.": "Қонаққа қонақүйдің расталған қызметтері негізінде кешкі демалыс жоспарын таңдауға көмектес."
+};
+
 const phraseIndex = new Map<string, Phrase>();
 for (const phrase of common) {
   phraseIndex.set(phrase.ru, phrase);
@@ -2152,7 +2169,7 @@ function translateText(source: string, locale: Locale): string {
   let translated: string;
   if (locale === "kz") {
     const canonicalRu = direct?.ru ?? exact[trimmed]?.ru ?? trimmed;
-    translated = KZ_EXACT[canonicalRu] ?? KZ_EXTRA[canonicalRu] ?? KZ_AUDIT_V2[canonicalRu] ?? KZ_AUDIT_V3[canonicalRu] ?? KZ_AUDIT_V4[canonicalRu] ?? KZ_EXACT[trimmed] ?? KZ_EXTRA[trimmed] ?? KZ_AUDIT_V2[trimmed] ?? KZ_AUDIT_V3[trimmed] ?? KZ_AUDIT_V4[trimmed] ?? trimmed;
+    translated = KZ_EXACT[canonicalRu] ?? KZ_EXTRA[canonicalRu] ?? KZ_AUDIT_V2[canonicalRu] ?? KZ_AUDIT_V3[canonicalRu] ?? KZ_AUDIT_V4[canonicalRu] ?? KZ_AUDIT_V5[canonicalRu] ?? KZ_EXACT[trimmed] ?? KZ_EXTRA[trimmed] ?? KZ_AUDIT_V2[trimmed] ?? KZ_AUDIT_V3[trimmed] ?? KZ_AUDIT_V4[trimmed] ?? KZ_AUDIT_V5[trimmed] ?? trimmed;
   } else {
     translated = direct ? direct[locale] : trimmed;
     if (!direct && exact[trimmed]) translated = exact[trimmed][locale];
