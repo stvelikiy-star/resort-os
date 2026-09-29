@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 type Policy = {
   scheduled_housekeeping_interval_days: number;
   scheduled_linen_change_included: boolean;
@@ -43,6 +43,21 @@ const COPY = {
     duplicate: "Мындай активдүү өтүнмө мурунтан бар.",
     unavailable: "Кызматтын баасы азырынча коюлган жок. Ресепшенге кайрылыңыз.",
   },
+  kz: {
+    eyebrow: "Бөлмені тазалау",
+    title: "Жоспарлы тазалау және қосымша қызметтер",
+    schedule: (days: number) => `Тұру кезінде жоспарлы тазалау әр ${days} күн сайын жүргізіледі.`,
+    linen: "Төсек-орынды ауыстыру жоспарлы тазалауға кіреді.",
+    housekeeping: "Қосымша тазалау",
+    extraLinen: "Төсек-орынды қосымша ауыстыру",
+    paid: "ақылы",
+    pricePending: "Бағаны әкімшілік баптайды",
+    request: "Тапсырыс беру",
+    sending: "Жіберілуде…",
+    sent: "Өтінім құрылды. Қызметкер оны Resort OS жүйесінде көреді.",
+    duplicate: "Мұндай белсенді өтінім бұрыннан бар.",
+    unavailable: "Қызмет бағасы әлі бапталмаған. Ресепшенге хабарласыңыз.",
+  },
   en: {
     eyebrow: "Housekeeping",
     title: "Scheduled cleaning and extra services",
@@ -63,7 +78,7 @@ const COPY = {
 function locale(): Locale {
   if (typeof window === "undefined") return "ru";
   const stored = window.localStorage.getItem("three-crowns-guest-language") || window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" ? stored : "ru";
+  return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
 }
 
 export default function GuestHousekeepingPolicy({ token }: { token: string }) {
@@ -122,7 +137,7 @@ export default function GuestHousekeepingPolicy({ token }: { token: string }) {
   return <section className="guest-housekeeping-policy">
     <div className="guest-housekeeping-head"><div><p>{c.eyebrow}</p><h2>{c.title}</h2></div><span>Housekeeping · Resort Core</span></div>
     <div className="guest-housekeeping-included"><strong>{c.schedule(policy.scheduled_housekeeping_interval_days)}</strong>{policy.scheduled_linen_change_included && <span>{c.linen}</span>}</div>
-    <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(lang === "en" ? "en-US" : "ru-RU")} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
+    <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(lang === "en" ? "en-US" : lang === "kz" ? "kk-KZ" : lang === "kg" ? "ky-KG" : "ru-RU")} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
     {message && <div className="guest-market-notice">{message}</div>}
   </section>;
 }
