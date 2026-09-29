@@ -37,6 +37,7 @@ EXPECTED_MIGRATIONS = (
     "zz101_marina_product_settings_20260926",
     "zz102_marina_full_modules_20260927",
     "zz103_agent_access_20260927",
+    "zz104_public_kz_20260929",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
