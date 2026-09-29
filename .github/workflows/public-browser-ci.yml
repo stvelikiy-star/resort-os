@@ -28,6 +28,10 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
+      - name: Run MARINA SMART Guest Web i18n guard
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        run: python3 scripts/marina_guest_i18n_guard.py
+
       - name: Install and build public site
         working-directory: apps/web
         run: |
@@ -57,6 +61,12 @@ jobs:
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: node scripts/public_browser_acceptance.mjs
+
+      - name: Run MARINA SMART KZ Guest OS browser acceptance
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        env:
+          PUBLIC_BASE_URL: http://127.0.0.1:3000
+        run: node scripts/marina_guest_kz_browser.mjs
 
       - name: Run MARINA SMART guest-web browser acceptance
         if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
@@ -102,10 +112,24 @@ jobs:
               'product: "MARINA SMART',
               'const HOTEL_PHONE_E164 = "+996501772233"',
               'Заезд с 13:00. Выезд до 11:00.',
-              'Check-in is from 13:00. Check-out is by 11:00.'
+              'Check-in is from 13:00. Check-out is by 11:00.',
+              'product: "MARINA SMART · қонақ кабинеті"',
             ]) {
               if (!concierge.includes(required)) throw new Error("AK BERMET guest fact missing: " + required);
             }
+            if (!concierge.includes("MARINA_GUEST_LOCALES.map")) {
+              throw new Error("Guest language switcher is not using the shared RU/KG/KZ/EN locale list");
+            }
+            const localeRuntime = fs.readFileSync("apps/web/lib/marinaGuestLocale.ts", "utf8");
+            if (!localeRuntime.includes('export const MARINA_GUEST_LOCALES: MarinaGuestLocale[] = ["ru", "kg", "kz", "en"]')) {
+              throw new Error("Shared Guest locale list is incomplete");
+            }
+            if (!localeRuntime.includes('if (locale === "kz") return "kk";')) {
+              throw new Error("Guest KZ html lang mapping is missing");
+            }
+            const landing = fs.readFileSync("apps/web/app/page.tsx", "utf8");
+            if (!landing.includes("RU · KG · KZ · EN")) throw new Error("Guest Web landing does not advertise all four languages");
+
             for (const forbidden of [
               "Три Короны",
               "Three Crowns",
@@ -116,7 +140,7 @@ jobs:
             ]) {
               if (concierge.includes(forbidden)) throw new Error("Legacy guest fact still present: " + forbidden);
             }
-            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS facts=PASS");
+            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS facts=PASS kz=PASS");
           } finally {
             await browser.close();
           }

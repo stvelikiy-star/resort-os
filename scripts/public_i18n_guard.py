@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed if the Three Crowns public RU/KG/EN contract regresses."""
+"""Fail closed if the Three Crowns public RU/KG/KZ/EN contract regresses."""
 from __future__ import annotations
 
 import re
@@ -37,19 +37,20 @@ def main() -> int:
         room_count = len(re.findall(r'^  (?:(?:"[^"\n]+")|apartments): \{$', body, re.M))
         if room_count != 12:
             errors.append(f"publicLocale.ts: expected 12 localized room categories, found {room_count}")
-        for locale in ("ru", "kg", "en"):
+        for locale in ("ru", "kg", "kz", "en"):
             count = len(re.findall(rf'^    {locale}: \{{ name:', body, re.M))
             if count != 12:
                 errors.append(f"publicLocale.ts: expected 12 {locale} room translations, found {count}")
 
     required_locale = [
-        'export type PublicLocale = "ru" | "kg" | "en"',
+        'export type PublicLocale = "ru" | "kg" | "kz" | "en"',
         "resolveClientLocale",
         "withPublicLocale",
         "localizeRoomTypeName",
         "Бир кишилик номер, цоколь",
         "Single Room, Basement Level",
         "Ашканасы бар апартаменттер",
+        "Асүйі бар апартаменттер",
         "Apartments with Kitchen",
     ]
     for snippet in required_locale:
@@ -61,6 +62,7 @@ def main() -> int:
         "const COPY = {",
         "ru: {",
         "kg: {",
+        "kz: {",
         "en: {",
         "resolveClientLocale",
         "localizeRoomTypeName",
@@ -68,6 +70,7 @@ def main() -> int:
         "/core/api/v1/booking/requests",
         "Заявка ещё не является подтверждённой бронью.",
         "Өтүнмө азырынча ырасталган бронь эмес.",
+        "Өтінім әлі расталған бронь болып саналмайды.",
         "The request is not yet a confirmed reservation.",
     ]:
         if snippet not in booking:
@@ -95,12 +98,12 @@ def main() -> int:
             errors.append(f"SiteContentRuntime.tsx: missing resilient locale behavior {snippet!r}")
 
     header = texts["header"]
-    for snippet in ['type Locale = "ru" | "kg" | "en"', '>RU</button>', '>KG</button>', '>EN</button>', "switchLanguage"]:
+    for snippet in ['type Locale = "ru" | "kg" | "kz" | "en"', '>RU</button>', '>KG</button>', '>KZ</button>', '>EN</button>', "switchLanguage"]:
         if snippet not in header:
             errors.append(f"SiteHeader.tsx: missing language-switch contract {snippet!r}")
 
     site_content = texts["site_content"]
-    for snippet in ["fallbackSiteContent", "kg: {", "en: {", "Үч Таажы", "Three Crowns"]:
+    for snippet in ["fallbackSiteContent", "kg: {", "kz: {", "en: {", "Үч Таажы", "Үш Тәж", "Three Crowns"]:
         if snippet not in site_content:
             errors.append(f"siteContent.ts: missing CMS fallback locale {snippet!r}")
 
@@ -109,7 +112,7 @@ def main() -> int:
 
     print("Three Crowns public i18n guard")
     print(f"FACT: localized_room_categories={room_count}")
-    print("FACT: locales=ru,kg,en")
+    print("FACT: locales=ru,kg,kz,en")
     print("FACT: surfaces=home,booking,rooms-index,room-detail,header,cms-fallback")
 
     if errors:
@@ -118,7 +121,7 @@ def main() -> int:
         print("RESULT: PUBLIC I18N DRIFT")
         return 1
 
-    print("PASS: public RU/KG/EN contract is structurally complete")
+    print("PASS: public RU/KG/KZ/EN contract is structurally complete")
     return 0
 
 

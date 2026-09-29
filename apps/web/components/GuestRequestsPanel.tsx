@@ -55,13 +55,34 @@ const COPY = {
     sending: "Жөнөтүлүүдө…",
     sent: "Өтүнмө түзүлдү",
     duplicate: "Мындай активдүү өтүнмө бар.",
-    error: "Өтүнмө түзүлгөн жок. Кайра аракет кылыңыз же ресепшенге кайрылыңыз.",
+    error: "Өтүнмө түзүлгөн жок. Кайра аракет кылыңыз же кабыл алуу кызматына кайрылыңыз.",
     mine: "Менин өтүнмөлөрүм",
     empty: "Азырынча өтүнмөлөр жок.",
     refresh: "Жаңыртуу",
     cancel: "Жокко чыгаруу",
     status: { OPEN: "Жаңы", IN_PROGRESS: "Аткарылууда", IN_INSPECTION: "Текшерүүдө", DONE: "Аткарылды", CANCELLED: "Жокко чыгарылды" },
     labels: { HOUSEKEEPING: "Тазалоо", TOWELS: "Сүлгү", LINEN: "Төшөк жабдыгын алмаштыруу", MAINTENANCE: "Бузулуу / оңдоо", TRANSFER: "Трансфер", MEALS: "Тамактануу", PARKING: "Унаа токтотуучу жай", SAUNA: "Сауна", BILLIARDS: "Бильярд", EXCURSIONS: "Экскурсиялар", ADMIN: "Администратор" },
+  },
+  kz: {
+    eyebrow: "Тұру кезіндегі сервис",
+    title: "Қонақүйге өтінім",
+    intro: "Қызметті таңдаңыз — өтінім Resort Core арқылы жауапты қызметкерге жетеді. Қосымша қызметтер тұру құнын автоматты түрде өзгертпейді.",
+    choose: "Не қажет",
+    note: "Пікір",
+    notePlaceholder: "Мысалы: 2 үлкен сүлгі әкеліңізші",
+    date: "Қажет болса күн",
+    time: "Қажет болса уақыт",
+    send: "Өтінімді жіберу",
+    sending: "Жіберілуде…",
+    sent: "Өтінім құрылды",
+    duplicate: "Мұндай белсенді өтінім бұрыннан бар.",
+    error: "Өтінімді құру мүмкін болмады. Қайта көріңіз немесе қабылдау бөліміне хабарласыңыз.",
+    mine: "Менің өтінімдерім",
+    empty: "Әзірге өтінімдер жоқ.",
+    refresh: "Жаңарту",
+    cancel: "Бас тарту",
+    status: { OPEN: "Жаңа", IN_PROGRESS: "Жұмыста", IN_INSPECTION: "Тексеруде", DONE: "Орындалды", CANCELLED: "Бас тартылды" },
+    labels: { HOUSEKEEPING: "Тазалау", TOWELS: "Сүлгілер", LINEN: "Төсек-орынды ауыстыру", MAINTENANCE: "Ақау / жөндеу", TRANSFER: "Трансфер", MEALS: "Тамақтану", PARKING: "Тұрақ", SAUNA: "Сауна", BILLIARDS: "Бильярд", EXCURSIONS: "Экскурсиялар", ADMIN: "Әкімші" },
   },
   en: {
     eyebrow: "Service during your stay",
@@ -89,13 +110,13 @@ const COPY = {
 function localeFromBrowser(): GuestFactsLocale {
   if (typeof window === "undefined") return "ru";
   const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "ru" || query === "kg" || query === "en") return query;
+  if (query === "ru" || query === "kg" || query === "kz" || query === "en") return query;
   const stored = window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" ? stored : "ru";
+  return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
 }
 
 function formatDateTime(value: string, locale: GuestFactsLocale) {
-  const lang = locale === "kg" ? "ky-KG" : locale === "en" ? "en-GB" : "ru-RU";
+  const lang = locale === "kg" ? "ky-KG" : locale === "kz" ? "kk-KZ" : locale === "en" ? "en-GB" : "ru-RU";
   return new Date(value).toLocaleString(lang, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
