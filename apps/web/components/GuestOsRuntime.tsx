@@ -85,6 +85,36 @@ const COPY = {
     privacy: "Бул жерде байланыш жана паспорт маалыматтары көрсөтүлбөйт. Кирүү активдүү жашоо мезгилинде гана иштейт.",
     error: "Guest OS ачылган жок. Интернет байланышын текшерип, кайра аракет кылыңыз.",
   },
+  kz: {
+    brand: "Үш Тәж",
+    kicker: "Guest OS · цифрлық консьерж",
+    loading: "Бөлменің QR коды тексерілуде…",
+    invalidTitle: "QR қолжетімсіз",
+    invalidText: "Бұл QR табылмады немесе ауыстырылды. Ресепшенге хабарласыңыз.",
+    genericTitle: "Бөлме туралы ақпарат",
+    noStay: "Қазір бұл бөлмеге белсенді тұру тіркелмеген. Тұрақты QR келесі қонақ үшін дайын күйде қалады.",
+    verifyTitle: "Осы бөлмеде тұрып жатқаныңызды растаңыз",
+    verifyText: "Орналасу кезінде берілген 6 таңбалы Guest OS кодын енгізіңіз. QR қонақтың жеке деректерін ашпайды.",
+    pin: "Guest OS коды",
+    submit: "Guest OS ашу",
+    verifying: "Тексерілуде…",
+    wrongPin: "Код сәйкес келмеді. Сандарды тексеріңіз немесе ресепшенге хабарласыңыз.",
+    rateLimit: "Әрекет саны тым көп. Қолжетімділік уақытша шектелді — ресепшенге хабарласыңыз немесе кейінірек қайталаңыз.",
+    pinExpired: "Кодтың мерзімі аяқталды. Ресепшеннен жаңа Guest OS кодын сұраңыз.",
+    welcome: "Қош келдіңіз",
+    room: "Бөлме",
+    stay: "Тұру",
+    services: "Сізге қажет болуы мүмкін қызметтер",
+    servicesIntro: "Guest OS өтінімдері Resort Core арқылы жауапты қызметкерге жіберіледі. Орындалу күйін төмендегі «Менің өтінімдерім» бөлімінен бақылауға болады.",
+    contact: "Әкімші",
+    contactText: "Қазір көмек керек пе? Менеджерге жазыңыз немесе ресепшенге қоңырау шалыңыз.",
+    whatsapp: "WhatsApp арқылы жазу",
+    call: "Ресепшенге қоңырау шалу",
+    rules: "Тұру ережелері",
+    logout: "Guest OS жүйесінен шығу",
+    privacy: "Мұнда байланыс және төлқұжат деректері көрсетілмейді. Қолжетімділік тек белсенді тұру кезеңінде жарамды.",
+    error: "Guest OS ашылмады. Интернет байланысын тексеріп, қайта көріңіз.",
+  },
   en: {
     brand: "Three Crowns",
     kicker: "Guest OS · digital concierge",
@@ -120,13 +150,13 @@ const COPY = {
 function localeFromBrowser(): GuestFactsLocale {
   if (typeof window === "undefined") return "ru";
   const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "ru" || query === "kg" || query === "en") return query;
+  if (query === "ru" || query === "kg" || query === "kz" || query === "en") return query;
   const stored = window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" ? stored : "ru";
+  return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
 }
 
 function fmtDate(value: string, locale: GuestFactsLocale) {
-  const lang = locale === "kg" ? "ky-KG" : locale === "en" ? "en-GB" : "ru-RU";
+  const lang = locale === "kg" ? "ky-KG" : locale === "kz" ? "kk-KZ" : locale === "en" ? "en-GB" : "ru-RU";
   return new Date(`${value}T00:00:00`).toLocaleDateString(lang, { day: "2-digit", month: "short", year: "numeric" });
 }
 
@@ -139,6 +169,14 @@ export default function GuestOsRuntime({ token }: { token: string }) {
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
   useEffect(() => setLocale(localeFromBrowser()), []);
+
+  function chooseLocale(next: GuestFactsLocale) {
+    setLocale(next);
+    window.localStorage.setItem("three-crowns-site-language", next);
+    window.localStorage.setItem("three-crowns-guest-language", next);
+    document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next;
+  }
+
   const copy = COPY[locale];
   const facts = ownerApprovedGuestFacts[locale];
 
@@ -211,8 +249,8 @@ export default function GuestOsRuntime({ token }: { token: string }) {
           <div className="guest-os-crown">III</div>
           <div><strong>{copy.brand}</strong><span>{copy.kicker}</span></div>
           <div className="guest-os-languages" aria-label="Language">
-            {(["ru", "kg", "en"] as GuestFactsLocale[]).map((item) => (
-              <button key={item} className={locale === item ? "active" : ""} onClick={() => setLocale(item)}>{item.toUpperCase()}</button>
+            {(["ru", "kg", "kz", "en"] as GuestFactsLocale[]).map((item) => (
+              <button key={item} className={locale === item ? "active" : ""} onClick={() => chooseLocale(item)}>{item.toUpperCase()}</button>
             ))}
           </div>
         </header>
