@@ -231,7 +231,7 @@ async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, u
                      "nameKz"=COALESCE($6,"nameKz"),"nameEn"=COALESCE($7,"nameEn"),"priceKgs"=COALESCE($8,"priceKgs"),"isActive"=COALESCE($9,"isActive"),
                      "isDraft"=COALESCE($10,"isDraft"),"sortOrder"=COALESCE($11,"sortOrder"),"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2
-                   RETURNING id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
+                   RETURNING id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
                 item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_kz, payload.name_en,
                 payload.price_kgs, payload.is_active, payload.is_draft, payload.sort_order,
             )
@@ -290,7 +290,7 @@ ORDER_SELECT = '''
 SELECT o.id,o."orderNumber",o.status,o.source,o."guestCount",o."mealType",o.notes,o."totalKgs",o."openedAt",o."completedAt",
        t.code AS table_code,t.name AS table_name,r.code AS room_code,
        COALESCE(jsonb_agg(jsonb_build_object(
-         'id',i.id::text,'menu_item_id',m.id::text,'name_ru',m."nameRu",'name_kg',m."nameKg",'name_en',m."nameEn",
+         'id',i.id::text,'menu_item_id',m.id::text,'name_ru',m."nameRu",'name_kg',m."nameKg",'name_kz',m."nameKz",'name_en',m."nameEn",
          'quantity',i.quantity,'unit_price_kgs',i."unitPriceKgs",'line_total_kgs',i."lineTotalKgs",'status',i.status,'notes',i.notes
        ) ORDER BY i."createdAt") FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
 FROM kitchen_orders o
