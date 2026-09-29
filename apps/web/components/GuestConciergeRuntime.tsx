@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { MARINA_GUEST_LOCALES, MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
-type Locale = "ru" | "kg" | "kz" | "en";
+type Locale = MarinaGuestLocale;
 type RequestCode = "HOUSEKEEPING" | "TOWELS" | "LINEN" | "MAINTENANCE" | "TRANSFER" | "MEALS" | "PARKING" | "SAUNA" | "BILLIARDS" | "EXCURSIONS" | "ADMIN";
 type RequestStatus = "OPEN" | "IN_PROGRESS" | "IN_INSPECTION" | "DONE" | "CANCELLED";
 
@@ -28,8 +29,6 @@ type GuestRequest = {
 
 type Service = { code: RequestCode; icon: string; title: string; note: string };
 
-const STORAGE_KEY = "three-crowns-guest-language";
-const SITE_STORAGE_KEY = "three-crowns-site-language";
 const HOTEL_PHONE_E164 = "+996501772233";
 const HOTEL_WHATSAPP_URL = "https://wa.me/996501772233";
 
@@ -379,21 +378,12 @@ const COPY = {
 const SERVICE_ORDER: RequestCode[] = ["MEALS", "HOUSEKEEPING", "TRANSFER", "MAINTENANCE", "SAUNA", "EXCURSIONS", "TOWELS", "LINEN", "BILLIARDS", "ADMIN"];
 const SERVICE_ICONS: Record<RequestCode, string> = { MEALS: "🍽", HOUSEKEEPING: "✦", TRANSFER: "↗", MAINTENANCE: "⌁", SAUNA: "♨", EXCURSIONS: "⌖", TOWELS: "▤", LINEN: "▧", BILLIARDS: "●", PARKING: "P", ADMIN: "?" };
 
-function initialLocale(): Locale {
-  if (typeof window === "undefined") return "ru";
-  const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "ru" || query === "kg" || query === "kz" || query === "en") return query;
-  const local = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(SITE_STORAGE_KEY);
-  return local === "kg" || local === "kz" || local === "en" ? local : "ru";
-}
-
 function dateLabel(value: string, locale: Locale) {
-  const lang = locale === "kg" ? "ky-KG" : locale === "kz" ? "kk-KZ" : locale === "en" ? "en-GB" : "ru-RU";
-  return new Date(`${value}T00:00:00`).toLocaleDateString(lang, { day: "numeric", month: "short" });
+  return new Date(`${value}T00:00:00`).toLocaleDateString(marinaGuestIntlLocale(locale), { day: "numeric", month: "short" });
 }
 
 export default function GuestConciergeRuntime({ token }: { token: string }) {
-  const [locale, setLocale] = useState<Locale>("ru");
+  const [locale, chooseLocale] = useMarinaGuestLocale();
   const [context, setContext] = useState<GuestContext | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "invalid" | "error">("loading");
   const [pin, setPin] = useState("");
@@ -413,15 +403,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   const [destination, setDestination] = useState("tamchy");
   const [vehicle, setVehicle] = useState("sedan");
 
-  useEffect(() => setLocale(initialLocale()), []);
   const copy = COPY[locale];
-
-  function chooseLocale(next: Locale) {
-    setLocale(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
-    window.localStorage.setItem(SITE_STORAGE_KEY, next);
-    document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next;
-  }
 
   const loadContext = useCallback(async () => {
     try {
@@ -512,7 +494,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   return <main className="concierge-page">
     <header className="concierge-topbar">
       <div className="concierge-brand"><span>III</span><div><strong>{copy.property}</strong><small>{copy.product}</small></div></div>
-      <div className="concierge-langs" aria-label={copy.language}>{(["ru", "kg", "kz", "en"] as Locale[]).map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
+      <div className="concierge-langs" aria-label={copy.language}>{MARINA_GUEST_LOCALES.map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
     </header>
 
     {state === "loading" && <section className="concierge-state">{copy.loading}</section>}
