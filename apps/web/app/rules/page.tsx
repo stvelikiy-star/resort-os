@@ -58,6 +58,31 @@ const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: 
       { title: "Мейманкананын мүлкү", text: "Мейманкананын мүлкүн жоготуу же бузуу учурдагы прейскурант боюнча төлөнөт." },
     ],
   },
+  kz: {
+    title: "Тұру ережелері",
+    description: "Үш Тәж қонақүйінде тұру ережелері: шығу, келушілер, тазалау, броньды тоқтату және қонақүй мүлкіне жауапкершілік.",
+    eyebrow: "Үш Тәж · Қонақүй ережелері",
+    heroTitle: "Тұру ережелері",
+    heroCopy: "Негізгі тұру шарттары бір жерде жинақталған: шығу уақыты, келушілер тәртібі, тазалау және броньды тоқтату шарттары алдын ала түсінікті болады.",
+    section: "Ережелер",
+    sectionTitle: "10 маңызды шарт",
+    sectionCopy: "Ережелер қонақүйдің қолданыстағы жадынамасынан алынған. Жеке жағдайға түсіндіру қажет болса, шарттың қолданылуын менеджер растайды.",
+    noteTitle: "Маңызды",
+    note: "Бұл бет ақпараттық сипатта. Сайт пен AI айыппұл, ұстап қалу немесе қайтаруды автоматты түрде орындамайды; кез келген қаржылық әрекетті уәкілетті қызметкер растайды.",
+    footer: "Брондау: +996 558 08 50 02",
+    rules: [
+      { title: "Темекі шегу", text: "Бөлмелерде темекі шегуге қатаң тыйым салынады." },
+      { title: "Кеш шығу", text: "12:00-ден кейін шыққанда әр келесі сағат үшін 1 000 сом қосымша төлем қарастырылған." },
+      { title: "Ерте шығу", text: "Броньдалған күннен ерте шыққанда +1 тәулік ұсталады; қалған күндер үшін қалған сомадан 10% салық ұсталып, қаражатты қайтару қарастырылған." },
+      { title: "Жануарлар", text: "Жануарлармен тұруға тыйым салынады." },
+      { title: "22:00-ге дейінгі келушілер", text: "Қонақүйде тұрмайтын келушілерге 22:00-ге дейін келуге рұқсат." },
+      { title: "Қосымша қонақтар", text: "Брондау кезінде көрсетілген адам санынан көп адам орналасса, қосымша орналастыру қолданыстағы тарифтер бойынша төленеді." },
+      { title: "22:00-ден кейінгі келушілер", text: "22:00-ден кейін бөлмеде қалған келушілер тұратын қонақ ретінде есептеліп, прайс бойынша қосымша төленеді." },
+      { title: "Броньды тоқтату", text: "Жоспарланған келуге 5 күн қалғанда ұсталымсыз. 4 күн қалғанда бір тәуліктің 25%, 3 күнде 50%, 2 күнде 75% ұсталады; 1 күн қалғанда және келу күні алдын ала төлем қайтарылмайды." },
+      { title: "Тазалау және төсек-орын", text: "Бөлме қонақ өтініші бойынша тазаланады. Төсек-орын әр 3 күн сайын ауыстырылады. Күнделікті тазалау және төсек-орын ауыстыру — қосымша 1 500 сом." },
+      { title: "Қонақүй мүлкі", text: "Қонақүй мүлкін жоғалту немесе бүлдіру қолданыстағы прейскурант бойынша төленеді." },
+    ],
+  },
   en: {
     title: "Hotel Rules",
     description: "Three Crowns hotel rules covering checkout, visitors, housekeeping, cancellation and responsibility for hotel property.",
@@ -98,7 +123,7 @@ export async function generateMetadata({ searchParams }: RulesPageProps): Promis
   return {
     title: copy.title,
     description: copy.description,
-    alternates: { canonical: url, languages: { "ru-RU": "/rules", "ky-KG": "/rules?lang=kg", "en-US": "/rules?lang=en" } },
+    alternates: { canonical: url, languages: { "ru-RU": "/rules", "ky-KG": "/rules?lang=kg", "kk-KZ": "/rules?lang=kz", "en-US": "/rules?lang=en" } },
   };
 }
 
@@ -133,6 +158,6 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
         <div className="wrap catalog-truth"><div><strong>{copy.noteTitle}</strong><p>{copy.note}</p></div></div>
       </section>
     </main>
-    <footer className="rooms-footer"><div className="wrap rooms-footer-inner"><strong>{locale === "en" ? "Three Crowns · Resort & SPA" : locale === "kg" ? "Үч Таажы · Resort & SPA" : "Три Короны · Resort & SPA"}</strong><a href="tel:+996558085002">{copy.footer}</a></div></footer>
+    <footer className="rooms-footer"><div className="wrap rooms-footer-inner"><strong>{locale === "en" ? "Three Crowns · Resort & SPA" : locale === "kg" ? "Үч Таажы · Resort & SPA" : locale === "kz" ? "Үш Тәж · Resort & SPA" : "Три Короны · Resort & SPA"}</strong><a href="tel:+996558085002">{copy.footer}</a></div></footer>
   </>;
 }
