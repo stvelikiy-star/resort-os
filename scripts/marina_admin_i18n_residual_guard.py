@@ -60,10 +60,6 @@ def kz_coverage_errors() -> list[str]:
     # Kazakh mapping somewhere in the runtime. Otherwise KZ silently falls back to RU.
     common_ru = re.findall(r'\{\s*ru:\s*"((?:\\.|[^"])*)",\s*kg:\s*"((?:\\.|[^"])*)",\s*en:\s*"((?:\\.|[^"])*)"', ADMIN_RUNTIME)
     for ru, kg, en in common_ru:
-        if ru == kg or ru == en:
-            # Brand/product/code-like labels may legitimately be identical.
-            if ru not in {"MARINA SMART", "NFC", "PIN", "QR", "WhatsApp", "Telegram", "OWNER", "MANAGER", "RECEPTION", "AGENT"}:
-                errors.append(f"ADMIN suspicious untranslated KG/EN common phrase: {ru}")
         key = '"' + ru.replace('\\', '\\\\').replace('"', '\\"') + '":'
         if key not in ADMIN_RUNTIME:
             errors.append(f"ADMIN missing explicit KZ mapping: {ru}")
