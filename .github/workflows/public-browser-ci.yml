@@ -102,10 +102,20 @@ jobs:
               'product: "MARINA SMART',
               'const HOTEL_PHONE_E164 = "+996501772233"',
               'Заезд с 13:00. Выезд до 11:00.',
-              'Check-in is from 13:00. Check-out is by 11:00.'
+              'Check-in is from 13:00. Check-out is by 11:00.',
+              'product: "MARINA SMART · қонақ кабинеті"',
             ]) {
               if (!concierge.includes(required)) throw new Error("AK BERMET guest fact missing: " + required);
             }
+            if (!concierge.includes('(["ru", "kg", "kz", "en"] as Locale[])')) {
+              throw new Error("Guest language switcher is missing KZ");
+            }
+            if (!concierge.includes('document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next')) {
+              throw new Error("Guest KZ html lang mapping is missing");
+            }
+            const landing = fs.readFileSync("apps/web/app/page.tsx", "utf8");
+            if (!landing.includes("RU · KG · KZ · EN")) throw new Error("Guest Web landing does not advertise all four languages");
+
             for (const forbidden of [
               "Три Короны",
               "Three Crowns",
@@ -116,7 +126,7 @@ jobs:
             ]) {
               if (concierge.includes(forbidden)) throw new Error("Legacy guest fact still present: " + forbidden);
             }
-            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS facts=PASS");
+            console.log("MARINA_GUEST_WEB_BROWSER_PASS desktop=PASS mobile=PASS guest-route=PASS facts=PASS kz=PASS");
           } finally {
             await browser.close();
           }
