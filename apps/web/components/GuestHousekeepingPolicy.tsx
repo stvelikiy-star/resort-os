@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
-type Locale = "ru" | "kg" | "kz" | "en";
+type Locale = MarinaGuestLocale;
 type Policy = {
   scheduled_housekeeping_interval_days: number;
   scheduled_linen_change_included: boolean;
@@ -75,14 +76,8 @@ const COPY = {
   },
 } as const;
 
-function locale(): Locale {
-  if (typeof window === "undefined") return "ru";
-  const stored = window.localStorage.getItem("three-crowns-guest-language") || window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
-}
-
 export default function GuestHousekeepingPolicy({ token }: { token: string }) {
-  const [lang, setLang] = useState<Locale>("ru");
+  const [lang] = useMarinaGuestLocale();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [busy, setBusy] = useState<ServiceCode | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -95,13 +90,7 @@ export default function GuestHousekeepingPolicy({ token }: { token: string }) {
     } catch { setPolicy(null); }
   }, [token]);
 
-  useEffect(() => {
-    const syncLocale = () => setLang(locale());
-    syncLocale();
-    window.addEventListener("three-crowns:content-ready", syncLocale);
-    void load();
-    return () => window.removeEventListener("three-crowns:content-ready", syncLocale);
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function requestService(code: ServiceCode) {
     if (busy) return;
@@ -137,7 +126,7 @@ export default function GuestHousekeepingPolicy({ token }: { token: string }) {
   return <section className="guest-housekeeping-policy">
     <div className="guest-housekeeping-head"><div><p>{c.eyebrow}</p><h2>{c.title}</h2></div><span>Housekeeping · Resort Core</span></div>
     <div className="guest-housekeeping-included"><strong>{c.schedule(policy.scheduled_housekeeping_interval_days)}</strong>{policy.scheduled_linen_change_included && <span>{c.linen}</span>}</div>
-    <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(lang === "en" ? "en-US" : lang === "kz" ? "kk-KZ" : lang === "kg" ? "ky-KG" : "ru-RU")} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
+    <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(marinaGuestIntlLocale(lang))} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
     {message && <div className="guest-market-notice">{message}</div>}
   </section>;
 }
