@@ -43,7 +43,7 @@ export default function GuestWebHome() {
           Если доступ не открывается, обратитесь на ресепшен AK BERMET.
         </p>
         <div style={{ marginTop: 30, fontSize: 13, letterSpacing: "0.08em", opacity: 0.5 }}>
-          RU · KG · EN
+          RU · KG · KZ · EN
         </div>
       </section>
     </main>
