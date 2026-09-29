@@ -1,8 +1,9 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
-type Locale = "ru" | "kg" | "kz" | "en";
+type Locale = MarinaGuestLocale;
 type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "OTHER";
 type GuestContext = { authenticated: boolean; active_stay: boolean; room: { code: string }; guest: { first_name: string } | null };
 type MenuItem = { id: string; code: string; category: string; name_ru: string; name_kg: string; name_kz?: string; name_en: string; price_kgs: number; is_active: boolean; is_draft: boolean; sort_order: number; meal_types?: string[] };
@@ -171,12 +172,6 @@ const copy = {
   },
 } as const;
 
-function currentLocale(): Locale {
-  if (typeof window === "undefined") return "ru";
-  const stored = window.localStorage.getItem("three-crowns-guest-language") || window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
-}
-
 function localized(item: OfferCampaign, locale: Locale) {
   if (locale === "kg") return { title: item.title_kg, hook: item.hook_kg, cta: item.cta_kg };
   if (locale === "kz") return { title: item.title_kz?.trim() || item.title_ru, hook: item.hook_kz?.trim() || item.hook_ru, cta: item.cta_kz?.trim() || item.cta_ru };
@@ -194,11 +189,11 @@ function cutoffTime(value: string | null, locale: Locale) {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString(locale === "en" ? "en-GB" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(marinaGuestIntlLocale(locale), { hour: "2-digit", minute: "2-digit" });
 }
 
 export default function GuestMarketplace({ token }: { token: string }) {
-  const [locale, setLocale] = useState<Locale>("ru");
+  const [locale] = useMarinaGuestLocale();
   const [authenticated, setAuthenticated] = useState(false);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [serviceDate, setServiceDate] = useState<string | null>(null);
@@ -220,13 +215,6 @@ export default function GuestMarketplace({ token }: { token: string }) {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
-
-  useEffect(() => {
-    const sync = () => setLocale(currentLocale());
-    sync();
-    window.addEventListener("three-crowns:content-ready", sync);
-    return () => window.removeEventListener("three-crowns:content-ready", sync);
-  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -403,11 +391,11 @@ export default function GuestMarketplace({ token }: { token: string }) {
         {!menu.length ? <div className="guest-market-empty">{c.noMenu}</div> : <form onSubmit={createOrder}>
           {!mealOpen && <div className="guest-market-notice">{activeWindow?.configured === false ? c.notConfigured : c.closed}{activeWindow?.start ? ` · ${c.meals[mealType]} ${activeWindow.start}` : ""}</div>}
           {mealOpen && !mealMenu.length && <div className="guest-market-empty">{c.noMealItems}</div>}
-          {mealOpen && mealMenu.length > 0 && <div className="guest-menu-groups">{grouped.map(([category, items]) => <section key={category}><div className="guest-menu-category">{category}</div>{items.map((item) => <label className="guest-menu-item" key={item.id}><span><strong>{locale === "kg" ? item.name_kg : locale === "kz" ? (item.name_kz?.trim() || item.name_ru) : locale === "en" ? item.name_en : item.name_ru}</strong><small>{item.price_kgs.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(event) => setQty((current) => ({ ...current, [item.id]: Math.max(0, Number(event.target.value) || 0) }))} /></label>)}</section>)}</div>}
+          {mealOpen && mealMenu.length > 0 && <div className="guest-menu-groups">{grouped.map(([category, items]) => <section key={category}><div className="guest-menu-category">{category}</div>{items.map((item) => <label className="guest-menu-item" key={item.id}><span><strong>{locale === "kg" ? item.name_kg : locale === "kz" ? (item.name_kz?.trim() || item.name_ru) : locale === "en" ? item.name_en : item.name_ru}</strong><small>{item.price_kgs.toLocaleString(marinaGuestIntlLocale(locale))} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(event) => setQty((current) => ({ ...current, [item.id]: Math.max(0, Number(event.target.value) || 0) }))} /></label>)}</section>)}</div>}
           <div className="guest-order-fields"><label>{c.guests}<input type="number" min="1" max="20" value={guestCount} onChange={(event) => setGuestCount(Math.max(1, Number(event.target.value) || 1))} /></label><label>{c.comment}<input value={note} maxLength={1000} onChange={(event) => setNote(event.target.value)} placeholder={c.commentPlaceholder} /></label></div>
-          {delivery.enabled && <label className="guest-room-delivery"><input type="checkbox" checked={deliveryToRoom} onChange={(event) => setDeliveryToRoom(event.target.checked)} /><span><strong>{c.delivery}</strong><small>+{delivery.fee_kgs.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</small></span></label>}
-          <div className="guest-order-breakdown"><div><span>{c.subtotal}</span><b>{subtotal.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</b></div><div><span>{deliveryToRoom && delivery.enabled ? c.delivery : c.pickup}</span><b>{deliveryFee.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</b></div></div>
-          <div className="guest-order-total"><span>{c.total}</span><strong>{total.toLocaleString(locale === "en" ? "en-US" : locale === "kz" ? "kk-KZ" : locale === "kg" ? "ky-KG" : "ru-RU")} KGS</strong></div>
+          {delivery.enabled && <label className="guest-room-delivery"><input type="checkbox" checked={deliveryToRoom} onChange={(event) => setDeliveryToRoom(event.target.checked)} /><span><strong>{c.delivery}</strong><small>+{delivery.fee_kgs.toLocaleString(marinaGuestIntlLocale(locale))} KGS</small></span></label>}
+          <div className="guest-order-breakdown"><div><span>{c.subtotal}</span><b>{subtotal.toLocaleString(marinaGuestIntlLocale(locale))} KGS</b></div><div><span>{deliveryToRoom && delivery.enabled ? c.delivery : c.pickup}</span><b>{deliveryFee.toLocaleString(marinaGuestIntlLocale(locale))} KGS</b></div></div>
+          <div className="guest-order-total"><span>{c.total}</span><strong>{total.toLocaleString(marinaGuestIntlLocale(locale))} KGS</strong></div>
           {cutoff && mealType !== "OTHER" && <div className="guest-order-cutoff">{c.cutoff(cutoff)} · {activeWindow?.cutoff_minutes ?? 60} min before start</div>}
           {notice && <div className="guest-market-notice">{notice}</div>}
           <button className="guest-market-primary" disabled={!selected.length || busy || !mealOpen}>{busy ? c.ordering : c.order}</button>
