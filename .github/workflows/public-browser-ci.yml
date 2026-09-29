@@ -28,6 +28,10 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
 
+      - name: Run MARINA SMART Guest Web i18n guard
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        run: python3 scripts/marina_guest_i18n_guard.py
+
       - name: Install and build public site
         working-directory: apps/web
         run: |
