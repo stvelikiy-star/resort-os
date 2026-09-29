@@ -25,7 +25,8 @@ const COPY = {
     pricePending: "Цена настраивается администрацией",
     request: "Заказать",
     sending: "Отправляем…",
-    sent: "Заявка создана. Сотрудник увидит её в Resort OS.",
+    sent: "Заявка создана. Сотрудник увидит её в MARINA SMART.",
+    system: "Уборка · MARINA SMART",
     duplicate: "Такая активная заявка уже есть.",
     unavailable: "Цена услуги ещё не настроена. Обратитесь на ресепшен.",
   },
@@ -37,12 +38,12 @@ const COPY = {
     housekeeping: "Кошумча тазалоо",
     extraLinen: "Төшөк жабдыгын кошумча алмаштыруу",
     paid: "акы төлөнөт",
-    pricePending: "Бааны администрация орнотот",
-    request: "Заказ кылуу",
+    pricePending: "Бааны администрация белгилейт",
+    request: "Өтүнмө берүү",
     sending: "Жөнөтүлүүдө…",
     sent: "Өтүнмө түзүлдү. Кызматкер аны Resort OS'то көрөт.",
     duplicate: "Мындай активдүү өтүнмө мурунтан бар.",
-    unavailable: "Кызматтын баасы азырынча коюлган жок. Ресепшенге кайрылыңыз.",
+    unavailable: "Кызматтын баасы азырынча коюлган жок. Кабыл алуу кызматына кайрылыңыз.",
   },
   kz: {
     eyebrow: "Бөлмені тазалау",
@@ -52,12 +53,13 @@ const COPY = {
     housekeeping: "Қосымша тазалау",
     extraLinen: "Төсек-орынды қосымша ауыстыру",
     paid: "ақылы",
-    pricePending: "Бағаны әкімшілік баптайды",
+    pricePending: "Бағаны әкімшілік белгілейді",
     request: "Тапсырыс беру",
     sending: "Жіберілуде…",
-    sent: "Өтінім құрылды. Қызметкер оны Resort OS жүйесінде көреді.",
+    sent: "Өтінім құрылды. Қызметкер оны MARINA SMART жүйесінде көреді.",
+    system: "Тазалау · MARINA SMART",
     duplicate: "Мұндай белсенді өтінім бұрыннан бар.",
-    unavailable: "Қызмет бағасы әлі бапталмаған. Ресепшенге хабарласыңыз.",
+    unavailable: "Қызмет бағасы әлі белгіленбеген. Қабылдау бөліміне хабарласыңыз.",
   },
   en: {
     eyebrow: "Housekeeping",
@@ -70,7 +72,8 @@ const COPY = {
     pricePending: "Price is being configured by management",
     request: "Request",
     sending: "Sending…",
-    sent: "Request created. Staff can now see it in Resort OS.",
+    sent: "Request created. Staff can now see it in MARINA SMART.",
+    system: "Housekeeping · MARINA SMART",
     duplicate: "An active request for this service already exists.",
     unavailable: "The service price has not been configured yet. Please contact reception.",
   },
@@ -124,7 +127,7 @@ export default function GuestHousekeepingPolicy({ token }: { token: string }) {
   ];
 
   return <section className="guest-housekeeping-policy">
-    <div className="guest-housekeeping-head"><div><p>{c.eyebrow}</p><h2>{c.title}</h2></div><span>Housekeeping · Resort Core</span></div>
+    <div className="guest-housekeeping-head"><div><p>{c.eyebrow}</p><h2>{c.title}</h2></div><span>{c.system}</span></div>
     <div className="guest-housekeeping-included"><strong>{c.schedule(policy.scheduled_housekeeping_interval_days)}</strong>{policy.scheduled_linen_change_included && <span>{c.linen}</span>}</div>
     <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(marinaGuestIntlLocale(lang))} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
     {message && <div className="guest-market-notice">{message}</div>}
