@@ -38,6 +38,18 @@ ALLOW = {
 }
 STRING = re.compile(r'(["\'\x60])((?:\\.|(?!\1)[\s\S])*?)\1')
 
+def dynamic_templates(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    found: list[str] = []
+    for match in re.finditer(r'`([^`]*\$\{[^`]+)`', text, re.S):
+        value = re.sub(r"\s+", " ", match.group(1)).strip()
+        if not re.search(r"[А-Яа-яЁё]", value):
+            continue
+        if len(value) > 220:
+            continue
+        found.append(value)
+    return sorted(set(found))
+
 def residuals(path: Path, runtime: str) -> list[str]:
     text = path.read_text(encoding="utf-8")
     found: list[str] = []
@@ -74,12 +86,18 @@ def main() -> int:
             continue
         for value in residuals(path, ADMIN_RUNTIME):
             errors.append(f"ADMIN {name}: {value}")
+        for value in dynamic_templates(path):
+            # Dynamic UI must be handled explicitly; exact DOM dictionaries cannot
+            # reliably translate interpolated values after render.
+            errors.append(f"ADMIN_DYNAMIC {name}: {value}")
     for name in STAFF_FILES:
         path = ROOT / "apps/staff/components" / name
         if not path.exists():
             continue
         for value in residuals(path, STAFF_RUNTIME):
             errors.append(f"STAFF {name}: {value}")
+        for value in dynamic_templates(path):
+            errors.append(f"STAFF_DYNAMIC {name}: {value}")
 
     print("MARINA SMART static locale residual guard")
     print(f"FACT: admin_files={len(ADMIN_FILES)} staff_files={len(STAFF_FILES)} kz_explicit=required")
