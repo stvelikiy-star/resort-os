@@ -9,12 +9,15 @@ type Campaign = {
   code: string;
   title_ru: string;
   title_kg: string;
+  title_kz: string;
   title_en: string;
   hook_ru: string;
   hook_kg: string;
+  hook_kz: string;
   hook_en: string;
   cta_ru: string;
   cta_kg: string;
+  cta_kz: string;
   cta_en: string;
   image_url?: string | null;
   action_type: ActionType;
@@ -57,12 +60,15 @@ const emptyForm: FormState = {
   code: "",
   title_ru: "",
   title_kg: "",
+  title_kz: "",
   title_en: "",
   hook_ru: "",
   hook_kg: "",
+  hook_kz: "",
   hook_en: "",
   cta_ru: "Хочу",
   cta_kg: "Каалайм",
+  cta_kz: "Сұрау",
   cta_en: "Request",
   image_url: "",
   action_type: "GUEST_REQUEST",
@@ -93,12 +99,15 @@ function fromCampaign(item: Campaign): FormState {
     code: item.code,
     title_ru: item.title_ru,
     title_kg: item.title_kg,
+    title_kz: item.title_kz,
     title_en: item.title_en,
     hook_ru: item.hook_ru,
     hook_kg: item.hook_kg,
+    hook_kz: item.hook_kz,
     hook_en: item.hook_en,
     cta_ru: item.cta_ru,
     cta_kg: item.cta_kg,
+    cta_kz: item.cta_kz,
     cta_en: item.cta_en,
     image_url: item.image_url || "",
     action_type: item.action_type,
@@ -206,7 +215,7 @@ export default function GuestOffersBoard() {
         body: JSON.stringify(payload()),
       });
       resetForm();
-      setNotice(wasEditing ? "Оффер обновлён." : "Оффер создан. Перед включением проверьте RU/KG/EN, действие, период и ссылку.");
+      setNotice(wasEditing ? "Оффер обновлён." : "Оффер создан. Перед включением проверьте RU/KG/KZ/EN, действие, период и ссылку.");
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось сохранить оффер");
@@ -265,12 +274,13 @@ export default function GuestOffersBoard() {
 
         <fieldset><legend>Русский</legend><div className="guest-offer-form-grid"><label><span>Заголовок</span><input value={form.title_ru} onChange={(e) => setForm((current) => ({ ...current, title_ru: e.target.value }))} required /></label><label><span>CTA</span><input value={form.cta_ru} onChange={(e) => setForm((current) => ({ ...current, cta_ru: e.target.value }))} required /></label><label className="span-2"><span>Hook / предложение</span><textarea value={form.hook_ru} onChange={(e) => setForm((current) => ({ ...current, hook_ru: e.target.value }))} required /></label></div></fieldset>
         <fieldset><legend>Кыргызча</legend><div className="guest-offer-form-grid"><label><span>Заголовок</span><input value={form.title_kg} onChange={(e) => setForm((current) => ({ ...current, title_kg: e.target.value }))} required /></label><label><span>CTA</span><input value={form.cta_kg} onChange={(e) => setForm((current) => ({ ...current, cta_kg: e.target.value }))} required /></label><label className="span-2"><span>Hook / предложение</span><textarea value={form.hook_kg} onChange={(e) => setForm((current) => ({ ...current, hook_kg: e.target.value }))} required /></label></div></fieldset>
+        <fieldset><legend>Қазақша</legend><div className="guest-offer-form-grid"><label><span>Тақырып</span><input value={form.title_kz} onChange={(e) => setForm((current) => ({ ...current, title_kz: e.target.value }))} required /></label><label><span>CTA</span><input value={form.cta_kz} onChange={(e) => setForm((current) => ({ ...current, cta_kz: e.target.value }))} required /></label><label className="span-2"><span>Ұсыныс мәтіні</span><textarea value={form.hook_kz} onChange={(e) => setForm((current) => ({ ...current, hook_kz: e.target.value }))} required /></label></div></fieldset>
         <fieldset><legend>English</legend><div className="guest-offer-form-grid"><label><span>Title</span><input value={form.title_en} onChange={(e) => setForm((current) => ({ ...current, title_en: e.target.value }))} required /></label><label><span>CTA</span><input value={form.cta_en} onChange={(e) => setForm((current) => ({ ...current, cta_en: e.target.value }))} required /></label><label className="span-2"><span>Hook</span><textarea value={form.hook_en} onChange={(e) => setForm((current) => ({ ...current, hook_en: e.target.value }))} required /></label></div></fieldset>
 
         <fieldset><legend>Период и аудитория</legend><div className="guest-offer-form-grid"><label><span>Активно с</span><input type="datetime-local" value={form.active_from} onChange={(e) => setForm((current) => ({ ...current, active_from: e.target.value }))} /></label><label><span>Активно до</span><input type="datetime-local" value={form.active_to} onChange={(e) => setForm((current) => ({ ...current, active_to: e.target.value }))} /></label><label><span>Мин. взрослых</span><input type="number" min="0" max="30" value={form.min_adults} onChange={(e) => setForm((current) => ({ ...current, min_adults: Number(e.target.value) || 0 }))} /></label><label><span>Мин. детей</span><input type="number" min="0" max="30" value={form.min_children} onChange={(e) => setForm((current) => ({ ...current, min_children: Number(e.target.value) || 0 }))} /></label><label><span>Мин. ночей</span><input type="number" min="0" max="120" value={form.min_stay_nights} onChange={(e) => setForm((current) => ({ ...current, min_stay_nights: Number(e.target.value) || 0 }))} /></label><label><span>Макс. ночей</span><input type="number" min="0" max="120" value={form.max_stay_nights} onChange={(e) => setForm((current) => ({ ...current, max_stay_nights: e.target.value === "" ? "" : Number(e.target.value) }))} /></label><label><span>Приоритет</span><input type="number" min="0" max="10000" value={form.priority} onChange={(e) => setForm((current) => ({ ...current, priority: Number(e.target.value) || 0 }))} /></label><label><span>Порядок</span><input type="number" min="0" max="10000" value={form.sort_order} onChange={(e) => setForm((current) => ({ ...current, sort_order: Number(e.target.value) || 0 }))} /></label></div></fieldset>
 
         <label className="guest-offer-active-checkbox"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm((current) => ({ ...current, is_active: e.target.checked }))} /><span>Сразу активировать после сохранения</span></label>
-        <p className="guest-offer-warning">Активируйте только после проверки RU/KG/EN, действия, периода и ссылки. Внешние действия принимаются только по HTTPS.</p>
+        <p className="guest-offer-warning">Активируйте только после проверки RU/KG/KZ/EN, действия, периода и ссылки. Внешние действия принимаются только по HTTPS.</p>
         <button className="btn primary guest-offer-save" disabled={busy === "save"}>{busy === "save" ? "Сохраняю…" : editingId ? "Сохранить изменения" : "Создать кампанию"}</button>
       </form>
 
