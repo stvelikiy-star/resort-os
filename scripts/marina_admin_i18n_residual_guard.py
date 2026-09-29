@@ -52,9 +52,13 @@ def dynamic_templates(path: Path) -> list[str]:
 
 
 def dynamic_covered(template: str, runtime: str) -> bool:
+    template = template.replace("\\n", " ").replace("\\t", " ")
     parts = re.split(r"\$\{[^}]+\}", template)
     significant: list[str] = []
     for part in parts:
+        # Nested template strings can leave an unfinished ${... tail in this
+        # lightweight scanner. Only the literal UI prefix is relevant here.
+        part = re.sub(r"\$\{.*$", "", part)
         normalized = re.sub(r"\s+", " ", part).strip(" .,:;!?()[]{}«»—–-")
         if not re.search(r"[А-Яа-яЁё]", normalized):
             continue
