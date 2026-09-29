@@ -616,6 +616,10 @@ const KZ_EXTRA: Record<string, string> = {
 
 /* MARINA_I18N_AUDIT_V2 */
 common.push(
+  { ru: "Ошибка Growth Control", kg: "Growth Control катасы", en: "Growth Control error" },
+  { ru: "DIRTY без active task", kg: "DIRTY — активдүү тапшырмасыз", en: "DIRTY without an active task" },
+  { ru: "TECH_BLOCK без active task", kg: "TECH_BLOCK — активдүү тапшырмасыз", en: "TECH_BLOCK without an active task" },
+  { ru: "Запрос оплаты уже использован для другой брони. Обновите карточку и повторите.", kg: "Төлөм суроо-талабы башка бронь үчүн колдонулуп калган. Карточканы жаңыртып, кайра аракет кылыңыз.", en: "This payment request has already been used for another reservation. Refresh the card and try again." },
   { ru: "Не удалось загрузить агентов", kg: "Агенттерди жүктөө мүмкүн болгон жок", en: "Could not load agents" },
   { ru: "Не удалось загрузить отчёт агента", kg: "Агенттин отчётун жүктөө мүмкүн болгон жок", en: "Could not load agent report" },
   { ru: "Не удалось создать агента", kg: "Агент түзүү мүмкүн болгон жок", en: "Could not create agent" },
@@ -803,6 +807,10 @@ common.push(
 );
 
 const KZ_AUDIT_V2: Record<string, string> = {
+  "Ошибка Growth Control": "Growth Control қатесі",
+  "DIRTY без active task": "DIRTY — белсенді тапсырмасыз",
+  "TECH_BLOCK без active task": "TECH_BLOCK — белсенді тапсырмасыз",
+  "Запрос оплаты уже использован для другой брони. Обновите карточку и повторите.": "Төлем сұрауы басқа бронь үшін қолданылып қойған. Карточканы жаңартып, қайта көріңіз.",
   "Не удалось загрузить агентов": "Агенттерді жүктеу мүмкін болмады",
   "Не удалось загрузить отчёт агента": "Агент есебін жүктеу мүмкін болмады",
   "Не удалось создать агента": "Агент құру мүмкін болмады",
@@ -1705,7 +1713,6 @@ const KZ_AUDIT_V3: Record<string, string> = {
   "включить": "қосу",
   "+ Создать сотрудника": "+ Қызметкер құру",
   "Отключить": "Өшіру",
-  "Включить": "Қосу",
   "Минимум 12 символов": "Кемінде 12 таңба",
   "Внутренняя задача менеджера. Автоматическая отправка не разрешена.": "Менеджердің ішкі тапсырмасы. Автоматты жіберуге рұқсат жоқ.",
   "Проверить актуальность контакта и допустимость коммуникации до любого outbound-действия.": "Кез келген outbound әрекетке дейін байланыс өзектілігін және коммуникация рұқсатын тексеріңіз.",
@@ -2122,7 +2129,7 @@ const tokenReplacements: Record<Locale, Array<[RegExp, string]>> = {
     [/\bNORMAL\b/g, "ОБЫЧНЫЙ"],
   ],
   kg: [
-    [/\bGUEST SERVICES\b/g, "КОНок СЕРВИСИ"],
+    [/\bGUEST SERVICES\b/g, "КОНОК СЕРВИСИ"],
     [/\bHOUSEKEEPING\b/g, "ТАЗАЛОО"],
     [/\bMAINTENANCE\b/g, "ОҢДОО"],
     [/\bNOT_CONFIGURED\b/g, "ЖӨНДӨЛГӨН ЭМЕС"],
