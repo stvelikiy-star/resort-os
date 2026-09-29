@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 import { MARINA_GUEST_LOCALES, MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
 type Locale = MarinaGuestLocale;
@@ -67,7 +68,7 @@ const COPY = {
     service: "Услуга",
     date: "Дата",
     time: "Время",
-    comment: "Түшүндүрмө",
+    comment: "Комментарий",
     commentPlaceholder: "Уточните детали, если нужно",
     send: "Отправить",
     sending: "Отправляем…",
@@ -156,11 +157,11 @@ const COPY = {
     commentPlaceholder: "Керек болсо маалымат кошуңуз",
     send: "Жөнөтүү",
     sending: "Жөнөтүлүүдө…",
-    sent: "Өтүнмө жөнөтүлдү. Абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
+    sent: "Өтүнмө жөнөтүлдү. Анын абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
     cancel: "Жокко чыгаруу",
     close: "Жабуу",
     mealsTitle: "Тамактануу",
-    mealsNote: "Тамактануу убактысын жана коноктордун санын тандаңыз. Менюну, жеткиликтүүлүктү жана бааны ашкана ырастайт.",
+    mealsNote: "Тамактануу түрүн жана коноктордун санын тандаңыз. Менюну, жеткиликтүүлүктү жана бааны ашкана ырастайт.",
     meal: "Тамактануу",
     breakfast: "Эртең мененки тамак",
     lunch: "Түшкү тамак",
@@ -238,14 +239,14 @@ const COPY = {
     date: "Күн",
     time: "Уақыт",
     comment: "Түсініктеме",
-    commentPlaceholder: "Қажет болса, мәлімет қосыңыз",
+    commentPlaceholder: "Қажет болса, қосымша мәлімет жазыңыз",
     send: "Жіберу",
     sending: "Жіберілуде…",
     sent: "Өтінім жіберілді. Күйі «Менің өтінімдерім» бөлімінде көрінеді.",
     cancel: "Бас тарту",
     close: "Жабу",
     mealsTitle: "Тамақтану",
-    mealsNote: "Тамақтану уақытын және қонақтар санын таңдаңыз. Мәзірді, қолжетімділікті және құнын асхана растайды.",
+    mealsNote: "Тамақтану түрін және қонақтар санын таңдаңыз. Мәзірді, қолжетімділікті және құнын асүй қызметі растайды.",
     meal: "Тамақтану",
     breakfast: "Таңғы ас",
     lunch: "Түскі ас",
