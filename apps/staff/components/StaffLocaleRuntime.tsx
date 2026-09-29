@@ -46,7 +46,7 @@ const COPY: Record<string, Copy> = {
   "Создать заказ": { kg: "Буйрутма түзүү", kz: "Тапсырыс құру", en: "Create order" },
   "Новый заказ": { kg: "Жаңы буйрутма", kz: "Жаңа тапсырыс", en: "New order" },
   "Сумма заказа": { kg: "Буйрутманын суммасы", kz: "Тапсырыс сомасы", en: "Order total" },
-  "Комментарий": { kg: "Комментарий", kz: "Түсініктеме", en: "Comment" },
+  "Комментарий": { kg: "Түшүндүрмө", kz: "Түсініктеме", en: "Comment" },
   "Без стола": { kg: "Столсуз", kz: "Үстелсіз", en: "No table" },
   "Стол": { kg: "Стол", kz: "Үстел", en: "Table" },
   "Номер": { kg: "Бөлмө", kz: "Бөлме", en: "Room" },
@@ -63,10 +63,10 @@ const COPY: Record<string, Copy> = {
   "Проверяю рабочую сессию и Telegram.": { kg: "Жумуш сессиясын жана Telegram'ды текшерип жатам.", kz: "Жұмыс сессиясы мен Telegram тексерілуде.", en: "Checking the work session and Telegram." },
   "Войдите под рабочей учётной записью.": { kg: "Жумуш аккаунту менен кириңиз.", kz: "Жұмыс аккаунтымен кіріңіз.", en: "Sign in with your work account." },
   "Неверный логин, пароль или роль не относится к операционной смене.": { kg: "Логин, сырсөз туура эмес же роль операциялык нөөмөткө кирбейт.", kz: "Логин не құпиясөз қате немесе рөл операциялық ауысымға жатпайды.", en: "Invalid username/password or this role is not assigned to the operational shift." },
-  "Resort Core недоступен": { kg: "Resort Core жеткиликсиз", kz: "Resort Core қолжетімсіз", en: "Resort Core is unavailable" },
+  "Resort Core недоступен": { kg: "MARINA SMART убактылуу жеткиликсиз", kz: "MARINA SMART уақытша қолжетімсіз", en: "MARINA SMART is temporarily unavailable" },
   "Владелец": { kg: "Ээси", kz: "Иесі", en: "Owner" },
   "Менеджер": { kg: "Менеджер", kz: "Менеджер", en: "Manager" },
-  "Ресепшен": { kg: "Ресепшен", kz: "Ресепшен", en: "Reception" },
+  "Ресепшен": { kg: "Кабыл алуу", kz: "Қабылдау", en: "Reception" },
   "Горничная": { kg: "Бөлмө кызматкери", kz: "Бөлме қызметкері", en: "Housekeeper" },
   "Техник": { kg: "Техник", kz: "Техник", en: "Technician" },
   "Питание": { kg: "Тамактануу", kz: "Тамақтану", en: "Dining" },
@@ -718,6 +718,28 @@ Object.assign(COPY, {
     "kz": "Соманы енгізіңіз",
     "en": "Enter amount"
   }
+});
+
+// STAFF_I18N_AUDIT_V3
+Object.assign(COPY, {
+  "Сохраняю…": { kg: "Сактап жатам…", kz: "Сақтап жатырмын…", en: "Saving…" },
+  "· вручную": { kg: "· кол менен", kz: "· қолмен", en: "· manually" },
+  "· ВЫЕЗД": { kg: "· ЧЫГУУ", kz: "· ШЫҒУ", en: "· CHECK-OUT" },
+  "Входим…": { kg: "Кирип жатабыз…", kz: "Кіріп жатырмыз…", en: "Signing in…" },
+  "Телефон прочитал NFC-метку, но не передал серийный номер. Используйте ручной ввод UID.": {
+    kg: "Телефон NFC-белгини окуду, бирок сериялык номерди берген жок. UID'ди кол менен киргизиңиз.",
+    kz: "Телефон NFC белгісін оқыды, бірақ сериялық нөмірді бермеді. UID кодын қолмен енгізіңіз.",
+    en: "The phone read the NFC tag but did not provide the serial number. Enter the UID manually."
+  },
+  "Связь прервалась до подтверждения результата. Нажмите «Повторить безопасно» — тот же ключ не позволит списать дважды.": {
+    kg: "Натыйжа ырасталганга чейин байланыш үзүлдү. «Коопсуз кайталоо» баскычын басыңыз — ошол эле ачкыч эки жолу эсептен чыгарууга жол бербейт.",
+    kz: "Нәтиже расталғанға дейін байланыс үзілді. «Қауіпсіз қайталау» түймесін басыңыз — сол кілт екі рет шегеруге жол бермейді.",
+    en: "The connection dropped before the result was confirmed. Select Retry safely — the same key prevents a duplicate charge."
+  },
+  "RU": { kg: "RU", kz: "RU", en: "RU" },
+  "KG": { kg: "KG", kz: "KG", en: "KG" },
+  "KZ": { kg: "KZ", kz: "KZ", en: "KZ" },
+  "EN": { kg: "EN", kz: "EN", en: "EN" }
 });
 
 function translated(text: string, locale: Locale): string {
