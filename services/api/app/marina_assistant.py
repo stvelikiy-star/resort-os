@@ -1,7 +1,9 @@
 import json
 import os
+import re
 import time
 import uuid
+from pathlib import Path
 from collections import defaultdict, deque
 from typing import Any, Literal
 
@@ -125,6 +127,91 @@ CHECK-OUT → DIRTY → уборка → IN_INSPECTION → CLEAN → CRM/Зая�
 и попросить уточнить роль, объект или экран.
 """
 
+MANUAL_PATH = Path(__file__).with_name("marina_assistant_knowledge.md")
+try:
+    MANUAL_TEXT = MANUAL_PATH.read_text(encoding="utf-8")
+except OSError:
+    MANUAL_TEXT = ""
+
+MANUAL_SECTIONS = [
+    section.strip()
+    for section in re.split(r"\n(?=## )", MANUAL_TEXT)
+    if section.strip()
+]
+
+STOP_WORDS = {
+    "как", "что", "где", "это", "для", "при", "или", "если", "мне", "моя", "мой",
+    "его", "она", "они", "нужно", "надо", "можно", "после", "перед", "через", "когда",
+    "the", "and", "for", "with", "this", "that", "from", "what", "where", "how",
+}
+
+
+def _tokens(value: str) -> set[str]:
+    return {
+        token.lower()
+        for token in re.findall(r"[A-Za-zА-Яа-яЁё0-9_/-]{3,}", value or "")
+        if token.lower() not in STOP_WORDS
+    }
+
+
+def _select_manual_context(payload: "MarinaAssistantRequest", role: str, screen: str) -> str:
+    if not MANUAL_SECTIONS:
+        return ""
+
+    user_text = " ".join(
+        message.content
+        for message in payload.messages[-4:]
+        if message.role == "user"
+    )
+    query_tokens = _tokens(f"{user_text} {screen} {role}")
+    scored: list[tuple[int, int, str]] = []
+
+    for index, section in enumerate(MANUAL_SECTIONS):
+        heading = section.splitlines()[0] if section else ""
+        heading_lower = heading.lower()
+        body_lower = section.lower()
+        score = 0
+        for token in query_tokens:
+            if token in heading_lower:
+                score += 6
+            elif token in body_lower:
+                score += min(3, body_lower.count(token))
+        if screen and screen.lower() in body_lower:
+            score += 5
+        if role and role.lower() in body_lower:
+            score += 2
+        scored.append((score, -index, section))
+
+    selected: list[str] = []
+    selected_ids: set[int] = set()
+
+    # Always include the source framing, role boundary and safety constraints.
+    mandatory_markers = (
+        "Назначение и главный принцип",
+        "Роли",
+        "Запрещённые действия",
+        "Типовые ошибки",
+    )
+    for index, section in enumerate(MANUAL_SECTIONS):
+        if any(marker.lower() in section.lower() for marker in mandatory_markers):
+            selected.append(section)
+            selected_ids.add(index)
+
+    ranked = sorted(scored, reverse=True)
+    for _score, neg_index, section in ranked:
+        index = -neg_index
+        if index in selected_ids:
+            continue
+        if _score <= 0 and len(selected) >= 5:
+            break
+        selected.append(section)
+        selected_ids.add(index)
+        if len(selected) >= 10:
+            break
+
+    joined = "\n\n".join(selected)
+    return joined[:14000]
+
 
 class AssistantMessage(BaseModel):
     role: Literal["user", "assistant"]
@@ -214,8 +301,10 @@ NON-NEGOTIABLE RULES:
 """
 
     conversation = [message.model_dump() for message in payload.messages[-ASSISTANT_MAX_MESSAGES:]]
+    manual_context = _select_manual_context(payload, role, screen)
     bundle = {
-        "confirmed_knowledge": KNOWLEDGE,
+        "confirmed_core_rules": KNOWLEDGE,
+        "relevant_operational_manual": manual_context,
         "conversation": conversation,
     }
     return rules + "\nVERIFIED KNOWLEDGE AND CONVERSATION:\n" + json.dumps(bundle, ensure_ascii=False)
