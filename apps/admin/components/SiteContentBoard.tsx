@@ -3,6 +3,8 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import SiteMediaBoard from "./SiteMediaBoard";
 
+type EditorTab = "PHOTOS" | "TEXTS";
+
 type Locale = "ru" | "kg" | "en";
 type Content = Record<string, Record<string, string>>;
 type ContentItem = {
@@ -100,6 +102,7 @@ export default function SiteContentBoard() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editorTab, setEditorTab] = useState<EditorTab>("PHOTOS");
 
   async function load() {
     setLoading(true);
@@ -211,7 +214,17 @@ export default function SiteContentBoard() {
         </div>
       </header>
 
-      <SiteMediaBoard />
+      <section className="content-status-row">
+        <div className="locale-tabs">
+          <button className={editorTab === "PHOTOS" ? "active" : ""} onClick={() => setEditorTab("PHOTOS")}>Фото номеров и сайта</button>
+          <button className={editorTab === "TEXTS" ? "active" : ""} onClick={() => setEditorTab("TEXTS")}>Тексты сайта</button>
+        </div>
+        <div className="publish-status"><span>{editorTab === "PHOTOS" ? "Основной режим: замена фотографий" : "Редактор текстов и SEO"}</span></div>
+      </section>
+
+      {editorTab === "PHOTOS" && <SiteMediaBoard />}
+
+      {editorTab === "TEXTS" && <>
 
       <section className="content-status-row">
         <div className="locale-tabs">{LOCALES.map((entry) => <button key={entry.code} className={locale === entry.code ? "active" : ""} onClick={() => setLocale(entry.code)}>{entry.label}</button>)}</div>
@@ -241,6 +254,7 @@ export default function SiteContentBoard() {
         <div><strong>Публикация безопасна для броней</strong><span>CMS меняет публичный редакционный контент и медиа. Номерной фонд, цены, inventory, оплаты и заявки остаются в Core.</span></div>
         <div><button className="btn" disabled={saving} onClick={() => void saveDraft()}>Сохранить черновик</button><button className="btn primary" disabled={saving} onClick={() => void publish()}>{saving ? "Сохраняю…" : "Опубликовать на сайте"}</button></div>
       </footer>
+      </>}
     </main>
   );
 }
