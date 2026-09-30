@@ -17,6 +17,15 @@ const QUICK = [
   "Не получается — помоги",
 ];
 
+function currentLocale(): "ru" | "kg" | "en" | "kz" {
+  if (typeof document === "undefined") return "ru";
+  const raw = (document.documentElement.lang || navigator.language || "ru").toLowerCase();
+  if (raw.startsWith("ky") || raw.startsWith("kg")) return "kg";
+  if (raw.startsWith("kk") || raw.startsWith("kz")) return "kz";
+  if (raw.startsWith("en")) return "en";
+  return "ru";
+}
+
 export default function MarinaAiAssistant({ screen, role }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -47,7 +56,7 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
         body: JSON.stringify({
           messages: history.map(({ role: messageRole, content }) => ({ role: messageRole, content })),
           current_screen: screen,
-          locale: "ru",
+          locale: currentLocale(),
         }),
       });
       const body = await response.json().catch(() => ({}));
