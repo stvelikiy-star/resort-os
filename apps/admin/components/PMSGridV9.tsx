@@ -8,14 +8,14 @@ import PMSOperationsCockpitV9 from "./PMSOperationsCockpitV9";
 import PMSOwnerGrid from "./PMSOwnerGrid";
 import PMSUniversalBoard from "./PMSUniversalBoard";
 
-export default function PMSGridV9({ agentMode = false }: { agentMode?: boolean }) {
+export default function PMSGridV9({ agentMode = false, readOnlyMode = false }: { agentMode?: boolean; readOnlyMode?: boolean }) {
   const [operationsOpen, setOperationsOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   return (
     <PMSControlSnapshotProviderV9>
       <div className="pms-v9-stack owner-pms-stack">
-        {!agentMode && <div className="owner-pms-switches">
+        {!agentMode && !readOnlyMode && <div className="owner-pms-switches">
           <button className={operationsOpen ? "active" : ""} onClick={() => setOperationsOpen((value) => !value)}>
             {operationsOpen ? "Скрыть операционный центр" : "Операционный центр"}
           </button>
@@ -24,15 +24,15 @@ export default function PMSGridV9({ agentMode = false }: { agentMode?: boolean }
           </button>
         </div>}
 
-        <PMSOwnerGrid agentMode={agentMode} />
+        <PMSOwnerGrid agentMode={agentMode} readOnlyMode={readOnlyMode} />
 
-        {!agentMode && operationsOpen && <div className="owner-pms-tools-panel">
+        {!agentMode && !readOnlyMode && operationsOpen && <div className="owner-pms-tools-panel">
           <PMSIntegrationRailV10 />
           <PMSOperationsCockpitV9 />
           <PMSBulkGuardV9 />
         </div>}
 
-        {!agentMode && advancedOpen && <div className="owner-pms-advanced-panel">
+        {!agentMode && !readOnlyMode && advancedOpen && <div className="owner-pms-advanced-panel">
           <div className="owner-pms-panel-head">
             <div><strong>Расширенная шахматка</strong><span>Drag & drop, resize, Split Stay и полный фильтр остаются доступны здесь.</span></div>
             <button onClick={() => setAdvancedOpen(false)}>Закрыть</button>
