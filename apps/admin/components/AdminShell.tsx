@@ -23,6 +23,7 @@ import RoomQrBoard from "./RoomQrBoard";
 import ServicePointsBoard from "./ServicePointsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 
 type User = {
   id: string;
@@ -271,6 +272,7 @@ export default function AdminShell() {
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
       {tab === "INBOX" && isManager && <InboxBoard />}
+      <MarinaAiAssistant screen={tab} role={user.role} />
     </>
   );
 }
