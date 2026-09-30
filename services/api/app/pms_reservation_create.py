@@ -15,7 +15,7 @@ from .main import price_room_type
 
 
 router = APIRouter(prefix="/api/v1/admin/pms/reservations", tags=["admin-pms-owner-grid"])
-manager_access = require_roles("OWNER", "MANAGER", "RECEPTION", "AGENT")
+manager_access = require_roles("OWNER", "MANAGER", "AGENT")
 
 # Owner-approved rule: these categories never accept extra places.
 EXTRA_BED_DENIED_ROOM_TYPES = {
