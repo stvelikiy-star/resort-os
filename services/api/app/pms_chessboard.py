@@ -12,7 +12,7 @@ from .auth import require_roles
 
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-chessboard"])
-manager_access = require_roles("OWNER", "MANAGER", "RECEPTION")
+manager_access = require_roles("OWNER", "MANAGER")
 
 
 class ScheduleSegment(BaseModel):
