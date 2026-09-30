@@ -26,6 +26,7 @@ OPENAI_API_BASE_URL = os.environ.get("OPENAI_API_BASE_URL", "https://api.openai.
 OPENAI_TIMEOUT_SECONDS = float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "30"))
 ASSISTANT_MAX_MESSAGES = max(4, int(os.environ.get("MARINA_ASSISTANT_MAX_MESSAGES", "12")))
 ASSISTANT_RATE_LIMIT_PER_MINUTE = max(1, int(os.environ.get("MARINA_ASSISTANT_RATE_LIMIT_PER_MINUTE", "30")))
+ASSISTANT_MAX_OUTPUT_TOKENS = max(256, int(os.environ.get("MARINA_ASSISTANT_MAX_OUTPUT_TOKENS", "1600")))
 
 _rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
@@ -318,7 +319,12 @@ async def _ask_openai(prompt: str) -> str:
             response = await client.post(
                 f"{OPENAI_API_BASE_URL}/responses",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
-                json={"model": OPENAI_ASSISTANT_MODEL, "input": prompt},
+                json={
+                    "model": OPENAI_ASSISTANT_MODEL,
+                    "input": prompt,
+                    "store": False,
+                    "max_output_tokens": ASSISTANT_MAX_OUTPUT_TOKENS,
+                },
             )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="MARINA AI provider transport error") from exc
