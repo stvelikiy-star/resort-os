@@ -33,6 +33,8 @@ def main() -> int:
     require("## Работа горничной" in knowledge and "## Работа техника" in knowledge, "manual includes staff workflows")
     require("## Запрещённые действия" in knowledge and "## Типовые ошибки" in knowledge, "manual includes safety/troubleshooting")
     require("Never reveal or request passwords" in backend, "secret protection")
+    require('"store": False' in backend, "OpenAI response storage disabled")
+    require("ASSISTANT_MAX_OUTPUT_TOKENS" in backend, "assistant output token cap")
     require("marina_assistant_router" in entry and "include_router(marina_assistant_router)" in entry, "router composed")
     require('import MarinaAiAssistant from "./MarinaAiAssistant"' in admin, "admin imports assistant")
     require("<MarinaAiAssistant" in admin, "admin mounts assistant")
