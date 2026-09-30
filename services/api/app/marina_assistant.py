@@ -530,10 +530,103 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
             }
 
         if role == "AGENT":
-            snapshot["agent"] = {
-                "live_data_scope": "NOT_ENABLED_UNTIL_AGENT_IDENTITY_TO_AGENCY_MAPPING_IS_VERIFIED",
-                "note": "Use confirmed product guidance only; never expose other agencies or hotel-internal data.",
-            }
+            agent = await conn.fetchrow(
+                """
+                SELECT su."bookingAgentId" AS agent_id,ba.name,ba.status
+                FROM staff_users su
+                LEFT JOIN booking_agents ba
+                  ON ba.id=su."bookingAgentId" AND ba."propertyId"=su."propertyId"
+                WHERE su.id=$2 AND su."propertyId"=$1 AND su.role='AGENT' AND su."isActive"=true
+                """,
+                pid,
+                actor_id,
+            )
+            if not agent or not agent["agent_id"] or agent["status"] != "ACTIVE":
+                snapshot["agent"] = {
+                    "available": False,
+                    "reason": "AGENT_ACCOUNT_NOT_LINKED_OR_INACTIVE",
+                }
+            else:
+                agent_id = agent["agent_id"]
+                request_counts = await conn.fetchrow(
+                    """
+                    SELECT count(*) FILTER (WHERE status='NEW')::int AS new,
+                           count(*) FILTER (WHERE status='QUOTED')::int AS quoted,
+                           count(*) FILTER (WHERE status='AWAITING_PREPAYMENT')::int AS awaiting_prepayment,
+                           count(*) FILTER (WHERE status IN ('NEW','QUOTED','AWAITING_PREPAYMENT'))::int AS active
+                    FROM reservation_requests
+                    WHERE "propertyId"=$1 AND "agentId"=$2
+                    """,
+                    pid,
+                    agent_id,
+                )
+                requests = await conn.fetch(
+                    """
+                    SELECT status::text AS status,"guestName","checkIn","checkOut",
+                           adults,children,"quotedTotalKgs"
+                    FROM reservation_requests
+                    WHERE "propertyId"=$1 AND "agentId"=$2
+                      AND status IN ('NEW','QUOTED','AWAITING_PREPAYMENT')
+                    ORDER BY "createdAt" DESC
+                    LIMIT 40
+                    """,
+                    pid,
+                    agent_id,
+                )
+                reservations = await conn.fetch(
+                    """
+                    SELECT r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
+                           g."firstName" AS guest_first_name,
+                           selected.room_code
+                    FROM reservations r
+                    LEFT JOIN guests g ON g.id=r."primaryGuestId"
+                    LEFT JOIN LATERAL (
+                      SELECT room.code AS room_code
+                      FROM inventory_blocks ib
+                      JOIN rooms room ON room.id=ib."roomId"
+                      WHERE ib."reservationId"=r.id
+                        AND ib.active=true
+                        AND ib."blockType"='RESERVATION'
+                      ORDER BY ib."startDate"
+                      LIMIT 1
+                    ) selected ON true
+                    WHERE r."propertyId"=$1 AND r."agentId"=$2
+                      AND r.status IN ('GUARANTEED','CHECKED_IN')
+                    ORDER BY r."checkIn","bookingNumber"
+                    LIMIT 60
+                    """,
+                    pid,
+                    agent_id,
+                )
+                snapshot["agent"] = {
+                    "available": True,
+                    "agency_name": agent["name"],
+                    "request_counts": dict(request_counts),
+                    "active_requests": [
+                        {
+                            "status": row["status"],
+                            "guest_name": row["guestName"],
+                            "check_in": str(row["checkIn"]),
+                            "check_out": str(row["checkOut"]),
+                            "adults": row["adults"],
+                            "children": row["children"],
+                            "quoted_total_kgs": row["quotedTotalKgs"],
+                        }
+                        for row in requests
+                    ],
+                    "active_reservations": [
+                        {
+                            "booking_number": row["bookingNumber"],
+                            "status": row["status"],
+                            "guest_first_name": row["guest_first_name"],
+                            "check_in": str(row["checkIn"]),
+                            "check_out": str(row["checkOut"]),
+                            "room_code": row["room_code"],
+                        }
+                        for row in reservations
+                    ],
+                    "scope_rule": "Only rows whose agentId equals the authenticated user's bookingAgentId are included.",
+                }
 
         if role == "STORE_STAFF":
             snapshot["store"] = {
@@ -732,7 +825,7 @@ async def marina_assistant_capabilities(user: dict[str, Any] = Depends(current_u
             "housekeeping": user["role"] == "MAID",
             "maintenance": user["role"] == "TECHNICIAN",
             "dining": user["role"] in LIVE_DINING_ROLES,
-            "agent": False,
+            "agent": user["role"] == "AGENT",
             "store": False,
         },
     }
