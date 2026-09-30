@@ -24,6 +24,7 @@ import RoomQrBoard from "./RoomQrBoard";
 import ServicePointsBoard from "./ServicePointsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 
 type User = {
   id: string;
@@ -314,6 +315,7 @@ export default function AdminShell() {
         onNavigate={(destination) => setTab(destination)}
         onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
       />}
+      <MarinaAiAssistant screen={tab} role={user.role} />
     </>
   );
 }
