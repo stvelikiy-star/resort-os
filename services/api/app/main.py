@@ -401,7 +401,7 @@ async def pms_grid(
     end: date,
     room_type_code: str | None = None,
     operational_state: str | None = None,
-    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", "AGENT")),
+    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", "RECEPTION", "AGENT")),
 ):
     if end <= start:
         raise HTTPException(status_code=422, detail="end must be after start")
