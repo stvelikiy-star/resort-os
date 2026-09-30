@@ -306,7 +306,7 @@ export default function PMSNewReservationModal({
               </div>
               {preview?.pricing.nights?.length ? (
                 <div className="owner-nightly-prices">
-                  {preview.pricing.nights.map((night) => <span key={night.date}>{night.date.slice(5)} · {money(night.price_kgs)}</span>)}
+                  {preview.pricing.nights.map((night) => <span key={night.date}>{night.date.slice(0, 10)} · {money(night.price_kgs)}{night.period ? ` · ${night.period}` : ""}</span>)}
                 </div>
               ) : null}
               {!preview?.pricing.core_sellable && !loading && !agentMode && (

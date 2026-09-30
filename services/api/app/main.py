@@ -126,7 +126,13 @@ async def price_room_type(conn, room_type_id, check_in: date, check_out: date) -
     reason = None
 
     for night in nights:
-        matched = next((r for r in rows if r["validFrom"] <= night <= r["validTo"]), None)
+        matches = [r for r in rows if r["validFrom"] <= night <= r["validTo"]]
+        if len(matches) > 1:
+            sellable = False
+            reason = "RATE_OVERLAP"
+            nightly.append({"date": night, "price_kgs": None, "status": "AMBIGUOUS"})
+            continue
+        matched = matches[0] if matches else None
         if not matched:
             sellable = False
             reason = "RATE_MISSING"

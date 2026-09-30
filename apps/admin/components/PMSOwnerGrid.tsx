@@ -142,6 +142,38 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
   const [windowDays, setWindowDays] = useState(31);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("ALL");
+  const [building, setBuilding] = useState("ALL");
+  const [availability, setAvailability] = useState("ALL");
+  const [locale, setLocale] = useState("ru-RU");
+  useEffect(() => {
+    const update = () => setLocale(({ ky: "ky-KG", kk: "kk-KZ", en: "en-US" } as Record<string, string>)[document.documentElement.lang] || "ru-RU");
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+    return () => observer.disconnect();
+  }, []);
+  const filterCopy: Record<string, string[]> = {
+    "Корпус": ["Корпус", "Корпус", "Building"],
+    "Все корпуса": ["Бардык корпустар", "Барлық корпустар", "All buildings"],
+    "Доступность": ["Жеткиликтүүлүк", "Қолжетімділік", "Availability"],
+    "Все номера": ["Бардык бөлмөлөр", "Барлық бөлмелер", "All rooms"],
+    "Свободны весь период": ["Бүт мезгилге бош", "Бүкіл кезеңге бос", "Free for entire period"],
+    "Есть занятые ночи": ["Бош эмес түндөр бар", "Бос емес түндер бар", "Has occupied nights"],
+    "На ремонте": ["Оңдоодо", "Жөндеуде", "Under repair"],
+    "Месяц": ["Ай", "Ай", "Month"], "Год": ["Жыл", "Жыл", "Year"],
+    "Предыдущий месяц": ["Мурунку ай", "Алдыңғы ай", "Previous month"],
+    "Следующий месяц": ["Кийинки ай", "Келесі ай", "Next month"],
+    "Сбросить фильтры": ["Чыпкаларды тазалоо", "Сүзгілерді тазалау", "Reset filters"],
+    "Номер, гость, бронь…": ["Бөлмө, конок, бронь…", "Бөлме, қонақ, бронь…", "Room, guest, booking…"],
+  };
+  const copy = (text: string) => locale === "ru-RU" ? text : (filterCopy[text]?.[locale === "ky-KG" ? 0 : locale === "kk-KZ" ? 1 : 2] || text);
+  const years = Array.from({ length: 21 }, (_, i) => new Date().getFullYear() - 5 + i);
+  if (!years.includes(start.getFullYear())) years.push(start.getFullYear());
+  years.sort((a, b) => a - b);
+  function jumpMonth(year: number, month: number) {
+    setStart(new Date(year, month, 1));
+    setSelection(null);
+  }
   const [data, setData] = useState<GridResponse | null>(null);
   const [finance, setFinance] = useState<ReceptionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -233,14 +265,20 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
 
   const financeById = useMemo(() => new Map(finance.map((item) => [item.id, item])), [finance]);
   const categories = useMemo(() => Array.from(new Set((data?.rooms || []).map((room) => room.room_type_name))), [data]);
+  const buildings = useMemo(() => Array.from(new Set((data?.rooms || []).map((room) => room.building_or_zone).filter((value): value is string => Boolean(value)))), [data]);
   const akBermetMode = data?.property === "AK_BERMET_TEST";
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const rooms = (data?.rooms || []).filter((room) => {
       if (category !== "ALL" && room.room_type_name !== category) return false;
+      if (building !== "ALL" && room.building_or_zone !== building) return false;
+      const occupied = room.blocks.some((block) => block.start < endIso && block.end > startIso);
+      if (availability === "FREE" && (occupied || room.operational_state === "TECH_BLOCK")) return false;
+      if (availability === "OCCUPIED" && !occupied) return false;
+      if (availability === "BLOCKED" && room.operational_state !== "TECH_BLOCK") return false;
       if (!q) return true;
-      return [room.code, room.beds_raw, room.room_type_name, room.building_or_zone, room.floor].some((value) => value?.toLowerCase().includes(q));
+      return [room.code, room.beds_raw, room.room_type_name, room.building_or_zone, room.floor, ...room.blocks.flatMap((block) => [block.guest_name, block.booking_number])].some((value) => value?.toLowerCase().includes(q));
     });
     const map = new Map<string, Room[]>();
     rooms.forEach((room) => {
@@ -264,7 +302,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
       );
     }
     return groups;
-  }, [data, query, category, akBermetMode]);
+  }, [data, query, category, building, availability, startIso, endIso, akBermetMode]);
 
   const allRooms = useMemo(() => data?.rooms || [], [data]);
   const roomById = useMemo(() => new Map(allRooms.map((room) => [room.id, room])), [allRooms]);
@@ -358,11 +396,26 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
       </header>
 
       <div className="owner-grid-toolbar">
-        <label className="owner-grid-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Номер, кровати, категория…" /></label>
+        <label className="owner-grid-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} data-i18n-skip placeholder={copy("Номер, гость, бронь…")} /></label>
         <select value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="ALL">Все категории</option>
           {categories.map((item) => <option key={item} value={item}>{OWNER_GROUP[item] || item}</option>)}
         </select>
+        <select data-i18n-skip aria-label={copy("Корпус")} value={building} onChange={(event) => setBuilding(event.target.value)}>
+          <option value="ALL">{copy("Все корпуса")}</option>
+          {buildings.map((item) => <option key={item} value={item}>{pmsStaffBuildingLabel(item, data?.property)}</option>)}
+        </select>
+        <select data-i18n-skip aria-label={copy("Доступность")} value={availability} onChange={(event) => setAvailability(event.target.value)}>
+          <option value="ALL">{copy("Все номера")}</option><option value="FREE">{copy("Свободны весь период")}</option><option value="OCCUPIED">{copy("Есть занятые ночи")}</option><option value="BLOCKED">{copy("На ремонте")}</option>
+        </select>
+        <div className="owner-month-picker">
+          <button data-i18n-skip aria-label={copy("Предыдущий месяц")} onClick={() => jumpMonth(start.getFullYear(), start.getMonth() - 1)}>‹</button>
+          <select data-i18n-skip aria-label={copy("Месяц")} value={start.getMonth()} onChange={(event) => jumpMonth(start.getFullYear(), Number(event.target.value))}>
+            {Array.from({ length: 12 }, (_, month) => <option key={month} value={month}>{new Date(2026, month, 1).toLocaleDateString(locale, { month: "long" })}</option>)}
+          </select>
+          <select data-i18n-skip aria-label={copy("Год")} value={start.getFullYear()} onChange={(event) => jumpMonth(Number(event.target.value), start.getMonth())}>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select>
+          <button data-i18n-skip aria-label={copy("Следующий месяц")} onClick={() => jumpMonth(start.getFullYear(), start.getMonth() + 1)}>›</button>
+        </div>
         <div className="owner-date-nav">
           <button onClick={() => setStart(addDays(start, -windowDays))}>‹</button>
           <button onClick={() => setStart(new Date())}>Сегодня</button>
@@ -371,6 +424,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
         <div className="owner-window-switch">
           {[14, 31].map((value) => <button key={value} aria-label={`Показать ${value} дней`} className={windowDays === value ? "active" : ""} onClick={() => setWindowDays(value)}>{value} дн.</button>)}
         </div>
+        <button data-i18n-skip onClick={() => { setQuery(""); setCategory("ALL"); setBuilding("ALL"); setAvailability("ALL"); }}>{copy("Сбросить фильтры")}</button>
         <button className="owner-refresh" onClick={() => void load()} aria-label="Обновить шахматку">↻</button>
       </div>
 
@@ -386,7 +440,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
           <div className="owner-state-head">Статус</div>
           {days.map((day) => {
             const key = iso(day);
-            return <div key={key} className={`owner-day-head ${key === today ? "today" : ""} ${[0, 6].includes(day.getDay()) ? "weekend" : ""}`}><strong>{day.getDate()}</strong><span>{day.toLocaleDateString("ru-RU", { weekday: "short" }).slice(0, 2)}</span></div>;
+            return <div key={key} className={`owner-day-head ${key === today ? "today" : ""} ${[0, 6].includes(day.getDay()) ? "weekend" : ""}`}><strong>{day.getDate()}</strong><span>{day.toLocaleDateString(locale, { weekday: "short" }).slice(0, 2)}</span></div>;
           })}
         </div>
 
