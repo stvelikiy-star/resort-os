@@ -258,7 +258,7 @@ export default function AdminShell() {
         </div>
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
-          {(isManager || isAgent) && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Супершахматка"}</button>}
+          {(canUseReception || isAgent) && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Супершахматка"}</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
@@ -289,7 +289,7 @@ export default function AdminShell() {
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
-      {tab === "PMS" && (isManager || isAgent) && <PMSGrid agentMode={isAgent} />}
+      {tab === "PMS" && (canUseReception || isAgent) && <PMSGrid agentMode={isAgent} />}
       {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
