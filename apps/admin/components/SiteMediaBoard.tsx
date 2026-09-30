@@ -85,7 +85,7 @@ export default function SiteMediaBoard() {
   const [error, setError] = useState<string | null>(null);
   const [uploadAlt, setUploadAlt] = useState("");
   const [showLibrary, setShowLibrary] = useState(true);
-  const [group, setGroup] = useState("PRIMARY");
+  const [group, setGroup] = useState("ROOM");
 
   const load = useCallback(async () => {
     setError(null);
@@ -193,9 +193,9 @@ export default function SiteMediaBoard() {
   return <section className={styles.shell}>
     <header className={styles.head}>
       <div>
-        <p>CMS · Media Library</p>
-        <h2>Фото публичного сайта</h2>
-        <span>Загрузка не меняет сайт. Сначала сохраняется черновик конкретного места, затем он публикуется отдельно.</span>
+        <p>Сайт · Фото</p>
+        <h2>Фотографии номеров и сайта</h2>
+        <span>Начните с вкладки «Номерной фонд»: выберите категорию, загрузите фото, проверьте превью и опубликуйте. Загрузка сама по себе сайт не меняет.</span>
       </div>
       <div className={styles.headStats}>
         <article><strong>{assets.length}</strong><span>фото</span></article>
