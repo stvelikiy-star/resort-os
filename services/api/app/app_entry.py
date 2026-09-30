@@ -59,6 +59,7 @@ from .pms_chessboard_read import router as pms_chessboard_read_router
 from .pms_control_snapshot import router as pms_control_snapshot_router
 from .pms_reservation_create import router as pms_reservation_create_router
 from .public_ai_admin import router as public_ai_admin_router
+from .marina_assistant import router as marina_assistant_router
 from .rate_management import router as rate_management_router
 from .realtime import router as realtime_router
 from .reception_readiness import router as reception_readiness_router
@@ -148,6 +149,7 @@ app.include_router(runtime_capabilities_router)
 app.include_router(site_content_router)
 app.include_router(site_media_router)
 app.include_router(public_ai_admin_router)
+app.include_router(marina_assistant_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
 # Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
