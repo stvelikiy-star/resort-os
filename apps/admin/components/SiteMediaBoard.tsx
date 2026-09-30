@@ -40,6 +40,19 @@ type MediaSlot = {
 
 type DraftValue = { assetId: string; altText: string };
 
+const ROOM_NAMES = [
+  "Одноместный, цоколь", "Двухместный стандарт, цоколь", "Одноместный улучшенный", "Двухместный улучшенный",
+  "Стандарт в коттеджном доме", "Полулюкс без балкона", "Люкс двухместный", "Люкс трёхместный",
+  "Двухкомнатный полулюкс", "Двухкомнатный стандарт", "Апартаменты", "Апартаменты с кухней",
+] as const;
+
+function roomLabel(slot: string, fallback: string) {
+  const match = slot.match(/^ROOM_(\\d{2})$/);
+  if (!match) return fallback;
+  const index = Number(match[1]) - 1;
+  return ROOM_NAMES[index] ? `${match[1]} · ${ROOM_NAMES[index]}` : fallback;
+}
+
 const GROUPS = [
   { key: "PRIMARY", label: "Главные блоки", match: (slot: string) => ["HERO", "CONFERENCE", "TERRITORY", "WATER", "GROUPS"].includes(slot) },
   { key: "GALLERY", label: "Галерея", match: (slot: string) => slot.startsWith("GALLERY_") },
@@ -152,7 +165,7 @@ export default function SiteMediaBoard() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ asset_id: value.assetId || null, alt_text: value.altText.trim() || null }),
       });
-      setMessage(`${slot.label}: черновик сохранён. Публичный сайт не изменён.`);
+      setMessage(`${roomLabel(slot.slot, slot.label)}: черновик сохранён. Публичный сайт не изменён.`);
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось сохранить черновик фото");
@@ -169,7 +182,7 @@ export default function SiteMediaBoard() {
         body: JSON.stringify({ asset_id: value.assetId || null, alt_text: value.altText.trim() || null }),
       });
       await api(`/core/api/v1/admin/site/media/slots/${slot.slot}/publish`, { method: "POST" });
-      setMessage(`${slot.label}: изображение опубликовано.`);
+      setMessage(`${roomLabel(slot.slot, slot.label)}: изображение опубликовано.`);
       await load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось опубликовать фото");
@@ -229,7 +242,7 @@ export default function SiteMediaBoard() {
         const value = drafts[slot.slot] || { assetId: "", altText: "" };
         const draftAsset = assets.find((asset) => asset.id === value.assetId);
         return <article className={styles.slot} key={slot.slot} data-dirty={slot.dirty}>
-          <div className={styles.slotHead}><div><small>{slot.slot}</small><h3>{slot.label}</h3></div><div>{slot.dirty ? <b>Есть черновик</b> : <span>Синхронизировано</span>}<small>v{slot.version} / live v{slot.published_version}</small></div></div>
+          <div className={styles.slotHead}><div><small>{slot.slot}</small><h3>{roomLabel(slot.slot, slot.label)}</h3></div><div>{slot.dirty ? <b>Есть черновик</b> : <span>Синхронизировано</span>}<small>v{slot.version} / live v{slot.published_version}</small></div></div>
 
           <div className={styles.previewGrid}>
             <div><span>Сейчас на сайте</span>{slot.published ? <img src={slot.published.url} alt={slot.published.alt_text || slot.label} /> : <div className={styles.noImage}>Системное фото / пусто</div>}<small>{slot.published?.filename || "Нет управляемой публикации"}</small></div>
