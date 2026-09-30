@@ -15,6 +15,7 @@ def require(value: bool, message: str) -> None:
 
 def main() -> int:
     backend = read("services/api/app/marina_assistant.py")
+    knowledge = read("services/api/app/marina_assistant_knowledge.md")
     entry = read("services/api/app/app_entry.py")
     admin = read("apps/admin/components/AdminShell.tsx")
     staff = read("apps/staff/components/StaffRoleGateway.tsx")
@@ -27,6 +28,10 @@ def main() -> int:
     require("Depends(current_user)" in backend, "server session is source of role truth")
     require('"read_only": True' in backend, "read-only boundary")
     require("TECH_BLOCK" in backend and "DIRTY" in backend and "IN_INSPECTION" in backend, "core room-state knowledge")
+    require("marina_assistant_knowledge.md" in backend and "_select_manual_context" in backend, "operational manual retrieval wired")
+    require("## CHECK-IN" in knowledge and "## CHECK-OUT" in knowledge, "manual includes check-in/out")
+    require("## Работа горничной" in knowledge and "## Работа техника" in knowledge, "manual includes staff workflows")
+    require("## Запрещённые действия" in knowledge and "## Типовые ошибки" in knowledge, "manual includes safety/troubleshooting")
     require("Never reveal or request passwords" in backend, "secret protection")
     require("marina_assistant_router" in entry and "include_router(marina_assistant_router)" in entry, "router composed")
     require('import MarinaAiAssistant from "./MarinaAiAssistant"' in admin, "admin imports assistant")
