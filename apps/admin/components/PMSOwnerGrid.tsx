@@ -134,7 +134,7 @@ function compactMoney(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
 }
 
-export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolean }) {
+export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }: { agentMode?: boolean; readOnlyMode?: boolean }) {
   const [start, setStart] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -318,7 +318,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
   }
 
   function beginSelection(room: Room, day: string, event: React.PointerEvent<HTMLButtonElement>) {
-    if (!isFree(room, day)) return;
+    if (readOnlyMode || !isFree(room, day)) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
     const next = { roomId: room.id, anchor: day, focus: day };
@@ -346,7 +346,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
   }
 
   const finishSelection = useCallback(() => {
-    if (!selectingRef.current || !selectionRef.current) return;
+    if (readOnlyMode || !selectingRef.current || !selectionRef.current) return;
     selectingRef.current = false;
     const selected = selectionRef.current;
     const room = roomById.get(selected.roomId);
@@ -364,7 +364,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
       return;
     }
     setCreateOpen({ roomId: room.id, roomCode: pmsRoomDisplayNumber(room, data?.property), bedsRaw: room.beds_raw, checkIn: selectedRange.checkIn, checkOut: selectedRange.checkOut });
-  }, [roomById, data?.property]);
+  }, [roomById, data?.property, readOnlyMode]);
 
   useEffect(() => {
     const finish = () => finishSelection();
@@ -377,7 +377,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
   }, [finishSelection]);
 
   function openReservation(block: Block) {
-    if (agentMode || !block.reservation_id) return;
+    if (agentMode || readOnlyMode || !block.reservation_id) return;
     setBuilder({ reservationId: block.reservation_id, intent: { kind: "OPEN", segmentBlockId: block.id } });
   }
 
@@ -390,7 +390,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
         <div>
           <p className="eyebrow">PMS · рабочая шахматка</p>
           <h1>Номер × ночь</h1>
-          <p>{agentMode ? "Показываются свободные/занятые ночи. Чужие гости и финансы скрыты. Новая бронь создаётся только по открытому тарифу." : "Выделите от одной до нужного количества свободных клеток. Цена и конфликты проверяются Resort Core до создания брони."}</p>
+          <p>{agentMode ? "Показываются свободные/занятые ночи. Чужие гости и финансы скрыты. Новая бронь создаётся только по открытому тарифу." : readOnlyMode ? "Режим администратора: шахматка доступна для просмотра. Создание и изменение брони выполняется в разделе «Ресепшен / Брони»." : "Выделите от одной до нужного количества свободных клеток. Цена и конфликты проверяются Resort Core до создания брони."}</p>
         </div>
         <div className={`owner-live ${realtime}`}><i />{realtime === "live" ? "LIVE" : realtime === "connecting" ? "CONNECT" : "HTTP"}</div>
       </header>
@@ -449,7 +449,7 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
             <div className="owner-group-label"><strong>{group.label}</strong><span>{group.rooms.length}</span></div>
             {group.rooms.map((room) => (
               <div key={room.id} className={`owner-room-row state-${room.operational_state}`} style={{ gridTemplateColumns: template }}>
-                <button className="owner-room-label" onClick={() => { if (!agentMode) setRoomId(room.id); }} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
+                <button className="owner-room-label" onClick={() => { if (!agentMode && !readOnlyMode) setRoomId(room.id); }} title={`${room.room_type_name}${room.beds_raw ? ` · ${room.beds_raw}` : ""}`}>
                   <strong>{akBermetMode ? `${pmsRoomDisplayNumber(room, data?.property)}${room.beds_raw ? ` · ${room.beds_raw}` : ""}` : pmsOwnerRoomDisplayLabel(room)}</strong>
                 </button>
                 <div className={`owner-room-state ${room.operational_state}`}>{ROOM_STATE[room.operational_state]}</div>
@@ -516,9 +516,9 @@ export default function PMSOwnerGrid({ agentMode = false }: { agentMode?: boolea
         <span><i className="maintenance" /> ремонт / блок</span>
       </footer>
 
-      {createOpen && <PMSNewReservationModal {...createOpen} agentMode={agentMode} onClose={() => { setCreateOpen(null); setSelection(null); selectionRef.current = null; }} onCreated={() => { setSelection(null); selectionRef.current = null; void load(); }} />}
-      {!agentMode && builder && <ReservationScheduleBuilder reservationId={builder.reservationId} rooms={allRooms.map((room) => ({ id: room.id, code: room.code, room_type_code: room.room_type_code, room_type_name: room.room_type_name, operational_state: room.operational_state, building_or_zone: room.building_or_zone, floor: room.floor }))} intent={builder.intent} onClose={() => setBuilder(null)} onUpdated={() => void load()} />}
-      {!agentMode && roomId && <RoomDetailModal roomId={roomId} onClose={() => setRoomId(null)} onUpdated={() => void load()} />}
+      {!readOnlyMode && createOpen && <PMSNewReservationModal {...createOpen} agentMode={agentMode} onClose={() => { setCreateOpen(null); setSelection(null); selectionRef.current = null; }} onCreated={() => { setSelection(null); selectionRef.current = null; void load(); }} />}
+      {!agentMode && !readOnlyMode && builder && <ReservationScheduleBuilder reservationId={builder.reservationId} rooms={allRooms.map((room) => ({ id: room.id, code: room.code, room_type_code: room.room_type_code, room_type_name: room.room_type_name, operational_state: room.operational_state, building_or_zone: room.building_or_zone, floor: room.floor }))} intent={builder.intent} onClose={() => setBuilder(null)} onUpdated={() => void load()} />}
+      {!agentMode && !readOnlyMode && roomId && <RoomDetailModal roomId={roomId} onClose={() => setRoomId(null)} onUpdated={() => void load()} />}
     </section>
   );
 }
