@@ -20,6 +20,8 @@ def main() -> int:
     staff = read("apps/staff/components/StaffRoleGateway.tsx")
     admin_widget = read("apps/admin/components/MarinaAiAssistant.tsx")
     staff_widget = read("apps/staff/components/MarinaAiAssistant.tsx")
+    kitchen = read("apps/staff/components/KitchenEntry.tsx")
+    waiter = read("apps/staff/components/WaiterEntry.tsx")
 
     require('prefix="/api/v1/assistant"' in backend, "assistant endpoint prefix")
     require("Depends(current_user)" in backend, "server session is source of role truth")
@@ -34,6 +36,8 @@ def main() -> int:
     require("/core/api/v1/assistant/chat" in admin_widget, "admin widget calls canonical endpoint")
     require("/core/api/v1/assistant/chat" in staff_widget, "staff widget calls canonical endpoint")
     require("current_screen" in admin_widget and "current_screen" in staff_widget, "screen context forwarded")
+    require('<MarinaAiAssistant screen="KITCHEN"' in kitchen, "kitchen mounts assistant")
+    require('<MarinaAiAssistant screen="WAITER"' in waiter, "waiter mounts assistant")
     print("MARINA_AI_EMBEDDED_CONTRACT: PASS")
     return 0
 
