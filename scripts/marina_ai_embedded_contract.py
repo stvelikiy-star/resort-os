@@ -49,7 +49,7 @@ def main() -> int:
     require('"live_read_only": True' in backend, "capabilities expose live read-only mode")
     require('"occupancy"' in backend and '"vacant_sellable_rooms"' in backend and '"occupancy_percent"' in backend, "owner live context includes factual occupancy")
     require('"active_reservations"' in backend and '"remaining_kgs"' in backend, "owner live context includes active reservations and balances")
-    require('"finance"' in backend and '"confirmed_payments_today_kgs"' in backend and '"debtor_count"' in backend, "owner live context includes finance snapshot")
+    require('"finance"' in backend and '"confirmed_payments_today_kgs"' in backend and "AS debtor_count" in backend, "owner live context includes finance snapshot")
     require('"task_counts"' in backend and '"active_inventory_holds"' in backend, "owner live context includes operations and inventory holds")
     require('"reason": row["reason"]' in backend and '"usage_category": row["usage_category"]' in backend, "room attention includes block reason and usage")
     require('"guest_first_name"' in backend and '"phone"' not in backend.split("async def _live_context",1)[1].split("class AssistantMessage",1)[0], "live context omits phone fields")
