@@ -105,11 +105,15 @@ def main() -> None:
             params={"from_date": today.isoformat(), "to_date": today.isoformat()},
         )
         assert denied_reception_finance.status_code == 403, denied_reception_finance.text
-        denied_reception_pms = reception.get(
-            "/api/v1/pms/grid",
-            params={"start": today.isoformat(), "end": (today + timedelta(days=2)).isoformat()},
+        reception_pms = expect(
+            reception.get(
+                "/api/v1/pms/grid",
+                params={"start": today.isoformat(), "end": (today + timedelta(days=2)).isoformat()},
+            ),
+            200,
+            "reception read-only PMS access",
         )
-        assert denied_reception_pms.status_code == 403, denied_reception_pms.text
+        assert isinstance(reception_pms.get("rooms"), list)
 
     managed_agent_suffix = uuid.uuid4().hex[:8]
     managed_agent_username = f"agent-{managed_agent_suffix}"
