@@ -63,7 +63,7 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
       if (!response.ok) {
         const message =
           response.status === 503
-            ? "MARINA AI пока не подключён к модели. Обратитесь к администратору системы."
+            ? "MARINA AI временно недоступен. Повторите запрос немного позже."
             : response.status === 401 || response.status === 403
               ? "Сессия завершена или для этой роли нет доступа."
               : "Не удалось получить ответ. Повторите запрос чуть позже.";

@@ -746,6 +746,43 @@ NON-NEGOTIABLE RULES:
     return rules + "\nVERIFIED KNOWLEDGE, LIVE CONTEXT AND CONVERSATION:\n" + json.dumps(bundle, ensure_ascii=False, default=str)
 
 
+NAVIGATION_KEYWORDS = {
+    "PMS": ("шахмат", "номер", "room", "grid", "доступност"),
+    "RESERVATIONS": ("заезд", "выезд", "check-in", "check-out", "брон", "reservation"),
+    "REQUESTS": ("заявк", "crm", "request"),
+    "RATES": ("цен", "сезон", "тариф", "rate"),
+    "FINANCE": ("финанс", "оплат", "платеж", "долг", "folio"),
+    "OPS": ("уборк", "ремонт", "тех", "clean", "dirty", "maintenance"),
+    "SERVICES": ("сервис", "полотен", "трансфер", "guest service"),
+    "DINING": ("кухн", "ресторан", "питан", "waiter", "dining"),
+    "REPORTS": ("отчет", "отчёт", "аналит", "report"),
+    "STAFF": ("персонал", "сотрудник", "staff"),
+    "AGENTS": ("агент", "туроператор"),
+    "ROOM_QR": ("qr номер", "qr комнаты", "room qr"),
+}
+
+ROLE_NAVIGATION = {
+    "OWNER": set(SCREEN_LABELS),
+    "MANAGER": set(SCREEN_LABELS),
+    "RECEPTION": {"PMS", "RESERVATIONS", "SERVICES", "OPS", "GROUPS", "DINING", "ROOM_QR"},
+    "AGENT": {"PMS"},
+    "MAID": {"OPS", "MY_SHIFT"},
+    "TECHNICIAN": {"OPS", "MY_SHIFT"},
+    "DINING_STAFF": {"DINING", "KITCHEN", "MY_SHIFT"},
+    "WAITER": {"DINING", "WAITER", "MY_SHIFT"},
+    "STORE_STAFF": {"MY_SHIFT"},
+}
+
+
+def _navigation_suggestion(payload: MarinaAssistantRequest, user: dict[str, Any]) -> dict[str, str] | None:
+    text = " ".join(message.content for message in payload.messages[-3:] if message.role == "user").lower()
+    allowed = ROLE_NAVIGATION.get(str(user.get("role") or ""), set())
+    for screen, keywords in NAVIGATION_KEYWORDS.items():
+        if screen in allowed and any(keyword in text for keyword in keywords):
+            return {"screen": screen, "label": SCREEN_LABELS.get(screen, screen)}
+    return None
+
+
 async def _ask_openai(prompt: str) -> str:
     if not OPENAI_API_KEY or not OPENAI_ASSISTANT_MODEL:
         raise HTTPException(status_code=503, detail="MARINA AI provider is not configured")
@@ -852,4 +889,5 @@ async def marina_assistant_chat(
         "property_code": user["property_code"],
         "current_screen": SCREEN_LABELS.get((payload.current_screen or "").upper(), payload.current_screen),
         "live_context_available": bool(live_context.get("available")),
+        "navigation": _navigation_suggestion(payload, user),
     }
