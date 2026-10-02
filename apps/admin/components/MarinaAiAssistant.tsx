@@ -6,6 +6,8 @@ import styles from "./MarinaAiAssistant.module.css";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type Locale = "ru" | "kg" | "kz" | "en";
 type Navigation = { screen: string; label: string };
+type Locale = "ru" | "kg" | "kz" | "en";
+type Navigation = { screen: string; label: string };
 
 type Props = {
   screen: string;
@@ -33,6 +35,7 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
+  const [navigation, setNavigation] = useState<Navigation | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
     setMessages(history);
     setInput("");
     setSending(true);
+    setNavigation(null);
     setNavigation(null);
 
     try {
@@ -75,6 +79,9 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
         ...current,
         { role: "assistant", content: String(body.answer || "Нет ответа.") },
       ]);
+      if (body.navigation && typeof body.navigation.screen === "string" && typeof body.navigation.label === "string") {
+        setNavigation(body.navigation as Navigation);
+      }
       if (body.navigation && typeof body.navigation.screen === "string" && typeof body.navigation.label === "string") {
         setNavigation(body.navigation as Navigation);
       }
@@ -134,6 +141,14 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
             {sending && <div className={styles.thinking}>MARINA AI думает…</div>}
             <div ref={endRef} />
           </div>
+
+          {navigation && onNavigate && (
+            <div className={styles.quick}>
+              <button type="button" onClick={() => { onNavigate(navigation.screen); setOpen(false); }}>
+                Открыть: {navigation.label}
+              </button>
+            </div>
+          )}
 
           {navigation && onNavigate && (
             <div className={styles.quick}>
