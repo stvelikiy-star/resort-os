@@ -176,6 +176,9 @@ jobs:
       - name: Bootstrap release OWNER
         run: python scripts/bootstrap_owner.py
 
+      - name: Verify MARINA AI Live Context V2 runtime
+        run: python scripts/verify_marina_ai_live_context_v2.py
+
       - name: Typecheck and build Admin
         working-directory: apps/admin
         run: |
