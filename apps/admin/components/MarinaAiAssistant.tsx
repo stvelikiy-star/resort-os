@@ -4,10 +4,12 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import styles from "./MarinaAiAssistant.module.css";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type Navigation = { screen: string; label: string };
 
 type Props = {
   screen: string;
   role?: string;
+  onNavigate?: (screen: string) => void;
 };
 
 const QUICK = [
@@ -26,13 +28,14 @@ function currentLocale(): "ru" | "kg" | "en" | "kz" {
   return "ru";
 }
 
-export default function MarinaAiAssistant({ screen, role }: Props) {
+export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: "assistant", content: "Я MARINA AI. Подскажу, куда зайти, что нажать и что проверить в MARINA SMART." },
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [navigation, setNavigation] = useState<Navigation | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -48,6 +51,7 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
     setMessages(history);
     setInput("");
     setSending(true);
+    setNavigation(null);
 
     try {
       const response = await fetch("/core/api/v1/assistant/chat", {
@@ -63,7 +67,7 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
       if (!response.ok) {
         const message =
           response.status === 503
-            ? "MARINA AI пока не подключён к модели. Обратитесь к администратору системы."
+            ? "MARINA AI временно недоступен. Повторите запрос немного позже."
             : response.status === 401 || response.status === 403
               ? "Сессия завершена или для этой роли нет доступа."
               : "Не удалось получить ответ. Повторите запрос чуть позже.";
@@ -74,6 +78,9 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
         ...current,
         { role: "assistant", content: String(body.answer || "Нет ответа.") },
       ]);
+      if (body.navigation && typeof body.navigation.screen === "string" && typeof body.navigation.label === "string") {
+        setNavigation(body.navigation as Navigation);
+      }
     } catch {
       setMessages((current) => [
         ...current,
@@ -130,6 +137,14 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
             {sending && <div className={styles.thinking}>MARINA AI думает…</div>}
             <div ref={endRef} />
           </div>
+
+          {navigation && onNavigate && (
+            <div className={styles.quick}>
+              <button type="button" onClick={() => { onNavigate(navigation.screen); setOpen(false); }}>
+                Открыть: {navigation.label}
+              </button>
+            </div>
+          )}
 
           <form className={styles.form} onSubmit={submit}>
             <textarea
