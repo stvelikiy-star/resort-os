@@ -10,6 +10,7 @@ on:
       - 'data-marina/**'
       - 'scripts/bootstrap_ak_bermet_test.py'
       - 'scripts/verify_marina_client_cycle.py'
+      - 'scripts/verify_marina_ai_role_runtime.py'
       - 'scripts/ak_bermet_grid_browser.mjs'
       - 'scripts/admin_full_navigation_browser.mjs'
       - 'deploy/ak-bermet-test-api.Dockerfile'
@@ -166,6 +167,9 @@ jobs:
 
           asyncio.run(main())
           PY
+
+      - name: Verify MARINA AI role-scoped runtime context
+        run: python scripts/verify_marina_ai_role_runtime.py
 
       - name: Build Admin
         working-directory: apps/admin
