@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import styles from "./MarinaAiAssistant.module.css";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
+type Locale = "ru" | "kg" | "kz" | "en";
 
 type Props = {
   screen: string;
@@ -16,6 +17,11 @@ const QUICK = [
   "Я новичок. Обучи меня",
   "Не получается — помоги",
 ];
+
+function currentLocale(): Locale {
+  const raw = window.localStorage.getItem("marina-smart-staff-locale");
+  return raw === "kg" || raw === "kz" || raw === "en" ? raw : "ru";
+}
 
 export default function MarinaAiAssistant({ screen, role }: Props) {
   const [open, setOpen] = useState(false);
@@ -47,14 +53,14 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
         body: JSON.stringify({
           messages: history.map(({ role: messageRole, content }) => ({ role: messageRole, content })),
           current_screen: screen,
-          locale: "ru",
+          locale: currentLocale(),
         }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         const message =
           response.status === 503
-            ? "MARINA AI пока не подключён к модели. Обратитесь к администратору системы."
+            ? "MARINA AI временно недоступен. Повторите запрос немного позже."
             : response.status === 401 || response.status === 403
               ? "Сессия завершена или для этой роли нет доступа."
               : "Не удалось получить ответ. Повторите запрос чуть позже.";
