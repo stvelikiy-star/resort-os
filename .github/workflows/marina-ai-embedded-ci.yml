@@ -5,6 +5,7 @@ on:
     paths:
       - 'services/api/app/marina_assistant.py'
       - 'services/api/app/marina_assistant_context.py'
+      - 'services/api/app/marina_assistant_context.py'
       - 'services/api/app/marina_assistant_knowledge.md'
       - 'services/api/app/app_entry.py'
       - 'apps/admin/components/MarinaAiAssistant.tsx'
