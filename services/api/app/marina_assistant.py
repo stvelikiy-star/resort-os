@@ -271,19 +271,57 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 """,
                 pid,
             )
-            room_attention = await conn.fetch(
+            occupied_rooms = await conn.fetchval(
                 """
-                SELECT code,"operationalState"::text AS state
-                FROM rooms
-                WHERE "propertyId"=$1
-                  AND "operationalState" IN ('DIRTY','IN_INSPECTION','TECH_BLOCK')
-                ORDER BY
-                  CASE "operationalState"::text WHEN 'TECH_BLOCK' THEN 0 WHEN 'DIRTY' THEN 1 ELSE 2 END,
-                  code
-                LIMIT 50
+                SELECT count(DISTINCT ib."roomId")::int
+                FROM inventory_blocks ib
+                JOIN reservations r ON r.id=ib."reservationId"
+                JOIN rooms room ON room.id=ib."roomId"
+                WHERE room."propertyId"=$1
+                  AND ib.active=true
+                  AND ib."blockType"='RESERVATION'
+                  AND r.status='CHECKED_IN'
+                  AND ib."startDate" <= $2
+                  AND ib."endDate" > $2
                 """,
                 pid,
+                local_date,
             )
+            total_rooms = int(room_counts["total"] or 0)
+            tech_block_rooms = int(room_counts["tech_block"] or 0)
+            occupied_rooms = int(occupied_rooms or 0)
+            sellable_rooms = max(total_rooms - tech_block_rooms, 0)
+            vacant_sellable_rooms = max(sellable_rooms - occupied_rooms, 0)
+            occupancy_percent = round((occupied_rooms * 100 / sellable_rooms), 1) if sellable_rooms else 0.0
+
+            room_attention = await conn.fetch(
+                """
+                SELECT room.code,room."operationalState"::text AS state,
+                       hold.reason,hold."usageCategory" AS usage_category,hold."usageLabel" AS usage_label,
+                       hold."startDate" AS hold_start,hold."endDate" AS hold_end
+                FROM rooms room
+                LEFT JOIN LATERAL (
+                  SELECT ib.reason,ib."usageCategory",ib."usageLabel",ib."startDate",ib."endDate"
+                  FROM inventory_blocks ib
+                  WHERE ib."roomId"=room.id
+                    AND ib.active=true
+                    AND ib."blockType" IN ('MAINTENANCE','MANUAL')
+                    AND ib."startDate" <= $2
+                    AND ib."endDate" > $2
+                  ORDER BY ib."createdAt" DESC
+                  LIMIT 1
+                ) hold ON true
+                WHERE room."propertyId"=$1
+                  AND room."operationalState" IN ('DIRTY','IN_INSPECTION','TECH_BLOCK')
+                ORDER BY
+                  CASE room."operationalState"::text WHEN 'TECH_BLOCK' THEN 0 WHEN 'DIRTY' THEN 1 ELSE 2 END,
+                  room.code
+                LIMIT 80
+                """,
+                pid,
+                local_date,
+            )
+
             arrivals = await conn.fetch(
                 """
                 SELECT r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
@@ -300,7 +338,7 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 ) room ON true
                 WHERE r."propertyId"=$1 AND r.status='GUARANTEED' AND r."checkIn"=$2
                 ORDER BY room.code NULLS LAST,r."createdAt"
-                LIMIT 40
+                LIMIT 60
                 """,
                 pid,
                 local_date,
@@ -321,15 +359,50 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 ) room ON true
                 WHERE r."propertyId"=$1 AND r.status='CHECKED_IN' AND r."checkOut"=$2
                 ORDER BY room.code NULLS LAST,r."createdAt"
-                LIMIT 40
+                LIMIT 60
                 """,
                 pid,
                 local_date,
             )
+
+            active_reservations = await conn.fetch(
+                """
+                WITH paid AS (
+                  SELECT "reservationId",
+                         COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
+                  FROM payments
+                  WHERE "reservationId" IS NOT NULL
+                  GROUP BY "reservationId"
+                )
+                SELECT r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
+                       r."totalKgs",COALESCE(p.paid_kgs,0)::bigint AS paid_kgs,
+                       GREATEST(r."totalKgs"-COALESCE(p.paid_kgs,0),0)::bigint AS remaining_kgs,
+                       g."firstName" AS guest_first_name,room.code AS room_code
+                FROM reservations r
+                LEFT JOIN guests g ON g.id=r."primaryGuestId"
+                LEFT JOIN paid p ON p."reservationId"=r.id
+                LEFT JOIN LATERAL (
+                  SELECT rm.code
+                  FROM inventory_blocks ib
+                  JOIN rooms rm ON rm.id=ib."roomId"
+                  WHERE ib."reservationId"=r.id AND ib.active=true AND ib."blockType"='RESERVATION'
+                  ORDER BY ib."startDate"
+                  LIMIT 1
+                ) room ON true
+                WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
+                ORDER BY
+                  CASE r.status::text WHEN 'CHECKED_IN' THEN 0 ELSE 1 END,
+                  r."checkIn",room.code NULLS LAST
+                LIMIT 80
+                """,
+                pid,
+            )
+
             tasks = await conn.fetch(
                 """
                 SELECT t.type::text AS type,t.status::text AS status,t.priority::text AS priority,
-                       t.title,room.code AS room_code,u."displayName" AS assigned_to
+                       t.title,t."serviceDate",t."createdAt",
+                       room.code AS room_code,u."displayName" AS assigned_to
                 FROM operational_tasks t
                 LEFT JOIN rooms room ON room.id=t."roomId"
                 LEFT JOIN staff_users u ON u.id=t."assignedToId"
@@ -338,14 +411,68 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 ORDER BY
                   CASE t.priority::text WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 WHEN 'NORMAL' THEN 2 ELSE 3 END,
                   t."createdAt"
-                LIMIT 30
+                LIMIT 80
                 """,
                 pid,
             )
+            task_counts = await conn.fetchrow(
+                """
+                SELECT
+                  count(*) FILTER (WHERE type='HOUSEKEEPING' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS housekeeping_active,
+                  count(*) FILTER (WHERE type='MAINTENANCE' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS maintenance_active,
+                  count(*) FILTER (WHERE type='GUEST_REQUEST' AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS guest_requests_active,
+                  count(*) FILTER (WHERE priority IN ('URGENT','HIGH') AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS high_priority_active,
+                  count(*) FILTER (
+                    WHERE "serviceDate" IS NOT NULL AND "serviceDate" < $2
+                      AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION')
+                  )::int AS overdue_by_service_date
+                FROM operational_tasks
+                WHERE "propertyId"=$1
+                """,
+                pid,
+                local_date,
+            )
+            active_holds = await conn.fetch(
+                """
+                SELECT room.code AS room_code,ib."blockType"::text AS block_type,
+                       ib."usageCategory" AS usage_category,ib."usageLabel" AS usage_label,
+                       ib.reason,ib."startDate",ib."endDate"
+                FROM inventory_blocks ib
+                JOIN rooms room ON room.id=ib."roomId"
+                WHERE room."propertyId"=$1
+                  AND ib.active=true
+                  AND ib."blockType" IN ('MAINTENANCE','MANUAL')
+                  AND ib."startDate" <= $2
+                  AND ib."endDate" > $2
+                ORDER BY room.code,ib."startDate"
+                LIMIT 80
+                """,
+                pid,
+                local_date,
+            )
+
             snapshot["hotel"] = {
                 "room_counts": dict(room_counts),
+                "occupancy": {
+                    "total_rooms": total_rooms,
+                    "sellable_rooms": sellable_rooms,
+                    "occupied_rooms": occupied_rooms,
+                    "vacant_sellable_rooms": vacant_sellable_rooms,
+                    "occupancy_percent": occupancy_percent,
+                    "tech_block_rooms": tech_block_rooms,
+                    "definition": "Occupied = physical rooms assigned to CHECKED_IN reservations for the hotel-local date. Sellable excludes TECH_BLOCK.",
+                },
                 "rooms_requiring_attention": [
-                    {"room_code": row["code"], "state": row["state"]} for row in room_attention
+                    {
+                        "room_code": row["code"],
+                        "state": row["state"],
+                        "reason": row["reason"],
+                        "usage_category": row["usage_category"],
+                        "usage_label": row["usage_label"],
+                        "hold_start": str(row["hold_start"]) if row["hold_start"] else None,
+                        "hold_end": str(row["hold_end"]) if row["hold_end"] else None,
+                    }
+                    for row in room_attention
                 ],
                 "arrivals_today": [
                     {
@@ -369,16 +496,45 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                     }
                     for row in departures
                 ],
+                "active_reservations": [
+                    {
+                        "booking_number": row["bookingNumber"],
+                        "status": row["status"],
+                        "check_in": str(row["checkIn"]),
+                        "check_out": str(row["checkOut"]),
+                        "guest_first_name": row["guest_first_name"],
+                        "room_code": row["room_code"],
+                        "total_kgs": int(row["totalKgs"] or 0),
+                        "paid_kgs": int(row["paid_kgs"] or 0),
+                        "remaining_kgs": int(row["remaining_kgs"] or 0),
+                    }
+                    for row in active_reservations
+                ],
+                "task_counts": dict(task_counts),
                 "active_tasks": [
                     {
                         "type": row["type"],
                         "status": row["status"],
                         "priority": row["priority"],
                         "title": row["title"],
+                        "service_date": str(row["serviceDate"]) if row["serviceDate"] else None,
+                        "created_at": row["createdAt"].isoformat() if row["createdAt"] else None,
                         "room_code": row["room_code"],
                         "assigned_to": row["assigned_to"],
                     }
                     for row in tasks
+                ],
+                "active_inventory_holds": [
+                    {
+                        "room_code": row["room_code"],
+                        "block_type": row["block_type"],
+                        "usage_category": row["usage_category"],
+                        "usage_label": row["usage_label"],
+                        "reason": row["reason"],
+                        "start": str(row["startDate"]),
+                        "end": str(row["endDate"]),
+                    }
+                    for row in active_holds
                 ],
             }
 
@@ -393,7 +549,71 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                     """,
                     pid,
                 )
+                finance = await conn.fetchrow(
+                    """
+                    WITH paid AS (
+                      SELECT "reservationId",
+                             COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
+                      FROM payments
+                      WHERE "reservationId" IS NOT NULL
+                      GROUP BY "reservationId"
+                    ),
+                    active AS (
+                      SELECT r.id,r."totalKgs",COALESCE(p.paid_kgs,0)::bigint AS paid_kgs,
+                             GREATEST(r."totalKgs"-COALESCE(p.paid_kgs,0),0)::bigint AS remaining_kgs
+                      FROM reservations r
+                      LEFT JOIN paid p ON p."reservationId"=r.id
+                      WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
+                    )
+                    SELECT
+                      count(*)::int AS active_reservation_count,
+                      COALESCE(SUM("totalKgs"),0)::bigint AS active_total_kgs,
+                      COALESCE(SUM(paid_kgs),0)::bigint AS active_paid_kgs,
+                      COALESCE(SUM(remaining_kgs),0)::bigint AS active_remaining_kgs,
+                      count(*) FILTER (WHERE remaining_kgs > 0)::int AS debtor_count
+                    FROM active
+                    """,
+                    pid,
+                )
+                payment_today = await conn.fetchval(
+                    """
+                    SELECT COALESCE(SUM(p."amountKgs"),0)::bigint
+                    FROM payments p
+                    LEFT JOIN reservation_requests rr ON rr.id=p."requestId"
+                    LEFT JOIN reservations r ON r.id=p."reservationId"
+                    WHERE COALESCE(rr."propertyId",r."propertyId")=$1
+                      AND p.status='RECEIVED'
+                      AND (((COALESCE(p."paidAt",p."createdAt") AT TIME ZONE 'UTC') AT TIME ZONE $2)::date)=$3
+                    """,
+                    pid,
+                    prop["timezone"],
+                    local_date,
+                )
+                awaiting_prepayment = await conn.fetchrow(
+                    """
+                    WITH received AS (
+                      SELECT "requestId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS received_kgs
+                      FROM payments
+                      WHERE "requestId" IS NOT NULL
+                      GROUP BY "requestId"
+                    )
+                    SELECT count(*)::int AS request_count,
+                           COALESCE(SUM(COALESCE(rr."requiredPrepaymentKgs",0)),0)::bigint AS required_kgs,
+                           COALESCE(SUM(COALESCE(x.received_kgs,0)),0)::bigint AS received_kgs,
+                           COALESCE(SUM(GREATEST(COALESCE(rr."requiredPrepaymentKgs",0)-COALESCE(x.received_kgs,0),0)),0)::bigint AS remaining_kgs
+                    FROM reservation_requests rr
+                    LEFT JOIN received x ON x."requestId"=rr.id
+                    WHERE rr."propertyId"=$1 AND rr.status='AWAITING_PREPAYMENT'
+                    """,
+                    pid,
+                )
                 snapshot["hotel"]["reservation_request_counts"] = dict(request_counts)
+                snapshot["hotel"]["finance"] = {
+                    **dict(finance),
+                    "confirmed_payments_today_kgs": int(payment_today or 0),
+                    "awaiting_prepayment": dict(awaiting_prepayment),
+                    "scope": "Internal Resort Core payment facts only; this is not an accounting statement.",
+                }
 
         elif role == "MAID":
             dirty_rooms = await conn.fetch(
