@@ -940,7 +940,8 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                         }
                         for row in reservations
                     ],
-                    "scope_rule": "Only rows whose agentId equals the authenticated user's bookingAgentId are included. Availability is aggregate inventory only and exposes no other agency reservation details.",
+                    "scope_rule": "Only rows whose agentId equals the authenticated user's bookingAgentId are included.",
+                    "availability_scope": "Aggregate physical-room availability only; no other agency reservation details are exposed.",
                 }
 
         if role == "STORE_STAFF":
