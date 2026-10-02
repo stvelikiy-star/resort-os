@@ -628,6 +628,7 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
             tasks = await conn.fetch(
                 """
                 SELECT t.status::text AS status,t.priority::text AS priority,t.title,
+                       t."serviceDate",t."createdAt",
                        room.code AS room_code,
                        CASE WHEN t."assignedToId"=$2 THEN true ELSE false END AS assigned_to_me
                 FROM operational_tasks t
@@ -638,12 +639,32 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 ORDER BY assigned_to_me DESC,
                   CASE t.priority::text WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 ELSE 2 END,
                   t."createdAt"
-                LIMIT 50
+                LIMIT 60
                 """,
                 pid,
                 actor_id,
             )
+            task_counts = await conn.fetchrow(
+                """
+                SELECT
+                  count(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS visible_active,
+                  count(*) FILTER (WHERE "assignedToId"=$2 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS assigned_to_me,
+                  count(*) FILTER (WHERE "assignedToId" IS NULL AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS unassigned,
+                  count(*) FILTER (WHERE "serviceDate" IS NOT NULL AND "serviceDate" < $3 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS overdue_by_service_date
+                FROM operational_tasks
+                WHERE "propertyId"=$1 AND type='HOUSEKEEPING'
+                  AND ("assignedToId" IS NULL OR "assignedToId"=$2)
+                """,
+                pid,
+                actor_id,
+                local_date,
+            )
             snapshot["housekeeping"] = {
+                "room_counts": {
+                    "dirty": sum(1 for row in dirty_rooms if row["state"] == "DIRTY"),
+                    "in_inspection": sum(1 for row in dirty_rooms if row["state"] == "IN_INSPECTION"),
+                },
+                "task_counts": dict(task_counts),
                 "rooms": [{"room_code": row["code"], "state": row["state"]} for row in dirty_rooms],
                 "tasks": [
                     {
@@ -651,25 +672,43 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                         "priority": row["priority"],
                         "title": row["title"],
                         "room_code": row["room_code"],
+                        "service_date": str(row["serviceDate"]) if row["serviceDate"] else None,
+                        "created_at": row["createdAt"].isoformat() if row["createdAt"] else None,
                         "assigned_to_me": row["assigned_to_me"],
                     }
                     for row in tasks
                 ],
+                "scope_rule": "Only unassigned housekeeping tasks and tasks assigned to the authenticated maid are included.",
             }
 
         elif role == "TECHNICIAN":
             blocked = await conn.fetch(
                 """
-                SELECT code,"operationalState"::text AS state
-                FROM rooms
-                WHERE "propertyId"=$1 AND "operationalState"='TECH_BLOCK'
-                ORDER BY code LIMIT 80
+                SELECT room.code,room."operationalState"::text AS state,
+                       hold.reason,hold."usageCategory" AS usage_category,hold."usageLabel" AS usage_label,
+                       hold."startDate" AS hold_start,hold."endDate" AS hold_end
+                FROM rooms room
+                LEFT JOIN LATERAL (
+                  SELECT ib.reason,ib."usageCategory",ib."usageLabel",ib."startDate",ib."endDate"
+                  FROM inventory_blocks ib
+                  WHERE ib."roomId"=room.id
+                    AND ib.active=true
+                    AND ib."blockType" IN ('MAINTENANCE','MANUAL')
+                    AND ib."startDate" <= $2
+                    AND ib."endDate" > $2
+                  ORDER BY ib."createdAt" DESC
+                  LIMIT 1
+                ) hold ON true
+                WHERE room."propertyId"=$1 AND room."operationalState"='TECH_BLOCK'
+                ORDER BY room.code LIMIT 80
                 """,
                 pid,
+                local_date,
             )
             tasks = await conn.fetch(
                 """
                 SELECT t.status::text AS status,t.priority::text AS priority,t.title,
+                       t."serviceDate",t."createdAt",
                        room.code AS room_code,
                        CASE WHEN t."assignedToId"=$2 THEN true ELSE false END AS assigned_to_me
                 FROM operational_tasks t
@@ -680,23 +719,53 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 ORDER BY assigned_to_me DESC,
                   CASE t.priority::text WHEN 'URGENT' THEN 0 WHEN 'HIGH' THEN 1 ELSE 2 END,
                   t."createdAt"
-                LIMIT 50
+                LIMIT 60
                 """,
                 pid,
                 actor_id,
             )
+            task_counts = await conn.fetchrow(
+                """
+                SELECT
+                  count(*) FILTER (WHERE status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS visible_active,
+                  count(*) FILTER (WHERE "assignedToId"=$2 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS assigned_to_me,
+                  count(*) FILTER (WHERE "assignedToId" IS NULL AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS unassigned,
+                  count(*) FILTER (WHERE priority IN ('URGENT','HIGH') AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS high_priority,
+                  count(*) FILTER (WHERE "serviceDate" IS NOT NULL AND "serviceDate" < $3 AND status IN ('OPEN','IN_PROGRESS','IN_INSPECTION'))::int AS overdue_by_service_date
+                FROM operational_tasks
+                WHERE "propertyId"=$1 AND type='MAINTENANCE'
+                  AND ("assignedToId" IS NULL OR "assignedToId"=$2)
+                """,
+                pid,
+                actor_id,
+                local_date,
+            )
             snapshot["maintenance"] = {
-                "tech_block_rooms": [row["code"] for row in blocked],
+                "task_counts": dict(task_counts),
+                "tech_block_rooms": [
+                    {
+                        "room_code": row["code"],
+                        "reason": row["reason"],
+                        "usage_category": row["usage_category"],
+                        "usage_label": row["usage_label"],
+                        "hold_start": str(row["hold_start"]) if row["hold_start"] else None,
+                        "hold_end": str(row["hold_end"]) if row["hold_end"] else None,
+                    }
+                    for row in blocked
+                ],
                 "tasks": [
                     {
                         "status": row["status"],
                         "priority": row["priority"],
                         "title": row["title"],
                         "room_code": row["room_code"],
+                        "service_date": str(row["serviceDate"]) if row["serviceDate"] else None,
+                        "created_at": row["createdAt"].isoformat() if row["createdAt"] else None,
                         "assigned_to_me": row["assigned_to_me"],
                     }
                     for row in tasks
                 ],
+                "scope_rule": "Only unassigned maintenance tasks and tasks assigned to the authenticated technician are included.",
             }
 
         if role in LIVE_DINING_ROLES:
@@ -713,14 +782,16 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
             )
             orders = await conn.fetch(
                 """
-                SELECT o."orderNumber",o.status,o.source,o."totalKgs",
+                SELECT o."orderNumber",o.status,o.source,o."totalKgs",o."openedAt",
                        t.code AS table_code,r.code AS room_code
                 FROM kitchen_orders o
                 LEFT JOIN kitchen_tables t ON t.id=o."tableId"
                 LEFT JOIN rooms r ON r.id=o."roomId"
                 WHERE o."propertyId"=$1 AND o.status IN ('NEW','ACCEPTED','COOKING','READY')
-                ORDER BY o."openedAt" ASC
-                LIMIT 40
+                ORDER BY
+                  CASE o.status::text WHEN 'READY' THEN 0 WHEN 'COOKING' THEN 1 WHEN 'ACCEPTED' THEN 2 ELSE 3 END,
+                  o."openedAt" ASC
+                LIMIT 50
                 """,
                 pid,
             )
@@ -743,6 +814,7 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                         "total_kgs": row["totalKgs"],
                         "table_code": row["table_code"],
                         "room_code": row["room_code"],
+                        "opened_at": row["openedAt"].isoformat() if row["openedAt"] else None,
                     }
                     for row in orders
                 ],
@@ -783,12 +855,12 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 requests = await conn.fetch(
                     """
                     SELECT status::text AS status,"guestName","checkIn","checkOut",
-                           adults,children,"quotedTotalKgs"
+                           adults,children,"quotedTotalKgs","requiredPrepaymentKgs"
                     FROM reservation_requests
                     WHERE "propertyId"=$1 AND "agentId"=$2
                       AND status IN ('NEW','QUOTED','AWAITING_PREPAYMENT')
                     ORDER BY "createdAt" DESC
-                    LIMIT 40
+                    LIMIT 50
                     """,
                     pid,
                     agent_id,
@@ -796,7 +868,7 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                 reservations = await conn.fetch(
                     """
                     SELECT r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
-                           g."firstName" AS guest_first_name,
+                           r."totalKgs",g."firstName" AS guest_first_name,
                            selected.room_code
                     FROM reservations r
                     LEFT JOIN guests g ON g.id=r."primaryGuestId"
@@ -813,14 +885,35 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                     WHERE r."propertyId"=$1 AND r."agentId"=$2
                       AND r.status IN ('GUARANTEED','CHECKED_IN')
                     ORDER BY r."checkIn","bookingNumber"
-                    LIMIT 60
+                    LIMIT 80
                     """,
                     pid,
                     agent_id,
                 )
+                availability = await conn.fetchrow(
+                    """
+                    SELECT
+                      count(*) FILTER (WHERE room."operationalState" <> 'TECH_BLOCK')::int AS sellable_physical_rooms,
+                      count(*) FILTER (
+                        WHERE room."operationalState" <> 'TECH_BLOCK'
+                          AND NOT EXISTS (
+                            SELECT 1 FROM inventory_blocks ib
+                            WHERE ib."roomId"=room.id
+                              AND ib.active=true
+                              AND daterange(ib."startDate",ib."endDate",'[)')
+                                  && daterange($2::date,($2::date + 1),'[)')
+                          )
+                      )::int AS available_tonight
+                    FROM rooms room
+                    WHERE room."propertyId"=$1
+                    """,
+                    pid,
+                    local_date,
+                )
                 snapshot["agent"] = {
                     "available": True,
                     "agency_name": agent["name"],
+                    "availability_today": dict(availability),
                     "request_counts": dict(request_counts),
                     "active_requests": [
                         {
@@ -831,6 +924,7 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                             "adults": row["adults"],
                             "children": row["children"],
                             "quoted_total_kgs": row["quotedTotalKgs"],
+                            "required_prepayment_kgs": row["requiredPrepaymentKgs"],
                         }
                         for row in requests
                     ],
@@ -842,10 +936,12 @@ async def _live_context(request: Request, user: dict[str, Any], screen: str | No
                             "check_in": str(row["checkIn"]),
                             "check_out": str(row["checkOut"]),
                             "room_code": row["room_code"],
+                            "total_kgs": int(row["totalKgs"] or 0),
                         }
                         for row in reservations
                     ],
                     "scope_rule": "Only rows whose agentId equals the authenticated user's bookingAgentId are included.",
+                    "availability_scope": "Aggregate physical-room availability only; no other agency reservation details are exposed.",
                 }
 
         if role == "STORE_STAFF":
