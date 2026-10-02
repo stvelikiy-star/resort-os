@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import os
 import secrets
 import uuid
 from typing import Any
@@ -16,8 +17,17 @@ PIN_ITERATIONS = 200_000
 
 
 def issue_guest_pin() -> tuple[str, str]:
-    """Return the one-time visible PIN and a salted PBKDF2 representation for storage."""
-    pin = f"{secrets.randbelow(1_000_000):06d}"
+    """Return the visible PIN and a salted PBKDF2 representation for storage.
+
+    A fixed PIN is allowed only outside production for controlled demo/test
+    environments. Production always receives a cryptographically random PIN.
+    """
+    app_env = os.environ.get("APP_ENV", "production").strip().lower()
+    fixed_pin = os.environ.get("TEST_GUEST_FIXED_PIN", "").strip()
+    if app_env != "production" and len(fixed_pin) == 6 and fixed_pin.isdigit():
+        pin = fixed_pin
+    else:
+        pin = f"{secrets.randbelow(1_000_000):06d}"
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac(
         "sha256",

@@ -49,7 +49,7 @@ async def authenticate_websocket(websocket: WebSocket, conn) -> dict[str, Any] |
     ):
         await websocket.close(code=4401, reason="Session expired or invalid")
         return None
-    if row["role"] not in {"OWNER", "MANAGER"}:
+    if row["role"] not in {"OWNER", "MANAGER", "RECEPTION"}:
         await websocket.close(code=4403, reason="PMS realtime requires management role")
         return None
     return {

@@ -1,0 +1,56 @@
+name: marina-ai-embedded-ci
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/marina_assistant.py'
+      - 'services/api/app/marina_assistant_knowledge.md'
+      - 'services/api/app/app_entry.py'
+      - 'apps/admin/components/MarinaAiAssistant.tsx'
+      - 'apps/admin/components/MarinaAiAssistant.module.css'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/staff/components/MarinaAiAssistant.tsx'
+      - 'apps/staff/components/MarinaAiAssistant.module.css'
+      - 'apps/staff/components/StaffRoleGateway.tsx'
+      - 'apps/staff/components/KitchenEntry.tsx'
+      - 'apps/staff/components/WaiterEntry.tsx'
+      - 'scripts/marina_ai_embedded_contract.py'
+      - '.github/workflows/marina-ai-embedded-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile backend
+        run: python -m py_compile services/api/app/marina_assistant.py services/api/app/app_entry.py
+      - name: Embedded assistant contract
+        run: python scripts/marina_ai_embedded_contract.py
+
+  admin-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci --prefix apps/admin
+      - run: npm run typecheck --prefix apps/admin
+
+  staff-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/staff/package-lock.json
+      - run: npm ci --prefix apps/staff
+      - run: npm run typecheck --prefix apps/staff

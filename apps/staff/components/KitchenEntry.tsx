@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import ChefProduction from "./ChefProduction";
 import KitchenAdminV2 from "./KitchenAdminV2";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 import styles from "./KitchenEntry.module.css";
 
 type User = { id: string; username: string; display_name: string; role: string; property_code: string };
@@ -168,5 +169,6 @@ export default function KitchenEntry() {
     </section>
     <ChefProduction userRole={user.role} />
     <KitchenAdminV2 />
+    <MarinaAiAssistant screen="KITCHEN" role={user.role} />
   </>;
 }

@@ -128,6 +128,7 @@ async function verifyDesktop(browser) {
   assert(await page.locator("#booking").isVisible(), "Booking widget is not visible on desktop");
 
   await assertServiceOrderAndLocale(page, "kg", "ky");
+  await assertServiceOrderAndLocale(page, "kz", "kk");
   await assertServiceOrderAndLocale(page, "en", "en");
 
   // Run the booking lifecycle in an explicit RU context so previous locale checks
@@ -182,7 +183,7 @@ try {
   await verifyServerHtml();
   await verifyDesktop(browser);
   await verifyMobile(browser);
-  console.log("PASS: public browser acceptance (SSR, desktop, mobile, RU/KG/EN, booking request UX, local media)");
+  console.log("PASS: public browser acceptance (SSR, desktop, mobile, RU/KG/KZ/EN, booking request UX, local media)");
 } finally {
   await browser.close();
 }

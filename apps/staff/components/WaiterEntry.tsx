@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import DiningFloorPlan from "./DiningFloorPlan";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 import styles from "./WaiterEntry.module.css";
 
 type User = { id: string; username: string; display_name: string; role: string };
@@ -265,5 +266,6 @@ export default function WaiterEntry() {
 
       <form className={styles.section} onSubmit={createReservation}><div className={styles.sectionHead}><div><small>Новая бронь</small><h2>Забронировать стол</h2></div></div><label>Стол<select value={reservationTable} onChange={(e) => setReservationTable(e.target.value)} required><option value="">Выберите стол</option>{floor?.tables.filter((table) => table.status !== "OUT_OF_SERVICE").map((table) => <option key={table.id} value={table.id}>{table.code} · {table.name} · {table.seats} мест</option>)}</select></label><label>Имя гостя<input value={reservationGuest} onChange={(e) => setReservationGuest(e.target.value)} minLength={2} required /></label><label>Телефон<input value={reservationPhone} onChange={(e) => setReservationPhone(e.target.value)} /></label><label>Гостей<input type="number" min="1" max="30" value={reservationParty} onChange={(e) => setReservationParty(Number(e.target.value) || 1)} /></label><div className={styles.timeGrid}><label>Начало<input type="datetime-local" value={reservationStart} onChange={(e) => setReservationStart(e.target.value)} required /></label><label>До<input type="datetime-local" value={reservationEnd} onChange={(e) => setReservationEnd(e.target.value)} required /></label></div><button className={styles.primary} disabled={busy === "reservation"}>Создать бронь стола</button></form>
     </section>
+    <MarinaAiAssistant screen="WAITER" role={user.role} />
   </main>;
 }

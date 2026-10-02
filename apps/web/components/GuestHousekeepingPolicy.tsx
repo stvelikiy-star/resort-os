@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = MarinaGuestLocale;
 type Policy = {
   scheduled_housekeeping_interval_days: number;
   scheduled_linen_change_included: boolean;
@@ -24,7 +25,8 @@ const COPY = {
     pricePending: "Цена настраивается администрацией",
     request: "Заказать",
     sending: "Отправляем…",
-    sent: "Заявка создана. Сотрудник увидит её в Resort OS.",
+    sent: "Заявка создана. Сотрудник увидит её в MARINA SMART.",
+    system: "Уборка · MARINA SMART",
     duplicate: "Такая активная заявка уже есть.",
     unavailable: "Цена услуги ещё не настроена. Обратитесь на ресепшен.",
   },
@@ -36,12 +38,29 @@ const COPY = {
     housekeeping: "Кошумча тазалоо",
     extraLinen: "Төшөк жабдыгын кошумча алмаштыруу",
     paid: "акы төлөнөт",
-    pricePending: "Бааны администрация орнотот",
-    request: "Заказ кылуу",
+    pricePending: "Бааны администрация аныктайт",
+    request: "Өтүнмө жөнөтүү",
     sending: "Жөнөтүлүүдө…",
-    sent: "Өтүнмө түзүлдү. Кызматкер аны Resort OS'то көрөт.",
+    sent: "Өтүнмө түзүлдү. Кызматкер аны MARINA SMART системасынан көрөт.",
     duplicate: "Мындай активдүү өтүнмө мурунтан бар.",
-    unavailable: "Кызматтын баасы азырынча коюлган жок. Ресепшенге кайрылыңыз.",
+    system: "Тазалоо · MARINA SMART",
+    unavailable: "Кызматтын баасы азырынча коюлган жок. Кабыл алуу кызматына кайрылыңыз.",
+  },
+  kz: {
+    eyebrow: "Бөлмені тазалау",
+    title: "Жоспарлы тазалау және қосымша қызметтер",
+    schedule: (days: number) => `Тұру кезінде жоспарлы тазалау әр ${days} күн сайын жүргізіледі.`,
+    linen: "Төсек-орынды ауыстыру жоспарлы тазалауға кіреді.",
+    housekeeping: "Қосымша тазалау",
+    extraLinen: "Төсек-орынды қосымша ауыстыру",
+    paid: "ақылы",
+    pricePending: "Бағаны әкімшілік анықтайды",
+    request: "Өтінім жіберу",
+    sending: "Жіберілуде…",
+    sent: "Өтінім құрылды. Қызметкер оны MARINA SMART жүйесінен көреді.",
+    system: "Тазалау · MARINA SMART",
+    duplicate: "Мұндай белсенді өтінім бұрыннан бар.",
+    unavailable: "Қызмет бағасы әлі белгіленбеген. Қабылдау бөліміне хабарласыңыз.",
   },
   en: {
     eyebrow: "Housekeeping",
@@ -54,20 +73,15 @@ const COPY = {
     pricePending: "Price is being configured by management",
     request: "Request",
     sending: "Sending…",
-    sent: "Request created. Staff can now see it in Resort OS.",
+    sent: "Request created. Staff can now see it in MARINA SMART.",
+    system: "Housekeeping · MARINA SMART",
     duplicate: "An active request for this service already exists.",
     unavailable: "The service price has not been configured yet. Please contact reception.",
   },
 } as const;
 
-function locale(): Locale {
-  if (typeof window === "undefined") return "ru";
-  const stored = window.localStorage.getItem("three-crowns-guest-language") || window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" ? stored : "ru";
-}
-
 export default function GuestHousekeepingPolicy({ token }: { token: string }) {
-  const [lang, setLang] = useState<Locale>("ru");
+  const [lang] = useMarinaGuestLocale();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [busy, setBusy] = useState<ServiceCode | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -80,13 +94,7 @@ export default function GuestHousekeepingPolicy({ token }: { token: string }) {
     } catch { setPolicy(null); }
   }, [token]);
 
-  useEffect(() => {
-    const syncLocale = () => setLang(locale());
-    syncLocale();
-    window.addEventListener("three-crowns:content-ready", syncLocale);
-    void load();
-    return () => window.removeEventListener("three-crowns:content-ready", syncLocale);
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function requestService(code: ServiceCode) {
     if (busy) return;
@@ -120,9 +128,9 @@ export default function GuestHousekeepingPolicy({ token }: { token: string }) {
   ];
 
   return <section className="guest-housekeeping-policy">
-    <div className="guest-housekeeping-head"><div><p>{c.eyebrow}</p><h2>{c.title}</h2></div><span>Housekeeping · Resort Core</span></div>
+    <div className="guest-housekeeping-head"><div><p>{c.eyebrow}</p><h2>{c.title}</h2></div><span>{c.system}</span></div>
     <div className="guest-housekeeping-included"><strong>{c.schedule(policy.scheduled_housekeeping_interval_days)}</strong>{policy.scheduled_linen_change_included && <span>{c.linen}</span>}</div>
-    <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(lang === "en" ? "en-US" : "ru-RU")} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
+    <div className="guest-housekeeping-options">{options.map((item) => <article key={item.code}><div><small>{c.paid}</small><h3>{item.title}</h3></div><strong>{item.price == null ? c.pricePending : `${item.price.toLocaleString(marinaGuestIntlLocale(lang))} KGS`}</strong><button disabled={busy !== null || item.price == null} onClick={() => void requestService(item.code)}>{busy === item.code ? c.sending : c.request}</button></article>)}</div>
     {message && <div className="guest-market-notice">{message}</div>}
   </section>;
 }

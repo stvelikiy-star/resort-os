@@ -41,7 +41,7 @@ def main() -> int:
     shell = read("apps/admin/components/AdminShell.tsx")
     for marker in (
         '/core/api/v1/auth/me', '/core/api/v1/auth/login', '/core/api/v1/auth/logout',
-        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"])',
+        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"])',
         'const isManager = ["OWNER", "MANAGER"].includes(user.role)', 'type="password"', 'minLength={8}',
     ):
         ok(marker in shell, f"admin auth/RBAC marker: {marker}")

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import GuestRequestShiftPanel from "./GuestRequestShiftPanel";
 import StaffShiftV2 from "./StaffShiftV2";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 
 type Role = "OWNER" | "MANAGER" | "RECEPTION" | "MAID" | "TECHNICIAN" | "DINING_STAFF" | "STORE_STAFF";
 type User = { id: string; username: string; display_name: string; role: Role; property_code: string };
@@ -155,6 +156,7 @@ export default function StaffRoleGateway() {
     return <>
       <StaffShiftV2 />
       <GuestRequestShiftPanel />
+      <MarinaAiAssistant screen="MY_SHIFT" role={user.role} />
     </>;
   }
 
@@ -174,5 +176,6 @@ export default function StaffRoleGateway() {
       {user.role === "RECEPTION" && <div className="shift-empty"><strong>Рабочая очередь ниже обновляется автоматически.</strong><span>Берите заявку в работу и закрывайте её после фактического выполнения.</span></div>}
     </main>
     {(user.role === "RECEPTION" || user.role === "DINING_STAFF") && <GuestRequestShiftPanel />}
+    <MarinaAiAssistant screen="MY_SHIFT" role={user.role} />
   </>;
 }

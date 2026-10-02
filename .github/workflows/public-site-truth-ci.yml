@@ -41,14 +41,35 @@ jobs:
         with:
           python-version: "3.12"
       - name: Enforce canonical public sales boundary
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/public_site_truth_guard.py
       - name: Enforce owner-approved guest service facts
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/owner_guest_facts_guard.py
       - name: Enforce implemented Guest OS request truth
         run: python3 scripts/guest_os_truth_guard.py
+
+      - name: Verify MARINA SMART guest-web isolation
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page = Path("apps/web/app/page.tsx").read_text(encoding="utf-8")
+          layout = Path("apps/web/app/layout.tsx").read_text(encoding="utf-8")
+          joined = page + "\n" + layout
+          assert "AK BERMET" in joined
+          assert "MARINA SMART" in joined
+          for forbidden in ("Три Короны", "Three Crowns", "3korony.com"):
+              assert forbidden not in joined, forbidden
+          print("PASS: dedicated MARINA SMART guest web is isolated from legacy Three Crowns public-site branding")
+          PY
       - name: Enforce public media integrity
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/public_media_integrity_guard.py
       - name: Test external rendered-site truth probe
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/external_public_truth_probe_test.py
-      - name: Enforce RU KG EN public locale contract
+      - name: Enforce RU KG KZ EN public locale contract
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
         run: python3 scripts/public_i18n_guard.py

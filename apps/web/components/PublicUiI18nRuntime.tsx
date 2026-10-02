@@ -62,6 +62,63 @@ const HOME = {
     final: ["Үч Таажы · Resort & SPA", "Даталарды тандаңыз.<br />Ысык-Көл күтүп жатат.", "Бош категорияларды жана сиздин мезгилге жашоонун баасын текшериңиз.", "Номерлерди текшерүү"],
     footer: ["Үч Таажы · Resort & SPA", "Номерлер", "Аймак", "Топторго", "Байланыш"], mobileBook: "Бош номерлерди текшерүү",
   },
+  kz: {
+    heroMeta: ["бөлме", "санат", "пирс", "бассейн"], scroll: "Бастау",
+    bookingTrust: ["Өзекті бос орындар", "Кезең құны", "Менеджер көмегі"],
+    help: ["Көмек керек пе?", "Бөлмені бірге таңдаймыз", "Кім келетінін, қанша күнге және қандай демалыс қалайтыныңызды жазыңыз. Менеджер санаттар мен қосымша қызметтерді салыстыруға көмектеседі.", "Қоңырау · +996 558 08 50 02", "WhatsApp арқылы жазу ↗", "Маңызды", "Өтінім жіберілгеннен кейін бөлме автоматты түрде ұсталып тұрмайды. Расталған бронь шарттар мен алдын ала төлем келісілгеннен кейін менеджер арқылы жасалады."],
+    advantageIntro: "Курорт артықшылықтары жай ғана ұзын тізім емес. Олар күннің табиғи ырғағына айналады: ояну, аумаққа шығу, көлге жету, бассейнде демалу және кешті SPA-мен аяқтау.",
+    advantages: [
+      ["Ыстықкөлдің бірінші желісі", "Демалыс көлдің айналасында құрылады: жағалау, жеке жағажай және ұзын пирс курорт бағытының ішінде."],
+      ["Жеке жағажай", "Суға бару үшін бөлек сапар жоспарлаудың қажеті жоқ — жағажай аумақтың табиғи жалғасы."],
+      ["150 метрлік пирс", "Курорттың негізгі көрініс нүктелерінің бірі: серуен, Ыстықкөл ауасы және ашық су көрінісі."],
+      ["SPA және массаж", "Белсенді күннен кейін тыныш демалыс пен қалпына келуге ауысуға болады."],
+      ["15×8 м бассейн", "Ашық бассейн көл жағасындағы демалысты толықтырады және күндізгі курорт ырғағына сай."],
+      ["Орналастырудың 12 санаты", "Ықшам бір орындық бөлмелерден екі бөлмелі нұсқалар мен асүйі бар апартаменттерге дейін."],
+    ],
+    rooms: ["Бөлмелер", "Барлық 12 санат.<br />Асықпай таңдаңыз.", "Ықшам бір орындық нұсқалардан кең екі бөлмелі санаттар мен апартаменттерге дейін. Сыйымдылықты, ауданды және маусымдық бағаны салыстырып, санатты ашып күндерді тексеріңіз.", "Толық каталогты ашу →", "Жоғары маусым", "сом / түн", "Санатты көру →"],
+    territory: ["Курорт аумағы", "Алғашқы қадамнан<br />пирстің соңына дейін", "Курорттың толық бағытын өтіңіз — орналасудан және күндізгі демалыстан жеке жағажайға және Ыстықкөлдің ашық кеңістігіне шығатын ұзын пирске дейін.", "Үш Тәж · аумақ", "Ғимараттар, жасыл аймақ және курорт ішіндегі бағыт"],
+    territoryJourney: [
+      ["Келу және орналасу", "Демалысты артық әуресіз бастаңыз: санатты алдын ала таңдап, күндер бойынша бос орынды тексеріп, мәліметтерді менеджермен келісіңіз."],
+      ["Курорт аумағы", "Орналасқаннан кейін негізгі демалыс сценарийі бір аумақта өтеді: бөлме, бассейн, SPA және көлге апарар жол."],
+      ["Ашық бассейн", "15×8 м бассейн — серуен мен сапарлардың арасында тыныш демалуға арналған жеке күндізгі аймақ."],
+      ["SPA және массаж", "Кешке белсенділіктен қалпына келуге және баяу ырғаққа ауысуға болады."],
+      ["Жеке жағажай", "Жазғы күннің негізгі нүктесі — курорттан шықпай-ақ Ыстықкөл жағасы."],
+      ["150 метрлік пирс", "Бағыттың финалы — ұзын пирс, ашық су және Ыстықкөлдің ерекше кеңдігі."],
+    ],
+    amenitiesHead: ["Көл және су жағасындағы демалыс", "Ыстықкөл — әр<br />күннің бір бөлігі.", "Жеке жағажай, 150 метрлік пирс және ашық су демалыс ырғағын қалыптастырады. Жағалауда тыныш күн өткізуге де, судағы белсенділікті қосуға да болады.", "Жеке жағажай", "150 м пирс", "Ашық бассейн 15×8 м", "Күндерді тексеру", "Ыстықкөл", "Жағажай · пирс · су · жазғы әсерлер"],
+    amenities: [
+      ["Су жағасындағы демалыс", "Жеке жағажай, 150 м пирс және 15×8 м ашық бассейн курорт ішінде толық су сценарийін жасайды."],
+      ["SPA & Recovery", "SPA мен массаж жағажайдағы демалысты қалпына келу және тыныш кешпен толықтырады."],
+      ["Отбасыларға", "Санаттардың кең таңдауы бір қонаққа, жұпқа немесе төрт адамға дейінгі отбасыға лайық нұсқа табуға мүмкіндік береді."],
+      ["Ұзақ тұру", "Кең апартаменттер мен асүйі бар санат бір-екі түннен ұзақ келгенде ыңғайлы."],
+      ["Менеджер көмегі", "Егер өзіңіз салыстырғыңыз келмесе, менеджер санатты, күндерді және қосымша қызметтерді таңдауға көмектеседі."],
+      ["Икемді демалыс", "Тыныш жағажай демалысын, Ыстықкөл бойынша белсенді бағдарламаны немесе топтық сапарды өз мақсатыңызға сай құруға болады."],
+    ],
+    reviewsHead: ["Қонақтар пікірі", "Сапардан кейін<br />не есте қалады", "Қонақтар көбіне көлге жақын орналасуды, жеке жағажайды, пирсті және күннің көп бөлігін бір курорт кеңістігінде өткізу мүмкіндігін атап өтеді."],
+    reviews: [
+      ["Ыстықкөл жағасындағы орналасу", "Қонақтар суға жақын тұрып, жағажайға күн сайын бөлек баруға уақыт кетпейтінін ерекше бағалайды."],
+      ["Жағажай және пирс", "Жеке жағалау мен ұзын пирс — демалыстың және сапар фотоларының есте қаларлық бөліктерінің бірі."],
+      ["Орналасу нұсқасын таңдау", "Әртүрлі санаттар жұпқа, отбасыға, компанияға немесе ұзақ демалысқа лайық нұсқа таңдауға көмектеседі."],
+      ["Курорт ырғағы", "Көл, бассейн, SPA және аумақ бір күн ішінде белсенділік пен тыныш демалысты үйлестіруге мүмкіндік береді."],
+    ],
+    extrasHead: ["Қосымша", "Демалыс курорт аумағымен шектелмейді", "Көбірек әсер немесе мүмкіндігінше қарапайым бағыт керек болса, қосымша қызметтерді тұрумен бірге келісуге болады."],
+    extras: [
+      ["Экскурсиялар мен турлар", "Ыстықкөл бойынша сапарлар мен әсерлерді таңдауға көмектесеміз. Нақты бағдарлама мен қолжетімділік өтініш кезінде расталады."],
+      ["Трансфер", "Шолпан-Атаға дейінгі трансфер мен бағытты алдын ала талқылауға болады."],
+      ["Такси және сапарлар", "Жеке бағыттар үшін менеджер көлік мәселесі бойынша көмектеседі."],
+      ["Судағы белсенділік", "Маусымға қарай қолжетімді су ойын-сауықтары мен серуендерді келер алдында нақтылауға болады."],
+    ],
+    groupCta: "Топтық келуді талқылау",
+    groups: [
+      ["Корпоративтік келулер", "Команданы орналастыру, ұйымдастырушымен бір арнада байланысу және тұру бағдарламасын келісу."],
+      ["Спорттық жиындар", "Топ құрамына сай бөлмелерді таңдап, тұру және тамақтану режимін алдын ала талқылаймыз."],
+      ["Арнайы мәзір", "Спорттық және ұйымдасқан топтар үшін рацион мен тамақтану кестесіне жеке талаптарды алдын ала талқылауға болады."],
+      ["Топтар және іс-шаралар", "Орналастыруды, тамақтануды, трансферді және қосымша белсенділікті бір түсінікті бағдарламаға біріктіруге көмектесеміз."],
+    ],
+    contacts: ["Байланыс және жол", "Шолпан-Ата.<br />Ыстықкөл жағасы.", "Брондау", "WhatsApp / менеджер", "Email", "Сапар алдында", "Байланыстарды сақтап қойыңыз — қалғанын ұйымдастыруға көмектесеміз", "Бөлме таңдау, топтық орналастыру, трансфер немесе Ыстықкөл бойынша қосымша бағдарлама керек болса, менеджерге жазыңыз.", "Күндерді таңдау", "Google Maps ашу ↗"],
+    final: ["Үш Тәж · Resort & SPA", "Күндерді таңдаңыз.<br />Ыстықкөл күтіп тұр.", "Бос санаттарды және сіздің кезеңіңізге тұру құнын тексеріңіз.", "Бөлмелерді тексеру"],
+    footer: ["Үш Тәж · Resort & SPA", "Бөлмелер", "Аумақ", "Топтарға", "Байланыс"], mobileBook: "Бос бөлмелерді тексеру",
+  },
   en: {
     heroMeta: ["rooms", "categories", "pier", "pool"], scroll: "Start",
     bookingTrust: ["Live availability", "Full-stay price", "Manager support"],
@@ -128,6 +185,12 @@ const ROOMS_PAGE = {
     truth: [["Баасы даталарга жараша өзгөрөт.", "Сезондук прайс категорияларды салыштырууга жардам берет, ал эми бүт мезгилдин так суммасы тандалган даталар текшерилгенден кийин көрсөтүлөт."], ["Өтүнмө ≠ ырасталган бронь.", "Өтүнмө жөнөтүлгөндөн кийин номер автоматтык түрдө кармалбайт. Менеджер шарттарды жана алдын ала төлөмдү макулдашат; активдүү бронь менеджер ырастагандан кийин гана пайда болот."]],
     footer: "Брондоо: +996 558 08 50 02",
   },
+  kz: {
+    hero: ["Орналастыру · 12 санат", "Демалыс<br />ырғағыңызға сай бөлме", "Бір-екі қонаққа арналған ықшам нұсқалардан кең екі бөлмелі санаттар мен апартаменттерге дейін. Формат пен бағаны салыстырып, күндеріңізге не бос екенін тексеріңіз.", "Санаттарды көру", "Күндерді тексеру"],
+    catalog: ["Каталог", "12 санат.<br />Өзіңізге лайықтысын таңдаңыз.", "Сыйымдылықты, ауданды және маусымдық бағаны салыстырыңыз. Нақты бөлме мәліметтері мен қосымша орындарды бронь расталмай тұрып менеджерден нақтылауға болады.", "Жоғары маусым", "сом / түн", "Санат туралы толығырақ →"],
+    truth: [["Баға күндерге байланысты.", "Маусымдық прайс санаттарды салыстыруға көмектеседі, ал бүкіл кезеңнің нақты сомасы таңдалған күндерді тексергеннен кейін көрсетіледі."], ["Өтінім ≠ расталған бронь.", "Өтінім жіберілгеннен кейін бөлме автоматты түрде ұсталып тұрмайды. Менеджер шарттар мен алдын ала төлемді келіседі; белсенді бронь менеджер растағаннан кейін ғана пайда болады."]],
+    footer: "Брондау: +996 558 08 50 02",
+  },
   en: {
     hero: ["Accommodation · 12 categories", "A room for your<br />holiday rhythm", "From compact options for one or two guests to spacious two-room categories and apartments. Compare the format and price, then check what is free for your dates.", "Browse categories", "Check dates"],
     catalog: ["Catalogue", "12 categories.<br />Choose yours.", "Compare capacity, area and seasonal rates. Details of the exact room and extra-bed options can be confirmed with the manager before the reservation is finalised.", "High season", "KGS / night", "Category details →"],
@@ -139,6 +202,9 @@ const ROOMS_PAGE = {
 const ROOM_DETAIL = {
   kg: {
     back: "← Бардык категориялар", category: "Категория", availability: "Бош орун — тандалган даталар боюнча", eyebrow: "Категория жөнүндө", title: "Көл жээгиндеги<br />сиздин эс алуу форматы", tail: "Брондоодон мурун менеджер конкреттүү номердин деталдарын жана керек болсо кошумча орундарды тактоого жардам берет.", placement: "Жайгашуу", area: "Аянты", how: "Кантип брондоо керек", safety: "Төмөндө даталарды тандап, бош орунду жана акыркы сумманы көрүңүз. Жөнөтүлгөн өтүнмө номерди автоматтык түрдө кармабайт: ырасталган бронь шарттар жана алдын ала төлөм макулдашылгандан кийин менеджер тарабынан түзүлөт.", summer: "Жайкы прайс · 2026", periods: ["1-июнь — 6-июль", "7-июль — 25-август", "26-август — 15-сентябрь"], note: "Баасы сезондук мезгил боюнча номер / түн үчүн көрсөтүлгөн. Бүт эс алуунун так суммасы даталарды тандагандан кийин эсептелет.", cta: "Даталарды текшерүү", footer: "Брондоо: +996 558 08 50 02",
+  },
+  kz: {
+    back: "← Барлық санаттар", category: "Санат", availability: "Бос орын — таңдалған күндер бойынша", eyebrow: "Санат туралы", title: "Көл жағасындағы<br />сіздің демалыс форматы", tail: "Брондау алдында менеджер нақты бөлменің мәліметтерін және қажет болса қосымша орындарды нақтылауға көмектеседі.", placement: "Орналастыру", area: "Ауданы", how: "Қалай брондау керек", safety: "Төменде күндерді таңдап, бос орынды және толық соманы көріңіз. Жіберілген өтінім бөлмені автоматты түрде ұстап тұрмайды: расталған бронь шарттар мен алдын ала төлем келісілгеннен кейін менеджер арқылы жасалады.", summer: "Жазғы прайс · 2026", periods: ["1 маусым — 6 шілде", "7 шілде — 25 тамыз", "26 тамыз — 15 қыркүйек"], note: "Баға маусымдық кезең бойынша бөлме / түн үшін көрсетілген. Бүкіл тұрудың нақты сомасы күндерді таңдағаннан кейін есептеледі.", cta: "Күндерді тексеру", footer: "Брондау: +996 558 08 50 02",
   },
   en: {
     back: "← All categories", category: "Category", availability: "Availability — for your selected dates", eyebrow: "About this category", title: "Your way to stay<br />by the lake", tail: "Before booking, the manager can help confirm details of the exact room and any extra-bed requirements.", placement: "Accommodation", area: "Area", how: "How to book", safety: "Choose dates below to see availability and the full price. A submitted request does not automatically hold the room: a confirmed reservation is created by the manager after the terms and prepayment are agreed.", summer: "Summer rates · 2026", periods: ["1 June — 6 July", "7 July — 25 August", "26 August — 15 September"], note: "The price is per room / night for the seasonal period. The exact full-stay total is calculated after you choose dates.", cta: "Check dates", footer: "Reservations: +996 558 08 50 02",
@@ -173,7 +239,7 @@ function relabelPrice(root: ParentNode, suffix: string) {
   if (number) strong.textContent = `${number} ${suffix}`;
 }
 
-function localizeHome(locale: "kg" | "en") {
+function localizeHome(locale: "kg" | "kz" | "en") {
   const c = HOME[locale];
   document.querySelectorAll<HTMLElement>(".v3-hero-meta span").forEach((el, index) => {
     const b = el.querySelector("b");
@@ -205,7 +271,7 @@ function localizeHome(locale: "kg" | "en") {
   setText(".home-footer-inner > strong", c.footer[0]); document.querySelectorAll<HTMLElement>(".home-footer-links a").forEach((el, i) => { if (c.footer[1 + i]) el.textContent = c.footer[1 + i]; }); setText(".mobile-book", c.mobileBook);
 }
 
-function localizeRoomsIndex(locale: "kg" | "en") {
+function localizeRoomsIndex(locale: "kg" | "kz" | "en") {
   const c = ROOMS_PAGE[locale];
   setText(".rooms-hero-content .eyebrow", c.hero[0]); setHtml("#rooms-page-title", c.hero[1]); setText(".rooms-hero-copy", c.hero[2]); document.querySelectorAll<HTMLElement>(".rooms-hero-actions a").forEach((el, i) => { if (c.hero[3 + i]) el.textContent = c.hero[3 + i]; });
   setText(".catalog-heading .eyebrow", c.catalog[0]); setHtml("#catalog-title", c.catalog[1]); setText(".catalog-heading > p", c.catalog[2]);
@@ -217,21 +283,21 @@ function localizeRoomsIndex(locale: "kg" | "en") {
   });
   document.querySelectorAll<HTMLElement>(".catalog-truth > div").forEach((box, i) => { const copy = c.truth[i]; if (!copy) return; setText("strong", copy[0], box); setText("p", copy[1], box); });
   setText(".rooms-footer a[href^='tel:']", c.footer);
-  document.title = locale === "en" ? "Rooms and Apartments · Three Crowns" : "Номерлер жана апартаменттер · Үч Таажы";
+  document.title = locale === "en" ? "Rooms and Apartments · Three Crowns" : locale === "kz" ? "Бөлмелер мен апартаменттер · Үш Тәж" : "Номерлер жана апартаменттер · Үч Таажы";
 }
 
-function localizeRoomDetail(locale: "kg" | "en", slug: string) {
+function localizeRoomDetail(locale: "kg" | "kz" | "en", slug: string) {
   const c = ROOM_DETAIL[locale]; const room = getLocalizedRoomCopy(slug, locale); if (!room) return;
-  setText(".room-detail-back", c.back); setText(".room-detail-hero-content .eyebrow", `${c.category} ${document.querySelector(".room-detail-hero-content .eyebrow")?.textContent?.match(/\d+/)?.[0] ?? ""} · ${locale === "en" ? "Three Crowns" : "Үч Таажы"}`); setText("#room-detail-title", room.name);
+  setText(".room-detail-back", c.back); setText(".room-detail-hero-content .eyebrow", `${c.category} ${document.querySelector(".room-detail-hero-content .eyebrow")?.textContent?.match(/\d+/)?.[0] ?? ""} · ${locale === "en" ? "Three Crowns" : locale === "kz" ? "Үш Тәж" : "Үч Таажы"}`); setText("#room-detail-title", room.name);
   const kicker = document.querySelectorAll<HTMLElement>(".room-detail-kicker span"); if (kicker[0]) kicker[0].textContent = room.capacity; if (kicker[2]) kicker[2].textContent = c.availability;
   setText(".room-detail-copy .eyebrow", c.eyebrow); setHtml(".room-detail-copy h2", c.title); setText(".room-detail-copy .lead", `${room.summary} ${c.tail}`); const facts = document.querySelectorAll<HTMLElement>(".room-detail-facts > div"); if (facts[0]) { setText("span", c.placement, facts[0]); setText("strong", room.capacity, facts[0]); } if (facts[1]) setText("span", c.area, facts[1]);
   setText(".room-detail-safety strong", c.how); setText(".room-detail-safety p", c.safety); setText(".room-rate-card > p:first-child", c.summer); document.querySelectorAll<HTMLElement>(".room-rate-row span").forEach((el, i) => { if (c.periods[i]) el.textContent = c.periods[i]; }); document.querySelectorAll<HTMLElement>(".room-rate-row").forEach((row) => relabelPrice(row, locale === "en" ? "KGS" : "сом")); setText(".room-rate-note", c.note); setText(".room-rate-cta", c.cta); setText(".rooms-footer a[href^='tel:']", c.footer);
-  document.title = `${room.name} · ${locale === "en" ? "Three Crowns" : "Үч Таажы"}`;
-  const meta = document.querySelector<HTMLMetaElement>('meta[name="description"]'); if (meta) meta.content = locale === "en" ? `${room.name} at Three Crowns Resort & SPA: ${room.capacity}. Seasonal rates and live availability for your dates.` : `${room.name} · Үч Таажы Resort & SPA: ${room.capacity}. Сезондук баалар жана даталар боюнча актуалдуу бош орундар.`;
+  document.title = `${room.name} · ${locale === "en" ? "Three Crowns" : locale === "kz" ? "Үш Тәж" : "Үч Таажы"}`;
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="description"]'); if (meta) meta.content = locale === "en" ? `${room.name} at Three Crowns Resort & SPA: ${room.capacity}. Seasonal rates and live availability for your dates.` : locale === "kz" ? `${room.name} · Үш Тәж Resort & SPA: ${room.capacity}. Маусымдық бағалар және күндер бойынша өзекті бос орындар.` : `${room.name} · Үч Таажы Resort & SPA: ${room.capacity}. Сезондук баалар жана даталар боюнча актуалдуу бош орундар.`;
 }
 
 function apply(locale: PublicLocale) {
-  document.documentElement.lang = locale === "kg" ? "ky" : locale;
+  document.documentElement.lang = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
   if (locale === "ru") return;
   const pathname = window.location.pathname.replace(/\/$/, "") || "/";
   if (pathname === "/") localizeHome(locale);

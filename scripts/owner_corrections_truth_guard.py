@@ -70,7 +70,7 @@ def main() -> None:
         fail("owner guest-service defaults drifted from cutoff=60, delivery=200, housekeeping=3, linen=true")
 
     defaults = json.loads(SITE_DEFAULTS.read_text(encoding="utf-8"))
-    for locale in ("ru", "kg", "en"):
+    for locale in ("ru", "kg", "kz", "en"):
         conference = defaults[locale]["conference"]
         if "20" not in conference["capacity"] or "120" not in conference["capacity"]:
             fail(f"{locale} conference capacity drifted")

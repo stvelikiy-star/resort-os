@@ -39,15 +39,40 @@ async def main() -> None:
 
         created = await owner.post(
             "/api/v1/kitchen/menu",
-            json={"code": code, "category": "MAIN", "name_ru": "CI блюдо", "price_kgs": 321, "is_active": True, "is_draft": True},
+            json={
+                "code": code,
+                "category": "MAIN",
+                "name_ru": "CI блюдо",
+                "name_kg": "CI тамагы",
+                "name_kz": "CI тағамы",
+                "name_en": "CI dish",
+                "price_kgs": 321,
+                "is_active": True,
+                "is_draft": True,
+            },
         )
         check(created.status_code == 201, f"owner create failed: {created.status_code} {created.text}")
         item = created.json()
         check(item["code"] == code and item["is_draft"] is True, "new item must be a draft")
+        check(
+            item["name_ru"] == "CI блюдо"
+            and item["name_kg"] == "CI тамагы"
+            and item["name_kz"] == "CI тағамы"
+            and item["name_en"] == "CI dish",
+            "multilingual menu names were not persisted",
+        )
 
         denied_create = await dining.post(
             "/api/v1/kitchen/menu",
-            json={"code": f"{code}_NO", "category": "MAIN", "name_ru": "Forbidden", "price_kgs": 1},
+            json={
+                "code": f"{code}_NO",
+                "category": "MAIN",
+                "name_ru": "Forbidden",
+                "name_kg": "Тыюу салынган",
+                "name_kz": "Тыйым салынған",
+                "name_en": "Forbidden",
+                "price_kgs": 1,
+            },
         )
         check(denied_create.status_code == 403, f"DINING_STAFF create must be 403, got {denied_create.status_code}")
 

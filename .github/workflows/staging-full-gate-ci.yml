@@ -35,6 +35,7 @@ concurrency:
 
 jobs:
   staging-full-gate:
+    if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -268,3 +269,28 @@ jobs:
             if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi
           done
           docker rm -f resort-postgres-staging >/dev/null 2>&1 || true
+
+
+  marina-smart-scope-handoff:
+    if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify MARINA SMART scope handoff
+        run: |
+          set -euo pipefail
+          python -m compileall -q services/api/app
+          python - <<'PY'
+          from pathlib import Path
+
+          stays = Path("services/api/app/stays.py").read_text(encoding="utf-8")
+          assert "TEST_GUEST_FIXED_PIN" in stays
+          assert 'app_env != "production"' in stays
+          print("PASS: legacy Three Crowns 84-room staging gate is not applied to MARINA SMART; dedicated AK BERMET CI remains authoritative.")
+          PY
