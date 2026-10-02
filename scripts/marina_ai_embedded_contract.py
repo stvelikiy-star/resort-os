@@ -38,7 +38,7 @@ def main() -> int:
     require('LIVE_HOTEL_ROLES = {"OWNER", "MANAGER", "RECEPTION"}' in backend, "hotel live scope is role bounded")
     require('role == "MAID"' in backend and "HOUSEKEEPING" in backend, "housekeeping live scope")
     require('role == "TECHNICIAN"' in backend and "MAINTENANCE" in backend, "maintenance live scope")
-    require('"task_counts"' in backend and '"overdue_by_service_date"' in backend, "line-staff context includes actionable task counts")
+    require('"task_counts"' in backend and "AS overdue_by_service_date" in backend, "line-staff context includes actionable task counts")
     require('"scope_rule": "Only unassigned housekeeping tasks' in backend, "maid context remains assignment scoped")
     require('"scope_rule": "Only unassigned maintenance tasks' in backend, "technician context remains assignment scoped")
     require('"availability_today"' in backend and '"available_tonight"' in backend, "agent receives aggregate availability without cross-agency detail")
