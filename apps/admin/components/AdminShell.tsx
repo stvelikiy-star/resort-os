@@ -315,7 +315,7 @@ export default function AdminShell() {
         onNavigate={(destination) => setTab(destination)}
         onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
       />}
-      <MarinaAiAssistant screen={tab} role={user.role} />
+      <MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => setTab(destination as Tab)} />
     </>
   );
 }
