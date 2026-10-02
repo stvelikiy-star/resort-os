@@ -41,7 +41,7 @@ def main() -> int:
     require('"task_counts"' in backend and "AS overdue_by_service_date" in backend, "line-staff context includes actionable task counts")
     require('"scope_rule": "Only unassigned housekeeping tasks' in backend, "maid context remains assignment scoped")
     require('"scope_rule": "Only unassigned maintenance tasks' in backend, "technician context remains assignment scoped")
-    require('"availability_today"' in backend and '"available_tonight"' in backend, "agent receives aggregate availability without cross-agency detail")
+    require('"availability_today"' in backend and "AS available_tonight" in backend, "agent receives aggregate availability without cross-agency detail")
     require('"required_prepayment_kgs"' in backend, "agent context includes own request prepayment requirement")
     require('"opened_at"' in backend, "dining context exposes operational order age")
     require("LIVE_DINING_ROLES" in backend and "kitchen_orders" in backend, "dining live scope")
