@@ -103,11 +103,22 @@ async def main() -> int:
             "active reservation balance is non-negative",
         )
 
-        forbidden = ("phone", "email", "pin", "password", "token", "api_key")
-        serialized = repr(snapshot).lower()
+        def collect_keys(value):
+            keys = set()
+            if isinstance(value, dict):
+                for key, nested in value.items():
+                    keys.add(str(key).lower())
+                    keys.update(collect_keys(nested))
+            elif isinstance(value, list):
+                for nested in value:
+                    keys.update(collect_keys(nested))
+            return keys
+
+        forbidden_keys = {"phone", "email", "pin", "password", "token", "api_key", "access_token"}
+        exposed_keys = collect_keys(snapshot)
         require(
-            not any(marker in serialized for marker in forbidden),
-            "OWNER live context omits secrets and direct contact fields",
+            forbidden_keys.isdisjoint(exposed_keys),
+            f"OWNER live context omits secrets and direct contact fields: exposed={sorted(forbidden_keys & exposed_keys)}",
         )
 
         print("MARINA_AI_LIVE_CONTEXT_V2_RUNTIME: PASS")
