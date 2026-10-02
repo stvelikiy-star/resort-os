@@ -5,6 +5,7 @@ import styles from "./MarinaAiAssistant.module.css";
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type Locale = "ru" | "kg" | "kz" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 
 type Props = {
   screen: string;
@@ -17,6 +18,11 @@ const QUICK = [
   "Я новичок. Обучи меня",
   "Не получается — помоги",
 ];
+
+function currentLocale(): Locale {
+  const raw = window.localStorage.getItem("marina-smart-staff-locale");
+  return raw === "kg" || raw === "kz" || raw === "en" ? raw : "ru";
+}
 
 function currentLocale(): Locale {
   const raw = window.localStorage.getItem("marina-smart-staff-locale");
