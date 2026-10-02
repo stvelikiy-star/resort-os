@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'services/api/app/marina_assistant.py'
+      - 'services/api/app/marina_assistant_context.py'
       - 'services/api/app/marina_assistant_knowledge.md'
       - 'services/api/app/app_entry.py'
       - 'apps/admin/components/MarinaAiAssistant.tsx'
@@ -27,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile backend
-        run: python -m py_compile services/api/app/marina_assistant.py services/api/app/app_entry.py
+        run: python -m py_compile services/api/app/marina_assistant.py services/api/app/marina_assistant_context.py services/api/app/app_entry.py
       - name: Embedded assistant contract
         run: python scripts/marina_ai_embedded_contract.py
 
