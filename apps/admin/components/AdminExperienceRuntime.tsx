@@ -159,7 +159,9 @@ const exact: Record<string, Phrase> = {
   "RECEPTION": { ru: "РЕСЕПШЕН", kg: "КАБЫЛ АЛУУ", en: "RECEPTION" },
   "MAID": { ru: "ГОРНИЧНАЯ", kg: "БӨЛМӨ КЫЗМАТКЕРИ", en: "MAID" },
   "TECHNICIAN": { ru: "ТЕХНИК", kg: "ТЕХНИК", en: "TECHNICIAN" },
-  "DINING_STAFF": { ru: "РЕСТОРАН", kg: "РЕСТОРАН КЫЗМАТКЕРИ", en: "DINING STAFF" },
+  "DINING_STAFF": { ru: "УСТАРЕВШИЙ ДОСТУП", kg: "ЭСКИ ТАМАКТАНУУ", en: "LEGACY DINING" },
+  "COOK": { ru: "ПОВАР", kg: "АШПОЗЧУ", en: "COOK" },
+  "WAITER": { ru: "ОФИЦИАНТ", kg: "ОФИЦИАНТ", en: "WAITER" },
   "STORE_STAFF": { ru: "МАГАЗИН", kg: "ДҮКӨН КЫЗМАТКЕРИ", en: "STORE STAFF" },
   "Request": { ru: "Заявка", kg: "Өтүнмө", en: "Request" },
 };
