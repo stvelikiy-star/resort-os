@@ -27,7 +27,7 @@ def main() -> int:
         'ADD COLUMN IF NOT EXISTS "tenantId"',
         "legacy_",
         'FOREIGN KEY ("tenantId")',
-        'ON DELETE RESTRICT',
+        "ON DELETE RESTRICT",
         '"properties_tenant_code_key"',
     ):
         if marker not in migration:
@@ -73,6 +73,17 @@ def main() -> int:
     ):
         if marker not in staging_gate:
             raise AssertionError(f"staging gate marker missing: {marker}")
+
+    staging_workflow = read(".github/workflows/marina-multitenant-staging-gate.yml")
+    for marker in (
+        "workflow_dispatch:",
+        "MARINA_STAGING_BASE_URL",
+        "MARINA_STAGING_DATABASE_URL",
+        "verify_marina_multitenant_staging.py",
+        "contents: read",
+    ):
+        if marker not in staging_workflow:
+            raise AssertionError(f"manual staging workflow marker missing: {marker}")
 
     production_env = read(".env.production.example")
     if "MARINA_TENANT_CONTEXT_ENABLED=false" not in production_env:
