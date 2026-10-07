@@ -48,7 +48,7 @@ const COPY = {
     free: "Свободно", yourDates: "На ваши даты", childrenReview: "детские места уточняются", fullPeriod: "за весь период", onRequest: "По запросу", managerPrice: "стоимость подтвердит менеджер",
     selected: "Выбрано", request: "Оставить заявку", askManager: "Уточнить у менеджера", requestEyebrow: "Заявка менеджеру", requestIntro: "Передадим выбранные даты и категорию. Менеджер согласует условия и предоплату.",
     name: "Имя", namePlaceholder: "Как к вам обращаться", phone: "Телефон", email: "Email, если нужен", sending: "Отправляем…", send: "Отправить заявку",
-    marketingConsent: "Хочу получать специальные предложения от «Три Короны» в WhatsApp.",
+    marketingConsent: "Хочу получать специальные предложения от «AK BERMET» в WhatsApp.",
     marketingOptional: "Необязательно. Согласие можно отозвать в любой момент.", privacy: "Политика конфиденциальности", consentDetails: "Условия согласия",
     disclaimer: "Отправка заявки не блокирует номер автоматически. Подтверждение брони делает менеджер после согласования условий и предоплаты.",
     breakfast: "Завтрак включён", noMeal: "Без питания", mixedMeal: "Условия питания меняются по датам", currency: "сом",
@@ -64,7 +64,7 @@ const COPY = {
     free: "Бош", yourDates: "Сиздин даталарга", childrenReview: "балдардын орундары такталат", fullPeriod: "бүт мезгил үчүн", onRequest: "Суроо боюнча", managerPrice: "бааны менеджер ырастайт",
     selected: "Тандалды", request: "Өтүнмө калтыруу", askManager: "Менеджерден тактоо", requestEyebrow: "Менеджерге өтүнмө", requestIntro: "Тандалган даталарды жана категорияны өткөрүп беребиз. Менеджер шарттарды жана алдын ала төлөмдү макулдашат.",
     name: "Аты-жөнү", namePlaceholder: "Сизге кантип кайрылалы", phone: "Телефон", email: "Email, керек болсо", sending: "Жөнөтүлүүдө…", send: "Өтүнмө жөнөтүү",
-    marketingConsent: "«Три Короны» мейманканасынан WhatsApp аркылуу атайын сунуштарды алгым келет.",
+    marketingConsent: "«AK BERMET» мейманканасынан WhatsApp аркылуу атайын сунуштарды алгым келет.",
     marketingOptional: "Милдеттүү эмес. Макулдукту каалаган убакта жокко чыгарууга болот.", privacy: "Купуялык саясаты", consentDetails: "Макулдуктун шарттары",
     disclaimer: "Өтүнмө жөнөтүү номерди автоматтык түрдө кармабайт. Бронду менеджер шарттар жана алдын ала төлөм макулдашылгандан кийин ырастайт.",
     breakfast: "Эртең мененки тамак кирет", noMeal: "Тамак-ашсыз", mixedMeal: "Тамактануу шарттары даталарга жараша өзгөрөт", currency: "сом",
@@ -80,7 +80,7 @@ const COPY = {
     free: "Бос", yourDates: "Сіздің күндеріңізге", childrenReview: "балалар орындары нақтыланады", fullPeriod: "бүкіл кезең үшін", onRequest: "Сұрау бойынша", managerPrice: "бағаны менеджер растайды",
     selected: "Таңдалды", request: "Өтінім қалдыру", askManager: "Менеджерден нақтылау", requestEyebrow: "Менеджерге өтінім", requestIntro: "Таңдалған күндер мен санатты жібереміз. Менеджер шарттар мен алдын ала төлемді келіседі.",
     name: "Аты-жөні", namePlaceholder: "Сізге қалай жүгінейік", phone: "Телефон", email: "Email, міндетті емес", sending: "Жіберілуде…", send: "Өтінімді жіберу",
-    marketingConsent: "«Үш Тәж» қонақүйінен WhatsApp арқылы арнайы ұсыныстар алғым келеді.",
+    marketingConsent: "«AK BERMET» қонақүйінен WhatsApp арқылы арнайы ұсыныстар алғым келеді.",
     marketingOptional: "Міндетті емес. Келісімді кез келген уақытта қайтарып алуға болады.", privacy: "Құпиялылық саясаты", consentDetails: "Келісім шарттары",
     disclaimer: "Өтінім жіберу бөлмені автоматты түрде ұстап тұрмайды. Броньды менеджер шарттар мен алдын ала төлем келісілгеннен кейін растайды.",
     breakfast: "Таңғы ас кіреді", noMeal: "Тамақсыз", mixedMeal: "Тамақтану шарттары күндерге қарай өзгереді", currency: "сом",
@@ -96,7 +96,7 @@ const COPY = {
     free: "Available", yourDates: "For your dates", childrenReview: "children’s places to be confirmed", fullPeriod: "for the full stay", onRequest: "On request", managerPrice: "price will be confirmed by the manager",
     selected: "Selected", request: "Send request", askManager: "Ask the manager", requestEyebrow: "Request to manager", requestIntro: "We will pass on your selected dates and category. The manager will agree the terms and prepayment.",
     name: "Name", namePlaceholder: "How should we address you?", phone: "Phone", email: "Email, optional", sending: "Sending…", send: "Send request",
-    marketingConsent: "I want to receive special offers from Three Crowns via WhatsApp.",
+    marketingConsent: "I want to receive special offers from AK BERMET via WhatsApp.",
     marketingOptional: "Optional. You can withdraw consent at any time.", privacy: "Privacy notice", consentDetails: "Consent terms",
     disclaimer: "Submitting a request does not automatically hold a room. A manager confirms the reservation after the terms and prepayment are agreed.",
     breakfast: "Breakfast included", noMeal: "No meals", mixedMeal: "Meal terms vary by date", currency: "KGS",
@@ -189,8 +189,8 @@ export default function BookingWidget() {
   useEffect(() => {
     const updateLocale = () => setLocale(resolveClientLocale());
     updateLocale();
-    window.addEventListener("three-crowns:content-ready", updateLocale);
-    return () => window.removeEventListener("three-crowns:content-ready", updateLocale);
+    window.addEventListener("marina-smart:content-ready", updateLocale);
+    return () => window.removeEventListener("marina-smart:content-ready", updateLocale);
   }, []);
 
   const validDates = useMemo(
@@ -334,7 +334,7 @@ export default function BookingWidget() {
         </div>
 
         {sortedResults.length === 0
-          ? <div className="no-results"><strong>{c.noRooms}</strong><span>{c.tryDates}</span><a href="tel:+996558085002">+996 558 08 50 02</a></div>
+          ? <div className="no-results"><strong>{c.noRooms}</strong><span>{c.tryDates}</span><a href="tel:+996558085002"></a></div>
           : <div className="availability-grid">{sortedResults.map((item) => {
               const meal = mealLabel(item.pricing.nights, locale);
               const isSelected = selected?.room_type_id === item.room_type_id;
