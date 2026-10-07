@@ -12,6 +12,7 @@ on:
       - 'scripts/bootstrap_ak_bermet_test.py'
       - 'scripts/verify_marina_client_cycle.py'
       - 'scripts/verify_marina_ai_role_runtime.py'
+      - 'scripts/verify_public_ai_privacy_contract.py'
       - 'scripts/ak_bermet_grid_browser.mjs'
       - 'scripts/admin_full_navigation_browser.mjs'
       - 'scripts/public_i18n_guard.py'
@@ -172,6 +173,9 @@ jobs:
 
       - name: Verify MARINA AI role-scoped runtime context
         run: python scripts/verify_marina_ai_role_runtime.py
+
+      - name: Verify public MARINA AI privacy and truth contract
+        run: python scripts/verify_public_ai_privacy_contract.py
 
       - name: Verify MARINA public brand and RU/KG/KZ/EN contract
         run: python scripts/public_i18n_guard.py
