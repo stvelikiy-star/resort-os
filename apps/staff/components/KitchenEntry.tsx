@@ -40,10 +40,12 @@ export default function KitchenEntry() {
   const [pulseError, setPulseError] = useState<string | null>(null);
 
   const loadPulse = useCallback(async () => {
+    if (!user) return;
     try {
+      const cookOnly = user.role === "COOK";
       const [menuBody, tablesBody, ordersBody, arrivalsBody] = await Promise.all([
-        json("/core/api/v1/kitchen/menu"),
-        json("/core/api/v1/kitchen/tables"),
+        cookOnly ? Promise.resolve({ items: [] }) : json("/core/api/v1/kitchen/menu"),
+        cookOnly ? Promise.resolve({ items: [] }) : json("/core/api/v1/kitchen/tables"),
         json("/core/api/v1/kitchen/orders?status=ACTIVE"),
         json("/core/api/v1/ops/kitchen/arrivals"),
       ]);
@@ -58,7 +60,7 @@ export default function KitchenEntry() {
       setPulse(null);
       setPulseError(e instanceof Error ? e.message : "Не удалось загрузить сводку кухни");
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,7 +170,7 @@ export default function KitchenEntry() {
       </div>
     </section>
     <ChefProduction userRole={user.role} />
-    <KitchenAdminV2 />
-    <MarinaAiAssistant screen="KITCHEN" role={user.role} />
+    {user.role !== "COOK" && <KitchenAdminV2 />
+    {user.role !== "COOK" && <MarinaAiAssistant screen="KITCHEN" role={user.role} />}
   </>;
 }
