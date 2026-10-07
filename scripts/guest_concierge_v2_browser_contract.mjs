@@ -11,8 +11,8 @@ function require(condition, message) {
 require(page.includes('GuestConciergeRuntime'), 'Guest concierge route not mounted');
 require(!page.includes('GuestRequestsPanel'), 'Duplicate legacy request panel is still mounted');
 require(!page.includes('GuestOsRuntime'), 'Legacy Guest OS runtime is still mounted');
-require(runtime.includes('three-crowns-guest-language'), 'Guest locale persistence missing');
-require(runtime.includes('three-crowns-site-language'), 'Public-site locale continuity missing');
+require(runtime.includes('marina-smart-guest-locale'), 'Guest locale persistence missing');
+require(runtime.includes('marina-smart-site-language'), 'Public-site locale continuity missing');
 require(runtime.includes('setInterval(() => void loadRequests(), 15000)'), 'Request status polling missing');
 require(runtime.includes('credentials: "include"'), 'Guest session cookie boundary missing');
 require(runtime.includes('request_code: selected'), 'OperationalTask request code missing');
