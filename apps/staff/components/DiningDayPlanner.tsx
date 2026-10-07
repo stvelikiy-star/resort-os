@@ -66,7 +66,7 @@ export default function DiningDayPlanner() {
   useEffect(() => {
     api("/core/api/v1/auth/me")
       .then((body) => {
-        if (!["OWNER", "MANAGER", "DINING_STAFF"].includes(body.role)) throw new Error("Нет доступа к меню кухни");
+        if (!["OWNER", "MANAGER"].includes(body.role)) throw new Error("Нет доступа к меню кухни");
         setUser(body);
       })
       .catch(() => setUser(null))
