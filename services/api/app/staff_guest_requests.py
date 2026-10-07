@@ -10,7 +10,9 @@ router = APIRouter(prefix="/api/v1/ops/guest-requests", tags=["staff-guest-reque
 ROLE_CODES: dict[str, set[str]] = {
     "MAID": {"HOUSEKEEPING", "TOWELS", "LINEN"},
     "TECHNICIAN": {"MAINTENANCE"},
-    "DINING_STAFF": {"MEALS"},
+    "COOK": {"MEALS"},
+    "WAITER": set(),
+    "DINING_STAFF": set(),
     "RECEPTION": {"TRANSFER", "PARKING", "SAUNA", "BILLIARDS", "EXCURSIONS", "ADMIN"},
     "OWNER": {"*"},
     "MANAGER": {"*"},
