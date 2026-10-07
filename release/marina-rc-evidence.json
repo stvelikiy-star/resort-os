@@ -6,14 +6,16 @@
   "status": "INTERNAL_CI_AND_EXTERNAL_STAGING_PARTIAL",
   "source_repository": "stvelikiy-star/resort-os",
   "source_branch": "marina-smart/live-base-20260925",
-  "merged_head": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+  "merged_head": "d36c15dd8e9e7b34a615c2537e897d4f15a3013e",
   "verified_tree": "812351dfee971c11227a4ccca499772156b78c7e",
   "verified_tree_source_commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
   "tree_equivalent_to_verified_commit": true,
   "pull_requests": [
     211,
     186,
-    213
+    213,
+    219,
+    220
   ],
   "evidence_observed_on": "2026-10-07",
   "production_cutover_authorized": false,
@@ -128,7 +130,7 @@
     "The 54/54 post-merge checks were executed against the verified tree; the squash merge kept the tree identical.",
     "Green repository CI is not proof of external production runtime.",
     "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied.",
-    "External Marina staging is now deployed on one pinned commit 419bee7ed419ca80f9e8a612d9751cbcfad4e6a8; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
+    "External Marina staging is healthy with a mixed runtime: Admin/Staff/Web remain on the verified baseline 419bee7, while API has the API-only public-AI fallback deployment 778d8f2; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
     "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified.",
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
     "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
@@ -140,7 +142,7 @@
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
     "railway_environment": "production",
     "source_branch": "marina-smart/live-base-20260925",
-    "deployed_commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+    "deployed_commit": "MIXED_RUNTIME_API_ONLY_UPDATE",
     "service_domains": {
       "api": "https://api-production-f1171.up.railway.app",
       "admin": "https://admin-production-80a1.up.railway.app",
@@ -328,7 +330,14 @@
       "deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
       "status": "SUCCESS",
       "observed_on": "2026-10-07",
-      "scope": "API only; Admin/Staff/Web remained on the previously verified runtime commit"
+      "scope": "API only; Admin/Staff/Web remained on the previously verified runtime commit 419bee7"
+    },
+    "deployment_layout": {
+      "api": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "admin": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+      "staff": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+      "web": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+      "postgres": "existing Railway service/volume; target migration ledger and restore remain unverified"
     }
   }
 }
