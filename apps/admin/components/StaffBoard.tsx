@@ -61,7 +61,9 @@ const roleLabel: Record<string, string> = {
   MAID: "Горничная",
   TECHNICIAN: "Техник",
   STORE_STAFF: "Магазин",
-  DINING_STAFF: "Столовая / ресторан",
+  DINING_STAFF: "Устаревший доступ питания",
+  COOK: "Повар",
+  WAITER: "Официант",
   CONTENT_MANAGER: "Контент-менеджер",
   BEACH_PARTNER: "Пляжный партнёр (legacy)",
 };
