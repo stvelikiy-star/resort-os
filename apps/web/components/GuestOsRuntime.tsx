@@ -56,7 +56,7 @@ const COPY = {
     error: "Не удалось открыть Guest OS. Проверьте интернет и попробуйте ещё раз.",
   },
   kg: {
-    brand: "Үч Таажы",
+    brand: "AK BERMET",
     kicker: "Guest OS · санарип консьерж",
     loading: "Бөлмөнүн QR кодун текшерип жатабыз…",
     invalidTitle: "QR жеткиликсиз",
@@ -86,7 +86,7 @@ const COPY = {
     error: "Guest OS ачылган жок. Интернет байланышын текшерип, кайра аракет кылыңыз.",
   },
   kz: {
-    brand: "Үш Тәж",
+    brand: "AK BERMET",
     kicker: "Guest OS · цифрлық консьерж",
     loading: "Бөлменің QR коды тексерілуде…",
     invalidTitle: "QR қолжетімсіз",
