@@ -117,7 +117,7 @@ jobs:
       - name: Prove current RBAC roles are reproducible by staff helper
         run: |
           STAFF_USERNAME=ci-reception STAFF_PASSWORD=CI-Reception-Password-2026 STAFF_DISPLAY_NAME='CI Reception' STAFF_ROLE=RECEPTION python scripts/upsert_staff_user.py
-          STAFF_USERNAME=ci-dining STAFF_PASSWORD=CI-Dining-Password-2026 STAFF_DISPLAY_NAME='CI Dining' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-cook STAFF_PASSWORD=CI-Cook-Password-2026 STAFF_DISPLAY_NAME='CI Cook' STAFF_ROLE=COOK python scripts/upsert_staff_user.py
           STAFF_USERNAME=ci-store STAFF_PASSWORD=CI-Store-Password-2026 STAFF_DISPLAY_NAME='CI Store' STAFF_ROLE=STORE_STAFF python scripts/upsert_staff_user.py
           STAFF_USERNAME=ci-content STAFF_PASSWORD=CI-Content-Password-2026 STAFF_DISPLAY_NAME='CI Content' STAFF_ROLE=CONTENT_MANAGER python scripts/upsert_staff_user.py
 
