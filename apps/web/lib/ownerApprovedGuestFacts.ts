@@ -36,7 +36,7 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
       title: "Соберите отдых под себя",
       intro: "Трансфер, питание и дополнительные услуги можно согласовать вместе с проживанием. Стоимость проживания в Core считается отдельно и не меняется автоматически из-за этих услуг.",
       cards: [
-        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивен 7 500 сом. Аэропорт Тамчы: седан 2 500 / минивен 3 500 сом. Бишкек: седан 5 500 / минивен 6 500 сом. Цена за автомобиль в одну сторону.", cta: "Заказать трансфер", href: transferHref("Здравствуйте! Хочу заказать трансфер в отель «Три Короны». Подскажите, пожалуйста, доступность.") },
+        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивен 7 500 сом. Аэропорт Тамчы: седан 2 500 / минивен 3 500 сом. Бишкек: седан 5 500 / минивен 6 500 сом. Цена за автомобиль в одну сторону.", cta: "Заказать трансфер", href: transferHref("Здравствуйте! Хочу заказать трансфер в отель «AK BERMET». Подскажите, пожалуйста, доступность.") },
         { code: "MEALS", title: "Трёхразовое питание", text: "Взрослый — 1 900 сом в день, ребёнок — 1 400 сом. Отдельно для взрослых: завтрак 500, обед 750, ужин 650 сом; для детей: 400 / 550 / 450 сом. Оплата в отеле." },
         { code: "PARKING", title: "Парковка", text: "Для проживающих парковка бесплатная. Ориентировочная вместимость — 20–30 автомобилей." },
         { code: "SAUNA", title: "Сауна", text: "Работает только в зимний период. 5 000 сом за 1 час, формат рассчитан на 4–5 человек." },
@@ -121,7 +121,7 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
   en: {
     reviews: {
       eyebrow: "Guest reviews · 2GIS",
-      title: "What guests say about Three Crowns",
+      title: "What guests say about AK BERMET",
       intro: "Current ratings and guest reviews are available on the hotel’s 2GIS listing. The website shows only broad review themes and does not present them as our own ratings.",
       cards: [
         { title: "Food", text: "2GIS reviews frequently mention tasty and varied meals." },
@@ -138,13 +138,13 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
       title: "Build the stay around your plans",
       intro: "Transfers, meals and additional services can be arranged together with accommodation. They do not automatically change the Core room price.",
       cards: [
-        { code: "TRANSFER", title: "Transfer", text: "Manas Airport: sedan 6,500 / minivan 7,500 KGS. Tamchy Airport: sedan 2,500 / minivan 3,500 KGS. Bishkek city: sedan 5,500 / minivan 6,500 KGS. Price is per vehicle, one way.", cta: "Order a transfer", href: transferHref("Hello! I would like to arrange a transfer to Three Crowns hotel.") },
+        { code: "TRANSFER", title: "Transfer", text: "Manas Airport: sedan 6,500 / minivan 7,500 KGS. Tamchy Airport: sedan 2,500 / minivan 3,500 KGS. Bishkek city: sedan 5,500 / minivan 6,500 KGS. Price is per vehicle, one way.", cta: "Order a transfer", href: transferHref("Hello! I would like to arrange a transfer to AK BERMET hotel.") },
         { code: "MEALS", title: "Three meals a day", text: "Adult — 1,900 KGS/day, child — 1,400 KGS/day. Separately for adults: breakfast 500, lunch 750, dinner 650 KGS; for children: 400 / 550 / 450 KGS. Payment is made at the hotel." },
         { code: "PARKING", title: "Parking", text: "Free for staying guests. Approximate capacity: 20–30 vehicles." },
         { code: "SAUNA", title: "Sauna", text: "Available in winter only. 5,000 KGS for 1 hour, intended for 4–5 guests." },
         { code: "BILLIARDS", title: "Billiards", text: "500 KGS per hour." },
         { code: "TABLE_TENNIS", title: "Table tennis", text: "Free for staying guests." },
-        { code: "EXCURSIONS", title: "Issyk-Kul tours · 2026 season", text: "Selected routes from the MIX TOUR.KG price list: Semenovskoye Gorge + hot spring — 2,000 KGS/person; Jeti-Oguz + hot spring — 3,500; Dead Lake + hot spring — 3,000; Barskoon waterfall + Skazka Gorge + Jeti-Oguz + Karakol (church and mosque) + hot spring — 4,500 KGS/person. Departures run daily from 20 June to 25 August 2026. Transfer and guide services are included; admission tickets, hot-spring entry, meals and other additional expenses are paid separately.", cta: "Choose a tour", href: transferHref("Hello! I would like to choose an Issyk-Kul excursion or tour during my stay at Three Crowns.") },
+        { code: "EXCURSIONS", title: "Issyk-Kul tours · 2026 season", text: "Selected routes from the MIX TOUR.KG price list: Semenovskoye Gorge + hot spring — 2,000 KGS/person; Jeti-Oguz + hot spring — 3,500; Dead Lake + hot spring — 3,000; Barskoon waterfall + Skazka Gorge + Jeti-Oguz + Karakol (church and mosque) + hot spring — 4,500 KGS/person. Departures run daily from 20 June to 25 August 2026. Transfer and guide services are included; admission tickets, hot-spring entry, meals and other additional expenses are paid separately.", cta: "Choose a tour", href: transferHref("Hello! I would like to choose an Issyk-Kul excursion or tour during my stay at AK BERMET.") },
         { code: "THERMAL_SPRINGS", title: "Thermal springs nearby", text: "Thermal springs are within walking distance of the hotel. The reception team can confirm the exact route." },
         { code: "WATER_ACTIVITIES", title: "Water activities on the beach", text: "Jet skis, parasailing and other seasonal activities may be offered by independent beach operators. These are not hotel services; price and availability are set by the operator." },
         { code: "RULES", title: "Hotel rules", text: "Key hotel rules, checkout time, visitor policy, housekeeping and cancellation terms are collected on a separate page.", cta: "View hotel rules", href: "/rules" },
