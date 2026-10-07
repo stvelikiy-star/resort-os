@@ -111,7 +111,7 @@ function localeFromBrowser(): GuestFactsLocale {
   if (typeof window === "undefined") return "ru";
   const query = new URLSearchParams(window.location.search).get("lang");
   if (query === "ru" || query === "kg" || query === "kz" || query === "en") return query;
-  const stored = window.localStorage.getItem("three-crowns-site-language");
+  const stored = window.localStorage.getItem("marina-smart-site-language");
   return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
 }
 
