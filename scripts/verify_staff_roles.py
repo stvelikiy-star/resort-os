@@ -115,7 +115,7 @@ def main():
     assert 'MEALS' not in reception_codes
     assert 'TOWELS' not in reception_codes
 
-    cook_codes = queue_codes(dining)
+    cook_codes = queue_codes(cook)
     assert 'MEALS' in cook_codes
     assert 'TRANSFER' not in cook_codes
     assert 'TOWELS' not in cook_codes
