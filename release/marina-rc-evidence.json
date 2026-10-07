@@ -114,13 +114,14 @@
     "live_ai_provider_verified": false,
     "manual_translation_review_verified": false,
     "restart_verified": true,
-    "public_ai_capability_contract_verified": true
+    "public_ai_capability_contract_verified": true,
+    "public_live_ai_provider_verified": true
   },
   "remaining_gates": [
     "Verify target database migration ledger and target backup/restore on Railway",
     "Run browser/API acceptance on the target for all staff and guest flows",
     "Verify real iPhone, Android and desktop staff devices",
-    "Perform live MARINA AI provider call after deployment",
+    "Verify authenticated embedded MARINA AI by staff role and complete public AI KG/KZ/EN acceptance",
     "Complete manual RU/KG/KZ/EN translation review",
     "Record immutable deployment linkage and rollback evidence",
     "No production cutover, DNS, payments or provider activation without owner gate"
@@ -135,8 +136,8 @@
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
     "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
     "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
-    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities explicitly report no configured live provider, so live AI remains pending.",
-    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, and public AI capabilities now report configured=true. No live provider request was executed."
+    "Earlier public smoke reported configured=false; after PR #219 capabilities report configured=true and a public RU provider request passed on 2026-10-07. Authenticated embedded assistant acceptance remains pending.",
+    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, and public AI capabilities now report configured=true. A subsequent public RU provider request returned HTTP 200; authenticated embedded assistant remains unverified."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -219,7 +220,14 @@
       "migration_boot_contract": {
         "command": "npx prisma migrate deploy",
         "source": "deploy/ak-bermet-test-api.Dockerfile",
-        "target_ledger_verified": false
+        "target_ledger_verified": false,
+        "observed_log": {
+          "deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
+          "timestamp": "2026-10-07T13:48:51.472835598Z",
+          "migration_directories_found": 30,
+          "pending_migrations": false,
+          "target_ledger_rows_independently_queried": false
+        }
       },
       "wss_access_control": {
         "observed_on": "2026-10-07",
@@ -321,7 +329,7 @@
         "availability_from_core": true,
         "collects_payment": false,
         "creates_confirmed_reservation": false,
-        "live_provider_call_verified": false,
+        "live_provider_call_verified": true,
         "verified_after_api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92"
       }
     },
@@ -338,6 +346,19 @@
       "staff": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
       "web": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
       "postgres": "existing Railway service/volume; target migration ledger and restore remain unverified"
+    },
+    "public_live_ai_smoke": {
+      "observed_on": "2026-10-07",
+      "endpoint": "/api/v1/public/ai-admin/chat",
+      "locale": "ru",
+      "http": 200,
+      "api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "request_scope": "Explain booking request process only; no reservation or request creation",
+      "answer_received": true,
+      "can_confirm_reservation": false,
+      "manager_handles_prepayment": true,
+      "provider_path_verified_in_source": "services/api/app/public_ai_admin.py: chat calls _ask_openai; no canned success fallback",
+      "authenticated_embedded_assistant_verified": false
     }
   }
 }
