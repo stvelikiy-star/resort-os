@@ -97,7 +97,7 @@ export default function SiteMediaRuntime() {
       })
       .catch(() => undefined);
 
-    window.addEventListener("three-crowns:content-ready", scheduleApply);
+    window.addEventListener("marina-smart:content-ready", scheduleApply);
     const observer = new MutationObserver((mutations) => {
       if (!payload) return;
       if (mutations.some((mutation) => mutation.addedNodes.length > 0)) scheduleApply();
@@ -106,7 +106,7 @@ export default function SiteMediaRuntime() {
 
     return () => {
       controller.abort();
-      window.removeEventListener("three-crowns:content-ready", scheduleApply);
+      window.removeEventListener("marina-smart:content-ready", scheduleApply);
       observer.disconnect();
       window.clearTimeout(scheduled);
     };
