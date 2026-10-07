@@ -594,7 +594,7 @@ def main() -> None:
     kitchen_menu_denied = kitchen.get("/api/v1/kitchen/menu")
     assert kitchen_menu_denied.status_code == 403, kitchen_menu_denied.text
     kitchen_orders = expect(kitchen.get("/api/v1/kitchen/orders?status=ACTIVE"), 200, "Cook order access")
-    assert isinstance(kitchen_orders.get("orders"), list)
+    assert isinstance(kitchen_orders.get("items"), list)
 
     waiter = login(WAITER_USERNAME, WAITER_PASSWORD)
     waiter_floor = expect(waiter.get("/api/v1/dining/floor"), 200, "Waiter dining floor access")
