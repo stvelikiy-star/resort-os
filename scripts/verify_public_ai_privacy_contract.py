@@ -14,9 +14,14 @@ REQUIRED = {
     '"manager_handles_prepayment": True': "prepayment remains manager-owned",
     "Do not request passport, bank-card or other sensitive data": "sensitive-data request rule is present",
     "status_code=502": "provider failures fail closed",
+    "three_crowns_guest_facts": "legacy Three Crowns facts must not be referenced",
 }
 
 for needle, label in REQUIRED.items():
+    if needle == "three_crowns_guest_facts":
+        if needle in SOURCE or "_guest_facts" in SOURCE:
+            raise SystemExit(f"FAIL: public AI still references legacy Three Crowns facts: {label}")
+        continue
     if needle not in SOURCE:
         raise SystemExit(f"FAIL: missing public AI contract: {label} ({needle})")
 

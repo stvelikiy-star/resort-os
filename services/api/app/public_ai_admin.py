@@ -9,7 +9,6 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .automation_read import _guest_facts
 from .main import check_availability, get_property_id
 
 router = APIRouter(prefix="/api/v1/public/ai-admin", tags=["public-ai-admin"])
@@ -165,7 +164,6 @@ async def _public_context(request: Request) -> dict[str, Any]:
             }
             for row in room_types
         ],
-        "guest_facts": _guest_facts(),
     }
 
 
