@@ -129,7 +129,8 @@
     "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied.",
     "External Marina staging is now deployed on one pinned commit 419bee7ed419ca80f9e8a612d9751cbcfad4e6a8; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
     "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified.",
-    "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded."
+    "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
+    "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -213,6 +214,60 @@
         "command": "npx prisma migrate deploy",
         "source": "deploy/ak-bermet-test-api.Dockerfile",
         "target_ledger_verified": false
+      }
+    },
+    "readonly_smoke": {
+      "observed_on": "2026-10-07",
+      "api": {
+        "health_http": 200,
+        "live_http": 200,
+        "ready_http": 200,
+        "openapi_http": 200,
+        "property": "AK_BERMET_TEST",
+        "rooms": 169,
+        "room_types": 16
+      },
+      "surfaces": {
+        "admin_http": 200,
+        "staff_http": 200,
+        "web_http": 200
+      },
+      "role_logins": {
+        "owner": {
+          "http": 200,
+          "role": "OWNER",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "reception": {
+          "http": 200,
+          "role": "RECEPTION",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "agent": {
+          "http": 200,
+          "role": "AGENT",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "maid": {
+          "http": 200,
+          "role": "MAID",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "technician": {
+          "http": 200,
+          "role": "TECHNICIAN",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "cook": {
+          "http": 200,
+          "role": "COOK",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "waiter": {
+          "http": 200,
+          "role": "WAITER",
+          "property_code": "AK_BERMET_TEST"
+        }
       }
     }
   }
