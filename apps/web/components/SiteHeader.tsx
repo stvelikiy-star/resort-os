@@ -22,10 +22,10 @@ type NavCopy = {
 };
 
 const NAV: Record<Locale, NavCopy> = {
-  ru: { rooms: "Номера", territory: "Территория", amenities: "На территории", reviews: "Отзывы", groups: "Группам", contacts: "Контакты", book: "Проверить даты", menuOpen: "Открыть меню", menuClose: "Закрыть меню", home: "Три Короны — на главную", subtitle: "Resort & SPA · Issyk-Kul", nav: "Основная навигация", mobileNav: "Мобильная навигация", language: "Язык сайта" },
-  kg: { rooms: "Номерлер", territory: "Аймак", amenities: "Инфраструктура", reviews: "Пикирлер", groups: "Топторго", contacts: "Байланыш", book: "Даталарды текшерүү", menuOpen: "Менюну ачуу", menuClose: "Менюну жабуу", home: "Үч Таажы — башкы бет", subtitle: "Resort & SPA · Ысык-Көл", nav: "Негизги навигация", mobileNav: "Мобилдик навигация", language: "Сайттын тили" },
-  kz: { rooms: "Бөлмелер", territory: "Аумақ", amenities: "Инфрақұрылым", reviews: "Пікірлер", groups: "Топтарға", contacts: "Байланыс", book: "Күндерді тексеру", menuOpen: "Мәзірді ашу", menuClose: "Мәзірді жабу", home: "Үш Тәж — басты бет", subtitle: "Resort & SPA · Ыстықкөл", nav: "Негізгі навигация", mobileNav: "Мобильді навигация", language: "Сайт тілі" },
-  en: { rooms: "Rooms", territory: "Resort", amenities: "Facilities", reviews: "Reviews", groups: "Groups", contacts: "Contacts", book: "Check dates", menuOpen: "Open menu", menuClose: "Close menu", home: "Three Crowns — home", subtitle: "Resort & SPA · Issyk-Kul", nav: "Main navigation", mobileNav: "Mobile navigation", language: "Site language" },
+  ru: { rooms: "Номера", territory: "Территория", amenities: "На территории", reviews: "Отзывы", groups: "Группам", contacts: "Контакты", book: "Проверить даты", menuOpen: "Открыть меню", menuClose: "Закрыть меню", home: "AK BERMET — на главную", subtitle: "MARINA SMART · AK BERMET", nav: "Основная навигация", mobileNav: "Мобильная навигация", language: "Язык сайта" },
+  kg: { rooms: "Номерлер", territory: "Аймак", amenities: "Инфраструктура", reviews: "Пикирлер", groups: "Топторго", contacts: "Байланыш", book: "Даталарды текшерүү", menuOpen: "Менюну ачуу", menuClose: "Менюну жабуу", home: "AK BERMET — башкы бет", subtitle: "MARINA SMART · AK BERMET", nav: "Негизги навигация", mobileNav: "Мобилдик навигация", language: "Сайттын тили" },
+  kz: { rooms: "Бөлмелер", territory: "Аумақ", amenities: "Инфрақұрылым", reviews: "Пікірлер", groups: "Топтарға", contacts: "Байланыс", book: "Күндерді тексеру", menuOpen: "Мәзірді ашу", menuClose: "Мәзірді жабу", home: "AK BERMET — басты бет", subtitle: "MARINA SMART · AK BERMET", nav: "Негізгі навигация", mobileNav: "Мобильді навигация", language: "Сайт тілі" },
+  en: { rooms: "Rooms", territory: "Resort", amenities: "Facilities", reviews: "Reviews", groups: "Groups", contacts: "Contacts", book: "Check dates", menuOpen: "Open menu", menuClose: "Close menu", home: "AK BERMET — home", subtitle: "MARINA SMART · AK BERMET", nav: "Main navigation", mobileNav: "Mobile navigation", language: "Site language" },
 };
 
 export default function SiteHeader() {
@@ -35,10 +35,10 @@ export default function SiteHeader() {
 
   useEffect(() => {
     const query = new URLSearchParams(window.location.search).get("lang");
-    const stored = window.localStorage.getItem("three-crowns-site-language");
+    const stored = window.localStorage.getItem("marina-smart-site-language");
     const selected: Locale = query === "kg" || query === "kz" || query === "en" || query === "ru" ? query : stored === "kg" || stored === "kz" || stored === "en" || stored === "ru" ? stored : "ru";
     setLocale(selected);
-    window.localStorage.setItem("three-crowns-site-language", selected);
+    window.localStorage.setItem("marina-smart-site-language", selected);
     document.documentElement.lang = selected === "kg" ? "ky" : selected === "kz" ? "kk" : selected;
   }, []);
 
@@ -70,7 +70,7 @@ export default function SiteHeader() {
   const links = [[withLanguage("/rooms"), copy.rooms],[withLanguage("/#resort"), copy.territory],[withLanguage("/#experience"), copy.amenities],[withLanguage("/#reviews"), copy.reviews],[withLanguage("/#groups"), copy.groups],[withLanguage("/#contacts"), copy.contacts]];
 
   function switchLanguage(next: Locale) {
-    window.localStorage.setItem("three-crowns-site-language", next);
+    window.localStorage.setItem("marina-smart-site-language", next);
     document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next;
     const url = new URL(window.location.href);
     if (next === "ru") url.searchParams.delete("lang"); else url.searchParams.set("lang", next);
@@ -84,7 +84,7 @@ export default function SiteHeader() {
       <div className="wrap header-inner">
         <a className="brand" href={withLanguage("/")} aria-label={copy.home} onClick={closeMenu}>
           <img src="/brand/three-crowns-mark.svg" alt="" width="118" height="33" />
-          <span className="brand-copy"><strong>{locale === "en" ? "THREE CROWNS" : locale === "kg" ? "ҮЧ ТААЖЫ" : locale === "kz" ? "ҮШ ТӘЖ" : "ТРИ КОРОНЫ"}</strong><small>{copy.subtitle}</small></span>
+          <span className="brand-copy"><strong>{locale === "en" ? "AK BERMET" : locale === "kg" ? "AK BERMET" : locale === "kz" ? "AK BERMET" : "AK BERMET"}</strong><small>{copy.subtitle}</small></span>
         </a>
         <nav className="desktop-nav" aria-label={copy.nav}>{links.map(([href,label]) => <a key={href} href={href}>{label}</a>)}</nav>
         {languageControl("desktop-language")}
