@@ -6,7 +6,7 @@
   "status": "INTERNAL_CI_AND_EXTERNAL_STAGING_PARTIAL",
   "source_repository": "stvelikiy-star/resort-os",
   "source_branch": "marina-smart/live-base-20260925",
-  "merged_head": "d36c15dd8e9e7b34a615c2537e897d4f15a3013e",
+  "merged_head": "4b1d21249a1c02fbf609fed675253846a6f0e71d",
   "verified_tree": "812351dfee971c11227a4ccca499772156b78c7e",
   "verified_tree_source_commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
   "tree_equivalent_to_verified_commit": true,
@@ -15,7 +15,8 @@
     186,
     213,
     219,
-    220
+    220,
+    223
   ],
   "evidence_observed_on": "2026-10-07",
   "production_cutover_authorized": false,
