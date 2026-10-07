@@ -36,7 +36,7 @@ function todayIso(offset = 0) {
 export default function AiAdministratorWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Здравствуйте! Я AI-администратор «Три Короны». Помогу с номерами, датами и вопросами об отдыхе. Для точной проверки свободных номеров укажите даты и количество гостей." },
+    { role: "assistant", content: "Здравствуйте! Я AI-администратор «AK BERMET». Помогу с номерами, датами и вопросами об отдыхе. Для точной проверки свободных номеров укажите даты и количество гостей." },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,9 +93,9 @@ export default function AiAdministratorWidget() {
   return (
     <div className="ai-admin-root">
       {open && (
-        <section className="ai-admin-panel" aria-label="AI-администратор Три Короны">
+        <section className="ai-admin-panel" aria-label="AI-администратор AK BERMET">
           <header className="ai-admin-header">
-            <div><strong>AI-администратор</strong><span>Три Короны · 24/7</span></div>
+            <div><strong>AI-администратор</strong><span>AK BERMET · 24/7</span></div>
             <button type="button" className="ai-admin-close" onClick={() => setOpen(false)} aria-label="Закрыть чат">×</button>
           </header>
 

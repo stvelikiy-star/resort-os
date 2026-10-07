@@ -18,6 +18,8 @@ ALLOWED_ROLES = {
     "TECHNICIAN",
     "STORE_STAFF",
     "DINING_STAFF",
+    "COOK",
+    "WAITER",
     "CONTENT_MANAGER",
     "BEACH_PARTNER",  # legacy/deferred compatibility only
 }

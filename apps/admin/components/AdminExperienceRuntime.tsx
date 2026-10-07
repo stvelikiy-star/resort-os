@@ -13,7 +13,7 @@ type PinPayload = {
   guest_access_pin_display_once?: boolean;
 };
 
-type Phrase = { ru: string; kg: string; en: string };
+type Phrase = { ru: string; kg: string; kz?: string; en: string };
 
 const STORAGE_KEY = "three-crowns-admin-locale";
 
@@ -84,6 +84,12 @@ const KZ_EXACT: Record<string, string> = {
   "РЕСЕПШЕН": "ҚАБЫЛДАУ",
   "ГОРНИЧНАЯ": "БӨЛМЕ ҚЫЗМЕТКЕРІ",
   "ТЕХНИК": "ТЕХНИК",
+  "УСТАРЕВШИЙ ДОСТУП": "ЕСКІ ҚОЛЖЕТІМ",
+  "ПОВАР": "АСПАЗ",
+  "ОФИЦИАНТ": "ДАЯШЫ",
+  "Повар": "Аспаз",
+  "Официант": "Даяшы",
+  "Устаревший доступ питания": "Ескірген тамақтану рөлі",
   "РЕСТОРАН": "МЕЙРАМХАНА",
   "МАГАЗИН": "ДҮКЕН",
   "Заявка": "Өтінім",
@@ -159,7 +165,9 @@ const exact: Record<string, Phrase> = {
   "RECEPTION": { ru: "РЕСЕПШЕН", kg: "КАБЫЛ АЛУУ", en: "RECEPTION" },
   "MAID": { ru: "ГОРНИЧНАЯ", kg: "БӨЛМӨ КЫЗМАТКЕРИ", en: "MAID" },
   "TECHNICIAN": { ru: "ТЕХНИК", kg: "ТЕХНИК", en: "TECHNICIAN" },
-  "DINING_STAFF": { ru: "РЕСТОРАН", kg: "РЕСТОРАН КЫЗМАТКЕРИ", en: "DINING STAFF" },
+  "DINING_STAFF": { ru: "УСТАРЕВШИЙ ДОСТУП", kg: "ЭСКИ ТАМАКТАНУУ", kz: "ЕСКІ ҚОЛЖЕТІМ", en: "LEGACY DINING" },
+  "COOK": { ru: "ПОВАР", kg: "АШПОЗЧУ", kz: "АСПАЗ", en: "COOK" },
+  "WAITER": { ru: "ОФИЦИАНТ", kg: "ОФИЦИАНТ", kz: "ДАЯШЫ", en: "WAITER" },
   "STORE_STAFF": { ru: "МАГАЗИН", kg: "ДҮКӨН КЫЗМАТКЕРИ", en: "STORE STAFF" },
   "Request": { ru: "Заявка", kg: "Өтүнмө", en: "Request" },
 };

@@ -13,7 +13,7 @@ from .websocket_security import require_websocket_same_origin
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 POLL_SECONDS = max(0.25, float(os.environ.get("DINING_WS_POLL_SECONDS", "1")))
 router = APIRouter(tags=["dining-realtime"])
-ALLOWED_ROLES = {"OWNER", "MANAGER", "DINING_STAFF"}
+ALLOWED_ROLES = {"OWNER", "MANAGER", "WAITER"}
 
 
 async def authenticate(websocket: WebSocket, conn) -> dict[str, Any] | None:

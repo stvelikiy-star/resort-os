@@ -6,7 +6,7 @@ import GuestRequestShiftPanel from "./GuestRequestShiftPanel";
 import StaffShiftV2 from "./StaffShiftV2";
 import MarinaAiAssistant from "./MarinaAiAssistant";
 
-type Role = "OWNER" | "MANAGER" | "RECEPTION" | "MAID" | "TECHNICIAN" | "DINING_STAFF" | "STORE_STAFF";
+type Role = "OWNER" | "MANAGER" | "RECEPTION" | "MAID" | "TECHNICIAN" | "DINING_STAFF" | "COOK" | "WAITER" | "STORE_STAFF";
 type User = { id: string; username: string; display_name: string; role: Role; property_code: string };
 
 declare global {
@@ -21,7 +21,7 @@ declare global {
   }
 }
 
-const OPERATIONAL_ROLES = new Set<Role>(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN", "DINING_STAFF", "STORE_STAFF"]);
+const OPERATIONAL_ROLES = new Set<Role>(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN", "COOK", "WAITER", "STORE_STAFF"]);
 const LEGACY_SHIFT_ROLES = new Set<Role>(["OWNER", "MANAGER", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set<Role>(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const roleLabel: Record<Role, string> = {
@@ -30,7 +30,9 @@ const roleLabel: Record<Role, string> = {
   RECEPTION: "Ресепшен",
   MAID: "Горничная",
   TECHNICIAN: "Техник",
-  DINING_STAFF: "Питание",
+  DINING_STAFF: "Устаревший доступ",
+  COOK: "Повар",
+  WAITER: "Официант",
   STORE_STAFF: "Магазин",
 };
 
@@ -172,10 +174,10 @@ export default function StaffRoleGateway() {
       </header>
       {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
       {user.role === "STORE_STAFF" && <div className="shift-empty"><strong>Смена магазина подключена к Hotel OS.</strong><span>Финансовые операции магазина будут включены только через отдельный Core-контур, без прямых записей вне учёта.</span></div>}
-      {user.role === "DINING_STAFF" && <div className="shift-empty"><strong>Kitchen Admin готов к работе.</strong><span>Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.</span><a className="shift-primary" href="/kitchen">Открыть Kitchen Admin</a></div>}
+      {user.role === "COOK" && <div className="shift-empty"><strong>Kitchen Admin готов к работе.</strong><span>Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.</span><a className="shift-primary" href="/kitchen">Открыть Kitchen Admin</a></div>}
       {user.role === "RECEPTION" && <div className="shift-empty"><strong>Рабочая очередь ниже обновляется автоматически.</strong><span>Берите заявку в работу и закрывайте её после фактического выполнения.</span></div>}
     </main>
-    {(user.role === "RECEPTION" || user.role === "DINING_STAFF") && <GuestRequestShiftPanel />}
+    {(user.role === "RECEPTION" || user.role === "WAITER") && <GuestRequestShiftPanel />}
     <MarinaAiAssistant screen="MY_SHIFT" role={user.role} />
   </>;
 }

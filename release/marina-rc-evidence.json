@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "product": "MARINA SMART",
+  "property": "AK BERMET",
+  "status": "INTERNAL_CI_VERIFIED_EXTERNAL_ACCEPTANCE_PENDING",
+  "source_repository": "stvelikiy-star/resort-os",
+  "source_branch": "marina-smart/p0-brand-release-20261007",
+  "evidence_commit": "f70f99701e8f8ed6ea65973343e4f569a78c6a63",
+  "pull_request": 211,
+  "evidence_observed_on": "2026-10-07",
+  "production_cutover_authorized": false,
+  "legacy_release_manifest": "release/current-rc.json",
+  "legacy_manifest_applies_to_marina": false,
+  "ci_fixture": {
+    "property_code": "AK_BERMET_TEST",
+    "rooms": 169,
+    "room_types": 16,
+    "clean_rooms": 137,
+    "tech_block_rooms": 32,
+    "source": ".github/workflows/marina-smart-ak-bermet-ci.yml",
+    "production_inventory_verified": false
+  },
+  "ci_evidence": {
+    "ak_bermet_run_id": 37596411271,
+    "ak_bermet_job_id": 112710041086,
+    "conclusion": "success",
+    "verified_steps": [
+      "clean database migrations",
+      "inventory and staff bootstrap",
+      "database inventory assertions",
+      "MARINA AI role-scoped runtime context",
+      "public brand and RU/KG/KZ/EN contract",
+      "Admin typecheck and build",
+      "169-room chessboard browser acceptance",
+      "owner navigation browser acceptance",
+      "client and role cycle"
+    ],
+    "legacy_full_staging_run_id": 37596411414,
+    "legacy_full_staging_job_conclusion": "skipped",
+    "scope_handoff_conclusion": "success",
+    "full_marina_external_staging_verified": false
+  },
+  "migration_count": null,
+  "critical_constraint_count": null,
+  "external_acceptance": {
+    "deployed_commit_verified": false,
+    "target_database_migrations_verified": false,
+    "target_backup_restore_verified": false,
+    "https_wss_verified": false,
+    "real_staff_devices_verified": false,
+    "live_ai_provider_verified": false
+  },
+  "remaining_gates": [
+    "Inventory migration and constraint ledger for exact Marina commit",
+    "Dedicated complete Marina staging gate",
+    "Validate dining permissions against agreed role matrix",
+    "Verify actual deployment SHA and target database",
+    "Target backup restore and rollback acceptance",
+    "Role browser/API and real-device acceptance",
+    "Full manual translation review"
+  ],
+  "notes": [
+    "This evidence file records the tested commit, not the commit introduced by this file.",
+    "CI inventory is a test fixture and must not be reported as live occupancy.",
+    "Successful scope handoff is not execution of the skipped full staging job.",
+    "No production approval, role change, navigation change or deployment is implied."
+  ]
+}

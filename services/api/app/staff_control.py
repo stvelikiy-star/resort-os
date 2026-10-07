@@ -18,6 +18,8 @@ ManagedRole = Literal[
     "TECHNICIAN",
     "STORE_STAFF",
     "DINING_STAFF",
+    "COOK",
+    "WAITER",
     "CONTENT_MANAGER",
 ]
 MANAGED_ROLES = [
@@ -152,8 +154,9 @@ async def staff_overview(
             ORDER BY
               CASE u.role::text
                 WHEN 'OWNER' THEN 0 WHEN 'MANAGER' THEN 1 WHEN 'RECEPTION' THEN 2
-                WHEN 'MAID' THEN 3 WHEN 'TECHNICIAN' THEN 4 WHEN 'DINING_STAFF' THEN 5
-                WHEN 'STORE_STAFF' THEN 6 WHEN 'CONTENT_MANAGER' THEN 7 ELSE 8
+                WHEN 'MAID' THEN 3 WHEN 'TECHNICIAN' THEN 4 WHEN 'COOK' THEN 5
+                WHEN 'WAITER' THEN 6 WHEN 'DINING_STAFF' THEN 7
+                WHEN 'STORE_STAFF' THEN 8 WHEN 'CONTENT_MANAGER' THEN 7 ELSE 8
               END,
               u."displayName"
             ''',

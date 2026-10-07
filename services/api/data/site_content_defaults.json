@@ -1,7 +1,7 @@
 {
   "ru": {
     "hero": {
-      "eyebrow": "Три Короны · Resort & SPA · Чолпон-Ата",
+      "eyebrow": "AK BERMET · Resort & SPA · Чолпон-Ата",
       "title": "Иссык-Куль. Ваш отдых начинается здесь.",
       "copy": "Курорт у самой воды: собственный пляж, 150-метровый пирс, SPA, открытый бассейн и 12 категорий размещения.",
       "primary_cta": "Проверить свободные номера",
@@ -24,7 +24,7 @@
       "rule_copy": "Номер автоматически не блокируется после заявки. Подтверждённая бронь оформляется менеджером после согласования условий и предоплаты."
     },
     "advantages": {
-      "eyebrow": "Почему Три Короны",
+      "eyebrow": "Почему AK BERMET",
       "title": "От номера до воды — один маршрут",
       "intro": "Преимущества курорта не спрятаны в длинном списке. Они становятся последовательностью дня: проснуться, выйти на территорию, дойти до воды, отдохнуть у бассейна и закончить вечер в SPA.",
       "card_1_title": "Первая линия Иссык-Куля",
@@ -62,7 +62,7 @@
       "eyebrow": "Территория курорта",
       "title": "От первого шага до конца пирса",
       "intro": "Пройдите весь маршрут курорта — от размещения и дневного отдыха до собственного пляжа и длинного пирса, который выходит в открытое пространство Иссык-Куля.",
-      "visual_label": "Три Короны · территория",
+      "visual_label": "AK BERMET · территория",
       "visual_caption": "Корпуса, зелень и внутренний маршрут курорта",
       "journey_1_title": "Заезд и размещение",
       "journey_1_text": "Начните отдых без лишней суеты: выберите категорию заранее, проверьте наличие по датам и согласуйте детали с менеджером.",
@@ -113,13 +113,13 @@
       "card_4_text": "Помогаем собрать проживание, питание, трансфер и дополнительные активности в одну понятную программу."
     },
     "contacts": {
-      "phone": "+996 558 08 50 02",
-      "whatsapp": "+996 558 08 50 02",
-      "email": "3koronykg@mail.ru",
-      "address": "Иманбай Молдо, Чолпон-Ата 722315, Кыргызстан",
+      "phone": "",
+      "whatsapp": "",
+      "email": "",
+      "address": "Свяжитесь с ресепшеном AK BERMET через гостевой кабинет",
       "eyebrow": "Контакты и дорога",
       "title": "Чолпон-Ата. Берег Иссык-Куля.",
-      "intro": "Три Короны Resort & SPA находится в Чолпон-Ате. Откройте карту, постройте маршрут или свяжитесь с менеджером — поможем с приездом и проживанием.",
+      "intro": "AK BERMET Resort & SPA находится в Чолпон-Ате. Откройте карту, постройте маршрут или свяжитесь с менеджером — поможем с приездом и проживанием.",
       "phone_label": "Бронирование",
       "whatsapp_label": "WhatsApp / менеджер",
       "email_label": "Email",
@@ -130,11 +130,11 @@
       "map_cta": "Открыть Google Maps ↗"
     },
     "final": {
-      "eyebrow": "Три Короны · Resort & SPA",
+      "eyebrow": "AK BERMET · Resort & SPA",
       "title": "Выберите даты. Иссык-Куль уже ждёт.",
       "copy": "Проверьте свободные категории и стоимость проживания на ваш период.",
       "cta": "Проверить номера",
-      "footer_brand": "Три Короны · Resort & SPA",
+      "footer_brand": "AK BERMET · Resort & SPA",
       "footer_rooms": "Номера",
       "footer_resort": "Территория",
       "footer_groups": "Группам",
@@ -142,13 +142,13 @@
       "mobile_cta": "Проверить свободные номера"
     },
     "seo": {
-      "title": "Три Короны — Resort & SPA на Иссык-Куле",
-      "description": "Три Короны Resort & SPA в Чолпон-Ате: 84 номера, конференц-зал на 20–120 гостей, собственный пляж, пирс 150 м, SPA и открытый бассейн."
+      "title": "AK BERMET — Resort & SPA на Иссык-Куле",
+      "description": "AK BERMET Resort & SPA в Чолпон-Ате: 84 номера, конференц-зал на 20–120 гостей, собственный пляж, пирс 150 м, SPA и открытый бассейн."
     }
   },
   "kg": {
     "hero": {
-      "eyebrow": "Үч Таажы · Resort & SPA · Чолпон-Ата",
+      "eyebrow": "AK BERMET · Resort & SPA · Чолпон-Ата",
       "title": "Ысык-Көл. Эс алууңуз ушул жерден башталат.",
       "copy": "Көл жээгиндеги эс алуу жайы: өз пляжы, 150 метрлик пирс, SPA, ачык бассейн жана жайгашуунун 12 категориясы.",
       "primary_cta": "Бош номерлерди текшерүү",
@@ -171,7 +171,7 @@
       "rule_copy": "Өтүнмө жөнөтүлгөндөн кийин номер автоматтык түрдө кармалбайт. Ырасталган бронь шарттар жана алдын ала төлөм макулдашылгандан кийин менеджер тарабынан түзүлөт."
     },
     "advantages": {
-      "eyebrow": "Эмне үчүн Үч Таажы",
+      "eyebrow": "Эмне үчүн AK BERMET",
       "title": "Номерден көлгө чейин — бир маршрут",
       "intro": "Курорттун артыкчылыктары жөн гана узун тизмек эмес. Алар бир күндүн табигый жүрүшүнө айланат: ойгонуу, аймакка чыгуу, көлгө жетүү, бассейнде эс алуу жана кечти SPA менен бүтүрүү.",
       "card_1_title": "Ысык-Көлдүн биринчи линиясы",
@@ -209,7 +209,7 @@
       "eyebrow": "Курорттун аймагы",
       "title": "Биринчи кадамдан пирстин аягына чейин",
       "intro": "Курорттун бардык маршрутун басып өтүңүз — жайгашуудан жана күндүзкү эс алуудан өз пляжына жана Ысык-Көлдүн ачык мейкиндигине чыккан узун пирске чейин.",
-      "visual_label": "Үч Таажы · аймак",
+      "visual_label": "AK BERMET · аймак",
       "visual_caption": "Корпустар, жашыл аймак жана курорттун ички маршруту",
       "journey_1_title": "Келүү жана жайгашуу",
       "journey_1_text": "Эс алууну ашыкча түйшүксүз баштаңыз: категорияны алдын ала тандап, даталар боюнча бош орунду текшерип, деталдарды менеджер менен макулдашыңыз.",
@@ -260,13 +260,13 @@
       "card_4_text": "Жайгашуу, тамактануу, трансфер жана кошумча активдүүлүктөрдү бир түшүнүктүү программага бириктирүүгө жардам беребиз."
     },
     "contacts": {
-      "phone": "+996 558 08 50 02",
-      "whatsapp": "+996 558 08 50 02",
-      "email": "3koronykg@mail.ru",
-      "address": "Иманбай Молдо, Чолпон-Ата 722315, Кыргызстан",
+      "phone": "",
+      "whatsapp": "",
+      "email": "",
+      "address": "Свяжитесь с ресепшеном AK BERMET через гостевой кабинет",
       "eyebrow": "Байланыш жана жол",
       "title": "Чолпон-Ата. Ысык-Көлдүн жээги.",
-      "intro": "Үч Таажы Resort & SPA Чолпон-Атада жайгашкан. Картаны ачыңыз, маршрут түзүңүз же менеджерге жазыңыз — келүү жана жайгашуу боюнча жардам беребиз.",
+      "intro": "AK BERMET Resort & SPA Чолпон-Атада жайгашкан. Картаны ачыңыз, маршрут түзүңүз же менеджерге жазыңыз — келүү жана жайгашуу боюнча жардам беребиз.",
       "phone_label": "Брондоо",
       "whatsapp_label": "WhatsApp / менеджер",
       "email_label": "Email",
@@ -277,11 +277,11 @@
       "map_cta": "Google Maps ачуу ↗"
     },
     "final": {
-      "eyebrow": "Үч Таажы · Resort & SPA",
+      "eyebrow": "AK BERMET · Resort & SPA",
       "title": "Даталарды тандаңыз. Ысык-Көл күтүп жатат.",
       "copy": "Сиздин даталар үчүн бош категорияларды жана жашоо баасын текшериңиз.",
       "cta": "Номерлерди текшерүү",
-      "footer_brand": "Үч Таажы · Resort & SPA",
+      "footer_brand": "AK BERMET · Resort & SPA",
       "footer_rooms": "Номерлер",
       "footer_resort": "Аймак",
       "footer_groups": "Топтор",
@@ -289,13 +289,13 @@
       "mobile_cta": "Бош номерлерди текшерүү"
     },
     "seo": {
-      "title": "Үч Таажы — Ысык-Көлдөгү Resort & SPA",
-      "description": "Чолпон-Атадагы Үч Таажы Resort & SPA: 84 номер, 20–120 конокко конференц-зал, өз пляжы, 150 м пирс, SPA жана ачык бассейн."
+      "title": "AK BERMET — Ысык-Көлдөгү Resort & SPA",
+      "description": "Чолпон-Атадагы AK BERMET Resort & SPA: 84 номер, 20–120 конокко конференц-зал, өз пляжы, 150 м пирс, SPA жана ачык бассейн."
     }
   },
   "en": {
     "hero": {
-      "eyebrow": "Three Crowns · Resort & SPA · Cholpon-Ata",
+      "eyebrow": "AK BERMET · Resort & SPA · Cholpon-Ata",
       "title": "Issyk-Kul. Your stay starts here.",
       "copy": "A lakeside resort with a private beach, a 150-metre pier, SPA, outdoor pool and 12 accommodation categories.",
       "primary_cta": "Check available rooms",
@@ -318,7 +318,7 @@
       "rule_copy": "Submitting a request does not automatically hold a room. A confirmed reservation is created by the manager after the terms and prepayment are agreed."
     },
     "advantages": {
-      "eyebrow": "Why Three Crowns",
+      "eyebrow": "Why AK BERMET",
       "title": "From your room to the lake — one easy route",
       "intro": "The resort advantages are not hidden in a long list. They become the natural sequence of the day: wake up, step outside, reach the lake, relax by the pool and finish the evening in the SPA.",
       "card_1_title": "First line of Issyk-Kul",
@@ -356,7 +356,7 @@
       "eyebrow": "Resort grounds",
       "title": "From the first step to the end of the pier",
       "intro": "Follow the whole resort route — from accommodation and daytime relaxation to the private beach and long pier opening onto Issyk-Kul.",
-      "visual_label": "Three Crowns · grounds",
+      "visual_label": "AK BERMET · grounds",
       "visual_caption": "Buildings, greenery and the resort’s internal route",
       "journey_1_title": "Arrival and accommodation",
       "journey_1_text": "Start your stay without unnecessary hassle: choose a category in advance, check availability for your dates and agree the details with a manager.",
@@ -407,13 +407,13 @@
       "card_4_text": "We help combine accommodation, meals, transfer and additional activities into one clear programme."
     },
     "contacts": {
-      "phone": "+996 558 08 50 02",
-      "whatsapp": "+996 558 08 50 02",
-      "email": "3koronykg@mail.ru",
-      "address": "Imanbay Moldo, Cholpon-Ata 722315, Kyrgyzstan",
+      "phone": "",
+      "whatsapp": "",
+      "email": "",
+      "address": "Contact the AK BERMET reception through the guest cabinet",
       "eyebrow": "Contacts and directions",
       "title": "Cholpon-Ata. The Issyk-Kul shore.",
-      "intro": "Three Crowns Resort & SPA is in Cholpon-Ata. Open the map, build your route or contact the manager — we can help with arrival and accommodation.",
+      "intro": "AK BERMET Resort & SPA is in Cholpon-Ata. Open the map, build your route or contact the manager — we can help with arrival and accommodation.",
       "phone_label": "Reservations",
       "whatsapp_label": "WhatsApp / manager",
       "email_label": "Email",
@@ -424,11 +424,11 @@
       "map_cta": "Open Google Maps ↗"
     },
     "final": {
-      "eyebrow": "Three Crowns · Resort & SPA",
+      "eyebrow": "AK BERMET · Resort & SPA",
       "title": "Choose your dates. Issyk-Kul is waiting.",
       "copy": "Check available categories and the stay price for your dates.",
       "cta": "Check rooms",
-      "footer_brand": "Three Crowns · Resort & SPA",
+      "footer_brand": "AK BERMET · Resort & SPA",
       "footer_rooms": "Rooms",
       "footer_resort": "Resort",
       "footer_groups": "Groups",
@@ -436,13 +436,13 @@
       "mobile_cta": "Check available rooms"
     },
     "seo": {
-      "title": "Three Crowns — Resort & SPA on Issyk-Kul",
-      "description": "Three Crowns Resort & SPA in Cholpon-Ata: 84 rooms, a conference hall for 20–120 guests, private beach, 150 m pier, SPA and outdoor pool."
+      "title": "AK BERMET — Resort & SPA on Issyk-Kul",
+      "description": "AK BERMET Resort & SPA in Cholpon-Ata: 84 rooms, a conference hall for 20–120 guests, private beach, 150 m pier, SPA and outdoor pool."
     }
   },
   "kz": {
     "hero": {
-      "eyebrow": "Үш Тәж · Resort & SPA · Шолпан-Ата",
+      "eyebrow": "AK BERMET · Resort & SPA · Шолпан-Ата",
       "title": "Ыстықкөл. Демалысыңыз осы жерден басталады.",
       "copy": "Көл жағасындағы курорт: жеке жағажай, 150 метрлік пирс, SPA, ашық бассейн және орналастырудың 12 санаты.",
       "primary_cta": "Бос бөлмелерді тексеру",
@@ -465,7 +465,7 @@
       "rule_copy": "Өтінім жіберілгеннен кейін бөлме автоматты түрде ұсталып тұрмайды. Расталған бронь шарттар мен алдын ала төлем келісілгеннен кейін менеджер арқылы жасалады."
     },
     "advantages": {
-      "eyebrow": "Неліктен Үш Тәж",
+      "eyebrow": "Неліктен AK BERMET",
       "title": "Бөлмеден суға дейін — бір бағыт",
       "intro": "Курорт артықшылықтары ұзын тізім болып қалмайды. Олар күннің табиғи ырғағына айналады: ояну, аумаққа шығу, көлге жету, бассейнде демалу және кешті SPA-мен аяқтау.",
       "card_1_title": "Ыстықкөлдің бірінші желісі",
@@ -503,7 +503,7 @@
       "eyebrow": "Курорт аумағы",
       "title": "Алғашқы қадамнан пирстің соңына дейін",
       "intro": "Курорттың толық бағытын өтіңіз — орналасудан және күндізгі демалыстан жеке жағажайға және Ыстықкөлдің ашық кеңістігіне шығатын ұзын пирске дейін.",
-      "visual_label": "Үш Тәж · аумақ",
+      "visual_label": "AK BERMET · аумақ",
       "visual_caption": "Ғимараттар, жасыл аймақ және курорт ішіндегі бағыт",
       "journey_1_title": "Келу және орналасу",
       "journey_1_text": "Демалысты артық әуресіз бастаңыз: санатты алдын ала таңдап, күндер бойынша бос орынды тексеріп, мәліметтерді менеджермен келісіңіз.",
@@ -554,10 +554,10 @@
       "card_4_text": "Орналастыруды, тамақтануды, трансферді және қосымша белсенділікті бір түсінікті бағдарламаға біріктіруге көмектесеміз."
     },
     "contacts": {
-      "phone": "+996 558 08 50 02",
-      "whatsapp": "+996 558 08 50 02",
-      "email": "3koronykg@mail.ru",
-      "address": "Иманбай Молдо, Шолпан-Ата 722315, Қырғызстан",
+      "phone": "",
+      "whatsapp": "",
+      "email": "",
+      "address": "AK BERMET ресепшенімен қонақ кабинеті арқылы байланысыңыз",
       "eyebrow": "Байланыс және жол",
       "title": "Шолпан-Ата. Ыстықкөл жағасы.",
       "intro": "Брондау, топтық орналасу, трансфер және сапарға дайындық бойынша менеджерге хабарласыңыз.",
@@ -571,11 +571,11 @@
       "map_cta": "Google Maps ашу ↗"
     },
     "final": {
-      "eyebrow": "Үш Тәж · Resort & SPA",
+      "eyebrow": "AK BERMET · Resort & SPA",
       "title": "Күндерді таңдаңыз. Ыстықкөл күтіп тұр.",
       "copy": "Бос санаттарды және сіздің кезеңіңізге тұру құнын тексеріңіз.",
       "cta": "Бөлмелерді тексеру",
-      "footer_brand": "Үш Тәж · Resort & SPA",
+      "footer_brand": "AK BERMET · Resort & SPA",
       "footer_rooms": "Бөлмелер",
       "footer_resort": "Аумақ",
       "footer_groups": "Топтарға",
@@ -583,8 +583,8 @@
       "mobile_cta": "Бос бөлмелерді тексеру"
     },
     "seo": {
-      "title": "Үш Тәж — Ыстықкөлдегі Resort & SPA",
-      "description": "Шолпан-Атадағы Үш Тәж Resort & SPA: 84 бөлме, 20–120 қонаққа арналған конференц-зал, жеке жағажай, 150 м пирс, SPA және ашық бассейн."
+      "title": "AK BERMET — Ыстықкөлдегі Resort & SPA",
+      "description": "Шолпан-Атадағы AK BERMET Resort & SPA: 84 бөлме, 20–120 қонаққа арналған конференц-зал, жеке жағажай, 150 м пирс, SPA және ашық бассейн."
     }
   }
 }

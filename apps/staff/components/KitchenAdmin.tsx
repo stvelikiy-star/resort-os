@@ -86,7 +86,7 @@ export default function KitchenAdmin() {
     (async () => {
       try {
         const me = await api("/core/api/v1/auth/me") as User;
-        if (!["OWNER", "MANAGER", "DINING_STAFF"].includes(me.role)) throw new Error("Нет доступа к кухне");
+        if (!["OWNER", "MANAGER"].includes(me.role)) throw new Error("Нет доступа к кухне");
         if (!cancelled) setUser(me);
         await api("/core/api/v1/ops/kitchen/sync-arrivals", { method: "POST" }).catch(() => null);
         if (!cancelled) await loadAll();

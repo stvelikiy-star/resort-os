@@ -15,8 +15,8 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 29
-    assert EXPECTED_MIGRATIONS[-10:] == (
+    assert len(EXPECTED_MIGRATIONS) == 30
+    assert EXPECTED_MIGRATIONS[-11:] == (
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
@@ -27,6 +27,7 @@ def main() -> int:
         "zz103_agent_access_20260927",
         "zz104_public_kz_20260929",
         "zz105_guest_dynamic_kz_20260929",
+        "zz106_marina_split_cook_waiter_20261007",
     )
     assert len(CRITICAL_CONSTRAINTS) == 93
     assert {
@@ -78,7 +79,7 @@ def main() -> int:
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact 28-migration current candidate ledger is fail-closed")
+    print("PASS: exact 30-migration current candidate ledger is fail-closed")
     print("PASS: current Dining, Guest, CMS, Group Booking, Service Point, Marketing and Owner Operations boundaries are canonical")
     print("PASS: current critical constraint fingerprint contains 93 constraints")
     return 0

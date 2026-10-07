@@ -591,12 +591,16 @@ def main() -> None:
     assert any(item["id"] == request_id for stay in crm["stays"] for item in stay["requests"])
 
     kitchen = login(KITCHEN_USERNAME, KITCHEN_PASSWORD)
-    kitchen_menu = expect(kitchen.get("/api/v1/kitchen/menu"), 200, "Kitchen menu access")
-    assert isinstance(kitchen_menu.get("items"), list)
+    kitchen_menu_denied = kitchen.get("/api/v1/kitchen/menu")
+    assert kitchen_menu_denied.status_code == 403, kitchen_menu_denied.text
+    kitchen_orders = expect(kitchen.get("/api/v1/kitchen/orders?status=ACTIVE"), 200, "Cook order access")
+    assert isinstance(kitchen_orders.get("items"), list)
 
     waiter = login(WAITER_USERNAME, WAITER_PASSWORD)
     waiter_floor = expect(waiter.get("/api/v1/dining/floor"), 200, "Waiter dining floor access")
     assert isinstance(waiter_floor, dict)
+    waiter_menu_denied = waiter.get("/api/v1/kitchen/menu")
+    assert waiter_menu_denied.status_code == 403, waiter_menu_denied.text
 
     technician = login(TECHNICIAN_USERNAME, TECHNICIAN_PASSWORD)
     technician_tasks = expect(technician.get("/api/v1/ops/tasks", params={"limit": 50}), 200, "Technician tasks access")

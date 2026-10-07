@@ -15,7 +15,7 @@ export function resolveClientLocale(): PublicLocale {
   if (typeof window === "undefined") return "ru";
   const query = new URLSearchParams(window.location.search).get("lang");
   if (query === "kg" || query === "kz" || query === "en" || query === "ru") return query;
-  const stored = window.localStorage.getItem("three-crowns-site-language");
+  const stored = window.localStorage.getItem("marina-smart-site-language");
   return normalizePublicLocale(stored);
 }
 

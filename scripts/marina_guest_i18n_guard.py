@@ -55,7 +55,7 @@ def main() -> int:
     require(texts["marketplace"], ['type Locale = MarinaGuestLocale', 'useMarinaGuestLocale()', 'eyebrow: "Сіздің демалысыңыз үшін"', 'name_kz?: string', 'title_kz?: string', 'kitchenSystem: "Асүй · MARINA SMART"', 'aiSystem: "AI · тексерілген деректер"'], "GuestMarketplace", errors)
     require(texts["ai"], ['Literal["ru", "kg", "kz", "en"]', '"kz": "Kazakh"'], "public_ai_admin", errors)
     require(texts["cms"], ['SUPPORTED_LOCALES = ("ru", "kg", "kz", "en")'], "site_content", errors)
-    require(texts["cms_defaults"], ['"kz": {', '"Үш Тәж · Resort & SPA · Шолпан-Ата"'], "site_content_defaults", errors)
+    require(texts["cms_defaults"], ['"kz": {', '"AK BERMET · Resort & SPA · Шолпан-Ата"'], "site_content_defaults", errors)
     require(texts["cms_admin"], ['type Locale = "ru" | "kg" | "kz" | "en"', '{ code: "kz", label: "Қазақша" }'], "SiteContentBoard", errors)
     require(texts["offers_api"], ["title_kz: str", "hook_kz: str", "cta_kz: str", '"title_kz": row["titleKz"]', '"hook_kz": row["hookKz"]', '"cta_kz": row["ctaKz"]'], "guest_offers", errors)
     require(texts["offers_admin"], ["title_kz: string", "hook_kz: string", "cta_kz: string", "<legend>Қазақша</legend>", "RU/KG/KZ/EN"], "GuestOffersBoard", errors)

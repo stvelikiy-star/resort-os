@@ -119,5 +119,5 @@ export function trackPublicEvent<Event extends PublicAnalyticsEvent>(
   const analyticsWindow = window as AnalyticsWindow;
   analyticsWindow.dataLayer ??= [];
   analyticsWindow.dataLayer.push(record);
-  window.dispatchEvent(new CustomEvent("three-crowns:analytics", { detail: record }));
+  window.dispatchEvent(new CustomEvent("marina-smart:analytics", { detail: record }));
 }

@@ -192,8 +192,8 @@ try {
 
     const stored = await page.evaluate(() => ({
       marina: localStorage.getItem("marina-smart-guest-locale"),
-      guest: localStorage.getItem("three-crowns-guest-language"),
-      site: localStorage.getItem("three-crowns-site-language"),
+      guest: localStorage.getItem("marina-smart-guest-locale"),
+      site: localStorage.getItem("marina-smart-site-language"),
     }));
     assert(
       stored.marina === "kz" && stored.guest === "kz" && stored.site === "kz",

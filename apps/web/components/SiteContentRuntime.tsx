@@ -8,7 +8,7 @@ type Payload = { locale: SiteLocale; content: SiteContent; published_version: nu
 function localeFromLocation(): SiteLocale {
   const query = new URLSearchParams(window.location.search).get("lang");
   if (query === "kg" || query === "kz" || query === "en" || query === "ru") return query;
-  const stored = window.localStorage.getItem("three-crowns-site-language");
+  const stored = window.localStorage.getItem("marina-smart-site-language");
   if (stored === "kg" || stored === "kz" || stored === "en" || stored === "ru") return stored;
   return "ru";
 }
@@ -72,7 +72,7 @@ function preserveInternalLanguage(locale: SiteLocale) {
 }
 
 function dispatchReady(locale: SiteLocale) {
-  window.dispatchEvent(new CustomEvent("three-crowns:content-ready", { detail: { locale } }));
+  window.dispatchEvent(new CustomEvent("marina-smart:content-ready", { detail: { locale } }));
 }
 
 function ensureConferenceBlock(content: SiteContent, locale: SiteLocale) {
@@ -122,7 +122,7 @@ function ensureConferenceBlock(content: SiteContent, locale: SiteLocale) {
   set("cta", conference.cta);
 
   const button = section.querySelector<HTMLAnchorElement>('[data-conference="cta"]');
-  const digits = (content.contacts?.whatsapp || content.contacts?.phone || "+996 558 08 50 02").replace(/\D/g, "");
+  const digits = (content.contacts?.whatsapp || content.contacts?.phone || "").replace(/\D/g, "");
   if (button) button.href = `https://wa.me/${digits}`;
 }
 
@@ -149,7 +149,7 @@ function applyContent(content: SiteContent, locale: SiteLocale) {
     text(".v3-booking-help > div:first-child > p:last-child", content.booking?.help_copy);
     const helpLinks = document.querySelectorAll<HTMLAnchorElement>(".v3-help-actions a");
     if (helpLinks[0] && content.booking?.help_call_label !== undefined) {
-      const phone = content.contacts?.phone || "+996 558 08 50 02";
+      const phone = content.contacts?.phone || "";
       helpLinks[0].textContent = `${content.booking.help_call_label} · ${phone}`;
     }
     if (helpLinks[1] && content.booking?.help_whatsapp_label !== undefined) helpLinks[1].textContent = content.booking.help_whatsapp_label;
@@ -281,7 +281,7 @@ function commitContent(content: SiteContent, locale: SiteLocale) {
 export default function SiteContentRuntime() {
   useEffect(() => {
     const locale = localeFromLocation();
-    window.localStorage.setItem("three-crowns-site-language", locale);
+    window.localStorage.setItem("marina-smart-site-language", locale);
 
     // Fail soft without falling back to Russian: every locale has an approved
     // local fallback and is replaced by the published Core payload when available.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail closed if the Three Crowns public RU/KG/KZ/EN contract regresses."""
+"""Fail closed if the MARINA SMART public RU/KG/KZ/EN contract regresses."""
 from __future__ import annotations
 
 import re
@@ -14,6 +14,21 @@ FILES = {
     "header": ROOT / "apps/web/components/SiteHeader.tsx",
     "site_content": ROOT / "apps/web/lib/siteContent.ts",
     "layout": ROOT / "apps/web/app/layout.tsx",
+    "rooms": ROOT / "apps/web/app/rooms/page.tsx",
+    "room_detail": ROOT / "apps/web/app/rooms/[slug]/page.tsx",
+    "rules": ROOT / "apps/web/app/rules/page.tsx",
+    "privacy": ROOT / "apps/web/app/privacy/page.tsx",
+    "marketing_consent": ROOT / "apps/web/app/marketing-consent/page.tsx",
+    "service_point": ROOT / "apps/web/app/p/[token]/page.tsx",
+    "guest": ROOT / "apps/web/components/GuestOsRuntime.tsx",
+    "guest_requests": ROOT / "apps/web/components/GuestRequestsPanel.tsx",
+    "guest_services": ROOT / "apps/web/components/GuestServicesRuntime.tsx",
+    "site_media": ROOT / "apps/web/components/SiteMediaRuntime.tsx",
+    "service_point_runtime": ROOT / "apps/web/components/ServicePointRuntime.tsx",
+    "guest_locale": ROOT / "apps/web/lib/marinaGuestLocale.ts",
+    "guest_facts": ROOT / "apps/web/lib/ownerApprovedGuestFacts.ts",
+    "analytics": ROOT / "apps/web/lib/publicAnalytics.ts",
+    "site_defaults": ROOT / "services/api/data/site_content_defaults.json",
 }
 
 
@@ -26,6 +41,12 @@ def main() -> int:
             texts[key] = ""
         else:
             texts[key] = path.read_text(encoding="utf-8")
+
+    legacy_tokens = ("Three Crowns", "Три Короны", "Үч Таажы", "Үш Тәж", "three-crowns", "3koronykg@mail.ru")
+    for key, value in texts.items():
+        for token in legacy_tokens:
+            if token in value:
+                errors.append(f"{key}: legacy public token remains: {token}")
 
     locale_text = texts["locale"]
     match = re.search(r"export const roomLocaleBySlug.*?=\s*\{(?P<body>.*?)\n\};\n\nconst roomSlugByRussianName", locale_text, re.S)
@@ -93,7 +114,7 @@ def main() -> int:
             errors.append(f"PublicUiI18nRuntime.tsx: missing deep i18n coverage {snippet!r}")
 
     site_runtime = texts["site_runtime"]
-    for snippet in ["preserveInternalLanguage", "dispatchReady", "three-crowns:content-ready"]:
+    for snippet in ["preserveInternalLanguage", "dispatchReady", "marina-smart:content-ready"]:
         if snippet not in site_runtime:
             errors.append(f"SiteContentRuntime.tsx: missing resilient locale behavior {snippet!r}")
 
@@ -103,14 +124,14 @@ def main() -> int:
             errors.append(f"SiteHeader.tsx: missing language-switch contract {snippet!r}")
 
     site_content = texts["site_content"]
-    for snippet in ["fallbackSiteContent", "kg: {", "kz: {", "en: {", "Үч Таажы", "Үш Тәж", "Three Crowns"]:
+    for snippet in ["fallbackSiteContent", "kg: {", "kz: {", "en: {", "AK BERMET", "MARINA SMART"]:
         if snippet not in site_content:
             errors.append(f"siteContent.ts: missing CMS fallback locale {snippet!r}")
 
     if "<PublicUiI18nRuntime />" not in texts["layout"]:
         errors.append("layout.tsx: PublicUiI18nRuntime is not mounted")
 
-    print("Three Crowns public i18n guard")
+    print("MARINA SMART public i18n guard")
     print(f"FACT: localized_room_categories={room_count}")
     print("FACT: locales=ru,kg,kz,en")
     print("FACT: surfaces=home,booking,rooms-index,room-detail,header,cms-fallback")
@@ -121,7 +142,7 @@ def main() -> int:
         print("RESULT: PUBLIC I18N DRIFT")
         return 1
 
-    print("PASS: public RU/KG/KZ/EN contract is structurally complete")
+    print("PASS: MARINA SMART public RU/KG/KZ/EN contract is structurally complete and legacy-free")
     return 0
 
 
