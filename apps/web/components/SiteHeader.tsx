@@ -83,7 +83,7 @@ export default function SiteHeader() {
     <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
       <div className="wrap header-inner">
         <a className="brand" href={withLanguage("/")} aria-label={copy.home} onClick={closeMenu}>
-          <img src="/brand/three-crowns-mark.svg" alt="" width="118" height="33" />
+          <img src="/brand/marina-smart-mark.svg" alt="" width="118" height="33" />
           <span className="brand-copy"><strong>{locale === "en" ? "AK BERMET" : locale === "kg" ? "AK BERMET" : locale === "kz" ? "AK BERMET" : "AK BERMET"}</strong><small>{copy.subtitle}</small></span>
         </a>
         <nav className="desktop-nav" aria-label={copy.nav}>{links.map(([href,label]) => <a key={href} href={href}>{label}</a>)}</nav>
