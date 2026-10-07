@@ -37,7 +37,7 @@ async def main() -> int:
         "MAID": os.environ["MAID_USERNAME"],
         "TECHNICIAN": os.environ["TECHNICIAN_USERNAME"],
         "AGENT": os.environ["AGENT_USERNAME"],
-        "DINING_STAFF": os.environ["DINING_STAFF_USERNAME"],
+        "COOK": os.environ.get("COOK_USERNAME") or os.environ.get("KITCHEN_USERNAME") or os.environ["DINING_STAFF_USERNAME"],
     }
 
     pool = await asyncpg.create_pool(database_url, min_size=1, max_size=3)
@@ -113,11 +113,11 @@ async def main() -> int:
                 require("scope_rule" in agent and "bookingAgentId" in agent["scope_rule"], "AGENT strict isolation rule documented")
                 require("hotel" not in snapshot and "finance" not in snapshot and "housekeeping" not in snapshot and "maintenance" not in snapshot, "AGENT has no cross-role operational scopes")
 
-            elif expected_role == "DINING_STAFF":
+            elif expected_role == "COOK":
                 dining = snapshot.get("dining") or {}
-                require(dining, "DINING_STAFF receives dining context")
-                require("order_counts" in dining and "active_orders" in dining and "table_counts" in dining, "DINING_STAFF receives operational dining fields")
-                require("hotel" not in snapshot and "finance" not in snapshot and "agent" not in snapshot, "DINING_STAFF has no hotel finance/agent scope")
+                require(dining, "COOK receives dining context")
+                require("order_counts" in dining and "active_orders" in dining and "table_counts" in dining, "COOK receives operational kitchen fields")
+                require("hotel" not in snapshot and "finance" not in snapshot and "agent" not in snapshot, "COOK has no hotel finance/agent scope")
 
         print("MARINA_AI_ROLE_RUNTIME_ACCEPTANCE: PASS")
         return 0
