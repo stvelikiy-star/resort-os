@@ -17,7 +17,7 @@ from .dining_coordination import (
 )
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-seating"])
-read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 write_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
 SESSION_TRANSITIONS: dict[str, set[str]] = {
     "WAITING": {"SEATED", "CANCELLED"},
