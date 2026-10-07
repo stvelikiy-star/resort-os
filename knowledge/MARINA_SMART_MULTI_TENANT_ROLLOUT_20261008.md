@@ -128,3 +128,22 @@ The rollout order is therefore: apply migration in isolated staging, enable the 
 there, create two test tenants, verify login/context and cross-tenant read/write denial,
 then migrate property/domain resolution. No production deployment is implied by this
 document.
+
+
+## Staging gate before customer onboarding
+
+The first staging gate is intentionally read-only and is implemented in
+`scripts/verify_marina_multitenant_staging.py`. It requires:
+
+1. HTTPS staging API readiness and OpenAPI availability;
+2. the complete migration ledger including `zz107_marina_tenants_20261008`;
+3. two active test tenants and two test properties;
+4. every property assigned to a non-null tenant;
+5. no duplicate property code inside one tenant;
+6. explicit expected property codes supplied by the staging runbook.
+
+This gate does not prove application-level login isolation. After it passes, a separate
+two-account E2E must log into both test properties, compare the server-returned
+`tenant_id/property_id`, verify role boundaries, and attempt cross-property reads and
+writes. Until that E2E and backup/restore are green, customer onboarding and production
+deployment remain blocked.
