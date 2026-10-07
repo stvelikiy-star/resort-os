@@ -17,7 +17,7 @@ from .dining_coordination import (
 )
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-control"])
-dining_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
+dining_access = require_roles("OWNER", "MANAGER", "WAITER")
 
 MEAL_TYPES = {"BREAKFAST", "LUNCH", "DINNER", "OTHER"}
 ACTIVE_ORDER_STATUSES = ("NEW", "ACCEPTED", "COOKING", "READY")
