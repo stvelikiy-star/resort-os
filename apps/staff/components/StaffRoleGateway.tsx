@@ -177,7 +177,7 @@ export default function StaffRoleGateway() {
       {user.role === "COOK" && <div className="shift-empty"><strong>Kitchen Admin готов к работе.</strong><span>Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.</span><a className="shift-primary" href="/kitchen">Открыть Kitchen Admin</a></div>}
       {user.role === "RECEPTION" && <div className="shift-empty"><strong>Рабочая очередь ниже обновляется автоматически.</strong><span>Берите заявку в работу и закрывайте её после фактического выполнения.</span></div>}
     </main>
-    {(user.role === "RECEPTION" || user.role === "DINING_STAFF") && <GuestRequestShiftPanel />}
+    {(user.role === "RECEPTION" || user.role === "WAITER") && <GuestRequestShiftPanel />}
     <MarinaAiAssistant screen="MY_SHIFT" role={user.role} />
   </>;
 }
