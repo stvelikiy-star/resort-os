@@ -16,7 +16,7 @@ def main() -> int:
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
     assert len(EXPECTED_MIGRATIONS) == 30
-    assert EXPECTED_MIGRATIONS[-10:] == (
+    assert EXPECTED_MIGRATIONS[-11:] == (
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
