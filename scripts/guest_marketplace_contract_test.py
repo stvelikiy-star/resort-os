@@ -83,7 +83,7 @@ def test_staff_has_separate_daily_menu_and_waiter_surfaces():
     assert "Опубликовать:" in DAY_PLANNER
     assert "Стоп-лист" in DAY_PLANNER
     assert '"/core/api/v1/dining/menu-day/publish"' in DAY_PLANNER
-    assert 'new Set(["OWNER", "MANAGER", "COOK"])' in WAITER
+    assert 'new Set(["OWNER", "MANAGER", "WAITER"])' in WAITER
     assert '"/core/api/v1/dining/floor"' in WAITER
     assert "Взять заказ" in WAITER
     assert "Выдано гостю" in WAITER
