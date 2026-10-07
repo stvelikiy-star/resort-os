@@ -109,3 +109,22 @@ Required before real customer data:
 - **On-premise:** optional later, only when the customer supplies or purchases an always-on managed device and accepts separate support/backup terms.
 
 No production/DNS cutover, payment activation or real-data migration is implied by this document.
+
+
+## Current implementation slice
+
+The first safe code slice now carries a trusted context in the authenticated session and
+in `/api/v1/auth/me`:
+
+- `property_id` is always derived from the joined database property;
+- `tenant_id` is read only from `properties.tenantId`;
+- `MARINA_TENANT_CONTEXT_ENABLED=false` is the default, so the pre-migration runtime
+  remains compatible;
+- the existing `PROPERTY_CODE` boundary remains active until every property-scoped
+  query is covered by isolation tests;
+- the browser cannot select a tenant by sending a custom header.
+
+The rollout order is therefore: apply migration in isolated staging, enable the flag only
+there, create two test tenants, verify login/context and cross-tenant read/write denial,
+then migrate property/domain resolution. No production deployment is implied by this
+document.
