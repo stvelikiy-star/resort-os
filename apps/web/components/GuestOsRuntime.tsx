@@ -26,7 +26,7 @@ type LoadState = "loading" | "ready" | "invalid" | "error";
 
 const COPY = {
   ru: {
-    brand: "Три Короны",
+    brand: "AK BERMET",
     kicker: "Guest OS · цифровой консьерж",
     loading: "Проверяем QR комнаты…",
     invalidTitle: "QR недоступен",
@@ -116,7 +116,7 @@ const COPY = {
     error: "Guest OS ашылмады. Интернет байланысын тексеріп, қайта көріңіз.",
   },
   en: {
-    brand: "Three Crowns",
+    brand: "AK BERMET",
     kicker: "Guest OS · digital concierge",
     loading: "Checking the room QR…",
     invalidTitle: "QR unavailable",
@@ -151,7 +151,7 @@ function localeFromBrowser(): GuestFactsLocale {
   if (typeof window === "undefined") return "ru";
   const query = new URLSearchParams(window.location.search).get("lang");
   if (query === "ru" || query === "kg" || query === "kz" || query === "en") return query;
-  const stored = window.localStorage.getItem("three-crowns-site-language");
+  const stored = window.localStorage.getItem("marina-smart-site-language");
   return stored === "kg" || stored === "kz" || stored === "en" ? stored : "ru";
 }
 
@@ -172,8 +172,8 @@ export default function GuestOsRuntime({ token }: { token: string }) {
 
   function chooseLocale(next: GuestFactsLocale) {
     setLocale(next);
-    window.localStorage.setItem("three-crowns-site-language", next);
-    window.localStorage.setItem("three-crowns-guest-language", next);
+    window.localStorage.setItem("marina-smart-site-language", next);
+    window.localStorage.setItem("marina-smart-guest-locale", next);
     document.documentElement.lang = next === "kg" ? "ky" : next === "kz" ? "kk" : next;
   }
 
