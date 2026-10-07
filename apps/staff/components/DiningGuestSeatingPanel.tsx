@@ -82,7 +82,7 @@ export default function DiningGuestSeatingPanel() {
     try {
       await api("/core/api/v1/dining/sessions", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ stay_id: stayId, table_id: tableId, service_date: todayIso(), meal_type: meal, waiter_id: user.role === "DINING_STAFF" ? user.id : null, status: "WAITING" }),
+        body: JSON.stringify({ stay_id: stayId, table_id: tableId, service_date: todayIso(), meal_type: meal, waiter_id: user.role === "WAITER" ? user.id : null, status: "WAITING" }),
       });
       setNotice("Гость закреплён за столом и ожидается.");
       await load();
