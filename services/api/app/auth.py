@@ -13,6 +13,10 @@ from pydantic import BaseModel, Field
 
 SESSION_COOKIE = "resort_session"
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
+# The migration is staged before this flag is enabled. Keeping it fail-closed lets
+# the existing single-property deployment continue while the trusted context is
+# rolled through staging and verified against every property-scoped query.
+MARINA_TENANT_CONTEXT_ENABLED = os.environ.get("MARINA_TENANT_CONTEXT_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "12"))
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
 COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN") or None
@@ -39,6 +43,24 @@ class AuthUser(BaseModel):
     display_name: str
     role: str
     property_code: str
+    property_id: str | None = None
+    tenant_id: str | None = None
+
+
+def _tenant_context_select_sql() -> str:
+    """Return only DB-derived tenant context; never accept it from the client.
+
+    The old database has no properties.tenantId column. The feature flag therefore
+    gates the new column reference until migration zz107 is applied in staging.
+    """
+
+    if not MARINA_TENANT_CONTEXT_ENABLED:
+        return 'p.id AS property_id, NULL::uuid AS tenant_id'
+    return 'p.id AS property_id, p."tenantId" AS tenant_id'
+
+
+def _optional_uuid_text(value: Any) -> str | None:
+    return str(value) if value is not None else None
 
 
 def hash_session_token(token: str) -> str:
@@ -186,10 +208,11 @@ async def current_user(request: Request) -> dict[str, Any]:
 
     async with request.app.state.db.acquire() as conn:
         row = await conn.fetchrow(
-            '''
+            f'''
             SELECT s.id AS session_id, s."expiresAt", s."revokedAt",
                    u.id AS user_id, u.username, u."displayName", u.role::text AS role, u."isActive",
-                   p.code AS property_code
+                   p.code AS property_code,
+                   {_tenant_context_select_sql()}
             FROM auth_sessions s
             JOIN staff_users u ON u.id = s."userId"
             JOIN properties p ON p.id = u."propertyId"
@@ -218,6 +241,8 @@ async def current_user(request: Request) -> dict[str, Any]:
         "display_name": row["displayName"],
         "role": row["role"],
         "property_code": row["property_code"],
+        "property_id": _optional_uuid_text(row["property_id"]),
+        "tenant_id": _optional_uuid_text(row["tenant_id"]),
     }
 
 
@@ -247,9 +272,10 @@ async def login(payload: LoginPayload, request: Request, response: Response):
                 raise _invalid_login()
 
             row = await conn.fetchrow(
-                '''
+                f'''
                 SELECT u.id, u.username, u."displayName", u."passwordHash", u.role::text AS role,
-                       u."isActive", u."propertyId", p.code AS property_code
+                       u."isActive", u."propertyId", p.code AS property_code,
+                       {_tenant_context_select_sql()}
                 FROM staff_users u
                 JOIN properties p ON p.id = u."propertyId"
                 WHERE p.code = $1 AND lower(u.username) = $2
@@ -321,6 +347,8 @@ async def login(payload: LoginPayload, request: Request, response: Response):
         display_name=row["displayName"],
         role=row["role"],
         property_code=row["property_code"],
+        property_id=_optional_uuid_text(row["property_id"]),
+        tenant_id=_optional_uuid_text(row["tenant_id"]),
     )
 
 
@@ -344,4 +372,6 @@ async def me(user: dict[str, Any] = Depends(current_user)):
         display_name=user["display_name"],
         role=user["role"],
         property_code=user["property_code"],
+        property_id=user.get("property_id"),
+        tenant_id=user.get("tenant_id"),
     )
