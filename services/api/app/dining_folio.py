@@ -9,7 +9,7 @@ from .auth import require_roles
 from .folio import ensure_kitchen_order_charge
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-folio"])
-access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 MANAGEMENT_ROLES = {"OWNER", "MANAGER", "RECEPTION"}
 
 
