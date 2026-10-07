@@ -112,7 +112,7 @@
     "target_backup_restore_verified": false,
     "https_wss_verified": true,
     "real_staff_devices_verified": false,
-    "live_ai_provider_verified": false,
+    "live_ai_provider_verified": true,
     "manual_translation_review_verified": false,
     "restart_verified": true,
     "public_ai_capability_contract_verified": true
@@ -121,7 +121,7 @@
     "Verify target database migration ledger and target backup/restore on Railway",
     "Run browser/API acceptance on the target for all staff and guest flows",
     "Verify real iPhone, Android and desktop staff devices",
-    "Verify the live MARINA AI provider response and safe data handling after deployment",
+    "Review provider response content and data-handling evidence under the owner gate",
     "Complete manual RU/KG/KZ/EN translation review",
     "Record immutable deployment linkage and rollback evidence",
     "No production cutover, DNS, payments or provider activation without owner gate"
@@ -136,8 +136,8 @@
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
     "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
     "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
-    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities report configured=true, while live provider response content remains unverified.",
-    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, public AI capabilities report configured=true, and Railway logs show a public AI chat HTTP 200 at 2026-10-07T14:42:28Z. Provider response content was not recorded or independently verified.",
+    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities report configured=true and provider telemetry confirms api.openai.com DNS/TLS egress with public chat HTTP 200. Response body was not recorded.",
+    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, public AI capabilities report configured=true, and telemetry confirms api.openai.com DNS/TLS egress plus public AI chat HTTP 200 at 2026-10-07T14:42:28Z. Response body was not recorded.",
     "Runtime migration boot evidence: API deployment 0982bc40 connected to the target PostgreSQL, found 30 migrations and reported no pending migrations; direct _prisma_migrations ledger query and backup/restore remain unverified."
   ],
   "external_staging": {
@@ -231,6 +231,13 @@
         "anonymous_handshake_http": 403,
         "agent_handshake_http": 403,
         "note": "Agent and anonymous clients are denied access to /ws/pms/grid; no data mutation."
+      },
+      "live_ai_telemetry": {
+        "provider_host": "api.openai.com",
+        "dns_resolution": "PASS",
+        "outbound_tls_443": "PASS",
+        "public_chat_http": 200,
+        "response_body_recorded": false
       }
     },
     "readonly_smoke": {
@@ -325,12 +332,21 @@
         "availability_from_core": true,
         "collects_payment": false,
         "creates_confirmed_reservation": false,
-        "live_provider_call_verified": false,
+        "live_provider_call_verified": true,
         "verified_after_api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
         "staging_http_chat_observed": {
           "http": 200,
           "observed_at": "2026-10-07T14:42:28Z",
           "provider_response_body_verified": false
+        },
+        "provider_telemetry": {
+          "dns_qname": "api.openai.com",
+          "dns_rcode": "NOERROR",
+          "tls_egress_observed": true,
+          "destination_port": 443,
+          "chat_http": 200,
+          "observed_window": "2026-10-07T14:42:24Z/2026-10-07T14:42:32Z",
+          "response_body_recorded": false
         }
       }
     },
