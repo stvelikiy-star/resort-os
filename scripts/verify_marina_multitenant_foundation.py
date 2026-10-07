@@ -62,6 +62,18 @@ def main() -> int:
         if marker not in auth:
             raise AssertionError(f"trusted auth-context marker missing: {marker}")
 
+    staging_gate = read("scripts/verify_marina_multitenant_staging.py")
+    for marker in (
+        "async def main()",
+        "MARINA_STAGING_BASE_URL",
+        "MARINA_STAGING_DATABASE_URL",
+        'to_regclass(\'public.tenants\')',
+        "properties without tenant",
+        "read-only foundation gate passed",
+    ):
+        if marker not in staging_gate:
+            raise AssertionError(f"staging gate marker missing: {marker}")
+
     production_env = read(".env.production.example")
     if "MARINA_TENANT_CONTEXT_ENABLED=false" not in production_env:
         raise AssertionError("production tenant context must remain disabled until staging gates pass")
