@@ -120,7 +120,7 @@
     "Verify target database migration ledger and target backup/restore on Railway",
     "Run browser/API acceptance on the target for all staff and guest flows",
     "Verify real iPhone, Android and desktop staff devices",
-    "Perform live MARINA AI provider call after deployment",
+    "Verify the live MARINA AI provider response and safe data handling after deployment",
     "Complete manual RU/KG/KZ/EN translation review",
     "Record immutable deployment linkage and rollback evidence",
     "No production cutover, DNS, payments or provider activation without owner gate"
@@ -135,8 +135,9 @@
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
     "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
     "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
-    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities explicitly report no configured live provider, so live AI remains pending.",
-    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, and public AI capabilities now report configured=true. No live provider request was executed."
+    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities report configured=true, while live provider response content remains unverified.",
+    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, public AI capabilities report configured=true, and Railway logs show a public AI chat HTTP 200 at 2026-10-07T14:42:28Z. Provider response content was not recorded or independently verified.",
+    "Runtime migration boot evidence: API deployment 0982bc40 connected to the target PostgreSQL, found 30 migrations and reported no pending migrations; direct _prisma_migrations ledger query and backup/restore remain unverified."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -219,7 +220,9 @@
       "migration_boot_contract": {
         "command": "npx prisma migrate deploy",
         "source": "deploy/ak-bermet-test-api.Dockerfile",
-        "target_ledger_verified": false
+        "target_ledger_verified": false,
+        "migration_boot_completed": true,
+        "runtime_log": "Deployment 0982bc40 logged 30 migrations found and No pending migrations to apply at 2026-10-07T13:48:51Z; direct target ledger query remains unverified."
       },
       "wss_access_control": {
         "observed_on": "2026-10-07",
@@ -322,7 +325,12 @@
         "collects_payment": false,
         "creates_confirmed_reservation": false,
         "live_provider_call_verified": false,
-        "verified_after_api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92"
+        "verified_after_api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+        "staging_http_chat_observed": {
+          "http": 200,
+          "observed_at": "2026-10-07T14:42:28Z",
+          "provider_response_body_verified": false
+        }
       }
     },
     "api_deployment": {
