@@ -131,7 +131,8 @@
     "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified.",
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
     "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
-    "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket."
+    "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
+    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities explicitly report no configured live provider, so live AI remains pending."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -276,6 +277,47 @@
           "role": "WAITER",
           "property_code": "AK_BERMET_TEST"
         }
+      }
+    },
+    "public_readonly_smoke": {
+      "observed_on": "2026-10-07",
+      "locales": {
+        "ru": {
+          "http": 200,
+          "response_locale": "ru",
+          "content_blocks": 11
+        },
+        "kg": {
+          "http": 200,
+          "response_locale": "kg",
+          "content_blocks": 11
+        },
+        "kz": {
+          "http": 200,
+          "response_locale": "kz",
+          "content_blocks": 11
+        },
+        "en": {
+          "http": 200,
+          "response_locale": "en",
+          "content_blocks": 11
+        }
+      },
+      "property_code": "AK_BERMET_TEST",
+      "availability": {
+        "http": 200,
+        "check_in": "2026-12-10",
+        "check_out": "2026-12-12",
+        "nights": 2,
+        "results": 8
+      },
+      "public_ai_capabilities": {
+        "http": 200,
+        "configured": false,
+        "availability_from_core": true,
+        "collects_payment": false,
+        "creates_confirmed_reservation": false,
+        "live_provider_call_verified": false
       }
     }
   }
