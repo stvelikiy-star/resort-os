@@ -204,8 +204,8 @@ export default function PremiumMotion() {
       refreshParallaxTargets();
       requestFrame();
     };
-    window.addEventListener("three-crowns:content-ready", handleContentReady);
-    cleanup.push(() => window.removeEventListener("three-crowns:content-ready", handleContentReady));
+    window.addEventListener("marina-smart:content-ready", handleContentReady);
+    cleanup.push(() => window.removeEventListener("marina-smart:content-ready", handleContentReady));
 
     const onAnchorClick = (event: MouseEvent) => {
       if (reduceMotion) return;
