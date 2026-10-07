@@ -111,7 +111,8 @@
     "real_staff_devices_verified": false,
     "live_ai_provider_verified": false,
     "manual_translation_review_verified": false,
-    "restart_verified": true
+    "restart_verified": true,
+    "public_ai_capability_contract_verified": true
   },
   "remaining_gates": [
     "Verify target database migration ledger and target backup/restore on Railway",
@@ -132,7 +133,8 @@
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
     "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
     "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
-    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities explicitly report no configured live provider, so live AI remains pending."
+    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities explicitly report no configured live provider, so live AI remains pending.",
+    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, and public AI capabilities now report configured=true. No live provider request was executed."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -313,12 +315,20 @@
       },
       "public_ai_capabilities": {
         "http": 200,
-        "configured": false,
+        "configured": true,
         "availability_from_core": true,
         "collects_payment": false,
         "creates_confirmed_reservation": false,
-        "live_provider_call_verified": false
+        "live_provider_call_verified": false,
+        "verified_after_api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92"
       }
+    },
+    "api_deployment": {
+      "deployed_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
+      "status": "SUCCESS",
+      "observed_on": "2026-10-07",
+      "scope": "API only; Admin/Staff/Web remained on the previously verified runtime commit"
     }
   }
 }
