@@ -9,8 +9,8 @@ BASE = os.environ.get("CORE_API_URL", "http://127.0.0.1:8000")
 DB = os.environ["DATABASE_URL"].split("?", 1)[0]
 OWNER_USERNAME = os.environ["BOOTSTRAP_OWNER_USERNAME"]
 OWNER_PASSWORD = os.environ["BOOTSTRAP_OWNER_PASSWORD"]
-DINING_USERNAME = os.environ["KITCHEN_MENU_DINING_USERNAME"]
-DINING_PASSWORD = os.environ["KITCHEN_MENU_DINING_PASSWORD"]
+COOK_USERNAME = os.environ.get("KITCHEN_MENU_COOK_USERNAME", os.environ["KITCHEN_MENU_DINING_USERNAME"])
+COOK_PASSWORD = os.environ.get("KITCHEN_MENU_COOK_PASSWORD", os.environ["KITCHEN_MENU_DINING_PASSWORD"])
 
 
 def check(value: bool, message: str) -> None:
@@ -29,12 +29,12 @@ async def main() -> None:
     code = f"CI_MENU_{uuid.uuid4().hex[:8].upper()}"
     conn = await asyncpg.connect(DB)
     owner = await login(OWNER_USERNAME, OWNER_PASSWORD)
-    dining = await login(DINING_USERNAME, DINING_PASSWORD)
+    cook = await login(COOK_USERNAME, COOK_PASSWORD)
     try:
-        denied_bootstrap = await dining.post("/api/v1/kitchen/menu/bootstrap-draft")
+        denied_bootstrap = await cook.post("/api/v1/kitchen/menu/bootstrap-draft")
         check(
             denied_bootstrap.status_code == 403,
-            f"DINING_STAFF draft bootstrap must be 403, got {denied_bootstrap.status_code}: {denied_bootstrap.text}",
+            f"COOK draft bootstrap must be 403, got {denied_bootstrap.status_code}: {denied_bootstrap.text}",
         )
 
         created = await owner.post(
@@ -62,7 +62,7 @@ async def main() -> None:
             "multilingual menu names were not persisted",
         )
 
-        denied_create = await dining.post(
+        denied_create = await cook.post(
             "/api/v1/kitchen/menu",
             json={
                 "code": f"{code}_NO",
@@ -74,19 +74,17 @@ async def main() -> None:
                 "price_kgs": 1,
             },
         )
-        check(denied_create.status_code == 403, f"DINING_STAFF create must be 403, got {denied_create.status_code}")
+        check(denied_create.status_code == 403, f"COOK create must be 403, got {denied_create.status_code}")
 
-        denied_patch = await dining.patch(f"/api/v1/kitchen/menu/{item['id']}", json={"price_kgs": 999})
-        check(denied_patch.status_code == 403, f"DINING_STAFF patch must be 403, got {denied_patch.status_code}")
+        denied_patch = await cook.patch(f"/api/v1/kitchen/menu/{item['id']}", json={"price_kgs": 999})
+        check(denied_patch.status_code == 403, f"COOK patch must be 403, got {denied_patch.status_code}")
 
         published = await owner.patch(f"/api/v1/kitchen/menu/{item['id']}", json={"is_draft": False, "price_kgs": 333})
         check(published.status_code == 200, f"owner publish failed: {published.text}")
         check(published.json()["is_draft"] is False and published.json()["price_kgs"] == 333, "publish/price not persisted")
 
-        menu = await dining.get("/api/v1/kitchen/menu")
-        check(menu.status_code == 200, f"DINING_STAFF must retain menu read access: {menu.text}")
-        visible = next((row for row in menu.json()["items"] if row["id"] == item["id"]), None)
-        check(visible is not None and visible["price_kgs"] == 333, "published menu not readable by dining staff")
+        menu = await cook.get("/api/v1/kitchen/menu")
+        check(menu.status_code == 403, f"COOK must not access menu management: {menu.text}")
 
         audit_count = await conn.fetchval(
             '''SELECT count(*) FROM audit_logs WHERE resource='KitchenMenuItem' AND "resourceId"=$1
@@ -97,7 +95,7 @@ async def main() -> None:
         print("KITCHEN MENU MANAGEMENT E2E: PASS")
     finally:
         await owner.aclose()
-        await dining.aclose()
+        await cook.aclose()
         await conn.execute('DELETE FROM kitchen_menu_items WHERE code=$1', code)
         await conn.close()
 
