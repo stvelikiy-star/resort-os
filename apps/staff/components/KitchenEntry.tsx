@@ -20,7 +20,7 @@ type KitchenPulse = {
   arrivals: ArrivalItem[];
 };
 
-const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
+const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "COOK"]);
 
 async function json(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
@@ -95,7 +95,7 @@ export default function KitchenEntry() {
       }) as User;
       if (!KITCHEN_ROLES.has(body.role)) {
         await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
-        throw new Error("Для этого входа нужна роль DINING_STAFF, MANAGER или OWNER.");
+        throw new Error("Для этого входа нужна роль COOK, MANAGER или OWNER.");
       }
       setUser(body);
       setPassword("");
@@ -164,7 +164,7 @@ export default function KitchenEntry() {
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; DINING_STAFF работает с заказами и столами без права менять цены.</span>
+        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; COOK работает с заказами и столами без права менять цены.</span>
       </div>
     </section>
     <ChefProduction userRole={user.role} />
