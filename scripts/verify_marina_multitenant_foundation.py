@@ -34,9 +34,14 @@ def main() -> int:
             raise AssertionError(f"tenant migration marker missing: {marker}")
 
     seed = read("scripts/seed_from_intake.py")
-    for marker in ("TENANT_CODE =", "async def upsert_tenant", "INSERT INTO tenants", '"tenantId"'):
+    for marker in ("TENANT_CODE =", "async def upsert_tenant", "async def tenant_schema_available", "INSERT INTO tenants", '"tenantId"'):
         if marker not in seed:
             raise AssertionError(f"tenant-aware seed marker missing: {marker}")
+
+    ak_bootstrap = read("scripts/bootstrap_ak_bermet_test.py")
+    for marker in ("async def tenant_schema_available", "async def upsert_tenant", '"tenantId"'):
+        if marker not in ak_bootstrap:
+            raise AssertionError(f"AK BERMET tenant bootstrap marker missing: {marker}")
 
     auth = read("services/api/app/auth.py")
     for marker in (
