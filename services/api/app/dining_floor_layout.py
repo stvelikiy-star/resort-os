@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-floor-layout"])
-read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 layout_access = require_roles("OWNER", "MANAGER")
 
 
