@@ -63,7 +63,8 @@ ROLE_GUIDANCE = {
     "RECEPTION": "Ресепшен: брони, заезды/выезды, гости, номера, оплаты, QR/PIN и готовность номера.",
     "MAID": "Горничная: Моя смена, задачи уборки, чек-лист, сдача на проверку.",
     "TECHNICIAN": "Техник: ремонтные задачи и TECH_BLOCK.",
-    "DINING_STAFF": "Кухня/общепит: питание и заказы в пределах разрешённого интерфейса.",
+    "COOK": "Повар: заказы и статусы приготовления в пределах разрешённого интерфейса.",
+    "DINING_STAFF": "Устаревшая общая роль питания; не выдавай действия вне текущего интерфейса.",
     "WAITER": "Официант: столы, заказы и обслуживание в пределах разрешённого интерфейса.",
     "STORE_STAFF": "Магазин: только разрешённые операции магазина; не выдумывай финансовые действия.",
     "AGENT": "Агент: только свой агентский контекст, доступность/HOLD/заявки в рамках прав.",
@@ -215,7 +216,7 @@ def _select_manual_context(payload: "MarinaAssistantRequest", role: str, screen:
 
 
 LIVE_HOTEL_ROLES = {"OWNER", "MANAGER", "RECEPTION"}
-LIVE_DINING_ROLES = {"OWNER", "MANAGER", "DINING_STAFF", "WAITER"}
+LIVE_DINING_ROLES = {"OWNER", "MANAGER", "COOK", "WAITER"}
 
 
 def _row_item(row: Any, *keys: str) -> dict[str, Any]:
@@ -1084,7 +1085,8 @@ ROLE_NAVIGATION = {
     "AGENT": {"PMS"},
     "MAID": {"OPS", "MY_SHIFT"},
     "TECHNICIAN": {"OPS", "MY_SHIFT"},
-    "DINING_STAFF": {"DINING", "KITCHEN", "MY_SHIFT"},
+    "COOK": {"KITCHEN", "MY_SHIFT"},
+    "DINING_STAFF": set(),
     "WAITER": {"DINING", "WAITER", "MY_SHIFT"},
     "STORE_STAFF": {"MY_SHIFT"},
 }
