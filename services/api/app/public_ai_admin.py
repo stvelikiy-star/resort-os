@@ -200,7 +200,7 @@ async def _ask_openai(prompt: str) -> str:
             response = await client.post(
                 f"{OPENAI_API_BASE_URL}/responses",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
-                json={"model": OPENAI_PUBLIC_ASSISTANT_MODEL, "input": prompt},
+                json={"model": OPENAI_PUBLIC_ASSISTANT_MODEL, "input": prompt, "store": False},
             )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="AI administrator provider transport error") from exc
