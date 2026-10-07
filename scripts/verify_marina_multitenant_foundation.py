@@ -43,6 +43,11 @@ def main() -> int:
         if marker not in ak_bootstrap:
             raise AssertionError(f"AK BERMET tenant bootstrap marker missing: {marker}")
 
+    marina_bootstrap = read("scripts/bootstrap_marina_test.py")
+    for marker in ("async def tenant_schema_available", "async def upsert_tenant", '"tenantId"'):
+        if marker not in marina_bootstrap:
+            raise AssertionError(f"MARINA test bootstrap marker missing: {marker}")
+
     auth = read("services/api/app/auth.py")
     for marker in (
         'MARINA_TENANT_CONTEXT_ENABLED =',
