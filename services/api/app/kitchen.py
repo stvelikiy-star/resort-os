@@ -12,7 +12,9 @@ from .guest_requests import authorized_context
 
 admin_router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen"])
 guest_router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-kitchen"])
-kitchen_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
+kitchen_operations_access = require_roles("OWNER", "MANAGER", "COOK")
+kitchen_management_access = require_roles("OWNER", "MANAGER")
+# Legacy DINING_STAFF is intentionally not accepted: cook and waiter are server-separated.
 
 DRAFT_MENU = [
     ("SYRNIKI", "BREAKFAST", "Сырники со сметаной", "Каймак кошулган сырник", "Қаймақ қосылған сырниктер", "Syrniki with sour cream", 280, 10),
@@ -189,7 +191,7 @@ async def audit(conn, pid, actor_type: str, actor_id: str | None, action: str, r
 
 
 @admin_router.post("/menu/bootstrap-draft")
-async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     created = 0
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -207,7 +209,7 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
 
 
 @admin_router.get("/menu")
-async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user["property_code"])
         rows = await conn.fetch(
@@ -218,7 +220,7 @@ async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_acc
 
 
 @admin_router.patch("/menu/{item_id}")
-async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     allowed_categories = {"BREAKFAST", "SOUP", "SALAD", "MAIN", "SIDE", "DESSERT", "DRINK"}
     if payload.category is not None and payload.category not in allowed_categories:
         raise HTTPException(status_code=422, detail="Unknown menu category")
@@ -254,7 +256,7 @@ async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, u
 
 
 @admin_router.get("/tables")
-async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user["property_code"])
         rows = await conn.fetch(
@@ -265,7 +267,7 @@ async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_a
 
 
 @admin_router.post("/tables", status_code=status.HTTP_201_CREATED)
-async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
@@ -284,7 +286,7 @@ async def create_table(payload: TableCreate, request: Request, user: dict[str, A
 
 
 @admin_router.patch("/tables/{table_id}")
-async def patch_table(table_id: uuid.UUID, payload: TablePatch, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def patch_table(table_id: uuid.UUID, payload: TablePatch, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
@@ -327,7 +329,7 @@ def order_json(row) -> dict[str, Any]:
 
 
 @admin_router.get("/orders")
-async def list_orders(request: Request, order_status: str = Query(default="ACTIVE", alias="status"), user: dict[str, Any] = Depends(kitchen_access)):
+async def list_orders(request: Request, order_status: str = Query(default="ACTIVE", alias="status"), user: dict[str, Any] = Depends(kitchen_operations_access)):
     if order_status not in {"ACTIVE", "ALL", "NEW", "ACCEPTED", "COOKING", "READY", "SERVED", "CANCELLED"}:
         raise HTTPException(status_code=422, detail="Unknown order status")
     async with request.app.state.db.acquire() as conn:
