@@ -51,7 +51,7 @@ def test_guest_marketplace_offers_are_server_managed_not_hardcoded_partner_copy(
 
 
 def test_kitchen_has_direct_role_bounded_entry_and_explicit_handoffs():
-    assert 'new Set(["OWNER", "MANAGER", "DINING_STAFF"])' in KITCHEN
+    assert 'new Set(["OWNER", "MANAGER", "COOK"])' in KITCHEN
     assert '"/core/api/v1/auth/login"' in KITCHEN
     assert "Отдельный вход «Официант / зал»" in KITCHEN
     assert 'href="/kitchen/today"' in KITCHEN
@@ -74,7 +74,7 @@ def test_dining_core_has_day_publish_stoplist_floor_and_table_booking():
     assert '@router.post("/table-reservations"' in DINING_CORE
     assert "DINING_TABLE_TIME_CONFLICT" in DINING_CORE
     assert '@router.patch("/orders/{order_id}/waiter")' in DINING_CORE
-    assert 'user["role"] == "DINING_STAFF"' in DINING_CORE
+    assert 'user["role"] == "WAITER"' in DINING_CORE
     assert '@router.get("/floor")' in DINING_CORE
     assert "app.include_router(dining_control_router)" in APP_ENTRY
 
@@ -83,7 +83,7 @@ def test_staff_has_separate_daily_menu_and_waiter_surfaces():
     assert "Опубликовать:" in DAY_PLANNER
     assert "Стоп-лист" in DAY_PLANNER
     assert '"/core/api/v1/dining/menu-day/publish"' in DAY_PLANNER
-    assert 'new Set(["OWNER", "MANAGER", "DINING_STAFF"])' in WAITER
+    assert 'new Set(["OWNER", "MANAGER", "COOK"])' in WAITER
     assert '"/core/api/v1/dining/floor"' in WAITER
     assert "Взять заказ" in WAITER
     assert "Выдано гостю" in WAITER
