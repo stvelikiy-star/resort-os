@@ -1,68 +1,121 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "product": "MARINA SMART",
   "property": "AK BERMET",
+  "release_id": "MARINA_SMART_INTERNAL_RC_2026-10-07",
   "status": "INTERNAL_CI_VERIFIED_EXTERNAL_ACCEPTANCE_PENDING",
   "source_repository": "stvelikiy-star/resort-os",
-  "source_branch": "marina-smart/p0-brand-release-20261007",
-  "evidence_commit": "f70f99701e8f8ed6ea65973343e4f569a78c6a63",
-  "pull_request": 211,
+  "source_branch": "marina-smart/live-base-20260925",
+  "merged_head": "9a12cd71ad4879242b2f544e8581409640025052",
+  "verified_tree": "a8239b636ec4c54c82e2b76d3e47b26030aae7ad",
+  "verified_tree_source_commit": "65bc6da53c7e2aedbfe8f4da77f40d76f14a2be1",
+  "tree_equivalent_to_verified_commit": true,
+  "pull_requests": [
+    211,
+    186
+  ],
   "evidence_observed_on": "2026-10-07",
   "production_cutover_authorized": false,
   "legacy_release_manifest": "release/current-rc.json",
   "legacy_manifest_applies_to_marina": false,
+  "database": {
+    "migration_count": 30,
+    "critical_constraint_count": 93,
+    "migration_contract_source": "scripts/release_contract.py",
+    "latest_marina_migrations": [
+      "zz101_marina_product_settings_20260926",
+      "zz102_marina_full_modules_20260927",
+      "zz103_agent_access_20260927",
+      "zz104_public_kz_20260929",
+      "zz105_guest_dynamic_kz_20260929",
+      "zz106_marina_split_cook_waiter_20261007"
+    ]
+  },
   "ci_fixture": {
     "property_code": "AK_BERMET_TEST",
     "rooms": 169,
     "room_types": 16,
     "clean_rooms": 137,
     "tech_block_rooms": 32,
+    "public_available_rooms": 137,
     "source": ".github/workflows/marina-smart-ak-bermet-ci.yml",
     "production_inventory_verified": false
   },
   "ci_evidence": {
-    "ak_bermet_run_id": 37596411271,
-    "ak_bermet_job_id": 112710041086,
-    "conclusion": "success",
-    "verified_steps": [
-      "clean database migrations",
-      "inventory and staff bootstrap",
-      "database inventory assertions",
-      "MARINA AI role-scoped runtime context",
-      "public brand and RU/KG/KZ/EN contract",
-      "Admin typecheck and build",
+    "post_merge_tree_workflows_triggered": 54,
+    "post_merge_tree_workflows_success": 54,
+    "post_merge_tree_workflows_failures": 0,
+    "post_merge_tree_source_commit": "65bc6da53c7e2aedbfe8f4da77f40d76f14a2be1",
+    "key_runs": {
+      "marina_ak_bermet": {
+        "run_id": 37620305597,
+        "job_id": 112788585616,
+        "conclusion": "success"
+      },
+      "release_gate": {
+        "run_id": 37620305647,
+        "job_id": 112788596687,
+        "conclusion": "success"
+      },
+      "resort_core": {
+        "run_id": 37620306079,
+        "job_id": 112788590561,
+        "conclusion": "success"
+      },
+      "public_browser": {
+        "run_id": 37620305921,
+        "job_id": 112788586294,
+        "conclusion": "success"
+      },
+      "staff_roles": {
+        "run_id": 37620305717,
+        "job_id": 112788586523,
+        "conclusion": "success"
+      },
+      "admin_guest_pin_i18n": {
+        "run_id": 37620305845,
+        "job_id": 112788586139,
+        "conclusion": "success"
+      }
+    },
+    "verified_scope": [
+      "clean PostgreSQL migrations",
+      "30-migration Marina release contract",
+      "AK BERMET 169-room inventory assertions",
       "169-room chessboard browser acceptance",
       "owner navigation browser acceptance",
-      "client and role cycle"
-    ],
-    "legacy_full_staging_run_id": 37596411414,
-    "legacy_full_staging_job_conclusion": "skipped",
-    "scope_handoff_conclusion": "success",
-    "full_marina_external_staging_verified": false
+      "MARINA AI role-scoped runtime context",
+      "public MARINA brand and RU/KG/KZ/EN contract",
+      "agent role isolation and agency scope",
+      "COOK and WAITER server-side separation",
+      "Guest OS and client role cycle",
+      "Resort Core booking, payment idempotency, check-in/out and housekeeping lifecycle",
+      "backup/restore, security and release-gate contracts"
+    ]
   },
-  "migration_count": null,
-  "critical_constraint_count": null,
   "external_acceptance": {
     "deployed_commit_verified": false,
     "target_database_migrations_verified": false,
     "target_backup_restore_verified": false,
     "https_wss_verified": false,
     "real_staff_devices_verified": false,
-    "live_ai_provider_verified": false
+    "live_ai_provider_verified": false,
+    "manual_translation_review_verified": false
   },
   "remaining_gates": [
-    "Inventory migration and constraint ledger for exact Marina commit",
-    "Dedicated complete Marina staging gate",
-    "Validate dining permissions against agreed role matrix",
-    "Verify actual deployment SHA and target database",
-    "Target backup restore and rollback acceptance",
-    "Role browser/API and real-device acceptance",
-    "Full manual translation review"
+    "Deploy this exact tree to isolated external Marina staging",
+    "Verify HTTPS, WSS, cookies, CORS, health/readiness and restart policy on the target",
+    "Run browser/API acceptance for owner, admin, reception, agent, maid, technician, cook, waiter and guest on the target",
+    "Verify target database migration ledger, AK BERMET inventory reconciliation and backup/restore",
+    "Verify real iPhone, Android and desktop staff devices",
+    "Perform live MARINA AI provider call after deployment",
+    "Complete manual RU/KG/KZ/EN translation review",
+    "Record immutable deployment linkage and rollback evidence"
   ],
   "notes": [
-    "This evidence file records the tested commit, not the commit introduced by this file.",
-    "CI inventory is a test fixture and must not be reported as live occupancy.",
-    "Successful scope handoff is not execution of the skipped full staging job.",
-    "No production approval, role change, navigation change or deployment is implied."
+    "The CI inventory is a test fixture and must not be reported as live occupancy.",
+    "The 54/54 post-merge checks were executed against the verified tree; the squash merge kept the tree identical.",
+    "Green repository CI is not proof of external production runtime.",
+    "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied."
   ]
 }
