@@ -107,14 +107,14 @@
     "deployed_commit_verified": true,
     "target_database_migrations_verified": false,
     "target_backup_restore_verified": false,
-    "https_wss_verified": false,
+    "https_wss_verified": true,
     "real_staff_devices_verified": false,
     "live_ai_provider_verified": false,
-    "manual_translation_review_verified": false
+    "manual_translation_review_verified": false,
+    "restart_verified": true
   },
   "remaining_gates": [
     "Verify target database migration ledger and target backup/restore on Railway",
-    "Verify WSS, cookies, CORS and restart behavior on the target",
     "Run browser/API acceptance on the target for all staff and guest flows",
     "Verify real iPhone, Android and desktop staff devices",
     "Perform live MARINA AI provider call after deployment",
@@ -128,7 +128,8 @@
     "Green repository CI is not proof of external production runtime.",
     "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied.",
     "External Marina staging is now deployed on one pinned commit 419bee7ed419ca80f9e8a612d9751cbcfad4e6a8; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
-    "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified."
+    "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified.",
+    "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -169,6 +170,50 @@
       "waiter": "WAITER",
       "property_code": "AK_BERMET_TEST"
     },
-    "observed_on": "2026-10-07"
+    "observed_on": "2026-10-07",
+    "post_deploy_validation": {
+      "observed_on": "2026-10-07",
+      "wss": {
+        "verified": true,
+        "api_first_message_bytes": 47587,
+        "admin_rewrite_first_message_bytes": 47587,
+        "authenticated_role": "OWNER",
+        "path": "/ws/pms/grid"
+      },
+      "cookies": {
+        "login_http": 200,
+        "session_cookie": "resort_session",
+        "flags": [
+          "HttpOnly",
+          "Secure",
+          "SameSite=Lax",
+          "Path=/",
+          "Max-Age=86400"
+        ],
+        "token_recorded": false
+      },
+      "cors": {
+        "admin_preflight_http": 200,
+        "admin_allow_credentials": true,
+        "staff_preflight_http": 200,
+        "staff_allow_credentials": true,
+        "untrusted_origin_http": 400,
+        "untrusted_origin_rejected": true
+      },
+      "restart": {
+        "service": "api",
+        "deployment_id": "18e51a96-9f9d-4538-ac1f-9ca7f74786b7",
+        "restarted_in_place": true,
+        "readiness_http_after_restart": 200,
+        "environment_services_online_after_restart": 5,
+        "failures_after_restart": 0,
+        "pending_work_after_restart": 0
+      },
+      "migration_boot_contract": {
+        "command": "npx prisma migrate deploy",
+        "source": "deploy/ak-bermet-test-api.Dockerfile",
+        "target_ledger_verified": false
+      }
+    }
   }
 }
