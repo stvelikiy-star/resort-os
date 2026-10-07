@@ -43,7 +43,7 @@ export const fallbackSiteContent: Record<SiteLocale, SiteContent> = {
     },
     groups: { eyebrow: "Групповые заезды", title: "Команды, сборы и корпоративные поездки", copy: "Подберём размещение под состав группы и заранее согласуем питание, трансфер и режим проживания." },
     contacts: { phone: "", whatsapp: "", email: "", address: "Иманбай Молдо, Чолпон-Ата 722315, Кыргызстан" },
-    seo: { title: "AK BERMET — Resort & SPA на Иссык-Куле", description: "AK BERMET Resort & SPA в Чолпон-Ате: 84 номера, конференц-зал на 20–120 гостей, собственный пляж, пирс 150 м, SPA и открытый бассейн." },
+    seo: { title: "AK BERMET — Resort & SPA на Иссык-Куле", description: "MARINA SMART — AK BERMET Resort & SPA в Чолпон-Ате: 84 номера, конференц-зал на 20–120 гостей, собственный пляж, пирс 150 м, SPA и открытый бассейн." },
   },
   kg: {
     hero: { eyebrow: "AK BERMET · Resort & SPA · Чолпон-Ата", title: "AK BERMET. Эс алууңуз ушул жерден башталат.", copy: "Көл жээгиндеги эс алуу жайы: өз пляжы, 150 метрлик пирс, SPA, ачык бассейн жана жайгашуунун 12 категориясы.", primary_cta: "Бош номерлерди текшерүү", secondary_cta: "Номерлерди көрүү" },
@@ -60,7 +60,7 @@ export const fallbackSiteContent: Record<SiteLocale, SiteContent> = {
     },
     groups: { eyebrow: "Топтук келүүлөр", title: "Командалар, спорттук жыйындар жана корпоративдик сапарлар", copy: "Топтун курамына жараша жайгашууну тандап, тамактануу, трансфер жана жашоо режимин алдын ала макулдашабыз." },
     contacts: { phone: "", whatsapp: "", email: "", address: "Иманбай Молдо, Чолпон-Ата 722315, Кыргызстан" },
-    seo: { title: "AK BERMET — AK BERMETдөгү Resort & SPA", description: "Чолпон-Атадагы AK BERMET Resort & SPA: 84 номер, 20–120 конокко конференц-зал, өз пляжы, 150 м пирс, SPA жана ачык бассейн." },
+    seo: { title: "AK BERMET — AK BERMETдөгү Resort & SPA", description: "MARINA SMART — Чолпон-Атадагы AK BERMET Resort & SPA: 84 номер, 20–120 конокко конференц-зал, өз пляжы, 150 м пирс, SPA жана ачык бассейн." },
   },
   kz: {
     hero: { eyebrow: "AK BERMET · Resort & SPA · Шолпан-Ата", title: "AK BERMET. Демалысыңыз осы жерден басталады.", copy: "Көл жағасындағы курорт: жеке жағажай, 150 метрлік пирс, SPA, ашық бассейн және орналастырудың 12 санаты.", primary_cta: "Бос бөлмелерді тексеру", secondary_cta: "Бөлмелерді көру" },
@@ -77,7 +77,7 @@ export const fallbackSiteContent: Record<SiteLocale, SiteContent> = {
     },
     groups: { eyebrow: "Топтық келулер", title: "Командалар, жиындар және корпоративтік сапарлар", copy: "Топ құрамына сай орналастыруды таңдап, тамақтану, трансфер және тұру режимін алдын ала келісеміз." },
     contacts: { phone: "", whatsapp: "", email: "", address: "Иманбай Молдо, Шолпан-Ата 722315, Қырғызстан" },
-    seo: { title: "AK BERMET — AK BERMETдегі Resort & SPA", description: "Шолпан-Атадағы AK BERMET Resort & SPA: 84 бөлме, 20–120 қонаққа арналған конференц-зал, жеке жағажай, 150 м пирс, SPA және ашық бассейн." },
+    seo: { title: "AK BERMET — AK BERMETдегі Resort & SPA", description: "MARINA SMART — Шолпан-Атадағы AK BERMET Resort & SPA: 84 бөлме, 20–120 қонаққа арналған конференц-зал, жеке жағажай, 150 м пирс, SPA және ашық бассейн." },
   },
   en: {
     hero: { eyebrow: "AK BERMET · Resort & SPA · Cholpon-Ata", title: "AK BERMET. Your stay starts here.", copy: "A lakeside resort with a private beach, a 150-metre pier, SPA, outdoor pool and 12 accommodation categories.", primary_cta: "Check available rooms", secondary_cta: "Explore rooms" },
@@ -94,7 +94,7 @@ export const fallbackSiteContent: Record<SiteLocale, SiteContent> = {
     },
     groups: { eyebrow: "Group stays", title: "Teams, training camps and corporate trips", copy: "We help match accommodation to your group and coordinate meals, transfers and the stay schedule in advance." },
     contacts: { phone: "", whatsapp: "", email: "", address: "Imanbay Moldo, Cholpon-Ata 722315, Kyrgyzstan" },
-    seo: { title: "AK BERMET — Resort & SPA on AK BERMET", description: "AK BERMET Resort & SPA in Cholpon-Ata: 84 rooms, a conference hall for 20–120 guests, private beach, 150 m pier, SPA and outdoor pool." },
+    seo: { title: "AK BERMET — Resort & SPA on AK BERMET", description: "MARINA SMART — AK BERMET Resort & SPA in Cholpon-Ata: 84 rooms, a conference hall for 20–120 guests, private beach, 150 m pier, SPA and outdoor pool." },
   },
 };
 
