@@ -142,23 +142,61 @@ async def upsert_tenant(conn) -> uuid.UUID:
     )
 
 
+async def tenant_schema_available(conn) -> bool:
+    row = await conn.fetchrow(
+        '''
+        SELECT
+            EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'tenants'
+            ) AS has_tenants,
+            EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'properties'
+                  AND column_name = 'tenantId'
+            ) AS has_property_tenant_id
+        '''
+    )
+    return bool(row["has_tenants"] and row["has_property_tenant_id"])
+
+
 async def upsert_property(conn) -> uuid.UUID:
-    tenant_id = await upsert_tenant(conn)
+    if await tenant_schema_available(conn):
+        tenant_id = await upsert_tenant(conn)
+        return await conn.fetchval(
+            '''
+            INSERT INTO properties (
+                id, "tenantId", code, name, timezone, currency, "createdAt", "updatedAt"
+            )
+            VALUES ($1, $2, $3, $4, 'Asia/Bishkek', 'KGS', now(), now())
+            ON CONFLICT (code) DO UPDATE SET
+                "tenantId" = EXCLUDED."tenantId",
+                name = EXCLUDED.name,
+                "updatedAt" = now()
+            RETURNING id
+            ''',
+            uuid.uuid4(), tenant_id, PROPERTY_CODE, PROPERTY_NAME,
+        )
+
+    # Legacy CI/dev schemas can intentionally stop before zz107. Keep their
+    # deterministic seed contract intact; tenant-aware seeding is used whenever
+    # both the tenants table and properties.tenantId are present.
     return await conn.fetchval(
         '''
         INSERT INTO properties (
-            id, "tenantId", code, name, timezone, currency, "createdAt", "updatedAt"
+            id, code, name, timezone, currency, "createdAt", "updatedAt"
         )
-        VALUES ($1, $2, $3, $4, 'Asia/Bishkek', 'KGS', now(), now())
+        VALUES ($1, $2, $3, 'Asia/Bishkek', 'KGS', now(), now())
         ON CONFLICT (code) DO UPDATE SET
-            "tenantId" = EXCLUDED."tenantId",
             name = EXCLUDED.name,
             "updatedAt" = now()
         RETURNING id
         ''',
-        uuid.uuid4(), tenant_id, PROPERTY_CODE, PROPERTY_NAME,
+        uuid.uuid4(), PROPERTY_CODE, PROPERTY_NAME,
     )
-
 
 async def upsert_room_types(
     conn,
