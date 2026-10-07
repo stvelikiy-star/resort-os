@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-stays"])
-access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 
 
 async def property_id(conn, property_code: str) -> uuid.UUID:
