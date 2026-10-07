@@ -106,7 +106,7 @@ async def post_order_to_folio(
             )
             if not order:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
-            if user["role"] == "DINING_STAFF" and order["waiterId"] != uuid.UUID(user["id"]):
+            if user["role"] == "WAITER" and order["waiterId"] != uuid.UUID(user["id"]):
                 raise HTTPException(
                     status_code=403,
                     detail={"code": "DINING_FOLIO_ORDER_NOT_ASSIGNED_TO_WAITER"},
