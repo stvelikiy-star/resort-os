@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/ops/kitchen", tags=["kitchen-arrivals"])
-kitchen_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
+kitchen_access = require_roles("OWNER", "MANAGER", "COOK")
 
 ARRIVAL_CODE = "NEW_GUEST_CHECKED_IN"
 ARRIVAL_SOURCE = "CHECK_IN_ARRIVAL_SYNC"
