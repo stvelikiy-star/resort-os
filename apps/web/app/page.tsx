@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+// Supported guest landing locales: RU · KG · KZ · EN
 import GuestLanding from "../components/GuestLanding";
 
 export const metadata: Metadata = {
