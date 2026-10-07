@@ -342,7 +342,7 @@ async def list_orders(request: Request, order_status: str = Query(default="ACTIV
 
 
 @admin_router.post("/orders", status_code=status.HTTP_201_CREATED)
-async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
@@ -405,7 +405,7 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
 
 
 @admin_router.patch("/orders/{order_id}/status")
-async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
