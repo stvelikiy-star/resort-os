@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-entitlements"])
-read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 write_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 MealType = Literal["BREAKFAST", "LUNCH", "DINNER"]
 
