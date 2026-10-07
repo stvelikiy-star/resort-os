@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 ROOMS_CSV = ROOT / "data-intake" / "rooms.csv"
 RATES_CSV = ROOT / "data-intake" / "rates.csv"
 
+TENANT_CODE = "MARINA_SMART_TEST_TENANT"
+TENANT_NAME = "MARINA SMART Test Tenant"
 PROPERTY_CODE = "THREE_CROWNS"
 PROPERTY_NAME = "MARINA SMART TEST HOTEL"
 RATE_PLAN_CODE = "DIRECT_2026_27"
@@ -125,15 +127,36 @@ def load_rates() -> list[dict]:
     return rows
 
 
-async def upsert_property(conn) -> uuid.UUID:
+async def upsert_tenant(conn) -> uuid.UUID:
     return await conn.fetchval(
         '''
-        INSERT INTO properties (id, code, name, timezone, currency, "createdAt", "updatedAt")
-        VALUES ($1, $2, $3, 'Asia/Bishkek', 'KGS', now(), now())
-        ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, "updatedAt" = now()
+        INSERT INTO tenants (id, code, name, status, "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, 'ACTIVE', now(), now())
+        ON CONFLICT (code) DO UPDATE SET
+            name = EXCLUDED.name,
+            status = 'ACTIVE',
+            "updatedAt" = now()
         RETURNING id
         ''',
-        uuid.uuid4(), PROPERTY_CODE, PROPERTY_NAME,
+        uuid.uuid4(), TENANT_CODE, TENANT_NAME,
+    )
+
+
+async def upsert_property(conn) -> uuid.UUID:
+    tenant_id = await upsert_tenant(conn)
+    return await conn.fetchval(
+        '''
+        INSERT INTO properties (
+            id, "tenantId", code, name, timezone, currency, "createdAt", "updatedAt"
+        )
+        VALUES ($1, $2, $3, $4, 'Asia/Bishkek', 'KGS', now(), now())
+        ON CONFLICT (code) DO UPDATE SET
+            "tenantId" = EXCLUDED."tenantId",
+            name = EXCLUDED.name,
+            "updatedAt" = now()
+        RETURNING id
+        ''',
+        uuid.uuid4(), tenant_id, PROPERTY_CODE, PROPERTY_NAME,
     )
 
 
