@@ -130,7 +130,8 @@
     "External Marina staging is now deployed on one pinned commit 419bee7ed419ca80f9e8a612d9751cbcfad4e6a8; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
     "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified.",
     "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
-    "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins."
+    "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
+    "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -214,6 +215,13 @@
         "command": "npx prisma migrate deploy",
         "source": "deploy/ak-bermet-test-api.Dockerfile",
         "target_ledger_verified": false
+      },
+      "wss_access_control": {
+        "observed_on": "2026-10-07",
+        "owner_authenticated_connection": "PASS",
+        "anonymous_handshake_http": 403,
+        "agent_handshake_http": 403,
+        "note": "Agent and anonymous clients are denied access to /ws/pms/grid; no data mutation."
       }
     },
     "readonly_smoke": {
