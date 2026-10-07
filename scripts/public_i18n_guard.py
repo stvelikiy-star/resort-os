@@ -17,6 +17,14 @@ FILES = {
     "rooms": ROOT / "apps/web/app/rooms/page.tsx",
     "room_detail": ROOT / "apps/web/app/rooms/[slug]/page.tsx",
     "service_point": ROOT / "apps/web/app/p/[token]/page.tsx",
+    "guest": ROOT / "apps/web/components/GuestOsRuntime.tsx",
+    "guest_requests": ROOT / "apps/web/components/GuestRequestsPanel.tsx",
+    "guest_services": ROOT / "apps/web/components/GuestServicesRuntime.tsx",
+    "site_media": ROOT / "apps/web/components/SiteMediaRuntime.tsx",
+    "service_point_runtime": ROOT / "apps/web/components/ServicePointRuntime.tsx",
+    "guest_locale": ROOT / "apps/web/lib/marinaGuestLocale.ts",
+    "guest_facts": ROOT / "apps/web/lib/ownerApprovedGuestFacts.ts",
+    "analytics": ROOT / "apps/web/lib/publicAnalytics.ts",
     "site_defaults": ROOT / "services/api/data/site_content_defaults.json",
 }
 
