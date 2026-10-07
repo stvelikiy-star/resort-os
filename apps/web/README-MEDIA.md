@@ -1,4 +1,4 @@
-# Three Crowns media intake
+# MARINA SMART / AK BERMET media intake
 
 Owner-supplied media is being normalized before final import so room categories are not mixed.
 
