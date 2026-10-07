@@ -13,7 +13,7 @@ type PinPayload = {
   guest_access_pin_display_once?: boolean;
 };
 
-type Phrase = { ru: string; kg: string; en: string };
+type Phrase = { ru: string; kg: string; kz?: string; en: string };
 
 const STORAGE_KEY = "three-crowns-admin-locale";
 
