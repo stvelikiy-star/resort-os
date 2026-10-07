@@ -7,8 +7,7 @@ export type MarinaGuestLocale = "ru" | "kg" | "kz" | "en";
 export const MARINA_GUEST_LOCALE_EVENT = "marina-smart:guest-locale";
 export const MARINA_GUEST_LOCALE_KEY = "marina-smart-guest-locale";
 
-const LEGACY_GUEST_KEY = "three-crowns-guest-language";
-const LEGACY_SITE_KEY = "three-crowns-site-language";
+const MARINA_SITE_LOCALE_KEY = "marina-smart-site-language";
 
 export const MARINA_GUEST_LOCALES: MarinaGuestLocale[] = ["ru", "kg", "kz", "en"];
 
@@ -34,7 +33,7 @@ export function readMarinaGuestLocale(): MarinaGuestLocale {
   const query = new URLSearchParams(window.location.search).get("lang");
   if (isMarinaGuestLocale(query)) return query;
 
-  for (const key of [MARINA_GUEST_LOCALE_KEY, LEGACY_GUEST_KEY, LEGACY_SITE_KEY]) {
+  for (const key of [MARINA_GUEST_LOCALE_KEY, MARINA_SITE_LOCALE_KEY]) {
     const stored = window.localStorage.getItem(key);
     if (isMarinaGuestLocale(stored)) return stored;
   }
@@ -49,9 +48,7 @@ export function applyMarinaGuestLocale(
   const { emit = true, updateUrl = false } = options;
 
   window.localStorage.setItem(MARINA_GUEST_LOCALE_KEY, locale);
-  // Keep legacy keys during migration so old sessions and components remain compatible.
-  window.localStorage.setItem(LEGACY_GUEST_KEY, locale);
-  window.localStorage.setItem(LEGACY_SITE_KEY, locale);
+  window.localStorage.setItem(MARINA_SITE_LOCALE_KEY, locale);
   document.documentElement.lang = marinaGuestHtmlLang(locale);
 
   if (updateUrl) {
@@ -81,7 +78,7 @@ export function useMarinaGuestLocale(): readonly [MarinaGuestLocale, (locale: Ma
     };
 
     const onStorage = (event: StorageEvent) => {
-      if (![MARINA_GUEST_LOCALE_KEY, LEGACY_GUEST_KEY, LEGACY_SITE_KEY].includes(event.key || "")) return;
+      if (![MARINA_GUEST_LOCALE_KEY, MARINA_SITE_LOCALE_KEY].includes(event.key || "")) return;
       if (!isMarinaGuestLocale(event.newValue)) return;
       setLocale(event.newValue);
       document.documentElement.lang = marinaGuestHtmlLang(event.newValue);
