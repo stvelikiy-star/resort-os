@@ -15,7 +15,11 @@ from .main import check_availability, get_property_id
 router = APIRouter(prefix="/api/v1/public/ai-admin", tags=["public-ai-admin"])
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_PUBLIC_ASSISTANT_MODEL = os.environ.get("OPENAI_PUBLIC_ASSISTANT_MODEL") or os.environ.get("OPENAI_SALES_MODEL")
+OPENAI_PUBLIC_ASSISTANT_MODEL = (
+    os.environ.get("OPENAI_PUBLIC_ASSISTANT_MODEL")
+    or os.environ.get("OPENAI_SALES_MODEL")
+    or os.environ.get("OPENAI_MARINA_ASSISTANT_MODEL")
+)
 OPENAI_API_BASE_URL = os.environ.get("OPENAI_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_TIMEOUT_SECONDS = float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "30"))
 AI_ADMIN_MAX_MESSAGES = int(os.environ.get("AI_ADMIN_MAX_MESSAGES", "12"))
