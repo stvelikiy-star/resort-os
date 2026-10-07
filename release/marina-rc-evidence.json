@@ -19,7 +19,9 @@
     223,
     224,
     225,
-    226
+    226,
+    227,
+    228
   ],
   "evidence_observed_on": "2026-10-07",
   "production_cutover_authorized": false,
@@ -118,7 +120,30 @@
     "live_ai_provider_verified": true,
     "manual_translation_review_verified": false,
     "restart_verified": true,
-    "public_ai_capability_contract_verified": true
+    "public_ai_capability_contract_verified": true,
+    "safe_ai_contract_verified": {
+      "verified": true,
+      "source_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "source_files": [
+        "services/api/app/public_ai_admin.py",
+        "services/api/app/marina_assistant.py"
+      ],
+      "public_ai": {
+        "availability_from_core": true,
+        "collects_payment": false,
+        "creates_confirmed_reservation": false,
+        "manager_handles_prepayment": true,
+        "sensitive_data_requests_blocked": true,
+        "provider_failure_mode": "fail_closed"
+      },
+      "staff_ai": {
+        "read_only": true,
+        "can_mutate": false,
+        "role_and_property_scoped": true,
+        "provider_failure_mode": "fail_closed"
+      },
+      "verification_type": "read-only source review against deployed API commit"
+    }
   },
   "remaining_gates": [
     "Verify target database migration ledger and target backup/restore on Railway",
@@ -141,7 +166,9 @@
     "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
     "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities report configured=true and provider telemetry confirms api.openai.com DNS/TLS egress with public chat HTTP 200. Response body was not recorded.",
     "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, public AI capabilities report configured=true, and telemetry confirms api.openai.com DNS/TLS egress plus public AI chat HTTP 200 at 2026-10-07T14:42:28Z. Response body was not recorded.",
-    "Runtime migration boot evidence: API deployment 0982bc40 connected to the target PostgreSQL, found 30 migrations and reported no pending migrations; direct _prisma_migrations ledger query and backup/restore remain unverified."
+    "Runtime migration boot evidence: API deployment 0982bc40 connected to the target PostgreSQL, found 30 migrations and reported no pending migrations; direct _prisma_migrations ledger query and backup/restore remain unverified.",
+    "Read-only deployed-source review on API commit 778d8f2 confirmed public AI uses Core availability only, collects no payment, cannot create confirmed reservations, leaves prepayment to a manager, blocks sensitive-data requests and fails closed on provider errors; staff MARINA AI is read-only, role/property-scoped and fail-closed.",
+    "Railway rollback capability observed on 2026-10-07 for current API 0982bc40, Web 81fe9fa1, Admin 51d68254 and Staff f9572ddf; no rollback was executed."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -366,6 +393,37 @@
       "staff": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
       "web": "4249b39c1ed28046482c95af3fd1b01dbb015576",
       "postgres": "existing Railway service/volume; target migration ledger and restore remain unverified"
+    },
+    "rollback_observed": {
+      "verified": true,
+      "observed_on": "2026-10-07",
+      "note": "Railway metadata reports canRollback=true for the current API, Web, Admin and Staff deployments; no rollback was executed.",
+      "deployments": {
+        "api": {
+          "service_id": "eeb844cc-bfce-41b1-88eb-06adb133eaa8",
+          "deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
+          "commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+          "can_rollback": true
+        },
+        "web": {
+          "service_id": "145fd88f-d223-445e-a419-ad2f07e40c63",
+          "deployment_id": "81fe9fa1-4b76-4943-ad8e-a7aaeee91ba9",
+          "commit": "4249b39c1ed28046482c95af3fd1b01dbb015576",
+          "can_rollback": true
+        },
+        "admin": {
+          "service_id": "8b843a29-51bc-44ab-ada0-f8726c0c563d",
+          "deployment_id": "51d68254-ff3b-4ba1-9fef-49e77da6bb9a",
+          "commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+          "can_rollback": true
+        },
+        "staff": {
+          "service_id": "93d86c09-0259-4365-b729-7b385eae5a4e",
+          "deployment_id": "f9572ddf-f7b9-4e08-80bd-5772ec4e7894",
+          "commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+          "can_rollback": true
+        }
+      }
     }
   }
 }
