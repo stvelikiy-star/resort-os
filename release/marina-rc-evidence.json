@@ -3,16 +3,17 @@
   "product": "MARINA SMART",
   "property": "AK BERMET",
   "release_id": "MARINA_SMART_INTERNAL_RC_2026-10-07",
-  "status": "INTERNAL_CI_VERIFIED_EXTERNAL_ACCEPTANCE_PENDING",
+  "status": "INTERNAL_CI_AND_EXTERNAL_STAGING_PARTIAL",
   "source_repository": "stvelikiy-star/resort-os",
   "source_branch": "marina-smart/live-base-20260925",
-  "merged_head": "9a12cd71ad4879242b2f544e8581409640025052",
-  "verified_tree": "a8239b636ec4c54c82e2b76d3e47b26030aae7ad",
-  "verified_tree_source_commit": "65bc6da53c7e2aedbfe8f4da77f40d76f14a2be1",
+  "merged_head": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+  "verified_tree": "812351dfee971c11227a4ccca499772156b78c7e",
+  "verified_tree_source_commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
   "tree_equivalent_to_verified_commit": true,
   "pull_requests": [
     211,
-    186
+    186,
+    213
   ],
   "evidence_observed_on": "2026-10-07",
   "production_cutover_authorized": false,
@@ -91,10 +92,19 @@
       "Guest OS and client role cycle",
       "Resort Core booking, payment idempotency, check-in/out and housekeeping lifecycle",
       "backup/restore, security and release-gate contracts"
-    ]
+    ],
+    "runtime_fix_ci": {
+      "pull_request": 213,
+      "commit": "c13cffbaf0af7c44d8cc19b8648d8cd20acc2485",
+      "checks_triggered": 5,
+      "checks_success": 5,
+      "failures": 0,
+      "marina_ak_bermet_run": 37623759437,
+      "conclusion": "success"
+    }
   },
   "external_acceptance": {
-    "deployed_commit_verified": false,
+    "deployed_commit_verified": true,
     "target_database_migrations_verified": false,
     "target_backup_restore_verified": false,
     "https_wss_verified": false,
@@ -103,19 +113,62 @@
     "manual_translation_review_verified": false
   },
   "remaining_gates": [
-    "Deploy this exact tree to isolated external Marina staging",
-    "Verify HTTPS, WSS, cookies, CORS, health/readiness and restart policy on the target",
-    "Run browser/API acceptance for owner, admin, reception, agent, maid, technician, cook, waiter and guest on the target",
-    "Verify target database migration ledger, AK BERMET inventory reconciliation and backup/restore",
+    "Verify target database migration ledger and target backup/restore on Railway",
+    "Verify WSS, cookies, CORS and restart behavior on the target",
+    "Run browser/API acceptance on the target for all staff and guest flows",
     "Verify real iPhone, Android and desktop staff devices",
     "Perform live MARINA AI provider call after deployment",
     "Complete manual RU/KG/KZ/EN translation review",
-    "Record immutable deployment linkage and rollback evidence"
+    "Record immutable deployment linkage and rollback evidence",
+    "No production cutover, DNS, payments or provider activation without owner gate"
   ],
   "notes": [
     "The CI inventory is a test fixture and must not be reported as live occupancy.",
     "The 54/54 post-merge checks were executed against the verified tree; the squash merge kept the tree identical.",
     "Green repository CI is not proof of external production runtime.",
-    "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied."
-  ]
+    "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied.",
+    "External Marina staging is now deployed on one pinned commit 419bee7ed419ca80f9e8a612d9751cbcfad4e6a8; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
+    "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified."
+  ],
+  "external_staging": {
+    "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
+    "railway_environment": "production",
+    "source_branch": "marina-smart/live-base-20260925",
+    "deployed_commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+    "service_domains": {
+      "api": "https://api-production-f1171.up.railway.app",
+      "admin": "https://admin-production-80a1.up.railway.app",
+      "staff": "https://staff-production-69f6.up.railway.app",
+      "web": "https://web-production-b7d1e.up.railway.app"
+    },
+    "service_health": {
+      "postgres": "SUCCESS",
+      "api": "SUCCESS",
+      "admin": "SUCCESS",
+      "staff": "SUCCESS",
+      "web": "SUCCESS",
+      "failures": 0,
+      "pending_work": 0
+    },
+    "https_smoke": {
+      "api_readiness_http": 200,
+      "admin_http": 200,
+      "staff_http": 200,
+      "web_http": 200,
+      "readiness_property": "AK_BERMET_TEST",
+      "readiness_rooms": 169,
+      "readiness_room_types": 16
+    },
+    "role_login_smoke": {
+      "owner": "OWNER",
+      "reception": "RECEPTION",
+      "agent": "AGENT",
+      "maid": "MAID",
+      "technician": "TECHNICIAN",
+      "cook": "COOK",
+      "waiter": "WAITER",
+      "property_code": "AK_BERMET_TEST"
+    },
+    "observed_on": "2026-10-07"
+  }
 }
