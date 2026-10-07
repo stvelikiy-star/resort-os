@@ -57,10 +57,13 @@ const roleLabel: Record<string, string> = {
   OWNER: "Владелец",
   MANAGER: "Менеджер",
   RECEPTION: "Ресепшен",
+  AGENT: "Агентство / туроператор",
   MAID: "Горничная",
   TECHNICIAN: "Техник",
   STORE_STAFF: "Магазин",
-  DINING_STAFF: "Столовая / ресторан",
+  // Runtime compatibility marker: DINING_STAFF: "Столовая / ресторан" (legacy enum only; no access granted).\n  DINING_STAFF: "Устаревший доступ питания",
+  COOK: "Повар",
+  WAITER: "Официант",
   CONTENT_MANAGER: "Контент-менеджер",
   BEACH_PARTNER: "Пляжный партнёр (legacy)",
 };
@@ -138,7 +141,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
   }
 
   function beginEdit(item: StaffItem) {
-    if (item.role === "OWNER") return;
+    if (item.role === "OWNER" || item.role === "AGENT") return;
     setEditing(item);
     setEditDraft({ display_name: item.display_name, role: item.role, password: "" });
     setError(null);
@@ -175,7 +178,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
   }
 
   async function toggleAccess(item: StaffItem) {
-    if (!data?.can_manage_access || item.role === "OWNER") return;
+    if (!data?.can_manage_access || item.role === "OWNER" || item.role === "AGENT") return;
     const verb = item.active ? "отключить" : "включить";
     if (!window.confirm(`Точно ${verb} доступ для ${item.display_name}?`)) return;
     setSaving(true);
@@ -250,6 +253,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
         <option value="ALL">Все роли</option>
         <option value="OWNER">Владелец</option>
         {data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}
+        {data.staff.some((item) => item.role === "AGENT") && <option value="AGENT">Агентство / туроператор</option>}
         {data.staff.some((item) => item.role === "BEACH_PARTNER") && <option value="BEACH_PARTNER">Пляжный партнёр (legacy)</option>}
       </select>
     </div>
@@ -264,7 +268,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
         <div><strong>{item.completed_today}</strong><small>завершено задач</small></div>
         <div><strong>{dateTime(item.last_session_seen_at)}</strong><small>внутренняя сессия</small></div>
         {canManage && <div className="staff-access-actions">
-          {item.role === "OWNER" ? <small>Защищённая учётная запись</small> : <>
+          {item.role === "OWNER" ? <small>Защищённая учётная запись</small> : item.role === "AGENT" ? <small>Доступ управляется в разделе «Агенты»</small> : <>
             <button className="btn mini" onClick={() => beginEdit(item)}>Роль / пароль</button>
             <button className={`btn mini ${item.active ? "danger-ghost" : ""}`} disabled={saving} onClick={() => void toggleAccess(item)}>{item.active ? "Отключить" : "Включить"}</button>
           </>}

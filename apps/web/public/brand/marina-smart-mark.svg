@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 72" role="img" aria-labelledby="title desc">
+  <title id="title">MARINA SMART</title>
+  <desc id="desc">AK BERMET digital hotel operating system mark</desc>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2d79b"/>
+      <stop offset="1" stop-color="#b88a45"/>
+    </linearGradient>
+  </defs>
+  <path d="M12 57V15h14l24 27 24-27h14v42H73V34L50 58 27 34v23z" fill="none" stroke="url(#gold)" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M111 57V15h21c16 0 25 8 25 21s-9 21-25 21h-8V44h8c7 0 11-3 11-8s-4-8-11-8h-7v29z" fill="#f7f4ea"/>
+  <path d="M166 57V15h13v30h24v12z" fill="#f7f4ea"/>
+  <path d="M216 57V15h13v42z" fill="#f7f4ea"/>
+</svg>

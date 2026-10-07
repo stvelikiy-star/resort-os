@@ -37,7 +37,7 @@ def main() -> int:
         'user.role',
         'isManager',
         'isReception',
-        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);',
+        'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);',
         'if (payload && !canEnterAdmin(payload.role))',
         'if (!canEnterAdmin(payload.role))',
         'Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.',
@@ -50,7 +50,7 @@ def main() -> int:
         '{tab === "RATES" && isManager && <RateManagementBoard />}',
         '<StaffBoard userRole={user.role} />',
     )
-    require(GRID_V9, 'import PMSOwnerGrid from "./PMSOwnerGrid"', "<PMSOwnerGrid />")
+    require(GRID_V9, 'import PMSOwnerGrid from "./PMSOwnerGrid"', "<PMSOwnerGrid agentMode={agentMode} readOnlyMode={readOnlyMode} />")
     require(
         OWNER_GRID,
         'fetch(`/core/api/v1/pms/grid?',

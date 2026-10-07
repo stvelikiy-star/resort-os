@@ -6,9 +6,9 @@ import { GuestFactsLocale, ownerApprovedGuestFacts, TWO_GIS_REVIEWS_URL } from "
 
 function localeFromLocation(): GuestFactsLocale {
   const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "kg" || query === "en" || query === "ru") return query;
-  const stored = window.localStorage.getItem("three-crowns-site-language");
-  return stored === "kg" || stored === "en" || stored === "ru" ? stored : "ru";
+  if (query === "kg" || query === "kz" || query === "en" || query === "ru") return query;
+  const stored = window.localStorage.getItem("marina-smart-site-language");
+  return stored === "kg" || stored === "kz" || stored === "en" || stored === "ru" ? stored : "ru";
 }
 
 function setText(selector: string, value: string) {
@@ -129,10 +129,10 @@ export default function GuestServicesRuntime() {
   useEffect(() => {
     refreshOwnerApprovedFacts();
     const handleReady = () => refreshOwnerApprovedFacts();
-    window.addEventListener("three-crowns:content-ready", handleReady);
+    window.addEventListener("marina-smart:content-ready", handleReady);
     window.addEventListener("popstate", handleReady);
     return () => {
-      window.removeEventListener("three-crowns:content-ready", handleReady);
+      window.removeEventListener("marina-smart:content-ready", handleReady);
       window.removeEventListener("popstate", handleReady);
     };
   }, []);

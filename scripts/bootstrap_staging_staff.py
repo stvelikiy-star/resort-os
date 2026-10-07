@@ -25,13 +25,13 @@ STAFF = [
         "display_name": first_env("RECEPTION_DISPLAY_NAME", "STAGING_RECEPTION_DISPLAY_NAME") or "Staging Reception",
     },
     {
-        "role": "DINING_STAFF",
-        "username": first_env("DINING_STAFF_USERNAME", "STAGING_DINING_USERNAME"),
-        "password": first_env("DINING_STAFF_PASSWORD", "STAGING_DINING_PASSWORD"),
-        "display_name": first_env("DINING_STAFF_DISPLAY_NAME", "STAGING_DINING_DISPLAY_NAME") or "Staging Dining",
+        "role": "COOK",
+        "username": first_env("COOK_USERNAME", "KITCHEN_USERNAME", "DINING_STAFF_USERNAME", "STAGING_DINING_USERNAME"),
+        "password": first_env("COOK_PASSWORD", "KITCHEN_PASSWORD", "DINING_STAFF_PASSWORD", "STAGING_DINING_PASSWORD"),
+        "display_name": first_env("COOK_DISPLAY_NAME", "KITCHEN_DISPLAY_NAME", "DINING_STAFF_DISPLAY_NAME", "STAGING_DINING_DISPLAY_NAME") or "Staging Cook",
     },
     {
-        "role": "DINING_STAFF",
+        "role": "WAITER",
         "username": first_env("WAITER_USERNAME", "STAGING_WAITER_USERNAME"),
         "password": first_env("WAITER_PASSWORD", "STAGING_WAITER_PASSWORD"),
         "display_name": first_env("WAITER_DISPLAY_NAME", "STAGING_WAITER_DISPLAY_NAME") or "Staging Waiter",
@@ -41,6 +41,13 @@ STAFF = [
         "username": first_env("MAID_USERNAME", "STAGING_MAID_USERNAME"),
         "password": first_env("MAID_PASSWORD", "STAGING_MAID_PASSWORD"),
         "display_name": first_env("MAID_DISPLAY_NAME", "STAGING_MAID_DISPLAY_NAME") or "Staging Maid",
+    },
+    {
+        "role": "AGENT",
+        "username": first_env("AGENT_USERNAME", "STAGING_AGENT_USERNAME"),
+        "password": first_env("AGENT_PASSWORD", "STAGING_AGENT_PASSWORD"),
+        "display_name": first_env("AGENT_DISPLAY_NAME", "STAGING_AGENT_DISPLAY_NAME") or "Staging Agent",
+        "agent_name": first_env("BOOKING_AGENT_NAME", "STAGING_BOOKING_AGENT_NAME") or "MARINA SMART Demo Agency",
     },
     {
         "role": "TECHNICIAN",
@@ -107,6 +114,33 @@ async def main() -> None:
                     password_hash,
                     item["role"],
                 )
+                if item["role"] == "AGENT":
+                    agent_id = await conn.fetchval(
+                        '''
+                        INSERT INTO booking_agents (
+                          id,"propertyId",name,"contactName",status,"createdAt","updatedAt"
+                        ) VALUES ($1,$2,$3,$4,'ACTIVE',now(),now())
+                        ON CONFLICT ("propertyId",name) DO UPDATE SET
+                          "contactName"=EXCLUDED."contactName",
+                          status='ACTIVE',
+                          "updatedAt"=now()
+                        RETURNING id
+                        ''',
+                        uuid.uuid4(),
+                        property_id,
+                        item["agent_name"],
+                        item["display_name"],
+                    )
+                    await conn.execute(
+                        'UPDATE staff_users SET "bookingAgentId"=$2,"updatedAt"=now() WHERE id=$1',
+                        user_id,
+                        agent_id,
+                    )
+                else:
+                    await conn.execute(
+                        'UPDATE staff_users SET "bookingAgentId"=NULL,"updatedAt"=now() WHERE id=$1',
+                        user_id,
+                    )
                 await conn.execute(
                     '''UPDATE auth_sessions SET "revokedAt"=now() WHERE "userId"=$1 AND "revokedAt" IS NULL''',
                     user_id,

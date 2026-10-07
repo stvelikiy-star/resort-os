@@ -7,9 +7,9 @@ type Payload = { locale: SiteLocale; content: SiteContent; published_version: nu
 
 function localeFromLocation(): SiteLocale {
   const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "kg" || query === "en" || query === "ru") return query;
-  const stored = window.localStorage.getItem("three-crowns-site-language");
-  if (stored === "kg" || stored === "en" || stored === "ru") return stored;
+  if (query === "kg" || query === "kz" || query === "en" || query === "ru") return query;
+  const stored = window.localStorage.getItem("marina-smart-site-language");
+  if (stored === "kg" || stored === "kz" || stored === "en" || stored === "ru") return stored;
   return "ru";
 }
 
@@ -72,7 +72,7 @@ function preserveInternalLanguage(locale: SiteLocale) {
 }
 
 function dispatchReady(locale: SiteLocale) {
-  window.dispatchEvent(new CustomEvent("three-crowns:content-ready", { detail: { locale } }));
+  window.dispatchEvent(new CustomEvent("marina-smart:content-ready", { detail: { locale } }));
 }
 
 function ensureConferenceBlock(content: SiteContent, locale: SiteLocale) {
@@ -93,16 +93,16 @@ function ensureConferenceBlock(content: SiteContent, locale: SiteLocale) {
           <h2 class="display-title" data-conference="title"></h2>
           <p class="owner-conference-lead" data-conference="copy"></p>
           <div class="owner-conference-facts">
-            <article><small>${locale === "en" ? "Capacity" : locale === "kg" ? "Сыйымдуулук" : "Вместимость"}</small><strong data-conference="capacity"></strong></article>
-            <article><small>${locale === "en" ? "Banquet" : locale === "kg" ? "Банкет" : "Банкет"}</small><strong data-conference="banquet"></strong></article>
-            <article><small>${locale === "en" ? "Menu" : locale === "kg" ? "Меню" : "Меню"}</small><strong data-conference="menu"></strong></article>
+            <article><small>${locale === "en" ? "Capacity" : locale === "kg" ? "Сыйымдуулук" : locale === "kz" ? "Сыйымдылық" : "Вместимость"}</small><strong data-conference="capacity"></strong></article>
+            <article><small>${locale === "en" ? "Banquet" : locale === "kg" ? "Банкет" : locale === "kz" ? "Банкет" : "Банкет"}</small><strong data-conference="banquet"></strong></article>
+            <article><small>${locale === "en" ? "Menu" : locale === "kg" ? "Меню" : locale === "kz" ? "Мәзір" : "Меню"}</small><strong data-conference="menu"></strong></article>
           </div>
           <a class="button button-accent owner-conference-cta" data-conference="cta" target="_blank" rel="noreferrer"></a>
         </div>
         <div class="owner-conference-visual" aria-hidden="true">
           <span class="owner-conference-number">20</span>
           <div><strong>—</strong><span class="owner-conference-number">120</span></div>
-          <p>${locale === "en" ? "conference · event · banquet" : locale === "kg" ? "конференция · иш-чара · банкет" : "конференция · событие · банкет"}</p>
+          <p>${locale === "en" ? "conference · event · banquet" : locale === "kg" ? "конференция · иш-чара · банкет" : locale === "kz" ? "конференция · іс-шара · банкет" : "конференция · событие · банкет"}</p>
         </div>
       </div>`;
     target.parentNode.insertBefore(section, target);
@@ -122,12 +122,12 @@ function ensureConferenceBlock(content: SiteContent, locale: SiteLocale) {
   set("cta", conference.cta);
 
   const button = section.querySelector<HTMLAnchorElement>('[data-conference="cta"]');
-  const digits = (content.contacts?.whatsapp || content.contacts?.phone || "+996 558 08 50 02").replace(/\D/g, "");
+  const digits = (content.contacts?.whatsapp || content.contacts?.phone || "").replace(/\D/g, "");
   if (button) button.href = `https://wa.me/${digits}`;
 }
 
 function applyContent(content: SiteContent, locale: SiteLocale) {
-  document.documentElement.lang = locale === "kg" ? "ky" : locale;
+  document.documentElement.lang = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
 
   if (window.location.pathname === "/" || window.location.pathname === "") {
     text(".v3-hero-content .eyebrow", content.hero?.eyebrow);
@@ -149,7 +149,7 @@ function applyContent(content: SiteContent, locale: SiteLocale) {
     text(".v3-booking-help > div:first-child > p:last-child", content.booking?.help_copy);
     const helpLinks = document.querySelectorAll<HTMLAnchorElement>(".v3-help-actions a");
     if (helpLinks[0] && content.booking?.help_call_label !== undefined) {
-      const phone = content.contacts?.phone || "+996 558 08 50 02";
+      const phone = content.contacts?.phone || "";
       helpLinks[0].textContent = `${content.booking.help_call_label} · ${phone}`;
     }
     if (helpLinks[1] && content.booking?.help_whatsapp_label !== undefined) helpLinks[1].textContent = content.booking.help_whatsapp_label;
@@ -228,7 +228,7 @@ function applyContent(content: SiteContent, locale: SiteLocale) {
       setHref('.v3-contact-actions a[href^="tel:"]', `tel:${phone.replace(/[^+\d]/g, "")}`);
       const help = document.querySelector<HTMLAnchorElement>('.v3-help-actions a[href^="tel:"]');
       if (help) {
-        help.textContent = `${content.booking?.help_call_label || (locale === "en" ? "Call" : locale === "kg" ? "Чалуу" : "Позвонить")} · ${phone}`;
+        help.textContent = `${content.booking?.help_call_label || (locale === "en" ? "Call" : locale === "kg" ? "Чалуу" : locale === "kz" ? "Қоңырау" : "Позвонить")} · ${phone}`;
         help.href = `tel:${phone.replace(/[^+\d]/g, "")}`;
       }
     }
@@ -281,7 +281,7 @@ function commitContent(content: SiteContent, locale: SiteLocale) {
 export default function SiteContentRuntime() {
   useEffect(() => {
     const locale = localeFromLocation();
-    window.localStorage.setItem("three-crowns-site-language", locale);
+    window.localStorage.setItem("marina-smart-site-language", locale);
 
     // Fail soft without falling back to Russian: every locale has an approved
     // local fallback and is replaced by the published Core payload when available.

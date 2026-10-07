@@ -116,3 +116,10 @@
 .guest-pin-actions button:first-child{background:#fff;color:#123d73}
 
 @media(max-width:720px){.admin-locale-switcher{right:10px;bottom:10px}.guest-pin-reissue{right:10px;bottom:64px}.guest-pin-backdrop{padding:12px}.guest-pin-modal{padding:22px 16px}.guest-pin-value{font-size:34px}.guest-pin-actions{grid-template-columns:1fr}}
+
+.admin-locale-switcher{left:12px;right:auto;bottom:max(12px,env(safe-area-inset-bottom));padding:3px;gap:0;z-index:70}
+.admin-locale-switcher select{width:62px;min-height:34px;border:0;border-radius:999px;background:#0d2d57;color:#fff;padding:0 7px;font:800 11px system-ui;cursor:pointer}
+.admin-locale-switcher select:focus-visible{outline:2px solid #fff;outline-offset:2px}
+@media(max-width:720px){.admin-locale-switcher{left:10px;right:auto;bottom:max(10px,env(safe-area-inset-bottom))}}
+.admin-locale-switcher>span{display:none}
+.admin-locale-switcher button{min-width:25px;height:30px;padding:0 3px;font-size:10px}

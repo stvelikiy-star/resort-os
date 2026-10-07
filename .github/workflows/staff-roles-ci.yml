@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'apps/staff/app/page.tsx'
+      - 'apps/staff/app/layout.tsx'
+      - 'apps/staff/components/StaffLocaleRuntime.tsx'
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'apps/staff/components/GuestRequestShiftPanel.tsx'
       - 'services/api/app/staff_guest_requests.py'
@@ -48,6 +50,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Guard Admin and Staff locale residuals
+        run: python3 scripts/marina_admin_i18n_residual_guard.py
 
       - uses: actions/setup-node@v4
         with:

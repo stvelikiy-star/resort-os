@@ -24,6 +24,7 @@ import RoomQrBoard from "./RoomQrBoard";
 import ServicePointsBoard from "./ServicePointsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 
 type User = {
   id: string;
@@ -35,7 +36,7 @@ type User = {
 
 type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS";
 
-const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
+const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const SESSION_CHECK_INTERVAL_MS = 30_000;
 const DEFAULT_ENABLED_MODULES = ["GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"];
@@ -47,6 +48,7 @@ function canEnterAdmin(role?: string | null): boolean {
 function initialTab(role?: string | null): Tab {
   if (["OWNER", "MANAGER"].includes(role || "")) return "DASHBOARD";
   if (role === "RECEPTION") return "RESERVATIONS";
+  if (role === "AGENT") return "PMS";
   if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";
   return "DASHBOARD";
 }
@@ -99,7 +101,7 @@ export default function AdminShell() {
     const authAwareFetch: typeof window.fetch = async (...args) => {
       const response = await nativeFetch(...args);
       const input = args[0];
-      if ((response.status === 401 || response.status === 403) && coreApiRequest(input)) {
+      if (response.status === 401 && coreApiRequest(input)) {
         setUser(null);
       }
       return response;
@@ -240,6 +242,7 @@ export default function AdminShell() {
 
   const isManager = ["OWNER", "MANAGER"].includes(user.role);
   const isReception = user.role === "RECEPTION";
+  const isAgent = user.role === "AGENT";
   const canUseReception = isManager || isReception;
   const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
   const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);
@@ -255,7 +258,7 @@ export default function AdminShell() {
         </div>
         <nav className="admin-tabs">
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
-          {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
+          {(canUseReception || isAgent) && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Супершахматка"}</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
@@ -263,7 +266,7 @@ export default function AdminShell() {
           {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
           {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
           {isManager && <button className={`admin-settings-button ${tab === "SETTINGS" ? "active" : ""}`} onClick={() => setTab("SETTINGS")}>Настройки</button>}
-          <details className="admin-more-menu">
+          {!isAgent && <details className="admin-more-menu">
             <summary>Ещё</summary>
             <div className="admin-more-panel">
               {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
@@ -281,16 +284,16 @@ export default function AdminShell() {
               {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
               {isManager && moduleEnabled("INBOX") && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
             </div>
-          </details>
+          </details>}
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
       {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
-      {tab === "PMS" && isManager && <PMSGrid />}
+      {tab === "PMS" && (canUseReception || isAgent) && <PMSGrid agentMode={isAgent} readOnlyMode={isReception} />}
       {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "AGENTS" && isManager && moduleEnabled("AGENTS") && <AgentsBoard />}
+      {tab === "AGENTS" && isManager && moduleEnabled("AGENTS") && <AgentsBoard userRole={user.role} />}
       {tab === "MARKETING" && isManager && moduleEnabled("MARKETING") && <MarketingBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
@@ -312,6 +315,7 @@ export default function AdminShell() {
         onNavigate={(destination) => setTab(destination)}
         onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
       />}
+      <MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => setTab(destination as Tab)} />
     </>
   );
 }

@@ -9,26 +9,32 @@ import { roomCategories } from "../../lib/roomCatalog";
 
 type RoomsPageProps = { searchParams: Promise<{ lang?: string | string[] }> };
 
-const ROOM_MEDIA_FALLBACK = "/media/three-crowns/hero-resort.webp";
+const ROOM_MEDIA_FALLBACK = "/brand/marina-smart-hero.svg";
 
 const COPY = {
   ru: {
-    title: "Номера и апартаменты", description: "12 категорий размещения в Три Короны Resort & SPA: площадь, вместимость, сезонные цены и проверка свободных вариантов на выбранные даты.",
+    title: "Номера и апартаменты", description: "12 категорий размещения в AK BERMET Resort & SPA: площадь, вместимость, сезонные цены и проверка свободных вариантов на выбранные даты.",
     heroEyebrow: "Проживание · 12 категорий", heroTitle: <>Номер под ваш<br />ритм отдыха</>, heroCopy: "От компактных вариантов для одного-двух гостей до просторных двухкомнатных категорий и апартаментов. Сравните формат, цену и проверьте, что свободно на ваши даты.", browse: "Смотреть категории", dates: "Проверить даты",
     catalog: "Каталог", catalogTitle: <>12 категорий.<br />Выберите свою.</>, catalogCopy: "Сравнивайте вместимость, площадь и сезонную стоимость. Детали конкретного размещения и дополнительные места можно уточнить у менеджера перед подтверждением брони.", peak: "Высокий сезон", suffix: "сом / сутки", details: "Подробнее о категории →",
-    truth1Title: "Стоимость зависит от дат.", truth1: "Сезонный прайс помогает сравнить категории, а точная сумма за весь период показывается после проверки выбранных дат.", truth2Title: "Заявка ≠ подтверждённая бронь.", truth2: "После отправки заявки номер автоматически не блокируется. Менеджер согласует условия и предоплату; действующая бронь появляется только после менеджерского подтверждения.", footer: "Бронирование: +996 558 08 50 02", brand: "Три Короны · Resort & SPA",
+    truth1Title: "Стоимость зависит от дат.", truth1: "Сезонный прайс помогает сравнить категории, а точная сумма за весь период показывается после проверки выбранных дат.", truth2Title: "Заявка ≠ подтверждённая бронь.", truth2: "После отправки заявки номер автоматически не блокируется. Менеджер согласует условия и предоплату; действующая бронь появляется только после менеджерского подтверждения.", footer: "Бронирование: ", brand: "AK BERMET · Resort & SPA",
   },
   kg: {
-    title: "Номерлер жана апартаменттер", description: "Үч Таажы Resort & SPAдагы жайгашуунун 12 категориясы: аянты, сыйымдуулугу, сезондук баалары жана тандалган даталарга бош орундарды текшерүү.",
+    title: "Номерлер жана апартаменттер", description: "AK BERMET Resort & SPAдагы жайгашуунун 12 категориясы: аянты, сыйымдуулугу, сезондук баалары жана тандалган даталарга бош орундарды текшерүү.",
     heroEyebrow: "Жайгашуу · 12 категория", heroTitle: <>Сиздин эс алуу<br />ритмиңизге ылайык номер</>, heroCopy: "Бир-эки конок үчүн компакттуу варианттардан кең эки бөлмөлүү категорияларга жана апартаменттерге чейин. Форматты, бааны салыштырып, даталарыңызга эмне бош экенин текшериңиз.", browse: "Категорияларды көрүү", dates: "Даталарды текшерүү",
     catalog: "Каталог", catalogTitle: <>12 категория.<br />Өзүңүздүкүн тандаңыз.</>, catalogCopy: "Сыйымдуулукту, аянтты жана сезондук бааны салыштырыңыз. Конкреттүү номердин деталдарын жана кошумча орундарды бронду ырастоодон мурун менеджерден тактоого болот.", peak: "Жогорку сезон", suffix: "сом / түн", details: "Категория жөнүндө толук →",
-    truth1Title: "Баасы даталарга жараша өзгөрөт.", truth1: "Сезондук прайс категорияларды салыштырууга жардам берет, ал эми бүт мезгилдин так суммасы тандалган даталар текшерилгенден кийин көрсөтүлөт.", truth2Title: "Өтүнмө ≠ ырасталган бронь.", truth2: "Өтүнмө жөнөтүлгөндөн кийин номер автоматтык түрдө кармалбайт. Менеджер шарттарды жана алдын ала төлөмдү макулдашат; активдүү бронь менеджер ырастагандан кийин гана пайда болот.", footer: "Брондоо: +996 558 08 50 02", brand: "Үч Таажы · Resort & SPA",
+    truth1Title: "Баасы даталарга жараша өзгөрөт.", truth1: "Сезондук прайс категорияларды салыштырууга жардам берет, ал эми бүт мезгилдин так суммасы тандалган даталар текшерилгенден кийин көрсөтүлөт.", truth2Title: "Өтүнмө ≠ ырасталган бронь.", truth2: "Өтүнмө жөнөтүлгөндөн кийин номер автоматтык түрдө кармалбайт. Менеджер шарттарды жана алдын ала төлөмдү макулдашат; активдүү бронь менеджер ырастагандан кийин гана пайда болот.", footer: "Брондоо: ", brand: "AK BERMET · Resort & SPA",
+  },
+  kz: {
+    title: "Бөлмелер мен апартаменттер", description: "AK BERMET Resort & SPA қонақүйіндегі орналастырудың 12 санаты: аудан, сыйымдылық, маусымдық бағалар және таңдалған күндерге бос орындарды тексеру.",
+    heroEyebrow: "Орналастыру · 12 санат", heroTitle: <>Демалыс<br />ырғағыңызға сай бөлме</>, heroCopy: "Бір-екі қонаққа арналған ықшам нұсқалардан кең екі бөлмелі санаттар мен апартаменттерге дейін. Формат пен бағаны салыстырып, күндеріңізге не бос екенін тексеріңіз.", browse: "Санаттарды көру", dates: "Күндерді тексеру",
+    catalog: "Каталог", catalogTitle: <>12 санат.<br />Өзіңізге лайықтысын таңдаңыз.</>, catalogCopy: "Сыйымдылықты, ауданды және маусымдық бағаны салыстырыңыз. Нақты бөлме мәліметтері мен қосымша орындарды броньды растауға дейін менеджерден нақтылауға болады.", peak: "Жоғары маусым", suffix: "сом / түн", details: "Санат туралы толығырақ →",
+    truth1Title: "Баға күндерге байланысты.", truth1: "Маусымдық прайс санаттарды салыстыруға көмектеседі, ал бүкіл кезеңнің нақты сомасы таңдалған күндерді тексергеннен кейін көрсетіледі.", truth2Title: "Өтінім ≠ расталған бронь.", truth2: "Өтінім жіберілгеннен кейін бөлме автоматты түрде ұсталып тұрмайды. Менеджер шарттар мен алдын ала төлемді келіседі; белсенді бронь менеджер растағаннан кейін ғана пайда болады.", footer: "Брондау: ", brand: "AK BERMET · Resort & SPA",
   },
   en: {
-    title: "Rooms and Apartments", description: "12 accommodation categories at Three Crowns Resort & SPA with capacity, area, seasonal rates and live availability for selected dates.",
+    title: "Rooms and Apartments", description: "12 accommodation categories at AK BERMET Resort & SPA with capacity, area, seasonal rates and live availability for selected dates.",
     heroEyebrow: "Accommodation · 12 categories", heroTitle: <>A room for your<br />holiday rhythm</>, heroCopy: "From compact options for one or two guests to spacious two-room categories and apartments. Compare the format and price, then check what is free for your dates.", browse: "Browse categories", dates: "Check dates",
     catalog: "Catalogue", catalogTitle: <>12 categories.<br />Choose yours.</>, catalogCopy: "Compare capacity, area and seasonal rates. Details of the exact room and extra-bed options can be confirmed with the manager before the reservation is finalised.", peak: "High season", suffix: "KGS / night", details: "Category details →",
-    truth1Title: "Price depends on dates.", truth1: "Seasonal rates help compare categories; the exact full-stay amount is shown after checking your chosen dates.", truth2Title: "Request ≠ confirmed reservation.", truth2: "Submitting a request does not automatically hold a room. The manager agrees the terms and prepayment; an active reservation appears only after manager confirmation.", footer: "Reservations: +996 558 08 50 02", brand: "Three Crowns · Resort & SPA",
+    truth1Title: "Price depends on dates.", truth1: "Seasonal rates help compare categories; the exact full-stay amount is shown after checking your chosen dates.", truth2Title: "Request ≠ confirmed reservation.", truth2: "Submitting a request does not automatically hold a room. The manager agrees the terms and prepayment; an active reservation appears only after manager confirmation.", footer: "Reservations: ", brand: "AK BERMET · Resort & SPA",
   },
 } satisfies Record<PublicLocale, Record<string, unknown>>;
 
@@ -48,14 +54,14 @@ export async function generateMetadata({ searchParams }: RoomsPageProps): Promis
     description,
     alternates: {
       canonical: locale === "ru" ? "/rooms" : `/rooms?lang=${locale}`,
-      languages: { "ru-RU": "/rooms", "ky-KG": "/rooms?lang=kg", "en-US": "/rooms?lang=en" },
+      languages: { "ru-RU": "/rooms", "ky-KG": "/rooms?lang=kg", "kk-KZ": "/rooms?lang=kz", "en-US": "/rooms?lang=en" },
     },
     openGraph: {
-      title: `${title} · ${locale === "en" ? "Three Crowns" : locale === "kg" ? "Үч Таажы" : "Три Короны"}`,
+      title: `${title} · ${locale === "en" ? "AK BERMET" : locale === "kg" ? "AK BERMET" : locale === "kz" ? "AK BERMET" : "AK BERMET"}`,
       description,
       url: locale === "ru" ? "/rooms" : `/rooms?lang=${locale}`,
-      locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : "ru_RU",
-      images: [{ url: ROOM_MEDIA_FALLBACK, alt: locale === "en" ? "Three Crowns Resort & SPA" : locale === "kg" ? "Үч Таажы Resort & SPA" : "Три Короны Resort & SPA" }],
+      locale: locale === "en" ? "en_US" : locale === "kg" ? "ky_KG" : locale === "kz" ? "kk_KZ" : "ru_RU",
+      images: [{ url: ROOM_MEDIA_FALLBACK, alt: locale === "en" ? "AK BERMET Resort & SPA" : locale === "kg" ? "AK BERMET Resort & SPA" : locale === "kz" ? "AK BERMET Resort & SPA" : "AK BERMET Resort & SPA" }],
     },
   };
 }

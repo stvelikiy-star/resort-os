@@ -48,7 +48,7 @@ const COPY = {
     free: "Свободно", yourDates: "На ваши даты", childrenReview: "детские места уточняются", fullPeriod: "за весь период", onRequest: "По запросу", managerPrice: "стоимость подтвердит менеджер",
     selected: "Выбрано", request: "Оставить заявку", askManager: "Уточнить у менеджера", requestEyebrow: "Заявка менеджеру", requestIntro: "Передадим выбранные даты и категорию. Менеджер согласует условия и предоплату.",
     name: "Имя", namePlaceholder: "Как к вам обращаться", phone: "Телефон", email: "Email, если нужен", sending: "Отправляем…", send: "Отправить заявку",
-    marketingConsent: "Хочу получать специальные предложения от «Три Короны» в WhatsApp.",
+    marketingConsent: "Хочу получать специальные предложения от «AK BERMET» в WhatsApp.",
     marketingOptional: "Необязательно. Согласие можно отозвать в любой момент.", privacy: "Политика конфиденциальности", consentDetails: "Условия согласия",
     disclaimer: "Отправка заявки не блокирует номер автоматически. Подтверждение брони делает менеджер после согласования условий и предоплаты.",
     breakfast: "Завтрак включён", noMeal: "Без питания", mixedMeal: "Условия питания меняются по датам", currency: "сом",
@@ -64,10 +64,26 @@ const COPY = {
     free: "Бош", yourDates: "Сиздин даталарга", childrenReview: "балдардын орундары такталат", fullPeriod: "бүт мезгил үчүн", onRequest: "Суроо боюнча", managerPrice: "бааны менеджер ырастайт",
     selected: "Тандалды", request: "Өтүнмө калтыруу", askManager: "Менеджерден тактоо", requestEyebrow: "Менеджерге өтүнмө", requestIntro: "Тандалган даталарды жана категорияны өткөрүп беребиз. Менеджер шарттарды жана алдын ала төлөмдү макулдашат.",
     name: "Аты-жөнү", namePlaceholder: "Сизге кантип кайрылалы", phone: "Телефон", email: "Email, керек болсо", sending: "Жөнөтүлүүдө…", send: "Өтүнмө жөнөтүү",
-    marketingConsent: "«Три Короны» мейманканасынан WhatsApp аркылуу атайын сунуштарды алгым келет.",
+    marketingConsent: "«AK BERMET» мейманканасынан WhatsApp аркылуу атайын сунуштарды алгым келет.",
     marketingOptional: "Милдеттүү эмес. Макулдукту каалаган убакта жокко чыгарууга болот.", privacy: "Купуялык саясаты", consentDetails: "Макулдуктун шарттары",
     disclaimer: "Өтүнмө жөнөтүү номерди автоматтык түрдө кармабайт. Бронду менеджер шарттар жана алдын ала төлөм макулдашылгандан кийин ырастайт.",
     breakfast: "Эртең мененки тамак кирет", noMeal: "Тамак-ашсыз", mixedMeal: "Тамактануу шарттары даталарга жараша өзгөрөт", currency: "сом",
+  },
+  kz: {
+    eyebrow: "Бос орындарды тексеру", title: "Күндеріңізге сай бөлме табыңыз", live: "Бос орындар мен бағалар қонақүй жүйесінен жаңартылады",
+    checkIn: "Келу", checkOut: "Кету", adults: "Ересектер", children: "Балалар", checking: "Тексерілуде…", find: "Бөлме табу",
+    dateError: "Келу және кету күндерін тексеріңіз.", searchError: "Бос орындарды тексеру мүмкін болмады. Қайта көріңіз немесе менеджерге хабарласыңыз.",
+    submitError: "Өтінімді жіберу мүмкін болмады. Қайта көріңіз немесе менеджерге қоңырау шалыңыз.",
+    success: (id: string) => `Өтінім ${id} қабылданды. Менеджер шарттар мен алдын ала төлемді келісу үшін сізбен хабарласады.`,
+    notReservation: "Өтінім әлі расталған бронь болып саналмайды.", available: "Бос нұсқалар", childConfirm: "балалар орындары менеджер растауымен",
+    noRooms: "Таңдалған күндерге сай бос бөлмелер табылмады.", tryDates: "Жақын күндерді тексеріңіз немесе брондау бөліміне қоңырау шалыңыз.",
+    free: "Бос", yourDates: "Сіздің күндеріңізге", childrenReview: "балалар орындары нақтыланады", fullPeriod: "бүкіл кезең үшін", onRequest: "Сұрау бойынша", managerPrice: "бағаны менеджер растайды",
+    selected: "Таңдалды", request: "Өтінім қалдыру", askManager: "Менеджерден нақтылау", requestEyebrow: "Менеджерге өтінім", requestIntro: "Таңдалған күндер мен санатты жібереміз. Менеджер шарттар мен алдын ала төлемді келіседі.",
+    name: "Аты-жөні", namePlaceholder: "Сізге қалай жүгінейік", phone: "Телефон", email: "Email, міндетті емес", sending: "Жіберілуде…", send: "Өтінімді жіберу",
+    marketingConsent: "«AK BERMET» қонақүйінен WhatsApp арқылы арнайы ұсыныстар алғым келеді.",
+    marketingOptional: "Міндетті емес. Келісімді кез келген уақытта қайтарып алуға болады.", privacy: "Құпиялылық саясаты", consentDetails: "Келісім шарттары",
+    disclaimer: "Өтінім жіберу бөлмені автоматты түрде ұстап тұрмайды. Броньды менеджер шарттар мен алдын ала төлем келісілгеннен кейін растайды.",
+    breakfast: "Таңғы ас кіреді", noMeal: "Тамақсыз", mixedMeal: "Тамақтану шарттары күндерге қарай өзгереді", currency: "сом",
   },
   en: {
     eyebrow: "Live availability", title: "Find a room for your dates", live: "Availability and pricing are updated from the hotel system",
@@ -80,7 +96,7 @@ const COPY = {
     free: "Available", yourDates: "For your dates", childrenReview: "children’s places to be confirmed", fullPeriod: "for the full stay", onRequest: "On request", managerPrice: "price will be confirmed by the manager",
     selected: "Selected", request: "Send request", askManager: "Ask the manager", requestEyebrow: "Request to manager", requestIntro: "We will pass on your selected dates and category. The manager will agree the terms and prepayment.",
     name: "Name", namePlaceholder: "How should we address you?", phone: "Phone", email: "Email, optional", sending: "Sending…", send: "Send request",
-    marketingConsent: "I want to receive special offers from Three Crowns via WhatsApp.",
+    marketingConsent: "I want to receive special offers from AK BERMET via WhatsApp.",
     marketingOptional: "Optional. You can withdraw consent at any time.", privacy: "Privacy notice", consentDetails: "Consent terms",
     disclaimer: "Submitting a request does not automatically hold a room. A manager confirms the reservation after the terms and prepayment are agreed.",
     breakfast: "Breakfast included", noMeal: "No meals", mixedMeal: "Meal terms vary by date", currency: "KGS",
@@ -101,6 +117,7 @@ const addDays = (iso: string, days: number) => {
 function nightsLabel(value: number, locale: PublicLocale) {
   if (locale === "en") return `${value} ${value === 1 ? "night" : "nights"}`;
   if (locale === "kg") return `${value} түн`;
+  if (locale === "kz") return `${value} түн`;
   const mod10 = value % 10;
   const mod100 = value % 100;
   if (mod10 === 1 && mod100 !== 11) return `${value} ночь`;
@@ -110,11 +127,13 @@ function nightsLabel(value: number, locale: PublicLocale) {
 function adultsLabel(value: number, locale: PublicLocale) {
   if (locale === "en") return `${value} ${value === 1 ? "adult" : "adults"}`;
   if (locale === "kg") return `${value} чоң киши`;
+  if (locale === "kz") return `${value} ересек`;
   return value === 1 ? "1 взрослый" : `${value} взрослых`;
 }
 function childrenLabel(value: number, locale: PublicLocale) {
   if (locale === "en") return `${value} ${value === 1 ? "child" : "children"}`;
   if (locale === "kg") return `${value} бала`;
+  if (locale === "kz") return `${value} бала`;
   if (value === 1) return "1 ребёнок";
   if (value >= 2 && value <= 4) return `${value} ребёнка`;
   return `${value} детей`;
@@ -170,8 +189,8 @@ export default function BookingWidget() {
   useEffect(() => {
     const updateLocale = () => setLocale(resolveClientLocale());
     updateLocale();
-    window.addEventListener("three-crowns:content-ready", updateLocale);
-    return () => window.removeEventListener("three-crowns:content-ready", updateLocale);
+    window.addEventListener("marina-smart:content-ready", updateLocale);
+    return () => window.removeEventListener("marina-smart:content-ready", updateLocale);
   }, []);
 
   const validDates = useMemo(
@@ -315,7 +334,7 @@ export default function BookingWidget() {
         </div>
 
         {sortedResults.length === 0
-          ? <div className="no-results"><strong>{c.noRooms}</strong><span>{c.tryDates}</span><a href="tel:+996558085002">+996 558 08 50 02</a></div>
+          ? <div className="no-results"><strong>{c.noRooms}</strong><span>{c.tryDates}</span><a href="tel:+996558085002"></a></div>
           : <div className="availability-grid">{sortedResults.map((item) => {
               const meal = mealLabel(item.pricing.nights, locale);
               const isSelected = selected?.room_type_id === item.room_type_id;

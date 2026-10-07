@@ -10,8 +10,8 @@ type Rule = { title: string; text: string };
 const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: string; heroTitle: string; heroCopy: string; section: string; sectionTitle: string; sectionCopy: string; noteTitle: string; note: string; footer: string; rules: Rule[] }> = {
   ru: {
     title: "Правила проживания",
-    description: "Правила проживания в отеле Три Короны: выезд, гости, уборка, отмена бронирования и ответственность за имущество.",
-    eyebrow: "Три Короны · Правила отеля",
+    description: "Правила проживания в отеле AK BERMET: выезд, гости, уборка, отмена бронирования и ответственность за имущество.",
+    eyebrow: "AK BERMET · Правила отеля",
     heroTitle: "Правила проживания",
     heroCopy: "Ключевые условия проживания собраны в одном месте, чтобы до заезда было понятно, как устроены выезд, посещение гостями, уборка и отмена.",
     section: "Правила",
@@ -19,7 +19,7 @@ const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: 
     sectionCopy: "Правила перенесены из действующей памятки отеля. Если ситуация требует индивидуального решения, применимость условия подтверждает менеджер.",
     noteTitle: "Важно",
     note: "Эта страница информирует о правилах отеля. Сайт и AI не выполняют автоматические штрафы, удержания или возвраты: финансовое действие подтверждает уполномоченный сотрудник.",
-    footer: "Бронирование: +996 558 08 50 02",
+    footer: "Бронирование через сайт",
     rules: [
       { title: "Курение", text: "Курить в номерах строго запрещено." },
       { title: "Поздний выезд", text: "При выезде после 12:00 за каждый следующий час предусмотрена доплата 1 000 сом." },
@@ -35,8 +35,8 @@ const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: 
   },
   kg: {
     title: "Жашоо эрежелери",
-    description: "Үч Таажы мейманканасында жашоо эрежелери: чыгуу, коноктор, тазалоо, бронду жокко чыгаруу жана мүлк үчүн жоопкерчилик.",
-    eyebrow: "Үч Таажы · Мейманкананын эрежелери",
+    description: "AK BERMET мейманканасында жашоо эрежелери: чыгуу, коноктор, тазалоо, бронду жокко чыгаруу жана мүлк үчүн жоопкерчилик.",
+    eyebrow: "AK BERMET · Мейманкананын эрежелери",
     heroTitle: "Жашоо эрежелери",
     heroCopy: "Негизги жашоо шарттары бир жерде топтолду: чыгуу убактысы, коноктордун келүүсү, тазалоо жана бронду жокко чыгаруу тартиби.",
     section: "Эрежелер",
@@ -44,7 +44,7 @@ const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: 
     sectionCopy: "Эрежелер мейманкананын учурдагы эскертмесинен көчүрүлдү. Жеке жагдайда шарттын колдонулушун менеджер тактайт.",
     noteTitle: "Маанилүү",
     note: "Бул барак маалыматтык мүнөздө. Сайт жана AI айыптарды, кармоолорду же кайтарууларды автоматтык түрдө жүргүзбөйт; каржылык аракетти ыйгарым укуктуу кызматкер ырастайт.",
-    footer: "Брондоо: +996 558 08 50 02",
+    footer: "Брондоо сайт аркылуу",
     rules: [
       { title: "Тамеки тартуу", text: "Номерлерде тамеки тартууга катуу тыюу салынат." },
       { title: "Кеч чыгуу", text: "12:00дөн кийин чыкканда ар бир кийинки саат үчүн 1 000 сом кошумча төлөм каралган." },
@@ -58,10 +58,35 @@ const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: 
       { title: "Мейманкананын мүлкү", text: "Мейманкананын мүлкүн жоготуу же бузуу учурдагы прейскурант боюнча төлөнөт." },
     ],
   },
+  kz: {
+    title: "Тұру ережелері",
+    description: "AK BERMET қонақүйінде тұру ережелері: шығу, келушілер, тазалау, броньды тоқтату және қонақүй мүлкіне жауапкершілік.",
+    eyebrow: "AK BERMET · Қонақүй ережелері",
+    heroTitle: "Тұру ережелері",
+    heroCopy: "Негізгі тұру шарттары бір жерде жинақталған: шығу уақыты, келушілер тәртібі, тазалау және броньды тоқтату шарттары алдын ала түсінікті болады.",
+    section: "Ережелер",
+    sectionTitle: "10 маңызды шарт",
+    sectionCopy: "Ережелер қонақүйдің қолданыстағы жадынамасынан алынған. Жеке жағдайға түсіндіру қажет болса, шарттың қолданылуын менеджер растайды.",
+    noteTitle: "Маңызды",
+    note: "Бұл бет ақпараттық сипатта. Сайт пен AI айыппұл, ұстап қалу немесе қайтаруды автоматты түрде орындамайды; кез келген қаржылық әрекетті уәкілетті қызметкер растайды.",
+    footer: "Сайт арқылы брондау",
+    rules: [
+      { title: "Темекі шегу", text: "Бөлмелерде темекі шегуге қатаң тыйым салынады." },
+      { title: "Кеш шығу", text: "12:00-ден кейін шыққанда әр келесі сағат үшін 1 000 сом қосымша төлем қарастырылған." },
+      { title: "Ерте шығу", text: "Броньдалған күннен ерте шыққанда +1 тәулік ұсталады; қалған күндер үшін қалған сомадан 10% салық ұсталып, қаражатты қайтару қарастырылған." },
+      { title: "Жануарлар", text: "Жануарлармен тұруға тыйым салынады." },
+      { title: "22:00-ге дейінгі келушілер", text: "Қонақүйде тұрмайтын келушілерге 22:00-ге дейін келуге рұқсат." },
+      { title: "Қосымша қонақтар", text: "Брондау кезінде көрсетілген адам санынан көп адам орналасса, қосымша орналастыру қолданыстағы тарифтер бойынша төленеді." },
+      { title: "22:00-ден кейінгі келушілер", text: "22:00-ден кейін бөлмеде қалған келушілер тұратын қонақ ретінде есептеліп, прайс бойынша қосымша төленеді." },
+      { title: "Броньды тоқтату", text: "Жоспарланған келуге 5 күн қалғанда ұсталымсыз. 4 күн қалғанда бір тәуліктің 25%, 3 күнде 50%, 2 күнде 75% ұсталады; 1 күн қалғанда және келу күні алдын ала төлем қайтарылмайды." },
+      { title: "Тазалау және төсек-орын", text: "Бөлме қонақ өтініші бойынша тазаланады. Төсек-орын әр 3 күн сайын ауыстырылады. Күнделікті тазалау және төсек-орын ауыстыру — қосымша 1 500 сом." },
+      { title: "Қонақүй мүлкі", text: "Қонақүй мүлкін жоғалту немесе бүлдіру қолданыстағы прейскурант бойынша төленеді." },
+    ],
+  },
   en: {
     title: "Hotel Rules",
-    description: "Three Crowns hotel rules covering checkout, visitors, housekeeping, cancellation and responsibility for hotel property.",
-    eyebrow: "Three Crowns · Hotel rules",
+    description: "AK BERMET hotel rules covering checkout, visitors, housekeeping, cancellation and responsibility for hotel property.",
+    eyebrow: "AK BERMET · Hotel rules",
     heroTitle: "Hotel rules",
     heroCopy: "The main stay conditions are collected in one place so checkout, visitor access, housekeeping and cancellation terms are clear before arrival.",
     section: "Rules",
@@ -69,7 +94,7 @@ const COPY: Record<PublicLocale, { title: string; description: string; eyebrow: 
     sectionCopy: "These rules are transcribed from the hotel’s current guest notice. Where an individual situation needs interpretation, the manager confirms how a rule applies.",
     noteTitle: "Important",
     note: "This page is informational. The website and AI do not automatically issue penalties, deductions or refunds; any financial action must be confirmed by an authorised staff member.",
-    footer: "Reservations: +996 558 08 50 02",
+    footer: "Book through the website",
     rules: [
       { title: "Smoking", text: "Smoking in guest rooms is strictly prohibited." },
       { title: "Late checkout", text: "For checkout after 12:00, an additional 1,000 KGS applies for each subsequent hour." },
@@ -98,7 +123,7 @@ export async function generateMetadata({ searchParams }: RulesPageProps): Promis
   return {
     title: copy.title,
     description: copy.description,
-    alternates: { canonical: url, languages: { "ru-RU": "/rules", "ky-KG": "/rules?lang=kg", "en-US": "/rules?lang=en" } },
+    alternates: { canonical: url, languages: { "ru-RU": "/rules", "ky-KG": "/rules?lang=kg", "kk-KZ": "/rules?lang=kz", "en-US": "/rules?lang=en" } },
   };
 }
 
@@ -109,7 +134,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
     <SiteHeader />
     <main className="rooms-page" id="top">
       <section className="rooms-hero" aria-labelledby="rules-title">
-        <div className="rooms-hero-media" aria-hidden="true"><Image src="/media/three-crowns/room-double.webp" alt="" fill priority sizes="100vw" /></div>
+        <div className="rooms-hero-media" aria-hidden="true"><Image src="/brand/marina-smart-hero.svg" alt="" fill priority sizes="100vw" /></div>
         <div className="rooms-hero-shade" aria-hidden="true" />
         <div className="wrap rooms-hero-content">
           <p className="eyebrow light">{copy.eyebrow}</p>
@@ -133,6 +158,6 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
         <div className="wrap catalog-truth"><div><strong>{copy.noteTitle}</strong><p>{copy.note}</p></div></div>
       </section>
     </main>
-    <footer className="rooms-footer"><div className="wrap rooms-footer-inner"><strong>{locale === "en" ? "Three Crowns · Resort & SPA" : locale === "kg" ? "Үч Таажы · Resort & SPA" : "Три Короны · Resort & SPA"}</strong><a href="tel:+996558085002">{copy.footer}</a></div></footer>
+    <footer className="rooms-footer"><div className="wrap rooms-footer-inner"><strong>{locale === "en" ? "AK BERMET · Resort & SPA" : locale === "kg" ? "AK BERMET · Resort & SPA" : locale === "kz" ? "AK BERMET · Resort & SPA" : "AK BERMET · Resort & SPA"}</strong><span>{copy.footer}</span></div></footer>
   </>;
 }

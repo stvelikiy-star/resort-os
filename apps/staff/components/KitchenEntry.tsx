@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import ChefProduction from "./ChefProduction";
 import KitchenAdminV2 from "./KitchenAdminV2";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 import styles from "./KitchenEntry.module.css";
 
 type User = { id: string; username: string; display_name: string; role: string; property_code: string };
@@ -19,7 +20,7 @@ type KitchenPulse = {
   arrivals: ArrivalItem[];
 };
 
-const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
+const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "COOK"]);
 
 async function json(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
@@ -39,10 +40,12 @@ export default function KitchenEntry() {
   const [pulseError, setPulseError] = useState<string | null>(null);
 
   const loadPulse = useCallback(async () => {
+    if (!user) return;
     try {
+      const cookOnly = user.role === "COOK";
       const [menuBody, tablesBody, ordersBody, arrivalsBody] = await Promise.all([
-        json("/core/api/v1/kitchen/menu"),
-        json("/core/api/v1/kitchen/tables"),
+        cookOnly ? Promise.resolve({ items: [] }) : json("/core/api/v1/kitchen/menu"),
+        cookOnly ? Promise.resolve({ items: [] }) : json("/core/api/v1/kitchen/tables"),
         json("/core/api/v1/kitchen/orders?status=ACTIVE"),
         json("/core/api/v1/ops/kitchen/arrivals"),
       ]);
@@ -57,7 +60,7 @@ export default function KitchenEntry() {
       setPulse(null);
       setPulseError(e instanceof Error ? e.message : "Не удалось загрузить сводку кухни");
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +97,7 @@ export default function KitchenEntry() {
       }) as User;
       if (!KITCHEN_ROLES.has(body.role)) {
         await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
-        throw new Error("Для этого входа нужна роль DINING_STAFF, MANAGER или OWNER.");
+        throw new Error("Для этого входа нужна роль COOK, MANAGER или OWNER.");
       }
       setUser(body);
       setPassword("");
@@ -163,10 +166,11 @@ export default function KitchenEntry() {
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; DINING_STAFF работает с заказами и столами без права менять цены.</span>
+        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; COOK работает только с заказами и статусами приготовления.</span>
       </div>
     </section>
     <ChefProduction userRole={user.role} />
-    <KitchenAdminV2 />
+    {user.role !== "COOK" && <KitchenAdminV2 />}
+    {user.role !== "COOK" && <MarinaAiAssistant screen="KITCHEN" role={user.role} />}
   </>;
 }

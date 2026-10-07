@@ -17,7 +17,7 @@ from .dining_coordination import (
 )
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-control"])
-dining_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
+dining_access = require_roles("OWNER", "MANAGER", "WAITER")
 
 MEAL_TYPES = {"BREAKFAST", "LUNCH", "DINNER", "OTHER"}
 ACTIVE_ORDER_STATUSES = ("NEW", "ACCEPTED", "COOKING", "READY")
@@ -506,7 +506,7 @@ async def assign_waiter(
     user: dict[str, Any] = Depends(dining_access),
 ):
     current_id = uuid.UUID(user["id"])
-    if user["role"] == "DINING_STAFF" and payload.waiter_id not in {current_id}:
+    if user["role"] == "WAITER" and payload.waiter_id not in {current_id}:
         raise HTTPException(status_code=403, detail="Dining staff may assign only themselves")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -526,8 +526,8 @@ async def assign_waiter(
                        WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true''',
                     payload.waiter_id, pid,
                 )
-                if not waiter or waiter["role"] != "DINING_STAFF":
-                    raise HTTPException(status_code=422, detail="Waiter must be active DINING_STAFF")
+                if not waiter or waiter["role"] != "WAITER":
+                    raise HTTPException(status_code=422, detail="Waiter must be active WAITER")
             await conn.execute(
                 'UPDATE kitchen_orders SET "waiterId"=$2,"updatedAt"=now() WHERE id=$1',
                 order_id, payload.waiter_id,

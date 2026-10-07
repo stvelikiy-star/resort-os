@@ -1,4 +1,4 @@
-export type GuestFactsLocale = "ru" | "kg" | "en";
+export type GuestFactsLocale = "ru" | "kg" | "kz" | "en";
 
 export type GuestReviewCard = { title: string; text: string };
 export type GuestServiceCard = { code: string; title: string; text: string; cta?: string; href?: string };
@@ -36,7 +36,7 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
       title: "Соберите отдых под себя",
       intro: "Трансфер, питание и дополнительные услуги можно согласовать вместе с проживанием. Стоимость проживания в Core считается отдельно и не меняется автоматически из-за этих услуг.",
       cards: [
-        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивен 7 500 сом. Аэропорт Тамчы: седан 2 500 / минивен 3 500 сом. Бишкек: седан 5 500 / минивен 6 500 сом. Цена за автомобиль в одну сторону.", cta: "Заказать трансфер", href: transferHref("Здравствуйте! Хочу заказать трансфер в отель «Три Короны». Подскажите, пожалуйста, доступность.") },
+        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивен 7 500 сом. Аэропорт Тамчы: седан 2 500 / минивен 3 500 сом. Бишкек: седан 5 500 / минивен 6 500 сом. Цена за автомобиль в одну сторону.", cta: "Заказать трансфер", href: transferHref("Здравствуйте! Хочу заказать трансфер в отель «AK BERMET». Подскажите, пожалуйста, доступность.") },
         { code: "MEALS", title: "Трёхразовое питание", text: "Взрослый — 1 900 сом в день, ребёнок — 1 400 сом. Отдельно для взрослых: завтрак 500, обед 750, ужин 650 сом; для детей: 400 / 550 / 450 сом. Оплата в отеле." },
         { code: "PARKING", title: "Парковка", text: "Для проживающих парковка бесплатная. Ориентировочная вместимость — 20–30 автомобилей." },
         { code: "SAUNA", title: "Сауна", text: "Работает только в зимний период. 5 000 сом за 1 час, формат рассчитан на 4–5 человек." },
@@ -52,7 +52,7 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
   kg: {
     reviews: {
       eyebrow: "Коноктордун пикирлери · 2ГИС",
-      title: "Коноктор Үч Таажы жөнүндө эмне дешет",
+      title: "Коноктор AK BERMET жөнүндө эмне дешет",
       intro: "Учурдагы баалар жана коноктордун пикирлери 2ГИС картасында жеткиликтүү. Сайтта биз пикирлердин жалпы темаларын гана көрсөтөбүз.",
       cards: [
         { title: "Тамактануу", text: "2ГИС пикирлеринде коноктор даамдуу жана түрдүү тамактарды көп белгилешет." },
@@ -69,23 +69,59 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
       title: "Эс алууну өзүңүзгө ылайык түзүңүз",
       intro: "Трансфер, тамактануу жана кошумча кызматтар жашоо менен бирге макулдашылат. Алар бөлмөнүн Core баасын автоматтык түрдө өзгөртпөйт.",
       cards: [
-        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивэн 7 500 сом. Тамчы аэропорту: седан 2 500 / минивэн 3 500 сом. Бишкек: седан 5 500 / минивэн 6 500 сом. Баа бир тарапка бир унаа үчүн.", cta: "Трансфер заказ кылуу", href: transferHref("Саламатсызбы! «Үч Таажы» мейманканасына трансфер заказ кылгым келет.") },
+        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивэн 7 500 сом. Тамчы аэропорту: седан 2 500 / минивэн 3 500 сом. Бишкек: седан 5 500 / минивэн 6 500 сом. Баа бир тарапка бир унаа үчүн.", cta: "Трансфер заказ кылуу", href: transferHref("Саламатсызбы! «AK BERMET» мейманканасына трансфер заказ кылгым келет.") },
         { code: "MEALS", title: "Үч маал тамак", text: "Чоң киши — күнүнө 1 900 сом, бала — 1 400 сом. Өзүнчө: чоңдор үчүн эртең мененки 500, түшкү 750, кечки 650 сом; балдар үчүн 400 / 550 / 450 сом. Төлөм мейманканада." },
         { code: "PARKING", title: "Унаа токтотуучу жай", text: "Жашоочулар үчүн акысыз. Болжолдуу сыйымдуулугу — 20–30 унаа." },
         { code: "SAUNA", title: "Сауна", text: "Кыш мезгилинде гана иштейт. 1 саат — 5 000 сом, 4–5 адамга ылайыктуу." },
         { code: "BILLIARDS", title: "Бильярд", text: "1 саат — 500 сом." },
         { code: "TABLE_TENNIS", title: "Стол тенниси", text: "Жашоочулар үчүн акысыз." },
-        { code: "EXCURSIONS", title: "Ысык-Көл боюнча турлар · 2026", text: "MIX TOUR.KG прайсынан негизги багыттар: Семёнов капчыгайы + ысык булак — 2 000 сом/адам; Жети-Өгүз + ысык булак — 3 500; Өлүк көл + ысык булак — 3 000; Барскоон шаркыратмасы + Сказка капчыгайы + Жети-Өгүз + Каракол (чиркөө жана мечит) + ысык булак — 4 500 сом/адам. Каттамдар 2026-жылдын 20-июнунан 25-августуна чейин күн сайын. Баага трансфер жана гид кирет; кирүү билеттерин, ысык булактарды, тамактанууну жана кошумча чыгымдарды конок өзүнчө төлөйт.", cta: "Тур тандоо", href: transferHref("Саламатсызбы! «Үч Таажыда» жашаган учурда Ысык-Көл боюнча экскурсия же тур тандагым келет.") },
+        { code: "EXCURSIONS", title: "Ысык-Көл боюнча турлар · 2026", text: "MIX TOUR.KG прайсынан негизги багыттар: Семёнов капчыгайы + ысык булак — 2 000 сом/адам; Жети-Өгүз + ысык булак — 3 500; Өлүк көл + ысык булак — 3 000; Барскоон шаркыратмасы + Сказка капчыгайы + Жети-Өгүз + Каракол (чиркөө жана мечит) + ысык булак — 4 500 сом/адам. Каттамдар 2026-жылдын 20-июнунан 25-августуна чейин күн сайын. Баага трансфер жана гид кирет; кирүү билеттерин, ысык булактарды, тамактанууну жана кошумча чыгымдарды конок өзүнчө төлөйт.", cta: "Тур тандоо", href: transferHref("Саламатсызбы! «AK BERMETда» жашаган учурда Ысык-Көл боюнча экскурсия же тур тандагым келет.") },
         { code: "THERMAL_SPRINGS", title: "Жакынкы термалдык булактар", text: "Термалдык булактар мейманканадан жөө жетчү аралыкта. Так маршрутту администратордон тактоого болот." },
         { code: "WATER_ACTIVITIES", title: "Пляждагы суу активдүүлүктөрү", text: "Гидроцикл, парашют жана башка сезондук көңүл ачуулар көз карандысыз пляж операторлорунда болушу мүмкүн. Бул мейманкананын кызматы эмес; баа жана жеткиликтүүлүктү оператор аныктайт." },
         { code: "RULES", title: "Жашоо эрежелери", text: "Мейманкананын негизги эрежелери, чыгуу убактысы, коноктордун келүүсү, тазалоо жана жокко чыгаруу шарттары өзүнчө баракта берилген.", cta: "Эрежелерди ачуу", href: "/rules" },
       ],
     },
   },
+  kz: {
+    reviews: {
+      eyebrow: "Қонақтар пікірі · 2GIS",
+      title: "Қонақтар AK BERMET туралы не дейді",
+      intro: "Қазіргі рейтингтер мен қонақ пікірлері қонақүйдің 2GIS карточкасында қолжетімді. Сайтта біз пікірлердің жалпы тақырыптарын ғана көрсетеміз және оларды өз бағамыз ретінде ұсынбаймыз.",
+      cards: [
+        { title: "Тамақтану", text: "2GIS пікірлерінде қонақтар дәмді және алуан түрлі тағамдарды жиі атап өтеді." },
+        { title: "Тазалық және аумақ", text: "Қонақтар бөлмелердің тазалығын, күтімді аумақты және тыныш атмосфераны атап өтеді." },
+        { title: "Жағажай және бассейн", text: "Жеке жағажай мен бассейн демалыстың маңызды бөлігі ретінде жиі аталады." },
+        { title: "Қызметкерлер", text: "Пікірлерде қызметкерлердің сыпайылығы мен тұру кезіндегі көмегі үшін жиі алғыс айтылады." },
+      ],
+      readCta: "2GIS-тегі пікірлерді оқу",
+      leaveCta: "Пікір қалдыру",
+    },
+    included: {
+      title: "Негізгі бағаға кіреді",
+      text: "Wi‑Fi, жеке жағажай, ашық бассейн, қолшатырлар мен шезлонгтар, тұратын қонақтарға тегін тұрақ және үстел теннисі. Тамақтану таңдалған тарифке байланысты немесе бөлек қосылады.",
+    },
+    services: {
+      eyebrow: "Қосымша қызметтер",
+      title: "Демалысты өз жоспарыңызға бейімдеңіз",
+      intro: "Трансфер, тамақтану және қосымша қызметтерді тұрумен бірге келісуге болады. Олар Core жүйесіндегі бөлме бағасын автоматты түрде өзгертпейді.",
+      cards: [
+        { code: "TRANSFER", title: "Трансфер", text: "Манас: седан 6 500 / минивэн 7 500 сом. Тамчы әуежайы: седан 2 500 / минивэн 3 500 сом. Бішкек: седан 5 500 / минивэн 6 500 сом. Баға бір бағытқа бір көлік үшін.", cta: "Трансферге тапсырыс беру", href: transferHref("Сәлеметсіз бе! «AK BERMET» қонақүйіне трансферге тапсырыс бергім келеді. Қолжетімділігін нақтылап беріңізші.") },
+        { code: "MEALS", title: "Күніне үш мезгіл тамақ", text: "Ересек — күніне 1 900 сом, бала — 1 400 сом. Бөлек: ересектерге таңғы ас 500, түскі ас 750, кешкі ас 650 сом; балаларға 400 / 550 / 450 сом. Төлем қонақүйде жасалады." },
+        { code: "PARKING", title: "Тұрақ", text: "Тұратын қонақтарға тегін. Шамамен 20–30 көлікке арналған." },
+        { code: "SAUNA", title: "Сауна", text: "Тек қысқы маусымда жұмыс істейді. 1 сағат — 5 000 сом, 4–5 адамға арналған." },
+        { code: "BILLIARDS", title: "Бильярд", text: "1 сағат — 500 сом." },
+        { code: "TABLE_TENNIS", title: "Үстел теннисі", text: "Тұратын қонақтарға тегін." },
+        { code: "EXCURSIONS", title: "Ыстықкөл бойынша турлар · 2026 маусымы", text: "MIX TOUR.KG прайсынан негізгі бағыттар: Семенов шатқалы + ыстық бұлақ — 2 000 сом/адам; Жеті-Өгіз + ыстық бұлақ — 3 500; Өлі көл + ыстық бұлақ — 3 000; Барскоон сарқырамасы + Сказка шатқалы + Жеті-Өгіз + Қаракөл (шіркеу және мешіт) + ыстық бұлақ — 4 500 сом/адам. Сапарлар 2026 жылғы 20 маусымнан 25 тамызға дейін күн сайын. Бағаға трансфер мен гид қызметі кіреді; кіру билеттері, ыстық бұлақтар, тамақтану және қосымша шығындар бөлек төленеді.", cta: "Тур таңдау", href: transferHref("Сәлеметсіз бе! «AK BERMETде» тұру кезінде Ыстықкөл бойынша экскурсия немесе тур таңдағым келеді.") },
+        { code: "THERMAL_SPRINGS", title: "Жақын маңдағы термалды бұлақтар", text: "Термалды бұлақтар қонақүйден жаяу жететін жерде. Нақты бағытты әкімшіден сұрауға болады." },
+        { code: "WATER_ACTIVITIES", title: "Жағажайдағы су ойын-сауықтары", text: "Гидроцикл, парашют және басқа маусымдық ойын-сауықтар тәуелсіз жағажай операторларында болуы мүмкін. Бұл қонақүй қызметі емес: баға мен қолжетімділікті оператор белгілейді." },
+        { code: "RULES", title: "Тұру ережелері", text: "Қонақүйдің негізгі ережелері, шығу уақыты, қонақ қабылдау тәртібі, тазалау және бас тарту шарттары жеке бетте берілген.", cta: "Ережелерді ашу", href: "/rules" },
+      ],
+    },
+  },
   en: {
     reviews: {
       eyebrow: "Guest reviews · 2GIS",
-      title: "What guests say about Three Crowns",
+      title: "What guests say about AK BERMET",
       intro: "Current ratings and guest reviews are available on the hotel’s 2GIS listing. The website shows only broad review themes and does not present them as our own ratings.",
       cards: [
         { title: "Food", text: "2GIS reviews frequently mention tasty and varied meals." },
@@ -102,13 +138,13 @@ export const ownerApprovedGuestFacts: Record<GuestFactsLocale, OwnerApprovedGues
       title: "Build the stay around your plans",
       intro: "Transfers, meals and additional services can be arranged together with accommodation. They do not automatically change the Core room price.",
       cards: [
-        { code: "TRANSFER", title: "Transfer", text: "Manas Airport: sedan 6,500 / minivan 7,500 KGS. Tamchy Airport: sedan 2,500 / minivan 3,500 KGS. Bishkek city: sedan 5,500 / minivan 6,500 KGS. Price is per vehicle, one way.", cta: "Order a transfer", href: transferHref("Hello! I would like to arrange a transfer to Three Crowns hotel.") },
+        { code: "TRANSFER", title: "Transfer", text: "Manas Airport: sedan 6,500 / minivan 7,500 KGS. Tamchy Airport: sedan 2,500 / minivan 3,500 KGS. Bishkek city: sedan 5,500 / minivan 6,500 KGS. Price is per vehicle, one way.", cta: "Order a transfer", href: transferHref("Hello! I would like to arrange a transfer to AK BERMET hotel.") },
         { code: "MEALS", title: "Three meals a day", text: "Adult — 1,900 KGS/day, child — 1,400 KGS/day. Separately for adults: breakfast 500, lunch 750, dinner 650 KGS; for children: 400 / 550 / 450 KGS. Payment is made at the hotel." },
         { code: "PARKING", title: "Parking", text: "Free for staying guests. Approximate capacity: 20–30 vehicles." },
         { code: "SAUNA", title: "Sauna", text: "Available in winter only. 5,000 KGS for 1 hour, intended for 4–5 guests." },
         { code: "BILLIARDS", title: "Billiards", text: "500 KGS per hour." },
         { code: "TABLE_TENNIS", title: "Table tennis", text: "Free for staying guests." },
-        { code: "EXCURSIONS", title: "Issyk-Kul tours · 2026 season", text: "Selected routes from the MIX TOUR.KG price list: Semenovskoye Gorge + hot spring — 2,000 KGS/person; Jeti-Oguz + hot spring — 3,500; Dead Lake + hot spring — 3,000; Barskoon waterfall + Skazka Gorge + Jeti-Oguz + Karakol (church and mosque) + hot spring — 4,500 KGS/person. Departures run daily from 20 June to 25 August 2026. Transfer and guide services are included; admission tickets, hot-spring entry, meals and other additional expenses are paid separately.", cta: "Choose a tour", href: transferHref("Hello! I would like to choose an Issyk-Kul excursion or tour during my stay at Three Crowns.") },
+        { code: "EXCURSIONS", title: "Issyk-Kul tours · 2026 season", text: "Selected routes from the MIX TOUR.KG price list: Semenovskoye Gorge + hot spring — 2,000 KGS/person; Jeti-Oguz + hot spring — 3,500; Dead Lake + hot spring — 3,000; Barskoon waterfall + Skazka Gorge + Jeti-Oguz + Karakol (church and mosque) + hot spring — 4,500 KGS/person. Departures run daily from 20 June to 25 August 2026. Transfer and guide services are included; admission tickets, hot-spring entry, meals and other additional expenses are paid separately.", cta: "Choose a tour", href: transferHref("Hello! I would like to choose an Issyk-Kul excursion or tour during my stay at AK BERMET.") },
         { code: "THERMAL_SPRINGS", title: "Thermal springs nearby", text: "Thermal springs are within walking distance of the hotel. The reception team can confirm the exact route." },
         { code: "WATER_ACTIVITIES", title: "Water activities on the beach", text: "Jet skis, parasailing and other seasonal activities may be offered by independent beach operators. These are not hotel services; price and availability are set by the operator." },
         { code: "RULES", title: "Hotel rules", text: "Key hotel rules, checkout time, visitor policy, housekeeping and cancellation terms are collected on a separate page.", cta: "View hotel rules", href: "/rules" },

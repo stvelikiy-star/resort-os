@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import DiningFloorPlan from "./DiningFloorPlan";
+import MarinaAiAssistant from "./MarinaAiAssistant";
 import styles from "./WaiterEntry.module.css";
 
 type User = { id: string; username: string; display_name: string; role: string };
@@ -13,7 +14,7 @@ type MenuItem = { id: string; name_ru: string; category: string; price_kgs: numb
 type DiningSession = { id: string; stay_id: string; reservation_id: string; table_id: string; status: string; party_size: number; meal_type?: "BREAKFAST" | "LUNCH" | "DINNER" | "OTHER" | null; guest_name?: string | null; room_code?: string | null };
 type Floor = { service_date: string; current_user_id: string; tables: TableItem[]; reservations: Reservation[]; orders: Order[] };
 
-const ALLOWED = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
+const ALLOWED = new Set(["OWNER", "MANAGER", "WAITER"]);
 const TABLE_LABEL: Record<string, string> = { AVAILABLE: "Свободен", RESERVED: "Бронь", OCCUPIED: "Занят", CLEANING: "Уборка", OUT_OF_SERVICE: "Закрыт" };
 const ORDER_LABEL: Record<string, string> = { NEW: "Новый", ACCEPTED: "Принят", COOKING: "Готовится", READY: "Готов к выдаче", SERVED: "Выдан", CANCELLED: "Отменён" };
 const RESERVATION_LABEL: Record<string, string> = { BOOKED: "Забронирован", SEATED: "Гости за столом", COMPLETED: "Завершён", CANCELLED: "Отменён", NO_SHOW: "Не пришли" };
@@ -109,7 +110,7 @@ export default function WaiterEntry() {
       }) as User;
       if (!ALLOWED.has(body.role)) {
         await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
-        throw new Error("Для входа в зал нужна роль DINING_STAFF, MANAGER или OWNER.");
+        throw new Error("Для входа в зал нужна роль WAITER, MANAGER или OWNER.");
       }
       setUser(body);
       setPassword("");
@@ -255,7 +256,7 @@ export default function WaiterEntry() {
     <section className={styles.section}><div className={styles.sectionHead}><div><small>Быстрые статусы</small><h2>Управление столами</h2></div><button onClick={() => void load()}>Обновить</button></div><div className={styles.tables}>{floor?.tables.map((table) => <article key={table.id} data-status={table.status}><div><strong>{table.code}</strong><span>{TABLE_LABEL[table.status] ?? table.status}</span></div><h3>{table.name}</h3><p>{table.seats} мест</p><div><button disabled={busy === table.id} onClick={() => void tableStatus(table, "OCCUPIED")}>Занят</button><button disabled={busy === table.id} onClick={() => void tableStatus(table, "CLEANING")}>Уборка</button><button disabled={busy === table.id} onClick={() => void tableStatus(table, "AVAILABLE")}>Свободен</button></div></article>)}</div></section>
 
     <section className={styles.two}>
-      <div className={styles.section}><div className={styles.sectionHead}><div><small>Kitchen → waiter</small><h2>Активные заказы</h2></div></div><div className={styles.orders}>{floor?.orders.map((order) => <article key={order.id} className={order.status === "READY" ? styles.ready : ""}><div><strong>{order.order_number}</strong><span>{ORDER_LABEL[order.status] ?? order.status}</span></div><p>{order.table_code ? `${order.table_code} · ${order.table_name || "стол"}` : order.room_code ? `Номер ${order.room_code}` : order.source}</p><small>{order.waiter_name ? `Официант: ${order.waiter_name}` : "Официант не назначен"}</small><b>{order.total_kgs.toLocaleString("ru-RU")} KGS</b><div>{!order.waiter_id && <button disabled={busy === order.id} onClick={() => void claim(order)}>Взять заказ</button>}{order.status === "READY" && (order.waiter_id === user.id || user.role !== "DINING_STAFF") && <button className={styles.primary} disabled={busy === order.id} onClick={() => void serve(order)}>Выдано гостю</button>}</div></article>)}</div></div>
+      <div className={styles.section}><div className={styles.sectionHead}><div><small>Kitchen → waiter</small><h2>Активные заказы</h2></div></div><div className={styles.orders}>{floor?.orders.map((order) => <article key={order.id} className={order.status === "READY" ? styles.ready : ""}><div><strong>{order.order_number}</strong><span>{ORDER_LABEL[order.status] ?? order.status}</span></div><p>{order.table_code ? `${order.table_code} · ${order.table_name || "стол"}` : order.room_code ? `Номер ${order.room_code}` : order.source}</p><small>{order.waiter_name ? `Официант: ${order.waiter_name}` : "Официант не назначен"}</small><b>{order.total_kgs.toLocaleString("ru-RU")} KGS</b><div>{!order.waiter_id && <button disabled={busy === order.id} onClick={() => void claim(order)}>Взять заказ</button>}{order.status === "READY" && (order.waiter_id === user.id || user.role !== "WAITER") && <button className={styles.primary} disabled={busy === order.id} onClick={() => void serve(order)}>Выдано гостю</button>}</div></article>)}</div></div>
 
       <form className={styles.section} onSubmit={createOrder}><div className={styles.sectionHead}><div><small>Новый заказ</small><h2>Заказ со стола</h2></div></div><label>Стол<select value={orderTable} onChange={(e) => setOrderTable(e.target.value)} required><option value="">Выберите стол</option>{floor?.tables.filter((table) => table.status !== "OUT_OF_SERVICE").map((table) => <option key={table.id} value={table.id}>{table.code} · {table.name} · {TABLE_LABEL[table.status] ?? table.status}</option>)}</select></label>{selectedSession ? <div className={styles.total}><span>{selectedSession.guest_name || "Гость отеля"}{selectedSession.room_code ? ` · номер ${selectedSession.room_code}` : ""}</span><strong>{selectedSession.party_size} гостей</strong></div> : <label>Гостей<input type="number" min="1" max="30" value={orderGuestCount} onChange={(e) => setOrderGuestCount(Number(e.target.value) || 1)} /></label>}<div className={styles.menuPicker}>{approvedMenu.map((item) => <label key={item.id}><span><strong>{item.name_ru}</strong><small>{item.price_kgs.toLocaleString("ru-RU")} KGS</small></span><input type="number" min="0" max="20" value={qty[item.id] ?? 0} onChange={(e) => setQty((current) => ({ ...current, [item.id]: Number(e.target.value) || 0 }))} /></label>)}</div><label>Комментарий<input value={orderNote} onChange={(e) => setOrderNote(e.target.value)} placeholder="Например: без лука" /></label><div className={styles.total}><span>Сумма</span><strong>{draftTotal.toLocaleString("ru-RU")} KGS</strong></div><button className={styles.primary} disabled={busy === "order" || !orderTable || !selectedItems.length}>Создать заказ</button></form>
     </section>
@@ -265,5 +266,6 @@ export default function WaiterEntry() {
 
       <form className={styles.section} onSubmit={createReservation}><div className={styles.sectionHead}><div><small>Новая бронь</small><h2>Забронировать стол</h2></div></div><label>Стол<select value={reservationTable} onChange={(e) => setReservationTable(e.target.value)} required><option value="">Выберите стол</option>{floor?.tables.filter((table) => table.status !== "OUT_OF_SERVICE").map((table) => <option key={table.id} value={table.id}>{table.code} · {table.name} · {table.seats} мест</option>)}</select></label><label>Имя гостя<input value={reservationGuest} onChange={(e) => setReservationGuest(e.target.value)} minLength={2} required /></label><label>Телефон<input value={reservationPhone} onChange={(e) => setReservationPhone(e.target.value)} /></label><label>Гостей<input type="number" min="1" max="30" value={reservationParty} onChange={(e) => setReservationParty(Number(e.target.value) || 1)} /></label><div className={styles.timeGrid}><label>Начало<input type="datetime-local" value={reservationStart} onChange={(e) => setReservationStart(e.target.value)} required /></label><label>До<input type="datetime-local" value={reservationEnd} onChange={(e) => setReservationEnd(e.target.value)} required /></label></div><button className={styles.primary} disabled={busy === "reservation"}>Создать бронь стола</button></form>
     </section>
+    <MarinaAiAssistant screen="WAITER" role={user.role} />
   </main>;
 }
