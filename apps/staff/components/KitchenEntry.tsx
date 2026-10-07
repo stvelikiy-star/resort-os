@@ -166,11 +166,11 @@ export default function KitchenEntry() {
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; COOK работает с заказами и столами без права менять цены.</span>
+        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; COOK работает только с заказами и статусами приготовления.</span>
       </div>
     </section>
     <ChefProduction userRole={user.role} />
-    {user.role !== "COOK" && <KitchenAdminV2 />
+    {user.role !== "COOK" && <KitchenAdminV2 />}
     {user.role !== "COOK" && <MarinaAiAssistant screen="KITCHEN" role={user.role} />}
   </>;
 }
