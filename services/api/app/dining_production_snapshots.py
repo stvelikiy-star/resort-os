@@ -14,8 +14,8 @@ from .auth import require_roles
 from .guest_service_settings import load_settings
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-production-snapshots"])
-read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
-capture_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
+read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "COOK")
+capture_access = require_roles("OWNER", "MANAGER", "COOK")
 MealType = Literal["BREAKFAST", "LUNCH", "DINNER"]
 MEALS: tuple[str, ...] = ("BREAKFAST", "LUNCH", "DINNER")
 
