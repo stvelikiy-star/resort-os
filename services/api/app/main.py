@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles, router as auth_router
+from .auth import require_roles, router as auth_router, trusted_property_id
 from .db import lifespan
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -410,7 +410,7 @@ async def pms_grid(
 
     linked_agent_id = None
     async with request.app.state.db.acquire() as conn:
-        property_id = await get_property_id(conn)
+        property_id = await trusted_property_id(conn, _user)
         if _user["role"] == "AGENT":
             linked_agent_id = await conn.fetchval(
                 'SELECT "bookingAgentId" FROM staff_users WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
