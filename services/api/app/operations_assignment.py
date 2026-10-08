@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/ops", tags=["operations-assignment"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -29,9 +29,7 @@ async def assign_task(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            property_id = await conn.fetchval("SELECT id FROM properties WHERE code=$1", user["property_code"])
-            if not property_id:
-                raise HTTPException(status_code=503, detail="Property not loaded")
+            property_id = await trusted_property_id(conn, user)
 
             task = await conn.fetchrow(
                 '''
