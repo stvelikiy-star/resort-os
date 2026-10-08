@@ -39,6 +39,11 @@ def main() -> int:
         if marker not in seed:
             raise AssertionError(f"tenant-aware seed marker missing: {marker}")
 
+    owner_intelligence = read("scripts/verify_owner_intelligence.py")
+    for marker in ("has_tenant_column", '"tenantId"', "OWNER_INTELLIGENCE_OTHER"):
+        if marker not in owner_intelligence:
+            raise AssertionError(f"owner intelligence tenant fixture marker missing: {marker}")
+
     ak_bootstrap = read("scripts/bootstrap_ak_bermet_test.py")
     for marker in ("async def tenant_schema_available", "async def upsert_tenant", '"tenantId"'):
         if marker not in ak_bootstrap:
