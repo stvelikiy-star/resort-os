@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .guest_identity import resolve_or_create_guest
 from .payment_idempotency import (
     ensure_same_payment_payload,
@@ -40,11 +40,8 @@ class ConfirmPaymentPayload(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=180)
 
 
-async def property_id(conn) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code = $1", PROPERTY_CODE)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property seed is not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def nights_between(check_in: date, check_out: date) -> list[date]:
@@ -137,7 +134,7 @@ async def list_requests(
     _user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn)
+        pid = await property_id(conn, _user)
         rows = await conn.fetch(
             '''
             SELECT rr.id
@@ -164,7 +161,7 @@ async def quote_request(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn)
+            pid = await property_id(conn, user)
             rr = await conn.fetchrow(
                 '''SELECT * FROM reservation_requests WHERE id = $1 AND "propertyId" = $2 FOR UPDATE''',
                 request_id,
@@ -327,7 +324,7 @@ async def confirm_payment_and_reserve(
                         },
                     )
 
-            pid = await property_id(conn)
+            pid = await property_id(conn, user)
             rr = await conn.fetchrow(
                 '''
                 SELECT rr.*,rt.code AS room_type_code
@@ -492,7 +489,7 @@ async def list_reservations(
     _user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn)
+        pid = await property_id(conn, _user)
         rows = await conn.fetch(
             '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
