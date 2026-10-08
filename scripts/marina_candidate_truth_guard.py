@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "release" / "marina-smart-current-candidate.json"
 STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
 
-EXPECTED_HEAD = "1676db73b35724d0d562f37e810928a3ccd980d0"
+EXPECTED_HEAD = "e6843b64b11a4c0a134e390d7b83e5a74389d077"
 EXPECTED_BRANCH = "marina-smart/multi-tenant-foundation-20261008"
 EXPECTED_PR = 234
 
