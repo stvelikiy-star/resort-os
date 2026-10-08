@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product": "MARINA SMART",
   "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
-  "candidate_commit": "64a20f08a91ddebc4c2522d3e640e131dce179d4",
+  "candidate_commit": "1676db73b35724d0d562f37e810928a3ccd980d0",
   "source_branch": "marina-smart/multi-tenant-foundation-20261008",
   "pull_request": 234,
   "migration_count": 31,
