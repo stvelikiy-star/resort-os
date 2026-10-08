@@ -74,6 +74,12 @@ def main() -> int:
         "services/api/app/operations.py": ("trusted_property_id(conn, user)",),
         "services/api/app/operations_assignment.py": ("trusted_property_id(conn, user)",),
         "services/api/app/staff_control.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/operations_history.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/staff_task_reports.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_pin_admin.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/agent_context.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_crm.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_services.py": ("trusted_property_id(conn, user)",),
     }.items():
         source = read(path)
         for marker in markers:
