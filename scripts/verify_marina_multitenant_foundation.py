@@ -2,7 +2,7 @@
 """Static fail-closed contract for the first MARINA SMART tenant rollout slice.
 
 This check never connects to a database and never changes runtime state. It verifies
-that the migration, seed path and trusted auth context move together before staging.
+that the migration, seed path, trusted auth context and release truth move together.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def main() -> int:
     marina_bootstrap = read("scripts/bootstrap_marina_test.py")
     for marker in ("async def tenant_schema_available", "async def upsert_tenant", '"tenantId"'):
         if marker not in marina_bootstrap:
-            raise AssertionError(f"MARINA test bootstrap marker missing: {marker}")
+            raise AssertionError(f"MARINA test tenant bootstrap marker missing: {marker}")
 
     auth = read("services/api/app/auth.py")
     for marker in (
@@ -85,6 +85,42 @@ def main() -> int:
         if marker not in staging_workflow:
             raise AssertionError(f"manual staging workflow marker missing: {marker}")
 
+    manifest = read("release/marina-smart-current-candidate.json")
+    for marker in (
+        '"product": "MARINA SMART"',
+        '"status": "INTERNAL_CANDIDATE_STAGING_REQUIRED"',
+        '"migration_count": 31',
+        '"tenant_model": "Tenant/Property"',
+        '"tenant_context_enabled": false',
+        '"external_staging_verified": false',
+        '"cross_tenant_e2e_verified": false',
+        '"production_cutover_authorized": false',
+    ):
+        if marker not in manifest:
+            raise AssertionError(f"candidate manifest marker missing: {marker}")
+
+    current_state = read("knowledge/MARINA_SMART_CURRENT_STATE_20261008.md")
+    for marker in (
+        "PR: #234",
+        "CI: 41/41 SUCCESS",
+        "Tenant/Property",
+        "two-tenant cross-tenant login/read/write E2E",
+        "The existing roles, navigation and approved compact chessboard remain unchanged.",
+    ):
+        if marker not in current_state:
+            raise AssertionError(f"candidate state marker missing: {marker}")
+
+    truth_guard = read("scripts/marina_candidate_truth_guard.py")
+    for marker in (
+        "EXPECTED_HEAD =",
+        "EXPECTED_BRANCH =",
+        "candidate_commit",
+        "cross_tenant_e2e_verified",
+        "MARINA CANDIDATE TRUTH GREEN",
+    ):
+        if marker not in truth_guard:
+            raise AssertionError(f"candidate truth guard marker missing: {marker}")
+
     production_env = read(".env.production.example")
     if "MARINA_TENANT_CONTEXT_ENABLED=false" not in production_env:
         raise AssertionError("production tenant context must remain disabled until staging gates pass")
@@ -94,7 +130,7 @@ def main() -> int:
         raise AssertionError("production compose must pass the explicit tenant context flag")
 
     print("MARINA_MULTITENANT_FOUNDATION_PASS")
-    print("BOUNDARY: migration + seed + trusted auth context are prepared; staging deployment remains STOP")
+    print("BOUNDARY: migration + seed + trusted auth context + candidate truth are prepared; staging deployment remains STOP")
     return 0
 
 
