@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import password_hasher, require_roles
+from .auth import password_hasher, require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/staff", tags=["admin-staff"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -53,10 +53,11 @@ class StaffPatch(BaseModel):
         return self
 
 
-async def _property(conn, property_code: str):
+async def _property(conn, user: dict[str, Any]):
+    property_id = await trusted_property_id(conn, user)
     prop = await conn.fetchrow(
-        'SELECT id,timezone FROM properties WHERE code=$1',
-        property_code,
+        'SELECT id,timezone FROM properties WHERE id=$1',
+        property_id,
     )
     if not prop:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -111,7 +112,7 @@ async def staff_overview(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop = await _property(conn, user["property_code"])
+        prop = await _property(conn, user)
         pid = prop["id"]
         today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
 
@@ -218,7 +219,7 @@ async def create_staff_user(
     display_name = payload.display_name.strip()
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             existing = await conn.fetchval(
                 'SELECT id FROM staff_users WHERE "propertyId"=$1 AND username=$2',
                 prop["id"],
@@ -265,7 +266,7 @@ async def patch_staff_user(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             current = await conn.fetchrow(
                 '''
                 SELECT id,username,"displayName",role::text AS role,"isActive",
