@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "product": "MARINA SMART",
+  "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
+  "candidate_commit": "e6843b64b11a4c0a134e390d7b83e5a74389d077",
+  "source_branch": "marina-smart/multi-tenant-foundation-20261008",
+  "pull_request": 234,
+  "migration_count": 31,
+  "tenant_model": "Tenant/Property",
+  "tenant_context_enabled": false,
+  "staging_gate": "manual_read_only",
+  "external_staging_verified": false,
+  "cross_tenant_e2e_verified": false,
+  "backup_restore_target_verified": false,
+  "production_cutover_authorized": false,
+  "payment_operations_enabled": false,
+  "nfc_wallet_enabled": false,
+  "notes": [
+    "This is the MARINA SMART candidate boundary, not the active production boundary.",
+    "The existing Three Crowns release/current-rc.json remains unchanged until Marina staging and owner acceptance are complete.",
+    "Tenant context is deliberately fail-closed and remains disabled until property-scoped read/write E2E passes.",
+    "The candidate requires two synthetic tenants, two properties, cross-tenant login/read/write E2E, backup/restore and rollback evidence before production."
+  ]
+}

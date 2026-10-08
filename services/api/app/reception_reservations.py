@@ -3,15 +3,16 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/reception", tags=["admin-reception"])
 reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 
 
-async def property_context(conn, property_code: str):
+async def property_context(conn, user: dict[str, Any]):
+    property_id = await trusted_property_id(conn, user)
     prop = await conn.fetchrow(
-        'SELECT id,timezone FROM properties WHERE code=$1', property_code
+        'SELECT id,timezone FROM properties WHERE id=$1', property_id
     )
     if not prop:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -28,7 +29,7 @@ async def list_reception_reservations(
     user: dict[str, Any] = Depends(reception_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop, local_today = await property_context(conn, user["property_code"])
+        prop, local_today = await property_context(conn, user)
         rows = await conn.fetch(
             '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",

@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Static fail-closed contract for the first MARINA SMART tenant rollout slice.
+
+This check never connects to a database and never changes runtime state. It verifies
+that the migration, seed path, trusted auth context, release truth and isolation
+gate move together.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def read(path: str) -> str:
+    target = ROOT / path
+    if not target.exists():
+        raise AssertionError(f"missing required file: {path}")
+    return target.read_text(encoding="utf-8")
+
+
+def main() -> int:
+    migration = read("packages/database/prisma/migrations/zz107_marina_tenants_20261008/migration.sql")
+    for marker in (
+        'CREATE TABLE IF NOT EXISTS "tenants"',
+        'ALTER TABLE "properties"',
+        'ADD COLUMN IF NOT EXISTS "tenantId"',
+        "legacy_",
+        'FOREIGN KEY ("tenantId")',
+        "ON DELETE RESTRICT",
+        '"properties_tenant_code_key"',
+    ):
+        if marker not in migration:
+            raise AssertionError(f"tenant migration marker missing: {marker}")
+
+    seed = read("scripts/seed_from_intake.py")
+    for marker in ("TENANT_CODE =", "async def upsert_tenant", "async def tenant_schema_available", "INSERT INTO tenants", '"tenantId"'):
+        if marker not in seed:
+            raise AssertionError(f"tenant-aware seed marker missing: {marker}")
+
+    owner_intelligence = read("scripts/verify_owner_intelligence.py")
+    for marker in ("has_tenant_column", '"tenantId"', "OWNER_INTELLIGENCE_OTHER"):
+        if marker not in owner_intelligence:
+            raise AssertionError(f"owner intelligence tenant fixture marker missing: {marker}")
+
+    ak_bootstrap = read("scripts/bootstrap_ak_bermet_test.py")
+    for marker in ("async def tenant_schema_available", "async def upsert_tenant", '"tenantId"'):
+        if marker not in ak_bootstrap:
+            raise AssertionError(f"AK BERMET tenant bootstrap marker missing: {marker}")
+
+    marina_bootstrap = read("scripts/bootstrap_marina_test.py")
+    for marker in ("async def tenant_schema_available", "async def upsert_tenant", '"tenantId"'):
+        if marker not in marina_bootstrap:
+            raise AssertionError(f"MARINA test tenant bootstrap marker missing: {marker}")
+
+    auth = read("services/api/app/auth.py")
+    for marker in (
+        'MARINA_TENANT_CONTEXT_ENABLED =',
+        'os.environ.get("MARINA_TENANT_CONTEXT_ENABLED", "false")',
+        "def _tenant_context_select_sql()",
+        'p."tenantId" AS tenant_id',
+        'NULL::uuid AS tenant_id',
+        'property_id=_optional_uuid_text(row["property_id"])',
+        'tenant_id=_optional_uuid_text(row["tenant_id"])',
+        'row["property_code"] != PROPERTY_CODE',
+        "async def trusted_property_id(conn, user: dict[str, Any])",
+        "JOIN tenants t ON t.id=p.\"tenantId\"",
+    ):
+        if marker not in auth:
+            raise AssertionError(f"trusted auth-context marker missing: {marker}")
+
+    for path, markers in {
+        "services/api/app/main.py": ("trusted_property_id(conn, _user)",),
+        "services/api/app/booking_admin.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/reception_reservations.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/pms_chessboard_read.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/room_detail.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/operations.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/operations_assignment.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/staff_control.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/operations_history.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/staff_task_reports.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_pin_admin.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/agent_context.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_crm.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_services.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_offers.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/guest_service_settings.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/service_points.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/reception_readiness.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/manager_dashboard.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/stays.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/inbox.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/folio.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/dining_folio.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/dining_stays.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/kitchen.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/dining_control.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/dining_entitlements.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/kitchen_menu_management.py": ("trusted_property_id(conn, user)",),
+    }.items():
+        source = read(path)
+        for marker in markers:
+            if marker not in source:
+                raise AssertionError(f"authenticated property-scope marker missing in {path}: {marker}")
+
+    staging_gate = read("scripts/verify_marina_multitenant_staging.py")
+    for marker in (
+        "async def main()",
+        "MARINA_STAGING_BASE_URL",
+        "MARINA_STAGING_DATABASE_URL",
+        'to_regclass(\'public.tenants\')',
+        "properties without tenant",
+        "read-only foundation gate passed",
+    ):
+        if marker not in staging_gate:
+            raise AssertionError(f"staging gate marker missing: {marker}")
+
+    staging_workflow = read(".github/workflows/marina-multitenant-staging-gate.yml")
+    for marker in (
+        "workflow_dispatch:",
+        "MARINA_STAGING_BASE_URL",
+        "MARINA_STAGING_DATABASE_URL",
+        "verify_marina_multitenant_staging.py",
+        "contents: read",
+    ):
+        if marker not in staging_workflow:
+            raise AssertionError(f"manual staging workflow marker missing: {marker}")
+
+    isolation = read("scripts/verify_marina_multitenant_isolation.py")
+    for marker in (
+        "async def main()",
+        "MARINA_STAGING_TENANT_A_USERNAME",
+        "MARINA_STAGING_TENANT_B_USERNAME",
+        "cross-tenant request must be denied",
+        "client-supplied tenant/property headers changed trusted context",
+        "MARINA_STAGING_ISOLATION_PASS",
+    ):
+        if marker not in isolation:
+            raise AssertionError(f"two-tenant isolation marker missing: {marker}")
+
+    onboarding = read("knowledge/MARINA_SMART_ONBOARDING_5_TO_30_20261008.md")
+    for marker in (
+        "Каждый клиент получает отдельный Tenant.",
+        "Каждый отель клиента получает отдельный Property",
+        "Пакет ролей",
+        "Масштабирование 5 → 30 клиентов",
+        "production cutover",
+    ):
+        if marker not in onboarding:
+            raise AssertionError(f"onboarding runbook marker missing: {marker}")
+
+    isolation_workflow = read(".github/workflows/marina-multitenant-isolation.yml")
+    for marker in (
+        "workflow_dispatch:",
+        "MARINA_STAGING_TENANT_A_USERNAME",
+        "MARINA_STAGING_TENANT_B_USERNAME",
+        "verify_marina_multitenant_isolation.py",
+        "contents: read",
+    ):
+        if marker not in isolation_workflow:
+            raise AssertionError(f"isolation workflow marker missing: {marker}")
+
+    manifest = read("release/marina-smart-current-candidate.json")
+    for marker in (
+        '"product": "MARINA SMART"',
+        '"status": "INTERNAL_CANDIDATE_STAGING_REQUIRED"',
+        '"migration_count": 31',
+        '"tenant_model": "Tenant/Property"',
+        '"tenant_context_enabled": false',
+        '"external_staging_verified": false',
+        '"cross_tenant_e2e_verified": false',
+        '"production_cutover_authorized": false',
+    ):
+        if marker not in manifest:
+            raise AssertionError(f"candidate manifest marker missing: {marker}")
+
+    current_state = read("knowledge/MARINA_SMART_CURRENT_STATE_20261008.md")
+    for marker in (
+        "PR: #234",
+        "CI: 41/41 SUCCESS",
+        "Tenant/Property",
+        "two-tenant cross-tenant login/read/write E2E",
+        "The existing roles, navigation and approved compact chessboard remain unchanged.",
+    ):
+        if marker not in current_state:
+            raise AssertionError(f"candidate state marker missing: {marker}")
+
+    truth_guard = read("scripts/marina_candidate_truth_guard.py")
+    for marker in (
+        "EXPECTED_HEAD =",
+        "EXPECTED_BRANCH =",
+        "candidate_commit",
+        "cross_tenant_e2e_verified",
+        "MARINA CANDIDATE TRUTH GREEN",
+    ):
+        if marker not in truth_guard:
+            raise AssertionError(f"candidate truth guard marker missing: {marker}")
+
+    production_env = read(".env.production.example")
+    if "MARINA_TENANT_CONTEXT_ENABLED=false" not in production_env:
+        raise AssertionError("production tenant context must remain disabled until staging gates pass")
+
+    compose = read("compose.production.yaml")
+    if "MARINA_TENANT_CONTEXT_ENABLED:" not in compose:
+        raise AssertionError("production compose must pass the explicit tenant context flag")
+
+    print("MARINA_MULTITENANT_FOUNDATION_PASS")
+    print("BOUNDARY: migration + seed + trusted auth context + candidate truth + isolation gate are prepared; staging deployment remains STOP")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

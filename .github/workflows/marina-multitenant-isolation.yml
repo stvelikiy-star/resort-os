@@ -1,0 +1,45 @@
+name: MARINA SMART Two-Tenant Isolation E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: "Required safety confirmation for staging-only denial probes"
+        required: true
+        default: "I_UNDERSTAND_STAGING_ONLY"
+
+permissions:
+  contents: read
+
+jobs:
+  isolation-e2e:
+    name: Authenticated two-tenant isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install E2E dependencies
+        run: python -m pip install --disable-pip-version-check httpx==0.28.1
+
+      - name: Run authenticated isolation E2E
+        env:
+          MARINA_STAGING_BASE_URL: ${{ secrets.MARINA_STAGING_BASE_URL }}
+          MARINA_STAGING_ISOLATION_CONFIRM: ${{ inputs.confirmation }}
+          MARINA_STAGING_TENANT_A_USERNAME: ${{ secrets.MARINA_STAGING_TENANT_A_USERNAME }}
+          MARINA_STAGING_TENANT_A_PASSWORD: ${{ secrets.MARINA_STAGING_TENANT_A_PASSWORD }}
+          MARINA_STAGING_TENANT_A_PROPERTY_CODE: ${{ secrets.MARINA_STAGING_TENANT_A_PROPERTY_CODE }}
+          MARINA_STAGING_TENANT_A_RESERVATION_ID: ${{ secrets.MARINA_STAGING_TENANT_A_RESERVATION_ID }}
+          MARINA_STAGING_TENANT_A_REQUEST_ID: ${{ secrets.MARINA_STAGING_TENANT_A_REQUEST_ID }}
+          MARINA_STAGING_TENANT_B_USERNAME: ${{ secrets.MARINA_STAGING_TENANT_B_USERNAME }}
+          MARINA_STAGING_TENANT_B_PASSWORD: ${{ secrets.MARINA_STAGING_TENANT_B_PASSWORD }}
+          MARINA_STAGING_TENANT_B_PROPERTY_CODE: ${{ secrets.MARINA_STAGING_TENANT_B_PROPERTY_CODE }}
+          MARINA_STAGING_TENANT_B_RESERVATION_ID: ${{ secrets.MARINA_STAGING_TENANT_B_RESERVATION_ID }}
+          MARINA_STAGING_TENANT_B_REQUEST_ID: ${{ secrets.MARINA_STAGING_TENANT_B_REQUEST_ID }}
+        run: python scripts/verify_marina_multitenant_isolation.py

@@ -96,12 +96,42 @@ async def create_foreign_guest() -> str:
     try:
         property_id = uuid.uuid4()
         guest_id = uuid.uuid4()
-        await conn.execute(
-            '''INSERT INTO properties (id,code,name,timezone,currency,"beachCommissionBps","createdAt","updatedAt")
-               VALUES ($1,$2,'Foreign Growth Property','Asia/Bishkek','KGS',500,now(),now())''',
-            property_id,
-            f"FOREIGN_GROWTH_{str(property_id)[:8]}",
+        property_code = f"FOREIGN_GROWTH_{str(property_id)[:8]}"
+        tenant_schema = await conn.fetchrow(
+            '''
+            SELECT
+                EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema='public' AND table_name='tenants'
+                ) AS has_tenants,
+                EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='properties' AND column_name='tenantId'
+                ) AS has_property_tenant_id
+            '''
         )
+        if tenant_schema["has_tenants"] and tenant_schema["has_property_tenant_id"]:
+            tenant_id = uuid.uuid4()
+            await conn.execute(
+                '''INSERT INTO tenants (id,code,name,status,"createdAt","updatedAt")
+                   VALUES ($1,$2,'Foreign Growth Tenant','ACTIVE',now(),now())''',
+                tenant_id,
+                f"tenant_{property_code.lower()}",
+            )
+            await conn.execute(
+                '''INSERT INTO properties (id,"tenantId",code,name,timezone,currency,"beachCommissionBps","createdAt","updatedAt")
+                   VALUES ($1,$2,$3,'Foreign Growth Property','Asia/Bishkek','KGS',500,now(),now())''',
+                property_id,
+                tenant_id,
+                property_code,
+            )
+        else:
+            await conn.execute(
+                '''INSERT INTO properties (id,code,name,timezone,currency,"beachCommissionBps","createdAt","updatedAt")
+                   VALUES ($1,$2,'Foreign Growth Property','Asia/Bishkek','KGS',500,now(),now())''',
+                property_id,
+                property_code,
+            )
         await conn.execute(
             '''INSERT INTO guests (id,"propertyId","firstName",phone,"createdAt","updatedAt")
                VALUES ($1,$2,'Foreign Guest','+996700000999',now(),now())''',

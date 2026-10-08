@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-entitlements"])
 read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
@@ -41,11 +41,8 @@ class EntitlementPatch(BaseModel):
     notes: str | None = Field(default=None, max_length=1000)
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, resource_id: str, payload: dict[str, Any]):
@@ -83,7 +80,7 @@ async def stay_entitlements(
     user: dict[str, Any] = Depends(read_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         stay = await conn.fetchrow(
             '''SELECT s.id,r."bookingNumber",r."checkIn",r."checkOut",r.adults,r.children,
                       g."firstName",g."lastName",room.code AS room_code
@@ -128,7 +125,7 @@ async def upsert_meal_plan(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             stay = await conn.fetchrow(
                 '''SELECT s.id,s."reservationId",s."guestId",s.status::text AS stay_status,
                           r."checkIn",r."checkOut",r.adults,r.children,r.status::text AS reservation_status
@@ -213,7 +210,7 @@ async def patch_entitlement(
         raise HTTPException(status_code=422, detail="No change supplied")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             current = await conn.fetchrow(
                 '''SELECT id,"adultPortions","childPortions",status,notes FROM dining_entitlements
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -246,7 +243,7 @@ async def production(
     user: dict[str, Any] = Depends(read_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         local_today = await conn.fetchval(
             '''SELECT (now() AT TIME ZONE COALESCE(timezone,'Asia/Bishkek'))::date FROM properties WHERE id=$1''', pid,
         )

@@ -7,7 +7,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .guest_os import hash_secret, qr_svg
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -62,11 +62,8 @@ def normalize_code(value: str, *, max_len: int) -> str:
     return normalized[:max_len]
 
 
-async def property_id(conn, property_code: str = PROPERTY_CODE) -> uuid.UUID:
-    pid = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not pid:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return pid
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def resolve_service_point(conn, raw_token: str, *, lock: bool = False):
@@ -173,7 +170,7 @@ async def issue_qr(conn, *, pid: uuid.UUID, point_id: uuid.UUID, label: str | No
 @admin_router.get("")
 async def list_service_points(request: Request, user: dict[str, Any] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''
             SELECT sp.id,sp.code,sp.name,sp.category,sp."zoneLabel",sp."isActive",
@@ -207,7 +204,7 @@ async def create_service_point(
     zone = payload.zone_label.strip() if payload.zone_label and payload.zone_label.strip() else None
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             exists = await conn.fetchval(
                 'SELECT id FROM service_points WHERE "propertyId"=$1 AND code=$2',
                 pid,
@@ -268,7 +265,7 @@ async def issue_service_point_qr(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             result = await issue_qr(conn, pid=pid, point_id=point_id)
             await conn.execute(
                 '''INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
@@ -291,7 +288,7 @@ async def rotate_service_point_qr(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             point = await conn.fetchrow(
                 'SELECT id FROM service_points WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
                 point_id,
@@ -327,7 +324,7 @@ async def revoke_service_point_qr(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             exists = await conn.fetchval(
                 'SELECT id FROM service_points WHERE id=$1 AND "propertyId"=$2',
                 point_id,

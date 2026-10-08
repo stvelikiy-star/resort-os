@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import current_user
+from .auth import current_user, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/ops", tags=["staff-task-reports"])
 
@@ -37,11 +37,8 @@ class TaskCompletionReport(BaseModel):
         return self
 
 
-async def _property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 @router.post("/tasks/{task_id}/complete-report")
@@ -67,7 +64,7 @@ async def complete_task_with_report(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await _property_id(conn, user["property_code"])
+            pid = await _property_id(conn, user)
             task = await conn.fetchrow(
                 '''
                 SELECT t.id,t.type::text AS type,t.status::text AS status,t."roomId",t."assignedToId",

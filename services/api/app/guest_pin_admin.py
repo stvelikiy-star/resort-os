@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .stays import issue_guest_pin
 
 router = APIRouter(prefix="/api/v1/admin/guest-access", tags=["guest-access-admin"])
@@ -23,8 +23,9 @@ async def reissue_guest_pin(
     """
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
+            property_id = await trusted_property_id(conn, user)
             prop = await conn.fetchrow(
-                'SELECT id FROM properties WHERE code=$1', user["property_code"]
+                'SELECT id FROM properties WHERE id=$1', property_id
             )
             if not prop:
                 raise HTTPException(status_code=503, detail="Property not loaded")

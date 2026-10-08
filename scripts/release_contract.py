@@ -40,6 +40,7 @@ EXPECTED_MIGRATIONS = (
     "zz104_public_kz_20260929",
     "zz105_guest_dynamic_kz_20260929",
     "zz106_marina_split_cook_waiter_20261007",
+    "zz107_marina_tenants_20261008",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make

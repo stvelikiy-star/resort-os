@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
@@ -99,11 +99,8 @@ class OrderStatusPatch(BaseModel):
     status: Literal["ACCEPTED", "COOKING", "READY", "SERVED", "CANCELLED"]
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def menu_item(row) -> dict[str, Any]:
@@ -195,7 +192,7 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
     created = 0
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             for code, category, ru, kg, kz, en, price, sort_order in DRAFT_MENU:
                 result = await conn.execute(
                     '''INSERT INTO kitchen_menu_items (
@@ -211,7 +208,7 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
 @admin_router.get("/menu")
 async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
                FROM kitchen_menu_items WHERE "propertyId"=$1 ORDER BY "sortOrder",category,"nameRu"''', pid,
@@ -226,7 +223,7 @@ async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, u
         raise HTTPException(status_code=422, detail="Unknown menu category")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             current = await conn.fetchrow(
                 '''SELECT "nameKz" FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 item_id, pid,
@@ -258,7 +255,7 @@ async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, u
 @admin_router.get("/tables")
 async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT id,code,name,seats,status,"isActive",notes FROM kitchen_tables
                WHERE "propertyId"=$1 ORDER BY code''', pid,
@@ -270,7 +267,7 @@ async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_m
 async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             try:
                 row = await conn.fetchrow(
                     '''INSERT INTO kitchen_tables (id,"propertyId",code,name,seats,status,"isActive",notes,"createdAt","updatedAt")
@@ -289,7 +286,7 @@ async def create_table(payload: TableCreate, request: Request, user: dict[str, A
 async def patch_table(table_id: uuid.UUID, payload: TablePatch, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             row = await conn.fetchrow(
                 '''UPDATE kitchen_tables SET name=COALESCE($3,name),seats=COALESCE($4,seats),status=COALESCE($5,status),
                      "isActive"=COALESCE($6,"isActive"),notes=COALESCE($7,notes),"updatedAt"=now()
@@ -333,7 +330,7 @@ async def list_orders(request: Request, order_status: str = Query(default="ACTIV
     if order_status not in {"ACTIVE", "ALL", "NEW", "ACCEPTED", "COOKING", "READY", "SERVED", "CANCELLED"}:
         raise HTTPException(status_code=422, detail="Unknown order status")
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             ORDER_SELECT + ''' WHERE o."propertyId"=$1 AND ($2='ALL' OR ($2='ACTIVE' AND o.status IN ('NEW','ACCEPTED','COOKING','READY')) OR o.status=$2)
               GROUP BY o.id,t.code,t.name,r.code ORDER BY o."openedAt" ASC LIMIT 300''', pid, order_status,
@@ -345,7 +342,7 @@ async def list_orders(request: Request, order_status: str = Query(default="ACTIV
 async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             table_id = payload.table_id
             live_session = None
             if table_id:
@@ -408,7 +405,7 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
 async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             row = await conn.fetchrow(
                 '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId"
                    FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
