@@ -70,6 +70,10 @@ def main() -> int:
         "services/api/app/booking_admin.py": ("trusted_property_id(conn, user)",),
         "services/api/app/reception_reservations.py": ("trusted_property_id(conn, user)",),
         "services/api/app/pms_chessboard_read.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/room_detail.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/operations.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/operations_assignment.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/staff_control.py": ("trusted_property_id(conn, user)",),
     }.items():
         source = read(path)
         for marker in markers:
