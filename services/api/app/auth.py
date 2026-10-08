@@ -63,6 +63,43 @@ def _optional_uuid_text(value: Any) -> str | None:
     return str(value) if value is not None else None
 
 
+async def trusted_property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    """Resolve the authenticated property from the database-derived context.
+
+    Legacy deployments keep the PROPERTY_CODE boundary. Once the Marina tenant
+    flag is enabled, authenticated routes must use the session's property_id and
+    active tenant relationship instead of a global environment property.
+    """
+
+    if not MARINA_TENANT_CONTEXT_ENABLED:
+        value = await conn.fetchval(
+            'SELECT id FROM properties WHERE code=$1',
+            PROPERTY_CODE,
+        )
+    else:
+        raw_property_id = user.get("property_id")
+        raw_tenant_id = user.get("tenant_id")
+        try:
+            property_uuid = uuid.UUID(str(raw_property_id))
+            tenant_uuid = uuid.UUID(str(raw_tenant_id))
+        except (TypeError, ValueError, AttributeError) as exc:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid tenant context") from exc
+        value = await conn.fetchval(
+            '''
+            SELECT p.id
+            FROM properties p
+            JOIN tenants t ON t.id=p."tenantId"
+            WHERE p.id=$1 AND p."tenantId"=$2 AND t.status='ACTIVE'
+            ''',
+            property_uuid,
+            tenant_uuid,
+        )
+
+    if not value:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Property not loaded")
+    return value
+
+
 def hash_session_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
