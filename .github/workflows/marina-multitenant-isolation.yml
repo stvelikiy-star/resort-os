@@ -31,6 +31,7 @@ jobs:
       - name: Run authenticated isolation E2E
         env:
           MARINA_STAGING_BASE_URL: ${{ secrets.MARINA_STAGING_BASE_URL }}
+          MARINA_STAGING_TENANT_B_BASE_URL: ${{ secrets.MARINA_STAGING_TENANT_B_BASE_URL }}
           MARINA_STAGING_ISOLATION_CONFIRM: ${{ inputs.confirmation }}
           MARINA_STAGING_TENANT_A_USERNAME: ${{ secrets.MARINA_STAGING_TENANT_A_USERNAME }}
           MARINA_STAGING_TENANT_A_PASSWORD: ${{ secrets.MARINA_STAGING_TENANT_A_PASSWORD }}
