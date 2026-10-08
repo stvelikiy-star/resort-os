@@ -140,6 +140,17 @@ def main() -> int:
         if marker not in isolation:
             raise AssertionError(f"two-tenant isolation marker missing: {marker}")
 
+    onboarding = read("knowledge/MARINA_SMART_ONBOARDING_5_TO_30_20261008.md")
+    for marker in (
+        "Каждый клиент получает отдельный Tenant.",
+        "Каждый отель клиента получает отдельный Property",
+        "Пакет ролей",
+        "Масштабирование 5 → 30 клиентов",
+        "production cutover",
+    ):
+        if marker not in onboarding:
+            raise AssertionError(f"onboarding runbook marker missing: {marker}")
+
     isolation_workflow = read(".github/workflows/marina-multitenant-isolation.yml")
     for marker in (
         "workflow_dispatch:",
