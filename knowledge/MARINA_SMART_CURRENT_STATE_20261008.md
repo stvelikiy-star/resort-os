@@ -18,6 +18,8 @@ backup/restore, rollback and owner acceptance are complete.
 
 ## Architecture decision
 
+Tenant/Property is the customer isolation model.
+
 MARINA SMART uses a central SaaS runtime and database infrastructure. Every
 customer is an isolated Tenant. Every hotel/resort is a Property belonging to a
 Tenant. Customer domains are public-site entry points; they are not the
