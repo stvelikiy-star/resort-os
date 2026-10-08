@@ -11,7 +11,7 @@ backup/restore, rollback and owner acceptance are complete.
 - Repository: stvelikiy-star/resort-os
 - PR: #234
 - Branch: marina-smart/multi-tenant-foundation-20261008
-- Candidate commit: 1676db73b35724d0d562f37e810928a3ccd980d0
+- Candidate commit: e6843b64b11a4c0a134e390d7b83e5a74389d077
 - CI: 41/41 SUCCESS
 - Candidate manifest: release/marina-smart-current-candidate.json
 - Migration candidate: 31 committed migrations
