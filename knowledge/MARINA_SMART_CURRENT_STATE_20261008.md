@@ -11,7 +11,7 @@ backup/restore, rollback and owner acceptance are complete.
 - Repository: stvelikiy-star/resort-os
 - PR: #234
 - Branch: marina-smart/multi-tenant-foundation-20261008
-- Candidate commit: 3734e5190808508142252700d253675f13540ab8
+- Candidate commit: a3cd1f34fa58ab760df9bbe0a5d279ecb2e8fc0c
 - CI: 41/41 SUCCESS
 - Candidate manifest: release/marina-smart-current-candidate.json
 - Migration candidate: 31 committed migrations
@@ -34,6 +34,7 @@ branding.
 - tenant-aware seed/bootstrap;
 - trusted database-derived tenant_id and property_id auth context;
 - manual read-only staging foundation gate;
+- authenticated two-tenant isolation E2E gate;
 - explicit production flag MARINA_TENANT_CONTEXT_ENABLED=false.
 
 ## Deliberately not claimed yet
