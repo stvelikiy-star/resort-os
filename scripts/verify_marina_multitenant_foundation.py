@@ -86,6 +86,10 @@ def main() -> int:
         "services/api/app/reception_readiness.py": ("trusted_property_id(conn, user)",),
         "services/api/app/manager_dashboard.py": ("trusted_property_id(conn, user)",),
         "services/api/app/stays.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/inbox.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/folio.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/dining_folio.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/dining_stays.py": ("trusted_property_id(conn, user)",),
     }.items():
         source = read(path)
         for marker in markers:
