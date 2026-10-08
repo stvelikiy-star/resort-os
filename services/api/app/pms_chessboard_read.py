@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-chessboard"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -16,9 +16,10 @@ async def get_reservation_schedule(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
+        property_id = await trusted_property_id(conn, user)
         prop = await conn.fetchrow(
-            'SELECT id,timezone,currency FROM properties WHERE code=$1',
-            user["property_code"],
+            'SELECT id,timezone,currency FROM properties WHERE id=$1',
+            property_id,
         )
         if not prop:
             raise HTTPException(status_code=503, detail="Property not loaded")
