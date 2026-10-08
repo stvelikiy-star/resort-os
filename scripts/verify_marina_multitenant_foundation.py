@@ -59,9 +59,22 @@ def main() -> int:
         'property_id=_optional_uuid_text(row["property_id"])',
         'tenant_id=_optional_uuid_text(row["tenant_id"])',
         'row["property_code"] != PROPERTY_CODE',
+        "async def trusted_property_id(conn, user: dict[str, Any])",
+        "JOIN tenants t ON t.id=p.\"tenantId\"",
     ):
         if marker not in auth:
             raise AssertionError(f"trusted auth-context marker missing: {marker}")
+
+    for path, markers in {
+        "services/api/app/main.py": ("trusted_property_id(conn, _user)",),
+        "services/api/app/booking_admin.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/reception_reservations.py": ("trusted_property_id(conn, user)",),
+        "services/api/app/pms_chessboard_read.py": ("trusted_property_id(conn, user)",),
+    }.items():
+        source = read(path)
+        for marker in markers:
+            if marker not in source:
+                raise AssertionError(f"authenticated property-scope marker missing in {path}: {marker}")
 
     staging_gate = read("scripts/verify_marina_multitenant_staging.py")
     for marker in (
