@@ -2,7 +2,8 @@
 """Static fail-closed contract for the first MARINA SMART tenant rollout slice.
 
 This check never connects to a database and never changes runtime state. It verifies
-that the migration, seed path, trusted auth context and release truth move together.
+that the migration, seed path, trusted auth context, release truth and isolation
+gate move together.
 """
 
 from __future__ import annotations
@@ -85,6 +86,29 @@ def main() -> int:
         if marker not in staging_workflow:
             raise AssertionError(f"manual staging workflow marker missing: {marker}")
 
+    isolation = read("scripts/verify_marina_multitenant_isolation.py")
+    for marker in (
+        "async def main()",
+        "MARINA_STAGING_TENANT_A_USERNAME",
+        "MARINA_STAGING_TENANT_B_USERNAME",
+        "cross-tenant request must be denied",
+        "client-supplied tenant/property headers changed trusted context",
+        "MARINA_STAGING_ISOLATION_PASS",
+    ):
+        if marker not in isolation:
+            raise AssertionError(f"two-tenant isolation marker missing: {marker}")
+
+    isolation_workflow = read(".github/workflows/marina-multitenant-isolation.yml")
+    for marker in (
+        "workflow_dispatch:",
+        "MARINA_STAGING_TENANT_A_USERNAME",
+        "MARINA_STAGING_TENANT_B_USERNAME",
+        "verify_marina_multitenant_isolation.py",
+        "contents: read",
+    ):
+        if marker not in isolation_workflow:
+            raise AssertionError(f"isolation workflow marker missing: {marker}")
+
     manifest = read("release/marina-smart-current-candidate.json")
     for marker in (
         '"product": "MARINA SMART"',
@@ -130,7 +154,7 @@ def main() -> int:
         raise AssertionError("production compose must pass the explicit tenant context flag")
 
     print("MARINA_MULTITENANT_FOUNDATION_PASS")
-    print("BOUNDARY: migration + seed + trusted auth context + candidate truth are prepared; staging deployment remains STOP")
+    print("BOUNDARY: migration + seed + trusted auth context + candidate truth + isolation gate are prepared; staging deployment remains STOP")
     return 0
 
 
