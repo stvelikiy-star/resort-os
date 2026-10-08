@@ -188,6 +188,8 @@ async def verify_account(
 
 async def main() -> int:
     base_url = validate_base_url(required("MARINA_STAGING_BASE_URL"))
+    # Property-pinned runtimes use separate origins; shared-origin gates retain the default.
+    base_url_b = validate_base_url(os.environ.get("MARINA_STAGING_TENANT_B_BASE_URL", "").strip() or base_url)
     if required("MARINA_STAGING_ISOLATION_CONFIRM") != CONFIRMATION:
         raise RuntimeError(
             f"MARINA_STAGING_ISOLATION_CONFIRM must equal {CONFIRMATION}"
@@ -215,7 +217,7 @@ async def main() -> int:
         timeout=15.0,
         follow_redirects=False,
     ) as client_a, httpx.AsyncClient(
-        base_url=base_url,
+        base_url=base_url_b,
         timeout=15.0,
         follow_redirects=False,
     ) as client_b:
