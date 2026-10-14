@@ -141,7 +141,7 @@ async def reception_reservation_detail(
     user: dict[str, Any] = Depends(reception_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop, local_today = await property_context(conn, user["property_code"])
+        prop, local_today = await property_context(conn, user)
         row = await conn.fetchrow(
             '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
