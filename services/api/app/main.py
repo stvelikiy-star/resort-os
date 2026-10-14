@@ -482,7 +482,7 @@ async def pms_grid(
         )
 
     return {
-        "property": PROPERTY_CODE,
+        "property": _user["property_code"],
         "start": start,
         "end": end,
         "rooms": [
