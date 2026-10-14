@@ -36,6 +36,8 @@ def validate_ci_dsn(value: str) -> str:
     if parsed.scheme not in {"postgres", "postgresql"} or parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
         raise RuntimeError("Only local disposable PostgreSQL is accepted")
     name = unquote(parsed.path.lstrip("/"))
+    if parsed.query or parsed.fragment:
+        raise RuntimeError("Disposable database URLs cannot override connection parameters")
     if not name.startswith("marina_isolation_") or not name.replace("_", "").isalnum():
         raise RuntimeError("Disposable database name must start with marina_isolation_")
     return cleaned
@@ -57,8 +59,8 @@ def runtime_env(dsn: str, index: int) -> dict[str, str]:
 async def ensure_empty_source(dsn: str) -> None:
     conn = await asyncpg.connect(dsn)
     try:
-        if await conn.fetchval("SELECT count(*) FROM properties"):
-            raise RuntimeError("Source contains properties; refusing to add synthetic fixtures")
+        if await conn.fetchval("SELECT count(*) FROM properties") or await conn.fetchval("SELECT count(*) FROM tenants"):
+            raise RuntimeError("Source contains tenants or properties; refusing to add synthetic fixtures")
         migrations = await conn.fetch("SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")
         if {row["migration_name"] for row in migrations} != set(EXPECTED_MIGRATIONS):
             raise RuntimeError("Source migration ledger does not match committed candidate")
