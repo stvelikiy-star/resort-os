@@ -30,10 +30,14 @@ def required(name: str) -> str:
 def validate_base_url(value: str) -> str:
     parsed = urlsplit(value)
     allowed_local = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+    if parsed.scheme not in {"http", "https"}:
+        raise RuntimeError("MARINA_STAGING_BASE_URL must use HTTP or HTTPS")
     if parsed.scheme != "https" and not allowed_local:
         raise RuntimeError("MARINA_STAGING_BASE_URL must use HTTPS outside local CI")
     if not parsed.netloc:
         raise RuntimeError("MARINA_STAGING_BASE_URL must include a host")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+        raise RuntimeError("MARINA_STAGING_BASE_URL must be an origin without credentials, path, query or fragment")
     return value.rstrip("/")
 
 
@@ -60,6 +64,8 @@ async def login(client: httpx.AsyncClient, username: str, password: str) -> dict
     for key in ("tenant_id", "property_id", "property_code"):
         if not body.get(key):
             raise RuntimeError(f"{username} /auth/me has no trusted {key}")
+    for key in ("tenant_id", "property_id"):
+        body[key] = validate_uuid(key, str(body[key]))
     return body
 
 
@@ -84,6 +90,7 @@ async def expect_denied(
     method: str = "GET",
     json_body: dict | None = None,
     label: str,
+    expected_detail: str,
 ) -> None:
     if method == "POST":
         response = await client.post(path, json=json_body or {})
@@ -94,6 +101,15 @@ async def expect_denied(
             f"{label}: cross-tenant request must be denied with 403/404, "
             f"found HTTP {response.status_code}"
         )
+    # A proxy/framework 404 or a validation error is not proof of authorization.
+    try:
+        body = response.json()
+    except ValueError as exc:
+        raise RuntimeError(f"{label}: denial response is not application JSON") from exc
+    detail = body.get("detail") if isinstance(body, dict) else None
+    allowed_details = {expected_detail} if response.status_code == 404 else {"Insufficient permission"}
+    if detail not in allowed_details:
+        raise RuntimeError(f"{label}: denial did not match the application access boundary")
 
 
 async def verify_account(
@@ -167,15 +183,25 @@ async def verify_account(
     if own_detail.get("reservation", {}).get("id") != own_reservation_id:
         raise RuntimeError(f"{expected_property_code} own reservation detail mismatch")
 
+    own_schedule = await get_json(
+        client,
+        f"/api/v1/admin/pms/reservations/{own_reservation_id}/schedule",
+        label=f"{expected_property_code} own reservation schedule",
+    )
+    if own_schedule.get("reservation", {}).get("id") != own_reservation_id:
+        raise RuntimeError(f"{expected_property_code} own reservation schedule mismatch")
+
     await expect_denied(
         client,
         f"/api/v1/admin/reception/reservations/{foreign_reservation_id}",
         label=f"{expected_property_code} foreign reservation detail",
+        expected_detail="Reservation not found",
     )
     await expect_denied(
         client,
         f"/api/v1/admin/pms/reservations/{foreign_reservation_id}/schedule",
         label=f"{expected_property_code} foreign reservation schedule",
+        expected_detail="Reservation not found",
     )
     await expect_denied(
         client,
@@ -183,6 +209,7 @@ async def verify_account(
         method="POST",
         json_body={"room_type_code": "__CROSS_TENANT_ISOLATION_PROBE__"},
         label=f"{expected_property_code} foreign quote probe",
+        expected_detail="Request not found",
     )
 
 
@@ -209,6 +236,8 @@ async def main() -> int:
         "MARINA_STAGING_TENANT_B_REQUEST_ID",
         required("MARINA_STAGING_TENANT_B_REQUEST_ID"),
     )
+    if a_reservation == b_reservation or a_request == b_request:
+        raise RuntimeError("Tenant fixtures must use distinct reservation and request IDs")
 
     async with httpx.AsyncClient(
         base_url=base_url,
@@ -270,16 +299,16 @@ async def main() -> int:
             end,
         )
 
-        spoofed = await client_a.get(
-            "/api/v1/pms/grid",
-            params={"start": start, "end": end},
-            headers={
-                "X-Tenant-Id": b["tenant_id"],
-                "X-Property-Id": b["property_id"],
-            },
-        )
-        if spoofed.status_code != 200 or spoofed.json().get("property") != expected_a:
-            raise RuntimeError("client-supplied tenant/property headers changed trusted context")
+        for client, foreign_user, expected_code in (
+            (client_a, b, expected_a), (client_b, a, expected_b),
+        ):
+            spoofed = await client.get(
+                "/api/v1/pms/grid",
+                params={"start": start, "end": end},
+                headers={"X-Tenant-Id": foreign_user["tenant_id"], "X-Property-Id": foreign_user["property_id"]},
+            )
+            if spoofed.status_code != 200 or spoofed.json().get("property") != expected_code:
+                raise RuntimeError("client-supplied tenant/property headers changed trusted context")
 
     print(
         "MARINA_STAGING_ISOLATION_PASS "
