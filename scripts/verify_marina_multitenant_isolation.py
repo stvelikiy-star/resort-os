@@ -215,6 +215,7 @@ async def verify_account(
 
 async def main() -> int:
     base_url = validate_base_url(required("MARINA_STAGING_BASE_URL"))
+    base_url_b = validate_base_url(os.environ.get("MARINA_STAGING_TENANT_B_BASE_URL", "").strip() or base_url)
     if required("MARINA_STAGING_ISOLATION_CONFIRM") != CONFIRMATION:
         raise RuntimeError(
             f"MARINA_STAGING_ISOLATION_CONFIRM must equal {CONFIRMATION}"
@@ -244,7 +245,7 @@ async def main() -> int:
         timeout=15.0,
         follow_redirects=False,
     ) as client_a, httpx.AsyncClient(
-        base_url=base_url,
+        base_url=base_url_b,
         timeout=15.0,
         follow_redirects=False,
     ) as client_b:
@@ -319,6 +320,8 @@ async def main() -> int:
         "BOUNDARY: authenticated two-tenant read isolation and denied cross-tenant "
         "probes passed; production remains STOP"
     )
+    mode = "PROPERTY_PINNED_RUNTIMES" if base_url_b != base_url else "SHARED_ORIGIN"
+    print(f"DEPLOYMENT_MODE={mode}; single-runtime SaaS readiness is not implied")
     return 0
 
 
