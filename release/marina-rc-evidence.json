@@ -2,7 +2,7 @@
   "schema_version": 2,
   "product": "MARINA SMART",
   "property": "AK BERMET",
-  "release_id": "MARINA_SMART_INTERNAL_RC_2026-10-07",
+  "release_id": "MARINA_SMART_INTERNAL_RC_2026-10-08",
   "status": "INTERNAL_CI_AND_EXTERNAL_STAGING_PARTIAL",
   "source_repository": "stvelikiy-star/resort-os",
   "source_branch": "marina-smart/live-base-20260925",
@@ -22,9 +22,11 @@
     226,
     227,
     228,
-    229
+    229,
+    231,
+    232
   ],
-  "evidence_observed_on": "2026-10-07",
+  "evidence_observed_on": "2026-10-08",
   "production_cutover_authorized": false,
   "legacy_release_manifest": "release/current-rc.json",
   "legacy_manifest_applies_to_marina": false,
@@ -147,6 +149,7 @@
     }
   },
   "remaining_gates": [
+    "Deploy merged public AI privacy/scope fixes to AK BERMET staging and repeat read-only smoke",
     "Verify target database migration ledger and target backup/restore on Railway",
     "Run browser/API acceptance on the target for all staff and guest flows",
     "Verify real iPhone, Android and desktop staff devices",
@@ -169,7 +172,9 @@
     "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, public AI capabilities report configured=true, and telemetry confirms api.openai.com DNS/TLS egress plus public AI chat HTTP 200 at 2026-10-07T14:42:28Z. Response body was not recorded.",
     "Runtime migration boot evidence: API deployment 0982bc40 connected to the target PostgreSQL, found 30 migrations and reported no pending migrations; direct _prisma_migrations ledger query and backup/restore remain unverified.",
     "Read-only deployed-source review on API commit 778d8f2 confirmed public AI uses Core availability only, collects no payment, cannot create confirmed reservations, leaves prepayment to a manager, blocks sensitive-data requests and fails closed on provider errors; staff MARINA AI is read-only, role/property-scoped and fail-closed.",
-    "Railway rollback capability observed on 2026-10-07 for current API 0982bc40, Web 81fe9fa1, Admin 51d68254 and Staff f9572ddf; no rollback was executed."
+    "Railway rollback capability observed on 2026-10-07 for current API 0982bc40, Web 81fe9fa1, Admin 51d68254 and Staff f9572ddf; no rollback was executed.",
+    "PR #231 merged the public AI Responses privacy contract (`store: false`) with full CI success; it is included in the canonical source but is not yet present in the deployed API runtime.",
+    "PR #232 merged the public AI scope-isolation fix removing the legacy Three Crowns facts reference from public context; full CI passed and the runtime remains pinned to 778d8f2 until the explicit staging deploy gate is granted."
   ],
   "external_staging": {
     "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
@@ -425,6 +430,31 @@
           "can_rollback": true
         }
       }
+    },
+    "pending_source_fix": {
+      "service": "api",
+      "current_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "target_commit": "7c35f1f2e7e1dc3b8d637fab0e59c1617270b7c0",
+      "target_pull_requests": [
+        231,
+        232
+      ],
+      "deployment_status": "NOT_DEPLOYED",
+      "owner_gate": "explicit staging deploy confirmation required"
     }
+  },
+  "latest_merged_source_commit": "7c35f1f2e7e1dc3b8d637fab0e59c1617270b7c0",
+  "latest_merged_source_prs": [
+    231,
+    232
+  ],
+  "staging_deploy_pending": {
+    "required": true,
+    "service": "api",
+    "current_deployed_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+    "target_commit": "7c35f1f2e7e1dc3b8d637fab0e59c1617270b7c0",
+    "current_deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
+    "status": "NOT_DEPLOYED",
+    "note": "Merged public AI privacy/scope fixes are prepared in the canonical Marina branch; no Railway deploy was initiated without explicit owner confirmation."
   }
 }
