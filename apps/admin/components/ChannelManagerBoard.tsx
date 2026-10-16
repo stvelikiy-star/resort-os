@@ -84,7 +84,6 @@ export default function ChannelManagerBoard() {
   }
 
   return <section className={styles.shell} data-i18n-skip>
-    <ChannelCsvImport locale={locale} rooms={data?.rooms ?? []} onImported={() => void load()} />
     <header className={styles.header}><div><h1>{t.title}</h1><p>{t.intro}</p></div><button type="button" disabled={busy || loading} onClick={() => { setErrorKey(null); void load(); }}>{t.refresh}</button></header>
     <p className={styles.boundary}>{t.boundary}</p>
     <div className={styles.providers}>{Object.entries(names).map(([code, name]) => <article key={code}><strong>{name}</strong><span>{t.disconnected}</span></article>)}</div>
@@ -106,6 +105,7 @@ export default function ChannelManagerBoard() {
       </fieldset>
       <div className={styles.actions}><button type="submit" disabled={busy || !data}>{busy ? t.loading : t.save}</button>{editing && <button type="button" disabled={busy} onClick={() => { setEditing(false); setForm(initial); }}>{t.reset}</button>}</div>
     </form>
+    <ChannelCsvImport locale={locale} rooms={data?.rooms ?? []} onImported={() => void load()} />
     <h2>{t.history}</h2>
     {loading && <p role="status">{t.loading}</p>}
     {!loading && data?.items.length === 0 && <p>{t.empty}</p>}

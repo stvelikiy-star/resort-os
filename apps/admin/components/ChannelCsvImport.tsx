@@ -22,7 +22,7 @@ export default function ChannelCsvImport({ locale, rooms, onImported }: Props) {
    const response = await fetch("/core/api/v1/admin/channels/reservations/csv", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ csv_text: text, preview }) });
    const result = await response.json();
    if (!response.ok) {
-    setFailed(true); setMessage(`${t[8]}${result.detail?.row ? ` · ${t[9]} ${result.detail.row}` : ""} · ${result.detail?.code || response.status}`); return;
+    setFailed(true); setMessage(`${t[8]}${result.detail?.row ? ` · ${t[9]} ${result.detail.row}` : ""} · ${result.detail?.code || response.status}${result.detail?.message ? ` · ${result.detail.message}` : ""}`); return;
    }
    setMessage(`${preview ? t[6] : t[7]}: ${result.count}`);
    if (preview) setChecked(text); else onImported();
