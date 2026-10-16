@@ -19,6 +19,7 @@ const STORAGE_KEY = "three-crowns-admin-locale";
 
 
 const KZ_EXACT: Record<string, string> = {
+  "Каналы продаж": "Сату арналары",
   "Главная": "Басты бет",
   "Супершахматка": "Супершахматка",
   "CRM / Заявки": "CRM / Өтінімдер",
