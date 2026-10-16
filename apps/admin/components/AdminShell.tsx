@@ -25,6 +25,7 @@ import ServicePointsBoard from "./ServicePointsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 import MarinaAiAssistant from "./MarinaAiAssistant";
+import ChannelManagerBoard from "./ChannelManagerBoard";
 
 type User = {
   id: string;
@@ -34,7 +35,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS" | "CHANNELS";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -269,6 +270,7 @@ export default function AdminShell() {
           {!isAgent && <details className="admin-more-menu">
             <summary>Ещё</summary>
             <div className="admin-more-panel">
+              {isManager && <button className={tab === "CHANNELS" ? "active" : ""} onClick={() => setTab("CHANNELS")}>Каналы продаж</button>}
               {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
               {canUseReception && moduleEnabled("GROUPS") && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
               {isManager && moduleEnabled("AGENTS") && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агенты</button>}
@@ -293,6 +295,7 @@ export default function AdminShell() {
       {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
       {tab === "REQUESTS" && isManager && <RequestsBoard />}
+      {tab === "CHANNELS" && isManager && <ChannelManagerBoard />}
       {tab === "AGENTS" && isManager && moduleEnabled("AGENTS") && <AgentsBoard userRole={user.role} />}
       {tab === "MARKETING" && isManager && moduleEnabled("MARKETING") && <MarketingBoard />}
       {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}

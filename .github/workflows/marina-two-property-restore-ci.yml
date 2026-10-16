@@ -6,6 +6,8 @@ on:
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/marina_two_property_restore_e2e.py'
+      - 'scripts/verify_channel_reservations.py'
+      - 'scripts/test_channel_reservation_contract.py'
       - 'scripts/test_marina_restore_safety.py'
       - 'scripts/test_marina_isolation_gate.py'
       - 'scripts/verify_marina_multitenant_isolation.py'
@@ -44,6 +46,7 @@ jobs:
       DATABASE_URL: postgresql://marina_ci:marina_ci_synthetic_only@127.0.0.1:5432/marina_isolation_source
       RESTORE_DATABASE_URL: postgresql://marina_ci:marina_ci_synthetic_only@127.0.0.1:5432/marina_isolation_restore
       MARINA_CI_ISOLATION_CONFIRM: CREATE_SYNTHETIC_LOCAL_ONLY
+      MARINA_CI_CHANNEL_IMPORT: 'true'
       PGPASSWORD: marina_ci_synthetic_only
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -67,5 +70,6 @@ jobs:
         run: |
           python scripts/test_marina_isolation_gate.py
           python scripts/test_marina_restore_safety.py
+          python scripts/test_channel_reservation_contract.py
       - name: Verify two-property API isolation before and after full restoration
         run: python scripts/marina_two_property_restore_e2e.py

@@ -31,6 +31,7 @@ const primaryTabs = [
 ];
 
 const moreTabs = [
+  "Каналы продаж",
   "Цены / Сезоны",
   "Групповая бронь",
   "Агенты",
@@ -122,6 +123,24 @@ try {
     await button.click();
     await assertHealthy(label);
   }
+
+  for (const item of [
+    { locale: "RU", title: "Каналы продаж", status: "Автосинхронизация не подключена" },
+    { locale: "KG", title: "Сатуу каналдары", status: "Автоматтык синхрондоштуруу туташкан эмес" },
+    { locale: "KZ", title: "Сату арналары", status: "Автоматты синхрондау қосылмаған" },
+    { locale: "EN", title: "Sales channels", status: "Automatic sync not connected" },
+  ]) {
+    await page.getByRole("button", { name: item.locale, exact: true }).click();
+    await more.evaluate((node) => { node.open = true; });
+    await page.getByRole("button", { name: item.title, exact: true }).click();
+    await page.getByRole("heading", { name: item.title, exact: true }).waitFor();
+    assert(await page.getByText(item.status, { exact: true }).count() === 3, "Channel provider status must be honest and localized: " + item.locale);
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  const channelPanel = page.locator("section[data-i18n-skip]");
+  assert(await channelPanel.count() === 1, "Channel panel missing on mobile");
+  const box = await channelPanel.boundingBox();
+  assert(box && box.width <= 390, "Channel panel overflows mobile viewport");
 
   console.log("PASS: MARINA SMART owner navigation + RU/KG/KZ/EN browser acceptance (" + primaryTabs.length + " primary + " + moreTabs.length + " secondary tabs; locale persistence verified; compact Ещё preserved; no React crash; no Core 5xx)");
 } finally {
