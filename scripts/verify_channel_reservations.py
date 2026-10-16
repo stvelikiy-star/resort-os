@@ -1,5 +1,7 @@
 """Exercise real channel imports in the disposable two-property CI runtimes."""
 import asyncio
+import csv
+import io
 from datetime import date, timedelta
 import os
 import uuid
@@ -78,6 +80,38 @@ async def main():
             assert (await send(a, {**updated, "revision": 4}, 409))["detail"]["code"] == "CHANNEL_CANCELLED_REQUIRES_REVIEW"
             await send(a, {**cancellation, "external_id": external + "-tombstone", "revision": 4})
             assert (await send(a, {**payload, "external_id": external + "-tombstone", "revision": 3}, 409))["detail"]["code"] == "CHANNEL_STALE_REVISION"
+            def batch_csv(items):
+                buffer = io.StringIO()
+                keys = sorted(set().union(*(item.keys() for item in items)))
+                writer = csv.DictWriter(buffer, fieldnames=keys)
+                writer.writeheader()
+                writer.writerows(items)
+                return buffer.getvalue()
+            batch_one = {**payload, "external_id": external + "-batch-a", "room_id": rooms_a[4]["id"]}
+            batch_two = {**payload, "external_id": external + "-batch-b", "room_id": rooms_a[5]["id"]}
+            csv_text = batch_csv([batch_one, batch_two])
+            async def csv_send(text, preview=True, expected=200):
+                response = await a.post("/api/v1/admin/channels/reservations/csv", json={"csv_text": text, "preview": preview})
+                assert response.status_code == expected, response.text
+                return response.json()
+            async def counts():
+                return tuple([await conn.fetchval(f'SELECT count(*) FROM {table}') for table in ("reservations", "reservation_requests", "guests", "inventory_blocks", "automation_inbound_events", "audit_logs", "payments")])
+            before = await counts()
+            assert (await csv_send(csv_text))["mode"] == "PREVIEW"
+            assert await counts() == before, "Preview must leave every canonical/identity/audit table unchanged"
+            bad_batch = batch_csv([batch_one, {**batch_two, "room_id": batch_one["room_id"]}])
+            assert (await csv_send(bad_batch, False, 409))["detail"]["row"] == 3
+            assert await counts() == before, "Failed batch must roll back earlier rows"
+            await csv_send(batch_csv([batch_one, {**batch_two, "room_id": rooms_b[0]["id"]}]), False, 404)
+            assert await counts() == before, "Foreign-room rejection must roll back earlier rows"
+            imported = await csv_send(csv_text, False)
+            assert imported["mode"] == "IMPORTED" and imported["count"] == 2
+            assert all(not item["duplicate"] for item in imported["items"])
+            after = await counts()
+            assert after[0] == before[0] + 2 and after[-1] == before[-1]
+            replay = await csv_send(csv_text, False)
+            assert all(item["duplicate"] for item in replay["items"])
+            assert await counts() == after
             me = (await a.get("/api/v1/auth/me")).json()
             for role in ("AGENT", "RECEPTION"):
                 username = "channel-ci-" + uuid.uuid4().hex[:12]
@@ -87,6 +121,7 @@ async def main():
                     login = await limited.post("/api/v1/auth/login", json={"username": username, "password": password})
                     assert login.status_code == 200, login.text
                     assert (await limited.get("/api/v1/admin/channels")).status_code == 403
+                    assert (await limited.post("/api/v1/admin/channels/reservations/csv", json={"csv_text": csv_text})).status_code == 403
                     await send(limited, {**payload, "external_id": external + role}, 403)
         finally:
             await conn.close()

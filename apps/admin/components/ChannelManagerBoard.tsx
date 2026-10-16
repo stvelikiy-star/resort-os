@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import ChannelCsvImport from "./ChannelCsvImport";
 import styles from "./ChannelManagerBoard.module.css";
 
 type Locale = "ru" | "kg" | "kz" | "en";
@@ -104,6 +105,7 @@ export default function ChannelManagerBoard() {
       </fieldset>
       <div className={styles.actions}><button type="submit" disabled={busy || !data}>{busy ? t.loading : t.save}</button>{editing && <button type="button" disabled={busy} onClick={() => { setEditing(false); setForm(initial); }}>{t.reset}</button>}</div>
     </form>
+    <ChannelCsvImport locale={locale} rooms={data?.rooms ?? []} onImported={() => void load()} />
     <h2>{t.history}</h2>
     {loading && <p role="status">{t.loading}</p>}
     {!loading && data?.items.length === 0 && <p>{t.empty}</p>}

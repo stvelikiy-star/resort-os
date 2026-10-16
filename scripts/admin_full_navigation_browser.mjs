@@ -136,6 +136,16 @@ try {
     await page.getByRole("heading", { name: item.title, exact: true }).waitFor();
     assert(await page.getByText(item.status, { exact: true }).count() === 3, "Channel provider status must be honest and localized: " + item.locale);
   }
+  const csvPanel = page.getByRole("region", { name: "Bulk CSV import", exact: true });
+  const csvInput = csvPanel.getByRole("textbox", { name: "CSV content", exact: true });
+  const importButton = csvPanel.getByRole("button", { name: "Import", exact: true });
+  assert(await importButton.isDisabled(), "CSV import requires preview");
+  await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-only,1,CANCELLED");
+  await csvPanel.getByRole("button", { name: "Preview", exact: true }).click();
+  await csvPanel.getByRole("status").filter({ hasText: "Checked: 1" }).waitFor();
+  assert(await importButton.isEnabled(), "Successful CSV preview enables import");
+  await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-edited,1,CANCELLED");
+  assert(await importButton.isDisabled(), "Editing CSV invalidates preview");
   await page.setViewportSize({ width: 390, height: 844 });
   const channelPanel = page.locator("section[data-i18n-skip]");
   assert(await channelPanel.count() === 1, "Channel panel missing on mobile");
