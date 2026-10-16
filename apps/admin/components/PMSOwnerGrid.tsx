@@ -498,7 +498,7 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
                       onClick={(event) => { event.stopPropagation(); openReservation(block); }}
                       title={`${block.channel_source || ""} ${block.reason || ""} · ${agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.type)} · ${block.start} → ${block.end}${financeTitle}`}
                     >
-                      <strong>{["Booking.com", "Airbnb", "Островок"].includes(block.channel_source || "") ? `${block.channel_source} · ` : ""}{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
+                      <strong>{["Booking.com", "Airbnb", "Ostrovok"].includes(block.channel_source || "") ? `${block.channel_source} · ` : ""}{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
                       {!agentMode && financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>}
                     </button>
                   );

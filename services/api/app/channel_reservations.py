@@ -18,7 +18,7 @@ from .guest_identity import resolve_or_create_guest
 
 router = APIRouter(prefix="/api/v1/admin/channels", tags=["channel-reservations"])
 manager_access = require_roles("OWNER", "MANAGER")
-PROVIDERS = {"BOOKING_COM": "Booking.com", "AIRBNB": "Airbnb", "OSTROVOK": "Островок"}
+PROVIDERS = {"BOOKING_COM": "Booking.com", "AIRBNB": "Airbnb", "OSTROVOK": "Ostrovok"}
 EVENT_TYPE = "CHANNEL_RESERVATION"
 
 
