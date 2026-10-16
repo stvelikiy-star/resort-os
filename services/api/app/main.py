@@ -441,10 +441,12 @@ async def pms_grid(
             SELECT ib.id, ib."roomId", ib."blockType", ib."startDate", ib."endDate", ib.reason,
                    res.id AS reservation_id, res."bookingNumber", res.status AS reservation_status,
                    res."agentId" AS reservation_agent_id,
+                   rr.source AS channel_source,
                    g."firstName", g."lastName", g.phone
             FROM inventory_blocks ib
             JOIN rooms r ON r.id = ib."roomId"
             LEFT JOIN reservations res ON res.id = ib."reservationId"
+            LEFT JOIN reservation_requests rr ON rr.id = res."requestId"
             LEFT JOIN guests g ON g.id = res."primaryGuestId"
             WHERE r."propertyId" = $1
               AND ib.active = true
@@ -478,6 +480,7 @@ async def pms_grid(
                 "reservation_status": str(block["reservation_status"]) if block["reservation_status"] else None,
                 "guest_name": guest_name,
                 "guest_phone": block["phone"] if own_agent_booking else None,
+                "channel_source": block["channel_source"] if own_agent_booking else None,
             }
         )
 

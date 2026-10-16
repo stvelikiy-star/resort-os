@@ -17,6 +17,7 @@ type Block = {
   reservation_status: string | null;
   guest_name: string | null;
   guest_phone: string | null;
+  channel_source?: string | null;
 };
 
 type Room = {
@@ -495,9 +496,9 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
                       style={{ gridColumn: `${3 + startIndex} / ${3 + endIndex}`, gridRow: 1 }}
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => { event.stopPropagation(); openReservation(block); }}
-                      title={`${agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.reason || block.type)} · ${block.start} → ${block.end}${financeTitle}`}
+                      title={`${block.channel_source || ""} ${block.reason || ""} · ${agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.type)} · ${block.start} → ${block.end}${financeTitle}`}
                     >
-                      <strong>{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
+                      <strong>{["Booking.com", "Airbnb", "Островок"].includes(block.channel_source || "") ? `${block.channel_source} · ` : ""}{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
                       {!agentMode && financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>}
                     </button>
                   );

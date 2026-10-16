@@ -40,6 +40,7 @@ from .kitchen import admin_router as kitchen_admin_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
 from .kitchen_menu_management import router as kitchen_menu_management_router
 from .main import app
+from .channel_reservations import router as channel_reservations_router
 from .manager_dashboard import router as manager_dashboard_router
 from .marketing import integration_router as marketing_integration_router
 from .marketing import router as marketing_router
@@ -85,6 +86,7 @@ from .telegram_auth import router as telegram_auth_router
 from .telegram_sales import router as telegram_sales_router
 
 install_observability(app)
+app.include_router(channel_reservations_router)
 
 # Payment integrations must stay fail-closed when a deployment omits a flag.
 # The current production profile explicitly sets all three flags to false.

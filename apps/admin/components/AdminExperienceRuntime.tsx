@@ -173,6 +173,7 @@ const exact: Record<string, Phrase> = {
 };
 
 const common: Phrase[] = [
+  { ru: "Каналы продаж", kg: "Сатуу каналдары", kz: "Сату арналары", en: "Sales channels" },
   { ru: "Главная", kg: "Башкы", en: "Home" },
   { ru: "Супершахматка", kg: "Супершахматка", en: "Super Grid" },
   { ru: "CRM / Заявки", kg: "CRM / Өтүнмөлөр", en: "CRM / Requests" },

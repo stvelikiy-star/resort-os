@@ -167,6 +167,8 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                 wrong = httpx.post(f"http://127.0.0.1:{PORTS[foreign]}/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[index]})
                 assert wrong.status_code == 401, "Foreign password authenticated wrong property"
         print("MARINA_CROSS_PROPERTY_SESSION_PASSWORD_PASS")
+        if os.environ.get("MARINA_CI_CHANNEL_IMPORT") == "true":
+            subprocess.run([sys.executable, "scripts/verify_channel_reservations.py"], cwd=ROOT, env=env, check=True)
     except Exception:
         for index, log in enumerate(logs):
             log.flush()
