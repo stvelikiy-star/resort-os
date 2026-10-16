@@ -9,7 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles, router as auth_router
+from .auth import require_roles, router as auth_router, trusted_property_id
 from .db import lifespan
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -410,7 +410,7 @@ async def pms_grid(
 
     linked_agent_id = None
     async with request.app.state.db.acquire() as conn:
-        property_id = await get_property_id(conn)
+        property_id = await trusted_property_id(conn, _user)
         if _user["role"] == "AGENT":
             linked_agent_id = await conn.fetchval(
                 'SELECT "bookingAgentId" FROM staff_users WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
@@ -441,10 +441,12 @@ async def pms_grid(
             SELECT ib.id, ib."roomId", ib."blockType", ib."startDate", ib."endDate", ib.reason,
                    res.id AS reservation_id, res."bookingNumber", res.status AS reservation_status,
                    res."agentId" AS reservation_agent_id,
+                   rr.source AS channel_source,
                    g."firstName", g."lastName", g.phone
             FROM inventory_blocks ib
             JOIN rooms r ON r.id = ib."roomId"
             LEFT JOIN reservations res ON res.id = ib."reservationId"
+            LEFT JOIN reservation_requests rr ON rr.id = res."requestId"
             LEFT JOIN guests g ON g.id = res."primaryGuestId"
             WHERE r."propertyId" = $1
               AND ib.active = true
@@ -478,11 +480,12 @@ async def pms_grid(
                 "reservation_status": str(block["reservation_status"]) if block["reservation_status"] else None,
                 "guest_name": guest_name,
                 "guest_phone": block["phone"] if own_agent_booking else None,
+                "channel_source": block["channel_source"] if own_agent_booking else None,
             }
         )
 
     return {
-        "property": PROPERTY_CODE,
+        "property": _user["property_code"],
         "start": start,
         "end": end,
         "rooms": [

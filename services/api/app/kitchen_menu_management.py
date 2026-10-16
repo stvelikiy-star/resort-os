@@ -8,7 +8,7 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .kitchen import DRAFT_MENU
 
 router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen-menu-management"])
@@ -49,11 +49,8 @@ class MenuPatch(BaseModel):
     sort_order: int | None = Field(default=None, ge=0, le=100_000)
 
 
-async def _property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def _item(row) -> dict[str, Any]:
@@ -97,7 +94,7 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
     created = 0
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await _property_id(conn, user["property_code"])
+            pid = await _property_id(conn, user)
             for code, category, ru, kg, kz, en, price, sort_order in DRAFT_MENU:
                 result = await conn.execute(
                     '''INSERT INTO kitchen_menu_items (
@@ -114,7 +111,7 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
 async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await _property_id(conn, user["property_code"])
+            pid = await _property_id(conn, user)
             item_id = uuid.uuid4()
             try:
                 row = await conn.fetchrow(
@@ -141,7 +138,7 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await _property_id(conn, user["property_code"])
+            pid = await _property_id(conn, user)
             before_row = await conn.fetchrow(
                 '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
                    FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',

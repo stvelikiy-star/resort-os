@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "product": "MARINA SMART",
+  "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
+  "candidate_commit": "52ecdd28bc63c2097eb4011ad2c998703021d38a",
+  "source_branch": "marina-smart/multi-tenant-foundation-20261008",
+  "pull_request": 234,
+  "migration_count": 32,
+  "tenant_model": "Tenant/Property",
+  "tenant_context_enabled": false,
+  "staging_gate": "manual_read_only",
+  "external_staging_verified": false,
+  "cross_tenant_e2e_verified": false,
+  "backup_restore_target_verified": false,
+  "production_cutover_authorized": false,
+  "payment_operations_enabled": false,
+  "nfc_wallet_enabled": false,
+  "notes": [
+    "This is the MARINA SMART candidate boundary, not the active production boundary.",
+    "The existing Three Crowns release/current-rc.json remains unchanged until Marina staging and owner acceptance are complete.",
+    "Tenant context is deliberately fail-closed and remains disabled until property-scoped read/write E2E passes.",
+    "The candidate requires two synthetic tenants, two properties, cross-tenant login/read/write E2E, backup/restore and rollback evidence before production.",
+    "candidate_commit identifies the last integrated baseline, not unmerged working changes. migration_count describes the proposed working ledger, validated separately by release contracts.",
+    "Disposable two-property restore and CSV CI passed at the baseline; target deployment and single-API multi-property login remain unverified.",
+    "zz108 adds disconnected channel category/rate mappings; its CI must pass before integration."
+  ],
+  "ci_baseline_commit": "116c65a7aaf50352dc5baf58e52983847f055390"
+}

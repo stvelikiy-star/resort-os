@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/inbox", tags=["admin-inbox"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -27,11 +27,8 @@ class InternalNoteCreate(BaseModel):
     text: str = Field(min_length=1, max_length=12000)
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
-    if not pid:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return pid
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def conversation_summary(row) -> dict[str, Any]:
@@ -73,7 +70,7 @@ async def list_conversations(
         raise HTTPException(status_code=422, detail="Unknown conversation status")
 
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''
             SELECT c.id,c.status::text AS status,c."contactName",c."contactPhone",c."contactUsername",
@@ -122,7 +119,7 @@ async def get_conversation(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         row = await conn.fetchrow(
             '''
             SELECT c.id,c.status::text AS status,c."contactName",c."contactPhone",c."contactUsername",
@@ -195,7 +192,7 @@ async def set_conversation_status(
         raise HTTPException(status_code=422, detail="Unknown conversation status")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             result = await conn.execute(
                 '''
                 UPDATE conversations SET status=$1::"ConversationStatus",
@@ -223,7 +220,7 @@ async def assign_conversation(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             if payload.assignee_id:
                 valid = await conn.fetchval(
                     '''SELECT id FROM staff_users WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true AND role IN ('OWNER','MANAGER')''',
@@ -247,7 +244,7 @@ async def claim_conversation(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         result = await conn.execute(
             '''UPDATE conversations SET "assignedToId"=$1,"updatedAt"=now()
                WHERE id=$2 AND "propertyId"=$3 AND ("assignedToId" IS NULL OR "assignedToId"=$1)''',
@@ -267,7 +264,7 @@ async def link_reservation_request(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             if payload.reservation_request_id:
                 exists = await conn.fetchval(
                     'SELECT id FROM reservation_requests WHERE id=$1 AND "propertyId"=$2',
@@ -293,7 +290,7 @@ async def create_internal_note(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             exists = await conn.fetchval('SELECT id FROM conversations WHERE id=$1 AND "propertyId"=$2', conversation_id, pid)
             if not exists:
                 raise HTTPException(status_code=404, detail="Conversation not found")

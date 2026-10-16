@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/folio", tags=["guest-folio"])
 access = require_roles("OWNER", "MANAGER", "RECEPTION")
@@ -26,11 +26,8 @@ class ChargeStatusPatch(BaseModel):
     reason: str = Field(min_length=2, max_length=1000)
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, resource_id: str, payload: dict[str, Any]):
@@ -181,7 +178,7 @@ async def reservation_folio(
     user: dict[str, Any] = Depends(access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         return await reservation_folio_snapshot(conn, pid, reservation_id)
 
 
@@ -194,7 +191,7 @@ async def create_manual_charge(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             reservation = await conn.fetchrow(
                 '''SELECT r.id,r."primaryGuestId",s.id AS stay_id FROM reservations r
                    LEFT JOIN stays s ON s."reservationId"=r.id
@@ -228,7 +225,7 @@ async def post_kitchen_order(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             owns = await conn.fetchval('SELECT 1 FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2', order_id, pid)
             if not owns:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
@@ -247,7 +244,7 @@ async def patch_charge(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             row = await conn.fetchrow(
                 '''SELECT id,"reservationId",status,"amountKgs",description FROM guest_folio_charges
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''', charge_id, pid,

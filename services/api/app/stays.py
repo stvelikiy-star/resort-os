@@ -7,7 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .kitchen_arrivals import create_arrival_notification
 
 router = APIRouter(prefix="/api/v1/admin/stays", tags=["stays"])
@@ -46,9 +46,10 @@ def issue_guest_pin() -> tuple[str, str]:
     return pin, stored
 
 
-async def property_context(conn, property_code: str):
+async def property_context(conn, user: dict[str, Any]):
+    property_id = await trusted_property_id(conn, user)
     row = await conn.fetchrow(
-        'SELECT id,timezone FROM properties WHERE code=$1', property_code
+        'SELECT id,timezone FROM properties WHERE id=$1', property_id
     )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -324,7 +325,7 @@ async def check_in(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn, user["property_code"])
+            prop = await property_context(conn, user)
             pid = prop["id"]
             local_today = await conn.fetchval(
                 "SELECT (now() AT TIME ZONE $1)::date", prop["timezone"]
@@ -444,7 +445,7 @@ async def check_out(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn, user["property_code"])
+            prop = await property_context(conn, user)
             pid = prop["id"]
             local_today = await conn.fetchval(
                 "SELECT (now() AT TIME ZONE $1)::date", prop["timezone"]

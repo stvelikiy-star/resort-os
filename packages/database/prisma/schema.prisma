@@ -169,6 +169,7 @@ model Property {
   currency                 String                    @default("KGS")
   beachCommissionBps       Int                       @default(500)
   roomTypes                RoomType[]
+  channelMappings          ChannelMapping[]
   rooms                    Room[]
   ratePlans                RatePlan[]
   productSettings          PropertyProductSettings?
@@ -233,6 +234,9 @@ model RoomType {
 
   @@unique([propertyId, code])
   @@unique([propertyId, name])
+  channelMappings ChannelMapping[]
+
+  @@unique([propertyId, id], map: "room_types_property_id_key")
   @@map("room_types")
 }
 
@@ -274,6 +278,9 @@ model RatePlan {
   updatedAt  DateTime     @updatedAt
 
   @@unique([propertyId, code])
+  channelMappings ChannelMapping[]
+
+  @@unique([propertyId, id], map: "rate_plans_property_id_key")
   @@map("rate_plans")
 }
 
@@ -968,4 +975,25 @@ model GuestEngagement {
   @@index([guestId, createdAt])
   @@index([reservationId])
   @@map("guest_engagements")
+}
+
+model ChannelMapping {
+  id String @id @db.Uuid
+  propertyId String @db.Uuid
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  provider String
+  externalPropertyId String
+  externalRoomTypeId String
+  externalRatePlanId String
+  roomTypeId String @db.Uuid
+  roomType RoomType @relation(fields: [propertyId, roomTypeId], references: [propertyId, id], onDelete: Restrict, map: "channel_mappings_room_type_fkey")
+  ratePlanId String @db.Uuid
+  ratePlan RatePlan @relation(fields: [propertyId, ratePlanId], references: [propertyId, id], onDelete: Restrict, map: "channel_mappings_rate_plan_fkey")
+  currency String
+  active Boolean @default(true)
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([propertyId, provider, externalPropertyId, externalRoomTypeId, externalRatePlanId], map: "channel_mappings_external_key")
+  @@map("channel_mappings")
 }

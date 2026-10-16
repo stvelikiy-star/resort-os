@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .folio import ensure_kitchen_order_charge
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-folio"])
@@ -13,11 +13,8 @@ access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 MANAGEMENT_ROLES = {"OWNER", "MANAGER", "RECEPTION"}
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def item(row: Any) -> dict[str, Any]:
@@ -67,7 +64,7 @@ async def folio_orders(
     user: dict[str, Any] = Depends(access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             ORDER_SELECT
             + ''' WHERE o."propertyId"=$1
@@ -94,7 +91,7 @@ async def post_order_to_folio(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             order = await conn.fetchrow(
                 '''SELECT o.id,o.status,o."waiterId",o."stayId",o."reservationId",o."folioChargeId",
                           s.status::text AS stay_status

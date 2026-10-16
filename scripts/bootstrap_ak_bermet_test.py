@@ -18,6 +18,42 @@ def database_url() -> str:
     return os.environ["DATABASE_URL"].replace("?schema=public", "")
 
 
+async def tenant_schema_available(conn) -> bool:
+    row = await conn.fetchrow(
+        '''
+        SELECT
+            EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'tenants'
+            ) AS has_tenants,
+            EXISTS (
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'properties'
+                  AND column_name = 'tenantId'
+            ) AS has_property_tenant_id
+        '''
+    )
+    return bool(row["has_tenants"] and row["has_property_tenant_id"])
+
+
+async def upsert_tenant(conn, name: str) -> uuid.UUID:
+    return await conn.fetchval(
+        '''
+        INSERT INTO tenants (id, code, name, status, "createdAt", "updatedAt")
+        VALUES ($1, $2, $3, 'ACTIVE', now(), now())
+        ON CONFLICT (code) DO UPDATE SET
+            name = EXCLUDED.name,
+            status = 'ACTIVE',
+            "updatedAt" = now()
+        RETURNING id
+        ''',
+        uuid.uuid4(), f"tenant_{PROPERTY_CODE.lower()}", name,
+    )
+
+
 def room_type_code(room: dict) -> str:
     key = room.get("price_key")
     if key:
@@ -79,16 +115,30 @@ async def main() -> None:
     try:
         async with conn.transaction():
             prop = snapshot["property"]
-            property_id = await conn.fetchval(
-                """
-                INSERT INTO properties (id,code,name,timezone,currency,"createdAt","updatedAt")
-                VALUES ($1,$2,$3,$4,$5,now(),now())
-                ON CONFLICT (code) DO UPDATE SET
-                  name=EXCLUDED.name,timezone=EXCLUDED.timezone,currency=EXCLUDED.currency,"updatedAt"=now()
-                RETURNING id
-                """,
-                uuid.uuid4(), PROPERTY_CODE, prop["name"], prop["timezone"], prop["currency"],
-            )
+            if await tenant_schema_available(conn):
+                tenant_id = await upsert_tenant(conn, prop["name"])
+                property_id = await conn.fetchval(
+                    """
+                    INSERT INTO properties (id,"tenantId",code,name,timezone,currency,"createdAt","updatedAt")
+                    VALUES ($1,$2,$3,$4,$5,$6,now(),now())
+                    ON CONFLICT (code) DO UPDATE SET
+                      "tenantId"=EXCLUDED."tenantId",
+                      name=EXCLUDED.name,timezone=EXCLUDED.timezone,currency=EXCLUDED.currency,"updatedAt"=now()
+                    RETURNING id
+                    """,
+                    uuid.uuid4(), tenant_id, PROPERTY_CODE, prop["name"], prop["timezone"], prop["currency"],
+                )
+            else:
+                property_id = await conn.fetchval(
+                    """
+                    INSERT INTO properties (id,code,name,timezone,currency,"createdAt","updatedAt")
+                    VALUES ($1,$2,$3,$4,$5,now(),now())
+                    ON CONFLICT (code) DO UPDATE SET
+                      name=EXCLUDED.name,timezone=EXCLUDED.timezone,currency=EXCLUDED.currency,"updatedAt"=now()
+                    RETURNING id
+                    """,
+                    uuid.uuid4(), PROPERTY_CODE, prop["name"], prop["timezone"], prop["currency"],
+                )
 
             await conn.execute(
                 """

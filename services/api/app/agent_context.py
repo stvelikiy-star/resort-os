@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 
 router = APIRouter(prefix="/api/v1/admin/agents-context", tags=["agents-context"])
@@ -12,7 +12,7 @@ access = require_roles("OWNER", "MANAGER", "RECEPTION")
 @router.get("/reservations")
 async def reservation_agent_context(request: Request, user: dict[str, Any] = Depends(access)):
     async with request.app.state.db.acquire() as conn:
-        property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', user["property_code"])
+        property_id = await trusted_property_id(conn, user)
         agents = await conn.fetch(
             '''SELECT id,name,status FROM booking_agents WHERE "propertyId"=$1 ORDER BY status,name''',
             property_id,

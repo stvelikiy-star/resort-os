@@ -31,6 +31,7 @@ const primaryTabs = [
 ];
 
 const moreTabs = [
+  "Каналы продаж",
   "Цены / Сезоны",
   "Групповая бронь",
   "Агенты",
@@ -122,6 +123,46 @@ try {
     await button.click();
     await assertHealthy(label);
   }
+
+  for (const item of [
+    { locale: "RU", title: "Каналы продаж", status: "Автосинхронизация не подключена" },
+    { locale: "KG", title: "Сатуу каналдары", status: "Автоматтык синхрондоштуруу туташкан эмес" },
+    { locale: "KZ", title: "Сату арналары", status: "Автоматты синхрондау қосылмаған" },
+    { locale: "EN", title: "Sales channels", status: "Automatic sync not connected" },
+  ]) {
+    await page.getByRole("button", { name: item.locale, exact: true }).click();
+    await more.evaluate((node) => { node.open = true; });
+    await page.getByRole("button", { name: item.title, exact: true }).click();
+    await page.getByRole("heading", { name: item.title, exact: true }).waitFor();
+    assert(await page.getByText(item.status, { exact: true }).count() === 3, "Channel provider status must be honest and localized: " + item.locale);
+  }
+  const mappingPanel = page.getByRole("region", { name: "Room and rate mapping", exact: true });
+  await mappingPanel.getByLabel("External property ID", { exact: true }).fill("browser-synthetic");
+  await mappingPanel.getByLabel("External room type ID", { exact: true }).fill("category-1");
+  await mappingPanel.getByLabel("External rate plan ID", { exact: true }).fill("rate-1");
+  for (const label of ["MARINA room type", "MARINA rate plan (KGS)"]) {
+    const select = mappingPanel.getByLabel(label, { exact: true });
+    await select.locator("option").nth(1).waitFor({ state: "attached" });
+    await select.selectOption({ index: 1 });
+  }
+  await mappingPanel.getByRole("button", { name: "Save mapping", exact: true }).click();
+  await mappingPanel.getByRole("status").filter({ hasText: "Saved. Platform is still disconnected." }).waitFor();
+  assert(await mappingPanel.getByText("browser-synthetic / category-1 / rate-1", { exact: true }).count() === 1, "Mapping saved exactly once");
+  const csvPanel = page.getByRole("region", { name: "Bulk CSV import", exact: true });
+  const csvInput = csvPanel.getByRole("textbox", { name: "CSV content", exact: true });
+  const importButton = csvPanel.getByRole("button", { name: "Import", exact: true });
+  assert(await importButton.isDisabled(), "CSV import requires preview");
+  await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-only,1,CANCELLED");
+  await csvPanel.getByRole("button", { name: "Preview", exact: true }).click();
+  await csvPanel.getByRole("status").filter({ hasText: "Checked: 1" }).waitFor();
+  assert(await importButton.isEnabled(), "Successful CSV preview enables import");
+  await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-edited,1,CANCELLED");
+  assert(await importButton.isDisabled(), "Editing CSV invalidates preview");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const channelPanel = page.locator("section[data-i18n-skip]");
+  assert(await channelPanel.count() === 1, "Channel panel missing on mobile");
+  const box = await channelPanel.boundingBox();
+  assert(box && box.width <= 390, "Channel panel overflows mobile viewport");
 
   console.log("PASS: MARINA SMART owner navigation + RU/KG/KZ/EN browser acceptance (" + primaryTabs.length + " primary + " + moreTabs.length + " secondary tabs; locale persistence verified; compact Ещё preserved; no React crash; no Core 5xx)");
 } finally {

@@ -63,6 +63,20 @@ def create_reservation(client: httpx.Client, start: date, phone: str, email: str
 async def inject_test_facts():
     conn = await asyncpg.connect(DATABASE_URL)
     main_pid = await conn.fetchval("SELECT id FROM properties WHERE code='THREE_CROWNS'")
+    has_tenant_column = await conn.fetchval(
+        '''
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema='public' AND table_name='properties' AND column_name='tenantId'
+        )
+        '''
+    )
+    main_tenant_id = (
+        await conn.fetchval('SELECT "tenantId" FROM properties WHERE id=$1', main_pid)
+        if has_tenant_column
+        else None
+    )
 
     duplicate_phone = "+996700123123"
     duplicate_one, duplicate_two = uuid.uuid4(), uuid.uuid4()
@@ -74,10 +88,16 @@ async def inject_test_facts():
     )
 
     other_pid, other_guest = uuid.uuid4(), uuid.uuid4()
-    await conn.execute(
-        'INSERT INTO properties(id,code,name,"createdAt","updatedAt") VALUES($1,$2,$3,now(),now())',
-        other_pid, "OWNER_INTELLIGENCE_OTHER", "Other Property",
-    )
+    if has_tenant_column:
+        await conn.execute(
+            'INSERT INTO properties(id,code,name,"tenantId","createdAt","updatedAt") VALUES($1,$2,$3,$4,now(),now())',
+            other_pid, "OWNER_INTELLIGENCE_OTHER", "Other Property", main_tenant_id,
+        )
+    else:
+        await conn.execute(
+            'INSERT INTO properties(id,code,name,"createdAt","updatedAt") VALUES($1,$2,$3,now(),now())',
+            other_pid, "OWNER_INTELLIGENCE_OTHER", "Other Property",
+        )
     await conn.execute(
         'INSERT INTO guests(id,"propertyId","firstName",phone,"createdAt","updatedAt") VALUES($1,$2,$3,$4,now(),now())',
         other_guest, other_pid, "Other Guest", "+996700999999",

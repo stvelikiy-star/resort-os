@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .dining_coordination import (
     active_session_for_table,
     live_table_status,
@@ -70,11 +70,8 @@ class WaiterAssignmentPatch(BaseModel):
     waiter_id: uuid.UUID | None = None
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def property_timezone(conn, pid: uuid.UUID) -> ZoneInfo:
@@ -136,7 +133,7 @@ async def get_menu_day(
     if meal_type is not None and meal_type not in MEAL_TYPES:
         raise HTTPException(status_code=422, detail="Unknown meal type")
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         day = service_date or await hotel_local_date(conn, pid)
         rows = await conn.fetch(
             '''
@@ -185,7 +182,7 @@ async def publish_menu_day(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             if payload.menu_item_ids:
                 rows = await conn.fetch(
                     '''SELECT id FROM kitchen_menu_items
@@ -251,7 +248,7 @@ async def patch_menu_availability(
         raise HTTPException(status_code=422, detail="No change supplied")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             row = await conn.fetchrow(
                 '''UPDATE kitchen_menu_availability SET
                      "isAvailable"=COALESCE($3,"isAvailable"),
@@ -282,7 +279,7 @@ async def list_table_reservations(
     user: dict[str, Any] = Depends(dining_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         tz = await property_timezone(conn, pid)
         day = service_date or datetime.now(tz).date()
         start = datetime.combine(day, time.min, tzinfo=tz)
@@ -320,7 +317,7 @@ async def create_table_reservation(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             await lock_dining_tables(conn, payload.table_id)
             table_row = await conn.fetchrow(
                 '''SELECT id,code,name,seats,status,"isActive" FROM kitchen_tables
@@ -400,7 +397,7 @@ async def patch_table_reservation(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             preliminary = await conn.fetchrow(
                 '''SELECT id,"tableId" FROM kitchen_table_reservations
                    WHERE id=$1 AND "propertyId"=$2''', reservation_id, pid,
@@ -510,7 +507,7 @@ async def assign_waiter(
         raise HTTPException(status_code=403, detail="Dining staff may assign only themselves")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             order = await conn.fetchrow(
                 '''SELECT id,status,"waiterId" FROM kitchen_orders
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -546,7 +543,7 @@ async def dining_floor(
     user: dict[str, Any] = Depends(dining_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         tz = await property_timezone(conn, pid)
         day = service_date or datetime.now(tz).date()
         start = datetime.combine(day, time.min, tzinfo=tz)

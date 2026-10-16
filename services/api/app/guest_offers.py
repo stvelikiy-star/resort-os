@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .guest_os import GUEST_COOKIE
 from .guest_requests import REQUEST_LABELS, authorized_context
 
@@ -84,11 +84,8 @@ class GuestOfferEvent(BaseModel):
     event_type: Literal["CLICK", "REQUEST", "EXTERNAL_OPEN", "AI_PROMPT"]
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def serialize_campaign(row, *, include_analytics: bool = False) -> dict[str, Any]:
@@ -147,7 +144,7 @@ async def audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, campaig
 @admin_router.get("")
 async def list_campaigns(request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT c.*,
                  count(e.id) FILTER (WHERE e."eventType"='CLICK')::int AS clicks,
@@ -168,7 +165,7 @@ async def list_campaigns(request: Request, user: dict[str, Any] = Depends(manage
 async def create_campaign(payload: CampaignWrite, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             campaign_id = uuid.uuid4()
             try:
                 await conn.execute(
@@ -198,7 +195,7 @@ async def create_campaign(payload: CampaignWrite, request: Request, user: dict[s
 async def replace_campaign(campaign_id: uuid.UUID, payload: CampaignWrite, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             try:
                 row = await conn.fetchrow(
                     '''UPDATE guest_offer_campaigns SET
@@ -228,7 +225,7 @@ async def replace_campaign(campaign_id: uuid.UUID, payload: CampaignWrite, reque
 async def toggle_campaign(campaign_id: uuid.UUID, payload: CampaignToggle, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             if payload.is_active:
                 current = await conn.fetchrow(
                     '''SELECT "titleRu","titleKg","titleKz","titleEn","hookRu","hookKg","hookKz","hookEn",

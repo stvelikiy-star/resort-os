@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .auth import current_user, require_roles
+from .auth import current_user, require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/ops", tags=["operations"])
 
@@ -56,11 +56,8 @@ class RoomStatePatch(BaseModel):
     state: str
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def allowed_types_for_role(role: str) -> set[str]:
@@ -180,7 +177,7 @@ async def list_tasks(
         raise HTTPException(status_code=422, detail="Unknown task status")
     line_staff_id = uuid.UUID(user["id"]) if user["role"] in {"MAID", "TECHNICIAN"} else None
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''
             SELECT t.id, t.type::text AS type, t.status::text AS status, t.priority::text AS priority,
@@ -218,7 +215,7 @@ async def create_task(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             if payload.room_id:
                 room = await conn.fetchrow(
                     '''SELECT id, code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -269,7 +266,7 @@ async def claim_task(
         raise HTTPException(status_code=403, detail="Only line staff claims tasks through this endpoint")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             task = await conn.fetchrow(
                 '''SELECT id,type::text AS type,status::text AS status,"assignedToId" FROM operational_tasks
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -309,7 +306,7 @@ async def change_task_status(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             task = await conn.fetchrow(
                 '''SELECT id,type::text AS type,status::text AS status,"roomId","assignedToId" FROM operational_tasks
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -399,7 +396,7 @@ async def change_room_state(
     if payload.state not in ROOM_STATES:
         raise HTTPException(status_code=422, detail="Unknown room state")
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         result = await conn.execute(
             '''UPDATE rooms SET "operationalState"=$1::"RoomOperationalState", "updatedAt"=now()
                WHERE id=$2 AND "propertyId"=$3''',

@@ -4,17 +4,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-stays"])
 access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 @router.get("/stays")
@@ -25,7 +22,7 @@ async def list_dining_stays(
     user: dict[str, Any] = Depends(access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         local_today: date = await conn.fetchval(
             '''SELECT (now() AT TIME ZONE COALESCE(timezone,'Asia/Bishkek'))::date FROM properties WHERE id=$1''', pid,
         )

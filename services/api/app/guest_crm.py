@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/guest-crm", tags=["guest-crm"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -33,11 +33,8 @@ class PreferenceUpsert(BaseModel):
     value: str = Field(min_length=1, max_length=240)
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def require_guest(conn, property_id_value: uuid.UUID, guest_id: uuid.UUID):
@@ -70,7 +67,7 @@ async def guest_crm_detail(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         guest = await require_guest(conn, pid, guest_id)
         stays = await conn.fetch(
             '''
@@ -237,7 +234,7 @@ async def upsert_guest_preference(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             await require_guest(conn, pid, guest_id)
             before = await conn.fetchrow(
                 '''SELECT id,"valueText","isActive" FROM guest_preferences WHERE "guestId"=$1 AND key=$2 FOR UPDATE''',
@@ -289,7 +286,7 @@ async def deactivate_guest_preference(
         raise HTTPException(status_code=404, detail="Preference not found")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             await require_guest(conn, pid, guest_id)
             row = await conn.fetchrow(
                 '''SELECT id,"valueText","isActive" FROM guest_preferences WHERE "propertyId"=$1 AND "guestId"=$2 AND key=$3 FOR UPDATE''',
