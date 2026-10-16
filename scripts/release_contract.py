@@ -41,6 +41,7 @@ EXPECTED_MIGRATIONS = (
     "zz105_guest_dynamic_kz_20260929",
     "zz106_marina_split_cook_waiter_20261007",
     "zz107_marina_tenants_20261008",
+    "zz108_marina_channel_mappings_20261016",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -49,6 +50,12 @@ EXPECTED_MIGRATIONS = (
 # focuses on fail-closed domain constraints that protect Resort Core behaviour.
 CRITICAL_CONSTRAINTS = frozenset(
     {
+        "channel_mapping_provider_check",
+        "channel_mapping_property_id_check",
+        "channel_mapping_room_id_check",
+        "channel_mapping_rate_id_check",
+        "channel_mapping_currency_check",
+        "channel_mapping_revision_check",
         "rate_period_valid_dates",
         "rate_period_nonnegative_price",
         "reservation_request_valid_dates",

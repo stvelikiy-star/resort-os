@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "release" / "marina-smart-current-candidate.json"
 STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
 
-EXPECTED_HEAD = "e6843b64b11a4c0a134e390d7b83e5a74389d077"
+EXPECTED_HEAD = "52ecdd28bc63c2097eb4011ad2c998703021d38a"
 EXPECTED_BRANCH = "marina-smart/multi-tenant-foundation-20261008"
 EXPECTED_PR = 234
 
@@ -34,7 +34,7 @@ def main() -> int:
         "candidate_commit": EXPECTED_HEAD,
         "source_branch": EXPECTED_BRANCH,
         "pull_request": EXPECTED_PR,
-        "migration_count": 31,
+        "migration_count": 32,
         "tenant_model": "Tenant/Property",
         "tenant_context_enabled": False,
         "staging_gate": "manual_read_only",
@@ -60,7 +60,7 @@ def main() -> int:
         state = STATE_PATH.read_text(encoding="utf-8")
         for marker in (
             "PR: #234",
-            "CI: 41/41 SUCCESS",
+            "CI: 29/29 SUCCESS",
             "Tenant/Property",
             "tenant_id",
             "property_id",
@@ -79,7 +79,7 @@ def main() -> int:
 
     print("FACT: product=MARINA SMART")
     print(f"FACT: candidate_commit={EXPECTED_HEAD}")
-    print("FACT: candidate_migrations=31")
+    print("FACT: candidate_migrations=32")
     print("FACT: tenant_model=Tenant/Property")
     print("FACT: tenant_context_enabled=false")
     print("FACT: external_staging_verified=false")

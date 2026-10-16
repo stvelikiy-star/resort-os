@@ -67,3 +67,25 @@ The screen invalidates its successful preview whenever the CSV text changes.
 
 Disposable two-property CI verifies no-write preview, conflicting/foreign-room
 batch rollback, successful commit, replay, role restrictions and restore coverage.
+
+## Draft category/rate mappings
+
+`GET/PUT /api/v1/admin/channels/mappings` (OWNER/MANAGER) configures the tuple
+(provider, external property ID, external category ID, external rate ID) against
+one local room type and rate plan. IDs are entered explicitly, never guessed.
+Only KGS is supported. Saving, editing or deactivating does not connect a provider,
+send updates, change bookings or assign a physical room.
+
+A dedicated `channel_mappings` table has a property-scoped unique identity and
+composite foreign keys preventing foreign-property targets even below HTTP.
+Expected revision 0 creates; updates require the latest revision. Same-key
+writers serialize and stale writes return CHANNEL_MAPPING_STALE. Accepted saves
+record an audit event in the same transaction. Inactive mappings retain identity
+and revision history; no destructive delete endpoint is exposed.
+
+Migration zz108 is additive and preserves existing inventory and bookings. The
+release ledger is explicitly extended to 32 migrations, with six new domain
+checks in the critical-constraint fingerprint. Disposable acceptance covers
+concurrent create, edit/deactivate, stale writes, property/role/currency rejection,
+composite FK enforcement and backup restoration. Browser acceptance saves a
+synthetic mapping and asserts the disconnected status remains explicit.
