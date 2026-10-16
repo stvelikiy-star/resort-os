@@ -3,15 +3,17 @@
 The existing property-scoped inbound ledger holds external identities and their
 latest revision. Reservations and inventory remain in the canonical PMS tables.
 """
+import csv
+import io
 import hashlib
 import json
 import uuid
 from datetime import date
 from typing import Literal
 
-from asyncpg.exceptions import ExclusionViolationError
+from asyncpg.exceptions import ExclusionViolationError, DeadlockDetectedError, LockNotAvailableError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from .auth import require_roles, trusted_property_id
 from .guest_identity import resolve_or_create_guest
@@ -167,3 +169,78 @@ async def import_channel_reservation(payload: ChannelReservationImport, request:
                 return await apply_import(conn, pid, user, payload)
         except ExclusionViolationError as exc:
             raise conflict("CHANNEL_ROOM_CONFLICT") from exc
+
+
+class ChannelCsvImport(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    csv_text: str = Field(min_length=1, max_length=200_000)
+    preview: bool = True
+
+
+def parse_channel_csv(csv_text: str) -> list[ChannelReservationImport]:
+    """Strict normalized CSV, never guess provider-specific export formats."""
+    allowed = set(ChannelReservationImport.model_fields)
+    try:
+        reader = csv.DictReader(io.StringIO(csv_text.lstrip("\ufeff")), strict=True)
+        headers = reader.fieldnames
+        if not headers or len(headers) != len(set(headers)) or not set(headers) <= allowed:
+            raise ValueError("CSV headers must be unique normalized reservation fields")
+        if not {"provider", "external_id", "revision"} <= set(headers):
+            raise ValueError("CSV requires provider, external_id and revision headers")
+        rows = []
+        identities = set()
+        for index, row in enumerate(reader, start=2):
+            if len(rows) >= 100:
+                raise ValueError("CSV accepts at most 100 reservations")
+            if None in row or any(value is None for value in row.values()):
+                raise ValueError(f"CSV row {index} has an incorrect number of columns")
+            try:
+                item = ChannelReservationImport(**{key: value.strip() for key, value in row.items() if value.strip()})
+            except ValidationError as exc:
+                # Do not echo guest names, phone numbers or raw input in errors.
+                fields = sorted({str(error["loc"][0]) if error["loc"] else "reservation" for error in exc.errors()})
+                raise ValueError(f"CSV row {index}: invalid fields: {', '.join(fields)}") from exc
+            identity = (item.provider, item.external_id)
+            if identity in identities:
+                raise ValueError(f"CSV row {index}: duplicate external identity in this batch")
+            identities.add(identity)
+            rows.append(item)
+        if not rows:
+            raise ValueError("CSV contains no reservations")
+        return rows
+    except csv.Error as exc:
+        raise ValueError("Malformed CSV") from exc
+
+
+@router.post("/reservations/csv")
+async def import_channel_csv(payload: ChannelCsvImport, request: Request, user=Depends(manager_access)):
+    try:
+        rows = parse_channel_csv(payload.csv_text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"code": "CHANNEL_CSV_INVALID", "message": str(exc)}) from exc
+    async with request.app.state.db.acquire() as conn:
+        transaction = conn.transaction()
+        await transaction.start()
+        row_number = None
+        try:
+            await conn.execute("SET LOCAL lock_timeout = '5s'")
+            pid = await trusted_property_id(conn, user)
+            results = []
+            # Stable identity ordering reduces contention between overlapping batches.
+            for row_number, item in sorted(enumerate(rows, start=2), key=lambda entry: (entry[1].provider, entry[1].external_id)):
+                result = await apply_import(conn, pid, user, item)
+                results.append({"row": row_number, "provider": item.provider, "external_id": item.external_id, "status": result["status"], "duplicate": result["duplicate"]})
+            if payload.preview:
+                await transaction.rollback()
+            else:
+                await transaction.commit()
+        except Exception as exc:
+            await transaction.rollback()
+            if isinstance(exc, (ExclusionViolationError, DeadlockDetectedError, LockNotAvailableError)):
+                code = "CHANNEL_ROOM_CONFLICT" if isinstance(exc, ExclusionViolationError) else "CHANNEL_BATCH_RETRY"
+                raise HTTPException(status_code=409, detail={"code": code, "row": row_number}) from exc
+            if isinstance(exc, HTTPException):
+                detail = exc.detail if isinstance(exc.detail, dict) else {"code": "CHANNEL_CSV_ROW_REJECTED"}
+                raise HTTPException(status_code=exc.status_code, detail={**detail, "row": row_number}) from exc
+            raise
+    return {"mode": "PREVIEW" if payload.preview else "IMPORTED", "count": len(results), "items": sorted(results, key=lambda result: result["row"]), "automatic_sync": False}

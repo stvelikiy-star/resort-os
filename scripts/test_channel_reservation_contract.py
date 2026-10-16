@@ -6,12 +6,33 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services/api"))
 from pydantic import ValidationError
-from app.channel_reservations import ChannelReservationImport, ledger_key
+from app.channel_reservations import ChannelReservationImport, ledger_key, parse_channel_csv
 
 
 class ChannelContractTests(unittest.TestCase):
     def payload(self):
         return dict(provider="BOOKING_COM", external_id="external-123", revision=1, room_id=str(uuid.uuid4()), guest_name="Test guest", check_in="2027-08-01", check_out="2027-08-03", total_kgs=9000)
+
+    def test_csv_accepts_bom_quoted_guest_and_cancellation(self):
+        text = '\ufeffprovider,external_id,revision,status,room_id,guest_name,check_in,check_out,total_kgs\n'
+        text += f'BOOKING_COM,csv-1,1,CONFIRMED,{uuid.uuid4()},"Guest, Name",2027-08-01,2027-08-03,9000\n'
+        text += 'AIRBNB,csv-2,2,CANCELLED,,,,,\n'
+        rows = parse_channel_csv(text)
+        self.assertEqual(rows[0].guest_name, "Guest, Name")
+        self.assertIsNone(rows[1].room_id)
+
+    def test_csv_rejects_ambiguous_and_oversized_batches(self):
+        for text in (
+            'provider,external_id,revision,property_id\nAIRBNB,x,1,foreign',
+            'provider,external_id,revision,revision\nAIRBNB,x,1,2',
+            'provider,external_id,revision,status\nAIRBNB,x,1,CANCELLED,extra',
+            'provider,external_id,revision,status\nAIRBNB,x,1',
+            'provider,external_id,revision,status\n',
+            'provider,external_id,revision,status\nAIRBNB,x,1,CANCELLED\nAIRBNB,x,2,CANCELLED',
+            'provider,external_id,revision,status\n' + ''.join(f'AIRBNB,{i},1,CANCELLED\n' for i in range(101)),
+        ):
+            with self.subTest(text=text[:80]), self.assertRaises(ValueError):
+                parse_channel_csv(text)
 
     def test_phone_not_fabricated(self):
         result = ChannelReservationImport(**self.payload())
