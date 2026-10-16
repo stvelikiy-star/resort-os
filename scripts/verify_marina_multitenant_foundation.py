@@ -166,7 +166,7 @@ def main() -> int:
     for marker in (
         '"product": "MARINA SMART"',
         '"status": "INTERNAL_CANDIDATE_STAGING_REQUIRED"',
-        '"migration_count": 31',
+        '"migration_count": 32',
         '"tenant_model": "Tenant/Property"',
         '"tenant_context_enabled": false',
         '"external_staging_verified": false',
@@ -179,7 +179,7 @@ def main() -> int:
     current_state = read("knowledge/MARINA_SMART_CURRENT_STATE_20261008.md")
     for marker in (
         "PR: #234",
-        "CI: 41/41 SUCCESS",
+        "CI: 29/29 SUCCESS",
         "Tenant/Property",
         "two-tenant cross-tenant login/read/write E2E",
         "The existing roles, navigation and approved compact chessboard remain unchanged.",

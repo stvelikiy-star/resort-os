@@ -136,6 +136,18 @@ try {
     await page.getByRole("heading", { name: item.title, exact: true }).waitFor();
     assert(await page.getByText(item.status, { exact: true }).count() === 3, "Channel provider status must be honest and localized: " + item.locale);
   }
+  const mappingPanel = page.getByRole("region", { name: "Room and rate mapping", exact: true });
+  await mappingPanel.getByLabel("External property ID", { exact: true }).fill("browser-synthetic");
+  await mappingPanel.getByLabel("External room type ID", { exact: true }).fill("category-1");
+  await mappingPanel.getByLabel("External rate plan ID", { exact: true }).fill("rate-1");
+  for (const label of ["MARINA room type", "MARINA rate plan (KGS)"]) {
+    const select = mappingPanel.getByLabel(label, { exact: true });
+    await select.locator("option").nth(1).waitFor({ state: "attached" });
+    await select.selectOption({ index: 1 });
+  }
+  await mappingPanel.getByRole("button", { name: "Save mapping", exact: true }).click();
+  await mappingPanel.getByRole("status").filter({ hasText: "Saved. Platform is still disconnected." }).waitFor();
+  assert(await mappingPanel.getByText("browser-synthetic / category-1 / rate-1", { exact: true }).count() === 1, "Mapping saved exactly once");
   const csvPanel = page.getByRole("region", { name: "Bulk CSV import", exact: true });
   const csvInput = csvPanel.getByRole("textbox", { name: "CSV content", exact: true });
   const importButton = csvPanel.getByRole("button", { name: "Import", exact: true });

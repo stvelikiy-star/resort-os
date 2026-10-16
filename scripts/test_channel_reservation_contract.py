@@ -6,6 +6,7 @@ import uuid
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services/api"))
 from pydantic import ValidationError
+from app.channel_mappings import ChannelMappingInput
 from app.channel_reservations import ChannelReservationImport, ledger_key, parse_channel_csv
 
 
@@ -33,6 +34,13 @@ class ChannelContractTests(unittest.TestCase):
         ):
             with self.subTest(text=text[:80]), self.assertRaises(ValueError):
                 parse_channel_csv(text)
+
+    def test_mapping_requires_exact_identity_and_supported_currency(self):
+        good = dict(provider="BOOKING_COM", external_property_id="hotel", external_room_type_id="room", external_rate_plan_id="rate", room_type_id=str(uuid.uuid4()), rate_plan_id=str(uuid.uuid4()))
+        self.assertEqual(ChannelMappingInput(**good).expected_revision, 0)
+        for change in ({"currency": "USD"}, {"external_rate_plan_id": " "}, {"expected_revision": -1}, {"property_id": str(uuid.uuid4())}, {"provider": "UNKNOWN"}):
+            with self.subTest(change=change), self.assertRaises(ValidationError):
+                ChannelMappingInput(**{**good, **change})
 
     def test_phone_not_fabricated(self):
         result = ChannelReservationImport(**self.payload())

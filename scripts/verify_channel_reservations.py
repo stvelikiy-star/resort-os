@@ -112,6 +112,34 @@ async def main():
             replay = await csv_send(csv_text, False)
             assert all(item["duplicate"] for item in replay["items"])
             assert await counts() == after
+            ma = (await a.get("/api/v1/admin/channels/mappings")).json()
+            mb = (await b.get("/api/v1/admin/channels/mappings")).json()
+            assert ma["connected"] is False and ma["automatic_sync"] is False
+            mapping = {"provider": "BOOKING_COM", "external_property_id": external, "external_room_type_id": "category", "external_rate_plan_id": "standard", "room_type_id": ma["room_types"][0]["id"], "rate_plan_id": ma["rate_plans"][0]["id"]}
+            async def map_send(client, body, expected=200):
+                result = await client.put("/api/v1/admin/channels/mappings", json=body)
+                assert result.status_code == expected, result.text
+                return result.json()
+            parallel_maps = await asyncio.gather(*[a.put("/api/v1/admin/channels/mappings", json=mapping) for _ in range(2)])
+            assert sorted(result.status_code for result in parallel_maps) == [200, 409]
+            saved_map = next(result.json() for result in parallel_maps if result.status_code == 200)
+            assert saved_map["revision"] == 1 and saved_map["connected"] is False
+            await map_send(a, {**mapping, "external_property_id": external + "-foreign-room", "room_type_id": mb["room_types"][0]["id"]}, 404)
+            await map_send(a, {**mapping, "external_property_id": external + "-foreign-rate", "rate_plan_id": mb["rate_plans"][0]["id"]}, 404)
+            await map_send(a, {**mapping, "property_id": str(uuid.uuid4())}, 422)
+            await map_send(a, {**mapping, "currency": "USD"}, 422)
+            updated_map = await map_send(a, {**mapping, "active": False, "expected_revision": 1})
+            assert updated_map["id"] == saved_map["id"] and updated_map["revision"] == 2 and updated_map["active"] is False
+            assert (await map_send(a, {**mapping, "expected_revision": 1}, 409))["detail"]["code"] == "CHANNEL_MAPPING_STALE"
+            b_map = await map_send(b, {**mapping, "room_type_id": mb["room_types"][0]["id"], "rate_plan_id": mb["rate_plans"][0]["id"]})
+            assert b_map["id"] != saved_map["id"]
+            assert b_map["id"] not in {row["id"] for row in (await a.get("/api/v1/admin/channels/mappings")).json()["items"]}
+            # Composite foreign keys enforce tenant boundaries even below HTTP.
+            try:
+                await conn.execute('UPDATE channel_mappings SET "roomTypeId"=$2 WHERE id=$1', uuid.UUID(saved_map["id"]), uuid.UUID(mb["room_types"][0]["id"]))
+                raise AssertionError("Foreign room type accepted by database")
+            except asyncpg.ForeignKeyViolationError:
+                pass
             me = (await a.get("/api/v1/auth/me")).json()
             for role in ("AGENT", "RECEPTION"):
                 username = "channel-ci-" + uuid.uuid4().hex[:12]
@@ -121,11 +149,13 @@ async def main():
                     login = await limited.post("/api/v1/auth/login", json={"username": username, "password": password})
                     assert login.status_code == 200, login.text
                     assert (await limited.get("/api/v1/admin/channels")).status_code == 403
+                    assert (await limited.get("/api/v1/admin/channels/mappings")).status_code == 403
+                    await map_send(limited, mapping, 403)
                     assert (await limited.post("/api/v1/admin/channels/reservations/csv", json={"csv_text": csv_text})).status_code == 403
                     await send(limited, {**payload, "external_id": external + role}, 403)
         finally:
             await conn.close()
-    print("MARINA_CHANNEL_RESERVATIONS_E2E_PASS: create/replay/update/cancel, concurrency, room conflicts, revision guards, property isolation, RBAC and no fabricated payments")
+    print("MARINA_CHANNEL_RESERVATIONS_E2E_PASS: create/replay/update/cancel, concurrency, room conflicts, revision guards, property isolation, RBAC, CSV rollback/preview, mapping revision/property/FK guards and no fabricated payments")
 
 
 if __name__ == "__main__":
