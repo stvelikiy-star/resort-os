@@ -12,6 +12,7 @@ on:
       - 'scripts/marina_ordinary_booking_e2e.py'
       - 'scripts/marina_grid_browser_smoke.mjs'
       - 'scripts/marina_season_boundary_e2e.py'
+      - 'services/api/app/hotel_rules.py'
   workflow_dispatch:
 
 permissions:
