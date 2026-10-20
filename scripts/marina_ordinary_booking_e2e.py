@@ -18,7 +18,7 @@ async def main():
         end = start + timedelta(days=2)
         avail = await c.get("/api/v1/booking/check-availability", params={"check_in": start.isoformat(), "check_out": end.isoformat(), "adults": 2})
         assert avail.status_code == 200, avail.text
-        choices = avail.json().get("items", avail.json().get("room_types", []))
+        choices = avail.json().get("results", [])
         if not choices:
             # API shape may group under categories; fail closed rather than skip booking.
             raise AssertionError("No room categories returned by public availability")
