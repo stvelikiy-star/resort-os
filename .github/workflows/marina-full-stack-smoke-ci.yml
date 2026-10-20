@@ -9,6 +9,7 @@ on:
       - 'services/api/**'
       - 'packages/database/**'
       - '.github/workflows/marina-full-stack-smoke-ci.yml'
+      - 'scripts/marina_ordinary_booking_e2e.py'
   workflow_dispatch:
 
 permissions:
@@ -143,6 +144,10 @@ jobs:
               assert result.status == 200
           print("PASS: three Next interfaces, MARINA API, synthetic database, owner login and availability")
           PY
+      - name: Verify ordinary owner booking lifecycle and conflict rejection
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_ordinary_booking_e2e.py
       - name: Print diagnostics on failure
         if: failure()
         run: |
