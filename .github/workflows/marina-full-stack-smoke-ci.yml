@@ -11,6 +11,7 @@ on:
       - '.github/workflows/marina-full-stack-smoke-ci.yml'
       - 'scripts/marina_ordinary_booking_e2e.py'
       - 'scripts/marina_grid_browser_smoke.mjs'
+      - 'scripts/marina_season_boundary_e2e.py'
   workflow_dispatch:
 
 permissions:
@@ -149,6 +150,10 @@ jobs:
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
         run: python scripts/marina_ordinary_booking_e2e.py
+      - name: Verify seasonal pricing across date boundaries on disposable DB
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_season_boundary_e2e.py
       - name: Install isolated headless browser dependencies
         run: |
           npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
