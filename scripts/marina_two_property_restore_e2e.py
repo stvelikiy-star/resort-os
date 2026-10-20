@@ -62,8 +62,16 @@ async def ensure_empty_source(dsn: str) -> None:
         if await conn.fetchval("SELECT count(*) FROM properties") or await conn.fetchval("SELECT count(*) FROM tenants"):
             raise RuntimeError("Source contains tenants or properties; refusing to add synthetic fixtures")
         migrations = await conn.fetch("SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")
-        if {row["migration_name"] for row in migrations} != set(EXPECTED_MIGRATIONS):
-            raise RuntimeError("Source migration ledger does not match committed candidate")
+        committed = {
+            path.parent.name
+            for path in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
+        }
+        # Preserve the pinned historical release baseline, while accepting new
+        # reviewable migrations included in this exact checkout.
+        if not set(EXPECTED_MIGRATIONS).issubset(committed):
+            raise RuntimeError("Pinned baseline migrations are missing from repository")
+        if {row["migration_name"] for row in migrations} != committed:
+            raise RuntimeError("Source migration ledger does not match committed checkout")
     finally:
         await conn.close()
 
