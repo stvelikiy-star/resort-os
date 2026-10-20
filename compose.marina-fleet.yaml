@@ -1,0 +1,108 @@
+name: marina-${MARINA_INSTANCE_SLUG:?Hotel slug required}
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MARINA_FLEET_DB:?Database required}
+      POSTGRES_USER: marina
+      POSTGRES_PASSWORD: ${MARINA_FLEET_DB_PASSWORD:?Password required}
+    volumes:
+      - hotel_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marina -d ${MARINA_FLEET_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/marina-demo-migrate.Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://marina:${MARINA_FLEET_DB_PASSWORD}@postgres:5432/${MARINA_FLEET_DB}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+  seed:
+    build:
+      context: .
+      dockerfile: deploy/marina-fleet-api.Dockerfile
+    restart: "no"
+    command: ["python","scripts/marina_fleet_seed.py"]
+    environment: &env
+      DATABASE_URL: postgresql://marina:${MARINA_FLEET_DB_PASSWORD}@postgres:5432/${MARINA_FLEET_DB}?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: ${MARINA_FLEET_PROPERTY_CODE}
+      MARINA_INSTANCE_SLUG: ${MARINA_INSTANCE_SLUG}
+      MARINA_FLEET_CONFIRM: SYNTHETIC_EMPTY_PROPERTY_ONLY
+      MARINA_PROPERTY_NAME: ${MARINA_FLEET_PROPERTY_NAME}
+      RATE_PLAN_CODE: MARINA_DIRECT
+      BOOTSTRAP_OWNER_USERNAME: ${MARINA_FLEET_OWNER_USERNAME}
+      BOOTSTRAP_OWNER_PASSWORD: ${MARINA_FLEET_OWNER_PASSWORD}
+      BOOTSTRAP_OWNER_DISPLAY_NAME: Demo Owner
+      COOKIE_SECURE: "false"
+      AUTH_TRUST_PROXY_HEADERS: "false"
+      MARINA_TENANT_CONTEXT_ENABLED: "false"
+      ENABLE_PAYMENT_OPERATIONS: "false"
+      ENABLE_MKASSA: "false"
+      ENABLE_SERVICE_POINT_QR: "false"
+      OPENAI_API_KEY: ""
+      MARINA_AI_API_KEY: ""
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  api:
+    build:
+      context: .
+      dockerfile: deploy/marina-fleet-api.Dockerfile
+    restart: unless-stopped
+    environment: *env
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD","python","-c","import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MARINA_FLEET_ADMIN_PORT}:3001"
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MARINA_FLEET_WEB_PORT}:3000"
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MARINA_FLEET_STAFF_PORT}:3002"
+
+volumes:
+  hotel_pgdata:
