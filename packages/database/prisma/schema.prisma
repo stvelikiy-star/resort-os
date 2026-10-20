@@ -173,6 +173,8 @@ model Property {
   rooms                    Room[]
   ratePlans                RatePlan[]
   productSettings          PropertyProductSettings?
+  hotelRules               PropertyHotelRules?
+  hotelRulesHistory        PropertyHotelRulesHistory[]
   guests                   Guest[]
   requests                 ReservationRequest[]
   reservations             Reservation[]
@@ -215,6 +217,29 @@ model PropertyProductSettings {
   updatedAt      DateTime @updatedAt
 
   @@map("property_product_settings")
+}
+
+model PropertyHotelRules {
+  propertyId String @id @db.Uuid
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  version Int @default(1)
+  policy Json
+  updatedBy String? @db.Uuid
+  updatedAt DateTime @default(now())
+  @@map("property_hotel_rules")
+}
+
+model PropertyHotelRulesHistory {
+  id String @id @db.Uuid
+  propertyId String @db.Uuid
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  version Int
+  policy Json
+  updatedBy String? @db.Uuid
+  createdAt DateTime @default(now())
+  @@unique([propertyId, version])
+  @@index([propertyId, createdAt(sort: Desc)])
+  @@map("property_hotel_rules_history")
 }
 
 model RoomType {
