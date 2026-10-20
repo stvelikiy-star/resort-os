@@ -30,6 +30,8 @@ jobs:
         run: |
           docker run --rm --network none --entrypoint python marina-api-ci:local -c '
           import importlib
+          import sys
+          sys.path.insert(0, "/app/services/api")
           app = importlib.import_module("app.app_entry")
           paths = {r.path for r in app.app.routes}
           required = {"/health/live", "/health/ready", "/api/v1/admin/channels"}
