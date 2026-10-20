@@ -36,7 +36,7 @@ jobs:
         run: docker compose -f compose.marina-demo.yaml config --quiet
       - name: Build disposable demo services and start database, migrations, seed, API
         run: |
-          docker compose -f compose.marina-demo.yaml up --build -d postgres migrate seed api
+          docker compose -f compose.marina-demo.yaml up --build -d --wait
       - name: Verify synthetic API on compose network
         shell: bash
         run: |
@@ -51,6 +51,25 @@ jobs:
           docker compose -f compose.marina-demo.yaml ps
           docker compose -f compose.marina-demo.yaml logs --tail 60 api seed migrate
           exit 1
+      - name: Verify browser entrypoints and private API proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          for port in 13000 13001 13002; do
+            for i in {1..35}; do
+              if curl -fsS "http://127.0.0.1:$port/" -o /dev/null; then break; fi
+              sleep 2
+            done
+            curl -fsS "http://127.0.0.1:$port/" -o /dev/null
+          done
+          curl -fsS http://127.0.0.1:13001/core/health/live | grep -q 'marina-smart-core'
+          echo "MARINA_ALL_UI_AND_API_PROXY_PASS"
+      - name: Re-run demo without erasing or rotating owner credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f compose.marina-demo.yaml up -d --build --wait
+          docker compose -f compose.marina-demo.yaml exec -T api python -c 'import json, urllib.request; r=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health/ready")); assert r["room_count"]==12'
       - name: Diagnostics on failure
         if: failure()
         run: docker compose -f compose.marina-demo.yaml ps && docker compose -f compose.marina-demo.yaml logs --tail 90 api seed migrate postgres
