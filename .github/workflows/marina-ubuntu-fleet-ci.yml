@@ -1,0 +1,82 @@
+name: MARINA Ubuntu Hotel Fleet CI
+
+on:
+  pull_request:
+    paths:
+      - 'compose.marina-fleet.yaml'
+      - 'deploy/marina-fleet-api.Dockerfile'
+      - 'scripts/marina_fleet.py'
+      - 'scripts/marina_fleet_seed.py'
+      - 'scripts/marina_fleet_backup.py'
+      - 'scripts/marina_ubuntu_preflight.sh'
+      - '.github/workflows/marina-ubuntu-fleet-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-ubuntu-fleet-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-hotel-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate scripts and generate two isolated hotel configurations
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/marina_ubuntu_preflight.sh
+          python3 -m py_compile scripts/marina_fleet.py scripts/marina_fleet_seed.py scripts/marina_fleet_backup.py
+          python3 scripts/marina_fleet.py create hotel01 --port-base 15000
+          python3 scripts/marina_fleet.py create hotel02 --port-base 15010
+          test "$(stat -c %a .marina-fleet/hotel01.env)" = 600
+          test "$(stat -c %a .marina-fleet)" = 700
+          if python3 scripts/marina_fleet.py create hotel03 --port-base 15001; then
+            echo "Overlapping hotel ports accepted!"
+            exit 1
+          fi
+          if python3 scripts/marina_fleet.py create hotel01 --port-base 15100; then
+            echo "Credential overwrite accepted!"
+            exit 1
+          fi
+          docker compose --env-file .marina-fleet/hotel01.env -f compose.marina-fleet.yaml config --quiet
+          docker compose --env-file .marina-fleet/hotel02.env -f compose.marina-fleet.yaml config --quiet
+      - name: Launch first synthetic hotel in real Docker
+        run: python3 scripts/marina_fleet.py start hotel01
+      - name: Verify first hotel's own database, API and UI ports
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose --env-file .marina-fleet/hotel01.env -f compose.marina-fleet.yaml exec -T api python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health/ready")); assert d["property"]=="MARINA_HOTEL01" and d["room_count"]==12'
+          for port in 15000 15001 15002; do
+            curl -fsS "http://127.0.0.1:$port/" -o /dev/null
+          done
+          curl -fsS http://127.0.0.1:15001/core/health/live | grep -q marina-smart-core
+      - name: Start independent second hotel and verify isolation
+        run: |
+          python3 scripts/marina_fleet.py start hotel02
+          docker compose --env-file .marina-fleet/hotel02.env -f compose.marina-fleet.yaml exec -T api python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health/ready")); assert d["property"]=="MARINA_HOTEL02" and d["room_count"]==12'
+          test "$(docker volume ls -q -f name=marina-hotel01_hotel_pgdata | wc -l)" -eq 1
+          test "$(docker volume ls -q -f name=marina-hotel02_hotel_pgdata | wc -l)" -eq 1
+      - name: Backup both isolated hotels
+        run: |
+          python3 scripts/marina_fleet_backup.py hotel01
+          python3 scripts/marina_fleet_backup.py hotel02
+      - name: Dump diagnostics on failure
+        if: failure()
+        run: |
+          docker ps -a --format 'table {{.Names}}\t{{.Status}}' || true
+          docker compose --env-file .marina-fleet/hotel01.env -f compose.marina-fleet.yaml logs --tail 70 || true
+      - name: Remove CI-only instances and volumes
+        if: always()
+        shell: bash
+        run: |
+          for hotel in hotel01 hotel02; do
+            if [ -f ".marina-fleet/${hotel}.env" ]; then
+              docker compose --env-file ".marina-fleet/${hotel}.env" -f compose.marina-fleet.yaml down -v --remove-orphans || true
+            fi
+          done
