@@ -19,7 +19,7 @@ async def main():
     try:
         properties = await conn.fetchval("SELECT count(*) FROM properties")
         tenants = await conn.fetchval("SELECT count(*) FROM tenants")
-        if properties == 1 and tenants == 0:
+        if properties == 1 and tenants == 1:
             row = await conn.fetchrow(
                 'SELECT p.code, (SELECT count(*) FROM rooms r WHERE r."propertyId"=p.id) AS rooms, '
                 '(SELECT count(*) FROM room_types rt WHERE rt."propertyId"=p.id) AS categories FROM properties p'
@@ -29,7 +29,8 @@ async def main():
                 'WHERE p.code=$1 AND su.username=$2 AND su.role=\'OWNER\' AND su."isActive"=true',
                 "MARINA_DEMO", os.environ.get("BOOTSTRAP_OWNER_USERNAME", "demo-owner")
             )
-            if row and row["code"] == "MARINA_DEMO" and row["rooms"] == 12 and row["categories"] == 3 and owner_count == 1:
+            tenant_code = await conn.fetchval('SELECT code FROM tenants LIMIT 1')
+            if row and tenant_code == "tenant_marina_demo" and row["code"] == "MARINA_DEMO" and row["rooms"] == 12 and row["categories"] == 3 and owner_count == 1:
                 print("MARINA_DEMO_ALREADY_READY: preserving demo data and reservations")
                 return
         if properties != 0 or tenants != 0:
