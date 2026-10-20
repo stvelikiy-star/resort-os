@@ -42,6 +42,23 @@ try {
   if (!(await scroll.isVisible())) throw new Error("Calendar scrolling not available on mobile");
   const bounds = await page.locator(".owner-grid-shell").boundingBox();
   if (!bounds || bounds.width > 395) throw new Error("Grid shell overflows 390px viewport");
+  // Verify owner can configure actual per-hotel rules through the existing UI.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator("details.admin-more-menu summary").click();
+  await page.getByRole("button", { name: "Правила отеля", exact: true }).click();
+  await page.getByRole("heading", { name: "Правила отеля", exact: true }).waitFor();
+  await page.getByLabel("Как берём предоплату?").selectOption("FIRST_NIGHT");
+  await page.getByLabel("Бесплатная отмена за сколько дней до заезда?").fill("7");
+  await page.getByLabel("Проживание с животными").fill("По согласованию с владельцем");
+  await page.getByRole("button", { name: "Сохранить правила" }).click();
+  await page.getByText("Сохранено. MARINA AI будет использовать обновлённые правила в следующих ответах.").waitFor();
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("details.admin-more-menu summary").click();
+  await page.getByRole("button", { name: "Правила отеля", exact: true }).click();
+  await page.getByRole("heading", { name: "Правила отеля", exact: true }).waitFor();
+  if (await page.getByLabel("Проживание с животными").inputValue() !== "По согласованию с владельцем") {
+    throw new Error("Saved hotel rules not preserved after browser reload");
+  }
   if (pageErrors.length || serverErrors.length) throw new Error(JSON.stringify({ pageErrors, serverErrors }));
   console.log("MARINA_BROWSER_GRID_PASS: owner auth, compact grid, month/year, 31-day mode, mobile viewport, no runtime 5xx");
 } finally {
