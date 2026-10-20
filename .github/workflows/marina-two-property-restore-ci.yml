@@ -15,6 +15,8 @@ on:
       - 'scripts/bootstrap_marina_test.py'
       - 'scripts/bootstrap_owner.py'
       - '.github/workflows/marina-two-property-restore-ci.yml'
+      - '.github/workflows/marina-full-stack-smoke-ci.yml'
+      - 'scripts/test_marina_grid_property.py'
   workflow_dispatch:
 
 permissions:
@@ -71,5 +73,6 @@ jobs:
           python scripts/test_marina_isolation_gate.py
           python scripts/test_marina_restore_safety.py
           python scripts/test_channel_reservation_contract.py
+          python scripts/test_marina_grid_property.py
       - name: Verify two-property API isolation before and after full restoration
         run: python scripts/marina_two_property_restore_e2e.py
