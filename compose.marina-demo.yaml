@@ -1,0 +1,123 @@
+name: marina-smart-demo
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marina_demo
+      POSTGRES_USER: marina_demo
+      POSTGRES_PASSWORD: ${MARINA_DEMO_DB_PASSWORD:?Run scripts/marina_demo_start.sh first}
+    volumes:
+      - marina_demo_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marina_demo -d marina_demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    networks: [marina_demo_net]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/marina-demo-migrate.Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://marina_demo:${MARINA_DEMO_DB_PASSWORD}@postgres:5432/marina_demo?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [marina_demo_net]
+
+  seed:
+    build:
+      context: .
+      dockerfile: deploy/marina-demo-api.Dockerfile
+    restart: "no"
+    command: ["python", "scripts/marina_demo_seed.py"]
+    environment: &demo_api_env
+      DATABASE_URL: postgresql://marina_demo:${MARINA_DEMO_DB_PASSWORD}@postgres:5432/marina_demo?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_DEMO
+      MARINA_PROPERTY_NAME: MARINA SMART Демо-отель
+      RATE_PLAN_CODE: MARINA_DIRECT
+      MARINA_DEMO_CONFIRM: EMPTY_SYNTHETIC_DB_ONLY
+      BOOTSTRAP_OWNER_USERNAME: ${MARINA_DEMO_OWNER_USERNAME:-demo-owner}
+      BOOTSTRAP_OWNER_PASSWORD: ${MARINA_DEMO_OWNER_PASSWORD:?Run scripts/marina_demo_start.sh first}
+      BOOTSTRAP_OWNER_DISPLAY_NAME: MARINA Демо-собственник
+      COOKIE_SECURE: "false"
+      AUTH_TRUST_PROXY_HEADERS: "false"
+      MARINA_TENANT_CONTEXT_ENABLED: "false"
+      ENABLE_PAYMENT_OPERATIONS: "false"
+      ENABLE_MKASSA: "false"
+      ENABLE_SERVICE_POINT_QR: "false"
+      OPENAI_API_KEY: ""
+      MARINA_AI_API_KEY: ""
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [marina_demo_net]
+
+  api:
+    build:
+      context: .
+      dockerfile: deploy/marina-demo-api.Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *demo_api_env
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [marina_demo_net]
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports: ["127.0.0.1:13001:3001"]
+    networks: [marina_demo_net]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports: ["127.0.0.1:13000:3000"]
+    networks: [marina_demo_net]
+
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports: ["127.0.0.1:13002:3002"]
+    networks: [marina_demo_net]
+
+networks:
+  marina_demo_net:
+    name: marina_demo_net
+
+volumes:
+  marina_demo_db:
+    name: marina_demo_db
