@@ -13,6 +13,7 @@ on:
       - 'scripts/marina_grid_browser_smoke.mjs'
       - 'scripts/marina_season_boundary_e2e.py'
       - 'services/api/app/hotel_rules.py'
+      - 'scripts/marina_hotel_rules_e2e.py'
   workflow_dispatch:
 
 permissions:
@@ -155,6 +156,10 @@ jobs:
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
         run: python scripts/marina_season_boundary_e2e.py
+      - name: Verify per-hotel owner rules CRUD and safety contract
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_hotel_rules_e2e.py
       - name: Install isolated headless browser dependencies
         run: |
           npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
