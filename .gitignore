@@ -11,3 +11,7 @@ coverage/
 .vscode/
 .idea/
 supabase/.temp/
+
+# Per-hotel synthetic credentials and isolated backup exports
+.marina-fleet/
+.marina-backups/
