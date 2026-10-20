@@ -12,6 +12,7 @@ import GuestServicesCenter from "./GuestServicesCenter";
 import GuestServiceSettingsBoard from "./GuestServiceSettingsBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
 import HotelSetupBoard from "./HotelSetupBoard";
+import HotelRulesBoard from "./HotelRulesBoard";
 import InboxBoard from "./InboxBoard";
 import MarketingBoard from "./MarketingBoard";
 import OperationsBoard from "./OperationsBoard";
@@ -35,7 +36,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS" | "CHANNELS";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS" | "HOTEL_RULES" | "CHANNELS";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -270,6 +271,7 @@ export default function AdminShell() {
           {!isAgent && <details className="admin-more-menu">
             <summary>Ещё</summary>
             <div className="admin-more-panel">
+              {isManager && <button className={tab === "HOTEL_RULES" ? "active" : ""} onClick={() => setTab("HOTEL_RULES")}>Правила отеля</button>}
               {isManager && <button className={tab === "CHANNELS" ? "active" : ""} onClick={() => setTab("CHANNELS")}>Каналы продаж</button>}
               {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
               {canUseReception && moduleEnabled("GROUPS") && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
@@ -313,6 +315,7 @@ export default function AdminShell() {
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
       {tab === "INBOX" && isManager && moduleEnabled("INBOX") && <InboxBoard />}
+      {tab === "HOTEL_RULES" && isManager && <HotelRulesBoard />}
       {tab === "SETTINGS" && isManager && <HotelSetupBoard
         onModulesChanged={setEnabledModules}
         onNavigate={(destination) => setTab(destination)}
