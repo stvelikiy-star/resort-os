@@ -2,6 +2,10 @@
 """Synthetic isolated hotel rules API contract, no external AI request or customer data."""
 import asyncio
 import os
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+import asyncpg
 from urllib.parse import urlsplit
 
 import httpx
@@ -41,6 +45,21 @@ async def main():
         assert update.status_code == 200 and update.json()["version"] == 2, update.text
         read = await client.get("/api/v1/admin/hotel-rules")
         assert read.status_code == 200 and read.json()["rules"]["pets_policy"] == changed["pets_policy"]
-        print("MARINA_HOTEL_RULES_E2E_PASS: 401, owner save/read, revision 409, invalid 422, update")
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api"))
+        from app.marina_assistant import _safe_property_rules
+        dsn = os.environ["DATABASE_URL"].replace("?schema=public", "")
+        assert urlsplit(dsn).hostname in {"127.0.0.1", "localhost"}
+        pool = await asyncpg.create_pool(dsn)
+        try:
+            fake_request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=pool)))
+            for role in ("OWNER", "RECEPTION", "MAID"):
+                context = await _safe_property_rules(fake_request, {"property_code": "MARINA_FULL_CI", "role": role})
+                assert context["available"] is True and context["version"] == 2, context
+                assert context["rules"]["pets_policy"] == changed["pets_policy"], context
+            foreign = await _safe_property_rules(fake_request, {"property_code": "FOREIGN_HOTEL", "role": "OWNER"})
+            assert foreign["available"] is False, foreign
+        finally:
+            await pool.close()
+        print("MARINA_HOTEL_RULES_E2E_PASS: 401, owner save/read, 409, 422, and scoped AI context")
 if __name__ == "__main__":
     asyncio.run(main())
