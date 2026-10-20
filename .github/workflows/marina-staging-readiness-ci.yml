@@ -1,0 +1,26 @@
+name: MARINA SMART Staging Readiness Contract CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/marina_staging_readiness.py'
+      - 'scripts/test_marina_staging_readiness.py'
+      - '.github/workflows/marina-staging-readiness-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Syntax check
+        run: python -m py_compile scripts/marina_staging_readiness.py scripts/test_marina_staging_readiness.py
+      - name: Offline behavior tests, no external calls
+        run: python scripts/test_marina_staging_readiness.py -v
