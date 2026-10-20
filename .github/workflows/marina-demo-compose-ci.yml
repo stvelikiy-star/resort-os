@@ -1,0 +1,59 @@
+name: MARINA Local Demo Docker Compose CI
+
+on:
+  pull_request:
+    paths:
+      - 'compose.marina-demo.yaml'
+      - 'deploy/marina-demo-api.Dockerfile'
+      - 'deploy/marina-demo-migrate.Dockerfile'
+      - 'scripts/marina_demo_seed.py'
+      - 'scripts/marina_demo_start.sh'
+      - '.github/workflows/marina-demo-compose-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-demo-compose-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-local-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      MARINA_DEMO_DB_PASSWORD: local_ci_synthetic_password_only
+      MARINA_DEMO_OWNER_USERNAME: demo-owner
+      MARINA_DEMO_OWNER_PASSWORD: Local-CI-Only-Synthetic-Owner-2026!
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell and Python
+        run: |
+          bash -n scripts/marina_demo_start.sh
+          python -m py_compile scripts/marina_demo_seed.py
+      - name: Validate complete Compose deployment graph
+        run: docker compose -f compose.marina-demo.yaml config --quiet
+      - name: Build disposable demo services and start database, migrations, seed, API
+        run: |
+          docker compose -f compose.marina-demo.yaml up --build -d postgres migrate seed api
+      - name: Verify synthetic API on compose network
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in {1..45}; do
+            if docker compose -f compose.marina-demo.yaml exec -T api python -c 'import json,urllib.request; data=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health/ready", timeout=3)); assert data["property"]=="MARINA_DEMO" and data["room_count"]==12 and data["room_type_count"]==3' 2>/dev/null; then
+              echo "MARINA_LOCAL_DEMO_DOCKER_PASS"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f compose.marina-demo.yaml ps
+          docker compose -f compose.marina-demo.yaml logs --tail 60 api seed migrate
+          exit 1
+      - name: Diagnostics on failure
+        if: failure()
+        run: docker compose -f compose.marina-demo.yaml ps && docker compose -f compose.marina-demo.yaml logs --tail 90 api seed migrate postgres
+      - name: Teardown disposable demo
+        if: always()
+        run: docker compose -f compose.marina-demo.yaml down -v --remove-orphans
