@@ -1,0 +1,114 @@
+name: MARINA SMART Isolated PostgreSQL API Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/bootstrap_marina_test.py'
+      - 'scripts/marina_staging_readiness.py'
+      - '.github/workflows/marina-api-postgres-smoke-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-api-postgres-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-api-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_smoke_ci
+          POSTGRES_USER: marina_smoke
+          POSTGRES_PASSWORD: synthetic_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_smoke -d marina_smoke_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_smoke:synthetic_ci_only@127.0.0.1:5432/marina_smoke_ci?schema=public
+      PROPERTY_CODE: MARINA_SMOKE_CI
+      MARINA_PROPERTY_NAME: MARINA Synthetic CI Hotel
+      RATE_PLAN_CODE: MARINA_DIRECT
+      APP_ENV: staging
+      COOKIE_SECURE: 'false'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      MARINA_TENANT_CONTEXT_ENABLED: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      OPENAI_API_KEY: ''
+      MARINA_AI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply committed migrations to disposable PostgreSQL
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+          npx prisma migrate status
+      - name: Install API dependencies
+        run: python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+      - name: Populate synthetic test inventory
+        run: python scripts/bootstrap_marina_test.py
+      - name: Start MARINA API and assert readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 18000 >/tmp/marina-api-smoke.log 2>&1 &
+          echo "$!" >/tmp/marina-api-smoke.pid
+          for attempt in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:18000/health/ready >/tmp/marina-ready.json; then break; fi
+            if ! kill -0 "$(cat /tmp/marina-api-smoke.pid)" 2>/dev/null; then
+              echo 'API process exited'
+              cat /tmp/marina-api-smoke.log
+              exit 1
+            fi
+            sleep 1
+          done
+          python scripts/marina_staging_readiness.py --api http://127.0.0.1:18000
+          python - <<'PY'
+          import json
+          import urllib.request
+          from datetime import date, timedelta
+          base = "http://127.0.0.1:18000"
+          def get(path):
+              with urllib.request.urlopen(base + path, timeout=8) as result:
+                  assert result.status == 200
+                  return json.load(result)
+          status = get("/health/ready")
+          assert status["property"] == "MARINA_SMOKE_CI", status
+          assert status["room_count"] == 12, status
+          assert status["room_type_count"] == 3, status
+          start = date.today() + timedelta(days=2)
+          end = start + timedelta(days=2)
+          q = f"/api/v1/booking/check-availability?check_in={start}&check_out={end}&adults=2&children=0"
+          availability = get(q)
+          assert availability["property"] == "MARINA_SMOKE_CI", availability
+          assert availability["nights"] == 2, availability
+          print("PASS: synthetic DB migrations, property scope, 12 rooms, 3 categories, API readiness and availability")
+          PY
+      - name: Print API diagnostics if failed
+        if: failure()
+        run: tail -100 /tmp/marina-api-smoke.log || true
+      - name: Stop isolated API
+        if: always()
+        run: |
+          if [ -f /tmp/marina-api-smoke.pid ]; then kill "$(cat /tmp/marina-api-smoke.pid)" 2>/dev/null || true; fi
