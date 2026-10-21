@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import RoomWayfindingPanel from "./RoomWayfindingPanel";
 
 type RoomDetail = {
   room: {
@@ -199,6 +200,8 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
             {block.reservation && <p>{block.reservation.guest_name || "Гость"} · {block.reservation.status}</p>}
           </article>)}
         </div>}
+
+        <RoomWayfindingPanel roomId={roomId} />
 
         <p className="room-detail-truth">Карточка показывает только сохранённые данные MARINA SMART. Пустые корпус, этаж, площадь или конфигурация не заполняются предположениями.</p>
       </>}
