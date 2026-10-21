@@ -46,7 +46,7 @@ try {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator("details.admin-more-menu summary").click();
   await page.getByRole("button", { name: "Знания отеля / MARINA AI", exact: true }).click();
-  await page.getByRole("heading", { name: "Знания отеля / MARINA AI", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Правила и знания отеля для MARINA AI", exact: true }).waitFor();
   await page.getByRole("button", { name: /^04 · Оплата, отмена и бронирование/ }).click();
   await page.getByLabel("Как берём предоплату?").selectOption("FIRST_NIGHT");
   await page.getByLabel("Бесплатная отмена за сколько дней до заезда?").fill("7");
@@ -60,7 +60,7 @@ try {
   await page.reload({ waitUntil: "networkidle" });
   await page.locator("details.admin-more-menu summary").click();
   await page.getByRole("button", { name: "Знания отеля / MARINA AI", exact: true }).click();
-  await page.getByRole("heading", { name: "Знания отеля / MARINA AI", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Правила и знания отеля для MARINA AI", exact: true }).waitFor();
   await page.getByRole("button", { name: /^02 · Заезд и правила проживания/ }).click();
   if (await page.getByLabel("Животные").inputValue() !== "По согласованию с владельцем") {
     throw new Error("Saved hotel rules not preserved after browser reload");
