@@ -355,12 +355,13 @@ export default function GrowthControlBoard() {
         <div className="growth-modal-backdrop" role="presentation" onMouseDown={() => setFeedbackTarget(null)}>
           <form className="growth-modal" onSubmit={submitFeedback} onMouseDown={(e) => e.stopPropagation()}>
             <div><p className="eyebrow">ФАКТИЧЕСКИЙ FEEDBACK</p><h2>{feedbackTarget.guest.name}</h2><span>{feedbackTarget.reservation?.booking_number}</span></div>
-            <label><span>Оценка 0–10</span><input type="number" min={0} max={10} value={score} onChange={(e) => setScore(Number(e.target.value))} required /></label>
-            <div className="growth-score-scale">
-              {[0,1,2,3,4,5,6,7,8,9,10].map((value) => <button type="button" key={value} className={score === value ? "active" : ""} onClick={() => setScore(value)}>{value}</button>)}
-            </div>
+            <label><span>Шкала оценки</span><select value={feedbackScale} onChange={(e) => setFeedbackScale(e.target.value as "STARS" | "NPS")}><option value="STARS">Проживание · 1–5★</option><option value="NPS">NPS · 0–10</option></select></label>
+            {feedbackScale === "STARS" ? <div className="growth-score-scale" role="group" aria-label="Оценка проживания">
+              {[1,2,3,4,5].map((value) => <button type="button" key={value} className={stars === value ? "active" : ""} onClick={() => setStars(value)}>{value}★</button>)}
+            </div> : <><label><span>Оценка NPS 0–10</span><input type="number" min={0} max={10} value={score} onChange={(e) => setScore(Number(e.target.value))} required /></label>
+              <div className="growth-score-scale">{[0,1,2,3,4,5,6,7,8,9,10].map((value) => <button type="button" key={value} className={score === value ? "active" : ""} onClick={() => setScore(value)}>{value}</button>)}</div></>}
             <label><span>Комментарий гостя / заметка менеджера</span><textarea rows={5} value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Записываем только фактически полученную обратную связь." /></label>
-            <p className="growth-modal-note">0–6 автоматически оставит задачу в IN_PROGRESS как recovery. 7–10 завершит feedback-задачу. Никаких сообщений гостю из этого окна не отправляется.</p>
+            <p className="growth-modal-note">1–3★ — срочная задача управляющего, 4–5★ — обычный результат. Шкала NPS 0–10 ведётся отдельно. Публичные ссылки доступны всем гостям независимо от оценки. Автоотправка отключена.</p>
             <div className="growth-modal-actions"><button type="button" className="btn" onClick={() => setFeedbackTarget(null)}>Отмена</button><button className="btn primary" disabled={busyId === feedbackTarget.id}>{busyId === feedbackTarget.id ? "Сохраняю…" : "Сохранить feedback"}</button></div>
           </form>
         </div>
