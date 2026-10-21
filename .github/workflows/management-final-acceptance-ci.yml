@@ -40,6 +40,26 @@ jobs:
           set -euo pipefail
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           case "$branch" in
+            fix/marina-staging-*)
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+              web_changed="$(printf '%s\\n' "$changed" | grep '^apps/web/' || true)"
+              for path in $web_changed; do
+                case "$path" in
+                  'apps/web/app/g/[token]/page.tsx'|\
+                  'apps/web/components/GuestConciergeRuntime.tsx'|\
+                  'apps/web/components/GuestRoomDirections.tsx'|\
+                  'apps/web/components/GuestStayReview.tsx')
+                    ;;
+                  *)
+                    echo "BLOCKED: unapproved MARINA public-web change: $path" >&2
+                    exit 1
+                    ;;
+                esac
+              done
+              echo "PASS: MARINA guest-portal scope permits only approved stay review and room-direction files; public marketing pages remain frozen."
+              exit 0
+              ;;
             marina-smart/*|railway/marina-*|fix/marina-smart-*)
               echo "PASS: legacy Three Crowns public-web freeze is not the MARINA SMART AK BERMET acceptance boundary."
               exit 0
