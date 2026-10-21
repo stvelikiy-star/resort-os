@@ -234,7 +234,7 @@ export default function AdminShell() {
           <h1>Вход в управление</h1>
           <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
-          <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></label>
+          <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={4} required /></label>
           {error && <div className="login-error">{error}</div>}
           <button className="btn primary login-button" disabled={submitting}>{submitting ? "Входим…" : "Войти"}</button>
         </form>
