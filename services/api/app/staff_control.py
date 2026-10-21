@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from typing import Any, Literal
 
@@ -33,21 +34,36 @@ MANAGED_ROLES = [
 ]
 
 
+def _check_staff_password(value: str) -> str:
+    is_demo = os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01"
+    min_size = 3 if is_demo else 8
+    if len(value) < min_size or (is_demo and len(value) > 10):
+        raise ValueError("Demo password must be 3-10 characters; live hotel password must be at least 8")
+    return value
+
+
 class StaffCreate(BaseModel):
     username: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
     display_name: str = Field(min_length=2, max_length=160)
-    password: str = Field(min_length=12, max_length=256)
+    password: str = Field(min_length=3, max_length=256)
+    
+    @model_validator(mode="after")
+    def password_policy(self):
+        _check_staff_password(self.password)
+        return self
     role: ManagedRole
 
 
 class StaffPatch(BaseModel):
     display_name: str | None = Field(default=None, min_length=2, max_length=160)
-    password: str | None = Field(default=None, min_length=12, max_length=256)
+    password: str | None = Field(default=None, min_length=3, max_length=256)
     role: ManagedRole | None = None
     active: bool | None = None
 
     @model_validator(mode="after")
     def require_change(self):
+        if self.password is not None:
+            _check_staff_password(self.password)
         if not self.model_fields_set:
             raise ValueError("At least one staff field must be provided")
         return self
