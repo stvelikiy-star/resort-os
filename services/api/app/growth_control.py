@@ -149,6 +149,7 @@ async def list_engagements(
               AND ($3::text IS NULL OR e.status=$3)
               AND ($4::uuid IS NULL OR e."guestId"=$4)
             ORDER BY
+              CASE WHEN e."starRating" BETWEEN 1 AND 3 AND e.status IN ('OPEN','IN_PROGRESS') THEN -1 ELSE 0 END,
               CASE e.status WHEN 'OPEN' THEN 0 WHEN 'IN_PROGRESS' THEN 1 ELSE 2 END,
               e."dueDate" NULLS LAST,e."updatedAt" DESC
             LIMIT $5
