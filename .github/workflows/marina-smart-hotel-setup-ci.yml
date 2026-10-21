@@ -200,7 +200,7 @@ jobs:
           assert "Three Crowns" not in shell
           for label in (
               "Главная",
-              "Супершахматка",
+              "Шахматка",
               "Ресепшен / Брони",
               "CRM / Заявки",
               "Финансы",
