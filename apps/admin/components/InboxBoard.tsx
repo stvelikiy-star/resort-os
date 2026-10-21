@@ -105,7 +105,7 @@ function messageAuthor(message: Message) {
   return "Внутренняя заметка";
 }
 
-export default function InboxBoard({ channelKind }: { channelKind?: "WHATSAPP" }) {
+export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKind?: "WHATSAPP"; role?: string }) {
   const [items, setItems] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState("NEEDS_REPLY");
   const [query, setQuery] = useState("");
@@ -187,13 +187,13 @@ export default function InboxBoard({ channelKind }: { channelKind?: "WHATSAPP" }
     try {
       const [detailResponse, requestResponse] = await Promise.all([
         fetch(`/core/api/v1/admin/inbox/conversations/${id}`, { cache: "no-store" }),
-        fetch("/core/api/v1/admin/booking/requests?limit=200", { cache: "no-store" }),
+        role === "RECEPTION" ? Promise.resolve(null) : fetch("/core/api/v1/admin/booking/requests?limit=200", { cache: "no-store" }),
       ]);
       const body = await detailResponse.json().catch(() => ({}));
       if (!detailResponse.ok) throw new Error(body.detail || "Не удалось открыть диалог");
       setDetail(body as Detail);
       setLinkRequestId(body.conversation.reservation_request_id || "");
-      if (requestResponse.ok) {
+      if (requestResponse?.ok) {
         const requestBody = await requestResponse.json();
         setRequests(requestBody.items || []);
       }
@@ -366,7 +366,7 @@ export default function InboxBoard({ channelKind }: { channelKind?: "WHATSAPP" }
         <div className="inbox-management">
           <div><span className="field-label">Ответственный</span><strong>{detail.conversation.assigned_to_name || "Не назначен"}</strong>{!detail.conversation.assigned_to_id && <button className="btn" onClick={claim} disabled={detailBusy}>Взять диалог</button>}</div>
           <div><span className="field-label">Статус</span><select value={detail.conversation.status} onChange={(e) => changeStatus(e.target.value)} disabled={detailBusy}><option value="OPEN">Открыт</option><option value="WAITING_STAFF">Ждёт сотрудника</option><option value="WAITING_GUEST">Ждём гостя</option><option value="RESOLVED">Решён</option><option value="ARCHIVED">Архив</option></select></div>
-          <div className="inbox-link-request"><span className="field-label">Заявка на бронь</span><div><select value={linkRequestId} onChange={(e) => setLinkRequestId(e.target.value)} disabled={detailBusy}><option value="">Не связана</option>{requests.map((request) => <option key={request.id} value={request.id}>{request.guest_name} · {request.phone} · {request.check_in} → {request.check_out} · {request.status}</option>)}</select><button className="btn" onClick={linkRequest} disabled={detailBusy}>Сохранить</button></div></div>
+          {role !== "RECEPTION" && <div className="inbox-link-request"><span className="field-label">Заявка на бронь</span><div><select value={linkRequestId} onChange={(e) => setLinkRequestId(e.target.value)} disabled={detailBusy}><option value="">Не связана</option>{requests.map((request) => <option key={request.id} value={request.id}>{request.guest_name} · {request.phone} · {request.check_in} → {request.check_out} · {request.status}</option>)}</select><button className="btn" onClick={linkRequest} disabled={detailBusy}>Сохранить</button></div></div>}
         </div>
 
         <div className="message-stream">
