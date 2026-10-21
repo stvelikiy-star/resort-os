@@ -445,6 +445,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
         return;
       }
       setPin(""); await loadContext();
+      window.dispatchEvent(new Event("marina:guest-session-updated"));
     } catch { setPinMessage(copy.error); }
     finally { setChecking(false); }
   }
