@@ -75,7 +75,9 @@ function dateTime(value?: string | null) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-export default function StaffBoard({ userRole }: { userRole: string }) {
+export default function StaffBoard({ userRole, propertyCode }: { userRole: string; propertyCode: string }) {
+  const demo = propertyCode === "MARINA_HOTEL01";
+  const passwordMin = demo ? 3 : 8;
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -229,7 +231,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
       <label><span>Имя сотрудника</span><input required minLength={2} value={createDraft.display_name} onChange={(e) => setCreateDraft({ ...createDraft, display_name: e.target.value })} /></label>
       <label><span>Логин</span><input required minLength={2} pattern="[A-Za-z0-9._-]+" autoComplete="off" value={createDraft.username} onChange={(e) => setCreateDraft({ ...createDraft, username: e.target.value })} /></label>
       <label><span>Роль</span><select value={createDraft.role} onChange={(e) => setCreateDraft({ ...createDraft, role: e.target.value })}>{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
-      <label><span>Временный пароль, минимум 12 символов</span><input required type="password" minLength={12} autoComplete="new-password" value={createDraft.password} onChange={(e) => setCreateDraft({ ...createDraft, password: e.target.value })} /></label>
+      <label><span>Пароль ({demo ? "3–10" : "от 8"} символов)</span><input required type="password" minLength={passwordMin} maxLength={demo ? 10 : 256} autoComplete="new-password" value={createDraft.password} onChange={(e) => setCreateDraft({ ...createDraft, password: e.target.value })} /></label>
       <div className="management-inline-actions"><button className="btn primary" disabled={saving}>{saving ? "Создаю…" : "Создать"}</button></div>
     </form>}
 
@@ -284,7 +286,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
         <div className="management-form-grid">
           <label><span>Имя сотрудника</span><input required minLength={2} value={editDraft.display_name} onChange={(e) => setEditDraft({ ...editDraft, display_name: e.target.value })} /></label>
           <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
-          <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={12} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder="Минимум 12 символов" /></label>
+          <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={passwordMin} maxLength={demo ? 10 : 256} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder={demo ? "От 3 до 10 символов" : "Не менее 8 символов"} /></label>
         </div>
         <div className="management-truth compact">При смене роли или пароля все активные сессии сотрудника будут немедленно отозваны.</div>
         <div className="management-modal-actions"><button type="button" className="btn" onClick={() => setEditing(null)}>Отмена</button><button className="btn primary" disabled={saving}>{saving ? "Сохраняю…" : "Сохранить"}</button></div>
