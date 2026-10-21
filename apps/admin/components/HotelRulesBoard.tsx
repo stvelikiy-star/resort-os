@@ -84,6 +84,19 @@ const topics: Topic[] = [
     { key: "additional_information", label: "Дополнительные сведения", hint: "Подтверждённые факты, не вошедшие в другие поля", rows: 4 },
   ] },
 ];
+const fieldLimits: Partial<Record<keyof Rules, number>> = {
+  late_cancellation_penalty: 400, no_show_policy: 400, children_policy: 600,
+  extra_bed_policy: 600, pets_policy: 600, smoking_policy: 600,
+  early_checkin_policy: 600, late_checkout_policy: 600, included_services: 1000,
+  additional_information: 1600, hotel_short_description: 1200,
+  location_address: 500, location_directions: 1200, official_website: 300,
+  official_contact: 300, reception_hours: 400, checkin_instructions: 1000,
+  checkout_instructions: 1000, meal_policy: 1000, restaurant_info: 900,
+  parking_policy: 700, wifi_info: 500, pool_spa_policy: 900,
+  transfer_transport: 900, nearby_attractions: 1000, accessibility_policy: 800,
+  payment_methods_info: 600, quiet_hours_policy: 500,
+  booking_contact_policy: 800, ai_faq: 3000, ai_escalation_policy: 1000,
+};
 const important: (keyof Rules)[] = ["hotel_short_description", "location_address", "official_contact", "reception_hours", "checkin_instructions", "meal_policy", "included_services", "booking_contact_policy", "ai_faq", "ai_escalation_policy"];
 
 export default function HotelRulesBoard() {
@@ -92,16 +105,24 @@ export default function HotelRulesBoard() {
   const [busy, setBusy] = useState(false);
   const [activeTopic, setActiveTopic] = useState(0);
   const [savedSnapshot, setSavedSnapshot] = useState("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   async function load() {
-    setError("");
-    const response = await fetch("/core/api/v1/admin/hotel-rules", { cache: "no-store" });
-    if (!response.ok) { setError("Не удалось загрузить правила"); return; }
-    const data: State = await response.json();
-    setState(data);
-    setRules(data.rules);
-    setSavedSnapshot(JSON.stringify(data.rules));
+    setError(""); setLoading(true);
+    try {
+      const response = await fetch("/core/api/v1/admin/hotel-rules", { cache: "no-store" });
+      if (!response.ok) throw new Error("Не удалось загрузить правила гостиницы");
+      const data: State = await response.json();
+      setState(data);
+      setRules(data.rules);
+      setSavedSnapshot(JSON.stringify(data.rules));
+      setNotice("");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Ошибка связи с сервером");
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { void load(); }, []);
   function change<K extends keyof Rules>(key: K, value: Rules[K]) {
@@ -118,7 +139,7 @@ export default function HotelRulesBoard() {
         body: JSON.stringify({ expected_version: state.version, rules }),
       });
       if (response.status === 409) {
-        setError("Правила уже изменены в другой вкладке. Обновите страницу и проверьте изменения.");
+        setError("Правила изменены в другой сессии. Ваш текст остаётся на экране, но НЕ сохранён. Скопируйте его перед обновлением.");
         return;
       }
       if (!response.ok) {
@@ -134,7 +155,7 @@ export default function HotelRulesBoard() {
   }
   const filled = rules ? important.filter(key => Boolean(String(rules[key] ?? "").trim())).length : 0;
   const changed = rules ? JSON.stringify(rules) !== savedSnapshot : false;
-  if (!state || !rules) return <main className="work-shell management-shell"><h1>Правила и знания отеля для MARINA AI</h1><p>{error || "Загружаем правила…"}</p><button className="btn" onClick={() => void load()}>Обновить</button></main>;
+  if (!state || !rules) return <main className="work-shell management-shell"><h1>Правила и знания отеля для MARINA AI</h1><p>{error || (loading ? "Загружаем правила…" : "Нет данных")}</p><button className="btn" onClick={() => void load()}>Обновить</button></main>;
   return <main className="work-shell management-shell">
     <div className="work-header"><div><p className="eyebrow">MARINA SMART · Настройки</p><h1>Правила и знания отеля для MARINA AI</h1>
       <p className="subtitle">База знаний гостиницы «{state.property_name}». MARINA AI читает сохранённые проверенные правила именно этого объекта. Оплаты и действующие брони не изменяются.</p></div></div>
@@ -157,10 +178,10 @@ export default function HotelRulesBoard() {
       <h2>Отмена бронирования</h2>
       <label><span>Бесплатная отмена за сколько дней до заезда?</span><input type="number" min="0" max="365" placeholder="Не установлено" value={rules.free_cancellation_days ?? ""} onChange={e => change("free_cancellation_days", e.target.value===""?null:Number(e.target.value))} /></label>
         </div>}
-        {topics[activeTopic].fields.map(item => <label key={item.key} className="management-form-wide"><span>{item.label}</span><textarea maxLength={item.key==="ai_faq"?3000:undefined} rows={item.rows || 2} value={String(rules[item.key] ?? "")} onChange={e => change(item.key, e.target.value)} placeholder={item.hint} /><small>{String(rules[item.key] ?? "").length} символов</small></label>)}
+        {topics[activeTopic].fields.map(item => <label key={item.key} className="management-form-wide"><span>{item.label}</span><textarea maxLength={fieldLimits[item.key]} rows={item.rows || 2} value={String(rules[item.key] ?? "")} onChange={e => change(item.key, e.target.value)} placeholder={item.hint} /><small>{String(rules[item.key] ?? "").length} / {fieldLimits[item.key]} символов</small></label>)}
       </section>
       <p className="subtitle">Важно: эти сведения используются для информирования и ответов MARINA AI. Автоматическое удержание денег, возврат или изменение старых броней здесь не включаются.</p>
-      <div className="management-modal-actions"><button type="button" className="btn" onClick={() => void load()} disabled={busy}>Отменить изменения</button><button className="btn primary" type="submit" disabled={busy || !changed}>{busy ? "Сохраняем…" : "Сохранить знания и правила"}</button></div>
+      <div className="management-modal-actions"><button type="button" className="btn" onClick={() => { if (!changed || window.confirm("Отменить все несохранённые изменения?")) void load(); }} disabled={busy || loading}>Отменить изменения</button><button className="btn primary" type="submit" disabled={busy || !changed}>{busy ? "Сохраняем…" : "Сохранить знания и правила"}</button></div>
     </form>
   </main>;
 }
