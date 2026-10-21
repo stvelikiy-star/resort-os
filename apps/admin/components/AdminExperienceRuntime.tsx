@@ -174,6 +174,26 @@ const exact: Record<string, Phrase> = {
 };
 
 const common: Phrase[] = [
+  // Guest reviews, WhatsApp and staff access — explicit RU/KG/KZ/EN.
+  { ru: "Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.", kg: "Тышкы шлюз кирүү өтүнүчүн өткөргөн жок. Cloudflare Access'ти текшериңиз же жергиликтүү даректи ачыңыз.", kz: "Сыртқы шлюз кіру сұрауын өткізбеді. Cloudflare Access-ті тексеріңіз немесе жергілікті мекенжайды ашыңыз.", en: "The external gateway rejected the sign-in request. Check Cloudflare Access or open the local address." },
+  { ru: "Разделы MARINA SMART", kg: "MARINA SMART бөлүмдөрү", kz: "MARINA SMART бөлімдері", en: "MARINA SMART sections" },
+  { ru: "NPS сохранён. Требуется работа с гостем.", kg: "NPS сакталды. Конок менен иштөө керек.", kz: "NPS сақталды. Қонақпен жұмыс қажет.", en: "NPS saved. Guest follow-up is required." },
+  { ru: "Оценка гостя", kg: "Коноктун баасы", kz: "Қонақ бағасы", en: "Guest rating" },
+  { ru: "Оценка записана. Срочная задача управляющего открыта.", kg: "Баа сакталды. Башкаруучу үчүн шашылыш тапшырма ачылды.", kz: "Баға сақталды. Басқарушыға шұғыл тапсырма ашылды.", en: "Rating saved. An urgent manager task has been opened." },
+  { ru: "Оценка проживания", kg: "Жашоону баалоо", kz: "Тұру бағасы", en: "Stay rating" },
+  { ru: "Оценки из QR-кабинета", kg: "QR-кабинеттен алынган баалар", kz: "QR-кабинеттегі бағалар", en: "Ratings from the QR guest portal" },
+  { ru: "Публичные площадки отзывов", kg: "Ачык пикир аянтчалары", kz: "Ашық пікір алаңдары", en: "Public review platforms" },
+  { ru: "Срочно управляющему", kg: "Башкаруучуга шашылыш", kz: "Басқарушыға шұғыл", en: "Urgent for manager" },
+  { ru: "Срочно: управляющему", kg: "Шашылыш: башкаруучуга", kz: "Шұғыл: басқарушыға", en: "Urgent: manager" },
+  { ru: "Яндекс Карты", kg: "Яндекс Карталар", kz: "Яндекс Карталар", en: "Yandex Maps" },
+  { ru: "Отзыв гостя о проживании", kg: "Коноктун жашоо тууралуу пикири", kz: "Қонақтың тұру туралы пікірі", en: "Guest's stay review" },
+  { ru: "Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет.", kg: "Кирген билдирүүлөр, чыныгы күтүү убактысы, AI долбоорлору жана жеткирүү абалдары. AI билдирүүлөрдү өзү жөнөтпөйт.", kz: "Кіріс хабарламалар, нақты күту уақыты, AI нобайлары және жеткізу күйлері. AI өзі хабар жібермейді.", en: "Incoming messages, actual wait times, AI drafts and delivery statuses. AI does not send messages." },
+  { ru: "Диалоги WhatsApp", kg: "WhatsApp сүйлөшүүлөрү", kz: "WhatsApp диалогтары", en: "WhatsApp conversations" },
+  { ru: "Единый Inbox", kg: "Бирдиктүү билдирүүлөр", kz: "Бірыңғай хабарламалар", en: "Unified Inbox" },
+  { ru: "Здесь появятся обращения номера вашей гостиницы после подтверждённого подключения. Пока отправка WhatsApp отключена.", kg: "Ырасталган туташуудан кийин мейманканаңыздын WhatsApp билдирүүлөрү бул жерде көрүнөт. Азыр жөнөтүү өчүк.", kz: "Расталған қосылымнан кейін қонақүйіңіздің WhatsApp хабарламалары осында көрсетіледі. Әзірге жіберу өшірулі.", en: "After verified connection, messages to your hotel's WhatsApp number will appear here. Sending is currently disabled." },
+  { ru: "Не менее 8 символов", kg: "Кеминде 8 белги", kz: "Кемінде 8 таңба", en: "At least 8 characters" },
+  { ru: "От 3 до 10 символов", kg: "3төн 10го чейин белги", kz: "3-тен 10 таңбаға дейін", en: "From 3 to 10 characters" },
+  { ru: "от 8", kg: "кеминде 8", kz: "кемінде 8", en: "at least 8" },
   { ru: "Каналы продаж", kg: "Сатуу каналдары", kz: "Сату арналары", en: "Sales channels" },
   { ru: "Главная", kg: "Башкы", en: "Home" },
   { ru: "Супершахматка", kg: "Супершахматка", en: "Super Grid" },
@@ -2130,6 +2150,9 @@ for (const [key, phrase] of Object.entries(exact)) {
 
 type DynamicFragment = { ru: string; kg: string; kz: string; en: string };
 const DYNAMIC_FRAGMENTS: DynamicFragment[] = [
+  { ru: "Не удалось войти: ошибка сервера (", kg: "Кирүү ишке ашкан жок: сервер катасы (", kz: "Кіру мүмкін болмады: сервер қатесі (", en: "Could not sign in: server error (" },
+  { ru: "). Попробуйте снова или обратитесь к администратору.", kg: "). Кайра аракет кылыңыз же администраторго кайрылыңыз.", kz: "). Қайталап көріңіз немесе әкімшіге хабарласыңыз.", en: "). Try again or contact the administrator." },
+
   {
     "ru": "Номер ",
     "kg": "Бөлмө ",
