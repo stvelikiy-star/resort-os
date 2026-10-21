@@ -487,6 +487,41 @@ async def reactivation_candidates(
     }
 
 
+@router.get("/guest-stay-reviews")
+async def list_guest_qr_reviews(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=200),
+    user: dict[str, Any] = Depends(manager_access),
+):
+    """Private reviews from live QR/PIN guest cabinet. No automatic guest messaging."""
+    async with request.app.state.db.acquire() as conn:
+        prop = await property_context(conn, user["property_code"])
+        rows = await conn.fetch(
+            """SELECT rev.id,rev.rating,rev.comment,rev."createdAt",
+                      rev."guestId",rev."stayId",
+                      g."firstName",g."lastName",r."bookingNumber"
+               FROM guest_stay_reviews rev
+               JOIN guests g ON g.id=rev."guestId" AND g."propertyId"=rev."propertyId"
+               JOIN stays s ON s.id=rev."stayId" AND s."propertyId"=rev."propertyId"
+               JOIN reservations r ON r.id=s."reservationId" AND r."propertyId"=rev."propertyId"
+               WHERE rev."propertyId"=$1
+               ORDER BY CASE WHEN rev.rating<=3 THEN 0 ELSE 1 END,rev."createdAt" DESC
+               LIMIT $2""",
+            prop["id"], limit,
+        )
+    return {"items": [{
+        "id": str(row["id"]),
+        "guest_id": str(row["guestId"]),
+        "stay_id": str(row["stayId"]),
+        "guest_name": guest_name(row),
+        "booking_number": row["bookingNumber"],
+        "rating": row["rating"],
+        "comment": row["comment"],
+        "created_at": row["createdAt"],
+        "manager_attention_required": row["rating"] <= 3,
+    } for row in rows], "outbound_authority": "NONE_AUTOMATIC"}
+
+
 @router.get("/summary")
 async def growth_summary(
     request: Request,
