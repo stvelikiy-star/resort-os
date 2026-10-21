@@ -9,7 +9,7 @@ echo "=== MARINA SMART | Ubuntu isolated pilot ==="
 if [[ "$(id -u)" == "0" ]]; then
   echo "ERROR: Run as your normal user, not sudo/root." >&2; exit 1
 fi
-for tool in python3 docker df awk ss; do
+for tool in python3 docker df awk ss curl; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "ERROR: Missing required command: $tool" >&2; exit 1
   fi
