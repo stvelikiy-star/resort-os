@@ -30,6 +30,7 @@ from .guest_os import public_router as guest_os_public_router
 from .guest_pin_admin import router as guest_pin_admin_router
 from .guest_requests import router as guest_requests_router
 from .guest_stay_reviews import router as guest_stay_reviews_router
+from .room_wayfinding import router as room_wayfinding_router, guest_router as guest_wayfinding_router
 from .guest_service_settings import router as guest_service_settings_router
 from .guest_services import router as guest_services_router
 from .health import router as health_router
@@ -160,6 +161,8 @@ app.include_router(marina_assistant_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
 app.include_router(guest_stay_reviews_router)
+app.include_router(room_wayfinding_router)
+app.include_router(guest_wayfinding_router)
 # Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
 # on draft/inactive or non-published-for-today menu items.
 app.include_router(guest_marketplace_router)
