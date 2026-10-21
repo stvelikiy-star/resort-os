@@ -2,10 +2,10 @@
   "schema_version": 1,
   "product": "MARINA SMART",
   "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
-  "candidate_commit": "52ecdd28bc63c2097eb4011ad2c998703021d38a",
-  "source_branch": "marina-smart/multi-tenant-foundation-20261008",
-  "pull_request": 234,
-  "migration_count": 32,
+  "candidate_commit": "614ebae0516bc99be02df9306decbc2c4a742715",
+  "source_branch": "fix/marina-staging-preflight-20261020",
+  "pull_request": 244,
+  "migration_count": 36,
   "tenant_model": "Tenant/Property",
   "tenant_context_enabled": false,
   "staging_gate": "manual_read_only",
@@ -16,13 +16,14 @@
   "payment_operations_enabled": false,
   "nfc_wallet_enabled": false,
   "notes": [
-    "This is the MARINA SMART candidate boundary, not the active production boundary.",
-    "The existing Three Crowns release/current-rc.json remains unchanged until Marina staging and owner acceptance are complete.",
-    "Tenant context is deliberately fail-closed and remains disabled until property-scoped read/write E2E passes.",
-    "The candidate requires two synthetic tenants, two properties, cross-tenant login/read/write E2E, backup/restore and rollback evidence before production.",
-    "candidate_commit identifies the last integrated baseline, not unmerged working changes. migration_count describes the proposed working ledger, validated separately by release contracts.",
-    "Disposable two-property restore and CSV CI passed at the baseline; target deployment and single-API multi-property login remain unverified.",
-    "zz108 adds disconnected channel category/rate mappings; its CI must pass before integration."
+    "This is the MARINA SMART internal candidate boundary, not an active production release.",
+    "candidate_commit identifies the application and test-source revision immediately before this manifest alignment; it is not evidence that CI passed.",
+    "The current release contract expects exactly 36 migrations and 105 critical constraints; the required CI must validate this exact candidate.",
+    "Tenant context remains disabled by default. Two-property verification uses explicitly property-pinned API runtimes and does not prove shared-runtime SaaS.",
+    "External staging, cross-tenant end-to-end acceptance, target backup/restore, rollback, and production cutover remain unverified.",
+    "The previous restore gate failed its source-versus-restored snapshot comparison; the current candidate now reports table fingerprints and constraint differences for diagnosis, pending CI.",
+    "Payment operations, acquiring, MKassa, service-point QR and NFC remain disabled.",
+    "Official OTA synchronization and live WhatsApp delivery are not configured; channel mapping and manual/CSV workflows do not claim provider connectivity."
   ],
   "ci_baseline_commit": "116c65a7aaf50352dc5baf58e52983847f055390"
 }
