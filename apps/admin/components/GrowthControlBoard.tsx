@@ -45,6 +45,12 @@ type Engagement = {
   outbound_authority: string;
 };
 
+type GuestQrReview = {
+  id: string; guest_id: string; stay_id: string; guest_name: string;
+  booking_number: string; rating: number; comment: string;
+  created_at: string; manager_attention_required: boolean;
+};
+
 type PostStayCandidate = {
   reservation_id: string;
   booking_number: string;
@@ -82,6 +88,7 @@ const statusLabel: Record<Engagement["status"], string> = {
 };
 
 const npsLabel = { PROMOTER: "Промоутер", PASSIVE: "Нейтральный", DETRACTOR: "Требует recovery" } as const;
+const dateTimeReview = (value: string) => new Intl.DateTimeFormat("ru-RU", {dateStyle:"medium",timeStyle:"short"}).format(new Date(value));
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(Math.round(value || 0))} сом`;
 const fmtDate = (value?: string | null) => value ? new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${value}T12:00:00`)) : "—";
 
@@ -100,6 +107,7 @@ export default function GrowthControlBoard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [postStay, setPostStay] = useState<PostStayCandidate[]>([]);
+  const [qrReviews, setQrReviews] = useState<GuestQrReview[]>([]);
   const [reactivation, setReactivation] = useState<ReactivationCandidate[]>([]);
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
   const [kindFilter, setKindFilter] = useState("ALL");
@@ -123,17 +131,19 @@ export default function GrowthControlBoard() {
       if (kindFilter !== "ALL") engagementQuery.set("kind", kindFilter);
       if (!["ALL", "ACTIVE"].includes(statusFilter)) engagementQuery.set("status", statusFilter);
       engagementQuery.set("limit", "200");
-      const [summaryBody, engagementBody, postBody, reactBody, hotelRulesBody] = await Promise.all([
+      const [summaryBody, engagementBody, postBody, reactBody, hotelRulesBody, qrReviewBody] = await Promise.all([
         api<Summary>(`/core/api/v1/admin/growth/summary?min_days_since_checkout=${reactivationDays}`),
         api<{ items: Engagement[] }>(`/core/api/v1/admin/growth/engagements?${engagementQuery}`),
         api<{ items: PostStayCandidate[] }>("/core/api/v1/admin/growth/candidates/post-stay?lookback_days=14&limit=100"),
         api<{ items: ReactivationCandidate[] }>(`/core/api/v1/admin/growth/candidates/reactivation?min_days_since_checkout=${reactivationDays}&limit=100`),
         api<{ rules: { review_google_url: string; review_2gis_url: string; review_yandex_url: string } }>("/core/api/v1/admin/hotel-rules"),
+        api<{ items: GuestQrReview[] }>("/core/api/v1/admin/growth/guest-stay-reviews?limit=100"),
       ]);
       setSummary(summaryBody);
       setReviewLinks({ review_google_url: hotelRulesBody.rules.review_google_url || "", review_2gis_url: hotelRulesBody.rules.review_2gis_url || "", review_yandex_url: hotelRulesBody.rules.review_yandex_url || "" });
       setEngagements(statusFilter === "ACTIVE" ? engagementBody.items.filter((item) => ["OPEN", "IN_PROGRESS"].includes(item.status)) : engagementBody.items);
       setPostStay(postBody.items);
+      setQrReviews(qrReviewBody.items);
       setReactivation(reactBody.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка Growth Control");
@@ -356,6 +366,18 @@ export default function GrowthControlBoard() {
         <p>{summary.truth.reactivation}</p>
         <p>{summary.truth.outbound}</p>
       </section>}
+
+      <section className="growth-card" aria-label="Оценки из QR-кабинета">
+        <div className="growth-card-head"><div><p className="eyebrow">QR / PIN · РЕАЛЬНЫЕ ГОСТИ</p><h2>Оценки из кабинета гостя</h2></div><strong>{qrReviews.length}</strong></div>
+        <p>Гость оставляет отзыв во время подтверждённого проживания. Он сохраняется в истории гостя. Жалобы 1–3★ показываются первыми; отправки WhatsApp здесь нет.</p>
+        <div className="growth-engagement-list">
+          {qrReviews.map(item => <article key={item.id} className="growth-row">
+            <div><strong>{item.guest_name} · {item.booking_number}</strong><p>{item.comment || "Без комментария"}</p><small>{dateTimeReview(item.created_at)}</small></div>
+            <div className="growth-row-score"><strong>{item.rating}/5★</strong><small>{item.manager_attention_required ? "Срочно: управляющему" : "Оценка гостя"}</small></div>
+          </article>)}
+          {!qrReviews.length && <p>Оценок из QR-кабинета пока нет.</p>}
+        </div>
+      </section>
 
       <section className="growth-policy" aria-label="Публичные площадки отзывов">
         <strong>Отзывы на картах — приглашение всем гостям без отбора по оценке</strong>
