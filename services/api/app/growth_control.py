@@ -310,6 +310,8 @@ async def record_feedback(
                 raise HTTPException(status_code=409, detail={"code": "FEEDBACK_WRONG_ENGAGEMENT_KIND"})
             if row["status"] == "CANCELLED":
                 raise HTTPException(status_code=409, detail={"code": "FEEDBACK_ENGAGEMENT_CANCELLED"})
+            if row["starRating"] is not None and row["starRating"] <= 3:
+                next_status = "IN_PROGRESS"
             await conn.execute(
                 '''
                 UPDATE guest_engagements
@@ -350,6 +352,8 @@ async def record_star_review(
                 raise HTTPException(status_code=409, detail="Only post-stay tasks accept star ratings")
             if row["status"] == "CANCELLED":
                 raise HTTPException(status_code=409, detail="Cancelled feedback task")
+            if row["score"] is not None and row["score"] <= 6:
+                new_status = "IN_PROGRESS"
             # A low score creates urgent manager work without any attempt to
             # discourage the guest from leaving their independent public review.
             await conn.execute(
@@ -373,7 +377,7 @@ async def record_star_review(
             )
             updated = await fetch_engagement(conn, engagement_id, pid)
     return serialize_engagement(updated) | {
-        "manager_attention_required": urgent,
+        "manager_attention_required": new_status == "IN_PROGRESS",
         "public_review_links_available_to_all_guests": True,
         "outbound_authority": "NONE_AUTOMATIC",
     }
