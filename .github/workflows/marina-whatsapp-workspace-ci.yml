@@ -9,6 +9,8 @@ on:
       - 'apps/admin/components/AdminShell.tsx'
       - 'services/api/app/inbox.py'
       - 'scripts/test_marina_whatsapp_reception.py'
+      - 'scripts/test_marina_admin_navigation.py'
+      - 'apps/admin/app/three-crowns-admin.css'
       - '.github/workflows/marina-whatsapp-workspace-ci.yml'
   workflow_dispatch:
 
@@ -30,6 +32,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/test_marina_whatsapp_reception.py -v
+      - run: python scripts/test_marina_admin_navigation.py -v
       - run: python -m py_compile services/api/app/inbox.py
       - run: npm ci --prefix apps/admin
       - run: npm run typecheck --prefix apps/admin
