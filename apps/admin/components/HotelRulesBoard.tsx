@@ -72,7 +72,7 @@ const topics: Topic[] = [
     { key: "pool_spa_policy", label: "Бассейн / SPA / источники", hint: "Режим, условия доступа, ограничения" },
     { key: "transfer_transport", label: "Трансфер / транспорт", hint: "Как заказать и сколько стоит, если подтверждено" },
   ] },
-  { title: "04 · Оплата, отмена и бронирование", explanation: "Настройки предоплаты — выше; здесь дополнительные подтверждённые условия для ответов AI.", fields: [
+  { title: "04 · Оплата, отмена и бронирование", explanation: "Настройте предоплату, отмену и порядок подтверждения. MARINA AI использует только сохранённые условия.", fields: [
     { key: "late_cancellation_penalty", label: "Поздняя отмена", hint: "Штраф или порядок расчёта" },
     { key: "no_show_policy", label: "Незаезд гостя", hint: "Что происходит при незаезде" },
     { key: "payment_methods_info", label: "Доступные способы оплаты", hint: "Только способы, реально принимаемые гостиницей; никаких реквизитов или секретов" },
@@ -155,6 +155,16 @@ export default function HotelRulesBoard() {
   }
   const filled = rules ? important.filter(key => Boolean(String(rules[key] ?? "").trim())).length : 0;
   const changed = rules ? JSON.stringify(rules) !== savedSnapshot : false;
+  useEffect(() => {
+    if (!changed) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [changed]);
+
   if (!state || !rules) return <main className="work-shell management-shell"><h1>Правила и знания отеля для MARINA AI</h1><p>{error || (loading ? "Загружаем правила…" : "Нет данных")}</p><button className="btn" onClick={() => void load()}>Обновить</button></main>;
   return <main className="work-shell management-shell">
     <div className="work-header"><div><p className="eyebrow">MARINA SMART · Настройки</p><h1>Правила и знания отеля для MARINA AI</h1>
