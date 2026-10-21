@@ -133,6 +133,22 @@ async def guest_crm_detail(
 
         # Ratings entered by the guest in the verified room-QR cabinet become part
         # of their existing long-lived guest history, not a parallel CRM.
+        # Canonical booking payments, not a copied ledger. The relationship is
+        # to the reservation (which may involve multiple guests), not a claim
+        # that this individual guest made the payment.
+        reservation_ids = sorted({row["reservationId"] for row in stays})
+        booking_payments = []
+        if reservation_ids:
+            booking_payments = await conn.fetch(
+                '''SELECT p.id,p."reservationId",p."amountKgs",p.method,
+                          p.status::text AS status,p.provider,p."externalRef",
+                          p."paidAt",p."createdAt"
+                   FROM payments p
+                   JOIN reservations r ON r.id=p."reservationId"
+                   WHERE r."propertyId"=$1 AND p."reservationId"=ANY($2::uuid[])
+                   ORDER BY p."createdAt" DESC LIMIT 150''',
+                pid, reservation_ids,
+            )
         reviews = await conn.fetch(
             '''SELECT "stayId",rating,comment,"createdAt","updatedAt"
                FROM guest_stay_reviews WHERE "propertyId"=$1 AND "guestId"=$2
@@ -149,6 +165,19 @@ async def guest_crm_detail(
         }
         for row in reviews
     }
+
+    payments_by_reservation: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in booking_payments:
+        payments_by_reservation[str(row["reservationId"])].append({
+            "id": str(row["id"]),
+            "amount_kgs": int(row["amountKgs"]),
+            "method": row["method"],
+            "status": row["status"],
+            "provider": row["provider"],
+            "external_ref": row["externalRef"],
+            "paid_at": row["paidAt"],
+            "recorded_at": row["createdAt"],
+        })
 
     assignments_by: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in assignments:
@@ -205,6 +234,7 @@ async def guest_crm_detail(
                 "assignments": assignments_by.get(str(row["id"]), []),
                 "requests": requests_by.get(str(row["id"]), []),
                 "guest_review": reviews_by_stay.get(str(row["id"])),
+                "booking_payments": payments_by_reservation.get(str(row["reservationId"]), [])[:5],
             }
             for row in stays
         ],
