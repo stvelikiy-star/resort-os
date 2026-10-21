@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 from .auth import require_roles, trusted_property_id
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
+from .hotel_setup import _audit
 
 router = APIRouter(prefix="/api/v1/admin/rooms", tags=["room-wayfinding"])
 guest_router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-room-wayfinding"])
@@ -74,6 +75,7 @@ async def update_room_route(room_id: uuid.UUID, payload: RoomWayfindingPatch, re
             exists = await conn.fetchval('SELECT 1 FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', room_id, pid)
             if not exists:
                 raise HTTPException(status_code=404, detail="Room not found")
+            previous = await fetch_room_route(conn, pid, room_id)
             await conn.execute(
                 '''INSERT INTO room_wayfinding
                     (id,"propertyId","roomId",latitude,longitude,"parkingLabel",directions,"walkthroughVideoUrl")
@@ -90,6 +92,9 @@ async def update_room_route(room_id: uuid.UUID, payload: RoomWayfindingPatch, re
                 payload.walkthrough_video_url or None,
             )
             row = await fetch_room_route(conn, pid, room_id)
+            await _audit(conn, property_id=pid, user=user, action="UPDATE_ROOM_WAYFINDING",
+                         resource="RoomWayfinding", resource_id=str(room_id),
+                         before=serialize(previous), after=serialize(row))
     return {"wayfinding": serialize(row)}
 
 
