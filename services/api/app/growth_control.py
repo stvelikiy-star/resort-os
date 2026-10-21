@@ -515,7 +515,11 @@ async def growth_summary(
                    count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 9 AND 10)::int AS promoters,
                    count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 7 AND 8)::int AS passives,
                    count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 0 AND 6)::int AS detractors,
-                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 0 AND 6 AND status='IN_PROGRESS')::int AS recovery_open
+                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 0 AND 6 AND status='IN_PROGRESS')::int AS recovery_open,
+                   count("starRating") FILTER (WHERE kind='POST_STAY_FEEDBACK')::int AS star_scored,
+                   round(avg("starRating") FILTER (WHERE kind='POST_STAY_FEEDBACK' AND "starRating" IS NOT NULL),2) AS average_stars,
+                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND "starRating" BETWEEN 1 AND 3)::int AS low_star_count,
+                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND "starRating" BETWEEN 1 AND 3 AND status='IN_PROGRESS')::int AS low_star_open
             FROM guest_engagements WHERE "propertyId"=$1
             ''',
             pid,
@@ -564,6 +568,10 @@ async def growth_summary(
             "recovery_open": int(feedback["recovery_open"] or 0),
             "nps": nps,
             "nps_sample_size": scored,
+            "star_scored": int(feedback["star_scored"] or 0),
+            "average_stars": float(feedback["average_stars"]) if feedback["average_stars"] is not None else None,
+            "low_star_count": int(feedback["low_star_count"] or 0),
+            "low_star_open": int(feedback["low_star_open"] or 0),
         },
         "candidates": {
             "post_stay_14d": post_stay_candidates,
