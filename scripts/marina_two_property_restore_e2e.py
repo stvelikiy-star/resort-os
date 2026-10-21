@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -103,6 +104,93 @@ async def seed_records(dsn: str) -> list[dict]:
     return fixtures
 
 
+def _strip_outer_parentheses(expression: str) -> str:
+    expression = expression.strip()
+    while expression.startswith("(") and expression.endswith(")"):
+        depth = 0
+        quote = None
+        closes_at_end = True
+        index = 0
+        while index < len(expression):
+            char = expression[index]
+            if quote:
+                if char == quote:
+                    if index + 1 < len(expression) and expression[index + 1] == quote:
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"'}:
+                quote = char
+            elif char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0 and index != len(expression) - 1:
+                    closes_at_end = False
+                    break
+            index += 1
+        if not closes_at_end or depth != 0:
+            break
+        expression = expression[1:-1].strip()
+    return expression
+
+
+def _split_top_level_boolean(expression: str, operator: str) -> list[str]:
+    parts: list[str] = []
+    depth = 0
+    quote = None
+    start = 0
+    index = 0
+    while index < len(expression):
+        char = expression[index]
+        if quote:
+            if char == quote:
+                if index + 1 < len(expression) and expression[index + 1] == quote:
+                    index += 2
+                    continue
+                quote = None
+        elif char in {"'", '"'}:
+            quote = char
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        elif depth == 0 and expression[index:index + len(operator)].upper() == operator:
+            before = expression[index - 1] if index else " "
+            after_index = index + len(operator)
+            after = expression[after_index] if after_index < len(expression) else " "
+            if not (before.isalnum() or before == "_") and not (after.isalnum() or after == "_"):
+                parts.append(expression[start:index].strip())
+                start = after_index
+                index = after_index
+                continue
+        index += 1
+    if parts:
+        parts.append(expression[start:].strip())
+    return parts
+
+
+def _canonical_constraint_expression(definition: str) -> str:
+    expression = definition.strip()
+    if expression[:5].upper() == "CHECK":
+        expression = expression[5:].strip()
+    expression = _strip_outer_parentheses(expression)
+    for operator in ("OR", "AND"):
+        parts = _split_top_level_boolean(expression, operator)
+        if len(parts) > 1:
+            children = []
+            for part in parts:
+                child = json.loads(_canonical_constraint_expression(part))
+                if isinstance(child, list) and child[0] == operator:
+                    children.extend(child[1])
+                else:
+                    children.append(child)
+            return json.dumps([operator, sorted(children, key=lambda item: json.dumps(item, ensure_ascii=False))],
+                              ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(["ATOM", re.sub(r"\\s+", " ", expression).strip()],
+                      ensure_ascii=False, separators=(",", ":"))
+
+
 async def snapshot(dsn: str) -> dict:
     conn = await asyncpg.connect(dsn)
     try:
@@ -116,7 +204,11 @@ async def snapshot(dsn: str) -> dict:
                 payload = json.dumps([item["row"] for item in rows], ensure_ascii=False).encode()
                 data[name] = {"count": len(rows), "sha256": hashlib.sha256(payload).hexdigest()}
             constraints = await conn.fetch("SELECT c.conname,pg_get_constraintdef(c.oid) AS definition FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' ORDER BY c.conname,definition")
-            return {"tables": data, "constraints": [dict(row) for row in constraints]}
+            normalized_constraints = [
+                {"conname": row["conname"], "definition": _canonical_constraint_expression(row["definition"])}
+                for row in constraints
+            ]
+            return {"tables": data, "constraints": normalized_constraints}
     finally:
         await conn.close()
 
