@@ -131,6 +131,25 @@ async def guest_crm_detail(
             guest_id,
         )
 
+    # Ratings entered by the guest in the verified room-QR cabinet become part
+    # of their existing long-lived guest history, not a parallel CRM.
+    reviews = await conn.fetch(
+        '''SELECT "stayId",rating,comment,"createdAt","updatedAt"
+           FROM guest_stay_reviews WHERE "propertyId"=$1 AND "guestId"=$2
+           ORDER BY "createdAt" DESC''',
+        pid, guest_id,
+    )
+    reviews_by_stay = {
+        str(row["stayId"]): {
+            "rating": row["rating"],
+            "comment": row["comment"],
+            "created_at": row["createdAt"],
+            "updated_at": row["updatedAt"],
+            "manager_attention_required": row["rating"] <= 3,
+        }
+        for row in reviews
+    }
+
     assignments_by: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in assignments:
         assignments_by[str(row["stayId"])].append(
@@ -185,6 +204,7 @@ async def guest_crm_detail(
                 "total_kgs": row["totalKgs"],
                 "assignments": assignments_by.get(str(row["id"]), []),
                 "requests": requests_by.get(str(row["id"]), []),
+                "guest_review": reviews_by_stay.get(str(row["id"])),
             }
             for row in stays
         ],
