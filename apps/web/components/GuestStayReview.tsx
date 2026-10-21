@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
 type Saved = { rating: number; comment: string };
@@ -11,7 +11,8 @@ const copy = {
   en: { title:"Rate your stay", intro:"Share your experience. The hotel manager can read your feedback.", comment:"Your feedback", placeholder:"What worked well, or what should we improve?", save:"Save feedback", saved:"Thank you! Your feedback is now in your stay history.", error:"Could not save. Please verify your guest session with your PIN.", waiting:"Available after verifying your stay", urgent:"Thank you. The hotel manager can review your concern.", label:"Your rating", kol:"KÖL · delivery and services", kolInfo:"KÖL offerings will appear after a separate secure integration. Orders are not available yet." },
 } as const;
 
-export default function GuestStayReview({ token, active }: { token: string; active: boolean }) {
+export default function GuestStayReview({ token }: { token: string }) {
+  const [active,setActive] = useState(false);
   const [locale] = useMarinaGuestLocale();
   const t = copy[locale];
   const [rating,setRating] = useState(5);
@@ -19,6 +20,18 @@ export default function GuestStayReview({ token, active }: { token: string; acti
   const [saved,setSaved] = useState(false);
   const [busy,setBusy] = useState(false);
   const [notice,setNotice] = useState("");
+  const refreshAccess = useCallback(async () => {
+    try {
+      const response = await fetch(`/core/api/v1/guest-os/rooms/${encodeURIComponent(token)}`, {credentials:"include",cache:"no-store"});
+      const body = response.ok ? await response.json() : null;
+      setActive(Boolean(body?.authenticated && body?.active_stay));
+    } catch {setActive(false)}
+  },[token]);
+  useEffect(() => {
+    void refreshAccess();
+    window.addEventListener("marina:guest-session-updated",refreshAccess);
+    return ()=>window.removeEventListener("marina:guest-session-updated",refreshAccess);
+  },[refreshAccess]);
   useEffect(() => {
     if (!active) return;
     let live = true;
