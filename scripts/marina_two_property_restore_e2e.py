@@ -221,7 +221,29 @@ def main() -> None:
         asyncio.run(ensure_empty_target(target))
         subprocess.run(["pg_restore", *args, "--exit-on-error", "--no-owner", "--no-acl", str(dump)], env=env, check=True)
         after = asyncio.run(snapshot(target))
-        assert before == after, "Restored database rows or constraints differ from source"
+        if before != after:
+            table_names = sorted(set(before["tables"]) | set(after["tables"]))
+            table_diffs = {
+                name: {"source": before["tables"].get(name), "restored": after["tables"].get(name)}
+                for name in table_names
+                if before["tables"].get(name) != after["tables"].get(name)
+            }
+            source_constraints = {(item["conname"], item["definition"]) for item in before["constraints"]}
+            restored_constraints = {(item["conname"], item["definition"]) for item in after["constraints"]}
+            constraint_diffs = {
+                "missing_after_restore": sorted(source_constraints - restored_constraints),
+                "unexpected_after_restore": sorted(restored_constraints - source_constraints),
+            }
+            print("MARINA_RESTORE_SNAPSHOT_DIFF=" + json.dumps(
+                {"tables": table_diffs, "constraints": constraint_diffs},
+                ensure_ascii=False, sort_keys=True,
+            ))
+            raise AssertionError(
+                "Restored database snapshot differs: "
+                f"{len(table_diffs)} table(s), "
+                f"{len(constraint_diffs['missing_after_restore'])} missing and "
+                f"{len(constraint_diffs['unexpected_after_restore'])} unexpected constraint(s)"
+            )
         print(f"MARINA_TWO_PROPERTY_RESTORE_PASS tables={len(before['tables'])}; all public rows and constraints match")
         run_api_gate(target, fixtures, directory)
     print("MARINA_TWO_PROPERTY_RESTORE_E2E_PASS; property-pinned local runtimes only; external staging and production unverified")
