@@ -12,8 +12,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 EXPECTED_MIGRATIONS = (
     "0_init",
     "1_site_content",
-    "20261020230000_marina_property_rules",
     "2_guest_service_tasks",
+    "20261020230000_marina_property_rules",
     "3_owner_analytics_snapshots",
     "4_guest_engagements",
     "5_guest_os_core",
