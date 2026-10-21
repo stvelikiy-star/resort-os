@@ -286,7 +286,7 @@ export default function AdminShell() {
                 (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
               }
             }}>
-              <p className="admin-nav-section-label">Бронирования и продажи</p>
+              {(isManager || moduleEnabled("GROUPS")) && <p className="admin-nav-section-label">Бронирования и продажи</p>}
               {canUseReception && moduleEnabled("GROUPS") && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
               {isManager && <button className={tab === "CHANNELS" ? "active" : ""} onClick={() => setTab("CHANNELS")}>Booking / Каналы продаж</button>}
               {isManager && moduleEnabled("AGENTS") && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агентства</button>}
@@ -295,11 +295,11 @@ export default function AdminShell() {
               {isManager && moduleEnabled("MARKETING") && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
               {isManager && moduleEnabled("OFFERS") && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Предложения гостям</button>}
               {isManager && moduleEnabled("GROWTH") && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Отзывы / Рост</button>}
-              <p className="admin-nav-section-label">Работа гостиницы</p>
+              {(isManager || moduleEnabled("DINING") || moduleEnabled("ROOM_QR")) && <p className="admin-nav-section-label">Работа гостиницы</p>}
               {canUseReception && moduleEnabled("DINING") && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
               {canManageRoomQr && moduleEnabled("ROOM_QR") && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
               {isManager && moduleEnabled("POINT_QR") && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
-              <p className="admin-nav-section-label">Управление и настройки</p>
+              {isManager && <p className="admin-nav-section-label">Управление и настройки</p>}
               {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
               {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
               {isManager && <button className={tab === "HOTEL_RULES" ? "active" : ""} onClick={() => setTab("HOTEL_RULES")}>Правила гостиницы</button>}
