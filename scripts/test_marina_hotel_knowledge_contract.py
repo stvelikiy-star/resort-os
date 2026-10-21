@@ -38,7 +38,7 @@ class KnowledgeContract(unittest.TestCase):
                 if keyword.arg == "max_length" and isinstance(keyword.value, ast.Constant):
                     lengths[field.target.id] = keyword.value.value
         section = frontend.split("const fieldLimits:", 1)[1].split("const important:", 1)[0]
-        actual = {key: int(val) for key, val in re.findall(r"([a-z_]+): (\\d+)", section)}
+        actual = {key: int(val) for key, val in re.findall(r"([a-z_]+): (\d+)", section)}
         self.assertEqual(lengths, actual)
         self.assertIn("maxLength={fieldLimits[item.key]}", frontend)
         self.assertIn("Отменить все несохранённые изменения?", frontend)
