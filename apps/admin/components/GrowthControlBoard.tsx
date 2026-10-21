@@ -31,6 +31,8 @@ type Engagement = {
   title: string;
   notes?: string | null;
   score?: number | null;
+  star_rating?: number | null;
+  recovery_urgent?: boolean;
   nps_class?: "PROMOTER" | "PASSIVE" | "DETRACTOR" | null;
   feedback_text?: string | null;
   completed_at?: string | null;
@@ -104,6 +106,9 @@ export default function GrowthControlBoard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [feedbackTarget, setFeedbackTarget] = useState<Engagement | null>(null);
   const [score, setScore] = useState(10);
+  const [stars, setStars] = useState(5);
+  const [feedbackScale, setFeedbackScale] = useState<"STARS" | "NPS">("STARS");
+  const [reviewLinks, setReviewLinks] = useState<{ review_google_url: string; review_2gis_url: string; review_yandex_url: string }>({ review_google_url: "", review_2gis_url: "", review_yandex_url: "" });
   const [feedbackText, setFeedbackText] = useState("");
 
   const load = useCallback(async () => {
@@ -114,13 +119,15 @@ export default function GrowthControlBoard() {
       if (kindFilter !== "ALL") engagementQuery.set("kind", kindFilter);
       if (!["ALL", "ACTIVE"].includes(statusFilter)) engagementQuery.set("status", statusFilter);
       engagementQuery.set("limit", "200");
-      const [summaryBody, engagementBody, postBody, reactBody] = await Promise.all([
+      const [summaryBody, engagementBody, postBody, reactBody, hotelRulesBody] = await Promise.all([
         api<Summary>(`/core/api/v1/admin/growth/summary?min_days_since_checkout=${reactivationDays}`),
         api<{ items: Engagement[] }>(`/core/api/v1/admin/growth/engagements?${engagementQuery}`),
         api<{ items: PostStayCandidate[] }>("/core/api/v1/admin/growth/candidates/post-stay?lookback_days=14&limit=100"),
         api<{ items: ReactivationCandidate[] }>(`/core/api/v1/admin/growth/candidates/reactivation?min_days_since_checkout=${reactivationDays}&limit=100`),
+        api<{ rules: { review_google_url: string; review_2gis_url: string; review_yandex_url: string } }>("/core/api/v1/admin/hotel-rules"),
       ]);
       setSummary(summaryBody);
+      setReviewLinks({ review_google_url: hotelRulesBody.rules.review_google_url || "", review_2gis_url: hotelRulesBody.rules.review_2gis_url || "", review_yandex_url: hotelRulesBody.rules.review_yandex_url || "" });
       setEngagements(statusFilter === "ACTIVE" ? engagementBody.items.filter((item) => ["OPEN", "IN_PROGRESS"].includes(item.status)) : engagementBody.items);
       setPostStay(postBody.items);
       setReactivation(reactBody.items);
@@ -196,15 +203,16 @@ export default function GrowthControlBoard() {
     setBusyId(feedbackTarget.id);
     setError(null);
     try {
-      await api(`/core/api/v1/admin/growth/engagements/${feedbackTarget.id}/feedback`, {
+      await api(`/core/api/v1/admin/growth/engagements/${feedbackTarget.id}/${feedbackScale === "STARS" ? "stars" : "feedback"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score, feedback_text: feedbackText || null }),
+        body: JSON.stringify(feedbackScale === "STARS" ? { rating: stars, feedback_text: feedbackText || null } : { score, feedback_text: feedbackText || null }),
       });
       setFeedbackTarget(null);
       setFeedbackText("");
       setScore(10);
-      setNotice(score <= 6 ? "Оценка записана. Задача оставлена в recovery." : "Оценка записана.");
+      setStars(5);
+      setNotice(feedbackScale === "STARS" && stars <= 3 ? "Оценка записана. Срочная задача управляющего открыта." : feedbackScale === "NPS" && score <= 6 ? "NPS сохранён. Требуется работа с гостем." : "Оценка записана.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось записать feedback");
@@ -213,7 +221,7 @@ export default function GrowthControlBoard() {
     }
   }
 
-  const activeRecovery = useMemo(() => engagements.filter((item) => item.nps_class === "DETRACTOR" && item.status === "IN_PROGRESS").length, [engagements]);
+  const activeRecovery = useMemo(() => engagements.filter((item) => (item.nps_class === "DETRACTOR" || item.recovery_urgent) && item.status === "IN_PROGRESS").length, [engagements]);
 
   return (
     <main className="growth-shell">
