@@ -25,7 +25,9 @@ export default function GuestStayReview({ token }: { token: string }) {
     try {
       const response = await fetch(`/core/api/v1/guest-os/rooms/${encodeURIComponent(token)}`, {credentials:"include",cache:"no-store"});
       const body = response.ok ? await response.json() : null;
-      setActive(Boolean(body?.authenticated && body?.active_stay));
+      const authorized = Boolean(body?.authenticated && body?.active_stay);
+      setActive(authorized);
+      if (!authorized) { setComment(""); setRating(5); setSaved(false); setNotice(""); setReviewLinks({google:null,gis:null,yandex:null}); }
     } catch {setActive(false)}
   },[token]);
   useEffect(() => {
