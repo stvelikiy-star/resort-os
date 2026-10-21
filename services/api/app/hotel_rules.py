@@ -48,6 +48,9 @@ class HotelRules(BaseModel):
     booking_contact_policy: str = Field(default="", max_length=800)
     ai_faq: str = Field(default="", max_length=3000)
     ai_escalation_policy: str = Field(default="", max_length=1000)
+    review_google_url: str = Field(default="", max_length=500)
+    review_2gis_url: str = Field(default="", max_length=500)
+    review_yandex_url: str = Field(default="", max_length=500)
 
     @model_validator(mode="after")
     def validate_deposit(self):
