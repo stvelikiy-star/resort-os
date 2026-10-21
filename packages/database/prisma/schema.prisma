@@ -991,6 +991,7 @@ model GuestEngagement {
   title         String
   notes         String?
   score         Int?
+  starRating    Int?
   feedbackText  String?
   completedAt   DateTime?
   createdAt     DateTime     @default(now())
