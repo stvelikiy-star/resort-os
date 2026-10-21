@@ -15,6 +15,10 @@ type Summary = {
     recovery_open: number;
     nps: number | null;
     nps_sample_size: number;
+    star_scored: number;
+    average_stars: number | null;
+    low_star_count: number;
+    low_star_open: number;
   };
   candidates: { post_stay_14d: number; reactivation: number; reactivation_min_days: number };
   truth: Record<string, string>;
@@ -249,6 +253,8 @@ export default function GrowthControlBoard() {
             <article><span>Ждут feedback</span><strong>{summary.queue.feedback_open}</strong><small>{summary.candidates.post_stay_14d} кандидатов за 14 дней</small></article>
             <article><span>Возврат гостей</span><strong>{summary.queue.return_open}</strong><small>{summary.candidates.reactivation} доступно по фильтру</small></article>
             <article className={summary.feedback.recovery_open > 0 ? "growth-danger" : ""}><span>Recovery</span><strong>{summary.feedback.recovery_open}</strong><small>оценка 0–6 и задача в работе</small></article>
+            <article><span>Средняя оценка гостей</span><strong>{summary.feedback.average_stars == null ? "—" : `${summary.feedback.average_stars.toFixed(2)}★`}</strong><small>{summary.feedback.star_scored} оценок по шкале 1–5</small></article>
+            <article className={summary.feedback.low_star_open > 0 ? "growth-danger" : ""}><span>Срочные жалобы 1–3★</span><strong>{summary.feedback.low_star_open}</strong><small>всего низких оценок: {summary.feedback.low_star_count}</small></article>
             <article><span>NPS</span><strong>{summary.feedback.nps == null ? "—" : summary.feedback.nps}</strong><small>выборка: {summary.feedback.nps_sample_size}</small></article>
             <article><span>Средняя оценка</span><strong>{summary.feedback.average_score == null ? "—" : summary.feedback.average_score.toFixed(2)}</strong><small>{summary.feedback.scored} фактических ответов</small></article>
             <article><span>Промоутеры</span><strong>{summary.feedback.promoters}</strong><small>9–10</small></article>
