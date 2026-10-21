@@ -279,7 +279,7 @@ export default function AdminShell() {
           {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
           {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
-          {!isAgent && <details className="admin-more-menu">
+          {(isManager || canUseReception) && <details className="admin-more-menu">
             <summary>Все разделы</summary>
             <div className="admin-more-panel" onClick={(event) => {
               if (event.target instanceof Element && event.target.closest("button")) {
