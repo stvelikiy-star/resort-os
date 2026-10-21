@@ -192,7 +192,17 @@ export default function AdminShell() {
         body: JSON.stringify({ username, password }),
       });
       if (!response.ok) {
-        setError("Неверный логин или пароль.");
+        // Cloudflare Access and reverse proxies may reject the HTTP request
+        // before it reaches MARINA Core. Do not mislabel their 401 as bad credentials.
+        const contentType = response.headers.get("content-type") || "";
+        const serverJson = contentType.includes("application/json");
+        if (!serverJson) {
+          setError("Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.");
+        } else if (response.status === 401) {
+          setError("Неверный логин или пароль.");
+        } else {
+          setError(`Не удалось войти: ошибка сервера (${response.status}). Попробуйте снова или обратитесь к администратору.`);
+        }
         return;
       }
       const payload = (await response.json()) as User;
