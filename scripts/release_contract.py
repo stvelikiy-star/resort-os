@@ -45,6 +45,7 @@ EXPECTED_MIGRATIONS = (
     "zz108_marina_channel_mappings_20261016",
     "zz109_marina_review_stars_20261022",
     "zz110_marina_guest_stay_reviews_20261022",
+    "zz111_marina_room_wayfinding_20261022",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -86,6 +87,9 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_engagements_star_rating_range",
         "guest_stay_reviews_rating_check",
         "guest_stay_reviews_comment_length_check",
+        "room_wayfinding_coordinates_pair_check",
+        "room_wayfinding_latitude_range_check",
+        "room_wayfinding_longitude_range_check",
         "service_points_category_check",
         "service_point_qrs_revocation_check",
         "operational_tasks_service_point_context_check",
