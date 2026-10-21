@@ -351,6 +351,16 @@ export default function GrowthControlBoard() {
         <p>{summary.truth.outbound}</p>
       </section>}
 
+      <section className="growth-policy" aria-label="Публичные площадки отзывов">
+        <strong>Отзывы на картах — приглашение всем гостям без отбора по оценке</strong>
+        <p>Попросите гостя поделиться честным впечатлением. Скидки за отзыв не предлагаем. Ссылки настраиваются в «Знания отеля / MARINA AI».</p>
+        <div className="growth-score-scale">
+          {([["Google Maps", reviewLinks.review_google_url], ["2GIS", reviewLinks.review_2gis_url], ["Яндекс Карты", reviewLinks.review_yandex_url]] as const).map(([label, url]) =>
+            url && /^https:\/\//i.test(url) ? <a key={label} href={url} target="_blank" rel="noopener noreferrer">{label} ↗</a> : <span key={label}>{label}: ссылка не заполнена</span>
+          )}
+        </div>
+        <p>Текст для всех гостей: «Спасибо за проживание! Будем благодарны за честный отзыв — положительный или критический. Нам важно любое мнение». Автоматическая отправка WhatsApp пока отключена.</p>
+      </section>
       {feedbackTarget && (
         <div className="growth-modal-backdrop" role="presentation" onMouseDown={() => setFeedbackTarget(null)}>
           <form className="growth-modal" onSubmit={submitFeedback} onMouseDown={(e) => e.stopPropagation()}>
