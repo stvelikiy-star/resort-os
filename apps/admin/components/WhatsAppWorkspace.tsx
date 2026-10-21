@@ -48,7 +48,7 @@ export default function WhatsAppWorkspace({ role, onNavigate }: Props) {
         <strong>Рабочий порядок:</strong> откройте диалог → уточните даты и гостей → проверьте наличие в шахматке → сохраните заявку → передайте гостю подтверждение только после проверки администратором.
         <p>В этом разделе видны только сообщения WhatsApp, уже сохранённые в CRM. Пока провайдер не подключён, новые сообщения с телефона сюда не поступают и отправить ответ в WhatsApp нельзя.</p>
       </div>
-      {isManager ? <InboxBoard channelKind="WHATSAPP" /> : <div className={styles.notice}>Доступ к реальным диалогам пока ограничен ролями «Собственник» и «Менеджер». Для ресепшена требуется отдельная проверка полномочий и изоляции данных перед включением.</div>}
+      <InboxBoard channelKind="WHATSAPP" role={role} />
     </section>}
 
     {section === "LEADS" && <section className={styles.section}>
