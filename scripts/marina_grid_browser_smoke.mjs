@@ -21,8 +21,8 @@ try {
   await page.locator('input[autocomplete="username"]').fill(USERNAME);
   await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);
   await page.locator("button.login-button").click();
-  await page.getByRole("button", { name: "Супершахматка", exact: true }).waitFor({ state: "visible", timeout: 20000 });
-  await page.getByRole("button", { name: "Супершахматка", exact: true }).click();
+  await page.getByRole("button", { name: "Шахматка", exact: true }).waitFor({ state: "visible", timeout: 20000 });
+  await page.getByRole("button", { name: "Шахматка", exact: true }).click();
   await page.locator(".owner-grid-shell").waitFor({ state: "visible", timeout: 20000 });
   await page.locator(".owner-grid-loading").waitFor({ state: "hidden", timeout: 20000 });
   await page.getByRole("heading", { name: "Номер × ночь" }).waitFor();
@@ -45,17 +45,18 @@ try {
   // Verify owner can configure actual per-hotel rules through the existing UI.
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator("details.admin-more-menu summary").click();
-  await page.getByRole("button", { name: "Правила отеля", exact: true }).click();
-  await page.getByRole("heading", { name: "Правила отеля", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Знания отеля / MARINA AI", exact: true }).click();
+  await page.getByRole("heading", { name: "Знания отеля / MARINA AI", exact: true }).waitFor();
+  await page.getByRole("button", { name: /^04 · Оплата, отмена и бронирование/ }).click();
   await page.getByLabel("Как берём предоплату?").selectOption("FIRST_NIGHT");
   await page.getByLabel("Бесплатная отмена за сколько дней до заезда?").fill("7");
   await page.getByLabel("Проживание с животными").fill("По согласованию с владельцем");
-  await page.getByRole("button", { name: "Сохранить правила" }).click();
+  await page.getByRole("button", { name: "Сохранить знания и правила" }).click();
   await page.getByText("Сохранено. MARINA AI будет использовать обновлённые правила в следующих ответах.").waitFor();
   await page.reload({ waitUntil: "networkidle" });
   await page.locator("details.admin-more-menu summary").click();
-  await page.getByRole("button", { name: "Правила отеля", exact: true }).click();
-  await page.getByRole("heading", { name: "Правила отеля", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Знания отеля / MARINA AI", exact: true }).click();
+  await page.getByRole("heading", { name: "Знания отеля / MARINA AI", exact: true }).waitFor();
   if (await page.getByLabel("Проживание с животными").inputValue() !== "По согласованию с владельцем") {
     throw new Error("Saved hotel rules not preserved after browser reload");
   }
