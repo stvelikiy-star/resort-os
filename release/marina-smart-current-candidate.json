@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product": "MARINA SMART",
   "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
-  "candidate_commit": "72445c7d5b13241aa6721457e35b6c7b1b19f061",
+  "candidate_commit": "2a8943cd44a900bed6ce8ee6a21f05462b5cc0b5",
   "source_branch": "fix/marina-staging-preflight-20261020",
   "pull_request": 244,
   "migration_count": 36,
