@@ -42,6 +42,7 @@ EXPECTED_MIGRATIONS = (
     "zz106_marina_split_cook_waiter_20261007",
     "zz107_marina_tenants_20261008",
     "zz108_marina_channel_mappings_20261016",
+    "zz109_marina_review_stars_20261022",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -80,6 +81,7 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_engagements_score_check",
         "guest_engagements_score_kind_check",
         "guest_engagements_feedback_reservation_check",
+        "guest_engagements_star_rating_range",
         "service_points_category_check",
         "service_point_qrs_revocation_check",
         "operational_tasks_service_point_context_check",
