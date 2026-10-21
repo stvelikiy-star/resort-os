@@ -147,7 +147,7 @@ export default function GrowthControlBoard() {
     setNotice(null);
     try {
       const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + (kind === "POST_STAY_FEEDBACK" ? 1 : 3));
+      if (kind !== "POST_STAY_FEEDBACK") dueDate.setDate(dueDate.getDate() + 3);
       const body = kind === "POST_STAY_FEEDBACK"
         ? {
             guest_id: candidate.guest_id,
