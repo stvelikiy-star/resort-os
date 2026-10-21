@@ -78,8 +78,16 @@ class GreenAdapterTests(unittest.TestCase):
     def test_skips_groups_without_ingesting(self):
         other = {**GOOD, "body": {**GOOD["body"], "senderData": {"chatId": "12345-123@g.us"}}}
         c = Client(item=other)
-        self.assertEqual(asyncio.run(adapter.process_one(c, CFG)), "SKIPPED_UNSUPPORTED")
-        self.assertEqual([x[0] for x in c.calls], ["receive", "ack"])
+        with self.assertRaises(adapter.AdapterError):
+            asyncio.run(adapter.process_one(c, CFG))
+        self.assertEqual([x[0] for x in c.calls], ["receive"])
+
+    def test_media_is_not_silently_discarded(self):
+        media = {**GOOD, "body": {**GOOD["body"], "messageData": {"typeMessage": "imageMessage"}}}
+        client = Client(item=media)
+        with self.assertRaises(adapter.AdapterError):
+            asyncio.run(adapter.process_one(client, CFG))
+        self.assertEqual([call[0] for call in client.calls], ["receive"])
 
     def test_no_received_item(self):
         c = Client(item=None)
