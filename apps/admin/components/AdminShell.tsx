@@ -302,7 +302,7 @@ export default function AdminShell() {
               {isManager && <p className="admin-nav-section-label">Управление и настройки</p>}
               {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
               {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
-              {isManager && <button className={tab === "HOTEL_RULES" ? "active" : ""} onClick={() => setTab("HOTEL_RULES")}>Правила гостиницы</button>}
+              {isManager && <button className={tab === "HOTEL_RULES" ? "active" : ""} onClick={() => setTab("HOTEL_RULES")}>Знания отеля / MARINA AI</button>}
               {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
               {isManager && moduleEnabled("CONTENT") && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
               {isManager && <button className={tab === "SETTINGS" ? "active" : ""} onClick={() => setTab("SETTINGS")}>Настройки гостиницы</button>}
