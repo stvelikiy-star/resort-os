@@ -105,7 +105,7 @@ function messageAuthor(message: Message) {
   return "Внутренняя заметка";
 }
 
-export default function InboxBoard() {
+export default function InboxBoard({ channelKind }: { channelKind?: "WHATSAPP" }) {
   const [items, setItems] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState("NEEDS_REPLY");
   const [query, setQuery] = useState("");
@@ -160,8 +160,9 @@ export default function InboxBoard() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => [
+    const channelItems = channelKind ? items.filter((item) => item.channel_kind === channelKind) : items;
+    if (!q) return channelItems;
+    return channelItems.filter((item) => [
       item.contact_name,
       item.contact_phone,
       item.contact_username,
@@ -169,7 +170,7 @@ export default function InboxBoard() {
       item.last_message_text,
       item.reservation_request_id,
     ].some((value) => value?.toLowerCase().includes(q)));
-  }, [items, query]);
+  }, [items, query, channelKind]);
 
   const telegramReplyEnabled = Boolean(
     detail
@@ -333,7 +334,7 @@ export default function InboxBoard() {
 
   return <main className="work-shell inbox-shell">
     <div className="work-head">
-      <div><p className="eyebrow">Коммуникации</p><h1>Единый Inbox</h1><p className="subtitle">Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет.</p></div>
+      <div><p className="eyebrow">Коммуникации</p><h1>{channelKind === "WHATSAPP" ? "Диалоги WhatsApp" : "Единый Inbox"}</h1><p className="subtitle">{channelKind === "WHATSAPP" ? "Здесь появятся обращения номера вашей гостиницы после подтверждённого подключения. Пока отправка WhatsApp отключена." : "Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет."}</p></div>
       <button className="btn" onClick={() => { load(); loadCapabilities(); }}>Обновить</button>
     </div>
 
