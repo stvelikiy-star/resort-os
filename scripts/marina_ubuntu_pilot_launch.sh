@@ -51,8 +51,16 @@ echo "Admin: http://127.0.0.1:15001"
 echo "Website: http://127.0.0.1:15000"
 echo "Staff: http://127.0.0.1:15002"
 for port in 15000 15001 15002; do
-  if ! curl -fsS --max-time 6 "http://127.0.0.1:$port/" -o /dev/null; then
-    echo "ERROR: UI did not respond on $port; inspect docker compose logs." >&2; exit 1
+  ready=false
+  for attempt in $(seq 1 24); do
+    if curl -fsS --max-time 6 "http://127.0.0.1:$port/" -o /dev/null 2>/dev/null; then
+      ready=true
+      break
+    fi
+    sleep 2
+  done
+  if [[ "$ready" != true ]]; then
+    echo "ERROR: UI did not respond on $port after readiness retries; inspect docker compose logs." >&2; exit 1
   fi
 done
 if ! curl -fsS --max-time 6 http://127.0.0.1:15001/core/health/ready | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["status"]=="ready" and d["property"]=="MARINA_HOTEL01"'; then
