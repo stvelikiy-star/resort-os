@@ -97,3 +97,35 @@ html, body { background: var(--bg); color: var(--ink); }
 }
 .admin-more-panel .admin-nav-section-label:first-child { border-top: none; margin-top: 2px; }
 .admin-more-panel { max-height: min(72vh, 690px); overflow-y: auto; overscroll-behavior: contain; }
+
+/* Portal-like fixed menu avoids clipping by the horizontally scrollable tab strip. */
+.admin-more-menu { flex: 0 0 auto; }
+.admin-more-menu > summary {
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; list-style: none; white-space: nowrap;
+  border-radius: 999px; padding: 9px 12px; font-size: 12px; font-weight: 800;
+  color: var(--brand); border: 1px solid var(--line); background: #fff;
+}
+.admin-more-menu > summary::-webkit-details-marker { display: none; }
+.admin-more-menu > summary::after { content: " ▾"; margin-left: 5px; }
+.admin-more-menu[open] > summary { background: var(--brand-soft); }
+.admin-more-menu > summary:focus-visible { outline: 3px solid #8bafcb; outline-offset: 2px; }
+.admin-more-panel {
+  position: fixed; top: 72px; right: 12px; z-index: 120;
+  display: grid; grid-template-columns: 1fr;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(75vh, 700px); padding: 9px;
+  border: 1px solid var(--line); border-radius: 16px;
+  background: #fff; box-shadow: 0 18px 48px #10233f24;
+  overflow: auto; overscroll-behavior: contain;
+}
+.admin-more-panel button {
+  width: 100%; min-height: 42px; border-radius: 9px;
+  text-align: left; padding: 10px 14px; font-size: 13px;
+}
+@media(max-width:1080px) {
+  .admin-more-panel { top: 110px; right: 8px; max-height: calc(100dvh - 125px); }
+}
+@media(max-width:600px) {
+  .admin-more-panel { top: 100px; right: 6px; width: min(340px, calc(100vw - 12px)); max-height: calc(100dvh - 108px); }
+}
