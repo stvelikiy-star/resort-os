@@ -38,6 +38,9 @@ type Rules = {
   booking_contact_policy: string;
   ai_faq: string;
   ai_escalation_policy: string;
+  review_google_url: string;
+  review_2gis_url: string;
+  review_yandex_url: string;
 };
 type State = { property_name: string; version: number; rules: Rules; updated_at: string | null };
 type Topic = { title: string; explanation: string; fields: { key: keyof Rules; label: string; hint: string; rows?: number }[] };
@@ -81,6 +84,9 @@ const topics: Topic[] = [
   { title: "05 · Знания MARINA AI и передача человеку", explanation: "Факты для ответов; не записывайте здесь команды, пароли, реквизиты карт или данные гостей.", fields: [
     { key: "ai_faq", label: "Частые вопросы и точные ответы", hint: "Вопрос: ...\nОтвет: ...\n\nВопрос: ...\nОтвет: ...", rows: 8 },
     { key: "ai_escalation_policy", label: "Когда передать обращение человеку", hint: "Например: спор по оплате, претензия, нестандартное размещение", rows: 4 },
+    { key: "review_google_url", label: "Ссылка на отзывы Google Maps", hint: "Публичная ссылка на карточку этого отеля. Показывается всем гостям, независимо от оценки" },
+    { key: "review_2gis_url", label: "Ссылка на отзывы 2GIS", hint: "Публичная ссылка на карточку этого отеля" },
+    { key: "review_yandex_url", label: "Ссылка на отзывы Яндекс Карт", hint: "Публичная ссылка на карточку этого отеля" },
     { key: "additional_information", label: "Дополнительные сведения", hint: "Подтверждённые факты, не вошедшие в другие поля", rows: 4 },
   ] },
 ];
@@ -96,6 +102,7 @@ const fieldLimits: Partial<Record<keyof Rules, number>> = {
   transfer_transport: 900, nearby_attractions: 1000, accessibility_policy: 800,
   payment_methods_info: 600, quiet_hours_policy: 500,
   booking_contact_policy: 800, ai_faq: 3000, ai_escalation_policy: 1000,
+  review_google_url: 500, review_2gis_url: 500, review_yandex_url: 500,
 };
 const important: (keyof Rules)[] = ["hotel_short_description", "location_address", "official_contact", "reception_hours", "checkin_instructions", "meal_policy", "included_services", "booking_contact_policy", "ai_faq", "ai_escalation_policy"];
 
