@@ -48,7 +48,7 @@ def main() -> int:
         'tab === "RATES"',
         '>Цены / Сезоны</button>',
         '{tab === "RATES" && isManager && <RateManagementBoard />}',
-        '<StaffBoard userRole={user.role} />',
+        '<StaffBoard userRole={user.role} propertyCode={user.property_code} />',
     )
     require(GRID_V9, 'import PMSOwnerGrid from "./PMSOwnerGrid"', "<PMSOwnerGrid agentMode={agentMode} readOnlyMode={readOnlyMode} />")
     require(
