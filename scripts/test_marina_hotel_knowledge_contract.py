@@ -16,14 +16,14 @@ class KnowledgeContract(unittest.TestCase):
         cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "HotelRules")
         keys = {n.target.id for n in cls.body if isinstance(n, ast.AnnAssign)}
         interface = frontend.split("type Rules = {",1)[1].split("};",1)[0]
-        ui = set(re.findall(r"^  ([a-z_]+):", interface, re.M))
+        ui = set(re.findall(r"^  ([a-z0-9_]+):", interface, re.M))
         self.assertEqual(keys, ui)
 
     def test_every_text_fact_has_wizard_location(self):
         interface = frontend.split("type Rules = {",1)[1].split("};",1)[0]
-        fields = set(re.findall(r"^  ([a-z_]+):", interface, re.M))
+        fields = set(re.findall(r"^  ([a-z0-9_]+):", interface, re.M))
         except_form = {"prepayment_type", "prepayment_value", "prepayment_deadline_hours", "free_cancellation_days"}
-        present = set(re.findall(r'key: "([a-z_]+)"', frontend))
+        present = set(re.findall(r'key: "([a-z0-9_]+)"', frontend))
         self.assertEqual(fields - except_form, present)
         self.assertEqual(len(re.findall(r'title: "0[1-5] ·', frontend)), 5)
 
@@ -38,7 +38,7 @@ class KnowledgeContract(unittest.TestCase):
                 if keyword.arg == "max_length" and isinstance(keyword.value, ast.Constant):
                     lengths[field.target.id] = keyword.value.value
         section = frontend.split("const fieldLimits:", 1)[1].split("const important:", 1)[0]
-        actual = {key: int(val) for key, val in re.findall(r"([a-z_]+): (\d+)", section)}
+        actual = {key: int(val) for key, val in re.findall(r"([a-z0-9_]+): (\d+)", section)}
         self.assertEqual(lengths, actual)
         self.assertIn("maxLength={fieldLimits[item.key]}", frontend)
         self.assertIn("Отменить все несохранённые изменения?", frontend)
