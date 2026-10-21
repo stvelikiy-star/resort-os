@@ -29,11 +29,15 @@ async def main():
         assert state["property_code"] == "MARINA_FULL_CI" and state["version"] == 0, state
         policy = dict(state["rules"])
         policy.update(prepayment_type="FIRST_NIGHT", prepayment_value=0,
-                      free_cancellation_days=7, late_cancellation_penalty="1 ночь", pets_policy="Не допускаются",\n                      hotel_short_description="Тестовый отель, только синтетические данные",\n                      location_address="Синтетический адрес",\n                      ai_faq="Вопрос: Есть парковка?\\nОтвет: уточните у администратора")
+                      free_cancellation_days=7, late_cancellation_penalty="1 ночь", pets_policy="Не допускаются",
+                      hotel_short_description="Тестовый отель, только синтетические данные",
+                      location_address="Синтетический адрес",
+                      ai_faq="Вопрос: Есть парковка?\\nОтвет: уточните у администратора")
         create = await client.put("/api/v1/admin/hotel-rules", json={"expected_version": 0, "rules": policy})
         assert create.status_code == 200, (create.status_code, create.text)
         assert create.json()["version"] == 1
-        assert create.json()["rules"]["free_cancellation_days"] == 7\n        assert create.json()["rules"]["hotel_short_description"] == policy["hotel_short_description"]
+        assert create.json()["rules"]["free_cancellation_days"] == 7
+        assert create.json()["rules"]["hotel_short_description"] == policy["hotel_short_description"]
         conflict = await client.put("/api/v1/admin/hotel-rules", json={"expected_version": 0, "rules": policy})
         assert conflict.status_code == 409, (conflict.status_code, conflict.text)
         invalid = await client.put("/api/v1/admin/hotel-rules", json={
@@ -44,7 +48,8 @@ async def main():
         update = await client.put("/api/v1/admin/hotel-rules", json={"expected_version": 1, "rules": changed})
         assert update.status_code == 200 and update.json()["version"] == 2, update.text
         read = await client.get("/api/v1/admin/hotel-rules")
-        assert read.status_code == 200 and read.json()["rules"]["pets_policy"] == changed["pets_policy"]\n        assert read.json()["rules"]["ai_faq"] == changed["ai_faq"]
+        assert read.status_code == 200 and read.json()["rules"]["pets_policy"] == changed["pets_policy"]
+        assert read.json()["rules"]["ai_faq"] == changed["ai_faq"]
         sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api"))
         from app.marina_assistant import _safe_property_rules
         dsn = os.environ["DATABASE_URL"].replace("?schema=public", "")
@@ -55,7 +60,9 @@ async def main():
             for role in ("OWNER", "RECEPTION", "MAID"):
                 context = await _safe_property_rules(fake_request, {"property_code": "MARINA_FULL_CI", "role": role})
                 assert context["available"] is True and context["version"] == 2, context
-                assert context["rules"]["pets_policy"] == changed["pets_policy"], context\n                assert context["rules"]["location_address"] == changed["location_address"], context\n                assert context["rules"]["ai_faq"] == changed["ai_faq"], context
+                assert context["rules"]["pets_policy"] == changed["pets_policy"], context
+                assert context["rules"]["location_address"] == changed["location_address"], context
+                assert context["rules"]["ai_faq"] == changed["ai_faq"], context
             foreign = await _safe_property_rules(fake_request, {"property_code": "FOREIGN_HOTEL", "role": "OWNER"})
             assert foreign["available"] is False, foreign
         finally:
