@@ -14,6 +14,7 @@ import HotelFinanceBoard from "./HotelFinanceBoard";
 import HotelSetupBoard from "./HotelSetupBoard";
 import HotelRulesBoard from "./HotelRulesBoard";
 import InboxBoard from "./InboxBoard";
+import WhatsAppWorkspace from "./WhatsAppWorkspace";
 import MarketingBoard from "./MarketingBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV9";
@@ -36,7 +37,7 @@ type User = {
   property_code: string;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF" | "SETTINGS" | "HOTEL_RULES" | "CHANNELS";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "WHATSAPP" | "OPS" | "STAFF" | "SETTINGS" | "HOTEL_RULES" | "CHANNELS";
 
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
@@ -273,6 +274,7 @@ export default function AdminShell() {
           {(canUseReception || isAgent) && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Супершахматка"}</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
+          {canUseReception && <button className={tab === "WHATSAPP" ? "active" : ""} onClick={() => setTab("WHATSAPP")}>WhatsApp / AI</button>}
           {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
           {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
           {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
@@ -325,6 +327,7 @@ export default function AdminShell() {
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
       {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} propertyCode={user.property_code} />}
       {tab === "INBOX" && isManager && moduleEnabled("INBOX") && <InboxBoard />}
+      {tab === "WHATSAPP" && canUseReception && <WhatsAppWorkspace role={user.role} onNavigate={(destination) => setTab(destination)} />}
       {tab === "HOTEL_RULES" && isManager && <HotelRulesBoard />}
       {tab === "SETTINGS" && isManager && <HotelSetupBoard
         onModulesChanged={setEnabledModules}
