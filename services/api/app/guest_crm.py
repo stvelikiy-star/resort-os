@@ -131,14 +131,14 @@ async def guest_crm_detail(
             guest_id,
         )
 
-    # Ratings entered by the guest in the verified room-QR cabinet become part
-    # of their existing long-lived guest history, not a parallel CRM.
-    reviews = await conn.fetch(
-        '''SELECT "stayId",rating,comment,"createdAt","updatedAt"
-           FROM guest_stay_reviews WHERE "propertyId"=$1 AND "guestId"=$2
-           ORDER BY "createdAt" DESC''',
-        pid, guest_id,
-    )
+        # Ratings entered by the guest in the verified room-QR cabinet become part
+        # of their existing long-lived guest history, not a parallel CRM.
+        reviews = await conn.fetch(
+            '''SELECT "stayId",rating,comment,"createdAt","updatedAt"
+               FROM guest_stay_reviews WHERE "propertyId"=$1 AND "guestId"=$2
+               ORDER BY "createdAt" DESC''',
+            pid, guest_id,
+        )
     reviews_by_stay = {
         str(row["stayId"]): {
             "rating": row["rating"],
