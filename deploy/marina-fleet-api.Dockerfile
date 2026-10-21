@@ -4,7 +4,7 @@ WORKDIR /app
 COPY services/api/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY services/api /app/services/api
-COPY scripts/bootstrap_marina_test.py scripts/bootstrap_owner.py scripts/marina_fleet_seed.py /app/scripts/
+COPY scripts/bootstrap_marina_test.py scripts/bootstrap_owner.py scripts/marina_fleet_seed.py scripts/marina_green_poll.py /app/scripts/
 RUN useradd -m -u 10001 marina && chown -R marina:marina /app
 USER marina
 EXPOSE 8000
