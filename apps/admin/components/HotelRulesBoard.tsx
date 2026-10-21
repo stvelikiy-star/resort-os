@@ -142,7 +142,13 @@ export default function HotelRulesBoard() {
     {error && <div className="error-box" role="alert">{error}</div>}
     {notice && <p role="status">{notice}</p>}
     <form onSubmit={save} className="management-form">
-      <h2>Предоплата</h2>
+      <div className="hotel-knowledge-tabs" role="group" aria-label="Темы базы знаний">
+        {topics.map((topic,index) => <button type="button" key={topic.title} aria-pressed={activeTopic===index} className={activeTopic===index?"selected":""} onClick={() => setActiveTopic(index)}>{topic.title}</button>)}
+      </div>
+      <section className="hotel-knowledge-topic" aria-label={topics[activeTopic].title}>
+        <h2>{topics[activeTopic].title}</h2>
+        <p>{topics[activeTopic].explanation}</p>
+        {activeTopic === 3 && <div className="hotel-knowledge-payment">      <h2>Предоплата</h2>
       <label><span>Как берём предоплату?</span><select value={rules.prepayment_type} onChange={e => { const val=e.target.value as Rules["prepayment_type"]; change("prepayment_type", val); if(val!=="PERCENT" && val!=="FIXED") change("prepayment_value", 0); }}>
         <option value="NOT_SET">Пока не указано</option><option value="NONE">Без предоплаты</option><option value="FIRST_NIGHT">За первые сутки</option><option value="PERCENT">Процент от стоимости</option><option value="FIXED">Фиксированная сумма</option>
       </select></label>
@@ -150,12 +156,7 @@ export default function HotelRulesBoard() {
       <label><span>В течение скольких часов внести предоплату?</span><input type="number" min="1" max="720" placeholder="Не установлено" value={rules.prepayment_deadline_hours ?? ""} onChange={e => change("prepayment_deadline_hours", e.target.value===""?null:Number(e.target.value))} /></label>
       <h2>Отмена бронирования</h2>
       <label><span>Бесплатная отмена за сколько дней до заезда?</span><input type="number" min="0" max="365" placeholder="Не установлено" value={rules.free_cancellation_days ?? ""} onChange={e => change("free_cancellation_days", e.target.value===""?null:Number(e.target.value))} /></label>
-      <div className="hotel-knowledge-tabs" role="group" aria-label="Темы базы знаний">
-        {topics.map((topic,index) => <button type="button" key={topic.title} aria-pressed={activeTopic===index} className={activeTopic===index?"selected":""} onClick={() => setActiveTopic(index)}>{topic.title}</button>)}
-      </div>
-      <section className="hotel-knowledge-topic" aria-label={topics[activeTopic].title}>
-        <h2>{topics[activeTopic].title}</h2>
-        <p>{topics[activeTopic].explanation}</p>
+        </div>}
         {topics[activeTopic].fields.map(item => <label key={item.key} className="management-form-wide"><span>{item.label}</span><textarea maxLength={item.key==="ai_faq"?3000:undefined} rows={item.rows || 2} value={String(rules[item.key] ?? "")} onChange={e => change(item.key, e.target.value)} placeholder={item.hint} /><small>{String(rules[item.key] ?? "").length} символов</small></label>)}
       </section>
       <p className="subtitle">Важно: эти сведения используются для информирования и ответов MARINA AI. Автоматическое удержание денег, возврат или изменение старых броней здесь не включаются.</p>
