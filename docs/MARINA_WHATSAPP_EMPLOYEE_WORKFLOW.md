@@ -13,7 +13,7 @@
 
 ## Employee role contract (current)
 - OWNER, MANAGER: CRM message viewing, status changes, internal notes and link to ReservationRequest, as allowed by current Core endpoints. Outbound WhatsApp **off**.
-- RECEPTION: workspace and operating procedure visible, PMS and reception navigation available; **message content is not exposed** because current Core Inbox authorizes OWNER/MANAGER only. Dedicated receptionist-scoped WhatsApp RBAC is a separate backend change and must precede operational access.
+- RECEPTION: may view only **WHATSAPP** conversations from the authenticated hotel's database, claim a conversation, change its status and add private notes. Existing owner-only request linking, manual assignment and outbound delivery remain unavailable. No other messaging channel may be viewed by reception.
 - AGENT: only PMS, never hotel correspondence.
 - MAID/TECHNICIAN: operational duties, never guest message Inbox.
 
@@ -21,6 +21,6 @@
 - Ensure the navigation CTA remains top-level and usable on mobile.
 - Without providers, status says disconnected; no QR and no fake chats or fake delivery ticks.
 - Filtering to WHATSAPP happens in UI for authorized staff. Server still scopes tenant via trusted property ID; never replace that with client-supplied hotel code.
-- Reception reading must not be turned on with just UI condition; backend RBAC tests required.
+- Reception reading must be enforced by tenant and channel checks in the API; standalone offline RBAC contract tests included in `scripts/test_marina_whatsapp_reception.py`. Verify with a real isolated test hotel before production.
 - Test owner/manager real stored test conversations, linking requests, internal notes and role denial.
 - Typecheck `npm run typecheck --prefix apps/admin` in CI and test in disposable Ubuntu pilot, not production.
