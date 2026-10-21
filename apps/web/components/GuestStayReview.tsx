@@ -13,6 +13,7 @@ const copy = {
 
 export default function GuestStayReview({ token }: { token: string }) {
   const [active,setActive] = useState(false);
+  const [reviewLinks,setReviewLinks] = useState<{google:string|null;gis:string|null;yandex:string|null}>({google:null,gis:null,yandex:null});
   const [locale] = useMarinaGuestLocale();
   const t = copy[locale];
   const [rating,setRating] = useState(5);
@@ -33,7 +34,11 @@ export default function GuestStayReview({ token }: { token: string }) {
     return ()=>window.removeEventListener("marina:guest-session-updated",refreshAccess);
   },[refreshAccess]);
   useEffect(() => {
-    if (!active) return;
+    if (!active) { setReviewLinks({google:null,gis:null,yandex:null}); return; }
+    fetch(`/core/api/v1/guest-os/rooms/${encodeURIComponent(token)}/review-links`,{credentials:"include",cache:"no-store"})
+      .then(res=>res.ok?res.json():null)
+      .then(data=>{if(data?.available_to_all_ratings) setReviewLinks({google:data.google||null,gis:data.gis||null,yandex:data.yandex||null});})
+      .catch(()=>{});
     let live = true;
     fetch(`/core/api/v1/guest-os/rooms/${encodeURIComponent(token)}/review`, {credentials:"include",cache:"no-store"})
       .then(async res=>res.ok ? res.json() : null)
@@ -64,6 +69,13 @@ export default function GuestStayReview({ token }: { token: string }) {
         <button type="submit" className="guest-os-primary" disabled={busy || saved} style={{marginTop:15}}>{busy?"…":t.save}</button>
         {notice&&<p role="status">{notice}</p>}
       </form>}
+      {active && Object.values(reviewLinks).some(Boolean) && <aside style={{marginTop:18}}>
+        <strong>{locale==="ru"?"Публичный отзыв — по вашему желанию":locale==="kg"?"Ачык пикир — каалооңуз боюнча":locale==="kz"?"Ашық пікір — өз қалауыңыз бойынша":"Public review — your choice"}</strong>
+        <p>{locale==="ru"?"Можно оставить честный отзыв на карте независимо от оценки.":locale==="kg"?"Баага карабастан, картада чынчыл пикир калтырсаңыз болот.":locale==="kz"?"Бағаңызға қарамастан картаға шынайы пікір қалдыра аласыз.":"You may leave an honest public review regardless of your rating."}</p>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+          {([["Google Maps",reviewLinks.google],["2GIS",reviewLinks.gis],["Яндекс Карты",reviewLinks.yandex]] as const).map(([label,url])=>url?<a key={label} href={url} target="_blank" rel="noopener noreferrer">{label} ↗</a>:null)}
+        </div>
+      </aside>}
     </section>
     <section className="guest-os-panel" aria-label={t.kol} style={{padding:24}}>
       <h2>{t.kol}</h2><p>{t.kolInfo}</p>
