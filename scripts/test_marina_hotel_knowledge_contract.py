@@ -27,6 +27,22 @@ class KnowledgeContract(unittest.TestCase):
         self.assertEqual(fields - except_form, present)
         self.assertEqual(len(re.findall(r'title: "0[1-5] ·', frontend)), 5)
 
+    def test_frontend_lengths_match_backend(self):
+        tree = ast.parse(backend)
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "HotelRules")
+        lengths = {}
+        for field in cls.body:
+            if not isinstance(field, ast.AnnAssign) or not isinstance(field.value, ast.Call):
+                continue
+            for keyword in field.value.keywords:
+                if keyword.arg == "max_length" and isinstance(keyword.value, ast.Constant):
+                    lengths[field.target.id] = keyword.value.value
+        section = frontend.split("const fieldLimits:", 1)[1].split("const important:", 1)[0]
+        actual = {key: int(val) for key, val in re.findall(r"([a-z_]+): (\\d+)", section)}
+        self.assertEqual(lengths, actual)
+        self.assertIn("maxLength={fieldLimits[item.key]}", frontend)
+        self.assertIn("Отменить все несохранённые изменения?", frontend)
+
     def test_existing_rules_version_and_ai_binding_preserved(self):
         self.assertIn('expected_version', backend)
         self.assertIn('property_hotel_rules_history', backend)
