@@ -9,6 +9,7 @@ on:
       - 'scripts/marina_fleet_seed.py'
       - 'scripts/marina_fleet_backup.py'
       - 'scripts/marina_ubuntu_preflight.sh'
+      - 'scripts/marina_ubuntu_pilot_launch.sh'
       - '.github/workflows/marina-ubuntu-fleet-ci.yml'
   workflow_dispatch:
 
@@ -29,7 +30,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash -n scripts/marina_ubuntu_preflight.sh
+          bash -n scripts/marina_ubuntu_preflight.sh scripts/marina_ubuntu_pilot_launch.sh
           python3 -m py_compile scripts/marina_fleet.py scripts/marina_fleet_seed.py scripts/marina_fleet_backup.py
           python3 scripts/marina_fleet.py create hotel01 --port-base 15000
           python3 scripts/marina_fleet.py create hotel02 --port-base 15010
@@ -46,7 +47,7 @@ jobs:
           docker compose --env-file .marina-fleet/hotel01.env -f compose.marina-fleet.yaml config --quiet
           docker compose --env-file .marina-fleet/hotel02.env -f compose.marina-fleet.yaml config --quiet
       - name: Launch first synthetic hotel in real Docker
-        run: python3 scripts/marina_fleet.py start hotel01
+        run: bash scripts/marina_ubuntu_pilot_launch.sh
       - name: Verify first hotel's own database, API and UI ports
         shell: bash
         run: |
