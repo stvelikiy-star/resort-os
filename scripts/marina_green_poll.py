@@ -56,12 +56,12 @@ def normalize(item, expected_instance, property_code):
     sender = body.get("senderData") or {}
     chat = sender.get("chatId", "")
     if not isinstance(chat, str) or not re.fullmatch(r"[0-9]{5,18}@c\.us", chat):
-        # Skip unsupported/group/newsletter formats rather than creating wrong contacts.
-        return receipt, None
+        # Never silently discard guest traffic from unsupported chat formats.
+        raise AdapterError("Unsupported WhatsApp chat type; manual reconciliation required")
     message = body.get("messageData") or {}
     if message.get("typeMessage") != "textMessage":
-        # Media will need a separately verified adapter.
-        return receipt, None
+        # Media must not disappear from Green queue without an inbox record.
+        raise AdapterError("Unsupported inbound media; manual reconciliation required")
     content = (message.get("textMessageData") or {}).get("textMessage")
     msg_id = body.get("idMessage")
     if not isinstance(msg_id, str) or not msg_id or not isinstance(content, str) or not content.strip():
