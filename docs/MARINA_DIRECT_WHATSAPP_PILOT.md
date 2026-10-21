@@ -13,9 +13,10 @@ Status: **SOURCE IMPLEMENTED, NOT ENABLED**, 2026-10-21.
   per-property idempotency key and external message identifier.
 - **No n8n, Nextbot, public webhook, browser-held Green token, AI auto-send,
   payment, HOLD or confirmed reservation in this stage.**
-- Group/newsletter/non-text messages are currently unsupported and acknowledged
-  without CRM insertion. Do not launch on hotels needing media/group support
-  before implementing their adapters and consent rules.
+- Group/newsletter/non-text inbound messages are **not acknowledged** and halt
+  the pilot worker, avoiding silent loss; an operator must reconcile them.
+  Do not launch on hotels needing media/group support before implementing their
+  adapters and consent rules.
 - The Core's service key is required. If not configured, the adapter fails
   closed; it never prints tokens or guest content.
 
