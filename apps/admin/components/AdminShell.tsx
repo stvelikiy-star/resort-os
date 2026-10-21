@@ -313,7 +313,7 @@ export default function AdminShell() {
       {tab === "REPORTS" && isManager && <ReportsBoard />}
       {tab === "CONTENT" && isManager && moduleEnabled("CONTENT") && <SiteContentBoard />}
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
-      {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
+      {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} propertyCode={user.property_code} />}
       {tab === "INBOX" && isManager && moduleEnabled("INBOX") && <InboxBoard />}
       {tab === "HOTEL_RULES" && isManager && <HotelRulesBoard />}
       {tab === "SETTINGS" && isManager && <HotelSetupBoard
