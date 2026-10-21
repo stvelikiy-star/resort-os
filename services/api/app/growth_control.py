@@ -138,7 +138,7 @@ async def list_engagements(
         rows = await conn.fetch(
             '''
             SELECT e.id,e."propertyId",e."guestId",e."reservationId",e.kind,e.status,e."dueDate",e."channelHint",
-                   e.title,e.notes,e.score,e."feedbackText",e."completedAt",e."createdAt",e."updatedAt",
+                   e.title,e.notes,e.score,e."starRating",e."feedbackText",e."completedAt",e."createdAt",e."updatedAt",
                    g."firstName",g."lastName",g.phone,g.email,
                    r."bookingNumber",r.status::text AS reservation_status,r."checkIn",r."checkOut"
             FROM guest_engagements e
