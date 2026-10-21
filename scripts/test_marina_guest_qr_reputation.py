@@ -17,7 +17,7 @@ class GuestReputationContract(unittest.TestCase):
     def test_api_is_valid_and_uses_verified_stay(self):
         ast.parse(api)
         self.assertIn("authorized_context(conn, token, tc_guest_session)", api)
-        self.assertEqual(api.count("authorized_context(conn, token, tc_guest_session)"), 2)
+        self.assertEqual(api.count("authorized_context(conn, token, tc_guest_session)"), 3)
         self.assertIn('"propertyId"=$1 AND "stayId"=$2 AND "guestId"=$3', api)
         self.assertIn("ON CONFLICT (\"stayId\")", api)
         self.assertIn('app.include_router(guest_stay_reviews_router)', entry)
