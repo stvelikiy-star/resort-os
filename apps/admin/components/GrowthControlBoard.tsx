@@ -301,12 +301,12 @@ export default function GrowthControlBoard() {
                   {item.feedback_text && <blockquote>{item.feedback_text}</blockquote>}
                 </div>
                 <div className="growth-row-score">
-                  {item.score != null ? <><strong>{item.score}/10</strong><small>NPS факт</small></> : <><strong>—</strong><small>оценки нет</small></>}
+                  {item.star_rating != null ? <><strong>{item.star_rating}/5★</strong><small>{item.recovery_urgent ? "Срочно управляющему" : "Оценка проживания"}</small>{item.score != null && <small>NPS: {item.score}/10</small>}</> : item.score != null ? <><strong>{item.score}/10</strong><small>NPS факт</small></> : <><strong>—</strong><small>оценки нет</small></>}
                 </div>
                 <div className="growth-row-actions">
                   {item.status === "OPEN" && <button className="btn sm" disabled={busyId === item.id} onClick={() => patchStatus(item, "IN_PROGRESS")}>В работу</button>}
                   {item.status === "IN_PROGRESS" && <button className="btn sm" disabled={busyId === item.id} onClick={() => patchStatus(item, "DONE")}>Готово</button>}
-                  {item.kind === "POST_STAY_FEEDBACK" && item.status !== "CANCELLED" && <button className="btn sm primary" onClick={() => { setFeedbackTarget(item); setScore(item.score ?? 10); setFeedbackText(item.feedback_text || ""); }}>Записать оценку</button>}
+                  {item.kind === "POST_STAY_FEEDBACK" && item.status !== "CANCELLED" && <button className="btn sm primary" onClick={() => { setFeedbackTarget(item); setScore(item.score ?? 10); setStars(item.star_rating ?? 5); setFeedbackScale(item.star_rating != null || item.score == null ? "STARS" : "NPS"); setFeedbackText(item.feedback_text || ""); }}>Записать оценку</button>}
                   {!["DONE", "CANCELLED"].includes(item.status) && <button className="btn sm" disabled={busyId === item.id} onClick={() => patchStatus(item, "CANCELLED")}>Отменить</button>}
                 </div>
               </article>
