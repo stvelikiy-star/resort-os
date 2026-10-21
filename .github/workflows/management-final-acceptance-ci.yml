@@ -43,7 +43,7 @@ jobs:
             fix/marina-staging-*)
               git fetch origin "${{ github.base_ref }}" --depth=1
               changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
-              web_changed="$(printf '%s\\n' "$changed" | grep '^apps/web/' || true)"
+              web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
               for path in $web_changed; do
                 case "$path" in
                   'apps/web/app/g/[token]/page.tsx'|\
