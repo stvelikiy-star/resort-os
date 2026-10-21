@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
+from .hotel_rules import load_rules
+from .guest_os import PROPERTY_CODE
 
 router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-stay-review"])
 
@@ -41,6 +43,41 @@ async def get_my_stay_review(
         review = await read_review(conn, qr["propertyId"], stay["stayId"], stay["guestId"])
     return {"review": review, "outbound_authority": "NONE_AUTOMATIC",
             "public_reviews_available_regardless_of_rating": True}
+
+
+@router.get("/rooms/{token}/review-links")
+async def guest_review_links(
+    token: str, request: Request,
+    tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE),
+):
+    """Only an authenticated in-stay guest can view this hotel's approved links.
+    No review gating: the same links are returned for every rating.
+    """
+    from urllib.parse import urlsplit
+
+    async with request.app.state.db.acquire() as conn:
+        await authorized_context(conn, token, tc_guest_session)
+        data = await load_rules(conn, PROPERTY_CODE)
+    approved_hosts = {
+        "google.com", "www.google.com", "maps.google.com", "maps.app.goo.gl",
+        "2gis.kg", "2gis.ru", "go.2gis.com", "2gis.com", "www.2gis.kg",
+        "yandex.ru", "yandex.com", "yandex.kz", "maps.yandex.ru",
+        "maps.yandex.com", "yandex.kg",
+    }
+    def approved_link(raw: str) -> str | None:
+        try:
+            parsed = urlsplit(raw)
+            host = (parsed.hostname or "").lower()
+            return raw if parsed.scheme == "https" and host in approved_hosts and not parsed.username and not parsed.password else None
+        except ValueError:
+            return None
+    rules = data["rules"]
+    return {
+        "google": approved_link(rules.get("review_google_url", "")),
+        "gis": approved_link(rules.get("review_2gis_url", "")),
+        "yandex": approved_link(rules.get("review_yandex_url", "")),
+        "available_to_all_ratings": True,
+    }
 
 
 @router.put("/rooms/{token}/review")
