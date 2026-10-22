@@ -80,6 +80,12 @@ jobs:
           python -m unittest discover -s scripts -p 'test_marina_production_preflight.py' -v
           python scripts/marina_production_preflight.py --env-file .env.marina-production.ci --bootstrap --allow-test-hosts
           bash -n scripts/host_preflight.sh
+          HOST_PREFLIGHT_LABEL='MARINA SMART CI host check' HOST_PREFLIGHT_ROOT="$RUNNER_TEMP/marina-preflight" bash scripts/host_preflight.sh | tee /tmp/marina-host-preflight.log
+          grep -Eq '^RESULT: PASS' /tmp/marina-host-preflight.log
+          ! grep -q '^FAIL:' /tmp/marina-host-preflight.log
+          grep -q '^FACT: cpu_count=' /tmp/marina-host-preflight.log
+          grep -q '^FACT: memory_mb=' /tmp/marina-host-preflight.log
+          grep -q '^FACT: root_free_gb=' /tmp/marina-host-preflight.log
           bash scripts/production_backup_test.sh
       - name: Validate rendered Compose topology and isolation
         run: |
