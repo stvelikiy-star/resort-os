@@ -42,11 +42,11 @@ def main() -> int:
     for marker in (
         '/core/api/v1/auth/me', '/core/api/v1/auth/login', '/core/api/v1/auth/logout',
         'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"])',
-        'const isManager = ["OWNER", "MANAGER"].includes(user.role)', 'type="password"', 'minLength={8}',
+        'const isManager = ["OWNER", "MANAGER"].includes(user.role)', 'type="password"', 'minLength={3}',
     ):
         ok(marker in shell, f"admin auth/RBAC marker: {marker}")
     ok('>Маркетинг</button>' in shell and 'tab === "MARKETING"' in shell, "final Admin retains Marketing")
-    ok('>Агенты</button>' in shell and 'tab === "AGENTS"' in shell, "final Admin includes Agents")
+    ok('>Агентства</button>' in shell and 'tab === "AGENTS"' in shell, "final Admin includes booking agencies")
 
     auth = read("services/api/app/auth.py")
     for marker in (
@@ -54,8 +54,14 @@ def main() -> int:
         'hashlib.sha256(token.encode("utf-8")).hexdigest()', 'Invalid username or password',
         'AUTH_LOGIN_PAIR_MAX_FAILURES', 'AUTH_LOGIN_IP_MAX_FAILURES', 'pg_advisory_lock',
         'row["property_code"] != PROPERTY_CODE', 'require_roles(*allowed_roles: str)',
+        'if not demo and len(self.password) < 8',
     ):
         ok(marker in auth, f"Core auth invariant: {marker}")
+
+    staff_ui = read("apps/admin/components/StaffBoard.tsx")
+    ok('const passwordMin = demo ? 3 : 8' in staff_ui, "staff creation uses 8-character live password policy")
+    staff_api = read("services/api/app/staff_control.py")
+    ok('min_size = 3 if is_demo else 8' in staff_api, "staff API enforces live password policy")
 
     prod = read(".env.production.example")
     for marker in (
