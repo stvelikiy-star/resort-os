@@ -26,7 +26,7 @@ class AdminNavigationTest(unittest.TestCase):
         owner_entry = nav.index('{user.role === "OWNER" && <button className={tab === "WHATSAPP"')
         pms_entry = nav.index('setTab("PMS")')
         self.assertLess(owner_entry, pms_entry)
-        self.assertIn('WhatsApp / MARINA AI</button>}', nav[owner_entry:nav.index("\n", owner_entry)])
+        self.assertIn('WhatsApp / AI</button>}', nav[owner_entry:nav.index("\n", owner_entry)])
 
     def test_owner_dashboard_has_direct_whatsapp_entry(self):
         self.assertIn('isOwner={user.role === "OWNER"}', source)
