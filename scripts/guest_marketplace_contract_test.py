@@ -141,6 +141,8 @@ def test_guest_offer_editor_exposes_curated_kol_media_and_guest_cards_label_imag
     assert 'role="img" aria-label={content.title}' in GUEST
     assert ".guest-offer-grid .guest-managed-offer-image" in (ROOT / "apps/web/app/guest-marketplace.css").read_text(encoding="utf-8")
 
+    external_action = GUEST.split('offer.action_type === "EXTERNAL_URL"', 1)[1].split("} else {", 1)[0]
+    assert external_action.index("window.open(") < external_action.index('await recordOfferEvent(offer, "EXTERNAL_OPEN")')
 
 def test_reception_readiness_is_narrow_role_bounded_handoff():
     assert 'ALLOWED_ROLES = {"OWNER", "MANAGER", "RECEPTION"}' in RECEPTION_CORE
