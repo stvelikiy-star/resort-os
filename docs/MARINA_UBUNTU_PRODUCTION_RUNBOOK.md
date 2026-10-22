@@ -18,7 +18,7 @@ Default per-hotel paths:
 - persistent PostgreSQL, media, n8n data: `/srv/marina-smart/<slug>/data`;
 - local backup points: `/srv/marina-smart/<slug>/backups`.
 
-The host must be Ubuntu/Debian on a supported 64-bit architecture, have working Docker Engine and Compose, outbound image registry access, enough CPU/RAM/disk for the selected feature set, and free or deliberately routed 80/443 ports. The non-destructive host probe accepts `HOST_PREFLIGHT_ROOT` and `HOST_PREFLIGHT_LABEL`; its default remains the existing Three Crowns path and output.
+The package supports Ubuntu/Debian on a supported 64-bit architecture with working Docker Engine and Compose. The probe reports CPU, RAM and free disk as measured facts; it does not impose generic numeric thresholds. Decide whether capacity is sufficient from the actual running stack, measured load, database/media size and backup size. For first-time image pulls, Docker Registry access must work or the required images must already be available locally. Before starting Caddy, identify any existing listener on 80/443 and choose the route. The non-destructive host probe accepts `HOST_PREFLIGHT_ROOT` and `HOST_PREFLIGHT_LABEL`; its default remains the existing Three Crowns path and output.
 
 Example probe after replacing `<slug>` with the intended unique hotel slug:
 
