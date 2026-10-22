@@ -6,6 +6,8 @@ import unittest
 
 FILE = Path(__file__).resolve().parents[1] / "apps/admin/components/AdminShell.tsx"
 source = FILE.read_text(encoding="utf-8")
+DASHBOARD = Path(__file__).resolve().parents[1] / "apps/admin/components/DashboardBoard.tsx"
+dashboard = DASHBOARD.read_text(encoding="utf-8")
 
 
 class AdminNavigationTest(unittest.TestCase):
@@ -25,6 +27,11 @@ class AdminNavigationTest(unittest.TestCase):
         pms_entry = nav.index('setTab("PMS")')
         self.assertLess(owner_entry, pms_entry)
         self.assertIn('WhatsApp / MARINA AI</button>}', nav[owner_entry:nav.index("\n", owner_entry)])
+
+    def test_owner_dashboard_has_direct_whatsapp_entry(self):
+        self.assertIn('isOwner={user.role === "OWNER"}', source)
+        self.assertIn('isOwner && <section className="command-panel" aria-label="WhatsApp и MARINA AI для собственника">', dashboard)
+        self.assertIn('Drill to="WHATSAPP" onNavigate={onNavigate}>Открыть раздел</Drill>', dashboard)
 
     def test_daily_work_order_is_preserved_for_other_roles(self):
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
