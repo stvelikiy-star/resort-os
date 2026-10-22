@@ -30,7 +30,7 @@ for role in ("COOK", "WAITER"):
     )
     StaffPatch(role=role)
 
-for role in ("OWNER", "AGENT", "DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"):
+for role in ("OWNER", "AGENT", "STORE_STAFF", "DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"):
     try:
         StaffCreate(
             username="test-legacy",
