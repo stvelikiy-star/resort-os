@@ -71,29 +71,33 @@ jobs:
           bash -n scripts/host_preflight.sh
       - name: Validate rendered Compose topology and isolation
         run: |
-          docker compose --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-rendered.yml
-          grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://admin.marina-ci.invalid' /tmp/marina-compose-rendered.yml
-          grep -F 'internal: true' /tmp/marina-compose-rendered.yml
-          grep -F 'image: postgres:16.15-alpine' /tmp/marina-compose-rendered.yml
-          grep -F 'image: caddy:2.11.4-alpine' /tmp/marina-compose-rendered.yml
-          grep -F 'image: n8nio/n8n:2.37.10' /tmp/marina-compose-rendered.yml
-          if grep -Eq '(^|[^0-9])5432:5432' /tmp/marina-compose-rendered.yml; then
+          docker compose --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-default.yml
+          docker compose --profile bootstrap --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-bootstrap.yml
+          grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://admin.marina-ci.invalid' /tmp/marina-compose-bootstrap.yml
+          grep -F 'internal: true' /tmp/marina-compose-bootstrap.yml
+          grep -F 'image: postgres:16.15-alpine' /tmp/marina-compose-bootstrap.yml
+          grep -F 'image: caddy:2.11.4-alpine' /tmp/marina-compose-bootstrap.yml
+          grep -F 'image: n8nio/n8n:2.37.10' /tmp/marina-compose-bootstrap.yml
+          if grep -Eq '(^|[^0-9])5432:5432' /tmp/marina-compose-bootstrap.yml; then
             echo 'PostgreSQL must not publish a host port.' >&2; exit 1
           fi
-          if grep -Eq '3korony\.com|THREE_CROWNS|/srv/three-crowns' /tmp/marina-compose-rendered.yml; then
+          if grep -Eq '3korony\.com|THREE_CROWNS|/srv/three-crowns' /tmp/marina-compose-bootstrap.yml; then
             echo 'MARINA render contains a Three Crowns host, property or path.' >&2; exit 1
           fi
           python - <<'PY'
           import yaml
-          data = yaml.safe_load(open('/tmp/marina-compose-rendered.yml'))
+          default = yaml.safe_load(open('/tmp/marina-compose-default.yml'))
+          data = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          assert 'provision' not in default['services']
+          assert data['services']['provision']['profiles'] == ['bootstrap']
           ports = {(p['published'], p['target'], p['protocol']) for p in data['services']['caddy']['ports']}
           assert ports == {('80', 80, 'tcp'), ('443', 443, 'tcp'), ('443', 443, 'udp')}, ports
           assert 'ports' not in data['services']['postgres']
-          assert data['services']['provision']['profiles'] == ['bootstrap']
           assert data['services']['api']['environment']['MARINA_TENANT_CONTEXT_ENABLED'] == 'false'
           assert data['services']['api']['environment']['ENABLE_PAYMENT_OPERATIONS'] == 'false'
           assert data['networks']['backend']['internal'] is True
-          assert data['networks']['backend']['name'] == 'marina-ak-bermet-ci_backend'
+          assert data['networks']['backend']['name'].startswith('marina-ak-bermet-ci_')
+          assert all('ports' not in service for name, service in data['services'].items() if name != 'caddy')
           print('PASS: only Caddy publishes ingress; database private; bootstrap opt-in; per-hotel isolated network')
           PY
       - name: Validate strict Caddy host routing
