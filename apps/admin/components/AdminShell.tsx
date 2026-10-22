@@ -274,7 +274,7 @@ export default function AdminShell() {
           {(canUseReception || isAgent) && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Шахматка"}</button>}
           {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен</button>}
           {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
-          {canUseReception && user.role !== "OWNER" && <button className={tab === "WHATSAPP" ? "active" : ""} onClick={() => setTab("WHATSAPP")}>WhatsApp / MARINA AI</button>
+          {canUseReception && user.role !== "OWNER" && <button className={tab === "WHATSAPP" ? "active" : ""} onClick={() => setTab("WHATSAPP")}>WhatsApp / MARINA AI</button>}
           {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
           {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
           {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
