@@ -60,7 +60,7 @@ const roleLabel: Record<string, string> = {
   AGENT: "Агентство / туроператор",
   MAID: "Горничная",
   TECHNICIAN: "Техник",
-  STORE_STAFF: "Магазин",
+  STORE_STAFF: "Магазин · модуль не подключён",
   // Runtime compatibility marker: DINING_STAFF: "Столовая / ресторан" (legacy enum only; no access granted).\n  DINING_STAFF: "Устаревшая роль · питание",
   COOK: "Повар",
   WAITER: "Официант",
@@ -265,7 +265,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
       {visible.length === 0 && <div className="empty">Сотрудников по фильтру нет.</div>}
       {visible.map((item) => <article className={`staff-row ${!item.active ? "staff-disabled" : ""}`} key={item.id}>
         <div><strong>{item.display_name}</strong><small>@{item.username}</small></div>
-        <div><b>{roleLabel[item.role] || item.role}</b><small>{["DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"].includes(item.role) ? "Устаревшая роль · вход в кабинеты не поддерживается" : item.active ? "Активен" : "Доступ отключён"} · Telegram: {item.telegram_linked ? item.telegram_username ? `@${item.telegram_username}` : "привязан" : "не привязан"}</small></div>
+        <div><b>{roleLabel[item.role] || item.role}</b><small>{["DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"].includes(item.role) ? "Устаревшая роль · вход в кабинеты не поддерживается" : item.role === "STORE_STAFF" ? "Ограниченная роль · операции магазина не подключены" : item.active ? "Активен" : "Доступ отключён"} · Telegram: {item.telegram_linked ? item.telegram_username ? `@${item.telegram_username}` : "привязан" : "не привязан"}</small></div>
         <div><strong>{item.active_tasks}</strong><small>{item.housekeeping_active ? `уборка ${item.housekeeping_active}` : ""}{item.housekeeping_active && item.maintenance_active ? " · " : ""}{item.maintenance_active ? `ремонт ${item.maintenance_active}` : ""}</small></div>
         <div><strong>{item.completed_today}</strong><small>завершено задач</small></div>
         <div><strong>{dateTime(item.last_session_seen_at)}</strong><small>внутренняя сессия</small></div>
