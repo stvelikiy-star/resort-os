@@ -44,7 +44,7 @@ def main() -> int:
         'const canUseOps = canAccess("OPS");',
         '{canUseOps && <button className={tab === "OPS"',
         '{tab === "OPS" && canUseOps && <OperationsBoard user={user} />}',
-        'if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";',
+        '["MAID", "TECHNICIAN"].includes(role || "") ? "OPS"',
         'tab === "RATES"',
         '>Цены / Сезоны</button>',
         '{tab === "RATES" && canAccess("RATES") && <RateManagementBoard />}',
