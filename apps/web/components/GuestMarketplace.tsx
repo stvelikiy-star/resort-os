@@ -379,8 +379,8 @@ export default function GuestMarketplace({ token }: { token: string }) {
         setOfferDone(offer.id);
       } else if (offer.action_type === "EXTERNAL_URL") {
         if (!offer.external_url || !offer.external_url.startsWith("https://")) throw new Error("INVALID_EXTERNAL_URL");
-        await recordOfferEvent(offer, "EXTERNAL_OPEN");
         window.open(offer.external_url, "_blank", "noopener,noreferrer");
+        await recordOfferEvent(offer, "EXTERNAL_OPEN");
         setOfferDone(offer.id);
       } else {
         if (!offer.ai_prompt) throw new Error("MISSING_AI_PROMPT");
@@ -440,7 +440,7 @@ export default function GuestMarketplace({ token }: { token: string }) {
       <div className="guest-offer-grid">{offers.filter((offer) => locale !== "kz" || Boolean(offer.title_kz?.trim() && offer.hook_kz?.trim() && offer.cta_kz?.trim())).map((offer) => {
         const content = localized(offer, locale);
         return <article key={offer.id} className="guest-managed-offer">
-          {offer.image_url && <div className="guest-managed-offer-image" style={{ backgroundImage: `url(${offer.image_url})` }} aria-hidden="true" />}
+          {offer.image_url && <div className="guest-managed-offer-image" role="img" aria-label={content.title} style={{ backgroundImage: `url(${offer.image_url})` }} />}
           <i>{offerGlyph(offer.action_type)}</i><small>{offer.code}</small><h4>{content.title}</h4><p>{content.hook}</p><button disabled={offerBusy === offer.id} onClick={() => void activateOffer(offer)}>{offerDone === offer.id ? (offer.action_type === "GUEST_REQUEST" ? c.requested : c.opened) : content.cta}</button>
         </article>;
       })}</div>

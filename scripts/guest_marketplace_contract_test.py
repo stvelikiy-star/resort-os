@@ -132,6 +132,18 @@ def test_dashboard_contrast_no_longer_blanket_forces_all_descendants_white():
     assert ".room-state-grid>div.state-clean" in CSS
 
 
+def test_guest_offer_editor_exposes_curated_kol_media_and_guest_cards_label_images():
+    assert "const OFFER_IMAGE_PRESETS = [" in OFFERS_ADMIN
+    assert "photo-1649938873286-6c3e5534a6e6" in OFFERS_ADMIN
+    assert "photo-1675157935570-e04938711f1e" in OFFERS_ADMIN
+    assert "Skazka_Canyon" in OFFERS_ADMIN
+    assert 'aria-pressed={form.image_url === preset.url}' in OFFERS_ADMIN
+    assert 'role="img" aria-label={content.title}' in GUEST
+    assert ".guest-offer-grid .guest-managed-offer-image" in (ROOT / "apps/web/app/guest-marketplace.css").read_text(encoding="utf-8")
+
+    external_action = GUEST.split('offer.action_type === "EXTERNAL_URL"', 1)[1].split("} else {", 1)[0]
+    assert external_action.index("window.open(") < external_action.index('await recordOfferEvent(offer, "EXTERNAL_OPEN")')
+
 def test_reception_readiness_is_narrow_role_bounded_handoff():
     assert 'ALLOWED_ROLES = {"OWNER", "MANAGER", "RECEPTION"}' in RECEPTION_CORE
     assert "request_housekeeping_for_arrival" in RECEPTION_CORE
