@@ -8,6 +8,7 @@ on:
       - 'scripts/bootstrap_marina_test.py'
       - 'scripts/provision_empty_marina_property.py'
       - 'scripts/marina_staging_readiness.py'
+      - 'scripts/test_marina_staff_roles.py'
       - '.github/workflows/marina-api-postgres-smoke-ci.yml'
   workflow_dispatch:
 
@@ -72,6 +73,8 @@ jobs:
           npx prisma migrate status
       - name: Install API dependencies
         run: python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+      - name: Verify staff role and portal contract
+        run: python scripts/test_marina_staff_roles.py
       - name: Provision one empty property in disposable PostgreSQL
         run: python scripts/provision_empty_marina_property.py
       - name: Populate synthetic test inventory
