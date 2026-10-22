@@ -43,6 +43,9 @@ jobs:
       RATE_PLAN_CODE: MARINA_DIRECT
       MARINA_PROVISION_CONFIRM: CREATE_ONE_EMPTY_MARINA_PROPERTY
       MARINA_TENANT_CODE: tenant_marina_smoke_ci
+      MARINA_OWNER_USERNAME: marina-smoke-owner
+      MARINA_OWNER_PASSWORD: Only-Synthetic-CI-Owner-Password-2026!
+      MARINA_OWNER_DISPLAY_NAME: Synthetic CI Owner
       APP_ENV: staging
       COOKIE_SECURE: 'false'
       AUTH_TRUST_PROXY_HEADERS: 'false'

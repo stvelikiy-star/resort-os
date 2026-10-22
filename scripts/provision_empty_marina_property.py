@@ -15,10 +15,12 @@ from urllib.parse import unquote, urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import asyncpg
+from argon2 import PasswordHasher
 
 CONFIRMATION = "CREATE_ONE_EMPTY_MARINA_PROPERTY"
 LOCK_KEY = "marina-smart-empty-property-provision-v1"
 CODE_RE = re.compile(r"^[A-Z0-9][A-Z0-9_-]{2,39}$")
+OWNER_PASSWORD_HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
 
 
 def _required(name: str) -> str:
@@ -68,6 +70,15 @@ def validate_environment() -> dict[str, str]:
     rate_plan_code = os.environ.get("RATE_PLAN_CODE", "DIRECT").strip().upper()
     if not CODE_RE.fullmatch(rate_plan_code):
         raise RuntimeError("RATE_PLAN_CODE must be 3-40 uppercase letters, digits, _ or -")
+    owner_username = _required("MARINA_OWNER_USERNAME").lower()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,79}", owner_username):
+        raise RuntimeError("MARINA_OWNER_USERNAME must be 3-80 lowercase letters, digits, ., _ or -")
+    owner_password = _required("MARINA_OWNER_PASSWORD")
+    if len(owner_password) < 16 or len(owner_password) > 256:
+        raise RuntimeError("MARINA_OWNER_PASSWORD must be 16-256 characters")
+    owner_display_name = os.environ.get("MARINA_OWNER_DISPLAY_NAME", "Owner").strip()
+    if not 2 <= len(owner_display_name) <= 160:
+        raise RuntimeError("MARINA_OWNER_DISPLAY_NAME must be 2-160 characters")
 
     return {
         "database_url": database_url.replace("?schema=public", ""),
@@ -78,6 +89,9 @@ def validate_environment() -> dict[str, str]:
         "timezone": timezone,
         "currency": currency,
         "rate_plan_code": rate_plan_code,
+        "owner_username": owner_username,
+        "owner_password": owner_password,
+        "owner_display_name": owner_display_name,
     }
 
 
@@ -107,6 +121,7 @@ async def assert_database_empty(conn: asyncpg.Connection) -> None:
 
 
 async def provision(config: dict[str, str]) -> dict[str, str]:
+    owner_password_hash = OWNER_PASSWORD_HASHER.hash(config["owner_password"])
     conn = await asyncpg.connect(config["database_url"])
     try:
         async with conn.transaction():
@@ -140,6 +155,13 @@ async def provision(config: dict[str, str]) -> dict[str, str]:
                    VALUES ($1,$2,TIME '14:00',TIME '12:00','[]'::jsonb,now(),now())''',
                 uuid.uuid4(), property_id,
             )
+            await conn.execute(
+                '''INSERT INTO staff_users
+                     (id,"propertyId",username,"displayName","passwordHash",role,"isActive","createdAt","updatedAt")
+                   VALUES ($1,$2,$3,$4,$5,'OWNER',true,now(),now())''',
+                uuid.uuid4(), property_id, config["owner_username"],
+                config["owner_display_name"], owner_password_hash,
+            )
 
             # Verify the bootstrap created exactly the intended minimum state.
             result = await conn.fetchrow(
@@ -150,16 +172,24 @@ async def provision(config: dict[str, str]) -> dict[str, str]:
                      (SELECT count(*) FROM property_product_settings) AS product_settings,
                      (SELECT count(*) FROM rooms) AS rooms,
                      (SELECT count(*) FROM room_types) AS room_types,
-                     (SELECT count(*) FROM staff_users) AS staff_users'''
+                     (SELECT count(*) FROM staff_users) AS staff_users,
+                     (SELECT count(*) FROM staff_users WHERE "propertyId"=$1 AND username=$2 AND role='OWNER' AND "isActive") AS owner_users''',
+                property_id, config["owner_username"],
             )
             actual = dict(result)
             expected = {
                 "tenants": 1, "properties": 1, "rate_plans": 1,
                 "product_settings": 1, "rooms": 0, "room_types": 0,
-                "staff_users": 0,
+                "staff_users": 1, "owner_users": 1,
             }
             if actual != expected:
                 raise RuntimeError(f"Unexpected post-provision state: {actual}")
+            saved_password_hash = await conn.fetchval(
+                'SELECT "passwordHash" FROM staff_users WHERE "propertyId"=$1 AND username=$2',
+                property_id, config["owner_username"],
+            )
+            if not OWNER_PASSWORD_HASHER.verify(saved_password_hash, config["owner_password"]):
+                raise RuntimeError("Owner password hash verification failed")
         return {"property_code": config["property_code"], "tenant_code": config["tenant_code"]}
     finally:
         await conn.close()
@@ -171,7 +201,7 @@ async def main() -> None:
     print(
         "MARINA empty-property provisioning OK: "
         f"database={config['database_name']} tenant={result['tenant_code']} "
-        f"property={result['property_code']} rooms=0 room_types=0 staff_users=0"
+        f"property={result['property_code']} rooms=0 room_types=0 owner_users=1"
     )
 
 
