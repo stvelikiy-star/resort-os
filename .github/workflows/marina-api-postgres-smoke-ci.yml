@@ -168,7 +168,7 @@ jobs:
           login_staff = lambda: call(staff_client, "POST", "/api/v1/auth/login", {"username": staff_username, "password": staff_password})
           code, staff_identity = login_staff()
           assert code == 200 and "OPS" in staff_identity["module_permissions"] and not staff_identity["module_permissions_custom"], staff_identity
-          code, _ = call(staff_client, "GET", "/api/v1/admin/finance/summary")
+          code, _ = call(staff_client, "GET", f"/api/v1/admin/finance/summary?from_date={date.today().isoformat()}&to_date={date.today().isoformat()}")
           assert code == 403, ("default role unexpectedly entered finance", code)
 
           code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": ["FINANCE"]})
@@ -177,7 +177,7 @@ jobs:
           assert code == 401, ("permission change did not revoke the old session", code)
           code, staff_identity = login_staff()
           assert code == 200 and staff_identity["module_permissions"] == ["FINANCE"] and staff_identity["module_permissions_custom"], staff_identity
-          code, _ = call(staff_client, "GET", "/api/v1/admin/finance/summary")
+          code, _ = call(staff_client, "GET", f"/api/v1/admin/finance/summary?from_date={date.today().isoformat()}&to_date={date.today().isoformat()}")
           assert code == 200, ("explicit section grant did not reach the API", code)
 
           code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": []})
@@ -186,7 +186,7 @@ jobs:
           assert code == 401, ("revocation did not expire the previous session", code)
           code, _ = login_staff()
           assert code == 200, code
-          code, _ = call(staff_client, "GET", "/api/v1/admin/finance/summary")
+          code, _ = call(staff_client, "GET", f"/api/v1/admin/finance/summary?from_date={date.today().isoformat()}&to_date={date.today().isoformat()}")
           assert code == 403, ("unchecked section remained available through the API", code)
 
           code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": ["STAFF"]})
