@@ -97,12 +97,11 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
         <button className="btn" onClick={load}>Обновить</button>
       </div>
 
-      {isOwner && <section className="command-panel" aria-label="WhatsApp и MARINA AI для собственника">
+      {isOwner && <section className="command-panel" aria-label="Диалоги WhatsApp">
         <div className="command-panel-head">
-          <div><p className="eyebrow">Приоритет собственника</p><h2>WhatsApp / MARINA AI</h2></div>
-          <Drill to="WHATSAPP" onNavigate={onNavigate}>Открыть раздел</Drill>
+          <div><h2>WhatsApp / AI</h2></div>
+          <Drill to="WHATSAPP" onNavigate={onNavigate}>Открыть</Drill>
         </div>
-        <p className="command-note">Входящие диалоги, правила ответов, заявки гостей и состояние подключения — в одном разделе.</p>
       </section>}
 
       <OwnerExecutivePack />
