@@ -126,4 +126,4 @@ def role_or_section_allowed(
         return role in allowed_roles
     if user.get("module_permissions_custom"):
         return has_section_permission(user, path)
-    return role in allowed_roles or has_section_permission(user, path)
+    return role in allowed_roles
