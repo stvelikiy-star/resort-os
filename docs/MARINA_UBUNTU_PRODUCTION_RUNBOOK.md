@@ -48,26 +48,27 @@ All five configured hosts must be distinct. Do not change DNS or point the produ
 1. On the approved Ubuntu host, create `/srv/marina-smart/<slug>` for the checkout and `/srv/marina-smart/<slug>/data/{postgres,media/public,n8n}` with restrictive permissions. Do not reuse another hotel's directory. The pinned n8n image runs as its unprivileged `node` user; inspect the image UID with `docker run --rm --entrypoint id n8nio/n8n:2.37.10` and grant that UID write access only to this hotel's `data/n8n` directory. Keep `media/public` readable by the Caddy container.
 2. Put the tested release checkout in that directory. Copy `.env.marina-production.example` to `.env.marina-production` and set permissions to `600`.
 3. Fill the exact host, property, tenant, and path values. Set `MARINA_RELEASE_SHA` to the exact 40-character Git commit SHA tested by CI. Generate separate 32+ character URL-safe PostgreSQL, automation service, and n8n encryption secrets. Do not put an owner's password in the environment file.
-4. Run the static environment gate:
+4. Configure the selected private S3-compatible off-site backup target before treating this as production-ready: `OFFSITE_BACKUP_REQUIRED=true`, HTTPS endpoint, region, private bucket, dedicated credentials, and `S3_BACKUP_PREFIX=marina/<slug>`. Do not reuse `three-crowns/production` or another hotel's prefix. Keep credentials in the mode-600 environment file and restrict the key to this bucket/prefix.
+5. Run the static environment gate:
 
    ```bash
    python3 scripts/marina_production_preflight.py --env-file .env.marina-production
    ```
 
-5. Run the host probe above and retain its output. Do not proceed on `BLOCKED` or unresolved port/path warnings.
-6. Start only the private PostgreSQL service and wait until healthy:
+6. Run the host probe above and retain its output. Do not proceed on `BLOCKED` or unresolved port/path warnings.
+7. Start only the private PostgreSQL service and wait until healthy:
 
    ```bash
    docker compose --env-file .env.marina-production -f compose.marina-production.yaml up -d postgres
    ```
 
-7. Apply the committed migrations. This command is repeatable; it uses Prisma `migrate deploy`, not `db push`:
+8. Apply the committed migrations. This command is repeatable; it uses Prisma `migrate deploy`, not `db push`:
 
    ```bash
    docker compose --env-file .env.marina-production -f compose.marina-production.yaml run --rm migrate
    ```
 
-8. In a protected operator shell, provide the one-time owner credential without writing it to `.env.marina-production` or shell history. Then run the bootstrap preflight and the isolated bootstrap profile:
+9. In a protected operator shell, provide the one-time owner credential without writing it to `.env.marina-production` or shell history. Then run the bootstrap preflight and the isolated bootstrap profile:
 
    ```bash
    export MARINA_PROVISION_CONFIRM=CREATE_ONE_EMPTY_MARINA_PROPERTY
@@ -80,14 +81,14 @@ All five configured hosts must be distinct. Do not change DNS or point the produ
 
    This action is intentionally one-shot. It refuses any database with rows in public application tables, validates the exact confirmation and dedicated `marina_` database, and rolls back all inserts on error. It creates an empty direct rate plan and product settings with optional modules disabled, plus one OWNER account. It does not import hotel rooms, guest records, prices, reservations, payments, or synthetic inventory.
 
-9. Start the application and edge services:
+10. Start the application and edge services:
 
    ```bash
    docker compose --env-file .env.marina-production -f compose.marina-production.yaml up -d --build
    docker compose --env-file .env.marina-production -f compose.marina-production.yaml ps
    ```
 
-10. Verify all four web/API origins over HTTPS, log in as the new OWNER, check `/health/ready`, and confirm that rooms, rates, guest history and booking operations match only this hotel's approved data. Add actual inventory through the verified hotel setup workflow; never use synthetic seed scripts for a live hotel.
+11. Verify all four web/API origins over HTTPS, log in as the new OWNER, check `/health/ready`, and confirm that rooms, rates, guest history and booking operations match only this hotel's approved data. Add actual inventory through the verified hotel setup workflow; never use synthetic seed scripts for a live hotel.
 
 ## Backup and rollback
 
@@ -101,9 +102,9 @@ COMPOSE_FILE=/srv/marina-smart/<slug>/compose.marina-production.yaml \
 bash /srv/marina-smart/<slug>/scripts/production_backup.sh
 ```
 
-The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. Before production acceptance, copy the backup off-host and perform a clean restore rehearsal on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
+The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. With the required S3 configuration, the shared script uploads each artifact beneath the Marina-specific prefix and verifies each object with a HEAD request. Before production acceptance, perform a clean restore rehearsal from the off-host copy on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
 
-The current repository backup script is designed for local points by default. Off-host retention, Ubuntu systemd scheduling, disk/health alerts, and an observed restore on the actual target still require explicit verification before go-live.
+The backup script has been tested synthetically, but off-host retention policy, Ubuntu systemd scheduling, disk/health alerts, and an observed restore on the actual target still require explicit verification before go-live.
 
 ## Release and final acceptance gates
 

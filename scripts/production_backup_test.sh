@@ -75,6 +75,27 @@ if find "$TMP/backups" -type f -name '*env*' ! -name 'last-success.env' | grep -
   exit 1
 fi
 
+# MARINA must supply its own prefix so the shared script's Three Crowns default
+# can never receive a MARINA backup accidentally.
+cat > "$TMP/root/.env.marina-production" <<'EOF'
+DB_BACKUP_MODE=url
+PG_DUMP_DATABASE_URL=postgresql://marina:secret@db.example.invalid:5432/marina_ci?sslmode=require
+OFFSITE_BACKUP_REQUIRED=true
+S3_ENDPOINT_URL=https://s3.example.invalid
+S3_REGION=test-region-1
+S3_BACKUP_BUCKET=marina-backups
+S3_BACKUP_PREFIX=marina/ak-bermet-ci
+S3_ACCESS_KEY_ID=MARINAACCESSKEY
+S3_SECRET_ACCESS_KEY=MARINASECRETKEY
+EOF
+PATH="$TMP/bin:$PATH" \
+ROOT_DIR="$TMP/root" \
+ENV_FILE="$TMP/root/.env.marina-production" \
+BACKUP_DIR="$TMP/backups-marina" \
+bash "$ROOT/scripts/production_backup.sh" > "$TMP/marina-output.txt"
+grep -q 's3.example.invalid/marina-backups/marina/ak-bermet-ci/' "$TMP/curl.log"
+grep -q '^OFFSITE_STATUS=VERIFIED_UPLOAD$' "$TMP/backups-marina/last-success.env"
+
 # The pre-existing single-server Compose mode must remain functional and must
 # record LOCAL_ONLY rather than pretending an off-site copy exists.
 cat > "$TMP/root/.env.production.compose" <<'EOF'

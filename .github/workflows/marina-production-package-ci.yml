@@ -9,6 +9,8 @@ on:
       - 'deploy/marina-provisioner.Dockerfile'
       - 'scripts/marina_production_preflight.py'
       - 'scripts/test_marina_production_preflight.py'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
       - 'scripts/host_preflight.sh'
       - 'docs/MARINA_UBUNTU_PRODUCTION_RUNBOOK.md'
       - '.github/workflows/marina-production-package-ci.yml'
@@ -55,6 +57,13 @@ jobs:
               'MARINA_TENANT_CODE': 'tenant_ak_bermet_ci',
               'AUTOMATION_SERVICE_KEY': 'ci_automation_service_key_1234567890_ABC',
               'N8N_ENCRYPTION_KEY': 'ci_n8n_encryption_key_1234567890_ABC',
+              'OFFSITE_BACKUP_REQUIRED': 'true',
+              'S3_ENDPOINT_URL': 'https://s3.example.test',
+              'S3_REGION': 'kg-1',
+              'S3_BACKUP_BUCKET': 'marina-backups-ci',
+              'S3_BACKUP_PREFIX': 'marina/ak-bermet-ci',
+              'S3_ACCESS_KEY_ID': 'CIACCESSKEY123456',
+              'S3_SECRET_ACCESS_KEY': 'ci_secret_key_1234567890_ABCDEF_123',
               'MARINA_PROVISION_CONFIRM': 'CREATE_ONE_EMPTY_MARINA_PROPERTY',
               'MARINA_OWNER_USERNAME': 'marina-ci-owner',
               'MARINA_OWNER_PASSWORD': 'Only-Synthetic-CI-Owner-Password-2026!',
@@ -69,6 +78,7 @@ jobs:
           python -m unittest discover -s scripts -p 'test_marina_production_preflight.py' -v
           python scripts/marina_production_preflight.py --env-file .env.marina-production.ci --bootstrap --allow-test-hosts
           bash -n scripts/host_preflight.sh
+          bash scripts/production_backup_test.sh
       - name: Validate rendered Compose topology and isolation
         run: |
           docker compose --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-default.yml

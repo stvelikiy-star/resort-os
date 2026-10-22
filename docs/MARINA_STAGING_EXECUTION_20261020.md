@@ -37,3 +37,10 @@ Update: 2026-10-22. Railway is not the target infrastructure for this rollout. U
 - `compose.marina-production.yaml`, `.env.marina-production.example`, `deploy/marina/Caddyfile`, the one-shot `scripts/provision_empty_marina_property.py`, and `docs/MARINA_UBUNTU_PRODUCTION_RUNBOOK.md` now form a MARINA-specific Ubuntu deployment package. It is code- and CI-verified only. The provisioner refuses non-empty app databases and requires explicit operator confirmation plus a strong initial OWNER password.
 - No real Ubuntu host, DNS, public HTTPS/WSS, customer data, production database, provider credentials, payments, or live backups were accessed. Actual-host preflight, browser/role acceptance, backup/restore, and rollback remain required before a pilot.
 - The `staging-full-gate` remains skipped; these CI results are not external staging acceptance or production authorization. The release manifest still has `production_cutover_authorized=false` and `external_staging_verified=false`.
+
+
+## Next gate: off-site backup isolation
+
+- Production preflight now fails closed unless `OFFSITE_BACKUP_REQUIRED=true`, an HTTPS S3-compatible endpoint, a private bucket, dedicated credentials, and exact per-hotel prefix `marina/<slug>` are configured. This prevents the shared script's `three-crowns` default from receiving Marina artifacts.
+- Local tests pass for the fail-closed contract and synthetic upload to `marina/ak-bermet-ci`; no real storage account or Ubuntu host was touched. GitHub Actions for this change must complete before it is marked CI-verified.
+- The actual target storage/provider configuration, read-only Ubuntu host preflight, DNS/TLS/WSS, and restore rehearsal remain pending. No SSH/Tailscale host connector is available in this session.

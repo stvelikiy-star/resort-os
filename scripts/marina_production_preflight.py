@@ -7,6 +7,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,39}$")
@@ -124,6 +125,42 @@ def validate(values: dict[str, str], bootstrap: bool = False, allow_test_hosts: 
         errors.append("AUTOMATION_SERVICE_KEY and N8N_ENCRYPTION_KEY must differ")
     if values.get("N8N_IMAGE", "n8nio/n8n:2.37.10").strip() != "n8nio/n8n:2.37.10":
         errors.append("N8N_IMAGE must remain pinned to the audited n8nio/n8n:2.37.10 image")
+
+    # A production deployment must be able to prove a per-hotel off-site copy.
+    # The shared backup script's generic prefix is Three Crowns, so require an
+    # explicit Marina prefix instead of allowing its default to leak across tenants.
+    if values.get("OFFSITE_BACKUP_REQUIRED", "").strip().lower() not in {"1", "true", "yes", "on"}:
+        errors.append("OFFSITE_BACKUP_REQUIRED must be true for a MARINA production deployment")
+    endpoint = values.get("S3_ENDPOINT_URL", "").strip()
+    try:
+        parsed_endpoint = urlsplit(endpoint)
+        if (parsed_endpoint.scheme != "https" or not parsed_endpoint.hostname
+                or parsed_endpoint.username or parsed_endpoint.password
+                or parsed_endpoint.query or parsed_endpoint.fragment):
+            raise ValueError
+    except ValueError:
+        errors.append("S3_ENDPOINT_URL must be an HTTPS object-storage endpoint without credentials, query or fragment")
+    region = values.get("S3_REGION", "").strip()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,62}", region):
+        errors.append("S3_REGION must identify the selected object-storage region")
+    bucket = values.get("S3_BACKUP_BUCKET", "").strip()
+    if (not 3 <= len(bucket) <= 63
+            or not re.fullmatch(r"[a-z0-9][a-z0-9.-]*[a-z0-9]", bucket)
+            or ".." in bucket or ".-" in bucket or "-." in bucket):
+        errors.append("S3_BACKUP_BUCKET must be a valid lowercase object-storage bucket name")
+    prefix = values.get("S3_BACKUP_PREFIX", "").strip().strip("/")
+    expected_prefix = f"marina/{slug}" if slug else "marina/INVALID_SLUG"
+    if (prefix != expected_prefix and not prefix.startswith(expected_prefix + "/")) or any(
+            part in {"", ".", ".."} for part in prefix.split("/")):
+        errors.append("S3_BACKUP_PREFIX must be isolated beneath marina/<MARINA_INSTANCE_SLUG>/")
+    access_key = values.get("S3_ACCESS_KEY_ID", "").strip()
+    secret_key = values.get("S3_SECRET_ACCESS_KEY", "").strip()
+    if len(access_key) < 16 or placeholder(access_key):
+        errors.append("S3_ACCESS_KEY_ID must be configured for the selected off-site backup target")
+    if len(secret_key) < 32 or placeholder(secret_key):
+        errors.append("S3_SECRET_ACCESS_KEY must be a separately generated 32+ character secret")
+    if access_key == secret_key:
+        errors.append("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must differ")
 
     if bootstrap:
         if values.get("MARINA_PROVISION_CONFIRM", "").strip() != CONFIRMATION:

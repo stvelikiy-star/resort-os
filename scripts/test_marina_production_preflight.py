@@ -30,6 +30,13 @@ def valid_values() -> dict[str, str]:
         "AUTOMATION_SERVICE_KEY": "ci_automation_service_key_1234567890_ABC",
         "N8N_ENCRYPTION_KEY": "ci_n8n_encryption_key_1234567890_ABC",
         "N8N_IMAGE": "n8nio/n8n:2.37.10",
+        "OFFSITE_BACKUP_REQUIRED": "true",
+        "S3_ENDPOINT_URL": "https://s3.example.test",
+        "S3_REGION": "kg-1",
+        "S3_BACKUP_BUCKET": "marina-backups-ci",
+        "S3_BACKUP_PREFIX": "marina/ak-bermet-ci",
+        "S3_ACCESS_KEY_ID": "CIACCESSKEY123456",
+        "S3_SECRET_ACCESS_KEY": "ci_secret_key_1234567890_ABCDEF_123",
         "MARINA_PROVISION_CONFIRM": CONFIRMATION,
         "MARINA_OWNER_USERNAME": "marina-ci-owner",
         "MARINA_OWNER_PASSWORD": "Only-Synthetic-CI-Owner-Password-2026!",
@@ -74,6 +81,26 @@ class MarinaProductionPreflightTest(unittest.TestCase):
         errors = validate(values)
         self.assertTrue(any("placeholder/test hostname" in error for error in errors))
         self.assertTrue(any("must be unique" in error for error in errors))
+        self.assertTrue(any("must differ" in error for error in errors))
+
+    def test_requires_isolated_offsite_backup_configuration(self):
+        values = valid_values()
+        values["OFFSITE_BACKUP_REQUIRED"] = "false"
+        values["S3_BACKUP_PREFIX"] = "three-crowns/production"
+        values["S3_ENDPOINT_URL"] = "http://s3.example.test"
+        errors = validate(values, allow_test_hosts=True)
+        self.assertTrue(any("OFFSITE_BACKUP_REQUIRED" in error for error in errors))
+        self.assertTrue(any("S3_BACKUP_PREFIX" in error for error in errors))
+        self.assertTrue(any("S3_ENDPOINT_URL" in error for error in errors))
+
+    def test_rejects_backup_credential_leak_and_prefix_traversal(self):
+        values = valid_values()
+        values["S3_ENDPOINT_URL"] = "https://user:password@s3.example.test"  # credentials belong in dedicated keys
+        values["S3_BACKUP_PREFIX"] = "marina/ak-bermet-ci/../three-crowns"
+        values["S3_SECRET_ACCESS_KEY"] = values["S3_ACCESS_KEY_ID"]
+        errors = validate(values, allow_test_hosts=True)
+        self.assertTrue(any("S3_ENDPOINT_URL" in error for error in errors))
+        self.assertTrue(any("S3_BACKUP_PREFIX" in error for error in errors))
         self.assertTrue(any("must differ" in error for error in errors))
 
     def test_requires_one_shot_confirmation_and_strong_owner_password(self):

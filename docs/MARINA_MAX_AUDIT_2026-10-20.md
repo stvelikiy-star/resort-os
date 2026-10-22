@@ -61,15 +61,23 @@
 - Общий MARINA multi-tenant runtime остаётся выключенным. Целевая схема — отдельная база, API, сеть, volume, настройки и backup-набор на каждый отель.
 
 ### Открытые блокеры до реального пилота
-1. Выполнить read-only preflight на целевом Ubuntu-хосте; состояние сервера из этой рабочей среды не наблюдалось.
-2. Проверить на реальном домене HTTPS/WSS, полный role/browser acceptance, шифрованный off-site backup, отдельное восстановление и откат.
-3. Выполнить внешний staging на AI PROF KG Ubuntu, не затрагивая Three Crowns и клиентские данные.
-4. OTA API и банковский эквайринг остаются выключенными/неподключёнными до официального доступа и провайдерских E2E. CI не доказывает подключение Booking.com/Airbnb/Ostrovok или банков.
+1. Выбрать и настроить отдельное S3-совместимое хранилище для Marina; текущий production env намеренно блокирует preflight без HTTPS endpoint, приватного bucket, уникального `marina/<slug>` prefix и отдельных credentials.
+2. Выполнить read-only preflight целевого Ubuntu-хоста; его состояние не наблюдается из этой сессии и доступного SSH/Tailscale-коннектора нет.
+3. Выполнить staging на AI PROF KG Ubuntu и проверить домен, HTTPS/WSS, полный role/browser acceptance.
+4. Провести off-site backup, отдельный restore и rollback rehearsal на реальном хосте.
+5. OTA API и банковский эквайринг остаются выключенными до официального доступа и провайдерских E2E.
 
 
 ## Проверка инфраструктурного этапа — 2026-10-22
 
 - Текущий проверенный PR #244 commit: `73a9bf06167507adf808eb71f1e2ff905ec870b1`; 66/66 GitHub Actions workflow завершились успешно. Подтверждены MARINA PostgreSQL API smoke, полный синтетический стек, Ubuntu fleet CI и Ubuntu production package CI.
 - Ранее открытые пункты «создать безопасный первичный provisioning» и «подготовить MARINA-пакет для Ubuntu» закрыты на уровне реализации и CI: bootstrap пустого отеля с первым OWNER, изолированный Compose/Caddy, fail-closed env preflight и production runbook готовы. CI не подтверждает работу на настоящем сервере.
-- Остаток до реального пилота: preflight целевого Ubuntu, DNS/TLS/WSS, полный браузерный и ролевой E2E, проверка off-site backup/restore и rollback.
+- Остаток до реального пилота: выбрать/настроить приватное S3-хранилище с отдельным Marina prefix; выполнить preflight целевого Ubuntu, DNS/TLS/WSS, полный браузерный и ролевой E2E, off-site backup/restore и rollback. SSH/Tailscale-коннектора к целевому серверу в текущей сессии нет.
 - `production_cutover_authorized=false`, `external_staging_verified=false`; `staging-full-gate` skipped. Никаких изменений реального сервера, DNS, production данных или платежей не делали.
+
+
+## Этап защиты off-site backup — проверка в работе
+
+- Обнаружен fail-open: статический production preflight разрешал отсутствие удалённой копии, а общий backup runner по умолчанию задаёт `three-crowns` prefix. Исправление требует `OFFSITE_BACKUP_REQUIRED=true`, HTTPS object-storage endpoint, отдельные credentials и префикс строго `marina/<slug>`; отсутствующие значения блокируют preflight.
+- Добавлены негативные тесты на общий/чужой prefix, traversal, секреты в URL и совпадающие credentials; добавлен синтетический запуск общего backup runner с отдельным Marina prefix. Локально прошли 8 unit-тестов, backup script synthetic test, Python compile, Bash syntax и `git diff --check`. GitHub Actions для текущего PR commit ещё должны завершиться до объявления этапа закрытым.
+- Target S3 credentials и реальный restore отсутствуют и не подменяются синтетическими значениями.
