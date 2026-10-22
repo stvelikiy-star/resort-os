@@ -125,13 +125,17 @@ try {
   assert(await mappingPanel.getByText("browser-synthetic / category-1 / rate-1", { exact: true }).count() === 1,
     "Mapping must persist exactly once while the provider stays disconnected");
 
-  const csvPanel = page.getByRole("region", { name: "Bulk CSV import", exact: true });
-  const csvInput = csvPanel.getByRole("textbox", { name: "CSV content", exact: true });
-  const importButton = csvPanel.getByRole("button", { name: "Import", exact: true });
+  const csvPanel = page.getByRole("region", {
+    name: /Bulk CSV import|Массовый импорт CSV|CSV топтук импорт|CSV топтық импорт/,
+  });
+  const csvInput = csvPanel.getByRole("textbox", {
+    name: /CSV content|Содержимое CSV|CSV мазмуну|CSV мазмұны/,
+  });
+  const importButton = csvPanel.getByRole("button", { name: /Import|Импортировать|Импорттоо|Импорттау/ });
   assert(await importButton.isDisabled(), "CSV import must require a preview");
   await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-only,1,CANCELLED");
-  await csvPanel.getByRole("button", { name: "Preview", exact: true }).click();
-  await csvPanel.getByRole("status").filter({ hasText: "Checked: 1" }).waitFor();
+  await csvPanel.getByRole("button", { name: /Preview|Проверить|Текшерүү|Тексеру/ }).click();
+  await csvPanel.getByRole("status").filter({ hasText: /Checked: 1|Проверено: 1|Текшерилди: 1|Тексерілді: 1/ }).waitFor();
   assert(await importButton.isEnabled(), "Successful CSV preview must enable import");
   await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-edited,1,CANCELLED");
   assert(await importButton.isDisabled(), "Editing CSV must invalidate the earlier preview");
