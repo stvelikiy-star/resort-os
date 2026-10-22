@@ -101,6 +101,19 @@ else
   fail "Docker Compose plugin is required"
 fi
 
+# Inventory running containers without reading their environment or touching
+# their lifecycle. This is especially important on the shared AI PROF KG host.
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  CONTAINERS="$(docker ps --format '{{.Names}}|{{.Image}}|{{.Ports}}' 2>/dev/null || true)"
+  if [ -n "$CONTAINERS" ]; then
+    while IFS= read -r CONTAINER; do
+      [ -n "$CONTAINER" ] && fact "running_container=$CONTAINER"
+    done <<< "$CONTAINERS"
+  else
+    fact "running_containers=none"
+  fi
+fi
+
 if command -v git >/dev/null 2>&1; then
   fact "git=$(git --version 2>/dev/null)"
   pass "Git is available"
@@ -141,6 +154,15 @@ for PORT in 80 443; do
   fi
 done
 
+if command -v ss >/dev/null 2>&1; then
+  UDP443="$(ss -lunp 2>/dev/null | awk '$5 ~ /:443$/ {print; exit}')"
+  if [ -n "$UDP443" ]; then
+    warn "UDP/443 is occupied; verify the listener before enabling Caddy HTTP/3: $UDP443"
+  else
+    pass "UDP/443 is currently free for Caddy HTTP/3"
+  fi
+fi
+
 if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk '$4 ~ /:5432$/ {found=1} END {exit !found}'; then
   warn "A process is listening on TCP/5432. Verify PostgreSQL is not exposed on a public interface"
 else
@@ -168,6 +190,11 @@ if command -v systemctl >/dev/null 2>&1; then
   for svc in nginx apache2 httpd caddy; do
     if systemctl is-active --quiet "$svc" 2>/dev/null; then
       warn "Existing web service is active: $svc. Preserve current-site backup and plan a controlled proxy/cutover; do not stop it during preflight"
+    fi
+  done
+  for svc in cloudflared tailscaled; do
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+      fact "existing_network_service_active=$svc (leave running during preflight)"
     fi
   done
 fi

@@ -13,6 +13,7 @@ on:
       - 'scripts/production_backup_test.sh'
       - 'scripts/host_preflight.sh'
       - 'docs/MARINA_UBUNTU_PRODUCTION_RUNBOOK.md'
+      - 'docs/MARINA_PRE_CONNECTION_READINESS_20261022.md'
       - '.github/workflows/marina-production-package-ci.yml'
   workflow_dispatch:
 

@@ -28,7 +28,7 @@ HOST_PREFLIGHT_ROOT='/srv/marina-smart/<slug>' \
 bash scripts/host_preflight.sh
 ```
 
-`BLOCKED` means stop. An occupied 80/443 listener must be identified and a planned route/cutover agreed before any Caddy stack is started. The script does not install, stop, or overwrite anything.
+`BLOCKED` means stop. An occupied TCP 80/443 or UDP 443 listener must be identified and a planned route/cutover agreed before any Caddy stack is started. The script reports running Docker container names/images/published ports and active `cloudflared`/`tailscaled` services without reading container environments or changing their state. Preserve existing n8n, PostgreSQL, control-center, tunnel and systemd services. The script does not install, stop, or overwrite anything.
 
 ## Domain contract
 
