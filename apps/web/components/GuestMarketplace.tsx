@@ -379,8 +379,8 @@ export default function GuestMarketplace({ token }: { token: string }) {
         setOfferDone(offer.id);
       } else if (offer.action_type === "EXTERNAL_URL") {
         if (!offer.external_url || !offer.external_url.startsWith("https://")) throw new Error("INVALID_EXTERNAL_URL");
-        await recordOfferEvent(offer, "EXTERNAL_OPEN");
         window.open(offer.external_url, "_blank", "noopener,noreferrer");
+        await recordOfferEvent(offer, "EXTERNAL_OPEN");
         setOfferDone(offer.id);
       } else {
         if (!offer.ai_prompt) throw new Error("MISSING_AI_PROMPT");
