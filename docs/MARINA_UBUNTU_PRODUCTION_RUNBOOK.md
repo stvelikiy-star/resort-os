@@ -18,7 +18,7 @@ Default per-hotel paths:
 - persistent PostgreSQL, media, n8n data: `/srv/marina-smart/<slug>/data`;
 - local backup points: `/srv/marina-smart/<slug>/backups`.
 
-The host must be Ubuntu/Debian on a supported 64-bit architecture, have working Docker Engine and Compose, outbound image registry access, enough CPU/RAM/disk for the selected feature set, and free or deliberately routed 80/443 ports. The non-destructive host probe accepts `HOST_PREFLIGHT_ROOT` and `HOST_PREFLIGHT_LABEL`; its default remains the existing Three Crowns path and output.
+The host check uses simple requirements: Linux, a supported 64-bit architecture, a usable Docker Engine, and Docker Compose. It reports CPU, RAM, free disk, ports, services, and target path for planning; it does not enforce generic CPU/RAM/disk minimums. Actual capacity is checked against the selected workload during acceptance. The non-destructive host probe accepts `HOST_PREFLIGHT_ROOT` and `HOST_PREFLIGHT_LABEL`.
 
 Example probe after replacing `<slug>` with the intended unique hotel slug:
 
@@ -28,7 +28,7 @@ HOST_PREFLIGHT_ROOT='/srv/marina-smart/<slug>' \
 bash scripts/host_preflight.sh
 ```
 
-`BLOCKED` means stop. An occupied TCP 80/443 or UDP 443 listener must be identified and a planned route/cutover agreed before any Caddy stack is started. The script reports running Docker container names/images/published ports and active `cloudflared`/`tailscaled` services without reading container environments or changing their state. Preserve existing n8n, PostgreSQL, control-center, tunnel and systemd services. The script does not install, stop, or overwrite anything.
+`BLOCKED` means a core Linux, architecture, Docker, or Compose check failed. An occupied TCP 80/443 or UDP 443 listener matters only when planning public Caddy ingress; identify it before starting that ingress. The script reports running Docker containers, ports, resource figures, and active network services without reading container environments or changing state. Preserve existing services. It does not install, stop, or overwrite anything.
 
 ## Domain contract
 
@@ -55,7 +55,7 @@ All five configured hosts must be distinct. Do not change DNS or point the produ
    python3 scripts/marina_production_preflight.py --env-file .env.marina-production
    ```
 
-6. Run the host probe above and retain its output. Do not proceed on `BLOCKED` or unresolved port/path warnings.
+6. Run the host probe above and retain its output. Do not proceed if a core check is `BLOCKED`. Review port ownership before public ingress; create the selected persistent path during deployment with operator privileges.
 7. Start only the private PostgreSQL service and wait until healthy:
 
    ```bash
