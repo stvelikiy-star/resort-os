@@ -6,8 +6,8 @@ Updated: 2026-10-22. This is a preparation record. No connection to the Ubuntu h
 
 | Area | Verified result | Boundary |
 |---|---|---|
-| Candidate | PR #244, commit `78e3ebe1e3dae8def9f4633fc390fba1d537b837` | Draft; not merged or deployed |
-| CI | 66/66 workflows successful on the commit | Synthetic CI is not a real host acceptance |
+| Candidate | PR #244, branch `fix/marina-staging-preflight-20261020`, head `9b410005bdf8e201a839a2252b2d9eb273cb9667` | Open, draft, not merged or deployed; base `marina-smart/channel-mappings-20261016` |
+| CI | 66/66 workflow runs completed successfully on the exact PR head SHA above | Synthetic CI is not a real host acceptance; the external staging gate is not run |
 | Hotel isolation | One Compose project, database, volumes, networks and hostname set per hotel | Actual host paths and network routing still need inspection |
 | Initial hotel | Guarded one-shot empty-property/OWNER provisioning passed disposable PostgreSQL API smoke | Not run on the Ubuntu host or customer data |
 | HTTPS/WSS routing | Strict Caddy configuration and Compose routing passed package CI | Domain, public reachability and real browser cookies/WSS remain unverified |
@@ -41,3 +41,11 @@ The sample environment is intentionally invalid and must fail the static gate un
 ## Current decision
 
 The package is code- and CI-verified. Host access and real storage/domain values are deliberately deferred. The next work item is the read-only host probe; no deploy command should be run before its findings are reviewed.
+
+## Final repository audit — 2026-10-22
+
+- Rechecked PR #244 through the connected GitHub source: open, draft, unmerged; head SHA is `9b410005bdf8e201a839a2252b2d9eb273cb9667`.
+- Rechecked workflow runs attached to that exact SHA: 66 total, all 66 completed successfully, none failed or pending. The Ubuntu package, isolated PostgreSQL API smoke, full-stack synthetic smoke, and Ubuntu hotel-fleet workflows are among the successful runs.
+- The commit is suitable as a **prepared deployment candidate** for the later host staging step. It is **not a production-ready/live deployment**: actual host inventory, chosen ingress and domain, DNS/TLS/WSS, private off-site bucket and credentials, live backup/restore, external staging/browser acceptance, and rollback rehearsal remain unverified.
+- The static production preflight intentionally returns `BLOCKED` with the example environment. That is the safe expected result until the property identity, domain, tested release SHA, and dedicated backup destination are supplied in the protected host environment.
+- No Ubuntu host, DNS, storage provider, production database, customer data, or live service was changed in this phase.
