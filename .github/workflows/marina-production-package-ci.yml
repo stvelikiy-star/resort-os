@@ -14,6 +14,7 @@ on:
       - 'scripts/host_preflight.sh'
       - 'docs/MARINA_UBUNTU_PRODUCTION_RUNBOOK.md'
       - 'docs/MARINA_PRE_CONNECTION_READINESS_20261022.md'
+      - 'docs/MARINA_FINAL_HOSTING_READINESS_2026-10-22.md'
       - '.github/workflows/marina-production-package-ci.yml'
   workflow_dispatch:
 
