@@ -125,7 +125,7 @@ def main() -> int:
     if passed < 70:
         raise AssertionError(f"final acceptance suite unexpectedly small: {passed}")
     print(f"MANAGEMENT_FINAL_ACCEPTANCE_PASS checks={passed}")
-    print("BOUNDARY: public website is frozen; acceptance scope is management/admin/staff/Core only")
+    print("BOUNDARY: public web content/design/marketing remain frozen; the exact Next.js security patch is permitted")
     return 0
 
 
