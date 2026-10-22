@@ -14,7 +14,7 @@
 ## Технические риски
 
 ### P0 — блокируют промышленный запуск
-1. **Отсутствует постоянный stage + проверка фактического целевого окружения.** CI работает на одноразовых ресурсах и не эквивалентен продакшену.
+1. **Постоянный stage и проверка фактического целевого окружения отсутствуют.** Марина-специфичный Ubuntu-пакет и безопасный первичный bootstrap теперь прошли CI, но CI работает на одноразовых ресурсах и не эквивалентен реальному серверу.
 2. **Tenant/Property не принят как единый SaaS режим.** В auth.py и части API работает PROPERTY_CODE; переключатель MARINA_TENANT_CONTEXT_ENABLED по умолчанию отключён. Тестированы два property-pinned API, но единый API для многих tenants, весь auth/read/write/realtime/AI контур не проверен.
 3. **Манифест релиза и ветки не сведены к утверждённому immutable commit.** Есть PR #234 (tenant), #240 (ручные OTA), #241 (CSV), #242 (mapping), #243 (старый Dockerfile) и текущий PR #244; ветки последних правок расходятся. Нельзя бесконтрольно смержить или объявить RC.
 4. **Внешние OTA API не работают автоматически.** Booking/Airbnb/Ostrovok — ручные записи и нормализованный CSV, без официальных credentials, pull/webhook/outbound sync и retry reconciliation.
@@ -61,8 +61,15 @@
 - Общий MARINA multi-tenant runtime остаётся выключенным. Целевая схема — отдельная база, API, сеть, volume, настройки и backup-набор на каждый отель.
 
 ### Открытые блокеры до реального пилота
-1. Создать и проверить безопасный production provisioning нового пустого отеля. Текущие `bootstrap_marina_test.py` и `marina_fleet_seed.py` создают демонстрационные данные; UI `hotel_setup` требует уже существующий объект.
-2. Подготовить MARINA-специфичный deployment-пакет для Ubuntu с доменными маршрутами, HTTPS/WSS, secure cookies, управляемым применением миграций и секретами.
-3. Выполнить read-only preflight именно на целевом Ubuntu-хосте; в этой рабочей среде состояние физического сервера не наблюдалось.
-4. Проверить реальное доменное HTTPS/WSS окружение, полный role/browser acceptance, шифрованный off-site backup, отдельное восстановление и откат.
-5. OTA API и банковский эквайринг остаются выключенными/неподключёнными до официального доступа и провайдерских E2E. CI не доказывает подключение Booking.com/Airbnb/Ostrovok или банков.
+1. Выполнить read-only preflight на целевом Ubuntu-хосте; состояние сервера из этой рабочей среды не наблюдалось.
+2. Проверить на реальном домене HTTPS/WSS, полный role/browser acceptance, шифрованный off-site backup, отдельное восстановление и откат.
+3. Выполнить внешний staging на AI PROF KG Ubuntu, не затрагивая Three Crowns и клиентские данные.
+4. OTA API и банковский эквайринг остаются выключенными/неподключёнными до официального доступа и провайдерских E2E. CI не доказывает подключение Booking.com/Airbnb/Ostrovok или банков.
+
+
+## Проверка инфраструктурного этапа — 2026-10-22
+
+- Текущий проверенный PR #244 commit: `73a9bf06167507adf808eb71f1e2ff905ec870b1`; 66/66 GitHub Actions workflow завершились успешно. Подтверждены MARINA PostgreSQL API smoke, полный синтетический стек, Ubuntu fleet CI и Ubuntu production package CI.
+- Ранее открытые пункты «создать безопасный первичный provisioning» и «подготовить MARINA-пакет для Ubuntu» закрыты на уровне реализации и CI: bootstrap пустого отеля с первым OWNER, изолированный Compose/Caddy, fail-closed env preflight и production runbook готовы. CI не подтверждает работу на настоящем сервере.
+- Остаток до реального пилота: preflight целевого Ubuntu, DNS/TLS/WSS, полный браузерный и ролевой E2E, проверка off-site backup/restore и rollback.
+- `production_cutover_authorized=false`, `external_staging_verified=false`; `staging-full-gate` skipped. Никаких изменений реального сервера, DNS, production данных или платежей не делали.
