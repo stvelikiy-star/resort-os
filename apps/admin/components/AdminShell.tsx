@@ -215,14 +215,14 @@ export default function AdminShell() {
         return;
       }
       const payload = (await response.json()) as User;
-      if (!canEnterAdmin(payload.role)) {
+      if (!canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
         await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
         setUser(null);
         setError("Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.");
         return;
       }
       setUser(payload);
-      setTab(initialTab(payload.role));
+      setTab(initialTab(payload.role, payload.module_permissions || []));
       setPassword("");
     } catch {
       setError("Сервис входа MARINA SMART недоступен. Проверьте API.");
