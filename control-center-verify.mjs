@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const trustedPackageBlobs = new Map([
-  ["apps/admin/package.json", "7f2bff12f481d142ca7c91b02a159f22c9ee364f"],
+  ["apps/admin/package.json", "750dd4a5486bcbac0ba6452d35909a4ce81d927f"],
   ["apps/web/package.json", "81026bed2fee1ca95f0017f7fc30c4cc75dcd5df"],
   ["apps/staff/package.json", "b2e892e15a3da20d88663bed6c78098ba569cef7"],
 ]);
