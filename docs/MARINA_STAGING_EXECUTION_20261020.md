@@ -1,4 +1,6 @@
-# MARINA SMART — execution sequence, 2026-10-20
+# MARINA SMART — execution sequence for own Ubuntu host
+
+Update: 2026-10-22. Railway is not the target infrastructure for this rollout. Use the AI PROF KG Ubuntu host and the owner's domain. References below to previous Railway resources are historical observations only; do not provision or deploy there.
 
 ## Source reconciliation (do not deploy 2026-09-25 baseline blindly)
 - Existing Railway project `MARINA SMART Pilot`: empty production environment.
@@ -11,8 +13,8 @@
 
 ## Required ordered gates
 1. Select a reviewed integration commit that incorporates approved channel changes without losing latest approved UI. Compare trees of mapping / CSV branches, reconcile and run all prescribed CI gates.
-2. Verify approved deployment package with Docker build for API/web/admin/staff. The existing candidate `services/api/Dockerfile` already provides Uvicorn startup; use it in an isolated environment. Do not port `deploy/ak-bermet-test-api.Dockerfile` into the shared app.
-3. Provision separate staging resources; never use Three Crowns PostgreSQL or customer backups. Avoid deploying to the pre-existing Railway production environment without an explicit staging/release decision. Check billing exposure before provisioning resources.
+2. Verify a MARINA-specific deployment package with Docker builds for API/web/admin/staff. `compose.marina-fleet.yaml` is synthetic-only and `compose.production.yaml` / `.env.production.example` currently target Three Crowns (`THREE_CROWNS`, `3korony.com`, `/srv/three-crowns`); do not use those defaults for MARINA. Do not port `deploy/ak-bermet-test-api.Dockerfile` into the shared app.
+3. Use a dedicated isolated environment on the AI PROF KG Ubuntu host for synthetic staging; never use Three Crowns PostgreSQL or customer backups. Preserve existing n8n, control-center services, systemd units, and network tunnels. Do not expose hotel stacks publicly before TLS/proxy and role-access checks.
 4. Run migrations through the documented controlled migration procedure on the new, empty staging DB. No automated application-start bootstrap, no payment/provider activation, no shared customer passwords.
 5. Run `python scripts/marina_staging_readiness.py --api https://YOUR-STAGING-API` (optionally `--web`, `--admin`, `--staff`). Only safe GET requests are sent. A success does not prove authorization or business flows.
 6. Run two-property authenticated login/read/write/role-denial acceptance on synthetic tenants plus isolation, booking concurrency, seasonal pricing, CSV preview/rollback, AI context, i18n, WSS, browser and staff workflows.
@@ -21,8 +23,12 @@
 9. OTA direct integration requires official access, provider-specific mapping, authenticated ingestion, outbound changes and reconciliation; do not advertise automatic synchronization before provider E2E.
 
 ## Current evidence and blockers
-- Source architecture: `stvelikiy-star/resort-os`.
-- Tested PR #241 head 116c65a7aaf50352dc5baf58e52983847f055390 reported 29/29 success in candidate notes; this is not external target verification.
-- `channel-mappings` working tree proposes migration 32; staging and cross-tenant tests remain required.
-- Railway health in Three Crowns environment: offline; Marina Pilot: no services.
-- No production, data, DNS or paid provider changes included in this PR.
+- Source repository: `stvelikiy-star/resort-os`; PR #244 targets `marina-smart/channel-mappings-20261016` at `ded416371a62ab32167585ff9c8a92c729ef8a3c`.
+- Current PR head at this update: `e7f3f94856e40201944f3e76386f030eae6744e8`; candidate source recorded in the manifest: `d7483660bff070556c060e9df0049d70749b7c65`.
+- 65 GitHub Actions workflow runs returned for `e7f3f94`; all 65 have `success` conclusion. The `staging-full-gate` job is explicitly `skipped`; this is not external staging acceptance.
+- MARINA two-property synthetic isolation/restore, full-stack synthetic smoke, Ubuntu fleet synthetic test, API image, AK BERMET CI, and public browser jobs passed.
+- Local checks passed: 405 hardening checks, release contract (36 migrations / 105 critical constraints), 32 MARINA unit tests, Python compile, and `git diff --check`.
+- The Ubuntu fleet Compose is a synthetic-only harness. No real-hotel production provisioning path or MARINA-specific public-domain deployment package has been verified.
+- Actual Ubuntu hardware/services, DNS, HTTPS/WSS, target database backup/restore, and rollback have not been observed from this workspace.
+- Railway observations in the 2026-10-20 version of this runbook are historical and are not part of the chosen deployment plan.
+- No production, real customer data, DNS, payment, or live provider changes were made.
