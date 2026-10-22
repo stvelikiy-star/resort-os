@@ -94,7 +94,9 @@ jobs:
           python scripts/marina_staging_readiness.py --api http://127.0.0.1:18000
           python - <<'PY'
           import json
+          import os
           import urllib.request
+          from http.cookiejar import CookieJar
           from datetime import date, timedelta
           base = "http://127.0.0.1:18000"
           def get(path):
@@ -111,7 +113,26 @@ jobs:
           availability = get(q)
           assert availability["property"] == "MARINA_SMOKE_CI", availability
           assert availability["nights"] == 2, availability
-          print("PASS: synthetic DB migrations, property scope, 12 rooms, 3 categories, API readiness and availability")
+          cookies = CookieJar()
+          client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
+          login = urllib.request.Request(
+              base + "/api/v1/auth/login",
+              data=json.dumps({
+                  "username": os.environ["MARINA_OWNER_USERNAME"],
+                  "password": os.environ["MARINA_OWNER_PASSWORD"],
+              }).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with client.open(login, timeout=8) as result:
+              identity = json.load(result)
+              assert result.status == 200
+          assert identity["username"] == os.environ["MARINA_OWNER_USERNAME"]
+          assert identity["role"] == "OWNER" and identity["property_code"] == "MARINA_SMOKE_CI", identity
+          with client.open(base + "/api/v1/auth/me", timeout=8) as result:
+              me = json.load(result)
+          assert me["username"] == identity["username"] and me["role"] == "OWNER", me
+          print("PASS: disposable DB migrations, empty property + OWNER provisioning, owner login/session, 12 synthetic rooms, API readiness and availability")
           PY
       - name: Print API diagnostics if failed
         if: failure()
