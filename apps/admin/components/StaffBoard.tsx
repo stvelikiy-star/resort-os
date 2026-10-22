@@ -61,10 +61,10 @@ const roleLabel: Record<string, string> = {
   MAID: "Горничная",
   TECHNICIAN: "Техник",
   STORE_STAFF: "Магазин",
-  // Runtime compatibility marker: DINING_STAFF: "Столовая / ресторан" (legacy enum only; no access granted).\n  DINING_STAFF: "Устаревший доступ питания",
+  // Runtime compatibility marker: DINING_STAFF: "Столовая / ресторан" (legacy enum only; no access granted).\n  DINING_STAFF: "Устаревшая роль · питание",
   COOK: "Повар",
   WAITER: "Официант",
-  CONTENT_MANAGER: "Контент-менеджер",
+  CONTENT_MANAGER: "Устаревшая роль · контент",
   BEACH_PARTNER: "Пляжный партнёр (legacy)",
 };
 
@@ -265,7 +265,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
       {visible.length === 0 && <div className="empty">Сотрудников по фильтру нет.</div>}
       {visible.map((item) => <article className={`staff-row ${!item.active ? "staff-disabled" : ""}`} key={item.id}>
         <div><strong>{item.display_name}</strong><small>@{item.username}</small></div>
-        <div><b>{roleLabel[item.role] || item.role}</b><small>{item.active ? "Активен" : "Доступ отключён"} · Telegram: {item.telegram_linked ? item.telegram_username ? `@${item.telegram_username}` : "привязан" : "не привязан"}</small></div>
+        <div><b>{roleLabel[item.role] || item.role}</b><small>{["DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"].includes(item.role) ? "Устаревшая роль · вход в кабинеты не поддерживается" : item.active ? "Активен" : "Доступ отключён"} · Telegram: {item.telegram_linked ? item.telegram_username ? `@${item.telegram_username}` : "привязан" : "не привязан"}</small></div>
         <div><strong>{item.active_tasks}</strong><small>{item.housekeeping_active ? `уборка ${item.housekeeping_active}` : ""}{item.housekeeping_active && item.maintenance_active ? " · " : ""}{item.maintenance_active ? `ремонт ${item.maintenance_active}` : ""}</small></div>
         <div><strong>{item.completed_today}</strong><small>завершено задач</small></div>
         <div><strong>{dateTime(item.last_session_seen_at)}</strong><small>внутренняя сессия</small></div>
@@ -285,7 +285,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
         <div className="management-modal-head"><div><p className="eyebrow">Учётная запись</p><h2>{editing.display_name}</h2><p>@{editing.username}</p></div><button type="button" className="btn mini" onClick={() => setEditing(null)}>Закрыть</button></div>
         <div className="management-form-grid">
           <label><span>Имя сотрудника</span><input required minLength={2} value={editDraft.display_name} onChange={(e) => setEditDraft({ ...editDraft, display_name: e.target.value })} /></label>
-          <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
+          <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{!data.managed_roles.includes(editing.role) && <option value={editing.role} disabled>{roleLabel[editing.role] || editing.role} · устаревшая</option>}{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
           <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={passwordMin} maxLength={demo ? 10 : 256} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder={demo ? "От 3 до 10 символов" : "Не менее 8 символов"} /></label>
         </div>
         <div className="management-truth compact">При смене роли или пароля все активные сессии сотрудника будут немедленно отозваны.</div>
