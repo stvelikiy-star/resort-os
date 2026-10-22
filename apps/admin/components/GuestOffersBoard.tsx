@@ -56,6 +56,15 @@ const REQUEST_CODES = [
   ["MAINTENANCE", "Поломка"],
 ] as const;
 
+const OFFER_IMAGE_PRESETS = [
+  { label: "Озеро Иссык-Куль", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/5/58/Lake_Issyk-Kul%2C_Kyrgyzstan.jpg/1280px-Lake_Issyk-Kul%2C_Kyrgyzstan.jpg" },
+  { label: "Юрта у озера", url: "https://images.unsplash.com/photo-1649938873286-6c3e5534a6e6?auto=format&fit=crop&w=1200&q=80" },
+  { label: "Горы и отдых", url: "https://images.unsplash.com/photo-1675157935570-e04938711f1e?auto=format&fit=crop&w=1200&q=80" },
+  { label: "Прогулка у воды", url: "https://images.unsplash.com/photo-1692771395287-c91badaeb5e3?auto=format&fit=crop&w=1200&q=80" },
+  { label: "Каньон Сказка", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Skazka_Canyon%2C_Kyrgyzstan_%2843713843865%29.jpg/1280px-Skazka_Canyon%2C_Kyrgyzstan_%2843713843865%29.jpg" },
+  { label: "Бешбармак", url: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/%D0%91%D0%B5%D1%88%D0%B1%D0%B0%D1%80%D0%BC%D0%B0%D0%BA.jpg/1280px-%D0%91%D0%B5%D1%88%D0%B1%D0%B0%D1%80%D0%BC%D0%B0%D0%BA.jpg" },
+] as const;
+
 const emptyForm: FormState = {
   code: "",
   title_ru: "",
@@ -269,7 +278,12 @@ export default function GuestOffersBoard() {
           {form.action_type === "GUEST_REQUEST" && <label><span>Тип заявки</span><select value={form.request_code || "ADMIN"} onChange={(e) => setForm((current) => ({ ...current, request_code: e.target.value }))}>{REQUEST_CODES.map(([code, label]) => <option key={code} value={code}>{label}</option>)}</select></label>}
           {form.action_type === "EXTERNAL_URL" && <label className="span-2"><span>HTTPS ссылка</span><input type="url" value={form.external_url || ""} onChange={(e) => setForm((current) => ({ ...current, external_url: e.target.value }))} placeholder="https://partner.example/..." required /></label>}
           {form.action_type === "AI_PROMPT" && <label className="span-2"><span>Стартовый AI-сценарий</span><textarea value={form.ai_prompt || ""} onChange={(e) => setForm((current) => ({ ...current, ai_prompt: e.target.value }))} placeholder="Помоги гостю выбрать вечерний сценарий отдыха на основе подтверждённых сервисов отеля." required /></label>}
-          <label className="span-2"><span>Картинка — HTTPS или /media/…</span><input value={form.image_url || ""} onChange={(e) => setForm((current) => ({ ...current, image_url: e.target.value }))} placeholder="/media/marina-smart/spa.webp" /></label>
+          <div className="guest-offer-image-picker span-2">
+            <div className="guest-offer-image-picker-head"><div><strong>Изображение офера</strong><small>Готовые фотографии из медиасистемы KÖL · можно указать ссылку отеля</small></div>{form.image_url && <button type="button" className="guest-offer-image-clear" onClick={() => setForm((current) => ({ ...current, image_url: "" }))}>Убрать</button>}</div>
+            <div className="guest-offer-image-presets">{OFFER_IMAGE_PRESETS.map((preset) => <button key={preset.url} type="button" className={form.image_url === preset.url ? "active" : ""} aria-pressed={form.image_url === preset.url} onClick={() => setForm((current) => ({ ...current, image_url: preset.url }))}><span style={{ backgroundImage: `url("${preset.url}")` }} /><b>{preset.label}</b></button>)}</div>
+            <label className="guest-offer-image-url"><span>Или вставьте HTTPS / путь /media/…</span><input value={form.image_url || ""} onChange={(e) => setForm((current) => ({ ...current, image_url: e.target.value }))} placeholder="/media/marina-smart/spa.webp" /></label>
+            {form.image_url && <div className="guest-offer-image-preview" role="img" aria-label="Предпросмотр изображения офера" style={{ backgroundImage: `url("${form.image_url}")` }} />}
+          </div>
         </div>
 
         <fieldset><legend>Русский</legend><div className="guest-offer-form-grid"><label><span>Заголовок</span><input value={form.title_ru} onChange={(e) => setForm((current) => ({ ...current, title_ru: e.target.value }))} required /></label><label><span>CTA</span><input value={form.cta_ru} onChange={(e) => setForm((current) => ({ ...current, cta_ru: e.target.value }))} required /></label><label className="span-2"><span>Hook / предложение</span><textarea value={form.hook_ru} onChange={(e) => setForm((current) => ({ ...current, hook_ru: e.target.value }))} required /></label></div></fieldset>
