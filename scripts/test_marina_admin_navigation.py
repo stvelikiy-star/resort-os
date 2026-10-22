@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Navigation contract: all modules remain accessible and operational priorities stay first."""
+"""Navigation contract: operational priorities plus owner-first WhatsApp access."""
 from pathlib import Path
 import re
 import unittest
@@ -9,18 +9,26 @@ source = FILE.read_text(encoding="utf-8")
 
 
 class AdminNavigationTest(unittest.TestCase):
-    def test_every_tab_appears_exactly_once(self):
+    def test_every_tab_has_expected_navigation_entries(self):
         definition = re.search(r"^type Tab = (.+);$", source, flags=re.MULTILINE)
         self.assertIsNotNone(definition)
         tabs = re.findall(r'"([A-Z_]+)"', definition.group(1))
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
         for tab in tabs:
             with self.subTest(tab=tab):
-                self.assertEqual(nav.count(f'setTab("{tab}")'), 1)
+                expected = 2 if tab == "WHATSAPP" else 1
+                self.assertEqual(nav.count(f'setTab("{tab}")'), expected)
 
-    def test_daily_work_is_first(self):
+    def test_owner_whatsapp_is_first_navigation_item(self):
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
-        priority = ["PMS", "RESERVATIONS", "REQUESTS", "WHATSAPP", "RATES",
+        owner_entry = nav.index('{user.role === "OWNER" && <button className={tab === "WHATSAPP"')
+        pms_entry = nav.index('setTab("PMS")')
+        self.assertLess(owner_entry, pms_entry)
+        self.assertIn('WhatsApp / MARINA AI</button>}', nav[owner_entry:nav.index("\n", owner_entry)])
+
+    def test_daily_work_order_is_preserved_for_other_roles(self):
+        nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
+        priority = ["PMS", "RESERVATIONS", "REQUESTS", "RATES",
                     "SERVICES", "OPS", "DASHBOARD", "FINANCE"]
         offsets = [nav.index(f'setTab("{tab}")') for tab in priority]
         self.assertEqual(offsets, sorted(offsets))
@@ -29,7 +37,8 @@ class AdminNavigationTest(unittest.TestCase):
     def test_role_guards_remain(self):
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
         self.assertIn('{(canUseReception || isAgent) && <button', nav)
-        self.assertIn('{canUseReception && <button className={tab === "WHATSAPP"', nav)
+        self.assertIn('{user.role === "OWNER" && <button className={tab === "WHATSAPP"', nav)
+        self.assertIn('{canUseReception && user.role !== "OWNER" && <button className={tab === "WHATSAPP"', nav)
         self.assertIn('{isManager && <button className={tab === "RATES"', nav)
         self.assertIn('{(isManager || canUseReception) && <details', nav)
         self.assertNotIn("GREEN_API_TOKEN_INSTANCE", nav)
