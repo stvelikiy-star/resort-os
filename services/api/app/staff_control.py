@@ -12,16 +12,16 @@ router = APIRouter(prefix="/api/v1/admin/staff", tags=["admin-staff"])
 manager_access = require_roles("OWNER", "MANAGER")
 owner_access = require_roles("OWNER")
 
+# Roles exposed to hotel owners must have a working sign-in surface. Legacy
+# enum values remain in the database for existing records but cannot be assigned.
 ManagedRole = Literal[
     "MANAGER",
     "RECEPTION",
     "MAID",
     "TECHNICIAN",
     "STORE_STAFF",
-    "DINING_STAFF",
     "COOK",
     "WAITER",
-    "CONTENT_MANAGER",
 ]
 MANAGED_ROLES = [
     "MANAGER",
@@ -29,8 +29,8 @@ MANAGED_ROLES = [
     "MAID",
     "TECHNICIAN",
     "STORE_STAFF",
-    "DINING_STAFF",
-    "CONTENT_MANAGER",
+    "COOK",
+    "WAITER",
 ]
 
 
