@@ -7,6 +7,7 @@ type StaffItem = {
   username: string;
   display_name: string;
   role: string;
+  module_permissions: string[];
   active: boolean;
   telegram_linked: boolean;
   telegram_username?: string | null;
@@ -44,7 +45,15 @@ type EditDraft = {
   display_name: string;
   role: string;
   password: string;
+  module_permissions: string[];
 };
+
+const MODULE_GROUPS = [
+  { title: "Работа с бронированиями", items: [["PMS", "Шахматка"], ["RESERVATIONS", "Ресепшен и бронирования"], ["REQUESTS", "Заявки"], ["GROUPS", "Групповые брони"], ["RATES", "Цены и сезоны"], ["CHANNELS", "Каналы продаж"], ["AGENTS", "Агентства"]] },
+  { title: "Гости и связь", items: [["WHATSAPP", "WhatsApp / AI"], ["INBOX", "Все сообщения"], ["GUESTS", "Гости и история"], ["SERVICES", "Сервис гостя"], ["OFFERS", "Предложения гостям"]] },
+  { title: "Работа отеля", items: [["OPS", "Уборка и ремонт"], ["DINING", "Питание и ресторан"], ["ROOM_QR", "QR номеров"], ["POINT_QR", "QR зон"], ["SERVICE_SETTINGS", "Настройки услуг"]] },
+  { title: "Управление", items: [["DASHBOARD", "Главная"], ["FINANCE", "Финансы"], ["REPORTS", "Отчёты и аналитика"], ["GROWTH", "Отзывы и рост"], ["MARKETING", "Маркетинг"], ["CONTENT", "Контент отеля"], ["HOTEL_RULES", "Знания отеля / MARINA AI"], ["SETTINGS", "Настройки гостиницы"], ["STAFF", "Просмотр персонала"]] },
+] as const;
 
 const emptyStaffDraft: StaffDraft = {
   username: "",
@@ -87,7 +96,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState<StaffDraft>(emptyStaffDraft);
   const [editing, setEditing] = useState<StaffItem | null>(null);
-  const [editDraft, setEditDraft] = useState<EditDraft>({ display_name: "", role: "RECEPTION", password: "" });
+  const [editDraft, setEditDraft] = useState<EditDraft>({ display_name: "", role: "RECEPTION", password: "", module_permissions: [] });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -145,7 +154,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
   function beginEdit(item: StaffItem) {
     if (item.role === "OWNER" || item.role === "AGENT") return;
     setEditing(item);
-    setEditDraft({ display_name: item.display_name, role: item.role, password: "" });
+    setEditDraft({ display_name: item.display_name, role: item.role, password: "", module_permissions: item.module_permissions || [] });
     setError(null);
     setNotice(null);
   }
@@ -160,6 +169,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
       const payload: Record<string, unknown> = {
         display_name: editDraft.display_name,
         role: editDraft.role,
+        module_permissions: editDraft.module_permissions,
       };
       if (editDraft.password.trim()) payload.password = editDraft.password;
       const response = await fetch(`/core/api/v1/admin/staff/${editing.id}`, {
@@ -170,7 +180,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось изменить доступ");
       setEditing(null);
-      setNotice(`Доступ сотрудника ${body.display_name} обновлён.${editDraft.password ? " Старые сессии отозваны, пароль изменён." : ""}`);
+      setNotice("Доступ обновлён. Сотруднику нужно войти заново.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка изменения доступа");
@@ -288,7 +298,18 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
           <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{!data.managed_roles.includes(editing.role) && <option value={editing.role} disabled>{roleLabel[editing.role] || editing.role} · устаревшая</option>}{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
           <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={passwordMin} maxLength={demo ? 10 : 256} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder={demo ? "От 3 до 10 символов" : "Не менее 8 символов"} /></label>
         </div>
-        <div className="management-truth compact">При смене роли или пароля все активные сессии сотрудника будут немедленно отозваны.</div>
+        <fieldset className="staff-module-access">
+          <legend>Доступ к разделам</legend>
+          <p>Отметьте разделы, которые будут доступны этому сотруднику. Этот список заменяет стандартный набор доступа по его роли.</p>
+          {MODULE_GROUPS.map((group) => <div className="staff-module-group" key={group.title}>
+            <strong>{group.title}</strong>
+            <div>{group.items.map(([key, title]) => <label key={key}>
+              <input type="checkbox" checked={editDraft.module_permissions.includes(key)} onChange={(event) => setEditDraft((draft) => ({ ...draft, module_permissions: event.target.checked ? [...new Set([...draft.module_permissions, key])] : draft.module_permissions.filter((module) => module !== key) }))} />
+              <span>{title}</span>
+            </label>)}</div>
+          </div>)}
+        </fieldset>
+        <div className="management-truth compact">После сохранения прежние сессии сотрудника отзываются. Новые разделы появятся после повторного входа.</div>
         <div className="management-modal-actions"><button type="button" className="btn" onClick={() => setEditing(null)}>Отмена</button><button className="btn primary" disabled={saving}>{saving ? "Сохраняю…" : "Сохранить"}</button></div>
       </form>
     </div>}

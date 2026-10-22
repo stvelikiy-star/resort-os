@@ -10,6 +10,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
+from .section_permissions import effective_section_permissions, role_or_section_allowed
 
 SESSION_COOKIE = "resort_session"
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -52,6 +53,8 @@ class AuthUser(BaseModel):
     property_code: str
     property_id: str | None = None
     tenant_id: str | None = None
+    module_permissions: list[str] | None = None
+    module_permissions_custom: bool = False
 
 
 def _tenant_context_select_sql() -> str:
@@ -255,6 +258,7 @@ async def current_user(request: Request) -> dict[str, Any]:
             f'''
             SELECT s.id AS session_id, s."expiresAt", s."revokedAt",
                    u.id AS user_id, u.username, u."displayName", u.role::text AS role, u."isActive",
+                   u."modulePermissions" AS module_permissions, (u."modulePermissions" IS NOT NULL) AS module_permissions_custom,
                    p.code AS property_code,
                    {_tenant_context_select_sql()}
             FROM auth_sessions s
@@ -287,12 +291,14 @@ async def current_user(request: Request) -> dict[str, Any]:
         "property_code": row["property_code"],
         "property_id": _optional_uuid_text(row["property_id"]),
         "tenant_id": _optional_uuid_text(row["tenant_id"]),
+        "module_permissions": effective_section_permissions(row["role"], row["module_permissions"]),
+        "module_permissions_custom": bool(row["module_permissions_custom"]),
     }
 
 
-def require_roles(*allowed_roles: str) -> Callable:
-    async def dependency(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
-        if user["role"] not in allowed_roles:
+def require_roles(*allowed_roles: str, module_grant: bool = True) -> Callable:
+    async def dependency(request: Request, user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+        if not role_or_section_allowed(user, request.url.path, allowed_roles, module_grant=module_grant):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permission")
         return user
 
@@ -318,7 +324,9 @@ async def login(payload: LoginPayload, request: Request, response: Response):
             row = await conn.fetchrow(
                 f'''
                 SELECT u.id, u.username, u."displayName", u."passwordHash", u.role::text AS role,
-                       u."isActive", u."propertyId", p.code AS property_code,
+                       u."isActive", u."propertyId", u."modulePermissions" AS module_permissions,
+                       (u."modulePermissions" IS NOT NULL) AS module_permissions_custom,
+                       p.code AS property_code,
                        {_tenant_context_select_sql()}
                 FROM staff_users u
                 JOIN properties p ON p.id = u."propertyId"
@@ -393,6 +401,8 @@ async def login(payload: LoginPayload, request: Request, response: Response):
         property_code=row["property_code"],
         property_id=_optional_uuid_text(row["property_id"]),
         tenant_id=_optional_uuid_text(row["tenant_id"]),
+        module_permissions=effective_section_permissions(row["role"], row["module_permissions"]),
+        module_permissions_custom=bool(row["module_permissions_custom"]),
     )
 
 
@@ -418,4 +428,6 @@ async def me(user: dict[str, Any] = Depends(current_user)):
         property_code=user["property_code"],
         property_id=user.get("property_id"),
         tenant_id=user.get("tenant_id"),
+        module_permissions=user.get("module_permissions", []),
+        module_permissions_custom=bool(user.get("module_permissions_custom")),
     )

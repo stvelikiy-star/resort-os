@@ -9,6 +9,7 @@ on:
       - 'scripts/provision_empty_marina_property.py'
       - 'scripts/marina_staging_readiness.py'
       - 'scripts/test_marina_staff_roles.py'
+      - 'scripts/test_marina_section_permissions.py'
       - '.github/workflows/marina-api-postgres-smoke-ci.yml'
   workflow_dispatch:
 
@@ -75,6 +76,8 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r services/api/requirements.txt
       - name: Verify staff role and portal contract
         run: python scripts/test_marina_staff_roles.py
+      - name: Verify owner-managed section permission contract
+        run: python scripts/test_marina_section_permissions.py
       - name: Provision one empty property in disposable PostgreSQL
         run: python scripts/provision_empty_marina_property.py
       - name: Populate synthetic test inventory
@@ -99,8 +102,10 @@ jobs:
           import json
           import os
           import urllib.request
+          import urllib.error
           from http.cookiejar import CookieJar
           from datetime import date, timedelta
+          import uuid
           base = "http://127.0.0.1:18000"
           def get(path):
               with urllib.request.urlopen(base + path, timeout=8) as result:
@@ -135,7 +140,67 @@ jobs:
           with client.open(base + "/api/v1/auth/me", timeout=8) as result:
               me = json.load(result)
           assert me["username"] == identity["username"] and me["role"] == "OWNER", me
-          print("PASS: disposable DB migrations, empty property + OWNER provisioning, owner login/session, 12 synthetic rooms, API readiness and availability")
+          def call(opener, method, path, payload=None):
+              request = urllib.request.Request(
+                  base + path,
+                  data=json.dumps(payload).encode() if payload is not None else None,
+                  headers={"Content-Type": "application/json"},
+                  method=method,
+              )
+              try:
+                  with opener.open(request, timeout=8) as result:
+                      raw = result.read()
+                      return result.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read()
+                  return exc.code, json.loads(raw) if raw else None
+
+          staff_username = "section-check-" + uuid.uuid4().hex[:10]
+          staff_password = "Synthetic-Section-2026!"
+          code, staff = call(client, "POST", "/api/v1/admin/staff", {
+              "username": staff_username, "display_name": "Synthetic Section Check",
+              "password": staff_password, "role": "MAID",
+          })
+          assert code == 201, (code, staff)
+          staff_id = staff["id"]
+          staff_cookies = CookieJar()
+          staff_client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(staff_cookies))
+          login_staff = lambda: call(staff_client, "POST", "/api/v1/auth/login", {"username": staff_username, "password": staff_password})
+          code, staff_identity = login_staff()
+          assert code == 200 and "OPS" in staff_identity["module_permissions"] and not staff_identity["module_permissions_custom"], staff_identity
+          code, _ = call(staff_client, "GET", "/api/v1/admin/finance/summary")
+          assert code == 403, ("default role unexpectedly entered finance", code)
+
+          code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": ["FINANCE"]})
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/auth/me")
+          assert code == 401, ("permission change did not revoke the old session", code)
+          code, staff_identity = login_staff()
+          assert code == 200 and staff_identity["module_permissions"] == ["FINANCE"] and staff_identity["module_permissions_custom"], staff_identity
+          code, _ = call(staff_client, "GET", "/api/v1/admin/finance/summary")
+          assert code == 200, ("explicit section grant did not reach the API", code)
+
+          code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": []})
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/auth/me")
+          assert code == 401, ("revocation did not expire the previous session", code)
+          code, _ = login_staff()
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/admin/finance/summary")
+          assert code == 403, ("unchecked section remained available through the API", code)
+
+          code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": ["STAFF"]})
+          assert code == 200, code
+          code, _ = login_staff()
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/admin/staff/overview")
+          assert code == 200, ("explicit staff-section grant did not reach read-only overview", code)
+          code, _ = call(staff_client, "POST", "/api/v1/admin/staff", {
+              "username": "forbidden-by-section", "display_name": "Must Not Be Created",
+              "password": staff_password, "role": "RECEPTION",
+          })
+          assert code == 403, ("a STAFF section grant granted owner-only account administration", code)
+          print("PASS: disposable DB migrations, owner login, section grants/revokes, live session revocation, API denial and owner-only staff administration")
           PY
       - name: Print API diagnostics if failed
         if: failure()
