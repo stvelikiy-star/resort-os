@@ -29,6 +29,7 @@ Update: 2026-10-22. Railway is not the target infrastructure for this rollout. U
 - MARINA two-property synthetic isolation/restore, full-stack synthetic smoke, Ubuntu fleet synthetic test, API image, AK BERMET CI, and public browser jobs passed.
 - Local checks passed: 405 hardening checks, release contract (36 migrations / 105 critical constraints), 32 MARINA unit tests, Python compile, and `git diff --check`.
 - The Ubuntu fleet Compose is a synthetic-only harness. No real-hotel production provisioning path or MARINA-specific public-domain deployment package has been verified.
+- `scripts/provision_empty_marina_property.py` now provides a one-shot empty-property bootstrap for a dedicated `marina_…` PostgreSQL database. It requires explicit `APP_ENV` and confirmation, refuses any database with rows in public application tables, and creates only tenant, property, empty direct rate plan and product settings. The disposable PostgreSQL CI smoke runs this before adding synthetic fixtures. It has not been run against any customer or Ubuntu database.
 - Actual Ubuntu hardware/services, DNS, HTTPS/WSS, target database backup/restore, and rollback have not been observed from this workspace.
 - Railway observations in the 2026-10-20 version of this runbook are historical and are not part of the chosen deployment plan.
 - No production, real customer data, DNS, payment, or live provider changes were made.
