@@ -43,3 +43,26 @@
 3. Проверить все несовместимые изменения веток PR #234/240/241/242/244 и сформировать единый RC.
 4. Развернуть изолированный постоянный staging, сделать E2E+rollback; стоимость сервисов согласовать отдельно от проверки.
 5. Только после приёмки связать реальные сайты отелей и проводить поэтапный onboarding.
+
+
+## Обновление проверки — 2026-10-22
+
+### Проверенный кандидат
+- PR #244: `fix/marina-staging-preflight-20261020`; базовая ветка `marina-smart/channel-mappings-20261016`, базовый SHA `ded416371a62ab32167585ff9c8a92c729ef8a3c`.
+- Текущий commit PR на момент проверки: `e7f3f94856e40201944f3e76386f030eae6744e8`; манифест фиксирует последний исходный/test commit `d7483660bff070556c060e9df0049d70749b7c65`.
+- GitHub Actions на `e7f3f94`: 65 возвращённых workflow-запусков завершились `success`. У `Three Crowns Full Staging Gate` job `staging-full-gate` имеет статус `skipped`; это не внешняя staging-приёмка.
+- Дополнительно подтверждены успешные jobs: MARINA Two-Property Isolation and Restore, Full Stack Synthetic Smoke, Ubuntu Hotel Fleet, API Image, AK BERMET и Public Browser.
+- Локально на текущем дереве: hardening 405 checks, release contract 36 миграций/105 ограничений, 32 модульных теста, Python compile и diff check — успешно.
+
+### Решение по размещению
+- Решение владельца от 2026-10-22: Railway не использовать как обязательную инфраструктуру. Целевой контур — собственный Ubuntu-сервер и домен AI PROF KG.
+- `compose.marina-fleet.yaml` — только синтетический стенд; его нельзя использовать для реальных данных гостиницы.
+- `compose.production.yaml`, `.env.production.example` и `docs/SINGLE_SERVER_PRODUCTION_RUNBOOK.md` содержат значения и маршрутизацию Three Crowns (`3korony.com`, `THREE_CROWNS`, `/srv/three-crowns`). Их нельзя копировать на Marina-сервер без отдельной проверенной конфигурации.
+- Общий MARINA multi-tenant runtime остаётся выключенным. Целевая схема — отдельная база, API, сеть, volume, настройки и backup-набор на каждый отель.
+
+### Открытые блокеры до реального пилота
+1. Создать и проверить безопасный production provisioning нового пустого отеля. Текущие `bootstrap_marina_test.py` и `marina_fleet_seed.py` создают демонстрационные данные; UI `hotel_setup` требует уже существующий объект.
+2. Подготовить MARINA-специфичный deployment-пакет для Ubuntu с доменными маршрутами, HTTPS/WSS, secure cookies, управляемым применением миграций и секретами.
+3. Выполнить read-only preflight именно на целевом Ubuntu-хосте; в этой рабочей среде состояние физического сервера не наблюдалось.
+4. Проверить реальное доменное HTTPS/WSS окружение, полный role/browser acceptance, шифрованный off-site backup, отдельное восстановление и откат.
+5. OTA API и банковский эквайринг остаются выключенными/неподключёнными до официального доступа и провайдерских E2E. CI не доказывает подключение Booking.com/Airbnb/Ostrovok или банков.
