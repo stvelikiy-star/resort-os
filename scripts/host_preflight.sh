@@ -42,37 +42,18 @@ case "$ARCH" in
   *) fail "Unsupported/unknown CPU architecture: ${ARCH:-unknown}" ;;
 esac
 
+# Report host capacity as measured facts; this probe does not impose generic
+# CPU, RAM or disk thresholds. Capacity depends on the actual stack and data.
 CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 0)"
 fact "cpu_count=$CPU_COUNT"
-if [ "$CPU_COUNT" -ge 4 ] 2>/dev/null; then
-  pass "CPU meets recommended 4 vCPU baseline"
-elif [ "$CPU_COUNT" -ge 2 ] 2>/dev/null; then
-  warn "CPU is below recommended 4 vCPU baseline"
-else
-  fail "At least 2 vCPU are required for this topology"
-fi
 
 MEM_KB="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
 MEM_MB=$((MEM_KB / 1024))
 fact "memory_mb=$MEM_MB"
-if [ "$MEM_MB" -ge 7500 ]; then
-  pass "RAM meets recommended 8 GB class"
-elif [ "$MEM_MB" -ge 3800 ]; then
-  warn "RAM is usable for a reduced-load start but below recommended 8 GB"
-else
-  fail "Host has less than approximately 4 GB RAM"
-fi
 
 ROOT_FREE_KB="$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}' || echo 0)"
 ROOT_FREE_GB=$((ROOT_FREE_KB / 1024 / 1024))
 fact "root_free_gb=$ROOT_FREE_GB"
-if [ "$ROOT_FREE_GB" -ge 100 ]; then
-  pass "Free disk meets recommended working headroom"
-elif [ "$ROOT_FREE_GB" -ge 50 ]; then
-  warn "Free disk is below recommended 100+ GB headroom"
-else
-  fail "Less than 50 GB free disk is unsuitable for application + database + local backups"
-fi
 
 if [ "$(id -u)" -eq 0 ]; then
   pass "Running with root privileges"
