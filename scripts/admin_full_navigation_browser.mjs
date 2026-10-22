@@ -100,17 +100,28 @@ try {
   assert(await page.getByText("Автосинхронизация не подключена", { exact: true }).count() === 3,
     "Channel provider status must state that all three external connections are disabled");
 
-  const mappingPanel = page.getByRole("region", { name: "Room and rate mapping", exact: true });
-  await mappingPanel.getByLabel("External property ID", { exact: true }).fill("browser-synthetic");
-  await mappingPanel.getByLabel("External room type ID", { exact: true }).fill("category-1");
-  await mappingPanel.getByLabel("External rate plan ID", { exact: true }).fill("rate-1");
-  for (const label of ["MARINA room type", "MARINA rate plan (KGS)"]) {
-    const select = mappingPanel.getByLabel(label, { exact: true });
+  const mappingPanel = page.getByRole("region", {
+    name: /Room and rate mapping|Сопоставление номеров и тарифов|Бөлмө жана тариф байланышы|Бөлме мен тариф сәйкестігі/,
+  });
+  const localizedLabels = {
+    property: /External property ID|ID отеля на площадке|Платформадагы объект ID|Платформадағы нысан ID/,
+    roomType: /External room type ID|ID категории на площадке|Платформадагы категория ID|Платформадағы санат ID/,
+    ratePlan: /External rate plan ID|ID тарифа на площадке|Платформадагы тариф ID|Платформадағы тариф ID/,
+    marinaRoomType: /MARINA room type|Категория MARINA|MARINA категориясы|MARINA санаты/,
+    marinaRatePlan: /MARINA rate plan \(KGS\)|Тариф MARINA \(KGS\)|MARINA тарифи \(KGS\)|MARINA тарифі \(KGS\)/,
+    save: /Save mapping|Сохранить связь|Байланышты сактоо|Байланысты сақтау/,
+    saved: /Saved\. Platform is still disconnected\.|Сохранено\. Площадка ещё не подключена\.|Сакталды\. Платформа туташа элек\.|Сақталды\. Платформа әлі қосылмаған\./,
+  };
+  await mappingPanel.getByLabel(localizedLabels.property).fill("browser-synthetic");
+  await mappingPanel.getByLabel(localizedLabels.roomType).fill("category-1");
+  await mappingPanel.getByLabel(localizedLabels.ratePlan).fill("rate-1");
+  for (const label of [localizedLabels.marinaRoomType, localizedLabels.marinaRatePlan]) {
+    const select = mappingPanel.getByLabel(label);
     await select.locator("option").nth(1).waitFor({ state: "attached" });
     await select.selectOption({ index: 1 });
   }
-  await mappingPanel.getByRole("button", { name: "Save mapping", exact: true }).click();
-  await mappingPanel.getByRole("status").filter({ hasText: "Saved. Platform is still disconnected." }).waitFor();
+  await mappingPanel.getByRole("button", { name: localizedLabels.save }).click();
+  await mappingPanel.getByRole("status").filter({ hasText: localizedLabels.saved }).waitFor();
   assert(await mappingPanel.getByText("browser-synthetic / category-1 / rate-1", { exact: true }).count() === 1,
     "Mapping must persist exactly once while the provider stays disconnected");
 
