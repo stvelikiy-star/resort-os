@@ -46,6 +46,7 @@ EXPECTED_MIGRATIONS = (
     "zz109_marina_review_stars_20261022",
     "zz110_marina_guest_stay_reviews_20261022",
     "zz111_marina_room_wayfinding_20261022",
+    "zz112_marina_staff_module_permissions_20261022",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
