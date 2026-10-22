@@ -3,7 +3,15 @@ name: Public Site Truth CI
 on:
   pull_request:
     paths:
-      - "apps/web/**"
+      - "apps/web/app/**"
+      - "apps/web/components/**"
+      - "apps/web/lib/**"
+      - "apps/web/public/**"
+      - "apps/web/middleware.ts"
+      - "apps/web/next.config.mjs"
+      - "apps/web/postcss.config.mjs"
+      - "apps/web/tailwind.config.ts"
+      - "apps/web/tsconfig.json"
       - "services/api/app/site_content.py"
       - "services/api/data/site_content_defaults.json"
       - "scripts/public_site_truth_guard.py"
@@ -13,11 +21,18 @@ on:
       - "scripts/owner_guest_facts_guard.py"
       - "scripts/guest_os_truth_guard.py"
       - "scripts/public_media_integrity_guard.py"
-      - ".github/workflows/public-site-truth-ci.yml"
   push:
     branches: [main]
     paths:
-      - "apps/web/**"
+      - "apps/web/app/**"
+      - "apps/web/components/**"
+      - "apps/web/lib/**"
+      - "apps/web/public/**"
+      - "apps/web/middleware.ts"
+      - "apps/web/next.config.mjs"
+      - "apps/web/postcss.config.mjs"
+      - "apps/web/tailwind.config.ts"
+      - "apps/web/tsconfig.json"
       - "services/api/app/site_content.py"
       - "services/api/data/site_content_defaults.json"
       - "scripts/public_site_truth_guard.py"
@@ -27,7 +42,6 @@ on:
       - "scripts/owner_guest_facts_guard.py"
       - "scripts/guest_os_truth_guard.py"
       - "scripts/public_media_integrity_guard.py"
-      - ".github/workflows/public-site-truth-ci.yml"
 
 permissions:
   contents: read

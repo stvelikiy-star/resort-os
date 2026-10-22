@@ -42,7 +42,11 @@ def main() -> int:
     for marker in (
         '/core/api/v1/auth/me', '/core/api/v1/auth/login', '/core/api/v1/auth/logout',
         'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"])',
-        'const isManager = ["OWNER", "MANAGER"].includes(user.role)', 'type="password"', 'minLength={3}',
+        'const canAccess = (section: string) => user.module_permissions.includes(section)',
+        'if (!canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom))',
+        'const canUseOps = canAccess("OPS")',
+        '{tab === "RATES" && canAccess("RATES") && <RateManagementBoard />}',
+        'type="password"', 'minLength={3}',
     ):
         ok(marker in shell, f"admin auth/RBAC marker: {marker}")
     ok('>Маркетинг</button>' in shell and 'tab === "MARKETING"' in shell, "final Admin retains Marketing")
@@ -53,7 +57,7 @@ def main() -> int:
         'PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)',
         'hashlib.sha256(token.encode("utf-8")).hexdigest()', 'Invalid username or password',
         'AUTH_LOGIN_PAIR_MAX_FAILURES', 'AUTH_LOGIN_IP_MAX_FAILURES', 'pg_advisory_lock',
-        'row["property_code"] != PROPERTY_CODE', 'require_roles(*allowed_roles: str)',
+        'row["property_code"] != PROPERTY_CODE', 'def require_roles(*allowed_roles: str, module_grant: bool = True)',
         'if not demo and len(self.password) < 8',
     ):
         ok(marker in auth, f"Core auth invariant: {marker}")
