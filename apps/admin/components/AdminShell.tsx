@@ -312,7 +312,7 @@ export default function AdminShell() {
         </nav>
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
-      {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
+      {tab === "DASHBOARD" && isManager && <DashboardBoard isOwner={user.role === "OWNER"} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && (canUseReception || isAgent) && <PMSGrid agentMode={isAgent} readOnlyMode={isReception} />}
       {tab === "RATES" && isManager && <RateManagementBoard />}
       {tab === "GROUPS" && canUseReception && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
