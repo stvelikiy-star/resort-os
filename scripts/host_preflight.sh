@@ -13,8 +13,9 @@ warn() { printf 'WARN: %s\n' "$*"; WARNS=$((WARNS + 1)); }
 fail() { printf 'FAIL: %s\n' "$*"; FAILS=$((FAILS + 1)); }
 fact() { printf 'FACT: %s\n' "$*"; }
 
-printf 'Three Crowns single-server host preflight\n'
-printf '=========================================\n'
+PREFLIGHT_LABEL="${HOST_PREFLIGHT_LABEL:-Three Crowns single-server host preflight}"
+printf '%s\n' "$PREFLIGHT_LABEL"
+printf '%s\n' "$(printf '%*s' "${#PREFLIGHT_LABEL}" '' | tr ' ' '=')"
 
 if [ "$(uname -s 2>/dev/null || true)" = "Linux" ]; then
   pass "Linux host detected"
@@ -130,7 +131,11 @@ for PORT in 80 443; do
     LISTENER="$(netstat -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p"$" {print; exit}')"
   fi
   if [ -n "$LISTENER" ]; then
-    warn "TCP/$PORT is currently occupied (expected if the legacy 3korony.com site is still live); record and plan controlled cutover: $LISTENER"
+    if [ -n "${HOST_PREFLIGHT_LABEL:-}" ]; then
+      warn "TCP/$PORT is occupied; identify the current listener and plan a controlled proxy/cutover: $LISTENER"
+    else
+      warn "TCP/$PORT is currently occupied (expected if the legacy 3korony.com site is still live); record and plan controlled cutover: $LISTENER"
+    fi
   else
     pass "TCP/$PORT is currently free for Caddy"
   fi
@@ -142,7 +147,7 @@ else
   pass "No host-level TCP/5432 listener detected"
 fi
 
-TARGET_ROOT="${THREE_CROWNS_ROOT:-/srv/three-crowns}"
+TARGET_ROOT="${HOST_PREFLIGHT_ROOT:-${THREE_CROWNS_ROOT:-/srv/three-crowns}}"
 fact "target_root=$TARGET_ROOT"
 PARENT="$(dirname "$TARGET_ROOT")"
 if [ -d "$TARGET_ROOT" ]; then
