@@ -15,7 +15,6 @@ expected = {
     "RECEPTION",
     "MAID",
     "TECHNICIAN",
-    "STORE_STAFF",
     "COOK",
     "WAITER",
 }
