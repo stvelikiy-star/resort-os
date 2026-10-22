@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-# Three Crowns Resort OS — non-destructive host capability preflight.
+# MARINA SMART — read-only Docker host inventory.
 # Safe to run before deployment. It does not install packages, stop services,
 # change firewall/DNS, create users, or overwrite application data.
 
@@ -13,7 +13,7 @@ warn() { printf 'WARN: %s\n' "$*"; WARNS=$((WARNS + 1)); }
 fail() { printf 'FAIL: %s\n' "$*"; FAILS=$((FAILS + 1)); }
 fact() { printf 'FACT: %s\n' "$*"; }
 
-PREFLIGHT_LABEL="${HOST_PREFLIGHT_LABEL:-Three Crowns single-server host preflight}"
+PREFLIGHT_LABEL="${HOST_PREFLIGHT_LABEL:-MARINA SMART Docker host check}"
 printf '%s\n' "$PREFLIGHT_LABEL"
 printf '%s\n' "$(printf '%*s' "${#PREFLIGHT_LABEL}" '' | tr ' ' '=')"
 
@@ -44,43 +44,20 @@ esac
 
 CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 0)"
 fact "cpu_count=$CPU_COUNT"
-if [ "$CPU_COUNT" -ge 4 ] 2>/dev/null; then
-  pass "CPU meets recommended 4 vCPU baseline"
-elif [ "$CPU_COUNT" -ge 2 ] 2>/dev/null; then
-  warn "CPU is below recommended 4 vCPU baseline"
-else
-  fail "At least 2 vCPU are required for this topology"
-fi
+# Resource figures are inventory only. Do not impose a universal CPU minimum:
+# actual capacity depends on the selected services and workload.
 
 MEM_KB="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
 MEM_MB=$((MEM_KB / 1024))
 fact "memory_mb=$MEM_MB"
-if [ "$MEM_MB" -ge 7500 ]; then
-  pass "RAM meets recommended 8 GB class"
-elif [ "$MEM_MB" -ge 3800 ]; then
-  warn "RAM is usable for a reduced-load start but below recommended 8 GB"
-else
-  fail "Host has less than approximately 4 GB RAM"
-fi
+# RAM is reported only; validate it against the actual workload during acceptance.
 
 ROOT_FREE_KB="$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}' || echo 0)"
 ROOT_FREE_GB=$((ROOT_FREE_KB / 1024 / 1024))
 fact "root_free_gb=$ROOT_FREE_GB"
-if [ "$ROOT_FREE_GB" -ge 100 ]; then
-  pass "Free disk meets recommended working headroom"
-elif [ "$ROOT_FREE_GB" -ge 50 ]; then
-  warn "Free disk is below recommended 100+ GB headroom"
-else
-  fail "Less than 50 GB free disk is unsuitable for application + database + local backups"
-fi
+# Free disk is reported only; check actual data and backup needs before production use.
 
-if [ "$(id -u)" -eq 0 ]; then
-  pass "Running with root privileges"
-elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-  pass "Passwordless sudo is available"
-else
-  fail "Root or usable sudo access is required"
-fi
+# This is a read-only inventory. Root/sudo is not required to inspect the host.
 
 if command -v docker >/dev/null 2>&1; then
   DOCKER_VERSION="$(docker --version 2>/dev/null || true)"
@@ -174,16 +151,12 @@ fact "target_root=$TARGET_ROOT"
 PARENT="$(dirname "$TARGET_ROOT")"
 if [ -d "$TARGET_ROOT" ]; then
   if [ -w "$TARGET_ROOT" ]; then
-    pass "$TARGET_ROOT exists and is writable"
+    fact "target_path=exists_writable"
   else
-    warn "$TARGET_ROOT exists but current account cannot write it directly"
+    fact "target_path=exists_needs_operator_permissions"
   fi
-elif [ -d "$PARENT" ] && [ -w "$PARENT" ]; then
-  pass "Parent $PARENT is writable; target layout can be created during deployment"
-elif [ "$(id -u)" -eq 0 ] || { command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; }; then
-  pass "Target layout can be created with root/sudo"
 else
-  fail "Cannot create persistent target layout $TARGET_ROOT"
+  fact "target_path=not_created_yet (create it during deployment with operator privileges)"
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
@@ -207,7 +180,7 @@ if [ "$FAILS" -gt 0 ]; then
   exit 1
 fi
 if [ "$WARNS" -gt 0 ]; then
-  printf 'RESULT: PASS WITH WARNINGS — resolve/accept warnings before production cutover\n'
+  printf 'RESULT: PASS WITH NOTES — review ingress notes before public exposure\n'
   exit 0
 fi
-printf 'RESULT: PASS — host satisfies the checked infrastructure requirements\n'
+printf 'RESULT: PASS — Linux/Docker host checks passed\n'
