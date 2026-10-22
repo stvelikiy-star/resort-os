@@ -174,6 +174,11 @@ const exact: Record<string, Phrase> = {
 };
 
 const common: Phrase[] = [
+  { ru: "Магазин · модуль не подключён", kg: "Дүкөн · модуль туташтырыла элек", kz: "Дүкен · модуль қосылмаған", en: "Store · module is not connected" },
+  { ru: "Ограниченная роль · операции магазина не подключены", kg: "Чектелген роль · дүкөн операциялары туташтырыла элек", kz: "Шектеулі рөл · дүкен операциялары қосылмаған", en: "Limited role · store operations are not connected" },
+  { ru: "Устаревшая роль · вход в кабинеты не поддерживается", kg: "Эскирген роль · кабинеттерге кирүү колдоого алынбайт", kz: "Ескірген рөл · кабинеттерге кіруге қолдау жоқ", en: "Legacy role · portal sign-in is not supported" },
+  { ru: "Устаревшая роль · контент", kg: "Эскирген роль · мазмун", kz: "Ескірген рөл · контент", en: "Legacy role · content" },
+  { ru: "Устаревшая роль · питание", kg: "Эскирген роль · тамактануу", kz: "Ескірген рөл · тамақтану", en: "Legacy role · dining" },
   // Guest reviews, WhatsApp and staff access — explicit RU/KG/KZ/EN.
   { ru: "Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.", kg: "Тышкы шлюз кирүү өтүнүчүн өткөргөн жок. Cloudflare Access'ти текшериңиз же жергиликтүү даректи ачыңыз.", kz: "Сыртқы шлюз кіру сұрауын өткізбеді. Cloudflare Access-ті тексеріңіз немесе жергілікті мекенжайды ашыңыз.", en: "The external gateway rejected the sign-in request. Check Cloudflare Access or open the local address." },
   { ru: "Разделы MARINA SMART", kg: "MARINA SMART бөлүмдөрү", kz: "MARINA SMART бөлімдері", en: "MARINA SMART sections" },
