@@ -694,6 +694,7 @@ model StaffUser {
   displayName              String
   passwordHash             String
   role                      StaffRole
+  modulePermissions        Json?                     @db.JsonB
   bookingAgentId            String?                   @db.Uuid
   bookingAgent              BookingAgent?             @relation(fields: [bookingAgentId], references: [id], onDelete: SetNull)
   isActive                 Boolean                   @default(true)

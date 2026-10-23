@@ -18,12 +18,12 @@ class AdminNavigationTest(unittest.TestCase):
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
         for tab in tabs:
             with self.subTest(tab=tab):
-                expected = 2 if tab == "WHATSAPP" else 1
+                expected = 1
                 self.assertEqual(nav.count(f'setTab("{tab}")'), expected)
 
     def test_owner_whatsapp_is_first_navigation_item(self):
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
-        owner_entry = nav.index('{user.role === "OWNER" && <button className={tab === "WHATSAPP"')
+        owner_entry = nav.index('{canAccess("WHATSAPP") && <button className={tab === "WHATSAPP"')
         pms_entry = nav.index('setTab("PMS")')
         self.assertLess(owner_entry, pms_entry)
         self.assertIn('WhatsApp / AI</button>}', nav[owner_entry:nav.index("\n", owner_entry)])
@@ -43,11 +43,10 @@ class AdminNavigationTest(unittest.TestCase):
 
     def test_role_guards_remain(self):
         nav = source.split('<nav className="admin-tabs"', 1)[1].split("</nav>", 1)[0]
-        self.assertIn('{(canUseReception || isAgent) && <button', nav)
-        self.assertIn('{user.role === "OWNER" && <button className={tab === "WHATSAPP"', nav)
-        self.assertIn('{canUseReception && user.role !== "OWNER" && <button className={tab === "WHATSAPP"', nav)
-        self.assertIn('{isManager && <button className={tab === "RATES"', nav)
-        self.assertIn('{(isManager || canUseReception) && <details', nav)
+        self.assertIn('{canAccess("PMS") && <button', nav)
+        self.assertIn('{canAccess("WHATSAPP") && <button', nav)
+        self.assertIn('{canAccess("RATES") && <button', nav)
+        self.assertIn('{user.module_permissions.length > 0 && <details', nav)
         self.assertNotIn("GREEN_API_TOKEN_INSTANCE", nav)
 
     def test_secondary_sections_named(self):

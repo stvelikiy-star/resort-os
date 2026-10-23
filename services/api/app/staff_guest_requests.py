@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .auth import current_user
+from .section_permissions import has_section_permission
 
 router = APIRouter(prefix="/api/v1/ops/guest-requests", tags=["staff-guest-requests"])
 
@@ -33,6 +34,22 @@ def allowed_codes(role: str) -> set[str]:
 def can_handle(role: str, service_code: str | None) -> bool:
     allowed = allowed_codes(role)
     return "*" in allowed or bool(service_code and service_code in allowed)
+
+
+def guest_request_access(user: dict[str, Any], path: str) -> bool:
+    if user.get("module_permissions_custom"):
+        return has_section_permission(user, path)
+    return bool(allowed_codes(user["role"]))
+
+
+def guest_request_codes(user: dict[str, Any]) -> set[str]:
+    if user.get("module_permissions_custom"):
+        return {"*"} if user_has_granted_requests(user) else set()
+    return allowed_codes(user["role"])
+
+
+def user_has_granted_requests(user: dict[str, Any]) -> bool:
+    return "OPS" in user.get("module_permissions", []) or "SERVICES" in user.get("module_permissions", [])
 
 
 def row_to_item(row) -> dict[str, Any]:
@@ -91,8 +108,8 @@ async def list_staff_guest_requests(
     limit: int = Query(default=150, ge=1, le=300),
     user: dict[str, Any] = Depends(current_user),
 ):
-    allowed = allowed_codes(user["role"])
-    if not allowed:
+    allowed = guest_request_codes(user)
+    if not guest_request_access(user, request.url.path) or not allowed:
         raise HTTPException(status_code=403, detail="Guest-request queue not available for role")
     if task_status not in {"ACTIVE", "ALL", "OPEN", "IN_PROGRESS", "DONE", "CANCELLED"}:
         raise HTTPException(status_code=422, detail="Unknown guest-request status")
@@ -120,7 +137,7 @@ async def list_staff_guest_requests(
     }
 
 
-async def load_routed_task_for_update(conn, pid, task_id: uuid.UUID, role: str):
+async def load_routed_task_for_update(conn, pid, task_id: uuid.UUID, user: dict[str, Any]):
     task = await conn.fetchrow(
         '''SELECT id,"serviceCode",status::text AS status,"assignedToId","stayId",source
            FROM operational_tasks
@@ -130,7 +147,9 @@ async def load_routed_task_for_update(conn, pid, task_id: uuid.UUID, role: str):
     )
     if not task:
         raise HTTPException(status_code=404, detail="Guest request not found")
-    if not can_handle(role, task["serviceCode"]):
+    if not guest_request_access(user, "/api/v1/ops/guest-requests") or not (
+        user.get("module_permissions_custom") and user_has_granted_requests(user)
+    ) and not can_handle(user["role"], task["serviceCode"]):
         raise HTTPException(status_code=403, detail="Request type not allowed for role")
     return task
 
@@ -169,14 +188,14 @@ async def record_guest_history(conn, pid, task, task_id: uuid.UUID, event_type: 
 
 @router.post("/{task_id}/claim")
 async def claim_guest_request(task_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(current_user)):
-    allowed = allowed_codes(user["role"])
-    if not allowed:
+    allowed = guest_request_codes(user)
+    if not guest_request_access(user, request.url.path) or not allowed:
         raise HTTPException(status_code=403, detail="Guest-request queue not available for role")
     actor_id = uuid.UUID(user["id"])
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
-            task = await load_routed_task_for_update(conn, pid, task_id, user["role"])
+            task = await load_routed_task_for_update(conn, pid, task_id, user)
             if task["assignedToId"] and task["assignedToId"] != actor_id:
                 raise HTTPException(status_code=409, detail="Request already assigned to another employee")
             if task["status"] not in {"OPEN", "IN_PROGRESS"}:
@@ -197,14 +216,14 @@ async def claim_guest_request(task_id: uuid.UUID, request: Request, user: dict[s
 
 @router.post("/{task_id}/complete")
 async def complete_guest_request(task_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(current_user)):
-    allowed = allowed_codes(user["role"])
-    if not allowed:
+    allowed = guest_request_codes(user)
+    if not guest_request_access(user, request.url.path) or not allowed:
         raise HTTPException(status_code=403, detail="Guest-request queue not available for role")
     actor_id = uuid.UUID(user["id"])
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
-            task = await load_routed_task_for_update(conn, pid, task_id, user["role"])
+            task = await load_routed_task_for_update(conn, pid, task_id, user)
             if task["assignedToId"] != actor_id and user["role"] not in {"OWNER", "MANAGER"}:
                 raise HTTPException(status_code=403, detail="Claim the request before completing it")
             if task["status"] != "IN_PROGRESS":
@@ -226,14 +245,14 @@ async def complete_guest_request(task_id: uuid.UUID, request: Request, user: dic
 
 @router.post("/{task_id}/cancel")
 async def cancel_guest_request(task_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(current_user)):
-    allowed = allowed_codes(user["role"])
-    if not allowed:
+    allowed = guest_request_codes(user)
+    if not guest_request_access(user, request.url.path) or not allowed:
         raise HTTPException(status_code=403, detail="Guest-request queue not available for role")
     actor_id = uuid.UUID(user["id"])
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user["property_code"])
-            task = await load_routed_task_for_update(conn, pid, task_id, user["role"])
+            task = await load_routed_task_for_update(conn, pid, task_id, user)
             if task["status"] not in {"OPEN", "IN_PROGRESS"}:
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_NOT_CANCELLABLE", "status": task["status"]})
             if task["assignedToId"] and task["assignedToId"] != actor_id and user["role"] not in {"OWNER", "MANAGER"}:

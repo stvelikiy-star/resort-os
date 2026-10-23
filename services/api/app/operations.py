@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .auth import current_user, require_roles, trusted_property_id
+from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/ops", tags=["operations"])
 
@@ -68,6 +69,18 @@ def allowed_types_for_role(role: str) -> set[str]:
     if role == "TECHNICIAN":
         return {"MAINTENANCE"}
     return set()
+
+
+def allowed_types_for_user(user: dict[str, Any]) -> set[str]:
+    if user.get("module_permissions_custom"):
+        return TASK_TYPES if user_has_section(user, "OPS") else set()
+    return allowed_types_for_role(user["role"])
+
+
+def has_full_operations_access(user: dict[str, Any]) -> bool:
+    if user.get("module_permissions_custom"):
+        return user_has_section(user, "OPS")
+    return user["role"] in {"OWNER", "MANAGER"}
 
 
 def task_to_dict(row) -> dict[str, Any]:
@@ -170,7 +183,7 @@ async def list_tasks(
     limit: int = Query(default=150, ge=1, le=300),
     user: dict[str, Any] = Depends(current_user),
 ):
-    allowed = allowed_types_for_role(user["role"])
+    allowed = allowed_types_for_user(user)
     if task_type and task_type not in allowed:
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if task_status and task_status not in TASK_STATUSES:
@@ -208,7 +221,7 @@ async def create_task(
     request: Request,
     user: dict[str, Any] = Depends(current_user),
 ):
-    if payload.type not in TASK_TYPES or payload.type not in allowed_types_for_role(user["role"]):
+    if payload.type not in TASK_TYPES or payload.type not in allowed_types_for_user(user):
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if payload.priority not in TASK_PRIORITIES:
         raise HTTPException(status_code=422, detail="Unknown priority")
@@ -262,7 +275,7 @@ async def claim_task(
     request: Request,
     user: dict[str, Any] = Depends(current_user),
 ):
-    if user["role"] not in {"MAID", "TECHNICIAN"}:
+    if user["role"] not in {"MAID", "TECHNICIAN"} and not has_full_operations_access(user):
         raise HTTPException(status_code=403, detail="Only line staff claims tasks through this endpoint")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -274,7 +287,7 @@ async def claim_task(
             )
             if not task:
                 raise HTTPException(status_code=404, detail="Task not found")
-            if task["type"] not in allowed_types_for_role(user["role"]):
+            if task["type"] not in allowed_types_for_user(user):
                 raise HTTPException(status_code=403, detail="Task type not allowed for role")
             current_user_id = uuid.UUID(user["id"])
             if task["assignedToId"] and task["assignedToId"] != current_user_id:
@@ -314,9 +327,9 @@ async def change_task_status(
             )
             if not task:
                 raise HTTPException(status_code=404, detail="Task not found")
-            if task["type"] not in allowed_types_for_role(user["role"]):
+            if task["type"] not in allowed_types_for_user(user):
                 raise HTTPException(status_code=403, detail="Task type not allowed for role")
-            if user["role"] in {"MAID", "TECHNICIAN"} and task["assignedToId"] != uuid.UUID(user["id"]):
+            if user["role"] in {"MAID", "TECHNICIAN"} and not has_full_operations_access(user) and task["assignedToId"] != uuid.UUID(user["id"]):
                 raise HTTPException(status_code=403, detail="Claim the task before changing its status")
 
             current_status = task["status"]
@@ -332,7 +345,7 @@ async def change_task_status(
                     },
                 )
 
-            is_manager = user["role"] in {"OWNER", "MANAGER"}
+            is_manager = has_full_operations_access(user)
             if payload.status == "CANCELLED" and not is_manager:
                 raise HTTPException(status_code=403, detail="Only management can cancel an operational task")
             if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status in {"IN_PROGRESS", "DONE"} and not is_manager:
