@@ -29,7 +29,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Run MARINA SMART Guest Web i18n guard
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-') || startsWith(github.head_ref, 'feat/marina-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         run: python3 scripts/marina_guest_i18n_guard.py
 
       - name: Install and build public site
@@ -57,19 +57,19 @@ jobs:
           exit 1
 
       - name: Run SSR desktop mobile and booking UX acceptance
-        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-') || startsWith(github.head_ref, 'feat/marina-')) }}
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: node scripts/public_browser_acceptance.mjs
 
       - name: Run MARINA SMART KZ Guest OS browser acceptance
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-') || startsWith(github.head_ref, 'feat/marina-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: node scripts/marina_guest_kz_browser.mjs
 
       - name: Run MARINA SMART guest-web browser acceptance
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-') || startsWith(github.head_ref, 'feat/marina-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: |
