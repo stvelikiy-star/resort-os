@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   staging-full-gate:
-    if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-')) }}
+    if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -272,7 +272,7 @@ jobs:
 
 
   marina-smart-scope-handoff:
-    if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-')) }}
+    if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
