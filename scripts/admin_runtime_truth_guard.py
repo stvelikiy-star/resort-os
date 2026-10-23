@@ -35,19 +35,19 @@ def main() -> int:
         'import PMSGrid from "./PMSGridV9"',
         'import RateManagementBoard from "./RateManagementBoard"',
         'user.role',
-        'isManager',
         'isReception',
         'const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);',
-        'if (payload && !canEnterAdmin(payload.role))',
-        'if (!canEnterAdmin(payload.role))',
+        'if (payload && !canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom))',
+        'if (!canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom))',
         'Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.',
-        'const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);',
+        'const canAccess = (section: string) => user.module_permissions.includes(section);',
+        'const canUseOps = canAccess("OPS");',
         '{canUseOps && <button className={tab === "OPS"',
         '{tab === "OPS" && canUseOps && <OperationsBoard user={user} />}',
-        'if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";',
+        '["MAID", "TECHNICIAN"].includes(role || "") ? "OPS"',
         'tab === "RATES"',
         '>Цены / Сезоны</button>',
-        '{tab === "RATES" && isManager && <RateManagementBoard />}',
+        '{tab === "RATES" && canAccess("RATES") && <RateManagementBoard />}',
         '<StaffBoard userRole={user.role} propertyCode={user.property_code} />',
     )
     require(GRID_V9, 'import PMSOwnerGrid from "./PMSOwnerGrid"', "<PMSOwnerGrid agentMode={agentMode} readOnlyMode={readOnlyMode} />")
@@ -104,7 +104,7 @@ def main() -> int:
         if "/demo" in page_text or "/demo" in shell_text or "app/demo" in page_text or "app/demo" in shell_text:
             raise AssertionError("normal admin runtime references the historical /demo route")
 
-    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; rates/seasons and staff access are Core-backed, non-admin roles fail closed, demo markers are absent, and operations UI follows staff RBAC")
+    print("ADMIN_RUNTIME_TRUTH_OK: / is authenticated Core-backed PMS; rates/seasons and staff access are Core-backed, non-admin roles fail closed, demo markers are absent, and admin navigation follows owner-managed section permissions")
     return 0
 
 

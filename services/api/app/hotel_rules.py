@@ -6,7 +6,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import current_user, require_roles
+from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/hotel-rules", tags=["hotel-rules"])
 write_access = require_roles("OWNER", "MANAGER")
@@ -83,7 +83,7 @@ async def load_rules(conn, property_code: str):
             "updated_at": row["updatedAt"].isoformat() if row["updatedAt"] else None}
 
 @router.get("")
-async def get_rules(request: Request, user=Depends(current_user)):
+async def get_rules(request: Request, user=Depends(write_access)):
     async with request.app.state.db.acquire() as conn:
         return await load_rules(conn, user["property_code"])
 
