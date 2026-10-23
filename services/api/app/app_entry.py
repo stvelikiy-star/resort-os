@@ -29,11 +29,14 @@ from .guest_os import admin_router as guest_os_admin_router
 from .guest_os import public_router as guest_os_public_router
 from .guest_pin_admin import router as guest_pin_admin_router
 from .guest_requests import router as guest_requests_router
+from .guest_stay_reviews import router as guest_stay_reviews_router
+from .room_wayfinding import router as room_wayfinding_router, guest_router as guest_wayfinding_router
 from .guest_service_settings import router as guest_service_settings_router
 from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
 from .hotel_setup import router as hotel_setup_router
+from .hotel_rules import router as hotel_rules_router
 from .housekeeping_schedule import router as housekeeping_schedule_router
 from .inbox import router as inbox_router
 from .kitchen import admin_router as kitchen_admin_router
@@ -157,6 +160,9 @@ app.include_router(public_ai_admin_router)
 app.include_router(marina_assistant_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
+app.include_router(guest_stay_reviews_router)
+app.include_router(room_wayfinding_router)
+app.include_router(guest_wayfinding_router)
 # Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
 # on draft/inactive or non-published-for-today menu items.
 app.include_router(guest_marketplace_router)
@@ -183,6 +189,7 @@ app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(rate_management_router)
 app.include_router(hotel_setup_router)
+app.include_router(hotel_rules_router)
 app.include_router(hotel_finance_router)
 app.include_router(analytics_reports_router)
 app.include_router(owner_intelligence_router)

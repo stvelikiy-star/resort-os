@@ -40,6 +40,26 @@ jobs:
           set -euo pipefail
           branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           case "$branch" in
+            fix/marina-staging-*)
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+              web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
+              for path in $web_changed; do
+                case "$path" in
+                  'apps/web/app/g/[token]/page.tsx'|\
+                  'apps/web/components/GuestConciergeRuntime.tsx'|\
+                  'apps/web/components/GuestRoomDirections.tsx'|\
+                  'apps/web/components/GuestStayReview.tsx')
+                    ;;
+                  *)
+                    echo "BLOCKED: unapproved MARINA public-web change: $path" >&2
+                    exit 1
+                    ;;
+                esac
+              done
+              echo "PASS: MARINA guest-portal scope permits only approved stay review and room-direction files; public marketing pages remain frozen."
+              exit 0
+              ;;
             marina-smart/*|railway/marina-*|fix/marina-smart-*)
               echo "PASS: legacy Three Crowns public-web freeze is not the MARINA SMART AK BERMET acceptance boundary."
               exit 0
@@ -51,15 +71,28 @@ jobs:
           echo "$changed"
           web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
           if [ -n "$web_changed" ]; then
-            if [ "$web_changed" != 'apps/web/components/BookingWidget.tsx' ]; then
-              echo 'BLOCKED: apps/web remains frozen except the owner-approved BookingWidget confirmation copy.' >&2
+            if [ "$web_changed" = $'apps/web/package-lock.json\napps/web/package.json' ]; then
+              node - <<'NODE'
+          const manifest = require('./apps/web/package.json');
+          const lock = require('./apps/web/package-lock.json');
+          const patched = '15.5.28';
+          if (manifest.dependencies?.next !== patched ||
+              lock.packages?.['']?.dependencies?.next !== patched ||
+              lock.packages?.['node_modules/next']?.version !== patched) {
+            throw new Error('Public-web exception only permits the verified Next.js 15.5.28 security patch.');
+          }
+          console.log('PASS: exact Next.js security patch is reflected in manifest and lockfile.');
+          NODE
+            elif [ "$web_changed" = 'apps/web/components/BookingWidget.tsx' ]; then
+              if ! printf '%s\n' "$changed" | grep -qx 'scripts/owner_ops_corrections_contract.py'; then
+                echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2
+                exit 1
+              fi
+              python scripts/owner_ops_corrections_contract.py
+            else
+              echo 'BLOCKED: public-web pages, marketing copy, and assets remain frozen; only the exact security patch or approved BookingWidget copy is allowed.' >&2
               exit 1
             fi
-            if ! printf '%s\n' "$changed" | grep -qx 'scripts/owner_ops_corrections_contract.py'; then
-              echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2
-              exit 1
-            fi
-            python scripts/owner_ops_corrections_contract.py
           fi
 
       - name: Run management final truth assertions

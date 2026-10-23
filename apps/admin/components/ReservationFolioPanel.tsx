@@ -12,6 +12,7 @@ type Folio = {
   payments: Payment[];
 };
 
+type AcquiringReadiness = { booking_number:string; total_kgs:number; paid_kgs:number; remaining_kgs:number; remaining_tyiyn:number; provider_connected:boolean; acquiring_status:string; payment_link:null; payment_collection_eligible:boolean };
 type AuthMe = { role?: string | null };
 type RuntimeCapabilities = {
   profile?: string;
@@ -47,6 +48,8 @@ async function api(path: string, init?: RequestInit) {
 
 export default function ReservationFolioPanel({ reservationId, onChanged }: { reservationId: string; onChanged?: () => void | Promise<void> }) {
   const [folio, setFolio] = useState<Folio | null>(null);
+  const [acquiring, setAcquiring] = useState<AcquiringReadiness | null>(null);
+  const [acquiringBusy, setAcquiringBusy] = useState(false);
   const [viewerRole, setViewerRole] = useState<string | null>(null);
   const [launchProfile, setLaunchProfile] = useState<string>("FULL");
   const [paymentOperationsEnabled, setPaymentOperationsEnabled] = useState(true);
@@ -77,6 +80,7 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
       setLoading(false);
     }
   }, [reservationId]);
+  useEffect(() => {setAcquiring(null)},[reservationId]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -101,6 +105,16 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
 
   const canManagePayments = paymentOperationsEnabled && (viewerRole === "OWNER" || viewerRole === "MANAGER");
   const canCloseCharges = viewerRole === "OWNER" || viewerRole === "MANAGER";
+
+  async function checkAcquiringReadiness() {
+    setAcquiringBusy(true); setError(null);
+    try {
+      const readiness = await api(`/core/api/v1/admin/booking/reservations/${reservationId}/acquiring-readiness`) as AcquiringReadiness;
+      setAcquiring(readiness);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось проверить онлайн-оплату");
+    } finally { setAcquiringBusy(false); }
+  }
 
   async function recordPayment(event: FormEvent) {
     event.preventDefault();
@@ -176,6 +190,12 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
       <div className={folio?.totals.remaining_kgs ? styles.due : styles.ok}><span>Остаток</span><strong>{loading || !folio ? "…" : money(folio.totals.remaining_kgs)}</strong>{Boolean(folio?.totals.overpaid_kgs) && <small>Переплата {money(folio!.totals.overpaid_kgs)}</small>}</div>
     </div>
 
+    {canManagePayments && <section className={styles.card} aria-label="Подготовка онлайн-оплаты" style={{margin:"16px 0"}}>
+      <h4>Онлайн-оплата бронирования · подготовка</h4>
+      <p>Проверьте остаток именно за проживание по данным PMS. Услуги отображаются отдельно в общем счёте. Банковский эквайринг пока не подключён: ссылка не создаётся и деньги не списываются.</p>
+      <button type="button" disabled={acquiringBusy} onClick={() => void checkAcquiringReadiness()}>{acquiringBusy?"Проверяем…":"Проверить готовность оплаты"}</button>
+      {acquiring && <p role="status">Бронь {acquiring.booking_number}: стоимость проживания {money(acquiring.total_kgs)}, оплачено {money(acquiring.paid_kgs)}, остаток {money(acquiring.remaining_kgs)}. Провайдер: не подключён. {acquiring.payment_collection_eligible ? "Можно готовить эквайринг после заключения договора с банком." : "Запрос новой оплаты недоступен для текущего состояния брони."}</p>}
+    </section>}
     <div className={styles.grid}>
       {canManagePayments ? <form className={styles.card} onSubmit={recordPayment}>
         <div className={styles.cardHead}><div><small>Касса / менеджер</small><h4>Принять оплату</h4></div></div>

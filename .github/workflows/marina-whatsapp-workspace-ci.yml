@@ -1,0 +1,44 @@
+name: MARINA WhatsApp Workspace CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/components/WhatsAppWorkspace.tsx'
+      - 'apps/admin/components/WhatsAppWorkspace.module.css'
+      - 'apps/admin/components/InboxBoard.tsx'
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'services/api/app/inbox.py'
+      - 'scripts/test_marina_whatsapp_reception.py'
+      - 'scripts/test_marina_admin_navigation.py'
+      - 'apps/admin/app/three-crowns-admin.css'
+      - '.github/workflows/marina-whatsapp-workspace-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace-typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/test_marina_whatsapp_reception.py -v
+      - run: python scripts/test_marina_admin_navigation.py -v
+      - run: python -m py_compile services/api/app/inbox.py
+      - run: npm ci --prefix apps/admin
+      - run: npm run typecheck --prefix apps/admin
+      - name: Verify WhatsApp remains visible and disabled provider states are honest
+        run: |
+          grep -Fq 'WhatsApp / AI' apps/admin/components/AdminShell.tsx
+          grep -Fq 'WhatsApp не подключён' apps/admin/components/WhatsAppWorkspace.tsx
+          grep -Fq 'InboxBoard channelKind="WHATSAPP" role={role}' apps/admin/components/WhatsAppWorkspace.tsx
+          grep -Fq 'WHERE id=$1 AND "propertyId"=$2' services/api/app/inbox.py

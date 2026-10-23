@@ -13,6 +13,7 @@ EXPECTED_MIGRATIONS = (
     "0_init",
     "1_site_content",
     "2_guest_service_tasks",
+    "20261020230000_marina_property_rules",
     "3_owner_analytics_snapshots",
     "4_guest_engagements",
     "5_guest_os_core",
@@ -42,6 +43,10 @@ EXPECTED_MIGRATIONS = (
     "zz106_marina_split_cook_waiter_20261007",
     "zz107_marina_tenants_20261008",
     "zz108_marina_channel_mappings_20261016",
+    "zz109_marina_review_stars_20261022",
+    "zz110_marina_guest_stay_reviews_20261022",
+    "zz111_marina_room_wayfinding_20261022",
+    "zz112_marina_staff_module_permissions_20261022",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -80,6 +85,12 @@ CRITICAL_CONSTRAINTS = frozenset(
         "guest_engagements_score_check",
         "guest_engagements_score_kind_check",
         "guest_engagements_feedback_reservation_check",
+        "guest_engagements_star_rating_range",
+        "guest_stay_reviews_rating_check",
+        "guest_stay_reviews_comment_length_check",
+        "room_wayfinding_coordinates_pair_check",
+        "room_wayfinding_latitude_range_check",
+        "room_wayfinding_longitude_range_check",
         "service_points_category_check",
         "service_point_qrs_revocation_check",
         "operational_tasks_service_point_context_check",

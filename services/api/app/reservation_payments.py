@@ -78,6 +78,50 @@ async def _totals(conn, reservation_id: uuid.UUID):
     }
 
 
+@router.get("/reservations/{reservation_id}/acquiring-readiness")
+async def reservation_acquiring_readiness(
+    reservation_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(payment_access),
+):
+    """Server-side payment readiness without claiming that a bank is connected.
+
+    Reuses canonical reservation payments; never creates a charge, payment,
+    external provider link or confirmed booking.
+    """
+    async with request.app.state.db.acquire() as conn:
+        pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", user["property_code"])
+        if not pid:
+            raise HTTPException(status_code=503, detail="Property not loaded")
+        row = await conn.fetchrow(
+            '''SELECT id,"bookingNumber",status::text AS status,"totalKgs"
+               FROM reservations WHERE id=$1 AND "propertyId"=$2''',
+            reservation_id, pid,
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        totals = await _totals(conn, reservation_id)
+    remaining = totals["remaining_kgs"]
+    closed = row["status"] in {"CANCELLED", "NO_SHOW"}
+    return {
+        "reservation_id": str(reservation_id),
+        "booking_number": row["bookingNumber"],
+        "status": row["status"],
+        "currency": "KGS",
+        "total_kgs": totals["total_kgs"],
+        "paid_kgs": totals["paid_kgs"],
+        "remaining_kgs": remaining,
+        "remaining_tyiyn": remaining * 100,
+        "overpaid_kgs": totals["overpaid_kgs"],
+        "payment_collection_eligible": remaining > 0 and not closed,
+        "provider_connected": False,
+        "payment_link": None,
+        "provider_code": None,
+        "acquiring_status": "NOT_CONFIGURED",
+        "message": "No bank merchant integration configured. Amount is based on existing PMS payment records; no payment was initiated.",
+    }
+
+
 @router.post("/reservations/{reservation_id}/payments", status_code=status.HTTP_201_CREATED)
 async def record_reservation_payment(
     reservation_id: uuid.UUID,

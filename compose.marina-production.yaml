@@ -1,0 +1,260 @@
+name: marina-${MARINA_INSTANCE_SLUG:?Set a unique MARINA_INSTANCE_SLUG}
+
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      TLS_EMAIL: ${TLS_EMAIL:?Set TLS_EMAIL}
+      PUBLIC_HOST: ${MARINA_PUBLIC_HOST:?Set MARINA_PUBLIC_HOST}
+      ADMIN_HOST: ${MARINA_ADMIN_HOST:?Set MARINA_ADMIN_HOST}
+      STAFF_HOST: ${MARINA_STAFF_HOST:?Set MARINA_STAFF_HOST}
+      API_HOST: ${MARINA_API_HOST:?Set MARINA_API_HOST}
+      AUTOMATION_HOST: ${MARINA_AUTOMATION_HOST:?Set MARINA_AUTOMATION_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/marina/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${MARINA_HOST_DATA_DIR:?Set an isolated per-hotel data directory}/media/public:/srv/media/public:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      staff:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks: [edge]
+
+  postgres:
+    image: postgres:16.15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MARINA_POSTGRES_DB:?Set MARINA_POSTGRES_DB}
+      POSTGRES_USER: marina
+      POSTGRES_PASSWORD: ${MARINA_POSTGRES_PASSWORD:?Set MARINA_POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ${MARINA_HOST_DATA_DIR:?Set an isolated per-hotel data directory}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marina -d ${MARINA_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/marina-demo-migrate.Dockerfile
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://marina:${MARINA_POSTGRES_PASSWORD}@postgres:5432/${MARINA_POSTGRES_DB}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  provision:
+    profiles: [bootstrap]
+    build:
+      context: .
+      dockerfile: deploy/marina-provisioner.Dockerfile
+    restart: "no"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: postgresql://marina:${MARINA_POSTGRES_PASSWORD}@postgres:5432/${MARINA_POSTGRES_DB}?schema=public
+      MARINA_PROVISION_CONFIRM: ${MARINA_PROVISION_CONFIRM:-}
+      PROPERTY_CODE: ${PROPERTY_CODE:?Set PROPERTY_CODE}
+      MARINA_PROPERTY_NAME: ${MARINA_PROPERTY_NAME:?Set MARINA_PROPERTY_NAME}
+      MARINA_TENANT_CODE: ${MARINA_TENANT_CODE:?Set MARINA_TENANT_CODE}
+      MARINA_TIMEZONE: ${MARINA_TIMEZONE:-Asia/Bishkek}
+      MARINA_CURRENCY: ${MARINA_CURRENCY:-KGS}
+      RATE_PLAN_CODE: ${RATE_PLAN_CODE:?Set RATE_PLAN_CODE}
+      MARINA_OWNER_USERNAME: ${MARINA_OWNER_USERNAME:-}
+      MARINA_OWNER_PASSWORD: ${MARINA_OWNER_PASSWORD:-}
+      MARINA_OWNER_DISPLAY_NAME: ${MARINA_OWNER_DISPLAY_NAME:-Owner}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [backend]
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+      args:
+        RELEASE_SHA: ${MARINA_RELEASE_SHA:-UNSET}
+    restart: unless-stopped
+    environment: &marina_app_env
+      APP_ENV: production
+      DATABASE_URL: postgresql://marina:${MARINA_POSTGRES_PASSWORD}@postgres:5432/${MARINA_POSTGRES_DB}?schema=public
+      PROPERTY_CODE: ${PROPERTY_CODE:?Set PROPERTY_CODE}
+      MARINA_TENANT_CONTEXT_ENABLED: "false"
+      RATE_PLAN_CODE: ${RATE_PLAN_CODE:?Set RATE_PLAN_CODE}
+      LAUNCH_PROFILE: ${LAUNCH_PROFILE:-FULL_NO_PAYMENTS}
+      ENABLE_PUBLIC_SITE: ${ENABLE_PUBLIC_SITE:-true}
+      ENABLE_PMS: ${ENABLE_PMS:-true}
+      ENABLE_CRM: ${ENABLE_CRM:-true}
+      ENABLE_STAFF: ${ENABLE_STAFF:-true}
+      ENABLE_GUEST_OS: ${ENABLE_GUEST_OS:-true}
+      ENABLE_KITCHEN: ${ENABLE_KITCHEN:-true}
+      ENABLE_AUTOMATION: ${ENABLE_AUTOMATION:-true}
+      ENABLE_AI_SALES: ${ENABLE_AI_SALES:-true}
+      ENABLE_PAYMENT_OPERATIONS: "false"
+      ENABLE_SERVICE_POINT_QR: "false"
+      ENABLE_MKASSA: "false"
+      CORS_ORIGINS: https://${MARINA_PUBLIC_HOST},https://${MARINA_ADMIN_HOST},https://${MARINA_STAFF_HOST}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      COOKIE_SECURE: "true"
+      COOKIE_DOMAIN: ""
+      AUTH_TRUST_PROXY_HEADERS: "true"
+      AUTH_LOGIN_WINDOW_SECONDS: ${AUTH_LOGIN_WINDOW_SECONDS:-900}
+      AUTH_LOGIN_PAIR_MAX_FAILURES: ${AUTH_LOGIN_PAIR_MAX_FAILURES:-5}
+      AUTH_LOGIN_IP_MAX_FAILURES: ${AUTH_LOGIN_IP_MAX_FAILURES:-30}
+      AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY:?Set AUTOMATION_SERVICE_KEY}
+      AUTOMATION_SERVICE_NAME: n8n
+      REQUIRE_AUTOMATION_SERVICE: ${REQUIRE_AUTOMATION_SERVICE:-true}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_INITDATA_MAX_AGE_SECONDS: ${TELEGRAM_INITDATA_MAX_AGE_SECONDS:-600}
+      TELEGRAM_STAFF_WEBHOOK_SECRET: ${TELEGRAM_STAFF_WEBHOOK_SECRET:-}
+      TELEGRAM_SALES_BOT_TOKEN: ${TELEGRAM_SALES_BOT_TOKEN:-}
+      TELEGRAM_SALES_WEBHOOK_SECRET: ${TELEGRAM_SALES_WEBHOOK_SECRET:-}
+      TELEGRAM_SALES_CHANNEL_CODE: ${TELEGRAM_SALES_CHANNEL_CODE:-TELEGRAM_SALES}
+      TELEGRAM_SALES_DISPLAY_NAME: ${TELEGRAM_SALES_DISPLAY_NAME:-Telegram Sales}
+      TELEGRAM_SALES_ACCOUNT_ID: ${TELEGRAM_SALES_ACCOUNT_ID:-}
+      TELEGRAM_PROVIDER_TIMEOUT_SECONDS: ${TELEGRAM_PROVIDER_TIMEOUT_SECONDS:-10}
+      TELEGRAM_BOT_API_BASE_URL: ${TELEGRAM_BOT_API_BASE_URL:-https://api.telegram.org}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_PUBLIC_ASSISTANT_MODEL: ${OPENAI_PUBLIC_ASSISTANT_MODEL:-}
+      OPENAI_SALES_MODEL: ${OPENAI_SALES_MODEL:-}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-30}
+      AI_ADMIN_MAX_MESSAGES: ${AI_ADMIN_MAX_MESSAGES:-12}
+      AI_ADMIN_RATE_LIMIT_PER_MINUTE: ${AI_ADMIN_RATE_LIMIT_PER_MINUTE:-20}
+      OPENAI_TRANSCRIBE_MODEL: ${OPENAI_TRANSCRIBE_MODEL:-}
+      OPENAI_TRANSCRIBE_TIMEOUT_SECONDS: ${OPENAI_TRANSCRIBE_TIMEOUT_SECONDS:-60}
+      STAFF_VOICE_MAX_BYTES: ${STAFF_VOICE_MAX_BYTES:-20000000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [edge, backend]
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        RELEASE_SHA: ${MARINA_RELEASE_SHA:-UNSET}
+    restart: unless-stopped
+    environment:
+      CORE_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+    networks: [edge, backend]
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        NEXT_PUBLIC_CORE_WS_URL: wss://${MARINA_ADMIN_HOST}
+        RELEASE_SHA: ${MARINA_RELEASE_SHA:-UNSET}
+    restart: unless-stopped
+    environment:
+      CORE_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+    networks: [edge, backend]
+
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        RELEASE_SHA: ${MARINA_RELEASE_SHA:-UNSET}
+    restart: unless-stopped
+    environment:
+      CORE_API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+    networks: [edge, backend]
+
+  n8n:
+    image: ${N8N_IMAGE:-n8nio/n8n:2.37.10}
+    restart: unless-stopped
+    environment:
+      N8N_HOST: ${MARINA_AUTOMATION_HOST}
+      N8N_PROTOCOL: https
+      N8N_PORT: 5678
+      WEBHOOK_URL: https://${MARINA_AUTOMATION_HOST}/
+      N8N_EDITOR_BASE_URL: https://${MARINA_AUTOMATION_HOST}/
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?Set N8N_ENCRYPTION_KEY}
+      N8N_SECURE_COOKIE: "true"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      GENERIC_TIMEZONE: ${MARINA_TIMEZONE:-Asia/Bishkek}
+      TZ: ${MARINA_TIMEZONE:-Asia/Bishkek}
+      RESORT_CORE_URL: http://api:8000
+      AUTOMATION_SERVICE_KEY: ${AUTOMATION_SERVICE_KEY:?Set AUTOMATION_SERVICE_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE_URL: ${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_WHATSAPP_MODEL: ${OPENAI_WHATSAPP_MODEL:-}
+      OPENAI_SALES_MODEL: ${OPENAI_SALES_MODEL:-}
+      GREEN_API_URL: ${GREEN_API_URL:-https://api.green-api.com}
+      GREEN_API_ID_INSTANCE: ${GREEN_API_ID_INSTANCE:-}
+      GREEN_API_TOKEN_INSTANCE: ${GREEN_API_TOKEN_INSTANCE:-}
+      GREEN_API_WEBHOOK_SECRET: ${GREEN_API_WEBHOOK_SECRET:-}
+    volumes:
+      - ${MARINA_HOST_DATA_DIR:?Set an isolated per-hotel data directory}/n8n:/home/node/.n8n
+      - ./automation/n8n:/opt/resort-workflows:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge, backend]
+
+networks:
+  edge:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -445,6 +445,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
         return;
       }
       setPin(""); await loadContext();
+      window.dispatchEvent(new Event("marina:guest-session-updated"));
     } catch { setPinMessage(copy.error); }
     finally { setChecking(false); }
   }
@@ -487,6 +488,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   async function logout() {
     await fetch("/core/api/v1/guest-os/logout", { method: "POST", credentials: "include" }).catch(() => null);
     setContext(null); setRequests([]); await loadContext();
+    window.dispatchEvent(new Event("marina:guest-session-updated"));
   }
 
   const services: Service[] = useMemo(() => SERVICE_ORDER.map((code) => ({ code, icon: SERVICE_ICONS[code], title: copy.services[code][0], note: copy.services[code][1] })), [copy]);

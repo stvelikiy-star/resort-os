@@ -105,7 +105,7 @@ function messageAuthor(message: Message) {
   return "Внутренняя заметка";
 }
 
-export default function InboxBoard() {
+export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKind?: "WHATSAPP"; role?: string }) {
   const [items, setItems] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState("NEEDS_REPLY");
   const [query, setQuery] = useState("");
@@ -160,8 +160,9 @@ export default function InboxBoard() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => [
+    const channelItems = channelKind ? items.filter((item) => item.channel_kind === channelKind) : items;
+    if (!q) return channelItems;
+    return channelItems.filter((item) => [
       item.contact_name,
       item.contact_phone,
       item.contact_username,
@@ -169,7 +170,7 @@ export default function InboxBoard() {
       item.last_message_text,
       item.reservation_request_id,
     ].some((value) => value?.toLowerCase().includes(q)));
-  }, [items, query]);
+  }, [items, query, channelKind]);
 
   const telegramReplyEnabled = Boolean(
     detail
@@ -186,13 +187,13 @@ export default function InboxBoard() {
     try {
       const [detailResponse, requestResponse] = await Promise.all([
         fetch(`/core/api/v1/admin/inbox/conversations/${id}`, { cache: "no-store" }),
-        fetch("/core/api/v1/admin/booking/requests?limit=200", { cache: "no-store" }),
+        role === "RECEPTION" ? Promise.resolve(null) : fetch("/core/api/v1/admin/booking/requests?limit=200", { cache: "no-store" }),
       ]);
       const body = await detailResponse.json().catch(() => ({}));
       if (!detailResponse.ok) throw new Error(body.detail || "Не удалось открыть диалог");
       setDetail(body as Detail);
       setLinkRequestId(body.conversation.reservation_request_id || "");
-      if (requestResponse.ok) {
+      if (requestResponse?.ok) {
         const requestBody = await requestResponse.json();
         setRequests(requestBody.items || []);
       }
@@ -333,7 +334,7 @@ export default function InboxBoard() {
 
   return <main className="work-shell inbox-shell">
     <div className="work-head">
-      <div><p className="eyebrow">Коммуникации</p><h1>Единый Inbox</h1><p className="subtitle">Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет.</p></div>
+      <div><p className="eyebrow">Коммуникации</p><h1>{channelKind === "WHATSAPP" ? "Диалоги WhatsApp" : "Единый Inbox"}</h1><p className="subtitle">{channelKind === "WHATSAPP" ? "Здесь появятся обращения номера вашей гостиницы после подтверждённого подключения. Пока отправка WhatsApp отключена." : "Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет."}</p></div>
       <button className="btn" onClick={() => { load(); loadCapabilities(); }}>Обновить</button>
     </div>
 
@@ -365,7 +366,7 @@ export default function InboxBoard() {
         <div className="inbox-management">
           <div><span className="field-label">Ответственный</span><strong>{detail.conversation.assigned_to_name || "Не назначен"}</strong>{!detail.conversation.assigned_to_id && <button className="btn" onClick={claim} disabled={detailBusy}>Взять диалог</button>}</div>
           <div><span className="field-label">Статус</span><select value={detail.conversation.status} onChange={(e) => changeStatus(e.target.value)} disabled={detailBusy}><option value="OPEN">Открыт</option><option value="WAITING_STAFF">Ждёт сотрудника</option><option value="WAITING_GUEST">Ждём гостя</option><option value="RESOLVED">Решён</option><option value="ARCHIVED">Архив</option></select></div>
-          <div className="inbox-link-request"><span className="field-label">Заявка на бронь</span><div><select value={linkRequestId} onChange={(e) => setLinkRequestId(e.target.value)} disabled={detailBusy}><option value="">Не связана</option>{requests.map((request) => <option key={request.id} value={request.id}>{request.guest_name} · {request.phone} · {request.check_in} → {request.check_out} · {request.status}</option>)}</select><button className="btn" onClick={linkRequest} disabled={detailBusy}>Сохранить</button></div></div>
+          {role !== "RECEPTION" && <div className="inbox-link-request"><span className="field-label">Заявка на бронь</span><div><select value={linkRequestId} onChange={(e) => setLinkRequestId(e.target.value)} disabled={detailBusy}><option value="">Не связана</option>{requests.map((request) => <option key={request.id} value={request.id}>{request.guest_name} · {request.phone} · {request.check_in} → {request.check_out} · {request.status}</option>)}</select><button className="btn" onClick={linkRequest} disabled={detailBusy}>Сохранить</button></div></div>}
         </div>
 
         <div className="message-stream">

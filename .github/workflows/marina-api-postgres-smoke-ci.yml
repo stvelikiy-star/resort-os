@@ -1,0 +1,211 @@
+name: MARINA SMART Isolated PostgreSQL API Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/bootstrap_marina_test.py'
+      - 'scripts/provision_empty_marina_property.py'
+      - 'scripts/marina_staging_readiness.py'
+      - 'scripts/test_marina_staff_roles.py'
+      - 'scripts/test_marina_section_permissions.py'
+      - '.github/workflows/marina-api-postgres-smoke-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-api-postgres-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-api-db:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_smoke_ci
+          POSTGRES_USER: marina_smoke
+          POSTGRES_PASSWORD: synthetic_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_smoke -d marina_smoke_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_smoke:synthetic_ci_only@127.0.0.1:5432/marina_smoke_ci?schema=public
+      PROPERTY_CODE: MARINA_SMOKE_CI
+      MARINA_PROPERTY_NAME: MARINA Synthetic CI Hotel
+      RATE_PLAN_CODE: MARINA_DIRECT
+      MARINA_PROVISION_CONFIRM: CREATE_ONE_EMPTY_MARINA_PROPERTY
+      MARINA_TENANT_CODE: tenant_marina_smoke_ci
+      MARINA_OWNER_USERNAME: marina-smoke-owner
+      MARINA_OWNER_PASSWORD: Only-Synthetic-CI-Owner-Password-2026!
+      MARINA_OWNER_DISPLAY_NAME: Synthetic CI Owner
+      APP_ENV: staging
+      COOKIE_SECURE: 'false'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      MARINA_TENANT_CONTEXT_ENABLED: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      OPENAI_API_KEY: ''
+      MARINA_AI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply committed migrations to disposable PostgreSQL
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+          npx prisma migrate status
+      - name: Install API dependencies
+        run: python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+      - name: Verify staff role and portal contract
+        run: python scripts/test_marina_staff_roles.py
+      - name: Verify owner-managed section permission contract
+        run: python scripts/test_marina_section_permissions.py
+      - name: Provision one empty property in disposable PostgreSQL
+        run: python scripts/provision_empty_marina_property.py
+      - name: Populate synthetic test inventory
+        run: python scripts/bootstrap_marina_test.py
+      - name: Start MARINA API and assert readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 18000 >/tmp/marina-api-smoke.log 2>&1 &
+          echo "$!" >/tmp/marina-api-smoke.pid
+          for attempt in {1..45}; do
+            if curl --fail --silent http://127.0.0.1:18000/health/ready >/tmp/marina-ready.json; then break; fi
+            if ! kill -0 "$(cat /tmp/marina-api-smoke.pid)" 2>/dev/null; then
+              echo 'API process exited'
+              cat /tmp/marina-api-smoke.log
+              exit 1
+            fi
+            sleep 1
+          done
+          python scripts/marina_staging_readiness.py --api http://127.0.0.1:18000
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+          from http.cookiejar import CookieJar
+          from datetime import date, timedelta
+          import uuid
+          base = "http://127.0.0.1:18000"
+          def get(path):
+              with urllib.request.urlopen(base + path, timeout=8) as result:
+                  assert result.status == 200
+                  return json.load(result)
+          status = get("/health/ready")
+          assert status["property"] == "MARINA_SMOKE_CI", status
+          assert status["room_count"] == 12, status
+          assert status["room_type_count"] == 3, status
+          start = date.today() + timedelta(days=2)
+          end = start + timedelta(days=2)
+          q = f"/api/v1/booking/check-availability?check_in={start}&check_out={end}&adults=2&children=0"
+          availability = get(q)
+          assert availability["property"] == "MARINA_SMOKE_CI", availability
+          assert availability["nights"] == 2, availability
+          cookies = CookieJar()
+          client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
+          login = urllib.request.Request(
+              base + "/api/v1/auth/login",
+              data=json.dumps({
+                  "username": os.environ["MARINA_OWNER_USERNAME"],
+                  "password": os.environ["MARINA_OWNER_PASSWORD"],
+              }).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with client.open(login, timeout=8) as result:
+              identity = json.load(result)
+              assert result.status == 200
+          assert identity["username"] == os.environ["MARINA_OWNER_USERNAME"]
+          assert identity["role"] == "OWNER" and identity["property_code"] == "MARINA_SMOKE_CI", identity
+          with client.open(base + "/api/v1/auth/me", timeout=8) as result:
+              me = json.load(result)
+          assert me["username"] == identity["username"] and me["role"] == "OWNER", me
+          def call(opener, method, path, payload=None):
+              request = urllib.request.Request(
+                  base + path,
+                  data=json.dumps(payload).encode() if payload is not None else None,
+                  headers={"Content-Type": "application/json"},
+                  method=method,
+              )
+              try:
+                  with opener.open(request, timeout=8) as result:
+                      raw = result.read()
+                      return result.status, json.loads(raw) if raw else None
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read()
+                  return exc.code, json.loads(raw) if raw else None
+
+          staff_username = "section-check-" + uuid.uuid4().hex[:10]
+          staff_password = "Synthetic-Section-2026!"
+          code, staff = call(client, "POST", "/api/v1/admin/staff", {
+              "username": staff_username, "display_name": "Synthetic Section Check",
+              "password": staff_password, "role": "MAID",
+          })
+          assert code == 201, (code, staff)
+          staff_id = staff["id"]
+          staff_cookies = CookieJar()
+          staff_client = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(staff_cookies))
+          login_staff = lambda: call(staff_client, "POST", "/api/v1/auth/login", {"username": staff_username, "password": staff_password})
+          code, staff_identity = login_staff()
+          assert code == 200 and "OPS" in staff_identity["module_permissions"] and not staff_identity["module_permissions_custom"], staff_identity
+          code, _ = call(staff_client, "GET", f"/api/v1/admin/finance/summary?from_date={date.today().isoformat()}&to_date={date.today().isoformat()}")
+          assert code == 403, ("default role unexpectedly entered finance", code)
+
+          code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": ["FINANCE"]})
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/auth/me")
+          assert code == 401, ("permission change did not revoke the old session", code)
+          code, staff_identity = login_staff()
+          assert code == 200 and staff_identity["module_permissions"] == ["FINANCE"] and staff_identity["module_permissions_custom"], staff_identity
+          code, _ = call(staff_client, "GET", f"/api/v1/admin/finance/summary?from_date={date.today().isoformat()}&to_date={date.today().isoformat()}")
+          assert code == 200, ("explicit section grant did not reach the API", code)
+
+          code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": []})
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/auth/me")
+          assert code == 401, ("revocation did not expire the previous session", code)
+          code, _ = login_staff()
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", f"/api/v1/admin/finance/summary?from_date={date.today().isoformat()}&to_date={date.today().isoformat()}")
+          assert code == 403, ("unchecked section remained available through the API", code)
+
+          code, _ = call(client, "PATCH", f"/api/v1/admin/staff/{staff_id}", {"module_permissions": ["STAFF"]})
+          assert code == 200, code
+          code, _ = login_staff()
+          assert code == 200, code
+          code, _ = call(staff_client, "GET", "/api/v1/admin/staff/overview")
+          assert code == 200, ("explicit staff-section grant did not reach read-only overview", code)
+          code, _ = call(staff_client, "POST", "/api/v1/admin/staff", {
+              "username": "forbidden-by-section", "display_name": "Must Not Be Created",
+              "password": staff_password, "role": "RECEPTION",
+          })
+          assert code == 403, ("a STAFF section grant granted owner-only account administration", code)
+          print("PASS: disposable DB migrations, owner login, section grants/revokes, live session revocation, API denial and owner-only staff administration")
+          PY
+      - name: Print API diagnostics if failed
+        if: failure()
+        run: tail -100 /tmp/marina-api-smoke.log || true
+      - name: Stop isolated API
+        if: always()
+        run: |
+          if [ -f /tmp/marina-api-smoke.pid ]; then kill "$(cat /tmp/marina-api-smoke.pid)" 2>/dev/null || true; fi

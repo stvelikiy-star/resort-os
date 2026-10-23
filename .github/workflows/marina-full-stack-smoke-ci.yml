@@ -1,0 +1,183 @@
+name: MARINA SMART Full Stack Synthetic Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'apps/admin/**'
+      - 'apps/staff/**'
+      - 'services/api/**'
+      - 'packages/database/**'
+      - '.github/workflows/marina-full-stack-smoke-ci.yml'
+      - 'scripts/marina_ordinary_booking_e2e.py'
+      - 'scripts/marina_grid_browser_smoke.mjs'
+      - 'scripts/marina_season_boundary_e2e.py'
+      - 'services/api/app/hotel_rules.py'
+      - 'scripts/marina_hotel_rules_e2e.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-full-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_full_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic_full_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_full_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic_full_ci_only@127.0.0.1:5432/marina_full_ci?schema=public
+      PROPERTY_CODE: MARINA_FULL_CI
+      MARINA_PROPERTY_NAME: MARINA Full Stack Synthetic Hotel
+      RATE_PLAN_CODE: MARINA_DIRECT
+      APP_ENV: staging
+      BOOTSTRAP_OWNER_USERNAME: marina-full-owner
+      BOOTSTRAP_OWNER_PASSWORD: Only-Synthetic-GitHub-Runner-2026!
+      BOOTSTRAP_OWNER_DISPLAY_NAME: Synthetic Owner
+      COOKIE_SECURE: 'false'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      MARINA_TENANT_CONTEXT_ENABLED: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      CORE_API_URL: http://127.0.0.1:18000
+      NEXT_PUBLIC_CORE_WS_URL: ws://127.0.0.1:18000
+      OPENAI_API_KEY: ''
+      MARINA_AI_API_KEY: ''
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply committed Prisma migrations
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+      - name: Install API and seed synthetic property and owner
+        run: |
+          python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+          python scripts/bootstrap_marina_test.py
+          python scripts/bootstrap_owner.py
+      - name: Typecheck and production-build all three frontends
+        shell: bash
+        run: |
+          set -euo pipefail
+          for app in web admin staff; do
+            pushd "apps/$app"
+            npm ci --no-audit --no-fund
+            npm run typecheck
+            npm run build
+            popd
+          done
+      - name: Launch API and Next apps
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 18000 > /tmp/marina-full-api.log 2>&1 &
+          echo "$!" >/tmp/marina-full-api.pid
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:18000/health/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18000/health/ready >/dev/null
+          for item in web:13000 admin:13001 staff:13002; do
+            app="${item%%:*}"
+            port="${item##*:}"
+            (cd "apps/$app" && npx next start -p "$port" > "/tmp/marina-full-$app.log" 2>&1) &
+            echo "$!" > "/tmp/marina-full-$app.pid"
+          done
+          for port in 13000 13001 13002; do
+            for i in {1..45}; do
+              if curl -fsS "http://127.0.0.1:$port/" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl -fsS "http://127.0.0.1:$port/" >/dev/null
+          done
+      - name: Verify health, identities, availability, and three interfaces
+        shell: bash
+        run: |
+          python scripts/marina_staging_readiness.py \
+            --api http://127.0.0.1:18000 \
+            --web http://127.0.0.1:13000 \
+            --admin http://127.0.0.1:13001 \
+            --staff http://127.0.0.1:13002
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from datetime import date, timedelta
+          base = "http://127.0.0.1:18000"
+          def get(path):
+              with urllib.request.urlopen(base + path, timeout=10) as reply:
+                  return json.load(reply)
+          ready = get("/health/ready")
+          assert ready["property"] == "MARINA_FULL_CI" and ready["room_count"] == 12, ready
+          start = date.today() + timedelta(days=4)
+          end = start + timedelta(days=2)
+          availability = get(f"/api/v1/booking/check-availability?check_in={start}&check_out={end}&adults=2")
+          assert availability["property"] == "MARINA_FULL_CI" and availability["nights"] == 2
+          login = urllib.request.Request(
+              base + "/api/v1/auth/login",
+              data=json.dumps({"username": os.environ["BOOTSTRAP_OWNER_USERNAME"], "password": os.environ["BOOTSTRAP_OWNER_PASSWORD"]}).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(login, timeout=10) as result:
+              assert result.status == 200
+          print("PASS: three Next interfaces, MARINA API, synthetic database, owner login and availability")
+          PY
+      - name: Verify ordinary owner booking lifecycle and conflict rejection
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_ordinary_booking_e2e.py
+      - name: Verify seasonal pricing across date boundaries on disposable DB
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_season_boundary_e2e.py
+      - name: Verify per-hotel owner rules CRUD and safety contract
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_hotel_rules_e2e.py
+      - name: Install isolated headless browser dependencies
+        run: |
+          npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Browser acceptance of owner grid, filters and mobile viewport
+        env:
+          MARINA_ADMIN_BROWSER_URL: http://127.0.0.1:13001
+        run: node scripts/marina_grid_browser_smoke.mjs
+      - name: Print diagnostics on failure
+        if: failure()
+        run: |
+          for name in api web admin staff; do
+            echo "=== $name ==="
+            tail -90 "/tmp/marina-full-$name.log" 2>/dev/null || true
+          done
+      - name: Stop synthetic app processes
+        if: always()
+        run: |
+          for name in api web admin staff; do
+            if [ -f "/tmp/marina-full-$name.pid" ]; then kill "$(cat "/tmp/marina-full-$name.pid")" 2>/dev/null || true; fi
+          done

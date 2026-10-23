@@ -1,4 +1,5 @@
 import json
+import os
 import uuid
 from typing import Any, Literal
 
@@ -6,48 +7,68 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
 from .auth import password_hasher, require_roles, trusted_property_id
+from .section_permissions import SECTION_MODULES, effective_section_permissions, normalized_configured_permissions
 
 router = APIRouter(prefix="/api/v1/admin/staff", tags=["admin-staff"])
 manager_access = require_roles("OWNER", "MANAGER")
-owner_access = require_roles("OWNER")
+owner_access = require_roles("OWNER", module_grant=False)
 
+# Roles exposed to hotel owners must have a working sign-in surface. Legacy
+# enum values remain in the database for existing records but cannot be assigned.
 ManagedRole = Literal[
     "MANAGER",
     "RECEPTION",
     "MAID",
     "TECHNICIAN",
-    "STORE_STAFF",
-    "DINING_STAFF",
     "COOK",
     "WAITER",
-    "CONTENT_MANAGER",
 ]
 MANAGED_ROLES = [
     "MANAGER",
     "RECEPTION",
     "MAID",
     "TECHNICIAN",
-    "STORE_STAFF",
-    "DINING_STAFF",
-    "CONTENT_MANAGER",
+    "COOK",
+    "WAITER",
 ]
+
+
+def _check_staff_password(value: str) -> str:
+    is_demo = os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01"
+    min_size = 3 if is_demo else 8
+    if len(value) < min_size or (is_demo and len(value) > 10):
+        raise ValueError("Demo password must be 3-10 characters; live hotel password must be at least 8")
+    return value
 
 
 class StaffCreate(BaseModel):
     username: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
     display_name: str = Field(min_length=2, max_length=160)
-    password: str = Field(min_length=12, max_length=256)
+    password: str = Field(min_length=3, max_length=256)
+    
+    @model_validator(mode="after")
+    def password_policy(self):
+        _check_staff_password(self.password)
+        return self
     role: ManagedRole
 
 
 class StaffPatch(BaseModel):
     display_name: str | None = Field(default=None, min_length=2, max_length=160)
-    password: str | None = Field(default=None, min_length=12, max_length=256)
+    password: str | None = Field(default=None, min_length=3, max_length=256)
     role: ManagedRole | None = None
     active: bool | None = None
+    module_permissions: list[str] | None = Field(default=None, max_length=len(SECTION_MODULES))
 
     @model_validator(mode="after")
     def require_change(self):
+        if self.password is not None:
+            _check_staff_password(self.password)
+        if self.module_permissions is not None:
+            unknown = set(self.module_permissions) - SECTION_MODULES
+            if unknown:
+                raise ValueError(f"Unknown module permission: {sorted(unknown)[0]}")
+            self.module_permissions = sorted(set(self.module_permissions))
         if not self.model_fields_set:
             raise ValueError("At least one staff field must be provided")
         return self
@@ -70,6 +91,7 @@ def _staff_payload(row) -> dict[str, Any]:
         "username": row["username"],
         "display_name": row["displayName"],
         "role": row["role"],
+        "module_permissions": effective_section_permissions(row["role"], row["modulePermissions"]),
         "active": bool(row["isActive"]),
         "telegram_linked": row["telegramUserId"] is not None,
         "telegram_username": row["telegramUsername"],
@@ -141,7 +163,7 @@ async def staff_overview(
               WHERE "revokedAt" IS NULL
               GROUP BY "userId"
             )
-            SELECT u.id,u.username,u."displayName",u.role::text AS role,u."isActive",
+            SELECT u.id,u.username,u."displayName",u.role::text AS role,u."isActive",u."modulePermissions",
                    u."telegramUserId",u."telegramUsername",u."telegramLinkedAt",u."createdAt",u."updatedAt",
                    COALESCE(ts.active_tasks,0)::int AS active_tasks,
                    COALESCE(ts.completed_today,0)::int AS completed_today,
@@ -190,6 +212,7 @@ async def staff_overview(
                 "username": row["username"],
                 "display_name": row["displayName"],
                 "role": row["role"],
+                "module_permissions": effective_section_permissions(row["role"], row["modulePermissions"]),
                 "active": row["isActive"],
                 "telegram_linked": row["telegramUserId"] is not None,
                 "telegram_username": row["telegramUsername"],
@@ -235,7 +258,7 @@ async def create_staff_user(
                   id,"propertyId",username,"displayName","passwordHash",role,"isActive","createdAt","updatedAt"
                 ) VALUES ($1,$2,$3,$4,$5,$6::"StaffRole",true,now(),now())
                 RETURNING id,username,"displayName",role::text AS role,"isActive",
-                          "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
+                          "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt","modulePermissions"
                 ''',
                 staff_id,
                 prop["id"],
@@ -269,7 +292,7 @@ async def patch_staff_user(
             prop = await _property(conn, user)
             current = await conn.fetchrow(
                 '''
-                SELECT id,username,"displayName",role::text AS role,"isActive",
+                SELECT id,username,"displayName",role::text AS role,"isActive","modulePermissions",
                        "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
                 FROM staff_users
                 WHERE id=$1 AND "propertyId"=$2
@@ -290,6 +313,11 @@ async def patch_staff_user(
             display_name = payload.display_name.strip() if payload.display_name is not None else current["displayName"]
             role = payload.role if payload.role is not None else current["role"]
             active = payload.active if payload.active is not None else bool(current["isActive"])
+            module_permissions = (
+                payload.module_permissions
+                if "module_permissions" in payload.model_fields_set
+                else normalized_configured_permissions(current["modulePermissions"])
+            )
             password_hash = password_hasher.hash(payload.password) if payload.password is not None else None
 
             row = await conn.fetchrow(
@@ -299,9 +327,10 @@ async def patch_staff_user(
                     role=$3::"StaffRole",
                     "isActive"=$4,
                     "passwordHash"=COALESCE($5,"passwordHash"),
+                    "modulePermissions"=$6::jsonb,
                     "updatedAt"=now()
                 WHERE id=$1
-                RETURNING id,username,"displayName",role::text AS role,"isActive",
+                RETURNING id,username,"displayName",role::text AS role,"isActive","modulePermissions",
                           "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
                 ''',
                 staff_id,
@@ -309,11 +338,13 @@ async def patch_staff_user(
                 role,
                 active,
                 password_hash,
+                json.dumps(module_permissions) if module_permissions is not None else None,
             )
             security_changed = (
                 role != current["role"]
                 or active != bool(current["isActive"])
                 or payload.password is not None
+                or "module_permissions" in payload.model_fields_set
             )
             if security_changed:
                 await conn.execute(
