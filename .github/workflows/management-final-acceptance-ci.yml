@@ -44,7 +44,8 @@ jobs:
               git fetch origin "${{ github.base_ref }}" --depth=1
               changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
               web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
-              if [ "$web_changed" =                 case "$path" in
+              if [ "$web_changed" = 
+                case "$path" in
                   'apps/web/app/g/[token]/page.tsx'|\
                   'apps/web/components/GuestConciergeRuntime.tsx'|\
                   'apps/web/components/GuestRoomDirections.tsx'|\
@@ -133,7 +134,7 @@ jobs:
 
       - name: Acceptance summary
         run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_AND_INTERNAL_HARDENING_PASS'
-apps/web/package-lock.json\\napps/web/package.json' ]; then
+apps/web/package-lock.json\napps/web/package.json' ]; then
                 node - <<'NODE'
           const manifest = require('./apps/web/package.json');
           const lock = require('./apps/web/package-lock.json');
