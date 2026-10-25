@@ -44,7 +44,34 @@ jobs:
               git fetch origin "${{ github.base_ref }}" --depth=1
               changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
               web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
-              if [ "$web_changed" = $'apps/web/package-lock.json\napps/web/package.json' ]; then
+              # Allow only the four reviewed guest-portal files and the exact
+              # Next.js security-patch pair, including their combined diff.
+              manifest_changed=false
+              lock_changed=false
+              for path in $web_changed; do
+                case "$path" in
+                  'apps/web/app/g/[token]/page.tsx'|\
+                  'apps/web/components/GuestConciergeRuntime.tsx'|\
+                  'apps/web/components/GuestRoomDirections.tsx'|\
+                  'apps/web/components/GuestStayReview.tsx')
+                    ;;
+                  'apps/web/package.json')
+                    manifest_changed=true
+                    ;;
+                  'apps/web/package-lock.json')
+                    lock_changed=true
+                    ;;
+                  *)
+                    echo "BLOCKED: unapproved MARINA public-web change: $path" >&2
+                    exit 1
+                    ;;
+                esac
+              done
+              if [ "$manifest_changed" != "$lock_changed" ]; then
+                echo 'BLOCKED: Next.js security patch requires both package.json and package-lock.json.' >&2
+                exit 1
+              fi
+              if [ "$manifest_changed" = true ]; then
                 node - <<'NODE'
           const manifest = require('./apps/web/package.json');
           const lock = require('./apps/web/package-lock.json');
@@ -56,21 +83,7 @@ jobs:
           }
           console.log('PASS: exact public-web Next.js security patch only.');
           NODE
-                exit 0
               fi
-              for path in $web_changed; do
-                case "$path" in
-                  'apps/web/app/g/[token]/page.tsx'|\
-                  'apps/web/components/GuestConciergeRuntime.tsx'|\
-                  'apps/web/components/GuestRoomDirections.tsx'|\
-                  'apps/web/components/GuestStayReview.tsx')
-                    ;;
-                  *)
-                    echo "BLOCKED: unapproved MARINA public-web change: $path" >&2
-                    exit 1
-                    ;;
-                esac
-              done
               echo "PASS: MARINA guest-portal scope permits only approved stay review and room-direction files; public marketing pages remain frozen."
               exit 0
               ;;
