@@ -1,0 +1,186 @@
+name: MARINA Ubuntu Baseline Upgrade Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - 'packages/database/**'
+      - '.github/workflows/marina-ubuntu-upgrade-rehearsal-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-baseline-upgrade-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  restored-baseline-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic_upgrade_ci_only
+          POSTGRES_DB: marina_upgrade_baseline
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_upgrade_baseline"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic_upgrade_ci_only@127.0.0.1:5432/marina_upgrade_baseline?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_UPGRADE_CI
+      MARINA_PROPERTY_NAME: Synthetic Upgrade Rehearsal Only
+      RATE_PLAN_CODE: MARINA_DIRECT
+      BOOTSTRAP_OWNER_USERNAME: upgrade-ci-owner
+      BOOTSTRAP_OWNER_PASSWORD: Synthetic-Upgrade-Owner-Only-2026!
+      PG_CONTAINER: ${{ job.services.postgres.id }}
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          path: candidate
+      - name: Checkout last observed Ubuntu source baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 5181d2961356865a2590a5ed5a3b58c18d71a953
+          path: baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Migrate disposable database to Ubuntu baseline
+        working-directory: baseline/packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+          npx prisma migrate status
+      - name: Seed synthetic baseline inventory and owner
+        run: |
+          python -m pip install --disable-pip-version-check asyncpg==0.31.0 argon2-cffi==25.1.0
+          python baseline/scripts/bootstrap_marina_test.py
+          python baseline/scripts/bootstrap_owner.py
+      - name: Write data fingerprint verifier and record baseline
+        run: |
+          cat > "$RUNNER_TEMP/upgrade_snapshot.py" <<'PY'
+          import asyncio, hashlib, json, os, sys
+          from pathlib import Path
+          import asyncpg
+          def quoted(value):
+              return '"' + value.replace('"', '""') + '"'
+          async def main():
+              conn = await asyncpg.connect(os.environ["DATABASE_URL"].replace("?schema=public", ""))
+              try:
+                  path = Path(os.environ["RUNNER_TEMP"]) / "baseline-fingerprints.json"
+                  if sys.argv[1] == "record":
+                      tables = await conn.fetch("""
+                          SELECT table_name FROM information_schema.tables
+                          WHERE table_schema='public' AND table_type='BASE TABLE'
+                          AND table_name <> '_prisma_migrations' ORDER BY table_name
+                      """)
+                      expected = {}
+                      for row in tables:
+                          name = row["table_name"]
+                          columns = await conn.fetch("""
+                              SELECT column_name FROM information_schema.columns
+                              WHERE table_schema='public' AND table_name=$1
+                              ORDER BY ordinal_position
+                          """, name)
+                          expected[name] = {"columns": [c["column_name"] for c in columns]}
+                      assert await conn.fetchval("SELECT count(*) FROM rooms") == 12
+                      assert await conn.fetchval("SELECT count(*) FROM staff_users") == 1
+                  else:
+                      expected = json.loads(path.read_text())
+                  for table, entry in expected.items():
+                      columns = ", ".join(quoted(c) for c in entry["columns"])
+                      rows = await conn.fetch(f"SELECT row_to_json(s)::text AS data FROM (SELECT {columns} FROM public.{quoted(table)}) s")
+                      encoded = sorted(json.dumps(json.loads(row["data"]), sort_keys=True, ensure_ascii=False, separators=(",", ":")) for row in rows)
+                      digest = hashlib.sha256("\n".join(encoded).encode()).hexdigest()
+                      if sys.argv[1] == "record":
+                          entry.update(count=len(rows), sha256=digest)
+                      else:
+                          assert entry["count"] == len(rows), f"{table}: row count changed"
+                          assert entry["sha256"] == digest, f"{table}: baseline data changed"
+                  if sys.argv[1] == "record":
+                      path.write_text(json.dumps(expected, sort_keys=True))
+                  print("PASS: baseline row fingerprints", sys.argv[1], len(expected), "tables")
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
+          python "$RUNNER_TEMP/upgrade_snapshot.py" record
+      - name: Back up baseline and restore to separate disposable database
+        run: |
+          set -euo pipefail
+          umask 077
+          docker exec "$PG_CONTAINER" pg_dump -U marina_ci -d marina_upgrade_baseline -Fc > "$RUNNER_TEMP/baseline.dump"
+          test -s "$RUNNER_TEMP/baseline.dump"
+          docker exec "$PG_CONTAINER" createdb -U marina_ci marina_upgrade_restored
+          docker exec -i "$PG_CONTAINER" pg_restore -U marina_ci -d marina_upgrade_restored --exit-on-error --no-owner --no-acl < "$RUNNER_TEMP/baseline.dump"
+          sha256sum "$RUNNER_TEMP/baseline.dump"
+      - name: Verify restored data before migration
+        env:
+          DATABASE_URL: postgresql://marina_ci:synthetic_upgrade_ci_only@127.0.0.1:5432/marina_upgrade_restored?schema=public
+        run: python "$RUNNER_TEMP/upgrade_snapshot.py" verify
+      - name: Apply candidate migrations to restored baseline
+        working-directory: candidate/packages/database
+        env:
+          DATABASE_URL: postgresql://marina_ci:synthetic_upgrade_ci_only@127.0.0.1:5432/marina_upgrade_restored?schema=public
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+          npx prisma migrate status
+      - name: Verify existing data and new migration invariants
+        env:
+          DATABASE_URL: postgresql://marina_ci:synthetic_upgrade_ci_only@127.0.0.1:5432/marina_upgrade_restored?schema=public
+        run: |
+          python "$RUNNER_TEMP/upgrade_snapshot.py" verify
+          python - <<'PY'
+          import asyncio, os
+          import asyncpg
+          from argon2 import PasswordHasher
+          async def main():
+              conn = await asyncpg.connect(os.environ["DATABASE_URL"].replace("?schema=public", ""))
+              try:
+                  expected = (
+                      "zz109_marina_review_stars_20261022",
+                      "zz110_marina_guest_stay_reviews_20261022",
+                      "zz111_marina_room_wayfinding_20261022",
+                      "zz112_marina_staff_module_permissions_20261022",
+                  )
+                  for migration in expected:
+                      count = await conn.fetchval('SELECT count(*) FROM _prisma_migrations WHERE migration_name=$1 AND finished_at IS NOT NULL AND rolled_back_at IS NULL', migration)
+                      assert count == 1, migration
+                  assert await conn.fetchval("SELECT count(*) FROM guest_stay_reviews") == 0
+                  assert await conn.fetchval("SELECT count(*) FROM room_wayfinding") == 0
+                  owner = await conn.fetchrow('SELECT "passwordHash", "modulePermissions" FROM staff_users WHERE username=$1', os.environ["BOOTSTRAP_OWNER_USERNAME"])
+                  assert owner["modulePermissions"] is None
+                  assert PasswordHasher().verify(owner["passwordHash"], os.environ["BOOTSTRAP_OWNER_PASSWORD"])
+                  tx = conn.transaction()
+                  await tx.start()
+                  try:
+                      await conn.execute("""UPDATE staff_users SET "modulePermissions"='{}'::jsonb""")
+                  except asyncpg.CheckViolationError:
+                      await tx.rollback()
+                  else:
+                      await tx.rollback()
+                      raise AssertionError("invalid module permissions object accepted")
+                  tx = conn.transaction()
+                  await tx.start()
+                  try:
+                      await conn.execute("""UPDATE staff_users SET "modulePermissions"='["PMS"]'::jsonb""")
+                      assert await conn.fetchval('SELECT "modulePermissions"::text FROM staff_users') == '["PMS"]'
+                  finally:
+                      await tx.rollback()
+                  print("PASS: zz109-zz112 applied, owner password preserved, permissions constraints enforced")
+              finally:
+                  await conn.close()
+          asyncio.run(main())
+          PY
