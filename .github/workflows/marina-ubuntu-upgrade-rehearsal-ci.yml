@@ -38,7 +38,6 @@ jobs:
       RATE_PLAN_CODE: MARINA_DIRECT
       BOOTSTRAP_OWNER_USERNAME: upgrade-ci-owner
       BOOTSTRAP_OWNER_PASSWORD: Synthetic-Upgrade-Owner-Only-2026!
-      PG_CONTAINER: ${{ job.services.postgres.id }}
     steps:
       - name: Checkout candidate
         uses: actions/checkout@v4
@@ -116,6 +115,8 @@ jobs:
           PY
           python "$RUNNER_TEMP/upgrade_snapshot.py" record
       - name: Back up baseline and restore to separate disposable database
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
         run: |
           set -euo pipefail
           umask 077
