@@ -44,6 +44,20 @@ jobs:
               git fetch origin "${{ github.base_ref }}" --depth=1
               changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
               web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
+              if [ "$web_changed" = $'apps/web/package-lock.json\napps/web/package.json' ]; then
+                node - <<'NODE'
+          const manifest = require('./apps/web/package.json');
+          const lock = require('./apps/web/package-lock.json');
+          const patched = '15.5.28';
+          if (manifest.dependencies?.next !== patched ||
+              lock.packages?.['']?.dependencies?.next !== patched ||
+              lock.packages?.['node_modules/next']?.version !== patched) {
+            throw new Error('Only the verified Next.js 15.5.28 security patch is permitted.');
+          }
+          console.log('PASS: exact public-web Next.js security patch only.');
+          NODE
+                exit 0
+              fi
               for path in $web_changed; do
                 case "$path" in
                   'apps/web/app/g/[token]/page.tsx'|\
