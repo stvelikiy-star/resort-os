@@ -4,6 +4,13 @@ on:
   pull_request:
     paths:
       - 'apps/admin/**'
+      # Trigger acceptance checks for approved guest portal and security patch files.
+      - 'apps/web/app/g/**'
+      - 'apps/web/components/GuestConciergeRuntime.tsx'
+      - 'apps/web/components/GuestRoomDirections.tsx'
+      - 'apps/web/components/GuestStayReview.tsx'
+      - 'apps/web/package.json'
+      - 'apps/web/package-lock.json'
       - 'apps/staff/**'
       - 'services/api/**'
       - 'scripts/**'
