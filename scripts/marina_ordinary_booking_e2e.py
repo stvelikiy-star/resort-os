@@ -208,6 +208,19 @@ async def main():
             assert folio_response.status_code == 200, folio_response.text
             assert folio_response.json()["totals"]["paid_kgs"] == grand + 150
             assert folio_response.json()["totals"]["overpaid_kgs"] == 150
+            # One canonical payment ledger must match both guest CRM and folio.
+            # An idempotent replay must not inflate the lifetime received amount.
+            refreshed_history = await c.get(f"/api/v1/admin/intelligence/guests/{matches[0]['id']}")
+            assert refreshed_history.status_code == 200, (refreshed_history.status_code, refreshed_history.text)
+            guest_record = refreshed_history.json()
+            matching_bookings = [item for item in guest_record["reservations"] if item["id"] == reservation_id]
+            assert len(matching_bookings) == 1, "Recorded payment reservation missing or duplicated in CRM"
+            assert matching_bookings[0]["paid_kgs"] == grand + 150
+            assert matching_bookings[0]["outstanding_kgs"] == 0
+            assert guest_record["lifetime"]["received_kgs"] == grand + 150, (
+                "CRM received sum disagrees with payment ledger (possible duplicate payment)"
+            )
+            assert len(folio_response.json()["payments"]) == 2, "Payment replay must not create a third payment"
             readiness = await c.get(f"/api/v1/admin/booking/reservations/{reservation_id}/acquiring-readiness")
             assert readiness.status_code == 200, readiness.text
             assert readiness.json()["payment_collection_eligible"] is False
