@@ -10,7 +10,8 @@ async def main():
     origin = os.environ.get("MARINA_BOOKING_TEST_API", "")
     parsed = urlsplit(origin)
     assert parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost"), "Local disposable API only"
-    assert os.environ.get("PROPERTY_CODE") == "MARINA_FULL_CI", "Synthetic MARINA property required"
+    assert os.environ.get("APP_ENV") in ("ci", "staging"), "Explicit synthetic CI/staging environment required"
+    assert os.environ.get("PROPERTY_CODE") in ("MARINA_FULL_CI", "MARINA_DEMO"), "Synthetic MARINA property required"
     async with httpx.AsyncClient(base_url=origin, timeout=15) as c:
         auth = await c.post("/api/v1/auth/login", json={"username": os.environ["BOOTSTRAP_OWNER_USERNAME"], "password": os.environ["BOOTSTRAP_OWNER_PASSWORD"]})
         assert auth.status_code == 200, (auth.status_code, auth.text)
@@ -46,7 +47,7 @@ async def main():
         assert clash.status_code == 409, (clash.status_code, clash.text)
         grid = await c.get("/api/v1/pms/grid", params={"start": start.isoformat(), "end": end.isoformat()})
         assert grid.status_code == 200, (grid.status_code, grid.text)
-        assert grid.json()["property"] == "MARINA_FULL_CI"
+        assert grid.json()["property"] == os.environ["PROPERTY_CODE"]
         blocks = [b for room in grid.json()["rooms"] for b in room.get("blocks", [])]
         assert any(b.get("reservation_id") == booking["reservation_id"] for b in blocks), "Booking missing from canonical grid"
         print("MARINA_ORDINARY_BOOKING_E2E_PASS: preview, commit, price, no auto-payment, overlap 409, grid")
