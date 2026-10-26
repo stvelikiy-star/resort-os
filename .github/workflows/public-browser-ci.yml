@@ -112,14 +112,18 @@ jobs:
 
             const concierge = fs.readFileSync("apps/web/components/GuestConciergeRuntime.tsx", "utf8");
             for (const required of [
-              'property: "AK BERMET"',
-              'product: "MARINA SMART',
-              'const HOTEL_PHONE_E164 = "+996501772233"',
-              'Заезд с 13:00. Выезд до 11:00.',
-              'Check-in is from 13:00. Check-out is by 11:00.',
+              'const propertyName = context?.property?.name || copy.property;',
+              'const officialContact = context?.property?.official_contact?.trim() || "";',
+              'const whatsappCandidate = (context?.property?.whatsapp || "").trim();',
+              'context.property?.check_out_time',
+              'context.property?.checkout_instructions',
               'product: "MARINA SMART · қонақ кабинеті"',
+              'product: "MARINA SMART · Guest area"',
             ]) {
-              if (!concierge.includes(required)) throw new Error("AK BERMET guest fact missing: " + required);
+              if (!concierge.includes(required)) throw new Error("Tenant-aware MARINA guest runtime contract missing: " + required);
+            }
+            if (concierge.includes('const HOTEL_PHONE_E164') || concierge.includes('property: "AK BERMET"')) {
+              throw new Error("Shared guest runtime contains a fixed hotel identity or phone");
             }
             if (!concierge.includes("MARINA_GUEST_LOCALES.map")) {
               throw new Error("Guest language switcher is not using the shared RU/KG/KZ/EN locale list");
