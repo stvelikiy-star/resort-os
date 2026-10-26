@@ -652,7 +652,13 @@ async def cancel_grid_reservation(
             stay_count = await conn.fetchval(
                 'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
             )
-            if payment_count or stay_count:
+            open_charge_count = await conn.fetchval(
+                """SELECT count(*) FROM guest_folio_charges
+                   WHERE "propertyId"=$1 AND "reservationId"=$2
+                     AND status NOT IN ('WAIVED','VOID')""",
+                prop["id"], reservation_id,
+            )
+            if payment_count or stay_count or open_charge_count:
                 raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"})
             await conn.execute(
                 """UPDATE reservations SET status='CANCELLED',"updatedAt"=now()
