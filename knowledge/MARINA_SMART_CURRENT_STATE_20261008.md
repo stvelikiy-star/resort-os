@@ -1,71 +1,74 @@
-# MARINA SMART — current candidate state
+# MARINA SMART — current staging candidate
 
-Date: 2026-10-16
-
-This document describes the MARINA SMART multi-tenant candidate in PR #234. It
-does not replace the active production boundary until staging, isolation,
-backup/restore, rollback and owner acceptance are complete.
+Date: 2026-10-26
 
 ## Candidate identity
 
 - Repository: stvelikiy-star/resort-os
-- PR: #234
-- Branch: marina-smart/multi-tenant-foundation-20261008
-- Last integrated baseline commit: 52ecdd28bc63c2097eb4011ad2c998703021d38a
-- CI: 29/29 SUCCESS on tested PR #241 head 116c65a7aaf50352dc5baf58e52983847f055390 (same tree as integrated baseline)
+- PR: #244
+- Branch: fix/marina-staging-preflight-20261020
+- Application baseline: 9c2e01ac3c755ad4fc75d2c6dec822b817795927
+- Verified manifest revision: 2e7b33c565932ebc710b459c37dcc57658eac221
 - Candidate manifest: release/marina-smart-current-candidate.json
-- Proposed working migration ledger: 32 migrations; zz108 mappings still requires its own CI evidence before merge.
-- The commit above identifies the integrated baseline, not a claim that pending changes have passed CI.
+- Migration ledger: 37 migrations
+- Critical constraints: 105 (scripts/release_contract.py)
 
-## Architecture decision
+## Observed CI evidence
 
-Tenant/Property is the customer isolation model.
+All 68 PR workflow runs for the verified manifest revision completed successfully.
+The full-stack job checked out PR merge e74d4e59c4f56ca708cffe2f23811da4bdcf2308.
+Its tree d4c0f90c895365eaa653f647f19f7583fbb0f7e9 exactly matches the
+verified manifest revision. This is PR integration evidence, not a standalone
+deployment or authorization for later commits.
 
-MARINA SMART uses a central SaaS runtime and database infrastructure. Every
-customer is an isolated Tenant. Every hotel/resort is a Property belonging to a
-Tenant. Customer domains are public-site entry points; they are not the
-customer database or application server.
+- Full-stack API/browser, booking/conflicts, seasonal boundary prices, staff
+  grants/revocation, QR/PIN and guest history:
+  https://github.com/stvelikiy-star/resort-os/actions/runs/40336820093
+- Two-property authenticated isolation and full restore, 67 public tables with
+  matching rows and constraints:
+  https://github.com/stvelikiy-star/resort-os/actions/runs/40336819705
+- Chessboard moves, stale snapshots, split/relocation, checkout and housekeeping:
+  https://github.com/stvelikiy-star/resort-os/actions/runs/40336820783
+- AK BERMET synthetic inventory, owner navigation and client/role cycle:
+  https://github.com/stvelikiy-star/resort-os/actions/runs/40336820341
+
+These runs test disposable synthetic data. They do not prove a live hotel,
+official provider connectivity or a customer database backup.
+
+## Customer isolation boundary
+
+Tenant/Property remains the customer isolation model. Trusted tenant_id and
+property_id come from database-derived authentication context. Verified
+two-property restore tests use PROPERTY_PINNED_RUNTIMES: separate API processes
+pinned to each property, sharing a disposable database. They do not prove a
+single-API multi-hotel SaaS service. Tenant context remains disabled by default.
 
 The existing roles, navigation and approved compact chessboard remain unchanged.
-MARINA SMART is not merged with Three Crowns product data or user-facing
-branding.
 
-## Implemented in this candidate
+## What remains before public use
 
-- tenants table and property tenantId;
-- deterministic legacy backfill;
-- tenant-aware seed/bootstrap;
-- trusted database-derived tenant_id and property_id auth context;
-- manual read-only staging foundation gate;
-- authenticated two-tenant isolation E2E gate;
-- explicit production flag MARINA_TENANT_CONTEXT_ENABLED=false.
+- external_staging_verified=false
+- cross_tenant_e2e_verified=false (target deployment acceptance)
+- backup_restore_target_verified=false
+- production_cutover_authorized=false
 
-## Deliberately not claimed yet
+Public demo access still requires a reachable HTTPS deployment and browser
+acceptance on that deployment. The local Docker demo binds to localhost; it is
+not a public demonstration URL. The historical Admin /demo route returns 404;
+the local demo uses the authenticated existing Admin interface.
 
-- external Marina staging verification;
-- two-tenant cross-tenant login/read/write E2E;
-- complete tenant-scoped coverage of every read/write/realtime/background path;
-- production backup/restore and rollback on the target;
-- production DNS, HTTPS/WSS and device acceptance;
-- production cutover authorization.
+Live WhatsApp delivery, official OTA synchronization and acquiring are not
+configured. Manual/CSV external bookings and offline provider tests must not
+be described as live integrations. Payments and NFC remain disabled in the
+candidate profile.
 
-## Gate order
+## Next actions
 
-1. Deploy this candidate to isolated staging.
-2. Create two synthetic tenants and two properties.
-3. Run the read-only foundation gate.
-4. Run browser/API isolation tests for login, reads, writes, roles, Guest OS,
-   AI, realtime and background tasks.
-5. Run backup/restore and rollback rehearsal.
-6. Only then consider enabling tenant context and preparing production.
-
-## Verified disposable CI versus customer deployment
-
-PR #240 added manual external bookings; PR #241 added CSV preview and atomic
-batch imports. Two property-specific API processes sharing a disposable database
-passed isolation and full restore acceptance (62 public tables at that baseline).
-This is not a single-API multi-property login test or a customer-server restore.
-The `cross_tenant_e2e_verified` and `backup_restore_target_verified` manifest flags
-refer to target deployment acceptance and remain false. No automatic provider is
-connected. zz108 adds draft category/rate mappings and one configuration table;
-provider access, outbound delivery and real-property acceptance remain pending.
+1. Validate every code change on the current PR head; retain the evidence above
+   as a dated baseline, never as proof for subsequent untested changes.
+2. Complete demo acceptance on an explicitly selected reachable environment.
+3. Verify target migration ledger, backup/restore, HTTPS/WSS and rollback before
+   a real hotel pilot.
+4. Ubuntu remains untouched under the owner's current instruction. No new
+   infrastructure, provider activation or production deployment is authorized
+   by this document.
