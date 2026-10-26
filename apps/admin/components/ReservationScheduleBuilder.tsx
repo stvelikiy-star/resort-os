@@ -436,7 +436,7 @@ export default function ReservationScheduleBuilder({
           <strong>Отмена брони</strong>
           <p>Доступна только для неоплаченной брони, созданной в шахматке. Брони с оплатой, заселением или из внешних каналов защищены проверками сервера. Отмена освободит номер, но сохранит историю бронирования.</p>
           {!confirmCancellation ? <button type="button" className="btn" disabled={busy} onClick={() => setConfirmCancellation(true)}>Отменить неоплаченную бронь</button> : <div role="group" aria-label="Подтвердить отмену брони">
-            <p><strong>Подтвердите отмену {data.reservation.booking_number}.</strong> Номер снова станет доступен для бронирования.</p>
+            <p><strong>Подтвердите отмену брони</strong> {data.reservation.booking_number}. Номер снова станет доступен для бронирования.</p>
             <button type="button" className="btn" disabled={busy} onClick={() => setConfirmCancellation(false)}>Оставить бронь</button>{" "}
             <button type="button" className="btn" disabled={busy} onClick={() => void cancelUnpaidReservation()}>{busy ? "Отменяю…" : "Да, отменить бронь"}</button>
           </div>}
