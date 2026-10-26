@@ -378,7 +378,7 @@ async def guest_detail(
                 "id": str(row["id"]), "booking_number": row["bookingNumber"], "status": row["status"],
                 "check_in": row["checkIn"], "check_out": row["checkOut"], "adults": row["adults"], "children": row["children"],
                 "total_kgs": int(row["totalKgs"]), "paid_kgs": int(row["paid_kgs"] or 0),
-                "outstanding_kgs": max(int(row["totalKgs"]) - int(row["paid_kgs"] or 0), 0),
+                "outstanding_kgs": 0 if row["status"] in {"CANCELLED", "NO_SHOW"} else max(int(row["totalKgs"]) - int(row["paid_kgs"] or 0), 0),
                 "source": row["source"], "notes": row["notes"], "created_at": row["createdAt"], "updated_at": row["updatedAt"],
                 "schedule": schedules_by[str(row["id"])],
                 "services": services_by[str(row["id"])],
