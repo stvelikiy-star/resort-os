@@ -75,6 +75,8 @@ jobs:
                   'apps/web/package.json'|\
                   'apps/web/app/g/[token]/page.tsx'|\
                   'apps/web/components/GuestConciergeRuntime.tsx'|\
+                  'apps/web/components/GuestAiAssistant.tsx'|\
+                  'apps/web/components/GuestAiAssistant.module.css'|\
                   'apps/web/components/GuestRoomDirections.tsx'|\
                   'apps/web/components/GuestStayReview.tsx')
                     ;;
@@ -84,7 +86,10 @@ jobs:
                     ;;
                 esac
               done
-              echo "PASS: MARINA guest-portal scope permits only approved stay review and room-direction files; public marketing pages remain frozen."
+              if printf '%s\n' "$web_changed" | grep -q '^apps/web/components/GuestAiAssistant'; then
+                python scripts/marina_ai_embedded_contract.py
+              fi
+              echo "PASS: MARINA guest-portal scope permits approved stay review, directions and authenticated guest assistant files; public marketing pages remain frozen."
               exit 0
               ;;
             marina-smart/*|railway/marina-*|fix/marina-smart-*)
