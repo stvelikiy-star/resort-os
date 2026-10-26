@@ -122,6 +122,72 @@ async def reservation_acquiring_readiness(
     }
 
 
+@router.get("/reservations/{reservation_id}/cancellation-finance-review")
+async def cancellation_finance_review(
+    reservation_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(payment_access),
+):
+    """Read-only decision support. Not a refund instruction or cancellation."""
+    async with request.app.state.db.acquire() as conn:
+        pid = await conn.fetchval(
+            "SELECT id FROM properties WHERE code=$1", user["property_code"],
+        )
+        if not pid:
+            raise HTTPException(status_code=503, detail="Property not loaded")
+        reservation = await conn.fetchrow(
+            """SELECT id,"bookingNumber",status::text AS status,"totalKgs"
+               FROM reservations WHERE id=$1 AND "propertyId"=$2""",
+            reservation_id, pid,
+        )
+        if not reservation:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        rows = await conn.fetch(
+            """SELECT status::text AS status,"amountKgs",provider,method
+               FROM payments WHERE "reservationId"=$1""", reservation_id,
+        )
+        stays = await conn.fetchval(
+            'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
+        )
+        charges = await conn.fetchrow(
+            """SELECT count(*) FILTER (WHERE status NOT IN ('WAIVED','VOID'))::int AS open_count,
+                      COALESCE(sum("amountKgs") FILTER (WHERE status NOT IN ('WAIVED','VOID')),0)::bigint AS open_kgs
+               FROM guest_folio_charges WHERE "propertyId"=$1 AND "reservationId"=$2""",
+            pid, reservation_id,
+        )
+    received = sum(int(p["amountKgs"]) for p in rows if p["status"] == "RECEIVED")
+    refunded = sum(int(p["amountKgs"]) for p in rows if p["status"] == "REFUNDED")
+    pending = sum(int(p["amountKgs"]) for p in rows if p["status"] == "PENDING")
+    has_payment_history = bool(rows)
+    has_stay = bool(stays)
+    has_open_charges = bool(charges["open_count"])
+    source_payment_methods = sorted({p["method"] for p in rows})
+    return {
+        "reservation_id": str(reservation_id),
+        "booking_number": reservation["bookingNumber"],
+        "status": reservation["status"],
+        "currency": "KGS",
+        "accommodation_original_kgs": int(reservation["totalKgs"]),
+        "received_kgs": received,
+        "already_refunded_kgs": refunded,
+        "pending_kgs": pending,
+        "payment_count": len(rows),
+        "payment_methods": source_payment_methods,
+        "open_folio_charge_count": int(charges["open_count"]),
+        "open_folio_charge_kgs": int(charges["open_kgs"]),
+        "has_stay_history": has_stay,
+        "requires_manual_review": has_payment_history or has_stay or has_open_charges,
+        "unpaid_cancel_path_eligible": (
+            reservation["status"] == "GUARANTEED"
+            and not has_payment_history and not has_stay and not has_open_charges
+        ),
+        "refund_executed": False,
+        "refund_available": False,
+        "next_action": "MANUAL_FINANCE_REVIEW" if has_payment_history or has_stay or has_open_charges else "CHECK_CANCELLATION_ELIGIBILITY",
+        "truth": "Read-only stored payment and folio facts; refunded status is not independent bank settlement proof. No external refund or cancellation was executed.",
+    }
+
+
 @router.post("/reservations/{reservation_id}/payments", status_code=status.HTTP_201_CREATED)
 async def record_reservation_payment(
     reservation_id: uuid.UUID,
