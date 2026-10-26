@@ -102,8 +102,12 @@ jobs:
             if (!routeSource.includes("GuestConciergeRuntime token={token}")) {
               throw new Error("Canonical guest QR route is not mounted");
             }
-            if (!routeSource.includes("AK BERMET") || !routeSource.includes("MARINA SMART")) {
-              throw new Error("Guest QR route metadata is not MARINA SMART / AK BERMET branded");
+            if (!routeSource.includes('title: "MARINA SMART · гостевой кабинет"') ||
+                !routeSource.includes('description: "Личный цифровой сервис гостя на платформе MARINA SMART."')) {
+              throw new Error("Guest QR route must have MARINA SMART platform metadata");
+            }
+            if (routeSource.includes('title: "AK BERMET') || routeSource.includes('title: "Three Crowns')) {
+              throw new Error("Shared guest QR route must not hard-code a hotel-specific title");
             }
 
             const concierge = fs.readFileSync("apps/web/components/GuestConciergeRuntime.tsx", "utf8");
