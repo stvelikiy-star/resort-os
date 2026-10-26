@@ -229,6 +229,21 @@ async def main():
             paid_cancel = await c.post(f"/api/v1/admin/pms/reservations/{reservation_id}/cancel")
             assert paid_cancel.status_code == 409, (paid_cancel.status_code, paid_cancel.text)
             assert paid_cancel.json()["detail"]["code"] == "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"
+            review = await c.get(f"/api/v1/admin/booking/reservations/{reservation_id}/cancellation-finance-review")
+            assert review.status_code == 200, (review.status_code, review.text)
+            decision = review.json()
+            assert decision["payment_count"] == 2
+            assert decision["received_kgs"] == grand + 150
+            assert decision["already_refunded_kgs"] == 0
+            assert decision["pending_kgs"] == 0
+            assert decision["requires_manual_review"] is True
+            assert decision["unpaid_cancel_path_eligible"] is False
+            assert decision["next_action"] == "MANUAL_FINANCE_REVIEW"
+            assert decision["refund_executed"] is False and decision["refund_available"] is False
+            assert decision["currency"] == "KGS"
+            after_review = await c.get(f"/api/v1/admin/folio/reservations/{reservation_id}")
+            assert after_review.status_code == 200, after_review.text
+            assert after_review.json()["totals"]["paid_kgs"] == grand + 150, "Read-only review changed payment history"
         print("MARINA_ORDINARY_BOOKING_E2E_PASS: cancellation, protected folio, and conditional manual payment idempotency/overpayment")
 
 
