@@ -72,8 +72,52 @@ try {
   if (await page.getByLabel("Полный адрес").inputValue() !== "Тестовый адрес MARINA FULL CI") {
     throw new Error("Hotel knowledge not preserved after browser reload");
   }
+  // Complete the cancellation in the real owner UI against a disposable CI hotel.
+  const testDate = new Date();
+  testDate.setUTCDate(testDate.getUTCDate() + 14);
+  const checkIn = testDate.toISOString().slice(0, 10);
+  testDate.setUTCDate(testDate.getUTCDate() + 2);
+  const checkOut = testDate.toISOString().slice(0, 10);
+  const bookingBase = "/core/api/v1";
+  const availabilityResponse = await page.request.get(`${bookingBase}/booking/check-availability?` + new URLSearchParams({
+    check_in: checkIn, check_out: checkOut, adults: "2", children: "0",
+  }));
+  if (!availabilityResponse.ok()) throw new Error("UI booking fixture availability failed: " + availabilityResponse.status());
+  const available = await availabilityResponse.json();
+  const roomId = available.results?.flatMap(item => item.available_rooms || []).find(room => room.id)?.id;
+  if (!roomId) throw new Error("No available room for disposable UI cancellation test");
+  const input = { room_id: roomId, check_in: checkIn, check_out: checkOut, adults: 2, children: 0 };
+  const quoteResponse = await page.request.post(`${bookingBase}/admin/pms/reservations/new/preview`, { data: input });
+  if (!quoteResponse.ok()) throw new Error("UI booking fixture preview failed: " + quoteResponse.status());
+  const quote = await quoteResponse.json();
+  if (!quote.can_commit || !quote.pricing?.total_kgs) throw new Error("UI booking fixture cannot commit");
+  const guest = "Synthetic UI Cancellation";
+  const commitResponse = await page.request.post(`${bookingBase}/admin/pms/reservations/new/commit`, {
+    data: {
+      ...input, guest_name: guest, phone: "+996555000101",
+      expected_total_kgs: quote.pricing.total_kgs,
+      expected_pricing_source: quote.pricing.source,
+    },
+  });
+  if (commitResponse.status() !== 201) throw new Error("UI booking fixture commit failed: " + commitResponse.status());
+  const created = await commitResponse.json();
+  await page.getByRole("button", { name: "Шахматка", exact: true }).click();
+  await page.locator(".owner-grid-shell").waitFor({ state: "visible" });
+  await page.getByRole("combobox", { name: "Год" }).selectOption(String(Number(checkIn.slice(0, 4))));
+  await page.getByRole("combobox", { name: "Месяц" }).selectOption(String(Number(checkIn.slice(5, 7)) - 1));
+  await page.getByRole("button", { name: "Показать 31 дней" }).click();
+  const bookingBar = page.locator(".owner-booking-bar").filter({ hasText: guest });
+  await bookingBar.first().waitFor({ state: "visible", timeout: 20000 });
+  await bookingBar.first().click();
+  await page.getByRole("dialog").getByRole("button", { name: "Отменить неоплаченную бронь" }).click();
+  await page.getByRole("group", { name: "Подтвердить отмену брони" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Да, отменить бронь" }).click();
+  await page.getByRole("dialog").waitFor({ state: "hidden", timeout: 20000 });
+  await bookingBar.first().waitFor({ state: "hidden", timeout: 20000 });
+  const cancelledResponse = await page.request.post(`${bookingBase}/admin/pms/reservations/${created.reservation_id}/cancel`);
+  if (cancelledResponse.status() !== 409) throw new Error("UI cancellation did not persist a terminal reservation state");
   if (pageErrors.length || serverErrors.length) throw new Error(JSON.stringify({ pageErrors, serverErrors }));
-  console.log("MARINA_BROWSER_GRID_PASS: owner auth, compact grid, month/year, 31-day mode, mobile viewport, no runtime 5xx");
+  console.log("MARINA_BROWSER_GRID_PASS: owner auth, compact grid, cancellation via UI, month/year, mobile viewport, no runtime 5xx");
 } finally {
   await browser.close();
 }
