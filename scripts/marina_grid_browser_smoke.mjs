@@ -106,6 +106,13 @@ try {
   await page.getByRole("combobox", { name: "Год" }).selectOption(String(Number(checkIn.slice(0, 4))));
   await page.getByRole("combobox", { name: "Месяц" }).selectOption(String(Number(checkIn.slice(5, 7)) - 1));
   await page.getByRole("button", { name: "Показать 31 дней" }).click();
+  // Wait for both month/window state transitions to settle before reading booking bars.
+  await page.getByRole("button", { name: "Обновить шахматку" }).click();
+  await page.locator(".owner-grid-loading").waitFor({ state: "hidden", timeout: 20000 });
+  const activeStart = await page.locator(".owner-grid-scroll [data-night]").first().getAttribute("data-night");
+  if (!activeStart || activeStart.slice(0, 7) !== checkIn.slice(0, 7)) {
+    throw new Error(`UI month navigation mismatch: expected ${checkIn.slice(0, 7)}, displayed ${activeStart}`);
+  }
   const bookingBar = page.locator(".owner-booking-bar").filter({ hasText: guest });
   await bookingBar.first().waitFor({ state: "visible", timeout: 20000 });
   await bookingBar.first().click();
