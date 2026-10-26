@@ -82,6 +82,20 @@ async def main():
         assert cancelled_folio.status_code == 200, (cancelled_folio.status_code, cancelled_folio.text)
         assert cancelled_folio.json()["totals"]["remaining_kgs"] == 0, "Cancelled reservation cannot create a collectible folio debt"
         assert cancelled_folio.json()["totals"]["paid_kgs"] == 0
+        closed_readiness = await c.get(f"/api/v1/admin/booking/reservations/{booking['reservation_id']}/acquiring-readiness")
+        assert closed_readiness.status_code == 200, (closed_readiness.status_code, closed_readiness.text)
+        assert closed_readiness.json()["payment_collection_eligible"] is False
+        assert closed_readiness.json()["remaining_kgs"] == 0
+        assert closed_readiness.json()["remaining_tyiyn"] == 0
+        closed_payment = await c.post(f"/api/v1/admin/booking/reservations/{booking['reservation_id']}/payments", json={
+            "amount_kgs": 100, "method": "CASH", "idempotency_key": f"synthetic-closed-{booking['reservation_id']}",
+        })
+        assert closed_payment.status_code == 409, (closed_payment.status_code, closed_payment.text)
+        assert closed_payment.json()["detail"]["code"] == "PAYMENT_REQUIRES_CLOSED_BOOKING_REVIEW"
+        closed_folio_again = await c.get(f"/api/v1/admin/folio/reservations/{booking['reservation_id']}")
+        assert closed_folio_again.status_code == 200
+        assert closed_folio_again.json()["totals"]["paid_kgs"] == 0, "Blocked payment must never mutate the ledger"
+
 
         # A returning guest must retain one CRM identity and both historical bookings.
         # The cancelled booking releases inventory, so the same stay may be rebooked.
