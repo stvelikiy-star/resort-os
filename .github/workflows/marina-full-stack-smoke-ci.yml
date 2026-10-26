@@ -57,7 +57,7 @@ jobs:
       COOKIE_SECURE: 'false'
       AUTH_TRUST_PROXY_HEADERS: 'false'
       MARINA_TENANT_CONTEXT_ENABLED: 'false'
-      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'true'
       ENABLE_MKASSA: 'false'
       ENABLE_SERVICE_POINT_QR: 'false'
       CORE_API_URL: http://127.0.0.1:18000
