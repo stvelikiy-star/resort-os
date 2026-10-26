@@ -10,12 +10,12 @@ type Props = {
   role?: string;
 };
 
-const QUICK = [
-  "Объясни этот экран",
-  "Что мне делать дальше?",
-  "Я новичок. Обучи меня",
-  "Не получается — помоги",
-];
+const TRANSLATIONS = {
+  ru: { greeting: "Я MARINA AI. Помогу разобраться с платформой.", quick: ["Объясни этот экран", "Что мне делать дальше?", "Обучи меня работе", "Помоги решить проблему"], launcher: "Помощник", open: "Открыть MARINA AI", close: "Закрыть", you: "Вы", thinking: "{copy.thinking}", placeholder: "Напишите вопрос по MARINA SMART…", send: "Отправить", readOnly: "Только чтение · помощник не изменяет данные", unavailable: "MARINA AI временно недоступен. Повторите запрос позже.", denied: "Сессия завершена или у вашей роли нет доступа.", failed: "Не удалось получить ответ. Повторите запрос.", network: "Проверьте соединение и повторите запрос.", empty: "Ответ отсутствует.", navigate: "Открыть" },
+  kg: { greeting: "Мен MARINA AI жардамчысымын. Платформаны колдонууга жардам берем.", quick: ["Бул экранды түшүндүр", "Эми эмне кылышым керек?", "Мага иштөөнү үйрөт", "Маселени чечүүгө жардам бер"], launcher: "Жардамчы", open: "MARINA AI ачуу", close: "Жабуу", you: "Сиз", thinking: "MARINA AI жооп даярдоодо…", placeholder: "MARINA SMART боюнча суроо жазыңыз…", send: "Жөнөтүү", readOnly: "Окуу режими · маалыматтарды өзгөртпөйт", unavailable: "MARINA AI убактылуу жеткиликсиз. Кийин кайталаңыз.", denied: "Сеанс аяктады же бул ролго уруксат жок.", failed: "Жооп алуу мүмкүн болгон жок. Кайталаңыз.", network: "Байланышты текшерип, кайра аракет кылыңыз.", empty: "Жооп жок.", navigate: "Ачуу" },
+  en: { greeting: "I'm MARINA AI. I can help you use the platform.", quick: ["Explain this screen", "What should I do next?", "Teach me how to use this", "Help me solve a problem"], launcher: "Assistant", open: "Open MARINA AI", close: "Close", you: "You", thinking: "MARINA AI is thinking…", placeholder: "Ask about MARINA SMART…", send: "Send", readOnly: "Read-only · the assistant cannot change data", unavailable: "MARINA AI is temporarily unavailable. Try again later.", denied: "Your session has ended or this role has no access.", failed: "Could not get a response. Try again.", network: "Check your connection and try again.", empty: "No response.", navigate: "Open" },
+  kz: { greeting: "Мен MARINA AI көмекшісімін. Платформаны пайдалануға көмектесемін.", quick: ["Бұл экранды түсіндір", "Әрі қарай не істеуім керек?", "Жұмыс істеуді үйрет", "Мәселені шешуге көмектес"], launcher: "Көмекші", open: "MARINA AI ашу", close: "Жабу", you: "Сіз", thinking: "MARINA AI жауап дайындауда…", placeholder: "MARINA SMART туралы сұрақ жазыңыз…", send: "Жіберу", readOnly: "Тек оқу · деректерді өзгертпейді", unavailable: "MARINA AI уақытша қолжетімсіз. Кейін қайталаңыз.", denied: "Сеанс аяқталды немесе бұл рөлге рұқсат жоқ.", failed: "Жауап алу мүмкін болмады. Қайталаңыз.", network: "Байланысты тексеріп, қайта көріңіз.", empty: "Жауап жоқ.", navigate: "Ашу" },
+} as const;
 
 function currentLocale(): "ru" | "kg" | "en" | "kz" {
   if (typeof document === "undefined") return "ru";
@@ -28,8 +28,17 @@ function currentLocale(): "ru" | "kg" | "en" | "kz" {
 
 export default function MarinaAiAssistant({ screen, role }: Props) {
   const [open, setOpen] = useState(false);
+  const [locale, setLocale] = useState<"ru" | "kg" | "en" | "kz">("ru");
+  const copy = TRANSLATIONS[locale];
+  useEffect(() => {
+    const update = () => setLocale(currentLocale());
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+    return () => observer.disconnect();
+  }, []);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "Я MARINA AI. Подскажу, куда зайти, что нажать и что проверить в MARINA SMART." },
+    { role: "assistant", content: "" },
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -56,28 +65,28 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
         body: JSON.stringify({
           messages: history.map(({ role: messageRole, content }) => ({ role: messageRole, content })),
           current_screen: screen,
-          locale: currentLocale(),
+          locale,
         }),
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         const message =
           response.status === 503
-            ? "MARINA AI временно недоступен. Повторите запрос немного позже."
+            ? copy.unavailable
             : response.status === 401 || response.status === 403
-              ? "Сессия завершена или для этой роли нет доступа."
-              : "Не удалось получить ответ. Повторите запрос чуть позже.";
+              ? copy.denied
+              : copy.failed;
         setMessages((current) => [...current, { role: "assistant", content: message }]);
         return;
       }
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: String(body.answer || "Нет ответа.") },
+        { role: "assistant", content: String(body.answer || copy.empty) },
       ]);
     } catch {
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: "MARINA AI сейчас недоступен. Проверьте соединение и повторите запрос." },
+        { role: "assistant", content: copy.network },
       ]);
     } finally {
       setSending(false);
@@ -98,10 +107,10 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
         className={styles.launcher}
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        aria-label="Открыть MARINA AI"
+        aria-label={copy.open}
       >
         <span className={styles.spark}>AI</span>
-        <span>Помощник</span>
+        <span>{copy.launcher}</span>
       </button>
 
       {open && (
@@ -111,11 +120,11 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
               <strong>MARINA AI</strong>
               <small>{role ? `${role} · ` : ""}{screen}</small>
             </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Закрыть">×</button>
+            <button type="button" onClick={() => setOpen(false)} aria-label={copy.close}>×</button>
           </header>
 
           <div className={styles.quick}>
-            {QUICK.map((label) => (
+            {copy.quick.map((label) => (
               <button key={label} type="button" onClick={() => void ask(label)} disabled={sending}>
                 {label}
               </button>
@@ -123,13 +132,14 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
           </div>
 
           <div className={styles.messages}>
+            <div className={styles.assistant}><p>{copy.greeting}</p></div>
             {messages.map((message, index) => (
               <div key={index} className={message.role === "user" ? styles.user : styles.assistant}>
-                <span>{message.role === "user" ? "Вы" : "MARINA AI"}</span>
+                <span>{message.role === "user" ? copy.you : "MARINA AI"}</span>
                 <p>{message.content}</p>
               </div>
             ))}
-            {sending && <div className={styles.thinking}>MARINA AI думает…</div>}
+            {sending && <div className={styles.thinking}>{copy.thinking}</div>}
             <div ref={endRef} />
           </div>
 
@@ -137,14 +147,14 @@ export default function MarinaAiAssistant({ screen, role }: Props) {
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Напишите вопрос по MARINA SMART…"
+              placeholder={copy.placeholder}
               maxLength={3000}
               rows={2}
             />
-            <button type="submit" disabled={sending || !input.trim()}>Отправить</button>
+            <button type="submit" disabled={sending || !input.trim()}>{copy.send}</button>
           </form>
 
-          <footer className={styles.footer}>Read-only · ничего не меняет в системе без вашего действия</footer>
+          <footer className={styles.footer}>{copy.readOnly}</footer>
         </section>
       )}
     </>
