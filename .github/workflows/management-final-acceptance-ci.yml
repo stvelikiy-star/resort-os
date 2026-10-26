@@ -5,7 +5,7 @@ on:
     paths:
       - 'apps/admin/**'
       # Reviewed MARINA guest-portal and paired Next.js security-patch inputs.
-      - 'apps/web/app/g/[token]/page.tsx'
+      - 'apps/web/app/g/**'
       - 'apps/web/components/GuestConciergeRuntime.tsx'
       - 'apps/web/components/GuestRoomDirections.tsx'
       - 'apps/web/components/GuestStayReview.tsx'
