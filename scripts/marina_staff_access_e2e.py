@@ -51,6 +51,13 @@ async def main():
             # Module grants may allow calendar access but never owner-only cancellation.
             cancel = await staff.post("/api/v1/admin/pms/reservations/00000000-0000-0000-0000-000000000000/cancel")
             assert cancel.status_code == 403, (cancel.status_code, cancel.text)
+            if os.environ.get("ENABLE_PAYMENT_OPERATIONS", "false").lower() == "true":
+                # PMS module permission alone may never create a RECEIVED payment.
+                denied_payment = await staff.post(
+                    "/api/v1/admin/booking/reservations/00000000-0000-0000-0000-000000000000/payments",
+                    json={"amount_kgs": 100, "method": "CASH", "idempotency_key": "synthetic-denied-payment"},
+                )
+                assert denied_payment.status_code == 403, (denied_payment.status_code, denied_payment.text)
             assert (await staff.patch(staff_url, json={"active": False})).status_code == 403
 
             revoked = await owner.patch(staff_url, json={"module_permissions": []})
