@@ -15,6 +15,7 @@ on:
       - 'services/api/app/hotel_rules.py'
       - 'scripts/marina_hotel_rules_e2e.py'
       - 'scripts/marina_guest_identity_e2e.py'
+      - 'scripts/marina_staff_access_e2e.py'
       - 'scripts/test_guest_property_context.py'
       - 'scripts/marina_guest_identity_browser.mjs'
   workflow_dispatch:
@@ -155,6 +156,10 @@ jobs:
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
         run: python scripts/marina_ordinary_booking_e2e.py
+      - name: Verify owner-managed staff permissions, session revocation and strict cancellation RBAC
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_staff_access_e2e.py
       - name: Verify seasonal pricing across date boundaries on disposable DB
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
