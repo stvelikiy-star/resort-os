@@ -4,6 +4,13 @@ on:
   pull_request:
     paths:
       - 'apps/admin/**'
+      # Reviewed MARINA guest-portal and paired Next.js security-patch inputs.
+      - 'apps/web/app/g/[token]/page.tsx'
+      - 'apps/web/components/GuestConciergeRuntime.tsx'
+      - 'apps/web/components/GuestRoomDirections.tsx'
+      - 'apps/web/components/GuestStayReview.tsx'
+      - 'apps/web/package.json'
+      - 'apps/web/package-lock.json'
       - 'apps/staff/**'
       - 'services/api/**'
       - 'scripts/**'
