@@ -78,6 +78,11 @@ async def main():
         assert history["status"] == "CANCELLED", history
         assert history["total_kgs"] == total, "Original booking price must remain in historical facts"
         assert history["paid_kgs"] == 0 and history["outstanding_kgs"] == 0, "Unpaid cancelled booking must not show a debt"
+        cancelled_folio = await c.get(f"/api/v1/admin/folio/reservations/{booking['reservation_id']}")
+        assert cancelled_folio.status_code == 200, (cancelled_folio.status_code, cancelled_folio.text)
+        assert cancelled_folio.json()["totals"]["remaining_kgs"] == 0, "Cancelled reservation cannot create a collectible folio debt"
+        assert cancelled_folio.json()["totals"]["paid_kgs"] == 0
+
         # A returning guest must retain one CRM identity and both historical bookings.
         # The cancelled booking releases inventory, so the same stay may be rebooked.
         rebook = await c.post("/api/v1/admin/pms/reservations/new/commit", json=commit_payload)
@@ -116,7 +121,25 @@ async def main():
         assert any(block.get("reservation_id") == rebooked["reservation_id"] for block in protected_blocks), (
             "A financially unresolved booking lost its room block"
         )
-        print("MARINA_ORDINARY_BOOKING_E2E_PASS: booking, cancel, rebook, history, and protected unpaid folio receivable")
+        closed_charge = await c.patch(
+            f"/api/v1/admin/folio/charges/{charge.json()['charge_id']}",
+            json={"status": "WAIVED", "reason": "Synthetic owner-reviewed folio correction"},
+        )
+        assert closed_charge.status_code == 200, (closed_charge.status_code, closed_charge.text)
+        closed_totals = closed_charge.json()["folio"]["totals"]
+        assert closed_totals["extras_kgs"] == 0
+        assert closed_totals["remaining_kgs"] == rebooked["total_kgs"]
+        assert (await c.patch(
+            f"/api/v1/admin/folio/charges/{charge.json()['charge_id']}",
+            json={"status": "WAIVED", "reason": "Duplicate synthetic waiver"},
+        )).status_code == 409, "Double closing a folio charge must be rejected"
+        approved_cancel = await c.post(f"/api/v1/admin/pms/reservations/{rebooked['reservation_id']}/cancel")
+        assert approved_cancel.status_code == 200, (approved_cancel.status_code, approved_cancel.text)
+        final_folio = await c.get(f"/api/v1/admin/folio/reservations/{rebooked['reservation_id']}")
+        assert final_folio.status_code == 200
+        assert final_folio.json()["totals"]["remaining_kgs"] == 0
+        assert final_folio.json()["totals"]["extras_kgs"] == 0
+        print("MARINA_ORDINARY_BOOKING_E2E_PASS: booking, rebook, financial hold, reviewed waiver, cancellation, zero collectible folio debt")
 
 if __name__ == "__main__":
     asyncio.run(main())
