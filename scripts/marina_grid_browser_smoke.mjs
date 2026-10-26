@@ -33,6 +33,9 @@ try {
   if (await month.count() !== 1 || await year.count() !== 1) throw new Error("Month or year filter missing");
   await page.getByRole("button", { name: "Следующий месяц" }).click();
   await page.locator(".owner-grid-loading").waitFor({ state: "hidden", timeout: 20000 });
+  // The loading state can disappear before the next month's cells commit to the DOM.
+  // Wait for actual visible cells; a genuinely empty calendar must still fail.
+  await cells.first().waitFor({ state: "visible", timeout: 20000 });
   if (await cells.count() === 0) throw new Error("Grid empty after month navigation");
   await page.getByRole("button", { name: "Показать 31 дней" }).click();
   if (await page.locator('.owner-grid-scroll[data-window-days="31"]').count() !== 1) throw new Error("31-day calendar not activated");
