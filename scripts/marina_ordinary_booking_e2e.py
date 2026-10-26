@@ -78,7 +78,28 @@ async def main():
         assert history["status"] == "CANCELLED", history
         assert history["total_kgs"] == total, "Original booking price must remain in historical facts"
         assert history["paid_kgs"] == 0 and history["outstanding_kgs"] == 0, "Unpaid cancelled booking must not show a debt"
-        print("MARINA_ORDINARY_BOOKING_E2E_PASS: preview, commit, overlap 409, cancel, room released, guest history retained, no ghost debt")
+        # A returning guest must retain one CRM identity and both historical bookings.
+        # The cancelled booking releases inventory, so the same stay may be rebooked.
+        rebook = await c.post("/api/v1/admin/pms/reservations/new/commit", json=commit_payload)
+        assert rebook.status_code == 201, (rebook.status_code, rebook.text)
+        rebooked = rebook.json()
+        assert rebooked["reservation_id"] != booking["reservation_id"]
+        refreshed_guests = await c.get("/api/v1/admin/intelligence/guests", params={"search": commit_payload["phone"]})
+        assert refreshed_guests.status_code == 200, (refreshed_guests.status_code, refreshed_guests.text)
+        matches = [profile for profile in refreshed_guests.json().get("items", []) if profile.get("phone") == commit_payload["phone"]]
+        assert len(matches) == 1, "Returning guest created a duplicate CRM profile"
+        profile_detail = await c.get(f"/api/v1/admin/intelligence/guests/{matches[0]['id']}")
+        assert profile_detail.status_code == 200, (profile_detail.status_code, profile_detail.text)
+        guest_history = profile_detail.json()
+        reservations_by_id = {item["id"]: item for item in guest_history["reservations"]}
+        bookings = (booking["reservation_id"], rebooked["reservation_id"])
+        assert all(item in reservations_by_id for item in bookings), "One of the returning guest bookings disappeared"
+        assert reservations_by_id[booking["reservation_id"]]["status"] == "CANCELLED"
+        assert reservations_by_id[booking["reservation_id"]]["outstanding_kgs"] == 0
+        assert reservations_by_id[rebooked["reservation_id"]]["status"] == "GUARANTEED"
+        assert guest_history["lifetime"]["booked_value_kgs"] >= rebooked["total_kgs"]
+        assert guest_history["lifetime"]["reservation_count"] >= 2
+        print("MARINA_ORDINARY_BOOKING_E2E_PASS: booking, cancellation, released inventory, one returning guest, historical bookings, no ghost debt")
 
 if __name__ == "__main__":
     asyncio.run(main())
