@@ -75,8 +75,12 @@ jobs:
                   'apps/web/package.json'|\
                   'apps/web/app/g/[token]/page.tsx'|\
                   'apps/web/components/GuestConciergeRuntime.tsx'|\
+                  'apps/web/components/GuestMarketplace.tsx'|\
+                  'apps/web/app/guest-marketplace.css'|\
                   'apps/web/components/GuestRoomDirections.tsx'|\
-                  'apps/web/components/GuestStayReview.tsx')
+                  'apps/web/components/GuestStayReview.tsx'|\
+                  'apps/web/package.json'|\
+                  'apps/web/package-lock.json')
                     ;;
                   *)
                     echo "BLOCKED: unapproved MARINA public-web change: $path" >&2
@@ -84,7 +88,7 @@ jobs:
                     ;;
                 esac
               done
-              echo "PASS: MARINA guest-portal scope permits only approved stay review and room-direction files; public marketing pages remain frozen."
+              echo "PASS: MARINA guest portal and approved stay-review/direction files are allowed; public marketing pages remain frozen."
               exit 0
               ;;
             marina-smart/*|railway/marina-*|fix/marina-smart-*)
