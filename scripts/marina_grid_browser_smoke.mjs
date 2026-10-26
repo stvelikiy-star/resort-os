@@ -78,7 +78,7 @@ try {
   const checkIn = testDate.toISOString().slice(0, 10);
   testDate.setUTCDate(testDate.getUTCDate() + 2);
   const checkOut = testDate.toISOString().slice(0, 10);
-  const bookingBase = "/core/api/v1";
+  const bookingBase = `${BASE}/core/api/v1`;
   const availabilityResponse = await page.request.get(`${bookingBase}/booking/check-availability?` + new URLSearchParams({
     check_in: checkIn, check_out: checkOut, adults: "2", children: "0",
   }));
