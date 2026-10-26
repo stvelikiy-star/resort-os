@@ -50,6 +50,21 @@ async def main():
         assert grid.json()["property"] == os.environ["PROPERTY_CODE"]
         blocks = [b for room in grid.json()["rooms"] for b in room.get("blocks", [])]
         assert any(b.get("reservation_id") == booking["reservation_id"] for b in blocks), "Booking missing from canonical grid"
-        print("MARINA_ORDINARY_BOOKING_E2E_PASS: preview, commit, price, no auto-payment, overlap 409, grid")
+        cancelled = await c.post(f"/api/v1/admin/pms/reservations/{booking['reservation_id']}/cancel")
+        assert cancelled.status_code == 200, (cancelled.status_code, cancelled.text)
+        assert cancelled.json()["status"] == "CANCELLED"
+        assert cancelled.json()["released_blocks"] >= 1
+        assert cancelled.json()["payment_refunded"] is False
+        repeat = await c.post(f"/api/v1/admin/pms/reservations/{booking['reservation_id']}/cancel")
+        assert repeat.status_code == 409, (repeat.status_code, repeat.text)
+        refreshed = await c.get("/api/v1/pms/grid", params={"start": start.isoformat(), "end": end.isoformat()})
+        assert refreshed.status_code == 200, refreshed.text
+        remaining = [b for room in refreshed.json()["rooms"] for b in room.get("blocks", [])]
+        assert not any(b.get("reservation_id") == booking["reservation_id"] for b in remaining), "Cancelled reservation still blocks the grid"
+        available_again = await c.post("/api/v1/admin/pms/reservations/new/preview", json=payload)
+        assert available_again.status_code == 200, (available_again.status_code, available_again.text)
+        assert available_again.json()["can_commit"] is True, "Room was not released after cancellation"
+        print("MARINA_ORDINARY_BOOKING_E2E_PASS: preview, commit, price, no auto-payment, overlap 409, grid, cancel, room released")
+
 if __name__ == "__main__":
     asyncio.run(main())
