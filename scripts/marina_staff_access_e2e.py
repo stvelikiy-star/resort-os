@@ -58,6 +58,10 @@ async def main():
                     json={"amount_kgs": 100, "method": "CASH", "idempotency_key": "synthetic-denied-payment"},
                 )
                 assert denied_payment.status_code == 403, (denied_payment.status_code, denied_payment.text)
+                denied_review = await staff.get(
+                    "/api/v1/admin/booking/reservations/00000000-0000-0000-0000-000000000000/cancellation-finance-review",
+                )
+                assert denied_review.status_code == 403, (denied_review.status_code, denied_review.text)
             assert (await staff.patch(staff_url, json={"active": False})).status_code == 403
 
             revoked = await owner.patch(staff_url, json={"module_permissions": []})
