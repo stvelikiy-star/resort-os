@@ -106,6 +106,8 @@ jobs:
           import yaml
           default = yaml.safe_load(open('/tmp/marina-compose-default.yml'))
           data = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          for name in ('migrate', 'provision', 'api', 'web', 'admin', 'staff'):
+              assert data['services'][name]['image'] == 'marina-ak-bermet-ci-' + name + ':' + 'a' * 40
           assert 'provision' not in default['services']
           assert data['services']['provision']['profiles'] == ['bootstrap']
           ports = {(p['published'], p['target'], p['protocol']) for p in data['services']['caddy']['ports']}
@@ -117,6 +119,24 @@ jobs:
           assert data['networks']['backend']['name'].startswith('marina-ak-bermet-ci_')
           assert all('ports' not in service for name, service in data['services'].items() if name != 'caddy')
           print('PASS: only Caddy publishes ingress; database private; bootstrap opt-in; per-hotel isolated network')
+          PY
+      - name: Verify release tags change without moving hotel storage or networks
+        run: |
+          MARINA_RELEASE_SHA=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb docker compose --profile bootstrap --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-previous.yml
+          python - <<'PY'
+          import yaml
+          current = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          previous = yaml.safe_load(open('/tmp/marina-compose-previous.yml'))
+          assert current['name'] == previous['name']
+          assert current['networks'] == previous['networks']
+          assert current['volumes'] == previous['volumes']
+          for name in ('migrate', 'provision', 'api', 'web', 'admin', 'staff'):
+              service = previous['services'][name]
+              assert service['image'] == 'marina-ak-bermet-ci-' + name + ':' + 'b' * 40
+              assert service.get('volumes') == current['services'][name].get('volumes')
+          assert current['services']['postgres'] == previous['services']['postgres']
+          assert current['services']['n8n'] == previous['services']['n8n']
+          print('PASS: release-specific application images; hotel database, storage and networks unchanged')
           PY
       - name: Validate strict Caddy host routing
         run: |

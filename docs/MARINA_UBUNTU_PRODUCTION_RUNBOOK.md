@@ -8,6 +8,8 @@ Each hotel uses its own Compose project, PostgreSQL database, host data director
 
 The stack contains Caddy, PostgreSQL 16.15, the committed Prisma migration runner, the guarded one-shot empty-property/OWNER provisioner, MARINA API, public web, Admin, Staff PWA, and pinned n8n. Payments, MKassa, and service-point QR mutations are disabled. OTA credentials and payment credentials are not fabricated or enabled here.
 
+Application and one-shot tool images use `marina-<slug>-<service>:<MARINA_RELEASE_SHA>` tags. A new release uses different image names, preserving the prior release tags for application rollback. Tags identify the intended revision; source checkout and image IDs must also be recorded. Do not prune prior release images before acceptance.
+
 The deployment graph is defined in `compose.marina-production.yaml`, Caddy routes in `deploy/marina/Caddyfile`, and the environment template in `.env.marina-production.example`. These files do not inherit Three Crowns hostnames, property identifiers, or `/srv/three-crowns` paths.
 
 ## Host contract
@@ -105,6 +107,61 @@ bash /srv/marina-smart/<slug>/scripts/production_backup.sh
 The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. With the required S3 configuration, the shared script uploads each artifact beneath the Marina-specific prefix and verifies each object with a HEAD request. Before production acceptance, perform a clean restore rehearsal from the off-host copy on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
 
 The backup script has been tested synthetically, but off-host retention policy, Ubuntu systemd scheduling, disk/health alerts, and an observed restore on the actual target still require explicit verification before go-live.
+
+
+## Application update and rollback boundary
+
+Use the same hotel directory, Compose project, environment file and data paths for
+both releases. Before building, check `git rev-parse HEAD` against the intended
+`MARINA_RELEASE_SHA`; the static environment gate validates the SHA format but
+cannot prove which source was checked out.
+
+Before an update, record the current application container image IDs and release
+tag, retain that source checkout and its Compose configuration, and complete the
+backup/isolated-restore gate above. Never run `docker image prune -a`,
+`docker compose down -v` or remove this hotel's data to perform an update.
+
+An application-only rollback is allowed only after the previous application has
+been verified compatible with the database schema and data now in use. It does
+not reverse migrations. From the retained prior release checkout, with the same
+hotel configuration, set the exact previously recorded SHA in the protected
+operator shell:
+
+```bash
+export MARINA_RELEASE_SHA='<previous-tested-40-character-SHA>'
+docker compose --env-file .env.marina-production -f compose.marina-production.yaml config --images
+```
+
+Confirm that all four previous application images already exist locally; do not
+silently rebuild them from the newer checkout:
+
+```bash
+for service in api web admin staff; do
+  image="marina-${MARINA_INSTANCE_SLUG}-${service}:${MARINA_RELEASE_SHA}"
+  docker image inspect "$image" --format '{{.Id}}'
+done
+```
+
+The loop requires `MARINA_INSTANCE_SLUG` to be set to the same hotel slug in the
+operator shell. Compare each image ID with the recorded pre-update value. If an
+image is absent or differs, stop and recover the verified release images first.
+After compatibility and image identity have been confirmed:
+
+```bash
+docker compose --env-file .env.marina-production -f compose.marina-production.yaml up -d --no-build --pull never --no-deps api web admin staff
+unset MARINA_RELEASE_SHA
+```
+
+This command targets only the four application services, without rerunning the
+migration/provision services or recreating PostgreSQL, n8n or Caddy. Verify HTTPS,
+owner/staff login, guest access, availability, booking conflicts and Admin WSS.
+Keep the rollback SHA in the environment file only after acceptance, so the next
+ordinary Compose invocation does not restore the newer release unintentionally.
+
+If schema compatibility is not established, stop writes and use the separately
+reviewed database recovery procedure on an isolated target. Do not run a
+destructive live database restore as an automatic response to an application
+failure. These are repository instructions; no host rollback has been performed.
 
 ## Release and final acceptance gates
 
