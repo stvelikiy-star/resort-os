@@ -94,7 +94,7 @@ try {
   const guest = "Synthetic UI Cancellation";
   const commitResponse = await page.request.post(`${bookingBase}/admin/pms/reservations/new/commit`, {
     data: {
-      ...input, guest_name: guest, phone: "+996555000101",
+      ...input, guest_name: guest, phone: "+996555000199",
       expected_total_kgs: quote.pricing.total_kgs,
       expected_pricing_source: quote.pricing.source,
     },
