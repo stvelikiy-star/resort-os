@@ -8,6 +8,7 @@ on:
       - 'deploy/marina-demo-migrate.Dockerfile'
       - 'scripts/marina_demo_seed.py'
       - 'scripts/marina_demo_start.sh'
+      - 'scripts/marina_grid_browser_smoke.mjs'
       - '.github/workflows/marina-demo-compose-ci.yml'
   workflow_dispatch:
 
@@ -64,6 +65,15 @@ jobs:
           done
           curl -fsS http://127.0.0.1:13001/core/health/live | grep -q 'marina-smart-core'
           echo "MARINA_ALL_UI_AND_API_PROXY_PASS"
+      - name: Verify real OWNER login and interactive PMS grid in demo browser
+        env:
+          MARINA_ADMIN_BROWSER_URL: http://127.0.0.1:13001
+          BOOTSTRAP_OWNER_USERNAME: ${{ env.MARINA_DEMO_OWNER_USERNAME }}
+          BOOTSTRAP_OWNER_PASSWORD: ${{ env.MARINA_DEMO_OWNER_PASSWORD }}
+        run: |
+          npm install --no-audit --no-fund --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          node scripts/marina_grid_browser_smoke.mjs
       - name: Re-run demo without erasing or rotating owner credentials
         shell: bash
         run: |
