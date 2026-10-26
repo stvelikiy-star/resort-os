@@ -64,7 +64,21 @@ async def main():
         available_again = await c.post("/api/v1/admin/pms/reservations/new/preview", json=payload)
         assert available_again.status_code == 200, (available_again.status_code, available_again.text)
         assert available_again.json()["can_commit"] is True, "Room was not released after cancellation"
-        print("MARINA_ORDINARY_BOOKING_E2E_PASS: preview, commit, price, no auto-payment, overlap 409, grid, cancel, room released")
+        guests_response = await c.get("/api/v1/admin/intelligence/guests", params={"search": commit_payload["phone"]})
+        assert guests_response.status_code == 200, (guests_response.status_code, guests_response.text)
+        profiles = guests_response.json().get("items", [])
+        assert profiles, "Cancelled guest disappeared from guest directory"
+        history_matches = []
+        for profile in profiles:
+            detail_response = await c.get(f"/api/v1/admin/intelligence/guests/{profile['id']}")
+            assert detail_response.status_code == 200, (detail_response.status_code, detail_response.text)
+            history_matches.extend(item for item in detail_response.json().get("reservations", []) if item["id"] == booking["reservation_id"])
+        assert len(history_matches) == 1, "Cancelled reservation missing or duplicated in guest history"
+        history = history_matches[0]
+        assert history["status"] == "CANCELLED", history
+        assert history["total_kgs"] == total, "Original booking price must remain in historical facts"
+        assert history["paid_kgs"] == 0 and history["outstanding_kgs"] == 0, "Unpaid cancelled booking must not show a debt"
+        print("MARINA_ORDINARY_BOOKING_E2E_PASS: preview, commit, overlap 409, cancel, room released, guest history retained, no ghost debt")
 
 if __name__ == "__main__":
     asyncio.run(main())
