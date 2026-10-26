@@ -101,8 +101,8 @@ async def reservation_acquiring_readiness(
         if not row:
             raise HTTPException(status_code=404, detail="Reservation not found")
         totals = await _totals(conn, reservation_id)
-    remaining = totals["remaining_kgs"]
     closed = row["status"] in {"CANCELLED", "NO_SHOW"}
+    remaining = 0 if closed else totals["remaining_kgs"]
     return {
         "reservation_id": str(reservation_id),
         "booking_number": row["bookingNumber"],
@@ -205,6 +205,12 @@ async def record_reservation_payment(
                     },
                     "finance": totals,
                 }
+
+            if reservation["status"] in {"CANCELLED", "NO_SHOW"}:
+                raise HTTPException(status_code=409, detail={
+                    "code": "PAYMENT_REQUIRES_CLOSED_BOOKING_REVIEW",
+                    "message": "New payments cannot be recorded against cancelled or no-show reservations. Review historical payments separately.",
+                })
 
             if external_ref:
                 reference_payment = await conn.fetchrow(
