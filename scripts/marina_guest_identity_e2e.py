@@ -52,6 +52,8 @@ async def main():
             before = checked(await guest.get(path))
             assert before["property"] == {"name": "Synthetic Identity Hotel"}
             assert before["guest"] is None and before["stay"] is None
+            ai_payload = {"messages": [{"role": "user", "content": "When is checkout?"}]}
+            assert (await guest.post(path + "/assistant/chat", json=ai_payload)).status_code == 401
             checked(await guest.post(path + "/verify", json={"pin": stay["guest_access_pin"]}))
             after = checked(await guest.get(path))
             assert after["authenticated"] is True
@@ -62,10 +64,15 @@ async def main():
                 "request_code": "ADMIN", "description": "Synthetic guest request",
             }), 201)
             checked(await guest.get(path + "/requests"))
+            # This synthetic profile deliberately has no provider key. Reaching
+            # 503 confirms real QR/PIN authorization and DB context succeeded.
+            ai_response = await guest.post(path + "/assistant/chat", json=ai_payload)
+            assert ai_response.status_code == 503, (ai_response.status_code, ai_response.text)
             checked(await owner.post(f"/api/v1/admin/stays/reservations/{reservation_id}/check-out"))
             expired = checked(await guest.get(path))
             assert expired["authenticated"] is False and expired["active_stay"] is False
             assert (await guest.get(path + "/requests")).status_code == 401
+            assert (await guest.post(path + "/assistant/chat", json=ai_payload)).status_code == 401
         # The revoked guest session must not erase commercial or service history.
         # Read it through the owner's existing, property-scoped CRM endpoints.
         profiles_response = await owner.get("/api/v1/admin/intelligence/guests", params={"search": "+996700000010"})

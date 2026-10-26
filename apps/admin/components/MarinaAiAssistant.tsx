@@ -96,6 +96,8 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
     void ask(input);
   }
 
+  if (!role || !["OWNER", "MANAGER", "RECEPTION"].includes(role)) return null;
+
   return (
     <>
       <button

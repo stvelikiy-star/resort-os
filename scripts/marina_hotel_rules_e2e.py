@@ -57,12 +57,19 @@ async def main():
         pool = await asyncpg.create_pool(dsn)
         try:
             fake_request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=pool)))
-            for role in ("OWNER", "RECEPTION", "MAID"):
+            for role in ("OWNER", "MANAGER", "RECEPTION"):
                 context = await _safe_property_rules(fake_request, {"property_code": "MARINA_FULL_CI", "role": role})
                 assert context["available"] is True and context["version"] == 2, context
                 assert context["rules"]["pets_policy"] == changed["pets_policy"], context
                 assert context["rules"]["location_address"] == changed["location_address"], context
                 assert context["rules"]["ai_faq"] == changed["ai_faq"], context
+            from fastapi import HTTPException
+            try:
+                await _safe_property_rules(fake_request, {"property_code": "MARINA_FULL_CI", "role": "MAID"})
+            except HTTPException as exc:
+                assert exc.status_code == 403
+            else:
+                raise AssertionError("MAID must not access staff assistant hotel rules")
             foreign = await _safe_property_rules(fake_request, {"property_code": "FOREIGN_HOTEL", "role": "OWNER"})
             assert foreign["available"] is False, foreign
         finally:

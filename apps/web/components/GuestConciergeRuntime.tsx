@@ -1,5 +1,7 @@
 "use client";
 
+import GuestAiAssistant from "./GuestAiAssistant";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { MARINA_GUEST_LOCALES, MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
 
@@ -529,6 +531,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
       <section className="concierge-section concierge-requests"><div className="concierge-heading"><h2>{copy.myRequests}</h2><button onClick={() => void loadRequests()}>{copy.refresh}</button></div>{!requests.length ? <p className="concierge-empty">{copy.noRequests}</p> : <div className="concierge-request-list">{requests.map((item) => { const code = (SERVICE_ORDER.includes(item.request_code as RequestCode) || item.request_code === "PARKING" ? item.request_code : "ADMIN") as RequestCode; return <article key={item.id}><div><strong>{copy.services[code][0]}</strong><span data-status={item.status}>{copy.status[item.status]}</span></div>{item.description && <p>{item.description}</p>} {item.status === "OPEN" && <button onClick={() => void cancelRequest(item.id)}>{copy.cancel}</button>}</article>; })}</div>}</section>
 
       <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p>{context.property?.checkout_instructions && <p>{context.property.checkout_instructions}</p>}</article><article><h3>{copy.contacts}</h3>{officialContact && <p>{officialContact}</p>}{phone && <a href={`tel:${phone}`}>{copy.call}</a>}{whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer">{copy.message}</a>}</article></div></section>
+      <GuestAiAssistant key={token} token={token} locale={locale} onSessionExpired={() => { setContext(null); setRequests([]); void loadContext(); }} />
       <button className="concierge-signout" onClick={() => void logout()}>{copy.signOut}</button>
     </>}
 

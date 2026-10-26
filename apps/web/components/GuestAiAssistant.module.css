@@ -1,0 +1,11 @@
+.card { padding: 20px; border: 1px solid #334155; border-radius: 18px; background: #101d2e; }
+.card summary { cursor: pointer; font-size: 18px; padding: 8px 0; }
+.card p { line-height: 1.6; color: #e2e8f0; white-space: pre-wrap; }
+.card form, .card label { display: grid; gap: 10px; }
+.card label { color: #e2e8f0; font-size: 15px; }
+.card textarea { width: 100%; min-height: 88px; resize: vertical; border: 1px solid #64748b; border-radius: 10px; padding: 12px; background: #07111f; color: #f8fafc; font: inherit; font-size: 16px; }
+.card button { justify-self: start; border: 0; border-radius: 10px; padding: 12px 20px; background: #dfbd76; color: #101827; font: inherit; font-weight: 700; cursor: pointer; }
+.card button:disabled { opacity: .65; cursor: default; }
+.card summary:focus-visible, .card textarea:focus-visible, .card button:focus-visible { outline: 3px solid #7dd3fc; outline-offset: 3px; }
+.log { max-height: 320px; overflow-y: auto; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .card { padding: 16px; } .card button { width: 100%; } }
