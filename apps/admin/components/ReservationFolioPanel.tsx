@@ -13,6 +13,7 @@ type Folio = {
 };
 
 type AcquiringReadiness = { booking_number:string; total_kgs:number; paid_kgs:number; remaining_kgs:number; remaining_tyiyn:number; provider_connected:boolean; acquiring_status:string; payment_link:null; payment_collection_eligible:boolean };
+type CancellationFinanceReview = { booking_number: string; status: string; received_kgs: number; already_refunded_kgs: number; pending_kgs: number; payment_count: number; open_folio_charge_count: number; open_folio_charge_kgs: number; has_stay_history: boolean; requires_manual_review: boolean; unpaid_cancel_path_eligible: boolean; refund_executed: false; refund_available: false }; 
 type AuthMe = { role?: string | null };
 type RuntimeCapabilities = {
   profile?: string;
@@ -50,6 +51,8 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
   const [folio, setFolio] = useState<Folio | null>(null);
   const [acquiring, setAcquiring] = useState<AcquiringReadiness | null>(null);
   const [acquiringBusy, setAcquiringBusy] = useState(false);
+  const [cancelReview, setCancelReview] = useState<CancellationFinanceReview | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
   const [viewerRole, setViewerRole] = useState<string | null>(null);
   const [launchProfile, setLaunchProfile] = useState<string>("FULL");
   const [paymentOperationsEnabled, setPaymentOperationsEnabled] = useState(true);
@@ -80,7 +83,7 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
       setLoading(false);
     }
   }, [reservationId]);
-  useEffect(() => {setAcquiring(null)},[reservationId]);
+  useEffect(() => { setAcquiring(null); setCancelReview(null); }, [reservationId]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
@@ -114,6 +117,19 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось проверить онлайн-оплату");
     } finally { setAcquiringBusy(false); }
+  }
+
+  async function checkCancellationFinance() {
+    if (!canManagePayments) return;
+    setReviewBusy(true); setError(null);
+    try {
+      const result = await api(`/core/api/v1/admin/booking/reservations/${reservationId}/cancellation-finance-review`) as CancellationFinanceReview;
+      setCancelReview(result);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Не удалось проверить оплаченные обязательства");
+    } finally {
+      setReviewBusy(false);
+    }
   }
 
   async function recordPayment(event: FormEvent) {
@@ -195,6 +211,17 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
       <p>Проверьте остаток именно за проживание по данным PMS. Услуги отображаются отдельно в общем счёте. Банковский эквайринг пока не подключён: ссылка не создаётся и деньги не списываются.</p>
       <button type="button" disabled={acquiringBusy} onClick={() => void checkAcquiringReadiness()}>{acquiringBusy?"Проверяем…":"Проверить готовность оплаты"}</button>
       {acquiring && <p role="status">Бронь {acquiring.booking_number}: стоимость проживания {money(acquiring.total_kgs)}, оплачено {money(acquiring.paid_kgs)}, остаток {money(acquiring.remaining_kgs)}. Провайдер: не подключён. {acquiring.payment_collection_eligible ? "Можно готовить эквайринг после заключения договора с банком." : "Запрос новой оплаты недоступен для текущего состояния брони."}</p>}
+    </section>}
+    {canManagePayments && <section className={styles.card} aria-label="Проверка финансов перед отменой" style={{margin:"16px 0"}}>
+      <h4>Отмена бронирования · финансовая проверка</h4>
+      <p>Перед отменой с оплатами проверьте начисления и журнал платежей. Эта проверка ничего не отменяет и не возвращает деньги.</p>
+      <button type="button" disabled={reviewBusy} onClick={() => void checkCancellationFinance()}>{reviewBusy ? "Проверяем…" : "Проверить финансовые обязательства"}</button>
+      {cancelReview && <div role="status">
+        <p>Бронь {cancelReview.booking_number} · {cancelReview.status}. Записано полученных средств: {money(cancelReview.received_kgs)}. Платежей: {cancelReview.payment_count}.</p>
+        <p>Платежи со статусом «возвращено» (только данные PMS, не подтверждение банка): {money(cancelReview.already_refunded_kgs)}. В ожидании: {money(cancelReview.pending_kgs)}.</p>
+        <p>Открытые начисления: {cancelReview.open_folio_charge_count} на {money(cancelReview.open_folio_charge_kgs)}. История проживания: {cancelReview.has_stay_history ? "есть" : "нет"}.</p>
+        <p><strong>{cancelReview.requires_manual_review ? "Требуется ручная финансовая сверка. Отмена и возврат автоматически недоступны." : cancelReview.unpaid_cancel_path_eligible ? "Финансовых препятствий для обычной неоплаченной отмены не обнаружено." : "Нужна дополнительная проверка статуса брони."}</strong></p>
+      </div>}
     </section>}
     <div className={styles.grid}>
       {canManagePayments ? <form className={styles.card} onSubmit={recordPayment}>
