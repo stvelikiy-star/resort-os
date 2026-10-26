@@ -14,6 +14,9 @@ on:
       - 'scripts/marina_season_boundary_e2e.py'
       - 'services/api/app/hotel_rules.py'
       - 'scripts/marina_hotel_rules_e2e.py'
+      - 'scripts/marina_guest_identity_e2e.py'
+      - 'scripts/test_guest_property_context.py'
+      - 'scripts/marina_guest_identity_browser.mjs'
   workflow_dispatch:
 
 permissions:
@@ -160,6 +163,12 @@ jobs:
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
         run: python scripts/marina_hotel_rules_e2e.py
+      - name: Verify hotel-specific guest identity and full stay access lifecycle
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: |
+          python scripts/test_guest_property_context.py
+          python scripts/marina_guest_identity_e2e.py
       - name: Install isolated headless browser dependencies
         run: |
           npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
@@ -168,6 +177,8 @@ jobs:
         env:
           MARINA_ADMIN_BROWSER_URL: http://127.0.0.1:13001
         run: node scripts/marina_grid_browser_smoke.mjs
+      - name: Browser acceptance of hotel-specific guest settings
+        run: node scripts/marina_guest_identity_browser.mjs
       - name: Print diagnostics on failure
         if: failure()
         run: |

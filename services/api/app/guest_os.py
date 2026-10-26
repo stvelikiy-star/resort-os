@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import io
+import json
 import os
 import secrets
 import uuid
@@ -144,12 +145,43 @@ async def valid_guest_session(conn, raw_session: str | None):
     return row
 
 
-def generic_room_context(qr, active_stay: bool):
+async def guest_property_info(conn, property_id):
+    """Expose only guest-facing hotel settings belonging to the resolved QR."""
+    row = await conn.fetchrow(
+        '''SELECT p.name, to_char(s."checkOutTime", 'HH24:MI') AS check_out_time,
+                  r.policy, c."publishedJson" AS site_content
+           FROM properties p
+           LEFT JOIN property_product_settings s ON s."propertyId"=p.id
+           LEFT JOIN property_hotel_rules r ON r."propertyId"=p.id
+           LEFT JOIN site_content_documents c ON c."propertyId"=p.id
+                AND c.locale='ru' AND c.scope='PUBLIC_SITE'
+           WHERE p.id=$1''', property_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail={"code": "PROPERTY_NOT_FOUND"})
+    policy = row["policy"] or {}
+    if isinstance(policy, str):
+        policy = json.loads(policy)
+    site_content = row["site_content"] or {}
+    if isinstance(site_content, str):
+        site_content = json.loads(site_content)
+    contacts = site_content.get("contacts") or {}
+    return {
+        "name": row["name"],
+        "check_out_time": row["check_out_time"],
+        "official_contact": str(contacts.get("phone") or policy.get("official_contact") or ""),
+        "whatsapp": str(contacts.get("whatsapp") or ""),
+        "checkout_instructions": str(policy.get("checkout_instructions") or ""),
+    }
+
+
+def generic_room_context(qr, active_stay: bool, property_info=None):
     return {
         "qr_valid": True,
         "authenticated": False,
         "verification_required": active_stay,
         "active_stay": active_stay,
+        "property": {"name": property_info["name"]} if property_info else None,
         "room": {
             "code": qr["room_code"],
             "name": qr["room_name"],
@@ -356,17 +388,19 @@ async def room_context(token: str, request: Request, tc_guest_session: str | Non
         qr = await resolve_room_qr(conn, token)
         if not qr:
             raise HTTPException(status_code=404, detail={"code": "ROOM_QR_NOT_FOUND"})
+        property_info = await guest_property_info(conn, qr["propertyId"])
         stay = await current_stay_for_room(conn, qr["roomId"])
         if not stay:
-            return generic_room_context(qr, active_stay=False)
+            return generic_room_context(qr, active_stay=False, property_info=property_info)
         session = await valid_guest_session(conn, tc_guest_session)
         if not session or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]:
-            return generic_room_context(qr, active_stay=True)
+            return generic_room_context(qr, active_stay=True, property_info=property_info)
         return {
             "qr_valid": True,
             "authenticated": True,
             "verification_required": False,
             "active_stay": True,
+            "property": property_info,
             "room": {
                 "code": qr["room_code"],
                 "name": qr["room_name"],

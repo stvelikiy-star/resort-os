@@ -8,6 +8,7 @@ type RequestCode = "HOUSEKEEPING" | "TOWELS" | "LINEN" | "MAINTENANCE" | "TRANSF
 type RequestStatus = "OPEN" | "IN_PROGRESS" | "IN_INSPECTION" | "DONE" | "CANCELLED";
 
 type GuestContext = {
+  property?: { name: string; check_out_time?: string | null; official_contact?: string; whatsapp?: string; checkout_instructions?: string } | null;
   qr_valid: boolean;
   authenticated: boolean;
   verification_required: boolean;
@@ -29,12 +30,9 @@ type GuestRequest = {
 
 type Service = { code: RequestCode; icon: string; title: string; note: string };
 
-const HOTEL_PHONE_E164 = "+996501772233";
-const HOTEL_WHATSAPP_URL = "https://wa.me/996501772233";
-
 const COPY = {
   ru: {
-    property: "AK BERMET",
+    property: "MARINA SMART",
     product: "MARINA SMART · гостевой кабинет",
     language: "Язык",
     loading: "Открываем цифровой консьерж…",
@@ -57,7 +55,7 @@ const COPY = {
     stay: "Ваше проживание",
     from: "с",
     to: "по",
-    checkout: "Выезд до 11:00",
+    checkout: "Выезд до",
     quick: "Что нужно сейчас?",
     quickNote: "Большинство услуг можно запросить за несколько нажатий.",
     myRequests: "Мои заявки",
@@ -93,12 +91,12 @@ const COPY = {
     manas: "Аэропорт Манас",
     tamchy: "Аэропорт Тамчы",
     bishkek: "Бишкек",
-    hotel: "AK BERMET",
+    hotel: "MARINA SMART",
     other: "Другое место",
     luggage: "Багаж / особые пожелания",
     serviceInfo: "После отправки сотрудник подтвердит доступность, время и окончательные условия.",
     rules: "Правила и информация",
-    rulesText: "Заезд с 13:00. Выезд до 11:00. По вопросам проживания, услуг и безопасности обращайтесь на ресепшен.",
+    rulesText: "По вопросам проживания, услуг и безопасности обращайтесь на ресепшен.",
     contacts: "Связаться с отелем",
     call: "Позвонить на ресепшен",
     message: "Написать менеджеру",
@@ -119,7 +117,7 @@ const COPY = {
     },
   },
   kg: {
-    property: "AK BERMET",
+    property: "MARINA SMART",
     product: "MARINA SMART · конок кабинети",
     language: "Тил",
     loading: "Санарип жардамчы ачылууда…",
@@ -142,7 +140,7 @@ const COPY = {
     stay: "Сиздин жашооңуз",
     from: "баштап",
     to: "чейин",
-    checkout: "Чыгуу саат 11:00гө чейин",
+    checkout: "Чыгуу убактысы:",
     quick: "Азыр эмне керек?",
     quickNote: "Көпчүлүк кызматтарды бир нече басуу менен сураса болот.",
     myRequests: "Менин өтүнмөлөрүм",
@@ -178,12 +176,12 @@ const COPY = {
     manas: "Манас аэропорту",
     tamchy: "Тамчы аэропорту",
     bishkek: "Бишкек",
-    hotel: "AK BERMET",
+    hotel: "MARINA SMART",
     other: "Башка жер",
     luggage: "Жүк / өзгөчө каалоо",
     serviceInfo: "Жөнөткөндөн кийин кызматкер жеткиликтүүлүктү, убакытты жана акыркы шарттарды ырастайт.",
     rules: "Эрежелер жана маалымат",
-    rulesText: "Кирүү саат 13:00дөн, чыгуу саат 11:00гө чейин. Жашоо, кызматтар жана коопсуздук боюнча кабыл алуу кызматына кайрылыңыз.",
+    rulesText: "Жашоо, кызматтар жана коопсуздук боюнча кабыл алуу кызматына кайрылыңыз.",
     contacts: "Мейманкана менен байланыш",
     call: "Кабыл алуу кызматына чалуу",
     message: "Менеджерге жазуу",
@@ -204,7 +202,7 @@ const COPY = {
     },
   },
   kz: {
-    property: "AK BERMET",
+    property: "MARINA SMART",
     product: "MARINA SMART · қонақ кабинеті",
     language: "Тіл",
     loading: "Цифрлық консьерж ашылуда…",
@@ -227,7 +225,7 @@ const COPY = {
     stay: "Сіздің тұруыңыз",
     from: "бастап",
     to: "дейін",
-    checkout: "Шығу 11:00-ге дейін",
+    checkout: "Шығу уақыты:",
     quick: "Қазір не қажет?",
     quickNote: "Қызметтердің көбін бірнеше рет басу арқылы сұратуға болады.",
     myRequests: "Менің өтінімдерім",
@@ -263,12 +261,12 @@ const COPY = {
     manas: "Манас әуежайы",
     tamchy: "Тамчы әуежайы",
     bishkek: "Бішкек",
-    hotel: "AK BERMET",
+    hotel: "MARINA SMART",
     other: "Басқа орын",
     luggage: "Жүк / ерекше тілек",
     serviceInfo: "Жіберілгеннен кейін қызметкер қолжетімділікті, уақытты және соңғы шарттарды растайды.",
     rules: "Ережелер мен ақпарат",
-    rulesText: "Кіру 13:00-ден, шығу 11:00-ге дейін. Тұру, қызметтер және қауіпсіздік мәселелері бойынша қабылдау бөліміне хабарласыңыз.",
+    rulesText: "Тұру, қызметтер және қауіпсіздік мәселелері бойынша қабылдау бөліміне хабарласыңыз.",
     contacts: "Қонақүймен байланысу",
     call: "Қабылдау бөліміне қоңырау шалу",
     message: "Менеджерге жазу",
@@ -289,7 +287,7 @@ const COPY = {
     },
   },
   en: {
-    property: "AK BERMET",
+    property: "MARINA SMART",
     product: "MARINA SMART · Guest area",
     language: "Language",
     loading: "Opening your digital concierge…",
@@ -312,7 +310,7 @@ const COPY = {
     stay: "Your stay",
     from: "from",
     to: "to",
-    checkout: "Check-out by 11:00",
+    checkout: "Check-out by",
     quick: "What do you need now?",
     quickNote: "Most hotel services can be requested in just a few taps.",
     myRequests: "My requests",
@@ -348,12 +346,12 @@ const COPY = {
     manas: "Manas Airport",
     tamchy: "Tamchy Airport",
     bishkek: "Bishkek",
-    hotel: "AK BERMET",
+    hotel: "MARINA SMART",
     other: "Other location",
     luggage: "Luggage / special request",
     serviceInfo: "After submission, staff will confirm availability, timing and final conditions.",
     rules: "Rules and information",
-    rulesText: "Check-in is from 13:00. Check-out is by 11:00. Contact reception for stay, service or safety questions.",
+    rulesText: "Contact reception for stay, service or safety questions.",
     contacts: "Contact the hotel",
     call: "Call reception",
     message: "Message manager",
@@ -404,6 +402,15 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   const [vehicle, setVehicle] = useState("sedan");
 
   const copy = COPY[locale];
+  const propertyName = context?.property?.name || copy.property;
+  const officialContact = context?.property?.official_contact?.trim() || "";
+  const phoneCandidate = officialContact.replace(/[\s().-]/g, "");
+  const phone = /^\+?[0-9]{7,15}$/.test(phoneCandidate) ? phoneCandidate : null;
+  const whatsappCandidate = (context?.property?.whatsapp || "").trim();
+  const whatsappDigits = whatsappCandidate.replace(/[\s()+.-]/g, "");
+  const whatsapp = /^[0-9]{7,15}$/.test(whatsappDigits)
+    ? `https://wa.me/${whatsappDigits}`
+    : /^https:\/\/wa\.me\/[0-9]{7,15}$/.test(whatsappCandidate) ? whatsappCandidate : null;
 
   const loadContext = useCallback(async () => {
     try {
@@ -456,8 +463,8 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
       return `${mealName}; ${copy.adults}: ${adults}; ${copy.children}: ${children}${comment.trim() ? `; ${copy.comment}: ${comment.trim()}` : ""}`;
     }
     if (code === "TRANSFER") {
-      const from = copy[origin as "hotel" | "manas" | "tamchy" | "bishkek" | "other"];
-      const to = copy[destination as "hotel" | "manas" | "tamchy" | "bishkek" | "other"];
+      const from = origin === "hotel" ? propertyName : copy[origin as "manas" | "tamchy" | "bishkek" | "other"];
+      const to = destination === "hotel" ? propertyName : copy[destination as "manas" | "tamchy" | "bishkek" | "other"];
       const car = vehicle === "minivan" ? copy.minivan : copy.sedan;
       return `${copy.origin}: ${from}; ${copy.destination}: ${to}; ${copy.vehicle}: ${car}${comment.trim() ? `; ${copy.luggage}: ${comment.trim()}` : ""}`;
     }
@@ -495,7 +502,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
 
   return <main className="concierge-page">
     <header className="concierge-topbar">
-      <div className="concierge-brand"><span>III</span><div><strong>{copy.property}</strong><small>{copy.product}</small></div></div>
+      <div className="concierge-brand"><span>III</span><div><strong>{propertyName}</strong><small>{copy.product}</small></div></div>
       <div className="concierge-langs" aria-label={copy.language}>{MARINA_GUEST_LOCALES.map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
     </header>
 
@@ -514,20 +521,20 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     {state === "ready" && context?.authenticated && context.stay && <>
       <section className="concierge-hero">
         <div><p>{copy.hello}{context.guest?.first_name ? `, ${context.guest.first_name}` : ""}</p><h1>{copy.room} {context.room.code}</h1></div>
-        <div className="concierge-stay"><strong>{copy.stay}</strong><span>{dateLabel(context.stay.check_in, locale)} — {dateLabel(context.stay.check_out, locale)}</span><small>{copy.checkout}</small></div>
+        <div className="concierge-stay"><strong>{copy.stay}</strong><span>{dateLabel(context.stay.check_in, locale)} — {dateLabel(context.stay.check_out, locale)}</span>{context.property?.check_out_time && <small>{copy.checkout} {context.property.check_out_time}</small>}</div>
       </section>
 
       <section className="concierge-section"><div className="concierge-heading"><div><h2>{copy.quick}</h2><p>{copy.quickNote}</p></div></div><div className="concierge-actions">{services.slice(0, 6).map((service) => <button key={service.code} onClick={() => { setSelected(service.code); setNotice(null); }}><span>{service.icon}</span><strong>{service.title}</strong><small>{service.note}</small></button>)}</div></section>
 
       <section className="concierge-section concierge-requests"><div className="concierge-heading"><h2>{copy.myRequests}</h2><button onClick={() => void loadRequests()}>{copy.refresh}</button></div>{!requests.length ? <p className="concierge-empty">{copy.noRequests}</p> : <div className="concierge-request-list">{requests.map((item) => { const code = (SERVICE_ORDER.includes(item.request_code as RequestCode) || item.request_code === "PARKING" ? item.request_code : "ADMIN") as RequestCode; return <article key={item.id}><div><strong>{copy.services[code][0]}</strong><span data-status={item.status}>{copy.status[item.status]}</span></div>{item.description && <p>{item.description}</p>} {item.status === "OPEN" && <button onClick={() => void cancelRequest(item.id)}>{copy.cancel}</button>}</article>; })}</div>}</section>
 
-      <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p></article><article><h3>{copy.contacts}</h3><a href={`tel:${HOTEL_PHONE_E164}`}>{copy.call}</a><a href={HOTEL_WHATSAPP_URL} target="_blank" rel="noreferrer">{copy.message}</a></article></div></section>
+      <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p>{context.property?.checkout_instructions && <p>{context.property.checkout_instructions}</p>}</article><article><h3>{copy.contacts}</h3>{officialContact && <p>{officialContact}</p>}{phone && <a href={`tel:${phone}`}>{copy.call}</a>}{whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer">{copy.message}</a>}</article></div></section>
       <button className="concierge-signout" onClick={() => void logout()}>{copy.signOut}</button>
     </>}
 
     {selected && <div className="concierge-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setSelected(null); }}><section className="concierge-modal" role="dialog" aria-modal="true"><div className="concierge-modal-head"><div><small>{copy.newRequest}</small><h2>{selected === "MEALS" ? copy.mealsTitle : selected === "TRANSFER" ? copy.transferTitle : copy.services[selected][0]}</h2></div><button onClick={() => setSelected(null)} aria-label={copy.close}>×</button></div><p>{selected === "MEALS" ? copy.mealsNote : selected === "TRANSFER" ? copy.serviceInfo : copy.services[selected][1]}</p><form onSubmit={sendRequest}>
       {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{copy.mealWarning}</strong></div></>}
-      {selected === "TRANSFER" && <><div className="concierge-two"><label>{copy.origin}<select value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label><label>{copy.destination}<select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label></div><label>{copy.vehicle}<select value={vehicle} onChange={(e) => setVehicle(e.target.value)}><option value="sedan">{copy.sedan}</option><option value="minivan">{copy.minivan}</option></select></label></>}
+      {selected === "TRANSFER" && <><div className="concierge-two"><label>{copy.origin}<select value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="hotel">{propertyName}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label><label>{copy.destination}<select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="hotel">{propertyName}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label></div><label>{copy.vehicle}<select value={vehicle} onChange={(e) => setVehicle(e.target.value)}><option value="sedan">{copy.sedan}</option><option value="minivan">{copy.minivan}</option></select></label></>}
       <div className="concierge-two"><label>{copy.date}<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label><label>{copy.time}<input type="time" value={serviceTime} onChange={(e) => setServiceTime(e.target.value)} /></label></div><label>{selected === "TRANSFER" ? copy.luggage : copy.comment}<textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={copy.commentPlaceholder} maxLength={1200} /></label>{notice && <div className="concierge-notice">{notice}</div>}<button className="concierge-submit" disabled={sending}>{sending ? copy.sending : copy.send}</button></form></section></div>}
   </main>;
 }
