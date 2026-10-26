@@ -66,7 +66,26 @@ async def main():
             expired = checked(await guest.get(path))
             assert expired["authenticated"] is False and expired["active_stay"] is False
             assert (await guest.get(path + "/requests")).status_code == 401
-        print("MARINA_GUEST_IDENTITY_E2E_PASS: booking, check-in, QR/PIN, hotel settings, request, checkout revocation")
+        # The revoked guest session must not erase commercial or service history.
+        # Read it through the owner's existing, property-scoped CRM endpoints.
+        profiles_response = await owner.get("/api/v1/admin/intelligence/guests", params={"search": "+996700000010"})
+        assert profiles_response.status_code == 200, (profiles_response.status_code, profiles_response.text)
+        profiles = profiles_response.json()["items"]
+        matching = [item for item in profiles if item.get("phone") == "+996700000010"]
+        assert len(matching) == 1, "Stay created duplicate guest profiles"
+        history_response = await owner.get(f"/api/v1/admin/intelligence/guests/{matching[0]['id']}")
+        assert history_response.status_code == 200, (history_response.status_code, history_response.text)
+        history = history_response.json()
+        matching_stays = [item for item in history["reservations"] if item["id"] == reservation_id]
+        assert len(matching_stays) == 1, "Checked-out reservation is missing or duplicated in CRM"
+        completed = matching_stays[0]
+        assert completed["status"] == "CHECKED_OUT", completed
+        assert completed["schedule"], "Reservation room history disappeared at checkout"
+        assert any(item["service_code"] == "ADMIN" for item in completed["services"]), "Guest service request disappeared at checkout"
+        assert history["lifetime"]["completed_stays"] >= 1
+        assert (await owner.post(f"/api/v1/admin/stays/reservations/{reservation_id}/check-out")).status_code == 409
+        assert (await owner.post(f"/api/v1/admin/pms/reservations/{reservation_id}/cancel")).status_code == 409
+        print("MARINA_GUEST_IDENTITY_E2E_PASS: booking, stay, QR/PIN, service, checkout revocation, CRM history and terminal-state guards")
 
 
 if __name__ == "__main__":
