@@ -99,7 +99,24 @@ async def main():
         assert reservations_by_id[rebooked["reservation_id"]]["status"] == "GUARANTEED"
         assert guest_history["lifetime"]["booked_value_kgs"] >= rebooked["total_kgs"]
         assert guest_history["lifetime"]["reservation_count"] >= 2
-        print("MARINA_ORDINARY_BOOKING_E2E_PASS: booking, cancellation, released inventory, one returning guest, historical bookings, no ghost debt")
+        # An open folio receivable is a financial obligation, even when no
+        # payment or checked-in stay exists. Never release the room silently.
+        charge = await c.post(
+            f"/api/v1/admin/folio/reservations/{rebooked['reservation_id']}/charges",
+            json={"code": "TEST_EXTRA", "description": "Synthetic guest extra", "amount_kgs": 350},
+        )
+        assert charge.status_code == 201, (charge.status_code, charge.text)
+        assert charge.json()["folio"]["totals"]["extras_kgs"] >= 350
+        blocked_cancel = await c.post(f"/api/v1/admin/pms/reservations/{rebooked['reservation_id']}/cancel")
+        assert blocked_cancel.status_code == 409, (blocked_cancel.status_code, blocked_cancel.text)
+        assert blocked_cancel.json()["detail"]["code"] == "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"
+        protected_grid = await c.get("/api/v1/pms/grid", params={"start": start.isoformat(), "end": end.isoformat()})
+        assert protected_grid.status_code == 200, protected_grid.text
+        protected_blocks = [block for room in protected_grid.json()["rooms"] for block in room.get("blocks", [])]
+        assert any(block.get("reservation_id") == rebooked["reservation_id"] for block in protected_blocks), (
+            "A financially unresolved booking lost its room block"
+        )
+        print("MARINA_ORDINARY_BOOKING_E2E_PASS: booking, cancel, rebook, history, and protected unpaid folio receivable")
 
 if __name__ == "__main__":
     asyncio.run(main())
