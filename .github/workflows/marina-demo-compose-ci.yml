@@ -9,6 +9,7 @@ on:
       - 'scripts/marina_demo_seed.py'
       - 'scripts/marina_demo_start.sh'
       - 'scripts/marina_grid_browser_smoke.mjs'
+      - 'scripts/marina_ordinary_booking_e2e.py'
       - '.github/workflows/marina-demo-compose-ci.yml'
   workflow_dispatch:
 
@@ -74,6 +75,13 @@ jobs:
           npm install --no-audit --no-fund --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
           node scripts/marina_grid_browser_smoke.mjs
+      - name: Verify actual demo booking, price, overlap rejection and grid persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f compose.marina-demo.yaml exec -T \
+            -e MARINA_BOOKING_TEST_API=http://127.0.0.1:8000 \
+            api python scripts/marina_ordinary_booking_e2e.py
       - name: Re-run demo without erasing or rotating owner credentials
         shell: bash
         run: |
