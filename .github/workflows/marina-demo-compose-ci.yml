@@ -7,6 +7,7 @@ on:
       - 'deploy/marina-demo-api.Dockerfile'
       - 'deploy/marina-demo-migrate.Dockerfile'
       - 'scripts/marina_demo_seed.py'
+      - 'scripts/marina_demo_restart_e2e.py'
       - 'scripts/marina_demo_start.sh'
       - 'scripts/marina_grid_browser_smoke.mjs'
       - 'scripts/marina_ordinary_booking_e2e.py'
@@ -82,12 +83,17 @@ jobs:
           docker compose -f compose.marina-demo.yaml exec -T \
             -e MARINA_BOOKING_TEST_API=http://127.0.0.1:8000 \
             api python scripts/marina_ordinary_booking_e2e.py
+      - name: Edit demo inventory and capture booking and owner fingerprints
+        run: |
+          docker compose -f compose.marina-demo.yaml exec -T api \
+            python scripts/marina_demo_restart_e2e.py prepare > "$RUNNER_TEMP/demo-restart.json"
       - name: Re-run demo without erasing or rotating owner credentials
         shell: bash
         run: |
           set -euo pipefail
           docker compose -f compose.marina-demo.yaml up -d --build --wait
-          docker compose -f compose.marina-demo.yaml exec -T api python -c 'import json, urllib.request; r=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health/ready")); assert r["room_count"]==12'
+          docker compose -f compose.marina-demo.yaml exec -T api \
+            python scripts/marina_demo_restart_e2e.py verify < "$RUNNER_TEMP/demo-restart.json"
       - name: Diagnostics on failure
         if: failure()
         run: docker compose -f compose.marina-demo.yaml ps && docker compose -f compose.marina-demo.yaml logs --tail 90 api seed migrate postgres
