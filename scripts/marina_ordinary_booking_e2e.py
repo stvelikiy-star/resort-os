@@ -82,22 +82,26 @@ async def main():
         assert cancelled_folio.status_code == 200, (cancelled_folio.status_code, cancelled_folio.text)
         assert cancelled_folio.json()["totals"]["remaining_kgs"] == 0, "Cancelled reservation cannot create a collectible folio debt"
         assert cancelled_folio.json()["totals"]["paid_kgs"] == 0
+        payment_enabled = os.environ.get("ENABLE_PAYMENT_OPERATIONS", "false").lower() == "true"
         closed_readiness = await c.get(f"/api/v1/admin/booking/reservations/{booking['reservation_id']}/acquiring-readiness")
-        assert closed_readiness.status_code == 200, (closed_readiness.status_code, closed_readiness.text)
-        assert closed_readiness.json()["payment_collection_eligible"] is False
-        assert closed_readiness.json()["remaining_kgs"] == 0
-        assert closed_readiness.json()["remaining_tyiyn"] == 0
         closed_payment = await c.post(f"/api/v1/admin/booking/reservations/{booking['reservation_id']}/payments", json={
             "amount_kgs": 100, "method": "CASH", "idempotency_key": f"synthetic-closed-{booking['reservation_id']}",
         })
-        assert closed_payment.status_code == 409, (closed_payment.status_code, closed_payment.text)
-        assert closed_payment.json()["detail"]["code"] == "PAYMENT_REQUIRES_CLOSED_BOOKING_REVIEW"
+        if payment_enabled:
+            assert closed_readiness.status_code == 200, (closed_readiness.status_code, closed_readiness.text)
+            assert closed_readiness.json()["payment_collection_eligible"] is False
+            assert closed_readiness.json()["remaining_kgs"] == 0
+            assert closed_readiness.json()["remaining_tyiyn"] == 0
+            assert closed_payment.status_code == 409, (closed_payment.status_code, closed_payment.text)
+            assert closed_payment.json()["detail"]["code"] == "PAYMENT_REQUIRES_CLOSED_BOOKING_REVIEW"
+        else:
+            assert closed_readiness.status_code == 404, "No-payment demo must not publish acquiring routes"
+            assert closed_payment.status_code == 404, "No-payment demo must not accept money"
         closed_folio_again = await c.get(f"/api/v1/admin/folio/reservations/{booking['reservation_id']}")
         assert closed_folio_again.status_code == 200
         assert closed_folio_again.json()["totals"]["paid_kgs"] == 0, "Blocked payment must never mutate the ledger"
 
-
-        # A returning guest must retain one CRM identity and both historical bookings.
+                # A returning guest must retain one CRM identity and both historical bookings.
         # The cancelled booking releases inventory, so the same stay may be rebooked.
         rebook = await c.post("/api/v1/admin/pms/reservations/new/commit", json=commit_payload)
         assert rebook.status_code == 201, (rebook.status_code, rebook.text)
@@ -153,7 +157,67 @@ async def main():
         assert final_folio.status_code == 200
         assert final_folio.json()["totals"]["remaining_kgs"] == 0
         assert final_folio.json()["totals"]["extras_kgs"] == 0
-        print("MARINA_ORDINARY_BOOKING_E2E_PASS: booking, rebook, financial hold, reviewed waiver, cancellation, zero collectible folio debt")
+        if payment_enabled:
+            # A third booking exercises the real manual ledger without bank credentials.
+            next_preview = await c.post("/api/v1/admin/pms/reservations/new/preview", json=payload)
+            assert next_preview.status_code == 200, (next_preview.status_code, next_preview.text)
+            next_quote = next_preview.json()
+            third_payload = {
+                **commit_payload,
+                "expected_total_kgs": next_quote["pricing"]["total_kgs"],
+                "expected_pricing_source": next_quote["pricing"]["source"],
+            }
+            third = await c.post("/api/v1/admin/pms/reservations/new/commit", json=third_payload)
+            assert third.status_code == 201, (third.status_code, third.text)
+            reservation_id = third.json()["reservation_id"]
+            grand = third.json()["total_kgs"]
+            first_amount = max(1, grand // 3)
+            payment_path = f"/api/v1/admin/booking/reservations/{reservation_id}/payments"
+            payment_body = {
+                "amount_kgs": first_amount, "method": "CASH",
+                "idempotency_key": f"synthetic-partial-{reservation_id}",
+                "external_ref": f"synthetic-ref-{reservation_id}",
+                "note": "Synthetic only; no bank transfer",
+            }
+            first_payment = await c.post(payment_path, json=payment_body)
+            assert first_payment.status_code == 201, (first_payment.status_code, first_payment.text)
+            assert first_payment.json()["idempotent_replay"] is False
+            assert first_payment.json()["finance"]["paid_kgs"] == first_amount
+            assert first_payment.json()["finance"]["remaining_kgs"] == grand - first_amount
+            replay = await c.post(payment_path, json=payment_body)
+            assert replay.status_code == 201, (replay.status_code, replay.text)
+            assert replay.json()["idempotent_replay"] is True
+            assert replay.json()["payment_id"] == first_payment.json()["payment_id"]
+            assert replay.json()["finance"]["paid_kgs"] == first_amount
+            collision = await c.post(payment_path, json={**payment_body, "amount_kgs": first_amount + 1})
+            assert collision.status_code == 409, (collision.status_code, collision.text)
+            duplicate_reference = await c.post(payment_path, json={**payment_body,
+                "idempotency_key": f"synthetic-other-{reservation_id}"})
+            assert duplicate_reference.status_code == 409, (duplicate_reference.status_code, duplicate_reference.text)
+            second_amount = grand - first_amount + 150
+            second_payment = await c.post(payment_path, json={
+                "amount_kgs": second_amount, "method": "CASH",
+                "idempotency_key": f"synthetic-overpay-{reservation_id}",
+                "note": "Synthetic overpayment test",
+            })
+            assert second_payment.status_code == 201, (second_payment.status_code, second_payment.text)
+            assert second_payment.json()["finance"]["paid_kgs"] == grand + 150
+            assert second_payment.json()["finance"]["remaining_kgs"] == 0
+            assert second_payment.json()["finance"]["overpaid_kgs"] == 150
+            folio_response = await c.get(f"/api/v1/admin/folio/reservations/{reservation_id}")
+            assert folio_response.status_code == 200, folio_response.text
+            assert folio_response.json()["totals"]["paid_kgs"] == grand + 150
+            assert folio_response.json()["totals"]["overpaid_kgs"] == 150
+            readiness = await c.get(f"/api/v1/admin/booking/reservations/{reservation_id}/acquiring-readiness")
+            assert readiness.status_code == 200, readiness.text
+            assert readiness.json()["payment_collection_eligible"] is False
+            assert readiness.json()["provider_connected"] is False
+            assert readiness.json()["payment_link"] is None
+            paid_cancel = await c.post(f"/api/v1/admin/pms/reservations/{reservation_id}/cancel")
+            assert paid_cancel.status_code == 409, (paid_cancel.status_code, paid_cancel.text)
+            assert paid_cancel.json()["detail"]["code"] == "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"
+        print("MARINA_ORDINARY_BOOKING_E2E_PASS: cancellation, protected folio, and conditional manual payment idempotency/overpayment")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
