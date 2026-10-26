@@ -620,7 +620,7 @@ async def commit_grid_reservation(
 async def cancel_grid_reservation(
     reservation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER")),
+    user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", module_grant=False)),
 ):
     """Cancel an unpaid, not-checked-in PMS reservation and release its inventory.
 
