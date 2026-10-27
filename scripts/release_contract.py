@@ -47,6 +47,7 @@ EXPECTED_MIGRATIONS = (
     "zz110_marina_guest_stay_reviews_20261022",
     "zz111_marina_room_wayfinding_20261022",
     "zz112_marina_staff_module_permissions_20261022",
+    "zz113_marina_housekeeping_schedule_date_20261027",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -77,6 +78,7 @@ CRITICAL_CONSTRAINTS = frozenset(
         "site_content_documents_locale_check",
         "site_content_documents_scope_check",
         "operational_tasks_service_context_type_check",
+        "operational_tasks_housekeeping_schedule_date_check",
         "operational_tasks_service_time_check",
         "owner_analytics_snapshots_horizon_check",
         "owner_analytics_snapshots_payload_object_check",
