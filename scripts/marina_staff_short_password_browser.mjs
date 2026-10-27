@@ -19,7 +19,13 @@ try {
       && new URL(response.url()).pathname === "/core/api/v1/auth/login");
     await page.locator('input[autocomplete="current-password"]').press("Enter");
     const response = await responsePromise;
-    assert.equal(response.status(), 401, `${path}: short password must reach the real auth API`);
+    assert.deepEqual(response.request().postDataJSON(), {
+      username: `synthetic-short-login-${index}`, password: "abc",
+    }, `${path}: browser must submit the entered credentials`);
+    assert.equal(response.status(), 422, `${path}: non-demo server must enforce the 8-character policy`);
+    const body = await response.json();
+    assert(body.detail.some(item => item.msg.includes("Password must contain at least 8 characters")),
+      `${path}: expected the server password policy validation error`);
     await context.close();
   }
   console.log("MARINA_SHORT_PASSWORD_BROWSER_PASS: staff, kitchen and waiter forms submit a short password to the API");
