@@ -31,6 +31,7 @@ type Overview = {
   };
   can_manage_access: boolean;
   managed_roles: string[];
+  staff_password_policy: { min_length: number; max_length: number };
   truth: string;
 };
 
@@ -85,8 +86,7 @@ function dateTime(value?: string | null) {
 }
 
 export default function StaffBoard({ userRole, propertyCode }: { userRole: string; propertyCode: string }) {
-  const demo = propertyCode === "MARINA_HOTEL01";
-  const passwordMin = demo ? 3 : 8;
+  // The API determines the password policy from the running environment.
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +98,9 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
   const [editing, setEditing] = useState<StaffItem | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft>({ display_name: "", role: "RECEPTION", password: "", module_permissions: [] });
   const [saving, setSaving] = useState(false);
+  const passwordMin = data?.staff_password_policy?.min_length ?? 8;
+  const passwordMax = data?.staff_password_policy?.max_length ?? 256;
+  const demo = passwordMin === 3 && passwordMax === 10;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -241,7 +244,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
       <label><span>Имя сотрудника</span><input required minLength={2} value={createDraft.display_name} onChange={(e) => setCreateDraft({ ...createDraft, display_name: e.target.value })} /></label>
       <label><span>Логин</span><input required minLength={2} pattern="[A-Za-z0-9._-]+" autoComplete="off" value={createDraft.username} onChange={(e) => setCreateDraft({ ...createDraft, username: e.target.value })} /></label>
       <label><span>Роль</span><select value={createDraft.role} onChange={(e) => setCreateDraft({ ...createDraft, role: e.target.value })}>{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
-      <label><span>Пароль ({demo ? "3–10" : "от 8"} символов)</span><input required type="password" minLength={passwordMin} maxLength={demo ? 10 : 256} autoComplete="new-password" value={createDraft.password} onChange={(e) => setCreateDraft({ ...createDraft, password: e.target.value })} /></label>
+      <label><span>Пароль ({demo ? "3–10" : "от 8"} символов)</span><input required type="password" minLength={passwordMin} maxLength={passwordMax} autoComplete="new-password" value={createDraft.password} onChange={(e) => setCreateDraft({ ...createDraft, password: e.target.value })} /></label>
       <div className="management-inline-actions"><button className="btn primary" disabled={saving}>{saving ? "Создаю…" : "Создать"}</button></div>
     </form>}
 
@@ -296,7 +299,7 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
         <div className="management-form-grid">
           <label><span>Имя сотрудника</span><input required minLength={2} value={editDraft.display_name} onChange={(e) => setEditDraft({ ...editDraft, display_name: e.target.value })} /></label>
           <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{!data.managed_roles.includes(editing.role) && <option value={editing.role} disabled>{roleLabel[editing.role] || editing.role} · устаревшая</option>}{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
-          <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={passwordMin} maxLength={demo ? 10 : 256} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder={demo ? "От 3 до 10 символов" : "Не менее 8 символов"} /></label>
+          <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={passwordMin} maxLength={passwordMax} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder={demo ? "От 3 до 10 символов" : "Не менее 8 символов"} /></label>
         </div>
         <fieldset className="staff-module-access">
           <legend>Доступ к разделам</legend>
