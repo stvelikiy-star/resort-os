@@ -112,6 +112,27 @@ class StaffPermissions(unittest.IsolatedAsyncioTestCase):
 
 
 class RouterPermissions(unittest.TestCase):
+    def test_first_question_without_placeholder_reaches_provider_in_all_locales(self):
+        app = FastAPI(); app.include_router(staff.router); app.state.db = Connection()
+        app.dependency_overrides[current_user] = lambda: user("MANAGER", [])
+        for locale in ("ru", "kg", "kz", "en"):
+            with TestClient(app) as client, patch.object(staff, "_ask_openai", new_callable=AsyncMock, return_value="Test reply") as provider:
+                result = client.post("/api/v1/assistant/chat", json={
+                    "messages": [{"role": "user", "content": "Где создать бронь?"}],
+                    "current_screen": "PMS", "locale": locale,
+                })
+                self.assertEqual(result.status_code, 200, result.text)
+                provider.assert_awaited_once()
+
+    def test_navigation_uses_actual_section_grants(self):
+        for module, text in (("WHATSAPP", "Как подключить WhatsApp?"),
+                             ("CHANNELS", "Где брони Booking?"),
+                             ("FINANCE", "Где финансы?")):
+            payload = staff.MarinaAssistantRequest(messages=[{"role": "user", "content": text}])
+            suggestion = staff._navigation_suggestion(payload, user("RECEPTION", [module]))
+            self.assertEqual(suggestion["screen"], module)
+            self.assertIsNone(staff._navigation_suggestion(payload, user("MANAGER", [])))
+
     def test_staff_endpoints_reject_disallowed_roles_without_provider(self):
         for role in ["MAID", "TECHNICIAN", "COOK", "WAITER", "AGENT"]:
             app = FastAPI(); app.include_router(staff.router)

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import InboxBoard from "./InboxBoard";
+import WhatsAppConnection from "./WhatsAppConnection";
 import styles from "./WhatsAppWorkspace.module.css";
 
 type Section = "INBOX" | "LEADS" | "AI" | "CONNECT";
@@ -27,7 +28,7 @@ export default function WhatsAppWorkspace({ role, onNavigate }: Props) {
         <h1>WhatsApp гостиницы</h1>
         <p className="subtitle">Диалоги гостей, предварительные заявки и MARINA AI — в одном рабочем месте.</p>
       </div>
-      <div className={styles.offline} role="status">WhatsApp не подключён · тестовая подготовка</div>
+      <div className={styles.offline} role="status">Доставка сообщений и автоответы требуют отдельной проверки</div>
     </header>
 
     <nav aria-label="Этапы работы с WhatsApp" className={styles.steps}>
@@ -82,14 +83,15 @@ export default function WhatsAppWorkspace({ role, onNavigate }: Props) {
 
     {section === "CONNECT" && <section className={styles.section}>
       <h2>Подключение WhatsApp</h2>
-      <p>У каждой гостиницы будет собственный номер и собственные переписки. Техническая интеграция Green-API сознательно отложена, поэтому сейчас нельзя выдавать QR-код или показывать ложный статус «Подключено».</p>
+      <p>У каждой гостиницы — собственный номер и переписки. Собственник получает QR-код через сервер MARINA SMART. Ключ GreenAPI остаётся на сервере.</p>
+      {role === "OWNER" ? <WhatsAppConnection /> : <p>Проверка номера и QR-подключение доступны собственнику гостиницы.</p>}
       <div className={styles.tiles}>
         <article><strong>1. Номер гостиницы</strong><span>Закрепляем номер только за одним объектом MARINA SMART.</span></article>
-        <article><strong>2. Подключение по QR</strong><span>Будет доступно после включения безопасного провайдера.</span></article>
+        <article><strong>2. Подключение по QR</strong><span>Собственник сканирует QR и проверяет авторизацию номера.</span></article>
         <article><strong>3. Проверка сообщений</strong><span>Тестируем приём и отправку с отдельного телефона.</span></article>
         <article><strong>4. Включение MARINA AI</strong><span>Только после проверки правил, ролей и предварительных заявок.</span></article>
       </div>
-      <p className={styles.small}>QR, отправка, массовые сообщения и автоматический приём броней пока недоступны. Никакие реальные номера не изменены.</p>
+      <p className={styles.small}>Без настроенного GreenAPI QR недоступен. Отправка сообщений, автоответы и автоматический приём броней требуют отдельных проверок и подключения.</p>
     </section>}
   </main>;
 }

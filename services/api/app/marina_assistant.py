@@ -52,6 +52,8 @@ SCREEN_LABELS = {
     "ROOM_QR": "QR номеров",
     "POINT_QR": "QR зон",
     "INBOX": "Сообщения",
+    "WHATSAPP": "WhatsApp / AI",
+    "CHANNELS": "Каналы продаж",
     "OPS": "Уборка / Ремонт",
     "STAFF": "Персонал",
     "MY_SHIFT": "Моя смена",
@@ -870,6 +872,8 @@ even if the role manual describes them. Never infer data omitted from LIVE_CONTE
 
 
 NAVIGATION_KEYWORDS = {
+    "WHATSAPP": ("whatsapp", "ватсап", "ватс апп", "greenapi", "green-api"),
+    "CHANNELS": ("booking.com", "booking", "букинг", "airbnb", "островок", "ostrovok", "каналы продаж", "tripadvisor"),
     "PMS": ("шахмат", "номер", "room", "grid", "доступност"),
     "RESERVATIONS": ("заезд", "выезд", "check-in", "check-out", "брон", "reservation"),
     "REQUESTS": ("заявк", "crm", "request"),
@@ -884,23 +888,10 @@ NAVIGATION_KEYWORDS = {
     "ROOM_QR": ("qr номер", "qr комнаты", "room qr"),
 }
 
-ROLE_NAVIGATION = {
-    "OWNER": set(SCREEN_LABELS),
-    "MANAGER": set(SCREEN_LABELS),
-    "RECEPTION": {"PMS", "RESERVATIONS", "SERVICES", "OPS", "GROUPS", "DINING", "ROOM_QR"},
-    "AGENT": {"PMS"},
-    "MAID": {"OPS", "MY_SHIFT"},
-    "TECHNICIAN": {"OPS", "MY_SHIFT"},
-    "COOK": {"KITCHEN", "MY_SHIFT"},
-    "DINING_STAFF": set(),
-    "WAITER": {"DINING", "WAITER", "MY_SHIFT"},
-    "STORE_STAFF": {"MY_SHIFT"},
-}
-
-
 def _navigation_suggestion(payload: MarinaAssistantRequest, user: dict[str, Any]) -> dict[str, str] | None:
+    _require_assistant_user(user)
     text = " ".join(message.content for message in payload.messages[-3:] if message.role == "user").lower()
-    allowed = ROLE_NAVIGATION.get(str(user.get("role") or ""), set()) & _allowed_modules(user)
+    allowed = set(SCREEN_LABELS) & _allowed_modules(user)
     for screen, keywords in NAVIGATION_KEYWORDS.items():
         if screen in allowed and any(keyword in text for keyword in keywords):
             return {"screen": screen, "label": SCREEN_LABELS.get(screen, screen)}

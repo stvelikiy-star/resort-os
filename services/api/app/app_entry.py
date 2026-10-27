@@ -40,6 +40,7 @@ from .hotel_setup import router as hotel_setup_router
 from .hotel_rules import router as hotel_rules_router
 from .housekeeping_schedule import router as housekeeping_schedule_router
 from .inbox import router as inbox_router
+from .whatsapp_connection import router as whatsapp_connection_router
 from .kitchen import admin_router as kitchen_admin_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
 from .kitchen_menu_management import router as kitchen_menu_management_router
@@ -257,6 +258,7 @@ app.include_router(crm_sync_router)
 app.include_router(google_control_router)
 app.include_router(communication_ingest_router)
 app.include_router(inbox_router)
+app.include_router(whatsapp_connection_router)
 app.include_router(channel_outbound_router)
 app.include_router(ai_sales_router)
 app.include_router(realtime_router)

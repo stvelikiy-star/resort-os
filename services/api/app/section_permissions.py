@@ -72,6 +72,7 @@ SECTION_PATHS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("/api/v1/admin/service-points", ("POINT_QR",)),
     ("/api/v1/admin/service-point-payments", ("POINT_QR",)),
     ("/api/v1/admin/inbox", ("INBOX", "WHATSAPP")),
+    ("/api/v1/admin/whatsapp", ("WHATSAPP",)),
     ("/api/v1/admin/channels", ("CHANNELS", "WHATSAPP")),
     ("/api/v1/ops/housekeeping", ("OPS",)),
     ("/api/v1/ops/guest-requests", ("OPS", "SERVICES")),

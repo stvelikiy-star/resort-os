@@ -39,9 +39,7 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
     return () => observer.disconnect();
   }, []);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: "assistant", content: "" },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [navigation, setNavigation] = useState<Navigation | null>(null);
@@ -110,6 +108,7 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
   return (
     <>
       <button
+        data-i18n-skip
         type="button"
         className={styles.launcher}
         onClick={() => setOpen((value) => !value)}
@@ -121,7 +120,7 @@ export default function MarinaAiAssistant({ screen, role, onNavigate }: Props) {
       </button>
 
       {open && (
-        <section className={styles.panel} aria-label="MARINA AI">
+        <section data-i18n-skip className={styles.panel} aria-label="MARINA AI">
           <header className={styles.header}>
             <div>
               <strong>MARINA AI</strong>
