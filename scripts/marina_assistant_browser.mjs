@@ -36,7 +36,17 @@ try {
       await page.setViewportSize(locale === "ru" ? { width: 1440, height: 900 } : { width: 390, height: 844 });
       await page.goto(base, { waitUntil: "networkidle" });
       await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
-      await page.getByRole("button", { name: open, exact: true }).click();
+      try {
+        await page.getByRole("button", { name: open, exact: true }).click({ timeout: 10000 });
+      } catch (error) {
+        const diagnostic = await page.evaluate(() => ({
+          lang: document.documentElement.lang,
+          localeButtons: Array.from(document.querySelectorAll("button")).filter(button => /^(RU|KG|KZ|EN)$/.test(button.textContent?.trim() || "")).map(button => ({ text: button.textContent?.trim(), pressed: button.getAttribute("aria-pressed") })),
+          aiButtons: Array.from(document.querySelectorAll("button")).filter(button => (button.getAttribute("aria-label") || "").includes("MARINA AI")).map(button => ({ label: button.getAttribute("aria-label"), expanded: button.getAttribute("aria-expanded") })),
+        }));
+        console.error("MARINA_AI_LOCALE_DIAGNOSTIC", JSON.stringify({ base, locale, ...diagnostic, pageErrors: errors }));
+        throw error;
+      }
       const panel = page.getByRole("region", { name: "MARINA AI", exact: true });
       const received = page.waitForResponse(response => response.request().method() === "POST"
         && new URL(response.url()).pathname === "/core/api/v1/assistant/chat");
