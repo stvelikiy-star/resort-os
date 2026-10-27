@@ -139,7 +139,20 @@ export default function StaffBoard({ userRole, propertyCode }: { userRole: strin
         body: JSON.stringify(createDraft),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось создать сотрудника");
+      if (!response.ok) {
+        const detail = typeof body.detail === "string"
+          ? body.detail
+          : Array.isArray(body.detail)
+            ? body.detail.map((item: { msg?: string; loc?: (string | number)[] }) =>
+                [item.loc?.slice(1).join("."), item.msg].filter(Boolean).join(": ")).join("; ")
+            : "";
+        const statusMessage = response.status === 401 ? "Сессия завершена. Войдите повторно."
+          : response.status === 403 ? "Недостаточно прав для создания сотрудника."
+          : response.status === 409 ? "Такой логин уже существует."
+          : response.status === 422 ? "Проверьте введённые данные сотрудника."
+          : "Сервер отклонил создание сотрудника.";
+        throw new Error(`${statusMessage} HTTP ${response.status}${detail ? `: ${detail}` : ""}`);
+      }
       setCreateDraft(emptyStaffDraft);
       setShowCreate(false);
       setNotice(`Сотрудник ${body.display_name} создан. Передайте пароль только лично сотруднику.`);
