@@ -38,7 +38,7 @@ try {
       await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
       // Verify the page switched languages before asserting assistant translations.
       // A click may precede React hydration, especially after a fresh navigation.
-      await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected, locale);
+      await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected, locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale);
       await page.getByRole("button", { name: open, exact: true }).click();
       const panel = page.getByRole("region", { name: "MARINA AI", exact: true });
       const received = page.waitForResponse(response => response.request().method() === "POST"
