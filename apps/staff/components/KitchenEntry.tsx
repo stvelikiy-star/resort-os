@@ -142,7 +142,7 @@ export default function KitchenEntry() {
         <h1>Кухня</h1>
         <span>План порций, заказы кухни, меню, стоп-лист и новые заезды — в одном рабочем контуре.</span>
         <label>Логин<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required autoFocus /></label>
-        <label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={8} required /></label>
+        <label>Пароль<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={3} required /></label>
         {error && <div className={styles.error}>{error}</div>}
         <button className={styles.primary} disabled={submitting}>{submitting ? "Входим…" : "Войти в кухню"}</button>
         <a href="/waiter">Отдельный вход «Официант / зал»</a>
