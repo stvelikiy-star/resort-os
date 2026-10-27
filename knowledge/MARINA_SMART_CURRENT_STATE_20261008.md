@@ -10,7 +10,7 @@ Date: 2026-10-26
 - Application baseline: 9c2e01ac3c755ad4fc75d2c6dec822b817795927
 - Verified manifest revision: 2e7b33c565932ebc710b459c37dcc57658eac221
 - Candidate manifest: release/marina-smart-current-candidate.json
-- Migration ledger: 37 migrations
+- Migration ledger: 38 migrations
 - Critical constraints: 105 (scripts/release_contract.py)
 
 ## Observed CI evidence

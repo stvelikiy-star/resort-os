@@ -63,7 +63,10 @@ def main() -> int:
         ok(marker in auth, f"Core auth invariant: {marker}")
 
     staff_ui = read("apps/admin/components/StaffBoard.tsx")
-    ok('const passwordMin = demo ? 3 : 8' in staff_ui, "staff creation uses 8-character live password policy")
+    ok('data?.staff_password_policy?.min_length ?? 8' in staff_ui and
+       'data?.staff_password_policy?.max_length ?? 256' in staff_ui and
+       'minLength={passwordMin}' in staff_ui and 'maxLength={passwordMax}' in staff_ui,
+       "staff creation follows API-reported password constraints")
     staff_api = read("services/api/app/staff_control.py")
     ok('min_size = 3 if is_demo else 8' in staff_api, "staff API enforces live password policy")
 
