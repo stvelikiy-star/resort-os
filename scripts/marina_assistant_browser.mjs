@@ -36,6 +36,7 @@ try {
       await page.setViewportSize(locale === "ru" ? { width: 1440, height: 900 } : { width: 390, height: 844 });
       await page.goto(base, { waitUntil: "networkidle" });
       await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
+      await page.waitForFunction(expected => document.documentElement.lang === expected, ({ kg: "ky", kz: "kk", ru: "ru", en: "en" })[locale]);
       try {
         await page.getByRole("button", { name: open, exact: true }).click({ timeout: 10000 });
       } catch (error) {
