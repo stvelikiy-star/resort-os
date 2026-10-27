@@ -12,6 +12,7 @@ on:
       - 'scripts/marina_ordinary_booking_e2e.py'
       - 'scripts/marina_grid_browser_smoke.mjs'
       - 'scripts/marina_assistant_browser.mjs'
+      - 'scripts/marina_staff_short_password_browser.mjs'
       - 'scripts/marina_season_boundary_e2e.py'
       - 'services/api/app/hotel_rules.py'
       - 'scripts/marina_hotel_rules_e2e.py'
@@ -185,6 +186,8 @@ jobs:
         run: node scripts/marina_grid_browser_smoke.mjs
       - name: Browser acceptance of hotel-specific guest settings
         run: node scripts/marina_guest_identity_browser.mjs
+      - name: Browser acceptance of short staff passwords
+        run: node scripts/marina_staff_short_password_browser.mjs
       - name: Browser acceptance of first staff assistant question in four locales
         run: node scripts/marina_assistant_browser.mjs
       - name: Print diagnostics on failure

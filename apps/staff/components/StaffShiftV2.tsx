@@ -256,7 +256,7 @@ export default function StaffShiftV2() {
     <p>{telegramDetected ? "Первый вход: рабочий логин и пароль. После привязки Telegram вход будет автоматическим." : "Войдите под рабочей учётной записью."}</p>
     {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
     <label><span>Логин</span><input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label>
-    <label><span>Пароль</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={8} required /></label>
+    <label><span>Пароль</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={3} required /></label>
     {loginError && <div className="shift-error">{loginError}</div>}
     <button className="shift-primary">Войти</button>
   </form></main>;

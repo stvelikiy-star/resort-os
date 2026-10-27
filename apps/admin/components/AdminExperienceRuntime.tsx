@@ -3187,6 +3187,7 @@ function requestUrl(input: RequestInfo | URL): string {
 
 export default function AdminExperienceRuntime() {
   const [locale, setLocale] = useState<Locale>("ru");
+  const [localeReady, setLocaleReady] = useState(false);
   const [pin, setPin] = useState<PinPayload | null>(null);
   const [currentReservationId, setCurrentReservationId] = useState<string | null>(null);
   const [currentReservationCheckedIn, setCurrentReservationCheckedIn] = useState(false);
@@ -3199,6 +3200,7 @@ export default function AdminExperienceRuntime() {
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === "ru" || stored === "kg" || stored === "kz" || stored === "en") setLocale(stored);
+    setLocaleReady(true);
   }, []);
 
   useEffect(() => {
@@ -3307,7 +3309,7 @@ export default function AdminExperienceRuntime() {
   return <>
     <div className="admin-locale-switcher" data-i18n-skip>
       <span>{labels.language}</span>
-      {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} onClick={() => setLocale(value)}>{value.toUpperCase()}</button>)}
+      {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} disabled={!localeReady} onClick={() => setLocale(value)}>{value.toUpperCase()}</button>)}
     </div>
 
     {detailOpen && currentReservationCheckedIn && <button type="button" className="guest-pin-reissue" data-i18n-skip onClick={reissuePin} disabled={pinBusy}>{pinBusy ? "…" : labels.reissue}</button>}

@@ -1294,12 +1294,14 @@ function translated(text: string, locale: Locale): string {
 
 export default function StaffLocaleRuntime() {
   const [locale, setLocale] = useState<Locale>("ru");
+  const [localeReady, setLocaleReady] = useState(false);
   const originalText = useMemo(() => new WeakMap<Text, { source: string; rendered: string }>(), []);
   const originalAttrs = useMemo(() => new WeakMap<Element, Map<string, { source: string; rendered: string }>>(), []);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === "ru" || stored === "kg" || stored === "kz" || stored === "en") setLocale(stored);
+    setLocaleReady(true);
   }, []);
 
   useEffect(() => {
@@ -1356,6 +1358,6 @@ export default function StaffLocaleRuntime() {
 
   return <div data-staff-i18n-skip style={{ position: "fixed", right: 12, top: 12, zIndex: 9999, display: "flex", alignItems: "center", gap: 4, padding: "6px 7px", borderRadius: 999, background: "rgba(10,17,40,.94)", color: "#fff", boxShadow: "0 8px 28px rgba(0,0,0,.22)", font: "700 11px/1 system-ui,sans-serif" }}>
     <span style={{ padding: "0 5px", opacity: .8 }}>{label}</span>
-    {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" onClick={() => setLocale(value)} aria-pressed={locale === value} style={{ border: "1px solid rgba(255,255,255,.22)", borderRadius: 999, padding: "6px 7px", cursor: "pointer", background: locale === value ? "#fff" : "transparent", color: locale === value ? "#0a1128" : "#fff", font: "800 10px/1 system-ui,sans-serif" }}>{value.toUpperCase()}</button>)}
+    {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" disabled={!localeReady} onClick={() => setLocale(value)} aria-pressed={locale === value} style={{ border: "1px solid rgba(255,255,255,.22)", borderRadius: 999, padding: "6px 7px", cursor: "pointer", background: locale === value ? "#fff" : "transparent", color: locale === value ? "#0a1128" : "#fff", font: "800 10px/1 system-ui,sans-serif" }}>{value.toUpperCase()}</button>)}
   </div>;
 }

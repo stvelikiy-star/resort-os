@@ -148,7 +148,7 @@ export default function StaffRoleGateway() {
       <p>{telegramInitData ? "Первый вход — рабочий логин и пароль. После привязки Telegram вход будет автоматическим." : "Войдите под рабочей учётной записью."}</p>
       {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
       <label><span>Логин</span><input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
-      <label><span>Пароль</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={8} required /></label>
+      <label><span>Пароль</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={3} required /></label>
       {error && <div className="shift-error">{error}</div>}
       <button className="shift-primary">Войти</button>
     </form></main>;
