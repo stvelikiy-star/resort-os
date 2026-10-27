@@ -25,6 +25,11 @@ try {
     const login = await context.request.post(`${base}/core/api/v1/auth/login`, { data: { username, password } });
     assert.equal(login.status(), 200, "Real synthetic owner login must succeed");
     const page = await context.newPage();
+    // This is the ordinary web login flow, not a Telegram Mini App. Keep an
+    // unrelated external SDK/network policy from breaking the assistant test.
+    await page.route("https://telegram.org/js/telegram-web-app.js", route => route.fulfill({
+      contentType: "application/javascript", body: "/* Non-Telegram browser fixture. */",
+    }));
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
     for (const [locale, [open, quick, unavailable]] of Object.entries(copy)) {
