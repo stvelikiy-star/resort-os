@@ -85,7 +85,7 @@ function dateTime(value?: string | null) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-export default function StaffBoard({ userRole, propertyCode }: { userRole: string; propertyCode: string }) {
+export default function StaffBoard({ userRole }: { userRole: string; propertyCode: string }) {
   // The API determines the password policy from the running environment.
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
