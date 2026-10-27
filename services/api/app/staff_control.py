@@ -228,6 +228,10 @@ async def staff_overview(
         "unassigned_active_tasks": dict(unassigned),
         "can_manage_access": user["role"] == "OWNER",
         "managed_roles": MANAGED_ROLES,
+        "staff_password_policy": {
+            "min_length": 3 if os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01" else 8,
+            "max_length": 10 if os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01" else 256,
+        },
         "truth": "This is task/session visibility only. It is not an attendance, payroll or employee-performance score.",
     }
 
