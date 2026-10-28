@@ -280,6 +280,38 @@ async def record_reservation_payment(
                     "message": "New payments cannot be recorded against cancelled or no-show reservations. Review historical payments separately.",
                 })
 
+            # Enforce the actual outstanding balance while the reservation row is locked.
+            # Charge totals and previously received payments are read in one transaction.
+            balance = await conn.fetchrow(
+                """
+                SELECT
+                    r."totalKgs"::bigint
+                      + COALESCE((
+                        SELECT SUM(c."amountKgs")
+                        FROM guest_folio_charges c
+                        WHERE c."reservationId" = r.id
+                          AND c."propertyId" = r."propertyId"
+                          AND c.status NOT IN ('WAIVED', 'VOID')
+                      ), 0)::bigint AS due_kgs,
+                    COALESCE((
+                        SELECT SUM(p."amountKgs")
+                        FROM payments p
+                        WHERE p."reservationId" = r.id AND p.status = 'RECEIVED'
+                    ), 0)::bigint AS paid_kgs
+                FROM reservations r
+                WHERE r.id = $1 AND r."propertyId" = $2
+                """,
+                reservation_id, pid,
+            )
+            outstanding = max(0, int(balance["due_kgs"]) - int(balance["paid_kgs"]))
+            if payload.amount_kgs > outstanding:
+                raise HTTPException(status_code=409, detail={
+                    "code": "PAYMENT_EXCEEDS_BALANCE",
+                    "message": "Payment exceeds the remaining reservation balance.",
+                    "remaining_kgs": outstanding,
+                    "attempted_kgs": payload.amount_kgs,
+                })
+
             if external_ref:
                 reference_payment = await conn.fetchrow(
                     '''
