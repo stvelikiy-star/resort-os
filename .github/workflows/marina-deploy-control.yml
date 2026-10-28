@@ -66,6 +66,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/host_preflight.sh
+          bash -n scripts/marina_host_inventory.sh
           echo "MARINA_HOST_PREFLIGHT_SYNTAX_OK"
           echo "NO_DEPLOYMENT_EXECUTED"
       - name: Explain strict deployment boundary
