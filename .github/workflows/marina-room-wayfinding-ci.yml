@@ -1,0 +1,36 @@
+name: MARINA Room Wayfinding CI
+on:
+  pull_request:
+    paths:
+      - "services/api/app/room_wayfinding.py"
+      - "apps/admin/components/RoomWayfindingPanel.tsx"
+      - "apps/admin/components/RoomDetailModal.tsx"
+      - "apps/web/components/GuestRoomDirections.tsx"
+      - "apps/web/app/g/**"
+      - "scripts/test_marina_room_wayfinding_contract.py"
+      - "packages/database/prisma/migrations/zz111_marina_room_wayfinding_20261022/**"
+      - ".github/workflows/marina-room-wayfinding-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wayfinding-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m py_compile services/api/app/room_wayfinding.py
+          python scripts/test_marina_room_wayfinding_contract.py -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci --prefix apps/admin
+      - run: npm run typecheck --prefix apps/admin
+      - run: npm ci --prefix apps/web
+      - run: npm run typecheck --prefix apps/web

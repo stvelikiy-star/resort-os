@@ -3,10 +3,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from .auth import current_user, trusted_property_id
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/reception", tags=["reception-readiness"])
-ALLOWED_ROLES = {"OWNER", "MANAGER", "RECEPTION"}
+reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 
 
 async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
@@ -17,11 +17,8 @@ async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
 async def request_housekeeping_for_arrival(
     reservation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(current_user),
+    user: dict[str, Any] = Depends(reception_access),
 ):
-    if user["role"] not in ALLOWED_ROLES:
-        raise HTTPException(status_code=403, detail="Insufficient permission")
-
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await _property_id(conn, user)

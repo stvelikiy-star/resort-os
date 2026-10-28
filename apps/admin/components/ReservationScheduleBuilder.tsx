@@ -96,6 +96,10 @@ function canonicalize(items: ScheduleSegment[]) {
 function errorText(body: any, fallback: string) {
   if (typeof body?.detail === "string") return body.detail;
   const code = body?.detail?.code;
+  if (code === "RESERVATION_NOT_CANCELLABLE") return "Эту бронь уже нельзя отменить: её статус изменился. Обновите данные.";
+  if (code === "CANCELLATION_REQUIRES_SOURCE_WORKFLOW") return "Бронь поступила из внешнего канала. Отмените её через управление каналами.";
+  if (code === "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW") return "У брони есть оплата или история проживания. Требуется проверка менеджером и отдельная процедура.";
+  if (code === "RESERVATION_INVENTORY_MISSING") return "Номера уже не закреплены за бронью. Обновите данные и обратитесь к администратору.";
   if (code === "STALE_RESERVATION") return "Бронь уже изменена в другом окне. Обновите график и повторите.";
   if (["ROOM_CONFLICT", "ROOM_CONFLICT_RACE"].includes(code)) return "Есть пересечение с другим активным блоком. Изменение не сохранено.";
   if (code === "PAST_ROOM_HISTORY_IMMUTABLE") return "Уже прожитые ночи защищены. Переносите только будущий сегмент или разрежьте график с сегодняшней даты.";
@@ -128,6 +132,7 @@ export default function ReservationScheduleBuilder({
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [confirmCancellation, setConfirmCancellation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [splitInputs, setSplitInputs] = useState<Record<number, string>>({});
 
@@ -185,6 +190,7 @@ export default function ReservationScheduleBuilder({
     setLoading(true);
     setError(null);
     setPreview(null);
+    setConfirmCancellation(false);
     try {
       const response = await fetch(`/core/api/v1/admin/pms/reservations/${reservationId}/schedule`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
@@ -349,6 +355,27 @@ export default function ReservationScheduleBuilder({
     }
   }
 
+  async function cancelUnpaidReservation() {
+    if (!data || data.reservation.status !== "GUARANTEED" || !confirmCancellation || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/pms/reservations/${reservationId}/cancel`, {
+        method: "POST",
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(errorText(body, "Не удалось отменить бронь. Обновите данные и повторите."));
+      if (body.status !== "CANCELLED") throw new Error("Сервер не подтвердил отмену. Обновите бронирования.");
+      onUpdated();
+      onClose();
+    } catch (cause) {
+      setConfirmCancellation(false);
+      setError(cause instanceof Error ? cause.message : "Ошибка отмены брони");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const totalNights = draft.length ? daysBetween(draft[0].start, draft[draft.length - 1].end) : 0;
 
   return <div className="v8-builder-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -404,6 +431,16 @@ export default function ReservationScheduleBuilder({
             </div>;
           })}
         </section>
+
+        {data.reservation.status === "GUARANTEED" && <section className="v8-builder-rules" aria-label="Отмена бронирования">
+          <strong>Отмена брони</strong>
+          <p>Доступна только для неоплаченной брони, созданной в шахматке. Брони с оплатой, заселением или из внешних каналов защищены проверками сервера. Отмена освободит номер, но сохранит историю бронирования.</p>
+          {!confirmCancellation ? <button type="button" className="btn" disabled={busy} onClick={() => setConfirmCancellation(true)}>Отменить неоплаченную бронь</button> : <div role="group" aria-label="Подтвердить отмену брони">
+            <p><strong>Подтвердите отмену брони</strong> {data.reservation.booking_number}. Номер снова станет доступен для бронирования.</p>
+            <button type="button" className="btn" disabled={busy} onClick={() => setConfirmCancellation(false)}>Оставить бронь</button>{" "}
+            <button type="button" className="btn" disabled={busy} onClick={() => void cancelUnpaidReservation()}>{busy ? "Отменяю…" : "Да, отменить бронь"}</button>
+          </div>}
+        </section>}
 
         {error && <div className="v8-builder-error">{error}</div>}
 

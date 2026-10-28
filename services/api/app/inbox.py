@@ -8,6 +8,7 @@ from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/inbox", tags=["admin-inbox"])
 manager_access = require_roles("OWNER", "MANAGER")
+inbox_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 CONVERSATION_STATUSES = {"OPEN", "WAITING_GUEST", "WAITING_STAFF", "RESOLVED", "ARCHIVED"}
 
 
@@ -29,6 +30,17 @@ class InternalNoteCreate(BaseModel):
 
 async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
     return await trusted_property_id(conn, user)
+
+
+async def check_reception_whatsapp(conn, pid: uuid.UUID, conversation_id: uuid.UUID, user: dict[str, Any]) -> None:
+    if user["role"] != "RECEPTION":
+        return
+    kind = await conn.fetchval(
+        'SELECT ch.kind::text FROM conversations c JOIN communication_channels ch ON ch.id=c."channelId" WHERE c.id=$1 AND c."propertyId"=$2',
+        conversation_id, pid,
+    )
+    if kind != "WHATSAPP":
+        raise HTTPException(status_code=404, detail="WhatsApp conversation not found")
 
 
 def conversation_summary(row) -> dict[str, Any]:
@@ -64,7 +76,7 @@ async def list_conversations(
     conversation_status: str | None = Query(default=None, alias="status"),
     needs_reply: bool | None = Query(default=None),
     limit: int = Query(default=150, ge=1, le=300),
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(inbox_access),
 ):
     if conversation_status and conversation_status not in CONVERSATION_STATUSES:
         raise HTTPException(status_code=422, detail="Unknown conversation status")
@@ -95,6 +107,7 @@ async def list_conversations(
             ) lm ON true
             WHERE c."propertyId"=$1
               AND ($2::text IS NULL OR c.status::text=$2)
+              AND ($5::boolean=false OR ch.kind::text='WHATSAPP')
               AND ($3::boolean IS NULL OR
                 (c."lastInboundAt" IS NOT NULL AND (c."lastOutboundAt" IS NULL OR c."lastInboundAt">c."lastOutboundAt")
                   AND c.status NOT IN ('RESOLVED','ARCHIVED'))=$3)
@@ -108,6 +121,7 @@ async def list_conversations(
             conversation_status,
             needs_reply,
             limit,
+            user["role"] == "RECEPTION",
         )
     return {"items": [conversation_summary(row) for row in rows]}
 
@@ -116,7 +130,7 @@ async def list_conversations(
 async def get_conversation(
     conversation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(inbox_access),
 ):
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user)
@@ -144,6 +158,8 @@ async def get_conversation(
         )
         if not row:
             raise HTTPException(status_code=404, detail="Conversation not found")
+        if user["role"] == "RECEPTION" and row["channel_kind"] != "WHATSAPP":
+            raise HTTPException(status_code=404, detail="WhatsApp conversation not found")
 
         messages = await conn.fetch(
             '''
@@ -186,13 +202,14 @@ async def set_conversation_status(
     conversation_id: uuid.UUID,
     payload: ConversationStatusPatch,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(inbox_access),
 ):
     if payload.status not in CONVERSATION_STATUSES:
         raise HTTPException(status_code=422, detail="Unknown conversation status")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
+            await check_reception_whatsapp(conn, pid, conversation_id, user)
             result = await conn.execute(
                 '''
                 UPDATE conversations SET status=$1::"ConversationStatus",
@@ -241,10 +258,11 @@ async def assign_conversation(
 async def claim_conversation(
     conversation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(inbox_access),
 ):
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user)
+        await check_reception_whatsapp(conn, pid, conversation_id, user)
         result = await conn.execute(
             '''UPDATE conversations SET "assignedToId"=$1,"updatedAt"=now()
                WHERE id=$2 AND "propertyId"=$3 AND ("assignedToId" IS NULL OR "assignedToId"=$1)''',
@@ -286,11 +304,12 @@ async def create_internal_note(
     conversation_id: uuid.UUID,
     payload: InternalNoteCreate,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(inbox_access),
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
+            await check_reception_whatsapp(conn, pid, conversation_id, user)
             exists = await conn.fetchval('SELECT id FROM conversations WHERE id=$1 AND "propertyId"=$2', conversation_id, pid)
             if not exists:
                 raise HTTPException(status_code=404, detail="Conversation not found")

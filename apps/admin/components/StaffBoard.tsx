@@ -7,6 +7,7 @@ type StaffItem = {
   username: string;
   display_name: string;
   role: string;
+  module_permissions: string[];
   active: boolean;
   telegram_linked: boolean;
   telegram_username?: string | null;
@@ -30,6 +31,7 @@ type Overview = {
   };
   can_manage_access: boolean;
   managed_roles: string[];
+  staff_password_policy: { min_length: number; max_length: number };
   truth: string;
 };
 
@@ -44,7 +46,15 @@ type EditDraft = {
   display_name: string;
   role: string;
   password: string;
+  module_permissions: string[];
 };
+
+const MODULE_GROUPS = [
+  { title: "Работа с бронированиями", items: [["PMS", "Шахматка"], ["RESERVATIONS", "Ресепшен и бронирования"], ["REQUESTS", "Заявки"], ["GROUPS", "Групповые брони"], ["RATES", "Цены и сезоны"], ["CHANNELS", "Каналы продаж"], ["AGENTS", "Агентства"]] },
+  { title: "Гости и связь", items: [["WHATSAPP", "WhatsApp / AI"], ["INBOX", "Все сообщения"], ["GUESTS", "Гости и история"], ["SERVICES", "Сервис гостя"], ["OFFERS", "Предложения гостям"]] },
+  { title: "Работа отеля", items: [["OPS", "Уборка и ремонт"], ["DINING", "Питание и ресторан"], ["ROOM_QR", "QR номеров"], ["POINT_QR", "QR зон"], ["SERVICE_SETTINGS", "Настройки услуг"]] },
+  { title: "Управление", items: [["DASHBOARD", "Главная"], ["FINANCE", "Финансы"], ["REPORTS", "Отчёты и аналитика"], ["GROWTH", "Отзывы и рост"], ["MARKETING", "Маркетинг"], ["CONTENT", "Контент отеля"], ["HOTEL_RULES", "Знания отеля / MARINA AI"], ["SETTINGS", "Настройки гостиницы"], ["STAFF", "Просмотр персонала"]] },
+] as const;
 
 const emptyStaffDraft: StaffDraft = {
   username: "",
@@ -60,11 +70,11 @@ const roleLabel: Record<string, string> = {
   AGENT: "Агентство / туроператор",
   MAID: "Горничная",
   TECHNICIAN: "Техник",
-  STORE_STAFF: "Магазин",
-  // Runtime compatibility marker: DINING_STAFF: "Столовая / ресторан" (legacy enum only; no access granted).\n  DINING_STAFF: "Устаревший доступ питания",
+  STORE_STAFF: "Магазин · модуль не подключён",
+  // Runtime compatibility marker: DINING_STAFF: "Столовая / ресторан" (legacy enum only; no access granted).\n  DINING_STAFF: "Устаревшая роль · питание",
   COOK: "Повар",
   WAITER: "Официант",
-  CONTENT_MANAGER: "Контент-менеджер",
+  CONTENT_MANAGER: "Устаревшая роль · контент",
   BEACH_PARTNER: "Пляжный партнёр (legacy)",
 };
 
@@ -75,7 +85,8 @@ function dateTime(value?: string | null) {
   return new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-export default function StaffBoard({ userRole }: { userRole: string }) {
+export default function StaffBoard({ userRole }: { userRole: string; propertyCode: string }) {
+  // The API determines the password policy from the running environment.
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,8 +96,11 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
   const [showCreate, setShowCreate] = useState(false);
   const [createDraft, setCreateDraft] = useState<StaffDraft>(emptyStaffDraft);
   const [editing, setEditing] = useState<StaffItem | null>(null);
-  const [editDraft, setEditDraft] = useState<EditDraft>({ display_name: "", role: "RECEPTION", password: "" });
+  const [editDraft, setEditDraft] = useState<EditDraft>({ display_name: "", role: "RECEPTION", password: "", module_permissions: [] });
   const [saving, setSaving] = useState(false);
+  const passwordMin = data?.staff_password_policy?.min_length ?? 8;
+  const passwordMax = data?.staff_password_policy?.max_length ?? 256;
+  const demo = passwordMin === 3 && passwordMax === 10;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -143,7 +157,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
   function beginEdit(item: StaffItem) {
     if (item.role === "OWNER" || item.role === "AGENT") return;
     setEditing(item);
-    setEditDraft({ display_name: item.display_name, role: item.role, password: "" });
+    setEditDraft({ display_name: item.display_name, role: item.role, password: "", module_permissions: item.module_permissions || [] });
     setError(null);
     setNotice(null);
   }
@@ -158,6 +172,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
       const payload: Record<string, unknown> = {
         display_name: editDraft.display_name,
         role: editDraft.role,
+        module_permissions: editDraft.module_permissions,
       };
       if (editDraft.password.trim()) payload.password = editDraft.password;
       const response = await fetch(`/core/api/v1/admin/staff/${editing.id}`, {
@@ -168,7 +183,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось изменить доступ");
       setEditing(null);
-      setNotice(`Доступ сотрудника ${body.display_name} обновлён.${editDraft.password ? " Старые сессии отозваны, пароль изменён." : ""}`);
+      setNotice("Доступ обновлён. Сотруднику нужно войти заново.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка изменения доступа");
@@ -229,7 +244,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
       <label><span>Имя сотрудника</span><input required minLength={2} value={createDraft.display_name} onChange={(e) => setCreateDraft({ ...createDraft, display_name: e.target.value })} /></label>
       <label><span>Логин</span><input required minLength={2} pattern="[A-Za-z0-9._-]+" autoComplete="off" value={createDraft.username} onChange={(e) => setCreateDraft({ ...createDraft, username: e.target.value })} /></label>
       <label><span>Роль</span><select value={createDraft.role} onChange={(e) => setCreateDraft({ ...createDraft, role: e.target.value })}>{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
-      <label><span>Временный пароль, минимум 12 символов</span><input required type="password" minLength={12} autoComplete="new-password" value={createDraft.password} onChange={(e) => setCreateDraft({ ...createDraft, password: e.target.value })} /></label>
+      <label><span>Пароль ({demo ? "3–10" : "от 8"} символов)</span><input required type="password" minLength={passwordMin} maxLength={passwordMax} autoComplete="new-password" value={createDraft.password} onChange={(e) => setCreateDraft({ ...createDraft, password: e.target.value })} /></label>
       <div className="management-inline-actions"><button className="btn primary" disabled={saving}>{saving ? "Создаю…" : "Создать"}</button></div>
     </form>}
 
@@ -263,7 +278,7 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
       {visible.length === 0 && <div className="empty">Сотрудников по фильтру нет.</div>}
       {visible.map((item) => <article className={`staff-row ${!item.active ? "staff-disabled" : ""}`} key={item.id}>
         <div><strong>{item.display_name}</strong><small>@{item.username}</small></div>
-        <div><b>{roleLabel[item.role] || item.role}</b><small>{item.active ? "Активен" : "Доступ отключён"} · Telegram: {item.telegram_linked ? item.telegram_username ? `@${item.telegram_username}` : "привязан" : "не привязан"}</small></div>
+        <div><b>{roleLabel[item.role] || item.role}</b><small>{["DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"].includes(item.role) ? "Устаревшая роль · вход в кабинеты не поддерживается" : item.role === "STORE_STAFF" ? "Ограниченная роль · операции магазина не подключены" : item.active ? "Активен" : "Доступ отключён"} · Telegram: {item.telegram_linked ? item.telegram_username ? `@${item.telegram_username}` : "привязан" : "не привязан"}</small></div>
         <div><strong>{item.active_tasks}</strong><small>{item.housekeeping_active ? `уборка ${item.housekeeping_active}` : ""}{item.housekeeping_active && item.maintenance_active ? " · " : ""}{item.maintenance_active ? `ремонт ${item.maintenance_active}` : ""}</small></div>
         <div><strong>{item.completed_today}</strong><small>завершено задач</small></div>
         <div><strong>{dateTime(item.last_session_seen_at)}</strong><small>внутренняя сессия</small></div>
@@ -283,10 +298,21 @@ export default function StaffBoard({ userRole }: { userRole: string }) {
         <div className="management-modal-head"><div><p className="eyebrow">Учётная запись</p><h2>{editing.display_name}</h2><p>@{editing.username}</p></div><button type="button" className="btn mini" onClick={() => setEditing(null)}>Закрыть</button></div>
         <div className="management-form-grid">
           <label><span>Имя сотрудника</span><input required minLength={2} value={editDraft.display_name} onChange={(e) => setEditDraft({ ...editDraft, display_name: e.target.value })} /></label>
-          <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
-          <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={12} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder="Минимум 12 символов" /></label>
+          <label><span>Роль</span><select value={editDraft.role} onChange={(e) => setEditDraft({ ...editDraft, role: e.target.value })}>{!data.managed_roles.includes(editing.role) && <option value={editing.role} disabled>{roleLabel[editing.role] || editing.role} · устаревшая</option>}{data.managed_roles.map((value) => <option key={value} value={value}>{roleLabel[value] || value}</option>)}</select></label>
+          <label className="management-form-wide"><span>Новый пароль (оставьте пустым, если не меняете)</span><input type="password" minLength={passwordMin} maxLength={passwordMax} autoComplete="new-password" value={editDraft.password} onChange={(e) => setEditDraft({ ...editDraft, password: e.target.value })} placeholder={demo ? "От 3 до 10 символов" : "Не менее 8 символов"} /></label>
         </div>
-        <div className="management-truth compact">При смене роли или пароля все активные сессии сотрудника будут немедленно отозваны.</div>
+        <fieldset className="staff-module-access">
+          <legend>Доступ к разделам</legend>
+          <p>Отметьте разделы, которые будут доступны этому сотруднику. Этот список заменяет стандартный набор доступа по его роли.</p>
+          {MODULE_GROUPS.map((group) => <div className="staff-module-group" key={group.title}>
+            <strong>{group.title}</strong>
+            <div>{group.items.map(([key, title]) => <label key={key}>
+              <input type="checkbox" checked={editDraft.module_permissions.includes(key)} onChange={(event) => setEditDraft((draft) => ({ ...draft, module_permissions: event.target.checked ? [...new Set([...draft.module_permissions, key])] : draft.module_permissions.filter((module) => module !== key) }))} />
+              <span>{title}</span>
+            </label>)}</div>
+          </div>)}
+        </fieldset>
+        <div className="management-truth compact">После сохранения прежние сессии сотрудника отзываются. Новые разделы появятся после повторного входа.</div>
         <div className="management-modal-actions"><button type="button" className="btn" onClick={() => setEditing(null)}>Отмена</button><button className="btn primary" disabled={saving}>{saving ? "Сохраняю…" : "Сохранить"}</button></div>
       </form>
     </div>}

@@ -29,7 +29,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Run MARINA SMART Guest Web i18n guard
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         run: python3 scripts/marina_guest_i18n_guard.py
 
       - name: Install and build public site
@@ -57,19 +57,19 @@ jobs:
           exit 1
 
       - name: Run SSR desktop mobile and booking UX acceptance
-        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: node scripts/public_browser_acceptance.mjs
 
       - name: Run MARINA SMART KZ Guest OS browser acceptance
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: node scripts/marina_guest_kz_browser.mjs
 
       - name: Run MARINA SMART guest-web browser acceptance
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-') || startsWith(github.head_ref, 'feat/marina-')) }}
         env:
           PUBLIC_BASE_URL: http://127.0.0.1:3000
         run: |
@@ -102,20 +102,28 @@ jobs:
             if (!routeSource.includes("GuestConciergeRuntime token={token}")) {
               throw new Error("Canonical guest QR route is not mounted");
             }
-            if (!routeSource.includes("AK BERMET") || !routeSource.includes("MARINA SMART")) {
-              throw new Error("Guest QR route metadata is not MARINA SMART / AK BERMET branded");
+            if (!routeSource.includes('title: "MARINA SMART · гостевой кабинет"') ||
+                !routeSource.includes('description: "Личный цифровой сервис гостя на платформе MARINA SMART."')) {
+              throw new Error("Guest QR route must have MARINA SMART platform metadata");
+            }
+            if (routeSource.includes('title: "AK BERMET') || routeSource.includes('title: "Three Crowns')) {
+              throw new Error("Shared guest QR route must not hard-code a hotel-specific title");
             }
 
             const concierge = fs.readFileSync("apps/web/components/GuestConciergeRuntime.tsx", "utf8");
             for (const required of [
-              'property: "AK BERMET"',
-              'product: "MARINA SMART',
-              'const HOTEL_PHONE_E164 = "+996501772233"',
-              'Заезд с 13:00. Выезд до 11:00.',
-              'Check-in is from 13:00. Check-out is by 11:00.',
+              'const propertyName = context?.property?.name || copy.property;',
+              'const officialContact = context?.property?.official_contact?.trim() || "";',
+              'const whatsappCandidate = (context?.property?.whatsapp || "").trim();',
+              'context.property?.check_out_time',
+              'context.property?.checkout_instructions',
               'product: "MARINA SMART · қонақ кабинеті"',
+              'product: "MARINA SMART · Guest area"',
             ]) {
-              if (!concierge.includes(required)) throw new Error("AK BERMET guest fact missing: " + required);
+              if (!concierge.includes(required)) throw new Error("Tenant-aware MARINA guest runtime contract missing: " + required);
+            }
+            if (concierge.includes('const HOTEL_PHONE_E164') || concierge.includes('property: "AK BERMET"')) {
+              throw new Error("Shared guest runtime contains a fixed hotel identity or phone");
             }
             if (!concierge.includes("MARINA_GUEST_LOCALES.map")) {
               throw new Error("Guest language switcher is not using the shared RU/KG/KZ/EN locale list");

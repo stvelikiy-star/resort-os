@@ -153,10 +153,11 @@ async def prove_database_state(feedback_id: str, return_id: str, return_guest_id
 
         table = await conn.fetchval("SELECT to_regclass('public.guest_engagements')::text")
         assert table == "guest_engagements"
-        feedback = await conn.fetchrow('SELECT kind,status,score FROM guest_engagements WHERE id=$1 AND "propertyId"=$2', uuid.UUID(feedback_id), pid)
+        feedback = await conn.fetchrow('SELECT kind,status,score,"starRating" FROM guest_engagements WHERE id=$1 AND "propertyId"=$2', uuid.UUID(feedback_id), pid)
         assert feedback["kind"] == "POST_STAY_FEEDBACK"
         assert feedback["status"] == "DONE"
         assert feedback["score"] == 5
+        assert feedback["starRating"] == 2
         return_row = await conn.fetchrow('SELECT kind,status,"guestId" FROM guest_engagements WHERE id=$1 AND "propertyId"=$2', uuid.UUID(return_id), pid)
         assert return_row["kind"] == "RETURN_GUEST"
         assert str(return_row["guestId"]) == return_guest_id
@@ -178,13 +179,14 @@ async def prove_database_state(feedback_id: str, return_id: str, return_guest_id
 
         audits = await conn.fetch(
             '''SELECT action,count(*)::int AS c FROM audit_logs
-               WHERE "propertyId"=$1 AND action IN ('CREATE_GUEST_ENGAGEMENT','RECORD_GUEST_FEEDBACK','GUEST_ENGAGEMENT_STATUS')
+               WHERE "propertyId"=$1 AND action IN ('CREATE_GUEST_ENGAGEMENT','RECORD_GUEST_FEEDBACK','RECORD_GUEST_STAR_REVIEW','GUEST_ENGAGEMENT_STATUS')
                GROUP BY action''',
             pid,
         )
         counts = {row["action"]: row["c"] for row in audits}
         assert counts.get("CREATE_GUEST_ENGAGEMENT", 0) >= 2
         assert counts.get("RECORD_GUEST_FEEDBACK", 0) >= 1
+        assert counts.get("RECORD_GUEST_STAR_REVIEW", 0) >= 1
         assert counts.get("GUEST_ENGAGEMENT_STATUS", 0) >= 1
     finally:
         await conn.close()
@@ -315,6 +317,23 @@ def main():
     assert scored["nps_class"] == "DETRACTOR"
     assert scored["status"] == "IN_PROGRESS"
     assert scored["recovery_required"] is True
+
+    # Five-star satisfaction is stored separately from NPS; 1–3★ is urgent.
+    bad_stars = client.post(
+        f"/api/v1/admin/growth/engagements/{feedback_id}/stars",
+        json={"rating": 2, "feedback_text": "Synthetic guest issue for manager"},
+    )
+    bad_stars.raise_for_status()
+    assert bad_stars.json()["star_rating"] == 2
+    assert bad_stars.json()["recovery_urgent"] is True
+    assert bad_stars.json()["manager_attention_required"] is True
+    assert bad_stars.json()["score"] == 5  # NPS stays independent
+    assert bad_stars.json()["status"] == "IN_PROGRESS"
+    assert bad_stars.json()["outbound_authority"] == "NONE_AUTOMATIC"
+    assert client.post(
+        f"/api/v1/admin/growth/engagements/{feedback_id}/stars",
+        json={"rating": 6},
+    ).status_code == 422
 
     after_score = client.get("/api/v1/admin/growth/summary?min_days_since_checkout=30")
     after_score.raise_for_status()

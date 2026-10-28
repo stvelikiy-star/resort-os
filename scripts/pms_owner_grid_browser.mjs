@@ -15,8 +15,8 @@ async function login(page) {
     await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);
     await page.locator("button.login-button").click();
   }
-  await page.getByRole("button", { name: "Супершахматка" }).waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "Супершахматка" }).click();
+  await page.getByRole("button", { name: "Шахматка" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Шахматка" }).click();
   await page.locator(".owner-grid-shell").waitFor({ state: "visible" });
   await page.locator(".owner-grid-loading").waitFor({ state: "detached" }).catch(() => {});
 }

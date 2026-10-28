@@ -21,8 +21,14 @@ def database_url() -> str:
 async def main() -> None:
     if not USERNAME or not PASSWORD:
         raise RuntimeError("BOOTSTRAP_OWNER_USERNAME and BOOTSTRAP_OWNER_PASSWORD are required")
-    if len(PASSWORD) < 12:
-        raise RuntimeError("BOOTSTRAP_OWNER_PASSWORD must be at least 12 characters")
+    demo = (
+        os.environ.get("APP_ENV") == "staging"
+        and PROPERTY_CODE == "MARINA_HOTEL01"
+        and USERNAME.strip().lower() == "ms"
+        and PASSWORD == "MS01"
+    )
+    if len(PASSWORD) < 12 and not demo:
+        raise RuntimeError("BOOTSTRAP_OWNER_PASSWORD must be at least 12 characters outside isolated demo")
 
     conn = await asyncpg.connect(database_url())
     try:

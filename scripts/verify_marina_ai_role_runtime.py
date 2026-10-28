@@ -5,6 +5,7 @@ import sys
 from types import SimpleNamespace
 
 import asyncpg
+from fastapi import HTTPException
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "services", "api"))
@@ -74,6 +75,15 @@ async def main() -> int:
                 "role": row["role"],
                 "property_code": row["property_code"],
             }
+            if expected_role != "RECEPTION":
+                try:
+                    await _live_context(request, user, expected_role)
+                except HTTPException as exc:
+                    require(exc.status_code == 403, f"{expected_role} assistant denied by server")
+                else:
+                    raise AssertionError(f"{expected_role} unexpectedly received AI access")
+                continue
+
             snapshot = await _live_context(request, user, expected_role)
             require(snapshot.get("available") is True, f"{expected_role} live context available")
             require(snapshot.get("read_only") is True, f"{expected_role} context stays read-only")
@@ -87,37 +97,6 @@ async def main() -> int:
                 require("hotel" in snapshot, "RECEPTION receives hotel operations context")
                 require("finance" not in (snapshot.get("hotel") or {}), "RECEPTION does not receive OWNER/MANAGER finance")
                 require("agent" not in snapshot and "dining" not in snapshot, "RECEPTION has no unrelated agent/dining scope")
-
-            elif expected_role == "MAID":
-                housekeeping = snapshot.get("housekeeping") or {}
-                require(housekeeping, "MAID receives housekeeping context")
-                require("task_counts" in housekeeping and "rooms" in housekeeping and "tasks" in housekeeping, "MAID receives actionable housekeeping fields")
-                require("hotel" not in snapshot and "finance" not in snapshot and "agent" not in snapshot, "MAID has no hotel finance/agent scope")
-                for task in housekeeping.get("tasks", []):
-                    require(task.get("assigned_to_me") in {True, False}, "MAID task assignment flag present")
-
-            elif expected_role == "TECHNICIAN":
-                maintenance = snapshot.get("maintenance") or {}
-                require(maintenance, "TECHNICIAN receives maintenance context")
-                require("task_counts" in maintenance and "tech_block_rooms" in maintenance and "tasks" in maintenance, "TECHNICIAN receives actionable maintenance fields")
-                require("hotel" not in snapshot and "finance" not in snapshot and "agent" not in snapshot, "TECHNICIAN has no hotel finance/agent scope")
-                for task in maintenance.get("tasks", []):
-                    require(task.get("assigned_to_me") in {True, False}, "TECHNICIAN task assignment flag present")
-
-            elif expected_role == "AGENT":
-                agent = snapshot.get("agent") or {}
-                require(row["booking_agent_id"] is not None, "AGENT fixture is linked to bookingAgentId")
-                require(agent.get("available") is True, "AGENT scoped context is active")
-                require("availability_today" in agent, "AGENT receives aggregate availability")
-                require("active_requests" in agent and "active_reservations" in agent, "AGENT receives own request/reservation collections")
-                require("scope_rule" in agent and "bookingAgentId" in agent["scope_rule"], "AGENT strict isolation rule documented")
-                require("hotel" not in snapshot and "finance" not in snapshot and "housekeeping" not in snapshot and "maintenance" not in snapshot, "AGENT has no cross-role operational scopes")
-
-            elif expected_role == "COOK":
-                dining = snapshot.get("dining") or {}
-                require(dining, "COOK receives dining context")
-                require("order_counts" in dining and "active_orders" in dining and "table_counts" in dining, "COOK receives operational kitchen fields")
-                require("hotel" not in snapshot and "finance" not in snapshot and "agent" not in snapshot, "COOK has no hotel finance/agent scope")
 
         print("MARINA_AI_ROLE_RUNTIME_ACCEPTANCE: PASS")
         return 0

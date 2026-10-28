@@ -614,3 +614,82 @@ async def commit_grid_reservation(
         "payment_created": False,
         "payment_terms": "AGENT_CORE_RATE" if user["role"] == "AGENT" else "MANAGER_CONTROLLED",
     }
+
+
+@router.post("/{reservation_id}/cancel")
+async def cancel_grid_reservation(
+    reservation_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", module_grant=False)),
+):
+    """Cancel an unpaid, not-checked-in PMS reservation and release its inventory.
+
+    Paid or operationally active reservations require a separate reviewed refund/
+    stay workflow. Channel reservations must be cancelled through their own ledger.
+    """
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            prop = await property_context(conn, user["property_code"])
+            row = await conn.fetchrow(
+                """SELECT id,status::text AS status,"requestId","bookingNumber"
+                   FROM reservations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE""",
+                reservation_id, prop["id"],
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail={"code": "RESERVATION_NOT_FOUND"})
+            if row["status"] != "GUARANTEED":
+                raise HTTPException(status_code=409, detail={"code": "RESERVATION_NOT_CANCELLABLE"})
+            # Never silently refund, revoke an active stay, or alter an OTA ledger.
+            source = await conn.fetchval(
+                'SELECT source::text FROM reservation_requests WHERE id=$1 AND "propertyId"=$2',
+                row["requestId"], prop["id"],
+            )
+            if source != "PMS":
+                raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_SOURCE_WORKFLOW"})
+            payment_count = await conn.fetchval(
+                'SELECT count(*) FROM payments WHERE "reservationId"=$1', reservation_id,
+            )
+            stay_count = await conn.fetchval(
+                'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
+            )
+            open_charge_count = await conn.fetchval(
+                """SELECT count(*) FROM guest_folio_charges
+                   WHERE "propertyId"=$1 AND "reservationId"=$2
+                     AND status NOT IN ('WAIVED','VOID')""",
+                prop["id"], reservation_id,
+            )
+            if payment_count or stay_count or open_charge_count:
+                raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"})
+            await conn.execute(
+                """UPDATE reservations SET status='CANCELLED',"updatedAt"=now()
+                   WHERE id=$1 AND "propertyId"=$2""", reservation_id, prop["id"],
+            )
+            await conn.execute(
+                """UPDATE reservation_requests SET status='CANCELLED',"updatedAt"=now()
+                   WHERE id=$1 AND "propertyId"=$2""", row["requestId"], prop["id"],
+            )
+            released = await conn.fetchval(
+                """WITH updated AS (
+                     UPDATE inventory_blocks SET active=false,"updatedAt"=now()
+                     WHERE "reservationId"=$1 AND "blockType"='RESERVATION' AND active=true
+                     RETURNING id
+                   ) SELECT count(*) FROM updated""", reservation_id,
+            )
+            if not released:
+                raise HTTPException(status_code=409, detail={"code": "RESERVATION_INVENTORY_MISSING"})
+            await conn.execute(
+                """INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                    source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'MANAGER_CANCEL_UNPAID_PMS_RESERVATION',
+                           'Reservation',$4,'PMS_OWNER_GRID','SUCCESS',
+                           jsonb_build_object('booking_number',$5::text,'released_blocks',$6::int),now())""",
+                uuid.uuid4(), prop["id"], user["id"], str(reservation_id),
+                row["bookingNumber"], released,
+            )
+    return {
+        "reservation_id": str(reservation_id),
+        "status": "CANCELLED",
+        "released_blocks": released,
+        "payment_refunded": False,
+    }

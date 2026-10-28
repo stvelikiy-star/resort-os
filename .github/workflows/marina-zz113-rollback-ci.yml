@@ -1,0 +1,66 @@
+name: MARINA zz113 Isolated Rollback Rehearsal
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/marina-zz113-rollback-ci.yml'
+      - 'packages/database/prisma/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_before
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: marina_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_before"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: marina_ci_only
+      DATABASE_URL: postgresql://marina_ci:marina_ci_only@localhost:5432/marina_before?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install committed database tooling
+        working-directory: packages/database
+        run: npm ci --no-audit --no-fund
+      - name: Restore original pre-zz113 migration boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/marina-prisma-before"
+          mkdir -p "$baseline"
+          cp -a packages/database/prisma/. "$baseline/"
+          rm -rf "$baseline/migrations/zz113_marina_housekeeping_schedule_date_20261027"
+          (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
+          test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 37
+          test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from information_schema.columns where table_name='operational_tasks' and column_name='scheduledFor'")" = 0
+          pg_dump -h 127.0.0.1 -U marina_ci -d marina_before -Fc -f "$RUNNER_TEMP/pre-zz113.dump"
+          pg_restore --list "$RUNNER_TEMP/pre-zz113.dump" >/dev/null
+      - name: Simulate migration and fail-close recovery on disposable databases
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -U marina_ci -d marina_before -v ON_ERROR_STOP=1 -1 -f packages/database/prisma/migrations/zz113_marina_housekeeping_schedule_date_20261027/migration.sql
+          test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from information_schema.columns where table_name='operational_tasks' and column_name='scheduledFor'")" = 1
+          psql -h 127.0.0.1 -U marina_ci -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE marina_rollback;'
+          pg_restore -h 127.0.0.1 -U marina_ci -d marina_rollback --no-owner --no-acl --exit-on-error "$RUNNER_TEMP/pre-zz113.dump"
+          test "$(psql -h 127.0.0.1 -U marina_ci -d marina_rollback -Atc "select count(*) from information_schema.columns where table_name='operational_tasks' and column_name='scheduledFor'")" = 0
+          test "$(psql -h 127.0.0.1 -U marina_ci -d marina_rollback -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 37
+          test "$(psql -h 127.0.0.1 -U marina_ci -d marina_rollback -Atc "select count(*) from pg_constraint where conname='operational_tasks_service_context_type_check'")" = 1
+          echo 'MARINA_ZZ113_DISPOSABLE_DB_ROLLBACK_PASS'
