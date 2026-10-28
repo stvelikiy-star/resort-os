@@ -27,7 +27,6 @@ type RuntimeCapabilities = {
 const METHODS = [
   ["CASH", "Наличные"],
   ["CARD_POS", "Карта / POS"],
-  ["QR_CASHLESS", "QR / безнал"],
   ["BANK_TRANSFER", "Банковский перевод"],
   ["OTHER", "Другое"],
 ] as const;
