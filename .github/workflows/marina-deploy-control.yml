@@ -1,0 +1,79 @@
+name: MARINA Deploy Control
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Safe inventory only (deployment intentionally disabled until host topology is reviewed)"
+        required: true
+        type: choice
+        options:
+          - preflight
+      expected_release:
+        description: "Exact reviewed 40-character staging commit SHA"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-staging-deploy-control
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Validate MARINA staged release identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Refuse unreviewed release inputs
+        env:
+          MODE: ${{ inputs.mode }}
+          EXPECTED: ${{ inputs.expected_release }}
+          REF_TYPE: ${{ github.ref_type }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$MODE" = preflight
+          test "$REF_TYPE" = branch
+          [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || { echo "Expected exact commit SHA" >&2; exit 1; }
+          echo "CONTROL_MODE=READ_ONLY"
+      - name: Checkout exact requested release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_release }}
+          persist-credentials: false
+      - name: Verify release commit matches request
+        env:
+          EXPECTED: ${{ inputs.expected_release }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test -f packages/database/prisma/migrations/zz113_marina_housekeeping_schedule_date_20261027/migration.sql
+          test -f docs/MARINA_ZZ113_ROLLBACK_GATE_20261028.md
+          python3 - <<'PY'
+          import sys
+          sys.path.insert(0,"scripts")
+          from release_contract import EXPECTED_MIGRATIONS, CRITICAL_CONSTRAINTS
+          assert EXPECTED_MIGRATIONS[-1] == "zz113_marina_housekeeping_schedule_date_20261027"
+          assert "operational_tasks_housekeeping_schedule_date_check" in CRITICAL_CONSTRAINTS
+          print("MARINA_RELEASE_CONTRACT_OK")
+          PY
+      - name: Verify existing host-preflight script without accessing servers
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/host_preflight.sh
+          bash -n scripts/marina_host_inventory.sh
+          bash -n scripts/marina_staging_backup.sh
+          echo "MARINA_HOST_PREFLIGHT_SYNTAX_OK"
+          echo "NO_DEPLOYMENT_EXECUTED"
+      - name: Explain strict deployment boundary
+        shell: bash
+        run: |
+          echo '### MARINA staging deploy control' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Exact reviewed commit verified.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Workflow is read-only: no SSH, server credentials, DB writes, or Docker operations.' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Before enabling remote operations: verify marina-hotel01 compose path, image build, Tailscale/SSH identity, volume isolation, backup restore and rollback drill.' >> "$GITHUB_STEP_SUMMARY"
