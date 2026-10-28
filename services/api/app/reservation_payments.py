@@ -196,6 +196,8 @@ async def record_reservation_payment(
     user: dict[str, Any] = Depends(payment_access),
 ):
     method = normalize_required_text(payload.method)
+    if method not in {"CASH", "CARD_POS", "BANK_TRANSFER", "OTHER"}:
+        raise HTTPException(status_code=422, detail={"code": "PAYMENT_METHOD_NOT_ALLOWED", "message": "Only non-QR manual payments may be recorded."})
     external_ref = normalize_optional_text(payload.external_ref)
     note = normalize_optional_text(payload.note)
     paid_at = utc_aware(payload.paid_at)
