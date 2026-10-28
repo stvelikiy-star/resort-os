@@ -136,6 +136,15 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     if (!canManagePayments) return;
     const amountKgs = Number(amount);
     if (!Number.isFinite(amountKgs) || amountKgs <= 0) return;
+    const outstanding = Math.max(0, folio?.totals.remaining_kgs ?? 0);
+    if (Math.round(amountKgs) > outstanding) {
+      setError(`Payment exceeds remaining balance (${money(outstanding)}). Overpayment is not allowed.`);
+      return;
+    }
+    if (outstanding === 0) {
+      setError("No remaining balance. A new payment cannot be recorded.");
+      return;
+    }
     setBusy("payment"); setError(null); setNotice(null);
     try {
       await api(`/core/api/v1/admin/booking/reservations/${reservationId}/payments`, {
