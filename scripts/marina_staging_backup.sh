@@ -32,9 +32,8 @@ if [[ ! -s "$tmp" ]]; then
 fi
 # Use the same Postgres client on the DB container for catalog validation.
 docker exec -i "$CONTAINER" pg_restore --list < "$tmp" >/dev/null
-sha256sum "$tmp" > "$tmp.sha256"
 mv -n "$tmp" "$target"
-mv "$tmp.sha256" "$target.sha256"
+sha256sum "$target" > "$target.sha256"
 trap - EXIT
 echo "MARINA_BACKUP_VERIFIED=$target"
 echo "MARINA_BACKUP_SHA256=$(sha256sum "$target" | cut -d' ' -f1)"
