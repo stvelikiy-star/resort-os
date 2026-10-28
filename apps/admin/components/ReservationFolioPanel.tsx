@@ -138,11 +138,11 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     if (!Number.isFinite(amountKgs) || amountKgs <= 0) return;
     const outstanding = Math.max(0, folio?.totals.remaining_kgs ?? 0);
     if (Math.round(amountKgs) > outstanding) {
-      setError(`Сумма превышает остаток долга (${money(outstanding)}). Переплата запрещена. Для отдельного депозита используйте отдельный документ.`);
+      setError(`Payment exceeds remaining balance (${money(outstanding)}). Overpayment is not allowed.`);
       return;
     }
     if (outstanding === 0) {
-      setError("Долг по бронированию отсутствует. Новая оплата недоступна.");
+      setError("No remaining balance. A new payment cannot be recorded.");
       return;
     }
     setBusy("payment"); setError(null); setNotice(null);
