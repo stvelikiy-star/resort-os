@@ -136,6 +136,15 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     if (!canManagePayments) return;
     const amountKgs = Number(amount);
     if (!Number.isFinite(amountKgs) || amountKgs <= 0) return;
+    const outstanding = Math.max(0, folio?.totals.remaining_kgs ?? 0);
+    if (Math.round(amountKgs) > outstanding) {
+      setError(`Сумма превышает остаток долга (${money(outstanding)}). Переплата запрещена. Для отдельного депозита используйте отдельный документ.`);
+      return;
+    }
+    if (outstanding === 0) {
+      setError("Долг по бронированию отсутствует. Новая оплата недоступна.");
+      return;
+    }
     setBusy("payment"); setError(null); setNotice(null);
     try {
       await api(`/core/api/v1/admin/booking/reservations/${reservationId}/payments`, {
