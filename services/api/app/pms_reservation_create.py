@@ -59,7 +59,6 @@ class GridReservationCommitPayload(GridReservationPreviewPayload):
     notes: str | None = Field(default=None, max_length=2000)
     expected_total_kgs: int = Field(gt=0)
     expected_pricing_source: str = Field(pattern="^(CORE_RATE|MANAGER_OVERRIDE)$")
-    hold_id: uuid.UUID | None = None
 
 
 async def property_context(conn, property_code: str):
