@@ -346,6 +346,45 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
             confirmed_release = client.delete(f"/api/v1/admin/pms/holds/{renewed_id}")
             assert confirmed_release.status_code == 409, "Confirmed HOLD was released"
         print("MARINA_HOLD_CONCURRENT_API_TENANT_RELEASE_CONVERSION_PASS")
+        # Verify owner-managed PMS permission revocation takes effect in an
+        # already-authenticated MANAGER session without a server restart.
+        async def seed_hold_manager():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return str(await conn.fetchval("""
+                    INSERT INTO staff_users
+                      (id,"propertyId",username,"displayName","passwordHash",role,"modulePermissions","createdAt","updatedAt")
+                    SELECT $1,u."propertyId",$2,'HOLD CI Manager',u."passwordHash",'MANAGER',
+                           '["PMS"]'::jsonb,now(),now()
+                    FROM staff_users u JOIN properties p ON p.id=u."propertyId"
+                    WHERE p.code=$3 AND u.username=$4
+                    RETURNING id
+                """, uuid.uuid4(), "hold-ci-manager", CODES[0], USERNAME))
+            finally:
+                await conn.close()
+        manager_id = asyncio.run(seed_hold_manager())
+        assert manager_id != "None", "HOLD manager seed failed"
+        with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}") as manager:
+            login = manager.post("/api/v1/auth/login",
+                                 json={"username": "hold-ci-manager", "password": PASSWORDS[0]})
+            assert login.status_code == 200, "HOLD manager login failed"
+            allowed = manager.get("/api/v1/admin/pms/holds")
+            assert allowed.status_code == 200, f"Granted PMS manager denied: {allowed.status_code}"
+            async def change_grants(value):
+                conn = await asyncpg.connect(dsn)
+                try:
+                    await conn.execute('UPDATE staff_users SET "modulePermissions"=$1::jsonb,"updatedAt"=now() WHERE id=$2',
+                                       value, uuid.UUID(manager_id))
+                finally:
+                    await conn.close()
+            asyncio.run(change_grants("[]"))
+            denied = manager.get("/api/v1/admin/pms/holds")
+            assert denied.status_code == 403, f"Revoked PMS manager retained access: {denied.status_code}"
+            asyncio.run(change_grants('["PMS"]'))
+            restored = manager.get("/api/v1/admin/pms/holds")
+            assert restored.status_code == 200, f"Regranted PMS manager denied: {restored.status_code}"
+        print("MARINA_HOLD_MANAGER_PERMISSION_REVOCATION_PASS")
+
 
         if os.environ.get("MARINA_CI_CHANNEL_IMPORT") == "true":
             subprocess.run([sys.executable, "scripts/verify_channel_reservations.py"], cwd=ROOT, env=env, check=True)
