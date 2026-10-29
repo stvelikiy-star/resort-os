@@ -22,7 +22,7 @@ class HoldCreate(BaseModel):
 
     @model_validator(mode="after")
     def dates(self):
-        if self.check_out <= self.check_in or (self.check_out - self.check_in).days > 60:
+        if self.check_out < date.today() or self.check_out <= self.check_in or (self.check_out - self.check_in).days > 60:
             raise ValueError("Invalid stay dates")
         return self
 
@@ -103,6 +103,23 @@ async def list_holds(request: Request, user: dict[str, Any] = Depends(access)):
                 ORDER BY "expiresAt"
             """, prop)
     return {"holds": [{k: (v.isoformat() if hasattr(v, "isoformat") else str(v)) for k,v in dict(row).items()} for row in rows]}
+
+
+@router.get("/{hold_id}")
+async def get_hold(hold_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(access)):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            prop = await property_id(conn, user)
+            await expire_holds(conn)
+            row = await conn.fetchrow("""
+                SELECT id,"roomId","checkIn","checkOut","guestName","guestPhone","expiresAt"
+                FROM marina_reservation_holds
+                WHERE id=$1 AND "propertyId"=$2 AND "releasedAt" IS NULL
+                  AND "confirmedReservationId" IS NULL AND "expiresAt">now()
+            """, hold_id, prop)
+            if not row:
+                raise HTTPException(404, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
+    return {k: (v.isoformat() if hasattr(v, "isoformat") else str(v)) for k,v in dict(row).items()}
 
 
 @router.delete("/{hold_id}")
