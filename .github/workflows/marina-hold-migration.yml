@@ -58,6 +58,17 @@ jobs:
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_indexes WHERE tablename='marina_reservation_holds' AND indexname='marina_holds_expiry_active_idx' AND indexdef LIKE '%releasedAt%'")" = 1
       - name: Verify synthetic HOLD overlap release and hotel isolation
         run: psql -h localhost -U hold_ci -d hold_ci -v ON_ERROR_STOP=1 -f scripts/marina_hold_postgres_invariants.sql
+      - name: Verify upgraded database survives dump and restore
+        run: |
+          set -euo pipefail
+          pg_dump -h localhost -U hold_ci -d hold_ci -Fc -f "$RUNNER_TEMP/upgraded.dump"
+          createdb -h localhost -U hold_ci hold_upgraded_restore
+          pg_restore -h localhost -U hold_ci -d hold_upgraded_restore --exit-on-error --no-owner --no-acl "$RUNNER_TEMP/upgraded.dump"
+          for db in hold_ci hold_upgraded_restore; do
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")" = 39
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_name='marina_reservation_holds'")" = 1
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
+          done
       - name: Verify backup restore into pristine PostgreSQL 16
         run: |
           set -euo pipefail
