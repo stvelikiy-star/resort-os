@@ -51,30 +51,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          psql -h localhost -U hold_ci -d hold_ci -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
-          DECLARE
-            expiry_default text;
-            valid_checks int;
-            active_expiry_indexes int;
-          BEGIN
-            SELECT pg_get_expr(d.adbin, d.adrelid) INTO expiry_default
-              FROM pg_attrdef d
-              JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum
-             WHERE d.adrelid='marina_reservation_holds'::regclass AND a.attname='expiresAt';
-            IF expiry_default IS NULL OR expiry_default NOT LIKE '%60 minutes%' THEN
-              RAISE EXCEPTION 'HOLD 60-minute default missing: %', expiry_default;
-            END IF;
-            SELECT count(*) INTO valid_checks FROM pg_constraint
-             WHERE conrelid='marina_reservation_holds'::regclass
-               AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration');
-            IF valid_checks <> 2 THEN RAISE EXCEPTION 'HOLD constraints missing'; END IF;
-            SELECT count(*) INTO active_expiry_indexes FROM pg_indexes
-             WHERE tablename='marina_reservation_holds' AND indexname='marina_holds_expiry_active_idx'
-               AND indexdef LIKE '%releasedAt%';
-            IF active_expiry_indexes <> 1 THEN RAISE EXCEPTION 'HOLD expiry partial index missing'; END IF;
-          END $;
-          SQL
+          expiry_default="$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT pg_get_expr(d.adbin,d.adrelid) FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum WHERE d.adrelid='marina_reservation_holds'::regclass AND a.attname='expiresAt'")"
+          echo "$expiry_default" | grep -q '60 minutes'
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_indexes WHERE tablename='marina_reservation_holds' AND indexname='marina_holds_expiry_active_idx' AND indexdef LIKE '%releasedAt%'")" = 1
       - name: Verify backup restore into pristine PostgreSQL 16
         run: |
           set -euo pipefail
