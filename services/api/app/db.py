@@ -1,4 +1,6 @@
 import os
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -43,7 +45,25 @@ async def lifespan(app: FastAPI):
         max_size=10,
         command_timeout=15,
     )
+    async def hold_expiration_worker():
+        # Database timestamps survive API restarts.
+        from .pms_holds import expire_holds
+        while True:
+            try:
+                async with app.state.db.acquire() as conn:
+                    async with conn.transaction():
+                        await expire_holds(conn)
+            except Exception:
+                logging.getLogger(__name__).exception("HOLD expiration worker failed")
+            await asyncio.sleep(30)
+
+    worker = asyncio.create_task(hold_expiration_worker())
     try:
         yield
     finally:
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
         await app.state.db.close()
