@@ -48,4 +48,28 @@ BEGIN
   END IF;
 END
 $hold$;
+-- Simulate a timed-out HOLD in the second hotel without waiting 60 minutes.
+UPDATE marina_reservation_holds
+SET "createdAt"=now()-interval '2 hours', "expiresAt"=now()-interval '1 hour'
+WHERE id='22222222-2222-4222-8222-222222222225';
+UPDATE inventory_blocks SET active=false,"updatedAt"=now()
+WHERE id IN (
+  SELECT "inventoryBlockId" FROM marina_reservation_holds
+  WHERE "releasedAt" IS NULL AND "confirmedReservationId" IS NULL AND "expiresAt" <= now()
+);
+UPDATE marina_reservation_holds SET "releasedAt"=now()
+WHERE "releasedAt" IS NULL AND "confirmedReservationId" IS NULL AND "expiresAt" <= now();
+DO $hold$
+BEGIN
+  IF EXISTS (SELECT 1 FROM marina_reservation_holds
+    WHERE id='22222222-2222-4222-8222-222222222225'
+      AND ("releasedAt" IS NULL OR "confirmedReservationId" IS NOT NULL)) THEN
+    RAISE EXCEPTION 'expired HOLD not released';
+  END IF;
+  IF EXISTS (SELECT 1 FROM inventory_blocks
+    WHERE id='22222222-2222-4222-8222-222222222224' AND active) THEN
+    RAISE EXCEPTION 'expired HOLD still blocks room';
+  END IF;
+END
+$hold$;
 ROLLBACK;
