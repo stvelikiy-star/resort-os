@@ -433,7 +433,6 @@ async def commit_grid_reservation(
                     if (held["roomId"] != payload.room_id or held["checkIn"] != payload.check_in
                             or held["checkOut"] != payload.check_out or held["guestPhone"] != payload.phone):
                         raise HTTPException(status_code=409, detail={"code": "HOLD_DETAILS_MISMATCH"})
-                    await conn.execute('UPDATE inventory_blocks SET active=false,"updatedAt"=now() WHERE id=$1 AND active=true', held["inventoryBlockId"])
                 # Commit always prices against the canonical phone field for management.
                 # Agent pricing stays on the public/core rate and must not unlock returning-guest discounts.
                 commit_preview_payload = GridReservationPreviewPayload(
@@ -483,6 +482,15 @@ async def commit_grid_reservation(
                         },
                     )
 
+                # Only retire the HOLD after pricing and availability preview has succeeded.
+                # All subsequent writes share the transaction; an error restores the block.
+                if payload.hold_id is not None:
+                    retired = await conn.fetchval("""
+                        UPDATE inventory_blocks SET active=false,"updatedAt"=now()
+                        WHERE id=$1 AND active=true RETURNING id
+                    """, held["inventoryBlockId"])
+                    if retired is None:
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_INVENTORY_MISSING"})
                 room = preview["room"]
                 identity = await resolve_or_create_guest(
                     conn,
