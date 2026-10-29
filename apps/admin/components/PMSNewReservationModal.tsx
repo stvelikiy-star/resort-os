@@ -82,6 +82,7 @@ export default function PMSNewReservationModal({
   onClose,
   onCreated,
   agentMode = false,
+  initialHoldId,
 }: {
   roomId: string;
   roomCode: string;
@@ -91,6 +92,7 @@ export default function PMSNewReservationModal({
   onClose: () => void;
   onCreated: () => void;
   agentMode?: boolean;
+  initialHoldId?: string;
 }) {
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
@@ -124,6 +126,25 @@ export default function PMSNewReservationModal({
       .catch(() => setAgents([]));
   }, [agentMode]);
 
+  useEffect(() => {
+    if (!initialHoldId) return;
+    let active = true;
+    fetch(`/core/api/v1/admin/pms/holds/${initialHoldId}`, { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error("Удержание уже истекло или снято");
+        return body;
+      })
+      .then((item) => {
+        if (!active) return;
+        setGuestName(item.guestName);
+        setPhone(item.guestPhone);
+        setHold({ id: item.id, expires_at: item.expiresAt });
+      })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "HOLD недоступен"); });
+    return () => { active = false; };
+  }, [initialHoldId]);
+
   const normalizedDiscount = useMemo(() => {
     if (!discountPercent.trim()) return null;
     const value = Number(discountPercent);
@@ -153,6 +174,7 @@ export default function PMSNewReservationModal({
           room_id: roomId,
           check_in: checkIn,
           check_out: checkOut,
+          hold_id: hold?.id ?? null,
           adults,
           children,
           manager_total_kgs: agentMode ? null : (override || null),
@@ -172,7 +194,7 @@ export default function PMSNewReservationModal({
     } finally {
       setLoading(false);
     }
-  }, [roomId, checkIn, checkOut, adults, children, phone, extraBedCount, normalizedExtraUnit, discountPercent, normalizedDiscount, discountReason, agentId, agentMode]);
+  }, [roomId, checkIn, checkOut, adults, children, phone, extraBedCount, normalizedExtraUnit, discountPercent, normalizedDiscount, discountReason, agentId, agentMode, hold?.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadPreview(null), phone.trim() ? 350 : 0);
