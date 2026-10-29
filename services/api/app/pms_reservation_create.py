@@ -2,7 +2,7 @@ import json
 import re
 import secrets
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from asyncpg.exceptions import ExclusionViolationError
@@ -413,7 +413,7 @@ async def commit_grid_reservation(
                         FROM marina_reservation_holds
                         WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
                     """, payload.hold_id, prop["id"])
-                    if not held or held["releasedAt"] is not None or held["confirmedReservationId"] is not None or held["expiresAt"] <= __import__("datetime").datetime.now(__import__("datetime").timezone.utc):
+                    if not held or held["releasedAt"] is not None or held["confirmedReservationId"] is not None or held["expiresAt"] <= datetime.now(timezone.utc):
                         raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
                     if (held["roomId"] != payload.room_id or held["checkIn"] != payload.check_in
                             or held["checkOut"] != payload.check_out or held["guestPhone"] != payload.phone):
