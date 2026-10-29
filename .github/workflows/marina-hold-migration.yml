@@ -52,7 +52,8 @@ jobs:
         run: |
           set -euo pipefail
           expiry_default="$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT pg_get_expr(d.adbin,d.adrelid) FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum WHERE d.adrelid='marina_reservation_holds'::regclass AND a.attname='expiresAt'")"
-          echo "$expiry_default" | grep -q '60 minutes'
+          echo "HOLD expiry default: $expiry_default"
+          echo "$expiry_default" | grep -Eq '60 minutes|01:00:00|1 hour'
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_indexes WHERE tablename='marina_reservation_holds' AND indexname='marina_holds_expiry_active_idx' AND indexdef LIKE '%releasedAt%'")" = 1
       - name: Verify synthetic HOLD overlap release and hotel isolation
