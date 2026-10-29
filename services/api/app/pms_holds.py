@@ -62,10 +62,12 @@ async def create_hold(payload: HoldCreate, request: Request, user: dict[str, Any
                 prop = await property_id(conn, user)
                 await expire_holds(conn)
                 room = await conn.fetchrow("""
-                    SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
+                    SELECT id,code,"operationalState"::text AS operational_state FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
                 """, payload.room_id, prop)
                 if not room:
                     raise HTTPException(404, detail={"code": "ROOM_NOT_FOUND"})
+                if room["operational_state"] == "TECH_BLOCK":
+                    raise HTTPException(409, detail={"code": "TARGET_ROOM_TECH_BLOCK"})
                 existing = await conn.fetchval("""
                     SELECT id FROM inventory_blocks WHERE "roomId"=$1 AND active=true
                     AND daterange("startDate","endDate",'[)')
