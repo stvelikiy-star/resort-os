@@ -58,6 +58,7 @@ class GridReservationCommitPayload(GridReservationPreviewPayload):
     notes: str | None = Field(default=None, max_length=2000)
     expected_total_kgs: int = Field(gt=0)
     expected_pricing_source: str = Field(pattern="^(CORE_RATE|MANAGER_OVERRIDE)$")
+    hold_id: uuid.UUID | None = None
 
 
 async def property_context(conn, property_code: str):
@@ -400,11 +401,29 @@ async def commit_grid_reservation(
                     payload = enforce_agent_booking_scope(payload, linked_agent_id)
                     if payload.expected_pricing_source != "CORE_RATE":
                         raise HTTPException(status_code=403, detail={"code": "AGENT_PRICING_SOURCE_FORBIDDEN"})
+                # The hold block is retired only within this booking transaction.
+                if payload.hold_id is not None:
+                    if is_agent:
+                        raise HTTPException(status_code=403, detail={"code": "AGENT_HOLD_CONFIRM_FORBIDDEN"})
+                    from .pms_holds import expire_holds
+                    await expire_holds(conn)
+                    held = await conn.fetchrow("""
+                        SELECT "roomId","inventoryBlockId","checkIn","checkOut",
+                               "guestPhone","releasedAt","confirmedReservationId","expiresAt"
+                        FROM marina_reservation_holds
+                        WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
+                    """, payload.hold_id, prop["id"])
+                    if not held or held["releasedAt"] is not None or held["confirmedReservationId"] is not None or held["expiresAt"] <= __import__("datetime").datetime.now(__import__("datetime").timezone.utc):
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
+                    if (held["roomId"] != payload.room_id or held["checkIn"] != payload.check_in
+                            or held["checkOut"] != payload.check_out or held["guestPhone"] != payload.phone):
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_DETAILS_MISMATCH"})
+                    await conn.execute('UPDATE inventory_blocks SET active=false,"updatedAt"=now() WHERE id=$1 AND active=true', held["inventoryBlockId"])
                 # Commit always prices against the canonical phone field for management.
                 # Agent pricing stays on the public/core rate and must not unlock returning-guest discounts.
                 commit_preview_payload = GridReservationPreviewPayload(
                     **{
-                        **payload.model_dump(exclude={"guest_name", "phone", "email", "notes", "expected_total_kgs", "expected_pricing_source"}),
+                        **payload.model_dump(exclude={"guest_name", "phone", "email", "notes", "expected_total_kgs", "expected_pricing_source", "hold_id"}),
                         "guest_phone": None if is_agent else payload.phone,
                     }
                 )
@@ -526,6 +545,8 @@ async def commit_grid_reservation(
                     payload.check_out,
                     booking_number,
                 )
+                if payload.hold_id is not None:
+                    await conn.execute('UPDATE marina_reservation_holds SET "confirmedReservationId"=$2 WHERE id=$1 AND "propertyId"=$3', payload.hold_id, reservation_id, prop["id"])
                 audit_action = "AGENT_CREATE_RESERVATION_FROM_GRID" if is_agent else "MANAGER_CREATE_RESERVATION_FROM_GRID"
                 audit_source = "PMS_AGENT_GRID" if is_agent else "PMS_OWNER_GRID"
                 await conn.execute(
