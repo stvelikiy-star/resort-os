@@ -28,6 +28,11 @@ class HoldContractTests(unittest.TestCase):
         self.assertIn('FOR UPDATE SKIP LOCKED', api)
         self.assertIn('UPDATE inventory_blocks SET active=false', api)
 
+    def test_hold_dates_use_property_timezone(self):
+        api = (ROOT / "services/api/app/pms_holds.py").read_text()
+        self.assertIn('now() AT TIME ZONE timezone', api)
+        self.assertIn('HOLD_DATES_IN_PAST', api)
+
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()
         grid = (ROOT / "apps/admin/components/PMSOwnerGrid.tsx").read_text()
