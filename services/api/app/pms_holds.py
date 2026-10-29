@@ -63,7 +63,7 @@ async def create_hold(payload: HoldCreate, request: Request, user: dict[str, Any
                 local_today = await conn.fetchval(
                     'SELECT (now() AT TIME ZONE timezone)::date FROM properties WHERE id=$1', prop
                 )
-                if payload.check_out <= local_today:
+                if payload.check_in < local_today:
                     raise HTTPException(422, detail={"code": "HOLD_DATES_IN_PAST"})
                 await expire_holds(conn)
                 room = await conn.fetchrow("""
