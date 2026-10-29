@@ -1,6 +1,6 @@
 """60-minute inventory holds. Tenant-scoped, transactional, never silently extended."""
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from typing import Any
 
 from asyncpg.exceptions import ExclusionViolationError
