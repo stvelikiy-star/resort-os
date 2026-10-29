@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, model_validator
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/pms/holds", tags=["admin-pms-holds"])
-access = require_roles("OWNER", "MANAGER", module_grant=False)
+access = require_roles("OWNER", "MANAGER")
 
 
 class HoldCreate(BaseModel):
