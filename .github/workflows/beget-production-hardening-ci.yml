@@ -165,11 +165,11 @@ jobs:
           python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-good.env | grep -q '^RESULT: PASS STATIC$'
 
       - name: Verify public truth still blocks rejected sports/payment drift
-        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-')) }}
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-') || startsWith(github.head_ref, 'feat/marina-hold-')) }}
         run: python scripts/public_site_truth_guard.py
 
       - name: Record MARINA SMART guest-web scope
-        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-')) }}
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-') || startsWith(github.head_ref, 'feat/marina-hold-')) }}
         run: |
           python - <<'PY'
           from pathlib import Path
