@@ -1,8 +1,11 @@
 -- Disposable CI database only. Transaction rolls back synthetic hotel/room/hold.
 BEGIN;
-INSERT INTO properties (id,code,name,"updatedAt") VALUES
-('11111111-1111-4111-8111-111111111111','HOLD_CI_A','HOLD CI A',now()),
-('22222222-2222-4222-8222-222222222222','HOLD_CI_B','HOLD CI B',now());
+INSERT INTO tenants (id,code,name) VALUES
+('11111111-1111-4111-8111-111111111110','hold_ci_tenant_a','HOLD CI Tenant A'),
+('22222222-2222-4222-8222-222222222220','hold_ci_tenant_b','HOLD CI Tenant B');
+INSERT INTO properties (id,code,name,"tenantId","updatedAt") VALUES
+('11111111-1111-4111-8111-111111111111','HOLD_CI_A','HOLD CI A','11111111-1111-4111-8111-111111111110',now()),
+('22222222-2222-4222-8222-222222222222','HOLD_CI_B','HOLD CI B','22222222-2222-4222-8222-222222222220',now());
 INSERT INTO room_types (id,"propertyId",code,name,"capacityAdults","updatedAt") VALUES
 ('11111111-1111-4111-8111-111111111112','11111111-1111-4111-8111-111111111111','STANDARD','Standard',2,now()),
 ('22222222-2222-4222-8222-222222222223','22222222-2222-4222-8222-222222222222','STANDARD','Standard',2,now());
