@@ -424,14 +424,15 @@ async def commit_grid_reservation(
                     await expire_holds(conn)
                     held = await conn.fetchrow("""
                         SELECT "roomId","inventoryBlockId","checkIn","checkOut",
-                               "guestPhone","releasedAt","confirmedReservationId","expiresAt"
+                               "guestName","guestPhone","releasedAt","confirmedReservationId","expiresAt"
                         FROM marina_reservation_holds
                         WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
                     """, payload.hold_id, prop["id"])
                     if not held or held["releasedAt"] is not None or held["confirmedReservationId"] is not None or held["expiresAt"] <= datetime.now(timezone.utc):
                         raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
                     if (held["roomId"] != payload.room_id or held["checkIn"] != payload.check_in
-                            or held["checkOut"] != payload.check_out or held["guestPhone"] != payload.phone):
+                            or held["checkOut"] != payload.check_out or held["guestPhone"] != payload.phone
+                            or held["guestName"] != payload.guest_name):
                         raise HTTPException(status_code=409, detail={"code": "HOLD_DETAILS_MISMATCH"})
                 # Commit always prices against the canonical phone field for management.
                 # Agent pricing stays on the public/core rate and must not unlock returning-guest discounts.
