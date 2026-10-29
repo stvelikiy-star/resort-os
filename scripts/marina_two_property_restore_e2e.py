@@ -270,6 +270,7 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
         # Real HTTP checks against property-pinned APIs and disposable PostgreSQL.
         # Two concurrent requests for one room must produce exactly one HOLD.
         from concurrent.futures import ThreadPoolExecutor
+        start, end = date.today() + timedelta(days=14), date.today() + timedelta(days=16)
         async def hold_rooms():
             conn = await asyncpg.connect(dsn)
             try:
@@ -277,15 +278,16 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                     str(await conn.fetchval(
                         'SELECT r.id FROM rooms r JOIN properties p ON p.id=r."propertyId" '
                         'WHERE p.code=$1 AND r."operationalState" <> \'TECH_BLOCK\' '
-                        'ORDER BY r.code LIMIT 1', code
+                        'AND NOT EXISTS (SELECT 1 FROM inventory_blocks b WHERE b."roomId"=r.id AND b.active '
+                        'AND daterange(b."startDate",b."endDate",\'[)\') && daterange($2::date,$3::date,\'[)\')) '
+                        'ORDER BY r.code LIMIT 1', code, start, end
                     )) for code in CODES
                 ]
             finally:
                 await conn.close()
         room_ids = asyncio.run(hold_rooms())
         assert all(room_id != "None" for room_id in room_ids), "Synthetic HOLD room missing"
-        check_in = (date.today() + timedelta(days=120)).isoformat()
-        check_out = (date.today() + timedelta(days=122)).isoformat()
+        check_in, check_out = start.isoformat(), end.isoformat()
         payload = {"room_id": room_ids[0], "check_in": check_in, "check_out": check_out,
                    "guest_name": "Synthetic Hold Guest", "guest_phone": "+996700111222"}
         with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}") as client:
