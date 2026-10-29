@@ -33,6 +33,8 @@ class HoldContractTests(unittest.TestCase):
         api = (ROOT / "services/api/app/pms_holds.py").read_text()
         self.assertIn('now() AT TIME ZONE timezone', api)
         self.assertIn('HOLD_DATES_IN_PAST', api)
+        self.assertIn('payload.check_in < local_today', api)
+        self.assertNotIn('payload.check_out <= local_today', api)
 
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()
