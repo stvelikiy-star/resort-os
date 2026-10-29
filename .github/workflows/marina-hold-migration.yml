@@ -56,10 +56,6 @@ jobs:
           echo "$expiry_default" | grep -Eq '60 minutes|01:00:00|1 hour'
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_indexes WHERE tablename='marina_reservation_holds' AND indexname='marina_holds_expiry_active_idx' AND indexdef LIKE '%releasedAt%'")" = 1
-      - name: Inspect tenant fixture schema
-        run: |
-          psql -h localhost -U hold_ci -d hold_ci -c '\\d+ tenants'
-          psql -h localhost -U hold_ci -d hold_ci -c '\\d+ properties'
       - name: Verify synthetic HOLD overlap release and hotel isolation
         run: psql -h localhost -U hold_ci -d hold_ci -v ON_ERROR_STOP=1 -f scripts/marina_hold_postgres_invariants.sql
       - name: Verify backup restore into pristine PostgreSQL 16
