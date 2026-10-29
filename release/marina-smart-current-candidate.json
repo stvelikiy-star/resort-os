@@ -5,7 +5,7 @@
   "candidate_commit": "9c2e01ac3c755ad4fc75d2c6dec822b817795927",
   "source_branch": "fix/marina-staging-preflight-20261020",
   "pull_request": 244,
-  "migration_count": 38,
+  "migration_count": 39,
   "tenant_model": "Tenant/Property",
   "tenant_context_enabled": false,
   "staging_gate": "manual_read_only",
