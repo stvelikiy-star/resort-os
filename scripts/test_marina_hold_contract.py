@@ -17,6 +17,7 @@ class HoldContractTests(unittest.TestCase):
         retirement = confirm.index("retired = await conn.fetchval(")
         reservation_insert = confirm.index("INSERT INTO reservations (")
         self.assertLess(preview, retirement)
+        self.assertIn('"expiresAt" <= clock_timestamp()', confirm)
         self.assertLess(retirement, reservation_insert)
         self.assertIn('"confirmedReservationId"=$2', confirm)
 
