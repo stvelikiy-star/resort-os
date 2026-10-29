@@ -485,6 +485,10 @@ async def commit_grid_reservation(
                 # Only retire the HOLD after pricing and availability preview has succeeded.
                 # All subsequent writes share the transaction; an error restores the block.
                 if payload.hold_id is not None:
+                    # Expiry is enforced at the actual conversion point, not only
+                    # when the transaction first fetched the HOLD.
+                    if await conn.fetchval('SELECT "expiresAt" <= clock_timestamp() FROM marina_reservation_holds WHERE id=$1', payload.hold_id):
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
                     retired = await conn.fetchval("""
                         UPDATE inventory_blocks SET active=false,"updatedAt"=now()
                         WHERE id=$1 AND active=true RETURNING id
