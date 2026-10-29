@@ -267,6 +267,51 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                 wrong = httpx.post(f"http://127.0.0.1:{PORTS[foreign]}/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[index]})
                 assert wrong.status_code == 401, "Foreign password authenticated wrong property"
         print("MARINA_CROSS_PROPERTY_SESSION_PASSWORD_PASS")
+        # Real HTTP checks against property-pinned APIs and disposable PostgreSQL.
+        # Two concurrent requests for one room must produce exactly one HOLD.
+        from concurrent.futures import ThreadPoolExecutor
+        async def hold_rooms():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return [
+                    str(await conn.fetchval(
+                        'SELECT r.id FROM rooms r JOIN properties p ON p.id=r."propertyId" '
+                        'WHERE p.code=$1 AND r."operationalState" <> \'TECH_BLOCK\' '
+                        'ORDER BY r.code LIMIT 1', code
+                    )) for code in CODES
+                ]
+            finally:
+                await conn.close()
+        room_ids = asyncio.run(hold_rooms())
+        assert all(room_id != "None" for room_id in room_ids), "Synthetic HOLD room missing"
+        check_in = (date.today() + timedelta(days=120)).isoformat()
+        check_out = (date.today() + timedelta(days=122)).isoformat()
+        payload = {"room_id": room_ids[0], "check_in": check_in, "check_out": check_out,
+                   "guest_name": "Synthetic Hold Guest", "guest_phone": "+996700111222"}
+        with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}") as client:
+            login = client.post("/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[0]})
+            assert login.status_code == 200, f"HOLD owner login failed: {login.status_code}"
+            token = client.cookies.get("resort_session")
+            assert token, "HOLD owner session cookie missing"
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                calls = [executor.submit(httpx.post, f"http://127.0.0.1:{PORTS[0]}/api/v1/admin/pms/holds",
+                        json=payload, cookies={"resort_session": token}, timeout=15) for _ in range(2)]
+                responses = [future.result() for future in calls]
+            codes = sorted(response.status_code for response in responses)
+            assert codes == [201, 409], f"Concurrent HOLD requests failed safety gate: {codes} {[r.text[:500] for r in responses]}"
+            held = next(response.json() for response in responses if response.status_code == 201)
+            foreign = httpx.get(f"http://127.0.0.1:{PORTS[1]}/api/v1/admin/pms/holds/{held['id']}",
+                                cookies={"resort_session": token})
+            assert foreign.status_code in (401, 403, 404), "HOLD visible across properties"
+            detail = client.get(f"/api/v1/admin/pms/holds/{held['id']}")
+            assert detail.status_code == 200, f"HOLD owner cannot read active HOLD: {detail.status_code}"
+            released = client.delete(f"/api/v1/admin/pms/holds/{held['id']}")
+            assert released.status_code == 200, f"HOLD release failed: {released.status_code}"
+            renewed = client.post("/api/v1/admin/pms/holds", json=payload)
+            assert renewed.status_code == 201, f"Released HOLD still blocks inventory: {renewed.status_code}"
+            client.delete(f"/api/v1/admin/pms/holds/{renewed.json()['id']}")
+        print("MARINA_HOLD_CONCURRENT_API_TENANT_RELEASE_PASS")
+
         if os.environ.get("MARINA_CI_CHANNEL_IMPORT") == "true":
             subprocess.run([sys.executable, "scripts/verify_channel_reservations.py"], cwd=ROOT, env=env, check=True)
     except Exception:
