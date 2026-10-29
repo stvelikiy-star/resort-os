@@ -300,9 +300,20 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
             codes = sorted(response.status_code for response in responses)
             assert codes == [201, 409], f"Concurrent HOLD requests failed safety gate: {codes} {[r.text[:500] for r in responses]}"
             held = next(response.json() for response in responses if response.status_code == 201)
-            foreign = httpx.get(f"http://127.0.0.1:{PORTS[1]}/api/v1/admin/pms/holds/{held['id']}",
-                                cookies={"resort_session": token})
-            assert foreign.status_code in (401, 403, 404), "HOLD visible across properties"
+            # Authenticate independently as the owner of the *other* hotel:
+            # an invalid foreign cookie alone would not prove tenant isolation.
+            with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}") as other_hotel:
+                second_login = other_hotel.post("/api/v1/auth/login",
+                    json={"username": USERNAME, "password": PASSWORDS[1]})
+                assert second_login.status_code == 200, "Second hotel owner login failed"
+                foreign = other_hotel.get(f"/api/v1/admin/pms/holds/{held['id']}")
+                assert foreign.status_code == 404, (
+                    f"Authenticated owner of hotel B could inspect hotel A HOLD: {foreign.status_code}"
+                )
+                forbidden_release = other_hotel.delete(f"/api/v1/admin/pms/holds/{held['id']}")
+                assert forbidden_release.status_code == 404, (
+                    f"Authenticated owner of hotel B could release hotel A HOLD: {forbidden_release.status_code}"
+                )
             detail = client.get(f"/api/v1/admin/pms/holds/{held['id']}")
             assert detail.status_code == 200, f"HOLD owner cannot read active HOLD: {detail.status_code}"
             released = client.delete(f"/api/v1/admin/pms/holds/{held['id']}")
