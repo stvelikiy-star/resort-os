@@ -320,8 +320,30 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
             assert released.status_code == 200, f"HOLD release failed: {released.status_code}"
             renewed = client.post("/api/v1/admin/pms/holds", json=payload)
             assert renewed.status_code == 201, f"Released HOLD still blocks inventory: {renewed.status_code}"
-            client.delete(f"/api/v1/admin/pms/holds/{renewed.json()['id']}")
-        print("MARINA_HOLD_CONCURRENT_API_TENANT_RELEASE_PASS")
+            renewed_id = renewed.json()["id"]
+            # Convert a real HOLD to a confirmed reservation through the same
+            # preview/commit API used by the owner chessboard.
+            preview_request = {
+                **payload, "hold_id": renewed_id, "manager_total_kgs": 9000,
+                "guest_phone": payload["guest_phone"],
+            }
+            preview = client.post("/api/v1/admin/pms/reservations/new/preview", json=preview_request)
+            assert preview.status_code == 200, f"HOLD booking preview failed: {preview.status_code} {preview.text[:500]}"
+            priced = preview.json()
+            assert priced["can_commit"], f"HOLD reservation preview unavailable: {priced}"
+            commit_request = {
+                **preview_request, "guest_name": payload["guest_name"],
+                "phone": payload["guest_phone"],
+                "expected_total_kgs": priced["pricing"]["total_kgs"],
+                "expected_pricing_source": priced["pricing"]["source"],
+            }
+            committed = client.post("/api/v1/admin/pms/reservations/new/commit", json=commit_request)
+            assert committed.status_code == 201, f"HOLD conversion failed: {committed.status_code} {committed.text[:500]}"
+            repeated = client.post("/api/v1/admin/pms/reservations/new/commit", json=commit_request)
+            assert repeated.status_code == 409, f"Confirmed HOLD converted twice: {repeated.status_code}"
+            confirmed_release = client.delete(f"/api/v1/admin/pms/holds/{renewed_id}")
+            assert confirmed_release.status_code == 409, "Confirmed HOLD was released"
+        print("MARINA_HOLD_CONCURRENT_API_TENANT_RELEASE_CONVERSION_PASS")
 
         if os.environ.get("MARINA_CI_CHANNEL_IMPORT") == "true":
             subprocess.run([sys.executable, "scripts/verify_channel_reservations.py"], cwd=ROOT, env=env, check=True)
