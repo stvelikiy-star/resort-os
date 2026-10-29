@@ -358,6 +358,10 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                            '["PMS"]'::jsonb,now(),now()
                     FROM staff_users u JOIN properties p ON p.id=u."propertyId"
                     WHERE p.code=$3 AND u.username=$4
+                    ON CONFLICT ("propertyId",username) DO UPDATE SET
+                      "modulePermissions"=EXCLUDED."modulePermissions",
+                      "passwordHash"=EXCLUDED."passwordHash",
+                      role='MANAGER',"isActive"=true,"updatedAt"=now()
                     RETURNING id
                 """, uuid.uuid4(), "hold-ci-manager", CODES[0], USERNAME))
             finally:
