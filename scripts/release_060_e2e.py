@@ -237,7 +237,7 @@ async def main() -> None:
         )
         session_id = session["id"]
         assert session["room_code"] == room_code and session["status"] == "SEATED"
-        floor = ok(await client.get("/api/v1/dining/floor-layout"), "live floor")
+        floor = ok(await client.get("/api/v1/dining/floor-layout", params={"service_date": str(D0)}), "live floor")
         floor_table = next(item for item in floor["tables"] if item["id"] == table_id)
         floor_session = next(item for item in floor["sessions"] if item["id"] == session_id)
         assert floor_table["status"] == "OCCUPIED"
