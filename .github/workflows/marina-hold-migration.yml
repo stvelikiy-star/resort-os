@@ -1,0 +1,56 @@
+name: MARINA HOLD zz114 Migration and Rollback CI
+on:
+  pull_request:
+    paths:
+      - 'packages/database/prisma/migrations/zz114_marina_60minute_holds_20261029/**'
+      - '.github/workflows/marina-hold-migration.yml'
+  workflow_dispatch:
+jobs:
+  migration-restore:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hold_ci
+          POSTGRES_PASSWORD: hold_ci_only
+          POSTGRES_DB: hold_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hold_ci -d hold_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://hold_ci:hold_ci_only@localhost:5432/hold_ci?schema=public
+      PGPASSWORD: hold_ci_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Prisma dependencies
+        run: cd packages/database && npm ci
+      - name: Apply migration chain through zz113
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/prisma-pre-hold"
+          cp -a packages/database/prisma "$baseline"
+          rm -rf "$baseline/migrations/zz114_marina_60minute_holds_20261029"
+          (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = 38
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 0
+      - name: Snapshot previous state and install HOLD
+        run: |
+          set -euo pipefail
+          pg_dump -h localhost -U hold_ci -d hold_ci -Fc -f "$RUNNER_TEMP/backup.dump"
+          (cd packages/database && npx prisma migrate deploy --schema prisma/schema.prisma)
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 1
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 39
+      - name: Verify backup restore into pristine PostgreSQL 16
+        run: |
+          set -euo pipefail
+          createdb -h localhost -U hold_ci hold_restore
+          pg_restore -h localhost -U hold_ci -d hold_restore --exit-on-error --no-owner --no-acl "$RUNNER_TEMP/backup.dump"
+          test "$(psql -h localhost -U hold_ci -d hold_restore -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 0
+          test "$(psql -h localhost -U hold_ci -d hold_restore -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 38
