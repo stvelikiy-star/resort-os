@@ -1,0 +1,22 @@
+name: MARINA Ubuntu Read-Only Inventory Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/marina_target_readonly_inventory.sh'
+      - 'scripts/test_marina_target_readonly_inventory.py'
+      - '.github/workflows/marina-target-inventory-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify inventory script syntax
+        run: bash -n scripts/marina_target_readonly_inventory.sh
+      - name: Verify no destructive operations and explicit isolation gate
+        run: python -m unittest scripts.test_marina_target_readonly_inventory -v
