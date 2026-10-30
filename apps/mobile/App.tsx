@@ -1,57 +1,70 @@
-import React, { useState } from 'react';
-import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, {useMemo, useState} from 'react';
+import {SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
+import {Role, roles, sampleTasks, summary, transitionTask} from './src/domain/tasks';
+import {Language, roleNames, translations} from './src/i18n/translations';
+import {APP_MODE} from './src/config/mode';
 
-type Role = 'HOUSEKEEPING' | 'REPAIR' | 'RECEPTION';
-type Task = { id: string; room: string; title: string; status: 'NEW' | 'IN_PROGRESS' | 'DONE'; role: Role };
-const tasks: Task[] = [
-  { id: 'demo-clean-1', room: '101', title: 'Уборка после выезда', status: 'NEW', role: 'HOUSEKEEPING' },
-  { id: 'demo-clean-2', room: '205', title: 'Проверить комплект белья', status: 'IN_PROGRESS', role: 'HOUSEKEEPING' },
-  { id: 'demo-repair-1', room: '302', title: 'Проверить кондиционер', status: 'NEW', role: 'REPAIR' },
-  { id: 'demo-reception-1', room: '110', title: 'Подготовить номер к заезду', status: 'NEW', role: 'RECEPTION' },
-];
-const labels: Record<Role, string> = { HOUSEKEEPING: 'Горничная', REPAIR: 'Техник', RECEPTION: 'Ресепшен' };
-const statusLabels: Record<Task['status'], string> = { NEW: 'Новое', IN_PROGRESS: 'В работе', DONE: 'Выполнено' };
+type Tab = 'home' | 'tasks' | 'profile';
+const roleIcons: Record<Role, string> = {HOUSEKEEPING:'🧹',REPAIR:'🔧',RECEPTION:'🛎️',KITCHEN:'🍳',WAITER:'🍽️',MANAGER:'📊'};
 export default function App() {
-  const [role, setRole] = useState<Role>('HOUSEKEEPING');
-  const [items, setItems] = useState<Task[]>(tasks);
-  const [tab, setTab] = useState<'home' | 'tasks' | 'profile'>('home');
-  const visible = items.filter(task => task.role === role);
-  const active = visible.filter(task => task.status !== 'DONE');
-  const advance = (id: string) => setItems(old => old.map(task => task.id === id
-    ? { ...task, status: task.status === 'NEW' ? 'IN_PROGRESS' : 'DONE' }
-    : task));
-  return (
-    <SafeAreaView style={styles.screen}>
-      <StatusBar barStyle="dark-content" />
-      <View style={styles.brand}><Text style={styles.brandText}>MARINA <Text style={styles.accent}>STAFF</Text></Text><Text style={styles.demo}>ДЕМО · БЕЗ ПОДКЛЮЧЕНИЯ К PMS</Text></View>
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.eyebrow}>РАБОЧИЙ КАБИНЕТ</Text>
-        <Text style={styles.heading}>{tab === 'profile' ? 'Профиль сотрудника' : tab === 'tasks' ? 'Мои задачи' : 'Добрый день!'}</Text>
-        <Text style={styles.subheading}>Демонстрационные данные — реальные гостиницы и сотрудники пока не подключены.</Text>
-        {tab === 'profile' ? <View style={styles.card}><Text style={styles.title}>Демо-профиль</Text><Text style={styles.detail}>Роль: {labels[role]}</Text><Text style={styles.detail}>Гостиница: демо-объект</Text><Text style={styles.detail}>Авторизация и подключение по QR — следующий этап.</Text></View> : <>
-          <View style={styles.roleRow}>{(Object.keys(labels) as Role[]).map(item =>
-            <TouchableOpacity accessibilityRole="button" key={item} style={[styles.chip, role === item && styles.selected]} onPress={() => setRole(item)}><Text style={[styles.chipText, role === item && styles.selectedText]}>{labels[item]}</Text></TouchableOpacity>
-          )}</View>
-          <View style={styles.metrics}><View style={styles.metric}><Text style={styles.number}>{active.length}</Text><Text style={styles.muted}>Активных задач</Text></View><View style={styles.metric}><Text style={styles.number}>{visible.filter(x => x.status === 'DONE').length}</Text><Text style={styles.muted}>Выполнено</Text></View></View>
-          <Text style={styles.section}>Задачи на сегодня</Text>
-          {visible.map(task => <View key={task.id} style={styles.card}><View style={styles.taskTop}><Text style={styles.room}>НОМЕР {task.room}</Text><Text style={styles.state}>{statusLabels[task.status]}</Text></View><Text style={styles.title}>{task.title}</Text>{task.status !== 'DONE' && <TouchableOpacity accessibilityRole="button" style={styles.action} onPress={() => advance(task.id)}><Text style={styles.actionText}>{task.status === 'NEW' ? 'Принять задачу' : 'Завершить (демо)'}</Text></TouchableOpacity>}</View>)}
-        </>}
-      </ScrollView>
-      <View style={styles.nav}>{([{id:'home',text:'Главная'},{id:'tasks',text:'Задачи'},{id:'profile',text:'Профиль'}] as const).map(item => <TouchableOpacity key={item.id} accessibilityRole="button" style={styles.navButton} onPress={() => setTab(item.id)}><Text style={[styles.navText, tab === item.id && styles.navActive]}>{item.text}</Text></TouchableOpacity>)}</View>
-    </SafeAreaView>
-  );
+ const [lang, setLang] = useState<Language>('ru');
+ const [role, setRole] = useState<Role>('HOUSEKEEPING');
+ const [tab, setTab] = useState<Tab>('home');
+ const [tasks, setTasks] = useState(sampleTasks);
+ const [expanded, setExpanded] = useState<string | null>(null);
+ const t = translations[lang];
+ const selected = useMemo(() => tasks.filter(task => task.role === role), [tasks,role]);
+ const counts = useMemo(() => summary(tasks,role),[tasks,role]);
+ return <SafeAreaView style={styles.root}>
+  <StatusBar barStyle="dark-content"/>
+  <View style={styles.top}>
+   <View><Text style={styles.brand}>MARINA <Text style={styles.teal}>STAFF</Text></Text><Text style={styles.demo}>{APP_MODE} · {t.demo}</Text></View>
+   <View style={styles.languages}>{(['ru','ky','en'] as Language[]).map(item=><TouchableOpacity accessibilityRole="button" accessibilityLabel={item} key={item} onPress={()=>setLang(item)} style={[styles.language,item===lang&&styles.languageActive]}><Text style={[styles.langText,item===lang&&styles.white]}>{item.toUpperCase()}</Text></TouchableOpacity>)}</View>
+  </View>
+  <ScrollView contentContainerStyle={styles.content}>
+   <Text style={styles.overline}>MARINA SMART · STAFF</Text>
+   <Text style={styles.heading}>{tab==='profile'?t.myProfile:tab==='tasks'?t.myTasks:t.hello}</Text>
+   <Text style={styles.warning}>{t.warning}</Text>
+   {tab==='profile'?<View style={styles.card}>
+    <Text style={styles.cardTitle}>{t.hotel}</Text><Text style={styles.description}>{roleIcons[role]} {t[roleNames[role]]}</Text>
+    <Text style={styles.description}>{t.language}: {lang.toUpperCase()}</Text>
+    <Text style={styles.note}>🔒 {t.demo}</Text>
+   </View>:<>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roles}>
+     {roles.map(item=><TouchableOpacity accessibilityRole="button" key={item} style={[styles.roleChip,item===role&&styles.roleActive]} onPress={()=>{setRole(item);setExpanded(null)}}><Text style={[styles.roleText,item===role&&styles.white]}>{roleIcons[item]} {t[roleNames[item]]}</Text></TouchableOpacity>)}
+    </ScrollView>
+    <View style={styles.stats}>
+     <View style={styles.stat}><Text style={styles.statValue}>{counts.active}</Text><Text style={styles.statLabel}>{t.active}</Text></View>
+     <View style={styles.stat}><Text style={styles.statValue}>{counts.done}</Text><Text style={styles.statLabel}>{t.done}</Text></View>
+    </View>
+    <Text style={styles.section}>{t.today}</Text>
+    {selected.length===0&&<Text style={styles.description}>{t.allDone}</Text>}
+    {selected.map(task=><View style={styles.card} key={task.id}>
+     <TouchableOpacity accessibilityRole="button" accessibilityLabel={task.title} onPress={()=>setExpanded(expanded===task.id?null:task.id)}>
+      <View style={styles.cardHeader}><Text style={styles.room}>{t.room}: {task.room}</Text><Text style={styles.state}>{task.status==='NEW'?t.new:task.status==='IN_PROGRESS'?t.progress:t.completed}</Text></View>
+      <Text style={styles.cardTitle}>{task.title}</Text>
+      {task.priority==='urgent'&&<Text style={styles.urgent}>● {t.urgent}</Text>}
+     </TouchableOpacity>
+     {(expanded===task.id||tab==='tasks')&&<Text style={styles.description}>{task.detail}</Text>}
+     {task.status!=='DONE'&&<TouchableOpacity accessibilityRole="button" accessibilityLabel={task.status==='NEW'?t.start:t.finish} style={styles.button} onPress={()=>setTasks(current=>transitionTask(current,task.id,role))}><Text style={styles.buttonText}>{task.status==='NEW'?t.start:t.finish} →</Text></TouchableOpacity>}
+    </View>)}
+   </>}
+  </ScrollView>
+  <View style={styles.nav}>{(['home','tasks','profile'] as Tab[]).map(item=><TouchableOpacity accessibilityRole="button" key={item} style={styles.navItem} onPress={()=>setTab(item)}><Text style={[styles.navLabel,tab===item&&styles.navSelected]}>{item==='home'?'⌂ ':item==='tasks'?'☷ ':'◉ '}{t[item]}</Text></TouchableOpacity>)}</View>
+ </SafeAreaView>;
 }
-const styles = StyleSheet.create({
-  screen:{flex:1,backgroundColor:'#F5F8FA'},brand:{backgroundColor:'#FFFFFF',paddingHorizontal:24,paddingTop:20,paddingBottom:16,borderBottomWidth:1,borderColor:'#E7EFF2'},
-  brandText:{fontSize:21,fontWeight:'900',letterSpacing:1.3,color:'#12333C'},accent:{color:'#12A6A1'},demo:{fontSize:10,color:'#AF6931',marginTop:5,fontWeight:'800'},
-  body:{padding:22,paddingBottom:40},eyebrow:{fontSize:11,fontWeight:'800',letterSpacing:1.7,color:'#159B99',marginBottom:9},
-  heading:{fontSize:29,fontWeight:'800',color:'#153640'},subheading:{color:'#627C84',lineHeight:21,marginTop:10,marginBottom:20},
-  roleRow:{flexDirection:'row',gap:7,flexWrap:'wrap',marginBottom:19},chip:{borderColor:'#CBDDE1',borderWidth:1,borderRadius:20,paddingVertical:9,paddingHorizontal:12,backgroundColor:'#fff'},
-  selected:{backgroundColor:'#087F80',borderColor:'#087F80'},chipText:{color:'#325660',fontSize:12,fontWeight:'700'},selectedText:{color:'#FFFFFF'},
-  metrics:{flexDirection:'row',gap:12,marginBottom:26},metric:{flex:1,backgroundColor:'#E3F4F2',padding:17,borderRadius:17},
-  number:{fontSize:30,color:'#137C80',fontWeight:'900'},muted:{color:'#648288',marginTop:4,fontSize:12},
-  section:{fontSize:19,fontWeight:'800',color:'#1A3A43',marginBottom:14},card:{backgroundColor:'#fff',padding:19,borderRadius:18,marginBottom:12,borderWidth:1,borderColor:'#E3EBEF'},
-  taskTop:{flexDirection:'row',justifyContent:'space-between',marginBottom:12},room:{color:'#178E8A',fontWeight:'800',fontSize:11},state:{color:'#6E838A',fontSize:12},
-  title:{fontSize:17,color:'#183C46',fontWeight:'700',marginBottom:14},detail:{color:'#4F6770',marginBottom:10},action:{borderRadius:11,backgroundColor:'#128B89',padding:13,alignItems:'center'},actionText:{color:'#FFFFFF',fontWeight:'800'},
-  nav:{flexDirection:'row',backgroundColor:'#fff',borderTopWidth:1,borderColor:'#E3EBEF',paddingVertical:14},navButton:{flex:1,alignItems:'center'},navText:{fontSize:13,color:'#85979B',fontWeight:'700'},navActive:{color:'#0B8783'}
+const styles=StyleSheet.create({
+ root:{flex:1,backgroundColor:'#F4F8F9'},
+ top:{backgroundColor:'#FFFFFF',paddingHorizontal:20,paddingVertical:18,borderBottomWidth:1,borderColor:'#DFEAED',flexDirection:'row',justifyContent:'space-between',alignItems:'center'},
+ brand:{fontSize:20,fontWeight:'900',letterSpacing:1,color:'#153A44'},teal:{color:'#0A9996'},demo:{fontSize:9,fontWeight:'800',color:'#B37735',marginTop:4},
+ languages:{flexDirection:'row',gap:3},language:{padding:6,borderRadius:7},languageActive:{backgroundColor:'#118985'},langText:{fontSize:10,fontWeight:'800',color:'#557078'},white:{color:'#FFFFFF'},
+ content:{padding:20,paddingBottom:35},overline:{fontSize:10,letterSpacing:1.6,color:'#13938E',fontWeight:'900',marginBottom:8},
+ heading:{fontSize:30,fontWeight:'800',color:'#173B46',marginBottom:10},warning:{fontSize:12,lineHeight:18,color:'#687E88',marginBottom:18},
+ roles:{paddingVertical:4,gap:7,marginBottom:18},roleChip:{backgroundColor:'#FFFFFF',borderRadius:18,borderWidth:1,borderColor:'#D7E5E8',paddingVertical:11,paddingHorizontal:13},roleActive:{backgroundColor:'#0A8986',borderColor:'#0A8986'},roleText:{fontSize:12,fontWeight:'800',color:'#2E5863'},
+ stats:{flexDirection:'row',gap:10,marginBottom:25},stat:{flex:1,backgroundColor:'#DFEFEE',padding:20,borderRadius:18},statValue:{fontSize:31,color:'#0B7E7A',fontWeight:'900'},statLabel:{fontSize:12,color:'#5C7B7D',marginTop:4},section:{fontSize:19,fontWeight:'800',color:'#163942',marginBottom:13},
+ card:{backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E1E9ED',borderRadius:19,padding:17,marginBottom:12},
+ cardHeader:{flexDirection:'row',justifyContent:'space-between',marginBottom:12,gap:8},room:{color:'#087E81',fontSize:11,fontWeight:'900'},state:{fontSize:11,color:'#6E8990'},
+ cardTitle:{fontSize:17,color:'#193E48',fontWeight:'800',marginBottom:7},description:{color:'#607982',fontSize:13,lineHeight:19,marginVertical:9},urgent:{fontSize:12,fontWeight:'800',color:'#C36D3D',marginBottom:7},note:{fontSize:11,color:'#A06E3D',marginTop:12},
+ button:{backgroundColor:'#128E89',borderRadius:12,padding:14,alignItems:'center',marginTop:11},buttonText:{color:'#FFFFFF',fontWeight:'800',fontSize:13},
+ nav:{flexDirection:'row',backgroundColor:'#FFFFFF',borderTopWidth:1,borderColor:'#E0E9EC',paddingTop:15,paddingBottom:19},navItem:{flex:1,alignItems:'center'},navLabel:{fontSize:13,color:'#859A9E',fontWeight:'800'},navSelected:{color:'#0E8B87'}
 });
