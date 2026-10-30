@@ -1,0 +1,36 @@
+name: MARINA STAFF Mobile Checks
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-staff-mobile-check.yml'
+  push:
+    branches:
+      - 'feat/marina-staff-mobile-foundation-20261030'
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-staff-mobile-check.yml'
+permissions:
+  contents: read
+jobs:
+  mobile-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify Expo dependency alignment
+        run: npx expo install --check
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Validate Expo configuration
+        run: npx expo config --type public --json > /tmp/marina-staff-expo-config.json
