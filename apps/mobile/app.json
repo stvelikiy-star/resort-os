@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "MARINA STAFF",
+    "slug": "marina-staff",
+    "scheme": "marinastaff",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    },
+    "extra": {
+      "environment": "development"
+    }
+  }
+}
