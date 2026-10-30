@@ -1,17 +1,23 @@
 # MARINA SMART — current staging candidate
 
-Date: 2026-10-26
+Date: 2026-10-30
 
 ## Candidate identity
 
 - Repository: stvelikiy-star/resort-os
-- PR: #244
-- Branch: fix/marina-staging-preflight-20261020
-- Application baseline: 9c2e01ac3c755ad4fc75d2c6dec822b817795927
-- Verified manifest revision: 2e7b33c565932ebc710b459c37dcc57658eac221
+- PR: #268
+- Branch: feat/marina-hold-60min-20261029
+- Application baseline: 4b9e816a1450a038b938e96616f31b908d0eba17
+- Verified application baseline: 4b9e816a1450a038b938e96616f31b908d0eba17 (59/59 GitHub CI on that commit; later manifest updates require their own checks)
 - Candidate manifest: release/marina-smart-current-candidate.json
-- Migration ledger: 38 migrations
+- Migration ledger: 39 migrations
 - Critical constraints: 105 (scripts/release_contract.py)
+
+## Current release scope
+
+- **Production:** property-isolated hotel PMS on Ubuntu, contingent on verified target backup/restore and operational acceptance.
+- **Demo:** same source release in a separately configured environment with a separate database, secrets, sessions and synthetic data.
+- PR #268 reached 59/59 successful GitHub CI on application baseline `4b9e816a1450a038b938e96616f31b908d0eba17`; this does not authorize a server cutover.
 
 ## Observed CI evidence
 

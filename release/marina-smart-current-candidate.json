@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "product": "MARINA SMART",
-  "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
-  "candidate_commit": "9c2e01ac3c755ad4fc75d2c6dec822b817795927",
-  "source_branch": "fix/marina-staging-preflight-20261020",
-  "pull_request": 244,
-  "migration_count": 38,
+  "status": "CI_VERIFIED_STAGING_AND_TARGET_RESTORE_REQUIRED",
+  "candidate_commit": "4b9e816a1450a038b938e96616f31b908d0eba17",
+  "source_branch": "feat/marina-hold-60min-20261029",
+  "pull_request": 268,
+  "migration_count": 39,
   "tenant_model": "Tenant/Property",
   "tenant_context_enabled": false,
   "staging_gate": "manual_read_only",
@@ -16,14 +16,11 @@
   "payment_operations_enabled": false,
   "nfc_wallet_enabled": false,
   "notes": [
-    "This is the MARINA SMART internal candidate boundary, not an active production release.",
-    "candidate_commit pins the last tested source revision before this manifest-only update; release authorization requires checks on the new PR head.",
-    "The release contract expects exactly 37 migrations and 105 critical constraints; required CI must validate the current PR head, including this manifest.",
-    "Tenant context remains disabled by default. Two-property verification uses explicitly property-pinned API runtimes and does not prove shared-runtime SaaS.",
-    "External staging, cross-tenant end-to-end acceptance, target backup/restore, rollback, and production cutover remain unverified.",
-    "Disposable restore contract CI succeeded for the pinned source revision; target-environment backup and restore are still unverified.",
-    "Payment operations, acquiring, MKassa, service-point QR and NFC remain disabled.",
-    "Official OTA synchronization and live WhatsApp delivery are not configured; channel mapping and manual/CSV workflows do not claim provider connectivity."
+    "Verified source revision 4b9e816a1450a038b938e96616f31b908d0eba17 completed 59/59 GitHub Actions successfully on 2026-10-30; changing this manifest requires CI rerun on the new head.",
+    "Production and demo must be isolated deployments of the same code release, each with separate database, credentials, cookies and configuration.",
+    "Target Ubuntu backup/restore and live end-to-end operations are not verified; production_cutover_authorized remains false.",
+    "Two-property tests use property-pinned API runtimes; shared-runtime multi-tenant isolation is not proven.",
+    "Payments, official OTA synchronization, live WhatsApp and smart-lock integrations require separate provider-specific acceptance."
   ],
-  "ci_baseline_commit": "116c65a7aaf50352dc5baf58e52983847f055390"
+  "ci_baseline_commit": "4b9e816a1450a038b938e96616f31b908d0eba17"
 }

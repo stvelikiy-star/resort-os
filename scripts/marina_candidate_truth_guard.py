@@ -11,8 +11,8 @@ from release_contract import EXPECTED_MIGRATIONS
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "release" / "marina-smart-current-candidate.json"
 STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
-EXPECTED_BRANCH = "fix/marina-staging-preflight-20261020"
-EXPECTED_PR = 244
+EXPECTED_BRANCH = "feat/marina-hold-60min-20261029"
+EXPECTED_PR = 268
 
 
 def main() -> int:
@@ -28,7 +28,7 @@ def main() -> int:
     required = {
         "schema_version": 1,
         "product": "MARINA SMART",
-        "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
+        "status": "CI_VERIFIED_STAGING_AND_TARGET_RESTORE_REQUIRED",
         "source_branch": EXPECTED_BRANCH,
         "pull_request": EXPECTED_PR,
         "migration_count": len(EXPECTED_MIGRATIONS),

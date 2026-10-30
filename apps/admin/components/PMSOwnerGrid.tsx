@@ -36,7 +36,7 @@ type Room = {
 type GridResponse = { property: string; start: string; end: string; rooms: Room[] };
 type BuilderOpen = { reservationId: string; intent: ScheduleIntent };
 type Selection = { roomId: string; anchor: string; focus: string };
-type CreateOpen = { roomId: string; roomCode: string; bedsRaw?: string | null; checkIn: string; checkOut: string };
+type CreateOpen = { roomId: string; roomCode: string; bedsRaw?: string | null; checkIn: string; checkOut: string; initialHoldId?: string };
 
 type RealtimeMessage = { type: "pms.grid.snapshot" | "heartbeat"; data?: GridResponse };
 
@@ -378,7 +378,23 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
   }, [finishSelection]);
 
   function openReservation(block: Block) {
-    if (agentMode || readOnlyMode || !block.reservation_id) return;
+    if (agentMode || readOnlyMode) return;
+    const match = block.type === "MANUAL" ? /^HOLD 60m ([0-9a-f-]{36})$/i.exec(block.reason || "") : null;
+    if (match) {
+      const room = allRooms.find((item) => item.blocks.some((itemBlock) => itemBlock.id === block.id));
+      if (room) {
+        setCreateOpen({
+          roomId: room.id,
+          roomCode: pmsRoomDisplayNumber(room, data?.property),
+          bedsRaw: room.beds_raw,
+          checkIn: block.start,
+          checkOut: block.end,
+          initialHoldId: match[1],
+        });
+      }
+      return;
+    }
+    if (!block.reservation_id) return;
     setBuilder({ reservationId: block.reservation_id, intent: { kind: "OPEN", segmentBlockId: block.id } });
   }
 
@@ -514,7 +530,7 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
         <span><i className="selected" /> выбранный диапазон</span>
         <span><i className="guaranteed" /> бронь</span>
         <span><i className="checked" /> проживает</span>
-        <span><i className="maintenance" /> ремонт / блок</span>
+        <span><i className="maintenance" /> ремонт / блок / HOLD (нажмите для подтверждения)</span>
       </footer>
 
       {!readOnlyMode && createOpen && <PMSNewReservationModal {...createOpen} agentMode={agentMode} onClose={() => { setCreateOpen(null); setSelection(null); selectionRef.current = null; }} onCreated={() => { setSelection(null); selectionRef.current = null; void load(); }} />}

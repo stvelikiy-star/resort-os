@@ -35,10 +35,22 @@ try {
     for (const [locale, [open, quick, unavailable]] of Object.entries(copy)) {
       await page.setViewportSize(locale === "ru" ? { width: 1440, height: 900 } : { width: 390, height: 844 });
       await page.goto(base, { waitUntil: "networkidle" });
-      await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
-      // Verify the page switched languages before asserting assistant translations.
-      // A click may precede React hydration, especially after a fresh navigation.
-      await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected, locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale);
+      const targetLocale = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
+      const languageButton = page.getByRole("button", { name: locale.toUpperCase(), exact: true });
+      // A server-rendered button may be clickable before client hydration.
+      // Wait for the locale handler to become active; repeat the *same* click
+      // only when hydration swallowed it, not after a successful language switch.
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        if (await page.evaluate(expected => document.documentElement.lang.toLowerCase() === expected, targetLocale)) break;
+        await languageButton.click();
+        try {
+          await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected, targetLocale, { timeout: 5000 });
+          break;
+        } catch (error) {
+          if (attempt === 3) throw new Error(`Locale ${locale} did not activate on ${base} after hydration retries: ${error.message}`);
+        }
+      }
+      assert.equal(await page.locator("html").getAttribute("lang"), targetLocale);
       await page.getByRole("button", { name: open, exact: true }).click();
       const panel = page.getByRole("region", { name: "MARINA AI", exact: true });
       const received = page.waitForResponse(response => response.request().method() === "POST"

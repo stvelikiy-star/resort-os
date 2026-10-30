@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import date
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -65,7 +66,7 @@ def session_item(row) -> dict[str, Any]:
 
 
 @router.get("/floor-layout")
-async def floor_layout(request: Request, user: dict[str, Any] = Depends(read_access)):
+async def floor_layout(request: Request, service_date: date | None = None, user: dict[str, Any] = Depends(read_access)):
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user["property_code"])
         local_date = await conn.fetchval(
@@ -96,10 +97,10 @@ async def floor_layout(request: Request, user: dict[str, Any] = Depends(read_acc
                LEFT JOIN rooms room ON room.id=ra."roomId"
                WHERE ds."propertyId"=$1 AND ds."serviceDate"=$2 AND ds.status IN ('WAITING','SEATED')
                ORDER BY CASE ds.status WHEN 'SEATED' THEN 0 ELSE 1 END,ds."createdAt"''',
-            pid, local_date,
+            pid, service_date or local_date,
         )
     return {
-        "service_date": local_date,
+        "service_date": service_date or local_date,
         "editable": user["role"] in {"OWNER", "MANAGER"},
         "current_user_id": user["id"],
         "tables": [table_item(row) for row in tables],
