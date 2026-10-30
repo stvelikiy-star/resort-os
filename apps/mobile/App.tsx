@@ -3,11 +3,13 @@ import {SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity,
 import {Role, roles, sampleTasks, summary, transitionTask} from './src/domain/tasks';
 import {Language, roleNames, translations} from './src/i18n/translations';
 import {APP_MODE} from './src/config/mode';
+import Welcome from './src/screens/Welcome';
 
 type Tab = 'home' | 'tasks' | 'profile';
 const roleIcons: Record<Role, string> = {HOUSEKEEPING:'🧹',REPAIR:'🔧',RECEPTION:'🛎️',KITCHEN:'🍳',WAITER:'🍽️',MANAGER:'📊'};
 export default function App() {
  const [lang, setLang] = useState<Language>('ru');
+ const [demoOpened, setDemoOpened] = useState(false);
  const [role, setRole] = useState<Role>('HOUSEKEEPING');
  const [tab, setTab] = useState<Tab>('home');
  const [tasks, setTasks] = useState(sampleTasks);
@@ -15,6 +17,7 @@ export default function App() {
  const t = translations[lang];
  const selected = useMemo(() => tasks.filter(task => task.role === role), [tasks,role]);
  const counts = useMemo(() => summary(tasks,role),[tasks,role]);
+ if (!demoOpened) return <Welcome language={lang} onDemo={() => setDemoOpened(true)} />;
  return <SafeAreaView style={styles.root}>
   <StatusBar barStyle="dark-content"/>
   <View style={styles.top}>
