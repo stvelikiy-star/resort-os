@@ -37,7 +37,7 @@ def _configuration(user):
     if not env_flag("ENABLE_GREEN_API_CONNECTION", False):
         return None
     bound = os.environ.get("GREEN_API_PROPERTY_CODE", "")
-    if (not bound or bound != os.environ.get("PROPERTY_CODE")
+    if (not bound or bound == "MARINA_DEMO" or bound != os.environ.get("PROPERTY_CODE")
             or bound != user.get("property_code")
             or env_flag("MARINA_TENANT_CONTEXT_ENABLED", False)):
         raise HTTPException(503, detail="WhatsApp hotel binding is not configured")
@@ -122,6 +122,12 @@ async def connection_qr(response: Response, user=Depends(owner_access)):
     body = await _provider(config, "qr")
     if body.get("type") == "alreadyLogged":
         return {"state": "authorized", "qr_data_url": None, "expires_in_seconds": 0}
+    if body.get("type") == "timeout":
+        return {"state": "qrWaiting", "qr_data_url": None, "expires_in_seconds": 0,
+                "retry_after_seconds": 3}
+    if body.get("type") == "passkeyRequired":
+        # Do not relay provider messages: they may include sensitive information.
+        return {"state": "passkeyRequired", "qr_data_url": None, "expires_in_seconds": 0}
     message = body.get("message")
     if body.get("type") != "qrCode" or not isinstance(message, str) or len(message) > 900_000:
         raise HTTPException(502, detail="WhatsApp QR is unavailable; check the connection status")

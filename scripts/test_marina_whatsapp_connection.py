@@ -55,7 +55,7 @@ class ConnectionTests(unittest.TestCase):
                 self.assertEqual(result.status_code, 403); self.assertEqual(seen, [])
 
     def test_missing_credentials_or_wrong_binding_never_calls_provider(self):
-        for env in ({"GREEN_API_PROPERTY_CODE": "HOTEL_B"}, {"PROPERTY_CODE": "HOTEL_B"},
+        for env in ({"GREEN_API_PROPERTY_CODE": "MARINA_DEMO", "PROPERTY_CODE": "MARINA_DEMO"}, {"GREEN_API_PROPERTY_CODE": "HOTEL_B"}, {"PROPERTY_CODE": "HOTEL_B"},
                     {"MARINA_TENANT_CONTEXT_ENABLED": "true"}, {"GREEN_API_TOKEN_INSTANCE": ""},
                     {"GREEN_API_URL": "https://api.greenapi.com.evil.test"},
                     {"GREEN_API_URL": "http://api.green-api.com"},
@@ -64,6 +64,13 @@ class ConnectionTests(unittest.TestCase):
                     {"GREEN_API_URL": "https://[invalid"}):
             result, seen = self.call({}, env=env)
             self.assertEqual(result.status_code, 503, env); self.assertEqual(seen, [])
+
+    def test_public_demo_cannot_pair_a_real_number_even_with_matching_credentials(self):
+        self.user["property_code"] = "MARINA_DEMO"
+        result, seen = self.call({"stateInstance": "authorized"}, env={
+            "PROPERTY_CODE": "MARINA_DEMO", "GREEN_API_PROPERTY_CODE": "MARINA_DEMO"})
+        self.assertEqual(result.status_code, 503)
+        self.assertEqual(seen, [])
 
     def test_state_does_not_claim_delivery_or_ai(self):
         for state in wa.STATES:
@@ -84,11 +91,22 @@ class ConnectionTests(unittest.TestCase):
         self.assertIn("/qr/", seen[0].url.path)
         result, _ = self.call({"type": "alreadyLogged"}, "/qr")
         self.assertEqual(result.status_code, 200); self.assertIsNone(result.json()["qr_data_url"])
-        for body in ({"type": "timeout"}, {"type": "error", "message": TOKEN},
+        for body in ({"type": "error", "message": TOKEN},
                      {"type": "qrCode", "message": "invalid"},
                      {"type": "qrCode", "message": base64.b64encode(b"<svg/>").decode()}):
             result, _ = self.call(body, "/qr")
             self.assertEqual(result.status_code, 502); self.assertNotIn(TOKEN, result.text)
+
+    def test_qr_waiting_and_phone_confirmation_are_not_transport_errors(self):
+        for provider_type, state in (("timeout", "qrWaiting"), ("passkeyRequired", "passkeyRequired")):
+            result, seen = self.call({"type": provider_type, "message": TOKEN}, "/qr")
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.json()["state"], state)
+            self.assertIsNone(result.json()["qr_data_url"])
+            self.assertEqual(result.json()["expires_in_seconds"], 0)
+            self.assertNotIn(TOKEN, result.text)
+            self.assertIn("no-store", result.headers["cache-control"])
+            self.assertEqual(len(seen), 1)
 
     def test_invalid_provider_responses_are_safe(self):
         for body in ({"stateInstance": "unknown"}, {"stateInstance": []}, [], None):
