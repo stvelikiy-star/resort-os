@@ -1,0 +1,43 @@
+name: MARINA SMART API Image CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/marina_staging_readiness.py'
+      - 'scripts/test_marina_staging_readiness.py'
+      - '.github/workflows/marina-api-image-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-api-image-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build candidate API image without any credentials
+        run: |
+          docker build --file services/api/Dockerfile --tag marina-api-ci:local .
+      - name: Validate app imports and critical routes without starting services or accessing customer DB
+        run: |
+          docker run --rm --network none --entrypoint python marina-api-ci:local -c '
+          import importlib
+          import sys
+          sys.path.insert(0, "/app/services/api")
+          app = importlib.import_module("app.app_entry")
+          paths = {r.path for r in app.app.routes}
+          required = {"/health/live", "/health/ready", "/api/v1/admin/channels"}
+          missing = required - paths
+          assert not missing, f"missing routes: {sorted(missing)}"
+          print("PASS: API app imports; readiness and external channel routes registered")
+          ' 
+      - name: Check packaged Python sources
+        run: docker run --rm --network none --entrypoint python marina-api-ci:local -m compileall -q services/api

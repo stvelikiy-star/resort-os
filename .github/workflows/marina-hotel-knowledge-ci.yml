@@ -1,0 +1,35 @@
+name: MARINA Hotel AI Knowledge CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/hotel_rules.py'
+      - 'apps/admin/components/HotelRulesBoard.tsx'
+      - 'apps/admin/app/management-control.css'
+      - 'scripts/test_marina_hotel_knowledge_contract.py'
+      - '.github/workflows/marina-hotel-knowledge-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-knowledge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate backend and source contract
+        run: |
+          python -m py_compile services/api/app/hotel_rules.py
+          python scripts/test_marina_hotel_knowledge_contract.py -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci --prefix apps/admin
+      - run: npm run typecheck --prefix apps/admin

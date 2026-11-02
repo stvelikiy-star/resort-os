@@ -25,19 +25,19 @@ CHECKS: list[tuple[str, str, str]] = [
     ("apps/admin/components/AdminShell.tsx", 'import OperationsBoard from "./OperationsBoard"', "operations mounted"),
     ("apps/admin/components/AdminShell.tsx", 'import StaffBoard from "./StaffBoard"', "staff mounted"),
     ("apps/admin/components/AdminShell.tsx", 'import InboxBoard from "./InboxBoard"', "inbox mounted"),
-    ("apps/admin/components/AdminShell.tsx", '"Супершахматка"', "PMS nav"),
+    ("apps/admin/components/AdminShell.tsx", '"Шахматка"', "PMS nav"),
     ("apps/admin/components/AdminShell.tsx", '>Цены / Сезоны</button>', "rates nav"),
-    ("apps/admin/components/AdminShell.tsx", '>Ресепшен / Брони</button>', "reception nav"),
+    ("apps/admin/components/AdminShell.tsx", '>Ресепшен</button>', "reception nav"),
     ("apps/admin/components/AdminShell.tsx", '>Сервис гостя</button>', "guest services nav"),
     ("apps/admin/components/AdminShell.tsx", '>Питание / Ресторан</button>', "dining nav"),
     ("apps/admin/components/AdminShell.tsx", '>Финансы</button>', "finance nav"),
     ("apps/admin/components/AdminShell.tsx", '>Отчёты / Аналитика</button>', "reports nav"),
     ("apps/admin/components/AdminShell.tsx", '>Уборка / Ремонт</button>', "operations nav"),
     ("apps/admin/components/AdminShell.tsx", '>Персонал</button>', "staff nav"),
-    ("apps/admin/components/AdminShell.tsx", '>Сообщения</button>', "inbox nav"),
-    ("apps/admin/components/AdminShell.tsx", 'const isManager = ["OWNER", "MANAGER"].includes(user.role)', "manager RBAC"),
-    ("apps/admin/components/AdminShell.tsx", 'const canUseReception = isManager || isReception', "reception RBAC"),
-    ("apps/admin/components/AdminShell.tsx", 'const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role)', "ops RBAC"),
+    ("apps/admin/components/AdminShell.tsx", '>Все сообщения</button>', "inbox nav"),
+    ("apps/admin/components/AdminShell.tsx", 'const canAccess = (section: string) => user.module_permissions.includes(section)', "owner-managed section RBAC"),
+    ("apps/admin/components/AdminShell.tsx", 'canAccess("RESERVATIONS") && <button', "reception section access"),
+    ("apps/admin/components/AdminShell.tsx", 'const canUseOps = canAccess("OPS")', "operations section access"),
 
     # Core composition
     ("services/api/app/app_entry.py", "app.include_router(staff_control_router)", "staff control router"),
@@ -63,7 +63,7 @@ CHECKS: list[tuple[str, str, str]] = [
     ("services/api/app/rate_management.py", 'router = APIRouter(prefix="/api/v1/admin/rates"', "rates API prefix"),
     ("services/api/app/rate_management.py", "RATE_PERIOD_OVERLAP", "rate overlap guard"),
     ("services/api/app/staff_control.py", 'router = APIRouter(prefix="/api/v1/admin/staff"', "staff control API prefix"),
-    ("services/api/app/staff_control.py", 'owner_access = require_roles("OWNER")', "staff owner-only guard"),
+    ("services/api/app/staff_control.py", 'owner_access = require_roles("OWNER", module_grant=False)', "staff owner-only guard"),
     ("services/api/app/staff_control.py", "auth_sessions", "staff session revocation"),
 
     # Reception / operations / finance
@@ -125,7 +125,7 @@ def main() -> int:
     if passed < 70:
         raise AssertionError(f"final acceptance suite unexpectedly small: {passed}")
     print(f"MANAGEMENT_FINAL_ACCEPTANCE_PASS checks={passed}")
-    print("BOUNDARY: public website is frozen; acceptance scope is management/admin/staff/Core only")
+    print("BOUNDARY: public web content/design/marketing remain frozen; the exact Next.js security patch is permitted")
     return 0
 
 

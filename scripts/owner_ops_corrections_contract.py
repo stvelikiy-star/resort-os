@@ -31,7 +31,7 @@ def main() -> int:
     require('import MarketingBoard from "./MarketingBoard"' in admin, "MarketingBoard missing from final AdminShell")
     require('tab === "MARKETING"' in admin and '>Маркетинг</button>' in admin, "Marketing tab missing from final admin")
     require('import AgentsBoard from "./AgentsBoard"' in admin, "AgentsBoard missing from final AdminShell")
-    require('tab === "AGENTS"' in admin and '>Агенты</button>' in admin, "Agents tab missing from final admin")
+    require('tab === "AGENTS"' in admin and '>Агентства</button>' in admin, "Agents tab missing from final admin")
     require("app.include_router(marketing_router)" in app_entry, "Marketing API router not composed")
     require("app.include_router(marketing_integration_router)" in app_entry, "Marketing integration router not composed")
     require("app.include_router(marketing_automation_router)" in app_entry, "Marketing automation router not composed")

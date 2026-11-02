@@ -15,6 +15,10 @@ type Summary = {
     recovery_open: number;
     nps: number | null;
     nps_sample_size: number;
+    star_scored: number;
+    average_stars: number | null;
+    low_star_count: number;
+    low_star_open: number;
   };
   candidates: { post_stay_14d: number; reactivation: number; reactivation_min_days: number };
   truth: Record<string, string>;
@@ -31,12 +35,20 @@ type Engagement = {
   title: string;
   notes?: string | null;
   score?: number | null;
+  star_rating?: number | null;
+  recovery_urgent?: boolean;
   nps_class?: "PROMOTER" | "PASSIVE" | "DETRACTOR" | null;
   feedback_text?: string | null;
   completed_at?: string | null;
   created_at: string;
   updated_at: string;
   outbound_authority: string;
+};
+
+type GuestQrReview = {
+  id: string; guest_id: string; stay_id: string; guest_name: string;
+  booking_number: string; rating: number; comment: string;
+  created_at: string; manager_attention_required: boolean;
 };
 
 type PostStayCandidate = {
@@ -76,6 +88,7 @@ const statusLabel: Record<Engagement["status"], string> = {
 };
 
 const npsLabel = { PROMOTER: "Промоутер", PASSIVE: "Нейтральный", DETRACTOR: "Требует recovery" } as const;
+const dateTimeReview = (value: string) => new Intl.DateTimeFormat("ru-RU", {dateStyle:"medium",timeStyle:"short"}).format(new Date(value));
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(Math.round(value || 0))} сом`;
 const fmtDate = (value?: string | null) => value ? new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(`${value}T12:00:00`)) : "—";
 
@@ -94,6 +107,7 @@ export default function GrowthControlBoard() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [postStay, setPostStay] = useState<PostStayCandidate[]>([]);
+  const [qrReviews, setQrReviews] = useState<GuestQrReview[]>([]);
   const [reactivation, setReactivation] = useState<ReactivationCandidate[]>([]);
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
   const [kindFilter, setKindFilter] = useState("ALL");
@@ -104,6 +118,9 @@ export default function GrowthControlBoard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [feedbackTarget, setFeedbackTarget] = useState<Engagement | null>(null);
   const [score, setScore] = useState(10);
+  const [stars, setStars] = useState(5);
+  const [feedbackScale, setFeedbackScale] = useState<"STARS" | "NPS">("STARS");
+  const [reviewLinks, setReviewLinks] = useState<{ review_google_url: string; review_2gis_url: string; review_yandex_url: string }>({ review_google_url: "", review_2gis_url: "", review_yandex_url: "" });
   const [feedbackText, setFeedbackText] = useState("");
 
   const load = useCallback(async () => {
@@ -114,15 +131,19 @@ export default function GrowthControlBoard() {
       if (kindFilter !== "ALL") engagementQuery.set("kind", kindFilter);
       if (!["ALL", "ACTIVE"].includes(statusFilter)) engagementQuery.set("status", statusFilter);
       engagementQuery.set("limit", "200");
-      const [summaryBody, engagementBody, postBody, reactBody] = await Promise.all([
+      const [summaryBody, engagementBody, postBody, reactBody, hotelRulesBody, qrReviewBody] = await Promise.all([
         api<Summary>(`/core/api/v1/admin/growth/summary?min_days_since_checkout=${reactivationDays}`),
         api<{ items: Engagement[] }>(`/core/api/v1/admin/growth/engagements?${engagementQuery}`),
         api<{ items: PostStayCandidate[] }>("/core/api/v1/admin/growth/candidates/post-stay?lookback_days=14&limit=100"),
         api<{ items: ReactivationCandidate[] }>(`/core/api/v1/admin/growth/candidates/reactivation?min_days_since_checkout=${reactivationDays}&limit=100`),
+        api<{ rules: { review_google_url: string; review_2gis_url: string; review_yandex_url: string } }>("/core/api/v1/admin/hotel-rules"),
+        api<{ items: GuestQrReview[] }>("/core/api/v1/admin/growth/guest-stay-reviews?limit=100"),
       ]);
       setSummary(summaryBody);
+      setReviewLinks({ review_google_url: hotelRulesBody.rules.review_google_url || "", review_2gis_url: hotelRulesBody.rules.review_2gis_url || "", review_yandex_url: hotelRulesBody.rules.review_yandex_url || "" });
       setEngagements(statusFilter === "ACTIVE" ? engagementBody.items.filter((item) => ["OPEN", "IN_PROGRESS"].includes(item.status)) : engagementBody.items);
       setPostStay(postBody.items);
+      setQrReviews(qrReviewBody.items);
       setReactivation(reactBody.items);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка Growth Control");
@@ -140,7 +161,7 @@ export default function GrowthControlBoard() {
     setNotice(null);
     try {
       const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + (kind === "POST_STAY_FEEDBACK" ? 1 : 3));
+      if (kind !== "POST_STAY_FEEDBACK") dueDate.setDate(dueDate.getDate() + 3);
       const body = kind === "POST_STAY_FEEDBACK"
         ? {
             guest_id: candidate.guest_id,
@@ -196,15 +217,16 @@ export default function GrowthControlBoard() {
     setBusyId(feedbackTarget.id);
     setError(null);
     try {
-      await api(`/core/api/v1/admin/growth/engagements/${feedbackTarget.id}/feedback`, {
+      await api(`/core/api/v1/admin/growth/engagements/${feedbackTarget.id}/${feedbackScale === "STARS" ? "stars" : "feedback"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score, feedback_text: feedbackText || null }),
+        body: JSON.stringify(feedbackScale === "STARS" ? { rating: stars, feedback_text: feedbackText || null } : { score, feedback_text: feedbackText || null }),
       });
       setFeedbackTarget(null);
       setFeedbackText("");
       setScore(10);
-      setNotice(score <= 6 ? "Оценка записана. Задача оставлена в recovery." : "Оценка записана.");
+      setStars(5);
+      setNotice(feedbackScale === "STARS" && stars <= 3 ? "Оценка записана. Срочная задача управляющего открыта." : feedbackScale === "NPS" && score <= 6 ? "NPS сохранён. Требуется работа с гостем." : "Оценка записана.");
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось записать feedback");
@@ -213,7 +235,7 @@ export default function GrowthControlBoard() {
     }
   }
 
-  const activeRecovery = useMemo(() => engagements.filter((item) => item.nps_class === "DETRACTOR" && item.status === "IN_PROGRESS").length, [engagements]);
+  const activeRecovery = useMemo(() => engagements.filter((item) => (item.nps_class === "DETRACTOR" || item.recovery_urgent) && item.status === "IN_PROGRESS").length, [engagements]);
 
   return (
     <main className="growth-shell">
@@ -241,6 +263,8 @@ export default function GrowthControlBoard() {
             <article><span>Ждут feedback</span><strong>{summary.queue.feedback_open}</strong><small>{summary.candidates.post_stay_14d} кандидатов за 14 дней</small></article>
             <article><span>Возврат гостей</span><strong>{summary.queue.return_open}</strong><small>{summary.candidates.reactivation} доступно по фильтру</small></article>
             <article className={summary.feedback.recovery_open > 0 ? "growth-danger" : ""}><span>Recovery</span><strong>{summary.feedback.recovery_open}</strong><small>оценка 0–6 и задача в работе</small></article>
+            <article><span>Средняя оценка гостей</span><strong>{summary.feedback.average_stars == null ? "—" : `${summary.feedback.average_stars.toFixed(2)}★`}</strong><small>{summary.feedback.star_scored} оценок по шкале 1–5</small></article>
+            <article className={summary.feedback.low_star_open > 0 ? "growth-danger" : ""}><span>Срочные жалобы 1–3★</span><strong>{summary.feedback.low_star_open}</strong><small>всего низких оценок: {summary.feedback.low_star_count}</small></article>
             <article><span>NPS</span><strong>{summary.feedback.nps == null ? "—" : summary.feedback.nps}</strong><small>выборка: {summary.feedback.nps_sample_size}</small></article>
             <article><span>Средняя оценка</span><strong>{summary.feedback.average_score == null ? "—" : summary.feedback.average_score.toFixed(2)}</strong><small>{summary.feedback.scored} фактических ответов</small></article>
             <article><span>Промоутеры</span><strong>{summary.feedback.promoters}</strong><small>9–10</small></article>
@@ -293,12 +317,12 @@ export default function GrowthControlBoard() {
                   {item.feedback_text && <blockquote>{item.feedback_text}</blockquote>}
                 </div>
                 <div className="growth-row-score">
-                  {item.score != null ? <><strong>{item.score}/10</strong><small>NPS факт</small></> : <><strong>—</strong><small>оценки нет</small></>}
+                  {item.star_rating != null ? <><strong>{item.star_rating}/5★</strong><small>{item.recovery_urgent ? "Срочно управляющему" : "Оценка проживания"}</small>{item.score != null && <small>NPS: {item.score}/10</small>}</> : item.score != null ? <><strong>{item.score}/10</strong><small>NPS факт</small></> : <><strong>—</strong><small>оценки нет</small></>}
                 </div>
                 <div className="growth-row-actions">
                   {item.status === "OPEN" && <button className="btn sm" disabled={busyId === item.id} onClick={() => patchStatus(item, "IN_PROGRESS")}>В работу</button>}
                   {item.status === "IN_PROGRESS" && <button className="btn sm" disabled={busyId === item.id} onClick={() => patchStatus(item, "DONE")}>Готово</button>}
-                  {item.kind === "POST_STAY_FEEDBACK" && item.status !== "CANCELLED" && <button className="btn sm primary" onClick={() => { setFeedbackTarget(item); setScore(item.score ?? 10); setFeedbackText(item.feedback_text || ""); }}>Записать оценку</button>}
+                  {item.kind === "POST_STAY_FEEDBACK" && item.status !== "CANCELLED" && <button className="btn sm primary" onClick={() => { setFeedbackTarget(item); setScore(item.score ?? 10); setStars(item.star_rating ?? 5); setFeedbackScale(item.star_rating != null || item.score == null ? "STARS" : "NPS"); setFeedbackText(item.feedback_text || ""); }}>Записать оценку</button>}
                   {!["DONE", "CANCELLED"].includes(item.status) && <button className="btn sm" disabled={busyId === item.id} onClick={() => patchStatus(item, "CANCELLED")}>Отменить</button>}
                 </div>
               </article>
@@ -343,16 +367,39 @@ export default function GrowthControlBoard() {
         <p>{summary.truth.outbound}</p>
       </section>}
 
+      <section className="growth-card" aria-label="Оценки из QR-кабинета">
+        <div className="growth-card-head"><div><p className="eyebrow">QR / PIN · РЕАЛЬНЫЕ ГОСТИ</p><h2>Оценки из кабинета гостя</h2></div><strong>{qrReviews.length}</strong></div>
+        <p>Гость оставляет отзыв во время подтверждённого проживания. Он сохраняется в истории гостя. Жалобы 1–3★ показываются первыми; отправки WhatsApp здесь нет.</p>
+        <div className="growth-engagement-list">
+          {qrReviews.map(item => <article key={item.id} className="growth-row">
+            <div><strong>{item.guest_name} · {item.booking_number}</strong><p>{item.comment || "Без комментария"}</p><small>{dateTimeReview(item.created_at)}</small></div>
+            <div className="growth-row-score"><strong>{item.rating}/5★</strong><small>{item.manager_attention_required ? "Срочно: управляющему" : "Оценка гостя"}</small></div>
+          </article>)}
+          {!qrReviews.length && <p>Оценок из QR-кабинета пока нет.</p>}
+        </div>
+      </section>
+
+      <section className="growth-policy" aria-label="Публичные площадки отзывов">
+        <strong>Отзывы на картах — приглашение всем гостям без отбора по оценке</strong>
+        <p>Попросите гостя поделиться честным впечатлением. Скидки за отзыв не предлагаем. Ссылки настраиваются в «Знания отеля / MARINA AI».</p>
+        <div className="growth-score-scale">
+          {([["Google Maps", reviewLinks.review_google_url], ["2GIS", reviewLinks.review_2gis_url], ["Яндекс Карты", reviewLinks.review_yandex_url]] as const).map(([label, url]) =>
+            url && /^https:\/\//i.test(url) ? <a key={label} href={url} target="_blank" rel="noopener noreferrer">{label} ↗</a> : <span key={label}>{label}: ссылка не заполнена</span>
+          )}
+        </div>
+        <p>Текст для всех гостей: «Спасибо за проживание! Будем благодарны за честный отзыв — положительный или критический. Нам важно любое мнение». Автоматическая отправка WhatsApp пока отключена.</p>
+      </section>
       {feedbackTarget && (
         <div className="growth-modal-backdrop" role="presentation" onMouseDown={() => setFeedbackTarget(null)}>
           <form className="growth-modal" onSubmit={submitFeedback} onMouseDown={(e) => e.stopPropagation()}>
             <div><p className="eyebrow">ФАКТИЧЕСКИЙ FEEDBACK</p><h2>{feedbackTarget.guest.name}</h2><span>{feedbackTarget.reservation?.booking_number}</span></div>
-            <label><span>Оценка 0–10</span><input type="number" min={0} max={10} value={score} onChange={(e) => setScore(Number(e.target.value))} required /></label>
-            <div className="growth-score-scale">
-              {[0,1,2,3,4,5,6,7,8,9,10].map((value) => <button type="button" key={value} className={score === value ? "active" : ""} onClick={() => setScore(value)}>{value}</button>)}
-            </div>
+            <label><span>Шкала оценки</span><select value={feedbackScale} onChange={(e) => setFeedbackScale(e.target.value as "STARS" | "NPS")}><option value="STARS">Проживание · 1–5★</option><option value="NPS">NPS · 0–10</option></select></label>
+            {feedbackScale === "STARS" ? <div className="growth-score-scale" role="group" aria-label="Оценка проживания">
+              {[1,2,3,4,5].map((value) => <button type="button" key={value} className={stars === value ? "active" : ""} onClick={() => setStars(value)}>{value}★</button>)}
+            </div> : <><label><span>Оценка NPS 0–10</span><input type="number" min={0} max={10} value={score} onChange={(e) => setScore(Number(e.target.value))} required /></label>
+              <div className="growth-score-scale">{[0,1,2,3,4,5,6,7,8,9,10].map((value) => <button type="button" key={value} className={score === value ? "active" : ""} onClick={() => setScore(value)}>{value}</button>)}</div></>}
             <label><span>Комментарий гостя / заметка менеджера</span><textarea rows={5} value={feedbackText} onChange={(e) => setFeedbackText(e.target.value)} placeholder="Записываем только фактически полученную обратную связь." /></label>
-            <p className="growth-modal-note">0–6 автоматически оставит задачу в IN_PROGRESS как recovery. 7–10 завершит feedback-задачу. Никаких сообщений гостю из этого окна не отправляется.</p>
+            <p className="growth-modal-note">1–3★ — срочная задача управляющего, 4–5★ — обычный результат. Шкала NPS 0–10 ведётся отдельно. Публичные ссылки доступны всем гостям независимо от оценки. Автоотправка отключена.</p>
             <div className="growth-modal-actions"><button type="button" className="btn" onClick={() => setFeedbackTarget(null)}>Отмена</button><button className="btn primary" disabled={busyId === feedbackTarget.id}>{busyId === feedbackTarget.id ? "Сохраняю…" : "Сохранить feedback"}</button></div>
           </form>
         </div>

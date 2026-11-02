@@ -1,0 +1,21 @@
+name: MARINA Manual Payments No QR CI
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/components/ReservationFolioPanel.tsx'
+      - 'services/api/app/reservation_payments.py'
+      - 'compose.marina-fleet.yaml'
+      - 'scripts/test_marina_manual_payment_guard.py'
+      - '.github/workflows/marina-manual-payments-ci.yml'
+  push:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  no-qr-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify manual payments and QR exclusion
+        run: python3 -m unittest discover -s scripts -p test_marina_manual_payment_guard.py -v

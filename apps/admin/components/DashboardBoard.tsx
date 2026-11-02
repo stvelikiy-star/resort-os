@@ -38,7 +38,7 @@ type Dashboard = {
   attention_tasks: AttentionTask[];
 };
 
-type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX";
+type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX" | "WHATSAPP";
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const taskType: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
@@ -57,7 +57,7 @@ function Drill({ children, to, onNavigate }: { children: React.ReactNode; to: Da
   return <button className="command-drill" onClick={() => onNavigate(to)}>{children}<span aria-hidden="true">→</span></button>;
 }
 
-export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: DashboardDestination) => void }) {
+export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavigate?: (tab: DashboardDestination) => void; isOwner?: boolean }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +96,13 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
         </div>
         <button className="btn" onClick={load}>Обновить</button>
       </div>
+
+      {isOwner && <section className="command-panel" aria-label="Диалоги WhatsApp">
+        <div className="command-panel-head">
+          <div><h2>WhatsApp / AI</h2></div>
+          <Drill to="WHATSAPP" onNavigate={onNavigate}>Открыть</Drill>
+        </div>
+      </section>}
 
       <OwnerExecutivePack />
       <OwnerControlV2 />

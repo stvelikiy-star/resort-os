@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'services/api/app/marina_assistant.py'
+      - 'services/api/app/guest_assistant.py'
+      - 'services/api/app/section_permissions.py'
+      - 'services/api/app/guest_requests.py'
+      - 'services/api/app/guest_os.py'
       - 'services/api/app/marina_assistant_knowledge.md'
       - 'services/api/app/app_entry.py'
       - 'apps/admin/components/MarinaAiAssistant.tsx'
@@ -15,6 +19,10 @@ on:
       - 'apps/staff/components/KitchenEntry.tsx'
       - 'apps/staff/components/WaiterEntry.tsx'
       - 'scripts/marina_ai_embedded_contract.py'
+      - 'scripts/test_marina_assistant_permissions.py'
+      - 'apps/web/components/GuestAiAssistant.tsx'
+      - 'apps/web/components/GuestAiAssistant.module.css'
+      - 'apps/web/components/GuestConciergeRuntime.tsx'
       - '.github/workflows/marina-ai-embedded-ci.yml'
   workflow_dispatch:
 
@@ -30,6 +38,22 @@ jobs:
         run: python -m py_compile services/api/app/marina_assistant.py services/api/app/app_entry.py
       - name: Embedded assistant contract
         run: python scripts/marina_ai_embedded_contract.py
+      - name: Install backend test dependencies
+        run: pip install -r services/api/requirements.txt
+      - name: Assistant role and guest isolation behavior
+        run: python scripts/test_marina_assistant_permissions.py
+
+  guest-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --prefix apps/web
+      - run: npm run typecheck --prefix apps/web
 
   admin-typecheck:
     runs-on: ubuntu-latest

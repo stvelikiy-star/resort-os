@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 
-# Three Crowns Resort OS — non-destructive host capability preflight.
+# MARINA SMART — read-only Docker host inventory.
 # Safe to run before deployment. It does not install packages, stop services,
 # change firewall/DNS, create users, or overwrite application data.
 
@@ -13,8 +13,9 @@ warn() { printf 'WARN: %s\n' "$*"; WARNS=$((WARNS + 1)); }
 fail() { printf 'FAIL: %s\n' "$*"; FAILS=$((FAILS + 1)); }
 fact() { printf 'FACT: %s\n' "$*"; }
 
-printf 'Three Crowns single-server host preflight\n'
-printf '=========================================\n'
+PREFLIGHT_LABEL="${HOST_PREFLIGHT_LABEL:-MARINA SMART Docker host check}"
+printf '%s\n' "$PREFLIGHT_LABEL"
+printf '%s\n' "$(printf '%*s' "${#PREFLIGHT_LABEL}" '' | tr ' ' '=')"
 
 if [ "$(uname -s 2>/dev/null || true)" = "Linux" ]; then
   pass "Linux host detected"
@@ -43,43 +44,20 @@ esac
 
 CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 0)"
 fact "cpu_count=$CPU_COUNT"
-if [ "$CPU_COUNT" -ge 4 ] 2>/dev/null; then
-  pass "CPU meets recommended 4 vCPU baseline"
-elif [ "$CPU_COUNT" -ge 2 ] 2>/dev/null; then
-  warn "CPU is below recommended 4 vCPU baseline"
-else
-  fail "At least 2 vCPU are required for this topology"
-fi
+# Resource figures are inventory only. Do not impose a universal CPU minimum:
+# actual capacity depends on the selected services and workload.
 
 MEM_KB="$(awk '/MemTotal:/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)"
 MEM_MB=$((MEM_KB / 1024))
 fact "memory_mb=$MEM_MB"
-if [ "$MEM_MB" -ge 7500 ]; then
-  pass "RAM meets recommended 8 GB class"
-elif [ "$MEM_MB" -ge 3800 ]; then
-  warn "RAM is usable for a reduced-load start but below recommended 8 GB"
-else
-  fail "Host has less than approximately 4 GB RAM"
-fi
+# RAM is reported only; validate it against the actual workload during acceptance.
 
 ROOT_FREE_KB="$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}' || echo 0)"
 ROOT_FREE_GB=$((ROOT_FREE_KB / 1024 / 1024))
 fact "root_free_gb=$ROOT_FREE_GB"
-if [ "$ROOT_FREE_GB" -ge 100 ]; then
-  pass "Free disk meets recommended working headroom"
-elif [ "$ROOT_FREE_GB" -ge 50 ]; then
-  warn "Free disk is below recommended 100+ GB headroom"
-else
-  fail "Less than 50 GB free disk is unsuitable for application + database + local backups"
-fi
+# Free disk is reported only; check actual data and backup needs before production use.
 
-if [ "$(id -u)" -eq 0 ]; then
-  pass "Running with root privileges"
-elif command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
-  pass "Passwordless sudo is available"
-else
-  fail "Root or usable sudo access is required"
-fi
+# This is a read-only inventory. Root/sudo is not required to inspect the host.
 
 if command -v docker >/dev/null 2>&1; then
   DOCKER_VERSION="$(docker --version 2>/dev/null || true)"
@@ -98,6 +76,19 @@ if docker compose version >/dev/null 2>&1; then
   pass "Docker Compose plugin is available"
 else
   fail "Docker Compose plugin is required"
+fi
+
+# Inventory running containers without reading their environment or touching
+# their lifecycle. This is especially important on the shared AI PROF KG host.
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  CONTAINERS="$(docker ps --format '{{.Names}}|{{.Image}}|{{.Ports}}' 2>/dev/null || true)"
+  if [ -n "$CONTAINERS" ]; then
+    while IFS= read -r CONTAINER; do
+      [ -n "$CONTAINER" ] && fact "running_container=$CONTAINER"
+    done <<< "$CONTAINERS"
+  else
+    fact "running_containers=none"
+  fi
 fi
 
 if command -v git >/dev/null 2>&1; then
@@ -130,11 +121,24 @@ for PORT in 80 443; do
     LISTENER="$(netstat -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p"$" {print; exit}')"
   fi
   if [ -n "$LISTENER" ]; then
-    warn "TCP/$PORT is currently occupied (expected if the legacy 3korony.com site is still live); record and plan controlled cutover: $LISTENER"
+    if [ -n "${HOST_PREFLIGHT_LABEL:-}" ]; then
+      warn "TCP/$PORT is occupied; identify the current listener and plan a controlled proxy/cutover: $LISTENER"
+    else
+      warn "TCP/$PORT is currently occupied (expected if the legacy 3korony.com site is still live); record and plan controlled cutover: $LISTENER"
+    fi
   else
     pass "TCP/$PORT is currently free for Caddy"
   fi
 done
+
+if command -v ss >/dev/null 2>&1; then
+  UDP443="$(ss -lunp 2>/dev/null | awk '$5 ~ /:443$/ {print; exit}')"
+  if [ -n "$UDP443" ]; then
+    warn "UDP/443 is occupied; verify the listener before enabling Caddy HTTP/3: $UDP443"
+  else
+    pass "UDP/443 is currently free for Caddy HTTP/3"
+  fi
+fi
 
 if command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | awk '$4 ~ /:5432$/ {found=1} END {exit !found}'; then
   warn "A process is listening on TCP/5432. Verify PostgreSQL is not exposed on a public interface"
@@ -142,27 +146,28 @@ else
   pass "No host-level TCP/5432 listener detected"
 fi
 
-TARGET_ROOT="${THREE_CROWNS_ROOT:-/srv/three-crowns}"
+TARGET_ROOT="${HOST_PREFLIGHT_ROOT:-${THREE_CROWNS_ROOT:-/srv/three-crowns}}"
 fact "target_root=$TARGET_ROOT"
 PARENT="$(dirname "$TARGET_ROOT")"
 if [ -d "$TARGET_ROOT" ]; then
   if [ -w "$TARGET_ROOT" ]; then
-    pass "$TARGET_ROOT exists and is writable"
+    fact "target_path=exists_writable"
   else
-    warn "$TARGET_ROOT exists but current account cannot write it directly"
+    fact "target_path=exists_needs_operator_permissions"
   fi
-elif [ -d "$PARENT" ] && [ -w "$PARENT" ]; then
-  pass "Parent $PARENT is writable; target layout can be created during deployment"
-elif [ "$(id -u)" -eq 0 ] || { command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; }; then
-  pass "Target layout can be created with root/sudo"
 else
-  fail "Cannot create persistent target layout $TARGET_ROOT"
+  fact "target_path=not_created_yet (create it during deployment with operator privileges)"
 fi
 
 if command -v systemctl >/dev/null 2>&1; then
   for svc in nginx apache2 httpd caddy; do
     if systemctl is-active --quiet "$svc" 2>/dev/null; then
       warn "Existing web service is active: $svc. Preserve current-site backup and plan a controlled proxy/cutover; do not stop it during preflight"
+    fi
+  done
+  for svc in cloudflared tailscaled; do
+    if systemctl is-active --quiet "$svc" 2>/dev/null; then
+      fact "existing_network_service_active=$svc (leave running during preflight)"
     fi
   done
 fi
@@ -175,7 +180,7 @@ if [ "$FAILS" -gt 0 ]; then
   exit 1
 fi
 if [ "$WARNS" -gt 0 ]; then
-  printf 'RESULT: PASS WITH WARNINGS — resolve/accept warnings before production cutover\n'
+  printf 'RESULT: PASS WITH NOTES — review ingress notes before public exposure\n'
   exit 0
 fi
-printf 'RESULT: PASS — host satisfies the checked infrastructure requirements\n'
+printf 'RESULT: PASS — Linux/Docker host checks passed\n'

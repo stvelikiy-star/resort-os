@@ -24,8 +24,8 @@ require(".concierge-page ~ .ai-admin-root{display:none!important}" in PAGE, "RU-
 for locale in ('ru:', 'kg:', 'en:'):
     require(locale in RUNTIME, f"locale dictionary missing: {locale}")
 for phrase in (
-    "Три Короны", "Цифровой консьерж", "Үч Таажы", "Санарип жардамчы",
-    "Three Crowns", "Digital concierge", "Что нужно сейчас?", "Азыр эмне керек?",
+    "MARINA SMART", "гостевой кабинет", "конок кабинети", "Guest area",
+    "Что нужно сейчас?", "Азыр эмне керек?",
     "What do you need now?",
 ):
     require(phrase in RUNTIME, f"localized guest phrase missing: {phrase}")
@@ -51,9 +51,11 @@ for endpoint_part in (
 for forbidden in ("/payments", "/reservation-payments", "/beach/charge", "/nfc"):
     require(forbidden not in RUNTIME, f"concierge must not mutate commercial/deferred scope: {forbidden}")
 
-# Meal estimate must use the owner-approved 2026 per-meal values and must not promise inclusion.
-for value in ("500", "750", "650", "400", "550", "450"):
-    require(value in RUNTIME, f"approved meal value missing: {value}")
+# The reusable hotel product must not quote a different hotel's fixed meal tariff.
+require("HOTEL_PHONE_E164" not in RUNTIME, "guest contact must come from the resolved hotel's settings")
+require("context?.property?.name" in RUNTIME, "guest hotel identity must come from Core")
+require("context.property?.check_out_time" in RUNTIME, "checkout time must come from hotel settings")
+require("996501772233" not in RUNTIME, "guest must not contact another hotel's hardcoded number")
 require("Включённое в проживание питание определяется вашей бронью" in RUNTIME, "RU meal-inclusion safety copy missing")
 require("Meal inclusion depends on your reservation" in RUNTIME, "EN meal-inclusion safety copy missing")
 require("Жашоого кирген тамактануу сиздин бронуңуз боюнча аныкталат" in RUNTIME, "KG meal-inclusion safety copy missing")

@@ -1,0 +1,82 @@
+{
+	email {$TLS_EMAIL}
+	servers {
+		protocols h1 h2 h3
+	}
+}
+
+{$PUBLIC_HOST} {
+	encode zstd gzip
+	@media path /media/*
+	handle @media {
+		root * /srv/media/public
+		file_server
+	}
+	handle {
+		request_body {
+			max_size 2MB
+		}
+		reverse_proxy web:3000
+	}
+}
+
+www.{$PUBLIC_HOST} {
+	redir https://{$PUBLIC_HOST}{uri} permanent
+}
+
+{$ADMIN_HOST} {
+	encode zstd gzip
+	@media_upload path /core/api/v1/admin/site/media
+	handle @media_upload {
+		request_body {
+			max_size 8MB
+		}
+		reverse_proxy admin:3001
+	}
+	@core_ws path /ws/*
+	handle @core_ws {
+		reverse_proxy api:8000
+	}
+	handle {
+		request_body {
+			max_size 2MB
+		}
+		reverse_proxy admin:3001
+	}
+}
+
+{$STAFF_HOST} {
+	encode zstd gzip
+	@core_ws path /ws/*
+	handle @core_ws {
+		reverse_proxy api:8000
+	}
+	handle {
+		request_body {
+			max_size 2MB
+		}
+		reverse_proxy staff:3002
+	}
+}
+
+{$API_HOST} {
+	encode zstd gzip
+	@telegram_webhooks path /api/v1/channels/telegram/webhook /api/v1/channels/telegram/staff/webhook
+	handle @telegram_webhooks {
+		request_body {
+			max_size 1MB
+		}
+		reverse_proxy api:8000
+	}
+	handle {
+		request_body {
+			max_size 2MB
+		}
+		reverse_proxy api:8000
+	}
+}
+
+{$AUTOMATION_HOST} {
+	encode zstd gzip
+	reverse_proxy n8n:5678
+}

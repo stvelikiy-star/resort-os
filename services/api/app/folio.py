@@ -130,7 +130,10 @@ async def reservation_folio_snapshot(conn, pid: uuid.UUID, reservation_id: uuid.
     )
     active_charges = [row for row in charges if row["status"] not in {"WAIVED", "VOID"}]
     extras = sum(int(row["amountKgs"]) for row in active_charges)
-    accommodation = int(reservation["totalKgs"])
+    # Cancelled reservations retain their original price in the reservation
+    # ledger, but do not create a collectible accommodation balance in folio.
+    # Any recorded payments remain visible for explicit finance reconciliation.
+    accommodation = 0 if reservation["status"] == "CANCELLED" else int(reservation["totalKgs"])
     grand_total = accommodation + extras
     paid = sum(int(row["amountKgs"]) for row in payments if row["status"] == "RECEIVED")
     return {

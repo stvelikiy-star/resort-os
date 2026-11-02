@@ -19,8 +19,8 @@ try {
     await page.locator("button.login-button").click();
   }
 
-  await page.getByRole("button", { name: "Супершахматка", exact: true }).waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "Супершахматка", exact: true }).click();
+  await page.getByRole("button", { name: "Шахматка", exact: true }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Шахматка", exact: true }).click();
   await page.locator(".owner-grid-shell").waitFor({ state: "visible" });
   await page.locator(".owner-grid-loading").waitFor({ state: "detached" }).catch(() => {});
 

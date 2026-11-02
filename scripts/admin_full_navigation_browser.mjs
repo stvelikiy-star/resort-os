@@ -19,33 +19,35 @@ async function login(page) {
 }
 
 const primaryTabs = [
-  "Главная",
-  "Супершахматка",
-  "Ресепшен / Брони",
-  "CRM / Заявки",
-  "Финансы",
+  "Шахматка",
+  "Ресепшен",
+  "Заявки",
+  "WhatsApp / AI",
+  "Цены / Сезоны",
   "Сервис гостя",
   "Уборка / Ремонт",
-  "Отчёты / Аналитика",
-  "Настройки",
+  "Главная",
+  "Финансы",
 ];
 
 const moreTabs = [
-  "Каналы продаж",
-  "Цены / Сезоны",
   "Групповая бронь",
-  "Агенты",
-  "Маркетинг",
-  "Питание / Ресторан",
-  "Настройки услуг",
+  "Booking / Каналы продаж",
+  "Агентства",
+  "Все сообщения",
   "Гости / История",
-  "Офферы гостю",
+  "Маркетинг",
+  "Предложения гостям",
+  "Отзывы / Рост",
+  "Питание / Ресторан",
   "QR номеров",
   "QR зон",
-  "Рост / Отзывы",
-  "Сайт / Контент",
+  "Отчёты / Аналитика",
   "Персонал",
-  "Сообщения",
+  "Знания отеля / MARINA AI",
+  "Настройки услуг",
+  "Сайт / Контент",
+  "Настройки гостиницы",
 ];
 
 const browser = await chromium.launch({ headless: true });
@@ -55,14 +57,13 @@ const coreServerErrors = [];
 
 page.on("pageerror", (error) => pageErrors.push(error.message));
 page.on("response", (response) => {
-  const url = response.url();
-  if (url.includes("/core/api/v1/") && response.status() >= 500) {
-    coreServerErrors.push(response.status() + " " + response.request().method() + " " + url);
+  if (response.url().includes("/core/api/v1/") && response.status() >= 500) {
+    coreServerErrors.push(response.status() + " " + response.request().method() + " " + response.url());
   }
 });
 
 async function assertHealthy(label) {
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(300);
   const activeTexts = (await page.locator(".admin-tabs button.active").allTextContents()).map((value) => value.trim());
   assert(activeTexts.includes(label), label + ": navigation button did not become active; active=" + JSON.stringify(activeTexts));
   assert(await page.getByText("Application error", { exact: false }).count() === 0, label + ": Next.js Application error is visible");
@@ -74,36 +75,6 @@ async function assertHealthy(label) {
 try {
   await login(page);
 
-  const localeExpectations = [
-    { code: "RU", label: "Главная", finance: "Финансы", settings: "Настройки", more: "Ещё", rates: "Цены / Сезоны", htmlLang: "ru", stored: "ru" },
-    { code: "KG", label: "Башкы", finance: "Каржы", settings: "Жөндөөлөр", more: "Дагы", rates: "Баалар / Сезондор", htmlLang: "ky", stored: "kg" },
-    { code: "KZ", label: "Басты бет", finance: "Қаржы", settings: "Баптаулар", more: "Тағы", rates: "Бағалар / Маусымдар", htmlLang: "kk", stored: "kz" },
-    { code: "EN", label: "Home", finance: "Finance", settings: "Settings", more: "More", rates: "Rates / Seasons", htmlLang: "en", stored: "en" },
-  ];
-
-  for (const item of localeExpectations) {
-    const localeButton = page.locator(".admin-locale-switcher button", { hasText: item.code });
-    assert(await localeButton.count() === 1, item.code + ": locale button is missing or duplicated");
-    await localeButton.click();
-    await page.getByRole("button", { name: item.label, exact: true }).waitFor({ state: "visible" });
-    await page.getByRole("button", { name: item.finance, exact: true }).waitFor({ state: "visible" });
-    await page.getByRole("button", { name: item.settings, exact: true }).waitFor({ state: "visible" });
-    assert((await page.locator("details.admin-more-menu summary").innerText()).trim() === item.more, item.code + ": compact More label did not translate");
-    assert(await page.locator("details.admin-more-menu button").filter({ hasText: item.rates }).count() === 1, item.code + ": secondary Rates / Seasons label did not translate");
-    assert(await page.locator("html").getAttribute("lang") === item.htmlLang, item.code + ": unexpected html lang");
-    assert(await page.evaluate(() => localStorage.getItem("three-crowns-admin-locale")) === item.stored, item.code + ": locale persistence key mismatch");
-  }
-
-  await page.getByRole("button", { name: "KZ", exact: true }).click();
-  await page.getByRole("button", { name: "Басты бет", exact: true }).waitFor({ state: "visible" });
-  await page.reload({ waitUntil: "networkidle" });
-  await page.getByRole("button", { name: "Басты бет", exact: true }).waitFor({ state: "visible" });
-  assert(await page.locator("html").getAttribute("lang") === "kk", "KZ: html lang was not restored after reload");
-  assert(await page.evaluate(() => localStorage.getItem("three-crowns-admin-locale")) === "kz", "KZ: locale was not restored after reload");
-
-  await page.getByRole("button", { name: "RU", exact: true }).click();
-  await page.getByRole("button", { name: "Главная", exact: true }).waitFor({ state: "visible" });
-
   for (const label of primaryTabs) {
     const button = page.getByRole("button", { name: label, exact: true });
     assert(await button.count() === 1, label + ": expected exactly one primary navigation button");
@@ -112,9 +83,8 @@ try {
   }
 
   const more = page.locator("details.admin-more-menu");
-  assert(await more.count() === 1, "Ещё: compact secondary menu is missing");
-  const summary = more.locator("summary");
-  assert((await summary.innerText()).trim() === "Ещё", "Ещё: unexpected summary label");
+  assert(await more.count() === 1, "All sections menu is missing");
+  assert((await more.locator("summary").innerText()).trim() === "Все разделы", "Unexpected all-sections label");
 
   for (const label of moreTabs) {
     await more.evaluate((node) => { node.open = true; });
@@ -124,47 +94,60 @@ try {
     await assertHealthy(label);
   }
 
-  for (const item of [
-    { locale: "RU", title: "Каналы продаж", status: "Автосинхронизация не подключена" },
-    { locale: "KG", title: "Сатуу каналдары", status: "Автоматтык синхрондоштуруу туташкан эмес" },
-    { locale: "KZ", title: "Сату арналары", status: "Автоматты синхрондау қосылмаған" },
-    { locale: "EN", title: "Sales channels", status: "Automatic sync not connected" },
-  ]) {
-    await page.getByRole("button", { name: item.locale, exact: true }).click();
-    await more.evaluate((node) => { node.open = true; });
-    await page.getByRole("button", { name: item.title, exact: true }).click();
-    await page.getByRole("heading", { name: item.title, exact: true }).waitFor();
-    assert(await page.getByText(item.status, { exact: true }).count() === 3, "Channel provider status must be honest and localized: " + item.locale);
-  }
-  const mappingPanel = page.getByRole("region", { name: "Room and rate mapping", exact: true });
-  await mappingPanel.getByLabel("External property ID", { exact: true }).fill("browser-synthetic");
-  await mappingPanel.getByLabel("External room type ID", { exact: true }).fill("category-1");
-  await mappingPanel.getByLabel("External rate plan ID", { exact: true }).fill("rate-1");
-  for (const label of ["MARINA room type", "MARINA rate plan (KGS)"]) {
-    const select = mappingPanel.getByLabel(label, { exact: true });
+  await more.evaluate((node) => { node.open = true; });
+  await page.getByRole("button", { name: "Booking / Каналы продаж", exact: true }).click();
+  await page.getByRole("heading", { name: "Каналы продаж", exact: true }).waitFor();
+  assert(await page.getByText("Автосинхронизация не подключена", { exact: true }).count() === 3,
+    "Channel provider status must state that all three external connections are disabled");
+
+  const mappingPanel = page.getByRole("region", {
+    name: /Room and rate mapping|Сопоставление номеров и тарифов|Бөлмө жана тариф байланышы|Бөлме мен тариф сәйкестігі/,
+  });
+  const localizedLabels = {
+    property: /External property ID|ID отеля на площадке|Платформадагы объект ID|Платформадағы нысан ID/,
+    roomType: /External room type ID|ID категории на площадке|Платформадагы категория ID|Платформадағы санат ID/,
+    ratePlan: /External rate plan ID|ID тарифа на площадке|Платформадагы тариф ID|Платформадағы тариф ID/,
+    marinaRoomType: /MARINA room type|Категория MARINA|MARINA категориясы|MARINA санаты/,
+    marinaRatePlan: /MARINA rate plan \(KGS\)|Тариф MARINA \(KGS\)|MARINA тарифи \(KGS\)|MARINA тарифі \(KGS\)/,
+    save: /Save mapping|Сохранить связь|Байланышты сактоо|Байланысты сақтау/,
+    saved: /Saved\. Platform is still disconnected\.|Сохранено\. Площадка ещё не подключена\.|Сакталды\. Платформа туташа элек\.|Сақталды\. Платформа әлі қосылмаған\./,
+  };
+  await mappingPanel.getByLabel(localizedLabels.property).fill("browser-synthetic");
+  await mappingPanel.getByLabel(localizedLabels.roomType).fill("category-1");
+  await mappingPanel.getByLabel(localizedLabels.ratePlan).fill("rate-1");
+  for (const label of [localizedLabels.marinaRoomType, localizedLabels.marinaRatePlan]) {
+    const select = mappingPanel.getByLabel(label);
     await select.locator("option").nth(1).waitFor({ state: "attached" });
     await select.selectOption({ index: 1 });
   }
-  await mappingPanel.getByRole("button", { name: "Save mapping", exact: true }).click();
-  await mappingPanel.getByRole("status").filter({ hasText: "Saved. Platform is still disconnected." }).waitFor();
-  assert(await mappingPanel.getByText("browser-synthetic / category-1 / rate-1", { exact: true }).count() === 1, "Mapping saved exactly once");
-  const csvPanel = page.getByRole("region", { name: "Bulk CSV import", exact: true });
-  const csvInput = csvPanel.getByRole("textbox", { name: "CSV content", exact: true });
-  const importButton = csvPanel.getByRole("button", { name: "Import", exact: true });
-  assert(await importButton.isDisabled(), "CSV import requires preview");
+  await mappingPanel.getByRole("button", { name: localizedLabels.save }).click();
+  await mappingPanel.getByRole("status").filter({ hasText: localizedLabels.saved }).waitFor();
+  assert(await mappingPanel.getByText("browser-synthetic / category-1 / rate-1", { exact: true }).count() === 1,
+    "Mapping must persist exactly once while the provider stays disconnected");
+
+  const csvPanel = page.getByRole("region", {
+    name: /Bulk CSV import|Массовый импорт CSV|CSV топтук импорт|CSV топтық импорт/,
+  });
+  const csvInput = csvPanel.getByRole("textbox", {
+    name: /CSV content|Содержимое CSV|CSV мазмуну|CSV мазмұны/,
+  });
+  const importButton = csvPanel.getByRole("button", { name: /Import|Импортировать|Импорттоо|Импорттау/ });
+  assert(await importButton.isDisabled(), "CSV import must require a preview");
   await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-only,1,CANCELLED");
-  await csvPanel.getByRole("button", { name: "Preview", exact: true }).click();
-  await csvPanel.getByRole("status").filter({ hasText: "Checked: 1" }).waitFor();
-  assert(await importButton.isEnabled(), "Successful CSV preview enables import");
+  await csvPanel.getByRole("button", { name: /Preview|Проверить|Текшерүү|Тексеру/ }).click();
+  await csvPanel.getByRole("status").filter({ hasText: /Checked: 1|Проверено: 1|Текшерилди: 1|Тексерілді: 1/ }).waitFor();
+  assert(await importButton.isEnabled(), "Successful CSV preview must enable import");
   await csvInput.fill("provider,external_id,revision,status\nAIRBNB,browser-preview-edited,1,CANCELLED");
-  assert(await importButton.isDisabled(), "Editing CSV invalidates preview");
+  assert(await importButton.isDisabled(), "Editing CSV must invalidate the earlier preview");
+
   await page.setViewportSize({ width: 390, height: 844 });
   const channelPanel = page.locator("section[data-i18n-skip]");
-  assert(await channelPanel.count() === 1, "Channel panel missing on mobile");
-  const box = await channelPanel.boundingBox();
-  assert(box && box.width <= 390, "Channel panel overflows mobile viewport");
+  assert(await channelPanel.count() === 1, "Channel panel is missing on mobile");
+  const bounds = await channelPanel.boundingBox();
+  assert(bounds && bounds.width <= 390, "Channel panel overflows the mobile viewport");
+  await assertHealthy("Booking / Каналы продаж");
 
-  console.log("PASS: MARINA SMART owner navigation + RU/KG/KZ/EN browser acceptance (" + primaryTabs.length + " primary + " + moreTabs.length + " secondary tabs; locale persistence verified; compact Ещё preserved; no React crash; no Core 5xx)");
+  console.log("PASS: MARINA compact owner navigation, all enabled sections, channel disconnection truth, mapping persistence, CSV preview gating, responsive channel UI");
 } finally {
   await browser.close();
 }

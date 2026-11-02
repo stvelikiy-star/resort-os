@@ -1,40 +1,37 @@
 #!/usr/bin/env python3
-"""Fail-closed truth guard for the MARINA SMART multi-tenant candidate."""
-
+"""Validate the current MARINA candidate identity and unverified rollout boundary."""
 from __future__ import annotations
 
 import json
 import re
 from pathlib import Path
 
+from release_contract import EXPECTED_MIGRATIONS
+
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "release" / "marina-smart-current-candidate.json"
 STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
-
-EXPECTED_HEAD = "52ecdd28bc63c2097eb4011ad2c998703021d38a"
-EXPECTED_BRANCH = "marina-smart/multi-tenant-foundation-20261008"
-EXPECTED_PR = 234
+EXPECTED_BRANCH = "fix/marina-staging-preflight-20261020"
+EXPECTED_PR = 244
 
 
 def main() -> int:
     errors: list[str] = []
-    if not MANIFEST_PATH.exists():
-        errors.append("missing MARINA SMART candidate manifest")
+    try:
+        manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+        if not isinstance(manifest, dict):
+            raise ValueError("manifest must be a JSON object")
+    except (OSError, ValueError) as exc:
+        errors.append(f"cannot read candidate manifest: {exc}")
         manifest = {}
-    else:
-        try:
-            manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-        except Exception as exc:
-            errors.append(f"cannot parse candidate manifest: {exc}")
-            manifest = {}
 
     required = {
+        "schema_version": 1,
         "product": "MARINA SMART",
         "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
-        "candidate_commit": EXPECTED_HEAD,
         "source_branch": EXPECTED_BRANCH,
         "pull_request": EXPECTED_PR,
-        "migration_count": 32,
+        "migration_count": len(EXPECTED_MIGRATIONS),
         "tenant_model": "Tenant/Property",
         "tenant_context_enabled": False,
         "staging_gate": "manual_read_only",
@@ -45,27 +42,38 @@ def main() -> int:
         "payment_operations_enabled": False,
         "nfc_wallet_enabled": False,
     }
-    if manifest.get("schema_version") != 1:
-        errors.append("schema_version must be 1")
     for key, value in required.items():
-        if manifest.get(key) != value:
+        actual = manifest.get(key)
+        if type(actual) is not type(value) or actual != value:
             errors.append(f"{key} must be {value!r}")
 
+    # This pins the reviewed application revision, not this metadata commit.
+    # CI status must be obtained from GitHub for the actual head, never inferred here.
     if not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("candidate_commit", ""))):
         errors.append("candidate_commit must be an exact 40-character Git SHA")
 
-    if not STATE_PATH.exists():
-        errors.append("missing MARINA SMART current-state document")
-    else:
+    migrations = ROOT / "packages" / "database" / "prisma" / "migrations"
+    actual_migrations = tuple(sorted(p.parent.name for p in migrations.glob("*/migration.sql")))
+    if len(actual_migrations) != len(EXPECTED_MIGRATIONS) or set(actual_migrations) != set(EXPECTED_MIGRATIONS):
+        errors.append("committed migration files differ from the reviewed release contract")
+
+    try:
         state = STATE_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        errors.append(f"cannot read current-state document: {exc}")
+    else:
         for marker in (
-            "PR: #234",
-            "CI: 29/29 SUCCESS",
+            f"PR: #{EXPECTED_PR}",
+            f"Branch: {EXPECTED_BRANCH}",
+            f"Application baseline: {manifest.get('candidate_commit', '')}",
+            f"Migration ledger: {len(EXPECTED_MIGRATIONS)} migrations",
             "Tenant/Property",
             "tenant_id",
             "property_id",
-            "cross-tenant login/read/write E2E",
-            "production cutover authorization",
+            "PROPERTY_PINNED_RUNTIMES",
+            "external_staging_verified=false",
+            "backup_restore_target_verified=false",
+            "production_cutover_authorized=false",
             "The existing roles, navigation and approved compact chessboard remain unchanged.",
         ):
             if marker not in state:
@@ -76,16 +84,11 @@ def main() -> int:
             print(f"FAIL: {error}")
         print("RESULT: MARINA CANDIDATE TRUTH RED")
         return 1
-
-    print("FACT: product=MARINA SMART")
-    print(f"FACT: candidate_commit={EXPECTED_HEAD}")
-    print("FACT: candidate_migrations=32")
-    print("FACT: tenant_model=Tenant/Property")
-    print("FACT: tenant_context_enabled=false")
-    print("FACT: external_staging_verified=false")
-    print("FACT: cross_tenant_e2e_verified=false")
-    print("FACT: production_cutover_authorized=false")
-    print("RESULT: MARINA CANDIDATE TRUTH GREEN; STAGING REQUIRED")
+    print(f"FACT: product=MARINA SMART branch={EXPECTED_BRANCH} PR={EXPECTED_PR}")
+    print(f"FACT: candidate_commit={manifest['candidate_commit']}")
+    print(f"FACT: candidate_migrations={len(EXPECTED_MIGRATIONS)}")
+    print("FACT: external staging, target restore and production authorization remain false")
+    print("RESULT: MARINA CANDIDATE TRUTH GREEN; STAGING REQUIRED; CI STATUS NOT ASSERTED")
     return 0
 
 

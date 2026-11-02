@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
 from .auth import current_user, trusted_property_id
+from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/ops", tags=["staff-task-reports"])
 
@@ -49,7 +50,9 @@ async def complete_task_with_report(
     user: dict[str, Any] = Depends(current_user),
 ):
     role = user["role"]
-    if role not in {"MAID", "TECHNICIAN"}:
+    if role not in {"MAID", "TECHNICIAN"} or (
+        user.get("module_permissions_custom") and not user_has_section(user, "OPS")
+    ):
         raise HTTPException(status_code=403, detail="Completion reports are for line staff")
 
     expected_type: Literal["HOUSEKEEPING", "MAINTENANCE"] = "HOUSEKEEPING" if role == "MAID" else "MAINTENANCE"

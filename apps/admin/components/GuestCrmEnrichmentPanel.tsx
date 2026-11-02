@@ -34,6 +34,8 @@ type ActualStay = {
   actual_check_out_at?: string | null;
   assignments: Assignment[];
   requests: StayRequest[];
+  guest_review?: { rating: number; comment: string; created_at: string; manager_attention_required: boolean } | null;
+  booking_payments?: Array<{ id:string;amount_kgs:number;method:string;status:string;provider?:string|null;external_ref?:string|null;paid_at?:string|null;recorded_at:string }>;
 };
 
 type Preference = {
@@ -197,6 +199,21 @@ export default function GuestCrmEnrichmentPanel({ guestId }: { guestId: string }
             </div>)}
             {!stay.assignments.length && <p className="guest-muted">Фактических назначений номера нет.</p>}
           </div>
+          {stay.guest_review && <section className="guest-crm-requests" aria-label="Отзыв гостя о проживании" style={{padding:14,marginTop:12,border:stay.guest_review.manager_attention_required?"2px solid #be5c43":"1px solid #dbe5da",borderRadius:12}}>
+            <strong>Оценка гостя: {stay.guest_review.rating}/5★</strong>
+            {stay.guest_review.manager_attention_required && <p><strong>Требуется внимание управляющего</strong> — оценка 1–3★</p>}
+            {stay.guest_review.comment && <p>{stay.guest_review.comment}</p>}
+            <small>Отправлено гостем через защищённый QR-кабинет · {dateTime(stay.guest_review.created_at)}</small>
+          </section>}
+          {(stay.booking_payments?.length ?? 0) > 0 && <details className="guest-crm-requests">
+            <summary>Оплаты связанной брони · {stay.booking_payments!.length} последних</summary>
+            <p>Факты оплаты относятся к бронированию; это не означает, что платил именно данный гость. Полный финансовый учёт — в карточке брони.</p>
+            {stay.booking_payments!.map(payment => <div key={payment.id}>
+              <strong>{new Intl.NumberFormat("ru-RU").format(payment.amount_kgs)} сом · {payment.status}</strong>
+              <span>{payment.method}{payment.provider?" · "+payment.provider:""}</span>
+              <small>{dateTime(payment.paid_at || payment.recorded_at)}</small>
+            </div>)}
+          </details>}
           {stay.requests.length > 0 && <details className="guest-crm-requests">
             <summary>Заявки во время проживания · {stay.requests.length}</summary>
             {stay.requests.map((item) => <div key={item.id}>
