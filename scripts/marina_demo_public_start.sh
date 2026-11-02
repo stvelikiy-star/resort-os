@@ -56,8 +56,8 @@ else:
                   MARINA_DEMO_OWNER_PASSWORD=secrets.token_urlsafe(24))
 if not re.fullmatch(r'[A-Za-z0-9_-]{16,}', values['MARINA_DEMO_DB_PASSWORD']):
     raise SystemExit("STOP: demo database password must be URL-safe; original file preserved.")
-if not re.fullmatch(r'[A-Za-z0-9_-]{8,}', values['MARINA_DEMO_OWNER_PASSWORD']):
-    raise SystemExit("STOP: owner password must be at least 8 URL-safe characters; original file preserved.")
+if not re.fullmatch(r'[A-Za-z0-9_-]{6,}' if values['MARINA_DEMO_OWNER_USERNAME'] == 'demo' else r'[A-Za-z0-9_-]{8,}', values['MARINA_DEMO_OWNER_PASSWORD']):
+    raise SystemExit("STOP: owner password must be URL-safe (6+ for demo, otherwise 8+); original file preserved.")
 if not re.fullmatch(r'[A-Za-z0-9_-]{2,80}', values['MARINA_DEMO_OWNER_USERNAME']):
     raise SystemExit("STOP: unsupported demo owner username; original file preserved.")
 for key, value in zip(['MARINA_DEMO_ADMIN_HOST', 'MARINA_DEMO_STAFF_HOST', 'MARINA_DEMO_WEB_HOST', 'MARINA_DEMO_TLS_EMAIL'], sys.argv[2:]):

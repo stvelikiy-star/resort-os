@@ -35,6 +35,19 @@ No provider credentials are configured; real payments and external AI remain
 disabled. Credentials are stored in `.marina-demo.env` with mode 0600 and never
 printed by this script. Existing local demo credentials must use the generated
 URL-safe format; unsupported values cause a stop without password rotation.
+The explicitly named `demo` account in isolated staging may use a 6-character
+password; other login policies remain enforced by the API.
+
+To rename the existing demo owner to `demo` and set the chosen demo password:
+
+```bash
+MARINA_DEMO_NEW_PASSWORD=demo01 bash scripts/marina_demo_change_access.sh
+```
+
+This builds first, saves a demo database/environment backup, preserves the
+owner's ID and bookings, revokes old sessions, updates the saved credentials,
+recreates only demo API/Staff, and verifies a real login. Existing tunnel
+containers and their URLs are preserved.
 
 The success marker requires valid public HTTPS for all three UIs, the correct
 property, actual owner login, Secure/HttpOnly cookie and authenticated `/me`.

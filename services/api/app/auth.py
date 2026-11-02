@@ -40,7 +40,14 @@ class LoginPayload(BaseModel):
     @model_validator(mode="after")
     def enforce_login_length(self):
         demo = os.environ.get("APP_ENV") == "staging" and PROPERTY_CODE == "MARINA_HOTEL01"
-        if not demo and len(self.password) < 8:
+        public_demo = (
+            os.environ.get("APP_ENV") == "staging"
+            and PROPERTY_CODE == "MARINA_DEMO"
+            and not MARINA_TENANT_CONTEXT_ENABLED
+            and self.username.strip().lower() == "demo"
+            and len(self.password) >= 6
+        )
+        if not (demo or public_demo) and len(self.password) < 8:
             raise ValueError("Password must contain at least 8 characters")
         return self
 

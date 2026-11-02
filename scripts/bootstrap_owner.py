@@ -27,7 +27,14 @@ async def main() -> None:
         and USERNAME.strip().lower() == "ms"
         and PASSWORD == "MS01"
     )
-    if len(PASSWORD) < 12 and not demo:
+    public_demo = (
+        os.environ.get("APP_ENV") == "staging"
+        and PROPERTY_CODE == "MARINA_DEMO"
+        and os.environ.get("MARINA_TENANT_CONTEXT_ENABLED", "false").lower() not in {"1", "true", "yes", "on"}
+        and USERNAME.strip().lower() == "demo"
+        and len(PASSWORD) >= 6
+    )
+    if len(PASSWORD) < 12 and not (demo or public_demo):
         raise RuntimeError("BOOTSTRAP_OWNER_PASSWORD must be at least 12 characters outside isolated demo")
 
     conn = await asyncpg.connect(database_url())

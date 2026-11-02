@@ -7,6 +7,8 @@ on:
       - 'compose.marina-demo-public.yaml'
       - 'deploy/marina/demo.Caddyfile'
       - 'scripts/marina_demo_public_start.sh'
+      - 'scripts/marina_demo_change_access.sh'
+      - 'scripts/marina_demo_set_access.py'
       - 'deploy/marina-demo-api.Dockerfile'
       - 'deploy/marina-demo-migrate.Dockerfile'
       - 'scripts/marina_demo_seed.py'
@@ -38,6 +40,7 @@ jobs:
         run: |
           bash -n scripts/marina_demo_start.sh
           bash -n scripts/marina_demo_public_start.sh
+          bash -n scripts/marina_demo_change_access.sh
           python -m py_compile scripts/marina_demo_seed.py
       - name: Validate complete Compose deployment graph
         run: docker compose -f compose.marina-demo.yaml config --quiet
@@ -131,6 +134,34 @@ jobs:
           docker compose -f compose.marina-demo.yaml up -d --build --wait
           docker compose -f compose.marina-demo.yaml exec -T api \
             python scripts/marina_demo_restart_e2e.py verify < "$RUNNER_TEMP/demo-restart.json"
+      - name: Verify requested short demo credentials and preserve restart identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f compose.marina-demo.yaml exec -T \
+            -e MARINA_DEMO_NEW_USERNAME=demo -e MARINA_DEMO_NEW_PASSWORD=demo01 \
+            api python scripts/marina_demo_set_access.py
+          docker compose -f compose.marina-demo.yaml exec -T api python - <<'PY'
+          import json, os, urllib.error, urllib.request
+          def login(username, password):
+              req = urllib.request.Request('http://127.0.0.1:8000/api/v1/auth/login',
+                  data=json.dumps({'username': username, 'password': password}).encode(),
+                  headers={'Content-Type': 'application/json'})
+              return urllib.request.urlopen(req, timeout=15)
+          with login('demo', 'demo01') as reply:
+              user = json.load(reply)
+              assert user['username'] == 'demo' and user['role'] == 'OWNER' and user['property_code'] == 'MARINA_DEMO'
+          try:
+              login(os.environ['BOOTSTRAP_OWNER_USERNAME'], os.environ['BOOTSTRAP_OWNER_PASSWORD'])
+          except urllib.error.HTTPError as exc:
+              assert exc.code == 401
+          else:
+              raise AssertionError('Previous demo credentials still accepted')
+          print('MARINA_DEMO_SHORT_LOGIN_PASS')
+          PY
+          # Updating the env does not reset or re-bootstrap the renamed owner.
+          MARINA_DEMO_OWNER_USERNAME=demo MARINA_DEMO_OWNER_PASSWORD=demo01 \
+            docker compose -f compose.marina-demo.yaml run --rm seed
       - name: Diagnostics on failure
         if: failure()
         run: docker compose -f compose.marina-demo.yaml ps && docker compose -f compose.marina-demo.yaml logs --tail 90 api seed migrate postgres
