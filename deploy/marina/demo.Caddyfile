@@ -1,0 +1,36 @@
+{
+  email {$TLS_EMAIL}
+}
+
+{$ADMIN_HOST} {
+  encode zstd gzip
+  header X-Robots-Tag "noindex, nofollow"
+  @ws path /ws/*
+  handle @ws {
+    reverse_proxy api:8000
+  }
+  handle {
+    reverse_proxy admin:3001
+  }
+}
+
+{$STAFF_HOST} {
+  encode zstd gzip
+  header X-Robots-Tag "noindex, nofollow"
+  @ws path /ws/*
+  handle @ws {
+    reverse_proxy api:8000
+  }
+  handle {
+    reverse_proxy staff:3002
+  }
+}
+
+{$WEB_HOST} {
+  encode zstd gzip
+  header X-Robots-Tag "noindex, nofollow"
+  # Guests use issued /g/<token> links. Do not expose the legacy hotel
+  # marketing homepage as the synthetic MARINA demo's identity.
+  redir / https://{$ADMIN_HOST} 302
+  reverse_proxy web:3000
+}

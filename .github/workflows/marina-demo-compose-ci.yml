@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'compose.marina-demo.yaml'
+      - 'compose.marina-demo-public.yaml'
+      - 'deploy/marina/demo.Caddyfile'
+      - 'scripts/marina_demo_public_start.sh'
       - 'deploy/marina-demo-api.Dockerfile'
       - 'deploy/marina-demo-migrate.Dockerfile'
       - 'scripts/marina_demo_seed.py'
@@ -34,9 +37,43 @@ jobs:
       - name: Verify shell and Python
         run: |
           bash -n scripts/marina_demo_start.sh
+          bash -n scripts/marina_demo_public_start.sh
           python -m py_compile scripts/marina_demo_seed.py
       - name: Validate complete Compose deployment graph
         run: docker compose -f compose.marina-demo.yaml config --quiet
+      - name: Validate HTTPS overlay and public proxy configuration without publishing
+        env:
+          MARINA_DEMO_ADMIN_HOST: demo.marina.invalid
+          MARINA_DEMO_STAFF_HOST: staff-demo.marina.invalid
+          MARINA_DEMO_WEB_HOST: guest-demo.marina.invalid
+          MARINA_DEMO_TLS_EMAIL: ci@marina.invalid
+        run: |
+          docker compose -f compose.marina-demo.yaml -f compose.marina-demo-public.yaml config --format json > /tmp/demo-public.json
+          python - <<'PY'
+          import json
+          cfg = json.load(open('/tmp/demo-public.json'))
+          assert cfg['name'] == 'marina-smart-demo'
+          for service in ('seed', 'api'):
+              env = cfg['services'][service]['environment']
+              assert env['PROPERTY_CODE'] == 'MARINA_DEMO'
+              assert env['COOKIE_SECURE'] == 'true'
+              assert env['WS_ENFORCE_SAME_ORIGIN'] == 'true'
+              assert env['ENABLE_PAYMENT_OPERATIONS'] == 'false'
+              assert env['OPENAI_API_KEY'] == ''
+              assert len(env['CORS_ORIGINS'].split(',')) == 3
+          assert not cfg['services']['postgres'].get('ports')
+          assert not cfg['services']['api'].get('ports')
+          for service in ('admin', 'staff', 'web'):
+              assert all(p['host_ip'] == '127.0.0.1' for p in cfg['services'][service]['ports'])
+          print('MARINA_PUBLIC_DEMO_CONFIG_PASS')
+          PY
+          docker run --rm --entrypoint caddy \
+            -e TLS_EMAIL="$MARINA_DEMO_TLS_EMAIL" \
+            -e ADMIN_HOST="$MARINA_DEMO_ADMIN_HOST" \
+            -e STAFF_HOST="$MARINA_DEMO_STAFF_HOST" \
+            -e WEB_HOST="$MARINA_DEMO_WEB_HOST" \
+            -v "$PWD/deploy/marina/demo.Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.4-alpine validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Build disposable demo services and start database, migrations, seed, API
         run: |
           docker compose -f compose.marina-demo.yaml up --build -d --wait
