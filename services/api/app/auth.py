@@ -47,7 +47,8 @@ class LoginPayload(BaseModel):
             and self.username.strip().lower() == "demo"
             and len(self.password) >= 6
         )
-        if not (demo or public_demo) and len(self.password) < 8:
+        demo = demo or public_demo
+        if not demo and len(self.password) < 8:
             raise ValueError("Password must contain at least 8 characters")
         return self
 
