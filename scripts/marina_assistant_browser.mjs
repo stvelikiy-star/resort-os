@@ -20,7 +20,7 @@ const copy = {
 };
 const browser = await chromium.launch({ headless: true });
 try {
-  for (const base of surfaces) {
+  for (const [surfaceIndex, base] of surfaces.entries()) {
     const context = await browser.newContext();
     const login = await context.request.post(`${base}/core/api/v1/auth/login`, { data: { username, password } });
     assert.equal(login.status(), 200, "Real synthetic owner login must succeed");
@@ -32,6 +32,22 @@ try {
     }));
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
+    if (surfaceIndex === 1) {
+      // Reproduce a click on the SSR selector while its handlers are still
+      // loading. Playwright must wait for initialization instead of losing it.
+      const slowChunks = async route => {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await route.continue();
+      };
+      await page.route("**/_next/static/**/*.js", slowChunks);
+      await page.goto(base, { waitUntil: "domcontentloaded" });
+      await page.getByRole("button", { name: "KG", exact: true }).click();
+      await page.waitForFunction(() => document.documentElement.lang === "ky");
+      await page.unroute("**/_next/static/**/*.js", slowChunks);
+      await page.reload({ waitUntil: "networkidle" });
+      await page.waitForFunction(() => document.documentElement.lang === "ky");
+      assert.equal(await page.evaluate(() => localStorage.getItem("marina-smart-staff-locale")), "kg");
+    }
     for (const [locale, [open, quick, unavailable]] of Object.entries(copy)) {
       await page.setViewportSize(locale === "ru" ? { width: 1440, height: 900 } : { width: 390, height: 844 });
       await page.goto(base, { waitUntil: "networkidle" });
