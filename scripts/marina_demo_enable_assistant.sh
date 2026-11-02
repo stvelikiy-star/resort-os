@@ -80,11 +80,21 @@ trap rollback ERR
 "${compose[@]}" exec -T api python - <<'PY'
 import http.cookiejar, json, os, urllib.request
 assert os.environ['PROPERTY_CODE'] == 'MARINA_DEMO'
-opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+cookies = http.cookiejar.CookieJar()
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies), NoRedirect())
 base = 'http://127.0.0.1:8000/api/v1'
 def call(path, payload=None):
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(base+path, data=data, headers={'Content-Type':'application/json'})
+    # Production Secure cookies are deliberately omitted on HTTP by CookieJar.
+    # This probe runs inside the API container: send its login cookie explicitly
+    # to the fixed loopback endpoint, without weakening COOKIE_SECURE or redirects.
+    if path != '/auth/login':
+        assert cookies, 'Login did not return a session cookie'
+        req.add_header('Cookie', '; '.join(f'{c.name}={c.value}' for c in cookies))
     with opener.open(req, timeout=60) as response:
         return json.load(response)
 who = call('/auth/login', {'username':os.environ['BOOTSTRAP_OWNER_USERNAME'], 'password':os.environ['BOOTSTRAP_OWNER_PASSWORD']})
