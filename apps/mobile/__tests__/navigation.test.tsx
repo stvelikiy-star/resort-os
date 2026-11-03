@@ -139,6 +139,18 @@ describe('navigation, guards and screens', () => {
     }
   });
 
+  it('profile language and theme selectors respond to taps', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-profile', {}, { timeout: 4000 }));
+    const en = await screen.findByTestId('segment-en', {}, { timeout: 4000 });
+    await fireEvent.press(en);
+    await waitFor(() => expect(screen.getByTestId('segment-en').props.accessibilityState.checked).toBe(true), { timeout: 4000 });
+    await fireEvent.press(screen.getByTestId('segment-dark'));
+    await waitFor(() => expect(screen.getByTestId('segment-dark').props.accessibilityState.checked).toBe(true), { timeout: 4000 });
+    await fireEvent.press(screen.getByTestId('segment-ru'));
+    await fireEvent.press(screen.getByTestId('segment-system'));
+  });
+
   it('waiter has no operational workspace (profile only)', async () => {
     const screen = await loginAs('waiter');
     await screen.findByTestId('tab-profile', {}, { timeout: 4000 });
