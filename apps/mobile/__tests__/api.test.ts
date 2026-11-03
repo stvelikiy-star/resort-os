@@ -124,6 +124,23 @@ describe('real api contract (mock fetch)', () => {
     expect(calls[0].init.credentials).toBe('include');
     expect(JSON.stringify(calls[0].init.headers)).not.toMatch(/bearer|token|secret/i);
   });
+  it('rejects task, room and staff IDs containing URL delimiters before any network call', async () => {
+    const { f, calls } = mk([]);
+    const a = createRealApi('https://hotel.example', f);
+    for (const bad of [
+      'room/../../auth', 'task?limit=999', 'task#fragment', 'task%2Fother',
+      '../admin', ' room', 'room\\\\escape', '', 'x'.repeat(129),
+    ]) {
+      await expect(a.claimTask(bad)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(a.setTaskStatus(bad, 'DONE')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(a.completeHousekeeping(bad, { checklist: {} })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(a.assignTask(bad, null)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(a.setRoomState(bad, 'CLEAN')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+    await expect(a.assignTask('task-123', 'staff#other')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(calls).toHaveLength(0);
+  });
+
   it('maps http errors and network failures', async () => {
     const { f } = mk([{ status: 403 }, { status: 401 }, { status: 409 }]);
     const a = createRealApi('https://h.example', f);
