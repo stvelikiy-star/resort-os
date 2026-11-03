@@ -110,9 +110,17 @@ async def verify(conn):
         assert await conn.fetchval('''
             SELECT count(*) FROM rooms WHERE id=$1 AND "propertyId"=$2
         ''', row["roomId"], row["propertyId"]) == 1, "Cross-hotel inventory link!"
-        assert await conn.fetchval('''
-            SELECT count(*) FROM payments WHERE "reservationId"=$1
-        ''', row["id"]) == 0, "Booking unexpectedly created payment"
+        received=await conn.fetch('''
+            SELECT id,"amountKgs",method,provider,status::text AS status,"idempotencyKey"
+            FROM payments WHERE "reservationId"=$1
+        ''', row["id"])
+        assert len(received)==1,"Expected exactly one staff-recorded payment"
+        payment=received[0]
+        assert str(payment["id"])==receipt["manual_payment_id"]
+        assert payment["amountKgs"]==receipt["manual_amount_kgs"]==(1000 if hotel=="HOTEL_A" else 1500)
+        assert payment["method"]=="CASH" and payment["provider"]=="MANAGER_MANUAL"
+        assert payment["status"]=="RECEIVED"
+        assert payment["idempotencyKey"],"Manual payment missing replay protection"
     # The second reservation per hotel was made through real HTTP and cancelled
     # through the real browser; no financial history may be silently refunded.
     assert await conn.fetchval('SELECT count(*) FROM reservations') == 4
@@ -159,7 +167,8 @@ async def verify(conn):
         assert hold["confirmedReservationId"] is None, "Released HOLD unexpectedly confirmed"
         assert hold["active"] is False, "Released HOLD still blocks availability"
     assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 2
-    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, 2 active schedule-mutated bookings, 2 cancelled unpaid PMS fixtures, 2 released HOLDs, 2 audit mutations, tenant isolation, no payments")
+    assert await conn.fetchval('SELECT count(*) FROM payments') == 2, "Unexpected extra manual payment"
+    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, 2 schedule-mutated active bookings, 2 cancelled unpaid fixtures, 2 manually recorded payments, 2 released HOLDs, tenant isolation and audit")
 
 
 async def main():
