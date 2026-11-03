@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Droplets, Fan, Lamp, Package, Zap, X } from 'lucide-react-native';
 import { Button, Field, PressScale, Screen, SectionLabel, Segmented, Title } from '../src/components/ui';
 import { useAsync } from '../src/lib/useAsync';
 import { useSession } from '../src/state/session';
+import { workspaceForSession } from '../src/roles/registry';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { font, radius, space } from '../src/theme/tokens';
 import type { Priority, Room } from '../src/api/types';
@@ -16,8 +17,8 @@ export default function NewRequest() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api } = useSession();
-  const rooms = useAsync<Room[]>(() => api!.listRooms(), [api]);
+  const { api, user } = useSession();
+  const rooms = useAsync<Room[]>(() => api ? api.listRooms() : Promise.resolve([]), [api]);
   const [cat, setCat] = useState<string>('PLUMBING');
   const [prio, setPrio] = useState<Priority>('NORMAL');
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -26,10 +27,14 @@ export default function NewRequest() {
   const [busy, setBusy] = useState(false);
 
   const send = async () => {
+    if (busy || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
     setBusy(true); setMsg(null);
     try { await api!.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text }); setMsg(t('mt.sent')); setTimeout(() => router.back(), 600); }
     catch { setMsg(t('errors.generic')); } finally { setBusy(false); }
   };
+
+  if (!user || !api) return <Redirect href="/connect" />;
+  if (!workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return <Redirect href="/profile" />;
 
   return (
     <Screen>
