@@ -109,7 +109,7 @@ export default function AdminShell() {
         }
         const payload = await response.json() as User;
         if (disposed) return;
-        if (!canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
+        if (payload && !canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
           void fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
           setUser(null);
           return;
