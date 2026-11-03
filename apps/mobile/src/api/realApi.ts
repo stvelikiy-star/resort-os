@@ -42,6 +42,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
     return ({
     id: String(t.id), type: t.type, status: t.status, priority: t.priority ?? 'NORMAL',
     title: t.title ?? '', room_code: t.room_code ?? t.roomCode ?? null, room_id: t.room_id ?? t.roomId ?? null,
+    room_state: ['CLEAN', 'DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(t.room_state) ? t.room_state : 'UNKNOWN',
     assigned_to_id: t.assigned_to_id ?? t.assignedToId ?? null, assigned_to_name: t.assigned_to_name ?? null,
   });
   };
@@ -98,7 +99,12 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       // The existing API exposes no staff "rooms list" endpoint: derive rooms from tasks until backend item B7 lands.
       const tasks = await this.listTasks();
       const seen = new Map<string, Room>();
-      for (const t of tasks) if (t.room_id && !seen.has(t.room_id)) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: 0, state: 'UNKNOWN' });
+      for (const t of tasks) if (t.room_id) {
+        const existing = seen.get(t.room_id);
+        const state = t.room_state ?? 'UNKNOWN';
+        if (!existing) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: 0, state });
+        else if (existing.state === 'UNKNOWN' && state !== 'UNKNOWN') existing.state = state;
+      }
       return [...seen.values()];
     },
     async setRoomState(roomId, state: RoomState) {
