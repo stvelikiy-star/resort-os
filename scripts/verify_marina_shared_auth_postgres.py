@@ -306,6 +306,11 @@ def main():
         assert canonical_client.post('/api/v1/reservations', json={}).status_code == 503
     print('PASS: canonical shared staff lifecycle: same usernames isolated, owner-only writes, cross-hotel 404, old session revocation, disabled login denial')
 
+    # Separate synthetic test clients intentionally share a process and default IP.
+    # Reset only the in-memory CI attempt counter between independent test phases;
+    # the real runtime throttle and its security tests remain unchanged.
+    auth._preview_attempts.clear()
+
     # Exercise only the reviewed QR handlers in a test harness with the real
     # shared auth and one pool. The canonical application's preview boundary
     # above remains closed; this is not a general shared-workspace rollout.
@@ -339,6 +344,11 @@ def main():
         execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
         assert qr_client.get('/api/v1/admin/guest-os/room-qrs').status_code == 401
     print('PASS: single test runtime + PostgreSQL: two-hotel QR list/issue/rotate/batch, foreign IDs/headers and blocked tenant denial; canonical preview remains closed')
+
+    # Separate synthetic test clients intentionally share a process and default IP.
+    # Reset only the in-memory CI attempt counter between independent test phases;
+    # the real runtime throttle and its security tests remain unchanged.
+    auth._preview_attempts.clear()
 
     # Test only the reviewed socket routers with real shared sessions and one
     # PostgreSQL pool. Do not open canonical shared-preview routes here.
