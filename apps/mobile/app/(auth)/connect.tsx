@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Building2, Link2, QrCode, ShieldCheck } from 'lucide-react-native';
 import { Badge, Button, Card, DemoBanner, FadeIn, Field, Screen, SectionLabel, Segmented } from '../../src/components/ui';
@@ -15,9 +15,11 @@ export default function Connect() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
+  const { hotelAddress } = useLocalSearchParams<{ hotelAddress?: string }>();
   const { hotels, addHotel, selectHotel, locale, setLocale } = useSession();
   const [addr, setAddr] = useState('');
   const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { if (typeof hotelAddress === 'string') setAddr(hotelAddress); }, [hotelAddress]);
 
   const open = (id: string) => { selectHotel(id); router.push('/login'); };
   const add = () => {
@@ -57,7 +59,7 @@ export default function Connect() {
         <Field label={t('connect.code')} placeholder={t('connect.codePh')} value={addr} onChangeText={setAddr} autoCapitalize="none" autoCorrect={false} keyboardType="url" testID="hotel-address" />
         {err ? <Text testID="connect-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
         <Button testID="connect-add" label={t('connect.addHotel')} icon={Link2} onPress={add} />
-        <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => setErr(t('hk.photoSoon'))} />
+        <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
       </Card>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <ShieldCheck size={18} color={c.success} /><Text style={[font.small, { color: c.textMuted, flex: 1 }]}>{t('connect.noSecrets')}</Text>
