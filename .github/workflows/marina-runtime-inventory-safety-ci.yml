@@ -1,0 +1,29 @@
+name: MARINA P0 Runtime Inventory Safety CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/marina_runtime_inventory_readonly.py'
+      - 'scripts/test_marina_runtime_inventory_readonly.py'
+      - '.github/workflows/marina-runtime-inventory-safety-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile read-only inventory
+        run: python -m py_compile scripts/marina_runtime_inventory_readonly.py
+      - name: Run isolated inventory safety tests
+        run: python -m unittest discover -s scripts -p 'test_marina_runtime_inventory_readonly.py' -v
+      - name: Verify no environment values are collected
+        run: |
+          ! grep -En 'docker.*inspect|docker.*exec|compose.*up|os\.environ|printenv|env_file|DATABASE_URL|TOKEN_INSTANCE' scripts/marina_runtime_inventory_readonly.py
