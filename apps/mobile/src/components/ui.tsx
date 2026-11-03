@@ -25,6 +25,31 @@ export function FadeIn({ children, delay = 0, style }: { children: React.ReactNo
 
 const OUTER_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'width', 'alignSelf'] as const;
 
+
+/** Animated progress with reduced-motion support and screen-reader value. */
+export function AnimatedProgressBar({ percent }: { percent: number }) {
+  const { c } = useTheme();
+  const safePercent = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    let active = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!active) return;
+      if (reduceMotion) { progress.setValue(safePercent); return; }
+      animation = Animated.timing(progress, { toValue: safePercent, duration: 750, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+      animation.start();
+    }).catch(() => { if (active) progress.setValue(safePercent); });
+    return () => { active = false; animation?.stop(); };
+  }, [progress, safePercent]);
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: safePercent }}
+      style={{ height: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
+      <Animated.View style={{ width: progress.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }), height: 11, borderRadius: 8, backgroundColor: c.accent }} />
+    </View>
+  );
+}
+
 export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string }) {
   const [s] = useState(() => new Animated.Value(1));
   const to = (x: number) => {
