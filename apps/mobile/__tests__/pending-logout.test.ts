@@ -59,6 +59,24 @@ describe('offline cookie logout compensation', () => {
     await setDurableItem(key, '{not valid json');
     expect(await hasUnrevokedCookieForHost('https://hotel.example')).toBe(true);
   });
+  it('fails closed on a mixed valid and malformed journal instead of discarding an entry', async () => {
+    await setDurableItem(key, JSON.stringify(['https://hotel.example', 123]));
+    expect(await hasUnrevokedCookieForHost('https://other.example')).toBe(true);
+    const logout = jest.fn(async () => {});
+    await flushPendingCookieLogouts(logout);
+    expect(logout).not.toHaveBeenCalled();
+  });
+  it('does not interpret an empty stored journal value as successful revocation', async () => {
+    await setDurableItem(key, '');
+    expect(await hasUnrevokedCookieForHost('https://hotel.example')).toBe(true);
+  });
+  it('refuses overflow without dropping the oldest unacknowledged logout', async () => {
+    const originalEntries = Array.from({ length: 20 }, (_, i) => `https://archived-${i}.example`);
+    const originalJournal = JSON.stringify(originalEntries);
+    await setDurableItem(key, originalJournal);
+    await expect(queueCookieLogout('https://hotel.example')).rejects.toThrow('Pending logout journal full');
+    expect(await getDurableItem(key)).toBe(originalJournal);
+  });
   it('does not place arbitrary QR domains into the logout queue', async () => {
     await expect(queueCookieLogout('https://evil.example')).rejects.toThrow();
     expect(await getDurableItem(key)).toBeNull();
