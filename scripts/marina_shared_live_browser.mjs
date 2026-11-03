@@ -148,7 +148,21 @@ async function completeStayViaBrowser(page,hotel){
   const checkOutResponse=page.waitForResponse(res=>
     res.url().endsWith("/core/api/v1/admin/stays/reservations/"+fixture.reservation_id+"/check-out") &&
     res.request().method()==="POST");
-  await checkOutButton.click();
+  try {
+    await checkOutButton.click({timeout:6000});
+  } catch (error) {
+    const facts=await checkOutButton.evaluate(button=>{
+      const r=button.getBoundingClientRect();
+      const midpoint=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      return {disabled:button.disabled, text:button.textContent,
+        rect:{x:r.x,y:r.y,width:r.width,height:r.height},
+        pointerEvents:getComputedStyle(button).pointerEvents,
+        centerElement:midpoint?.outerHTML?.slice(0,400)??null,
+        documentHeight:document.documentElement.scrollHeight};
+    }).catch(e=>({lookupError:String(e)}));
+    console.log("STAY_CHECKOUT_ACTIONABILITY_ERROR",hotel,String(error).slice(0,1800),JSON.stringify(facts));
+    throw error;
+  }
   console.log("STAY_POST_CHECKOUT_CLICK",hotel,"button-enabled",await checkOutButton.isEnabled());
   const checkedOut=await checkOutResponse;
   assert.equal(checkedOut.status(),200,await checkedOut.text());
