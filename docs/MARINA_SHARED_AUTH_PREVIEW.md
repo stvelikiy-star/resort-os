@@ -33,6 +33,18 @@ uses server-trusted hotel ID and validates the quoted price, and the room
 inventory exclusion constraint prevents concurrent double booking.
 The shared PMS endpoints are API-only in this staging slice; the Admin UI
 still displays a read-only grid, without booking mutation controls.
+An additional narrowly reviewed stay-operation slice allows only POST
+`/api/v1/admin/stays/reservations/{reservation_uuid}/check-in` and
+POST `/check-out` for authenticated OWNER/MANAGER/RECEPTION according to
+server-managed section permissions. Existing handlers verify property ownership,
+hotel-local dates, assigned room readiness, stay and booking state; check-in
+issues a one-time visible guest access PIN and creates a non-financial kitchen
+arrival task. Check-out revokes the guest PIN and sessions, closes occupancy,
+releases unused future nights only when valid, marks the vacated room DIRTY and
+creates housekeeping work. The core route logic stays on the same backend for
+web and future mobile clients. These are test-only API permissions: there is no
+production shared staff/guest app rollout or general guest-service activation.
+
 The next reviewed financial slice composes only internal manual booking payment
 records in shared staging even when legacy ENABLE_PAYMENT_OPERATIONS is false,
 then explicitly allows authenticated OWNER/MANAGER GET
