@@ -59,10 +59,10 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
    */
   async function committedTask(id: string, acknowledged: unknown): Promise<Task> {
     if (!acknowledged || typeof acknowledged !== 'object' ||
-        (acknowledged as { id?: unknown }).id !== id) {
+        ((acknowledged as { id?: unknown; task_id?: unknown }).id ?? (acknowledged as { task_id?: unknown }).task_id) !== id) {
       throw new ApiError('UNKNOWN', 'Invalid mutation acknowledgment');
     }
-    const ack = acknowledged as { status?: TaskStatus; assigned_to_id?: string | null };
+    const ack = acknowledged as { status?: TaskStatus; assigned_to_id?: string | null; assigned_to_name?: string | null; room_state?: RoomState };
     try {
       return await findTask(id);
     } catch (error) {
@@ -75,7 +75,8 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       const updated: Task = {
         ...previous, status,
         assigned_to_id: hasAssignee ? ack.assigned_to_id ?? null : previous.assigned_to_id,
-        assigned_to_name: hasAssignee && ack.assigned_to_id !== previous.assigned_to_id ? null : previous.assigned_to_name,
+        assigned_to_name: hasAssignee ? (ack.assigned_to_name ?? (ack.assigned_to_id === previous.assigned_to_id ? previous.assigned_to_name : null)) : previous.assigned_to_name,
+        room_state: ack.room_state && ['CLEAN', 'DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(ack.room_state) ? ack.room_state : previous.room_state,
       };
       lastKnownTasks.set(id, updated);
       return updated;
