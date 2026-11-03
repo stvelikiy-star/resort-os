@@ -177,7 +177,9 @@ async def verify(conn):
         FROM reservations r
         JOIN properties p ON p.id=r."propertyId"
         JOIN stays s ON s."reservationId"=r.id AND s."propertyId"=r."propertyId"
-        JOIN rooms room ON room."propertyId"=r."propertyId" AND room.id=ANY(SELECT ib."roomId" FROM inventory_blocks ib WHERE ib."reservationId"=r.id LIMIT 1)
+        JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib.active=true
+                                 AND ib."blockType"='RESERVATION'
+        JOIN rooms room ON room.id=ib."roomId" AND room."propertyId"=r."propertyId"
         WHERE r.status='CHECKED_OUT'
     ''')
     assert len(stayed_rows)==2,"Expected two closed hotel-local stays"
