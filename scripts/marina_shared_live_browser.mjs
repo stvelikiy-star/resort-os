@@ -205,11 +205,10 @@ async function cancelFixture(page,hotel){
     BASE+"/core/api/v1/admin/reception/reservations/"+fixture.reservation_id);
   assert.equal(apiAfterCancel.status(),200);
   const detail=await apiAfterCancel.json();
-  const status=detail.reservation?.status ?? detail.status;
-  console.log("CANCEL_AFTER_API",hotel,status);
-  const listings=await page.locator("table").allInnerTexts();
-  console.log("CANCEL_AFTER_UI",hotel,JSON.stringify(listings).slice(0,2500));
-  await row.getByRole("cell",{name:"CANCELLED"}).waitFor({timeout:3000});
+  assert.equal(detail.reservation?.status ?? detail.status,"CANCELLED");
+  // The Admin locale sanitizer renders Russian labels for enum statuses.
+  // Verify visible state as well as the unchanged canonical API enum.
+  await row.getByRole("cell",{name:/^(?:ОТМЕНЕНО|CANCELLED)$/}).waitFor();
 }
 
 try {
