@@ -24,7 +24,7 @@ def inventory(repo: Path, backups: Path):
         "docker": {"available": False, "containers": []},
         "backups": {"directory_present": backups.is_dir(), "files": [], "integrity_checked": False},
         "limitations": [
-            "No DB queries, volume checks, backup validation, host HTTPS checks or deploy performed.",
+            "No DB queries, volume checks, backup restore, host HTTPS checks or deploy performed; pg_restore --list checks TOC readability only.",
             "Git HEAD does not establish the running image version; immutable image_id is a local Docker image ID, not a repository commit or registry digest."
         ]
     }
@@ -68,9 +68,23 @@ def inventory(repo: Path, backups: Path):
                     entry.suffix.lower() not in {".dump", ".backup", ".sql", ".gz"}):
                     continue
                 stat = entry.stat()
+                # pg_restore --list is read-only: it parses an archive's table
+                # of contents without contacting PostgreSQL or extracting data.
+                # A valid list is NOT evidence of a successful database restore.
+                archive_listing = None
+                if entry.suffix.lower() in {".dump", ".backup"}:
+                    try:
+                        with entry.open("rb") as handle:
+                            if handle.read(5) == b"PGDMP":
+                                archive_listing = command(["pg_restore", "--list", str(entry)]) is not None
+                            else:
+                                archive_listing = False
+                    except OSError:
+                        archive_listing = None
                 report["backups"]["files"].append({
                     "filename": entry.name, "size_bytes": stat.st_size,
-                    "modified_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
+                    "modified_utc": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat(),
+                    "custom_archive_listing_ok": archive_listing
                 })
             except OSError:
                 continue
