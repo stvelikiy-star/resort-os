@@ -7,7 +7,7 @@ import { Badge, Button, Card, Empty, FadeIn, PressScale, Screen, SectionLabel, T
 import { TaskCard } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 import type { DaySummary, StaffMember, Task } from '../../src/api/types';
@@ -28,7 +28,7 @@ export default function Admin() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user } = useSession();
-  const allowed = workspaceFor(user!.role).canManage;
+  const allowed = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE').canManage;
   const [pick, setPick] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const summary = useAsync<DaySummary | null>(() => (allowed ? api!.daySummary().catch(() => null) : Promise.resolve(null)), [api, tick]);
