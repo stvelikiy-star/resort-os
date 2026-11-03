@@ -29,6 +29,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Expo dependency alignment
         run: npx expo install --check
+      - name: Verify mobile routes against actual PMS source
+        run: node scripts/verify-backend-contract.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
