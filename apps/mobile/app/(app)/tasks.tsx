@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react-native';
-import { Card, DemoBanner, Empty, FadeIn, PressScale, Screen, SectionLabel } from '../../src/components/ui';
+import { AnimatedProgressBar, Card, DemoBanner, Empty, FadeIn, PressScale, Screen, SectionLabel } from '../../src/components/ui';
 import { TaskCard } from '../../src/components/domain';
 import { Hero } from '../../src/components/Brand';
 import { useAsync } from '../../src/lib/useAsync';
@@ -39,9 +39,7 @@ export default function Tasks() {
               <Text style={[font.small, { color: '#D4E3F4' }]}>{t('tasks.progress')}</Text>
               <Text testID="progress-pct" style={[font.small, { color: '#fff', fontWeight: '800' }]}>{pct}%</Text>
             </View>
-            <View style={{ height: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.25)' }}>
-              <View style={{ width: `${pct}%`, height: 11, borderRadius: 8, backgroundColor: c.accent }} />
-            </View>
+            <AnimatedProgressBar percent={pct} />
           </View>
         </Hero>
       </FadeIn>
