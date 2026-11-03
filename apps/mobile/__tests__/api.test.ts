@@ -195,8 +195,49 @@ describe('real api contract (mock fetch)', () => {
     })).rejects.toMatchObject({ code: 'UNKNOWN' });
   });
 
+  it('uses server-acknowledged status after a committed update when follow-up list misses task', async () => {
+    const { f, calls } = mk([
+      { body: { items: [{ id: 't1', type: 'HOUSEKEEPING', status: 'IN_INSPECTION', priority: 'HIGH', title: 'Room clean', room_id: 'r1', room_state: 'IN_INSPECTION' }] } },
+      { body: { id: 't1', status: 'DONE' } },
+      { body: { items: [] } },
+    ]);
+    const api = createRealApi('https://hotel.example', f);
+    await api.listTasks();
+    const result = await api.setTaskStatus('t1', 'DONE');
+    expect(result).toMatchObject({ id: 't1', status: 'DONE', type: 'HOUSEKEEPING', title: 'Room clean' });
+    expect(calls.filter((x) => x.init.method === 'PATCH')).toHaveLength(1);
+  });
+  it('uses task_id acknowledgment after housekeeping report even if re-read is offline', async () => {
+    let req = 0;
+    const fetcher = (async (_url: string, init: RequestInit) => {
+      req++;
+      if (req === 1) return { ok: true, status: 200, json: async () => ({ items: [{ id: 't2', type: 'HOUSEKEEPING', status: 'IN_PROGRESS', title: 'Cleaning', room_id: 'r2', room_state: 'DIRTY' }] }) } as Response;
+      if (init.method === 'POST') return { ok: true, status: 200, json: async () => ({ ok: true, task_id: 't2', status: 'IN_INSPECTION', room_state: 'IN_INSPECTION' }) } as Response;
+      throw new TypeError('offline after commit');
+    }) as typeof fetch;
+    const api = createRealApi('https://hotel.example', fetcher);
+    await api.listTasks();
+    const report = await api.completeHousekeeping('t2', { checklist: { BED_LINEN: true, BATHROOM: true, SURFACES: true, AMENITIES: true, FINAL_CHECK: true } });
+    expect(report).toMatchObject({ id: 't2', status: 'IN_INSPECTION', room_state: 'IN_INSPECTION', type: 'HOUSEKEEPING' });
+    expect(req).toBe(3);
+  });
+  it('uses server confirmed assignee when follow-up list does not contain the task', async () => {
+    const { f } = mk([
+      { body: { items: [{ id: 't3', type: 'MAINTENANCE', status: 'OPEN', title: 'Repair', assigned_to_id: null }] } },
+      { body: { id: 't3', assigned_to_id: 's3', assigned_to_name: 'Technician', idempotent: false } },
+      { body: { items: [] } },
+    ]);
+    const api = createRealApi('https://hotel.example', f);
+    await api.listTasks();
+    expect(await api.assignTask('t3', 's3')).toMatchObject({ id: 't3', assigned_to_id: 's3', assigned_to_name: 'Technician' });
+  });
+  it('never accepts a mutation acknowledgment for another task id', async () => {
+    const { f } = mk([{ body: { id: 'wrong', status: 'IN_PROGRESS' } }]);
+    await expect(createRealApi('https://hotel.example', f).claimTask('t1')).rejects.toMatchObject({ code: 'UNKNOWN' });
+  });
+
   it('uses backend routes for tasks, status, assignee, complete-report', async () => {
-    const { f, calls } = mk([{ body: [] }, {}, { body: [{ id: 't', type: 'MAINTENANCE', status: 'DONE' }] }, {}, { body: [{ id: 't', type: 'HOUSEKEEPING', status: 'IN_INSPECTION' }] }, {}, { body: [{ id: 't', type: 'HOUSEKEEPING', status: 'OPEN' }] }]);
+    const { f, calls } = mk([{ body: [] }, { body: { id: 't', status: 'DONE' } }, { body: [{ id: 't', type: 'MAINTENANCE', status: 'DONE' }] }, { body: { task_id: 't', status: 'IN_INSPECTION' } }, { body: [{ id: 't', type: 'HOUSEKEEPING', status: 'IN_INSPECTION' }] }, { body: { id: 't', assigned_to_id: null } }, { body: [{ id: 't', type: 'HOUSEKEEPING', status: 'OPEN' }] }]);
     const a = createRealApi('https://h.example', f);
     await a.listTasks({ type: 'MAINTENANCE' });
     await a.setTaskStatus('t', 'DONE');
