@@ -38,7 +38,8 @@ export default function Admin() {
   if (!allowed) return <Screen><Title>{t('admin.title')}</Title><Empty text={t('admin.forbidden')} /></Screen>;
   const s = summary.data;
   const queue = (tasks.data ?? []).filter((x) => x.status === 'IN_INSPECTION');
-  const unassigned = (tasks.data ?? []).filter((x) => !x.assigned_to_id && x.status === 'OPEN');
+  const unassigned = (tasks.data ?? []).filter((x) => !x.assigned_to_id && x.status === 'OPEN' && (x.type === 'HOUSEKEEPING' || x.type === 'MAINTENANCE'));
+  const eligibleStaff = (task: Task) => (staff.data ?? []).filter((member) => member.active !== false && member.role === (task.type === 'HOUSEKEEPING' ? 'MAID' : 'TECHNICIAN'));
   const assign = async (staffId: string) => { if (!pick) return; await api!.assignTask(pick, staffId); setPick(null); setTick((n) => n + 1); };
   const approve = async (id: string) => { await api!.setTaskStatus(id, 'DONE'); setTick((n) => n + 1); };
   const back = async (id: string) => { await api!.setTaskStatus(id, 'IN_PROGRESS'); setTick((n) => n + 1); };
@@ -76,18 +77,19 @@ export default function Admin() {
           <TaskCard task={task} onPress={() => setPick(pick === task.id ? null : task.id)} />
           {pick === task.id ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-              {(staff.data ?? []).map((m) => (
+              {eligibleStaff(task).map((m) => (
                 <PressScale key={m.id} testID={`assign-${m.id}`} onPress={() => assign(m.id)} style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft }}>
                   <Text style={[font.small, { color: c.primary, fontWeight: '700' }]}>{m.display_name} · {m.open_tasks}</Text>
                 </PressScale>
               ))}
+              {eligibleStaff(task).length === 0 ? <Empty text={t('admin.noEligible')} /> : null}
             </View>
           ) : <Badge label={t('admin.assign')} tone="primary" />}
         </View>
       ))}
 
       <SectionLabel>{t('admin.staff')}</SectionLabel>
-      {(staff.data ?? []).map((m) => (
+      {(staff.data ?? []).filter((m) => m.active !== false).map((m) => (
         <Card key={m.id} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <View><Text style={[font.h2, { color: c.text }]}>{m.display_name}</Text><Text style={[font.small, { color: c.textMuted }]}>{t(`roles.${m.role}`)}</Text></View>
           <Badge label={String(m.open_tasks)} tone={m.open_tasks > 2 ? 'warning' : 'success'} />
