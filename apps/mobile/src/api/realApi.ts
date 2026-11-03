@@ -1,3 +1,4 @@
+import { parseHotelAddress } from './hotels';
 import { ApiError, AuthUser, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
@@ -8,8 +9,9 @@ type Fetch = typeof fetch;
  * Bearer/refresh tokens + device registry are backend work item B1/B2 (see docs) and are NOT assumed here.
  */
 export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffApi {
-  if (!/^https:\/\//i.test(baseUrl)) throw new Error('Only https base URLs are allowed');
-  const root = baseUrl.replace(/\/+$/, '');
+  const validated = parseHotelAddress(baseUrl);
+  if (!validated.ok) throw new Error('Invalid or insecure hotel API origin');
+  const root = validated.baseUrl;
 
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
