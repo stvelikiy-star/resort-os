@@ -5,6 +5,13 @@ from urllib.parse import urlsplit
 
 from fastapi import WebSocket
 
+
+def websocket_authority(user: dict) -> tuple:
+    """Bind an open stream to the identity and grants verified at connection."""
+    return (user["id"], user.get("property_id"), user.get("tenant_id"),
+            user["role"], tuple(sorted(user.get("module_permissions", ()))),
+            user.get("module_permissions_custom", False))
+
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 _default_enforce = "true" if APP_ENV == "production" else "false"
 WS_ENFORCE_SAME_ORIGIN = os.environ.get("WS_ENFORCE_SAME_ORIGIN", _default_enforce).strip().lower() in {

@@ -299,9 +299,9 @@ async def _record_pair_reset(conn, property_id: uuid.UUID, pair_key: str) -> Non
     )
 
 
-async def current_user(request: Request) -> dict[str, Any]:
+async def resolve_session_user(conn, token: str | None, *, touch: bool = True) -> dict[str, Any]:
+    """Use one server-side session boundary for HTTP and WebSocket callers."""
     shared_auth_preview_guard()
-    token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
@@ -309,39 +309,39 @@ async def current_user(request: Request) -> dict[str, Any]:
     shared_context = _shared_session_context(token) if MARINA_SHARED_AUTH_PREVIEW_ENABLED else None
     if not MARINA_SHARED_AUTH_PREVIEW_ENABLED and token.startswith("ms1."):
         raise HTTPException(401, detail="Session expired or invalid")
-    active_tenant_filter = "" if not MARINA_SHARED_AUTH_PREVIEW_ENABLED else '''
+    active_tenant_filter = "" if not MARINA_TENANT_CONTEXT_ENABLED else '''
         AND EXISTS (SELECT 1 FROM tenants t WHERE t.id=p."tenantId" AND t.status='ACTIVE')
     '''
     now = datetime.utcnow()
 
-    async with request.app.state.db.acquire() as conn:
-        row = await conn.fetchrow(
-            f'''
-            SELECT s.id AS session_id, s."expiresAt", s."revokedAt",
-                   u.id AS user_id, u.username, u."displayName", u.role::text AS role, u."isActive",
-                   u."modulePermissions" AS module_permissions, (u."modulePermissions" IS NOT NULL) AS module_permissions_custom,
-                   p.code AS property_code,
-                   {_tenant_context_select_sql()}
-            FROM auth_sessions s
-            JOIN staff_users u ON u.id = s."userId"
-            JOIN properties p ON p.id = u."propertyId"
-            WHERE s."tokenHash" = $1 {active_tenant_filter}
-            ''',
-            token_hash,
-        )
-        if (
-            not row
-            or row["revokedAt"] is not None
-            or row["expiresAt"] <= now
-            or not row["isActive"]
-            or (not MARINA_SHARED_AUTH_PREVIEW_ENABLED and row["property_code"] != PROPERTY_CODE)
-            or (shared_context is not None and (
-                _optional_uuid_text(row["tenant_id"]) != str(shared_context[0])
-                or _optional_uuid_text(row["property_id"]) != str(shared_context[1])
-            ))
-        ):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired or invalid")
+    row = await conn.fetchrow(
+        f'''
+        SELECT s.id AS session_id, s."expiresAt", s."revokedAt",
+               u.id AS user_id, u.username, u."displayName", u.role::text AS role, u."isActive",
+               u."modulePermissions" AS module_permissions, (u."modulePermissions" IS NOT NULL) AS module_permissions_custom,
+               p.code AS property_code,
+               {_tenant_context_select_sql()}
+        FROM auth_sessions s
+        JOIN staff_users u ON u.id = s."userId"
+        JOIN properties p ON p.id = u."propertyId"
+        WHERE s."tokenHash" = $1 {active_tenant_filter}
+        ''',
+        token_hash,
+    )
+    if (
+        not row
+        or row["revokedAt"] is not None
+        or row["expiresAt"] <= now
+        or not row["isActive"]
+        or (not MARINA_SHARED_AUTH_PREVIEW_ENABLED and row["property_code"] != PROPERTY_CODE)
+        or (shared_context is not None and (
+            _optional_uuid_text(row["tenant_id"]) != str(shared_context[0])
+            or _optional_uuid_text(row["property_id"]) != str(shared_context[1])
+        ))
+    ):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired or invalid")
 
+    if touch:
         await conn.execute(
             'UPDATE auth_sessions SET "lastSeenAt" = now() WHERE id = $1',
             row["session_id"],
@@ -359,6 +359,15 @@ async def current_user(request: Request) -> dict[str, Any]:
         "module_permissions": effective_section_permissions(row["role"], row["module_permissions"]),
         "module_permissions_custom": bool(row["module_permissions_custom"]),
     }
+
+
+async def current_user(request: Request) -> dict[str, Any]:
+    shared_auth_preview_guard()
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    async with request.app.state.db.acquire() as conn:
+        return await resolve_session_user(conn, token)
 
 
 def require_roles(*allowed_roles: str, module_grant: bool = True) -> Callable:
