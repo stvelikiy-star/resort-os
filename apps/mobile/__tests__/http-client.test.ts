@@ -37,6 +37,7 @@ describe('one safe HTTP client for realApi and LIVE modules', () => {
     for (const path of [
       '/api/v1/../auth/me', '/api/v1/%2e%2e/auth/me',
       '/api/v1/ops/tasks/a%2Fb', '/api/v1/ops/tasks/a%5Cb',
+      '/api/v1/ops/tasks/r1#ignored',
       '/api/v1/ops\\\\evil', '//evil.example/api/v1/auth/me',
     ]) {
       await expect(api.request('GET', path)).rejects.toMatchObject({code:'BAD_REQUEST'});
