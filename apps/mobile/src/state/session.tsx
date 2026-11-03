@@ -18,24 +18,28 @@ interface SessionCtx {
   addHotel: (h: HotelConnection) => void;
   selectHotel: (id: string) => void;
   signIn: (username: string, password: string) => Promise<AuthUser>;
+  /** Isolated synthetic preview: does not touch hotel APIs. */
+  startDemo: (username?: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
   leaveHotel: () => void;
 }
 const Ctx = createContext<SessionCtx | null>(null);
 
 export function SessionProvider({ children, initialLocale, initialHotelId, initialUser }: { children: React.ReactNode; initialLocale?: Locale; initialHotelId?: string; initialUser?: AuthUser }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? localeFromDevice(getLocales()[0]?.languageCode));
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    const selected = initialLocale ?? localeFromDevice(getLocales()[0]?.languageCode);
+    initI18n(selected);
+    return selected;
+  });
   const [hotels, setHotels] = useState<HotelConnection[]>(DEMO_HOTELS);
   const [hotelId, setHotelId] = useState<string | null>(initialHotelId ?? null);
   // Sessions are keyed by hotel id: signing in to hotel A never exposes data of hotel B.
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
   const sessionRevision = useRef(0);
   const loginAttempt = useRef(0);
-  initI18n(locale);
-
   useEffect(() => {
     if (initialLocale) return;
-    void getItem('marina.locale').then((v) => { if (v && ['ru', 'kg', 'en', 'kz'].includes(v)) setLocaleState(v as Locale); });
+    void getItem('marina.locale').then((v) => { if (v && ['ru', 'kg', 'en', 'kz'].includes(v)) { initI18n(v as Locale); setLocaleState(v as Locale); } });
     void getItem('marina.hotels').then((v) => {
       if (!v) return;
       try {
@@ -106,7 +110,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     return () => sub.remove();
   }, [hotel, api, user]);
 
-  const setLocale = useCallback((l: Locale) => { setLocaleState(l); void setItem('marina.locale', l); }, []);
+  const setLocale = useCallback((l: Locale) => { initI18n(l); setLocaleState(l); void setItem('marina.locale', l); }, []);
   const selectHotel = useCallback((id: string | null) => {
     // A hotel switch is a security boundary: do not reuse an earlier user
     // session merely because the device previously opened that property.
@@ -135,6 +139,31 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     });
     selectHotel(h.id);
   }, [selectHotel]);
+  const startDemo = useCallback(async (username = 'manager'): Promise<AuthUser> => {
+    const demoHotel = DEMO_HOTELS[0];
+    // Never bypass production auth. This method explicitly uses the isolated
+    // in-memory demo API, which does not make network calls.
+    const revision = ++sessionRevision.current;
+    loginAttempt.current++;
+    if (hotelId) dropApi(hotelId);
+    dropApi(demoHotel.id);
+    setSessions({});
+    setHotelId(demoHotel.id);
+    try {
+      const demoApi = apiFor(demoHotel);
+      const demoUser = await demoApi.login(username, 'demo');
+      if (sessionRevision.current !== revision) throw new ApiError('UNAUTHORIZED', 'Demo selection changed');
+      setSessions({ [demoHotel.id]: demoUser });
+      return demoUser;
+    } catch (error) {
+      if (sessionRevision.current === revision) {
+        setSessions({});
+        setHotelId(null);
+      }
+      throw error;
+    }
+  }, [hotelId]);
+
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
     const revision = sessionRevision.current;
@@ -169,8 +198,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   }, [hotel, api]);
 
   const value = useMemo<SessionCtx>(() => ({
-    hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, signOut, leaveHotel: () => selectHotel(null),
-  }), [hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, signOut]);
+    hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut, leaveHotel: () => selectHotel(null),
+  }), [hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
