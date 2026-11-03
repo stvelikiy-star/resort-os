@@ -51,6 +51,8 @@ def validate(values: dict[str, str], bootstrap: bool = False, allow_test_hosts: 
 
     if values.get("APP_ENV", "").strip().lower() != "production":
         errors.append("APP_ENV must be production for this deployment package")
+    if values.get("MARINA_SHARED_AUTH_PREVIEW_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        errors.append("MARINA_SHARED_AUTH_PREVIEW_ENABLED is staging-only and must be disabled in production")
     if not re.fullmatch(r"[0-9a-f]{40}", values.get("MARINA_RELEASE_SHA", "").strip().lower()):
         errors.append("MARINA_RELEASE_SHA must be the exact 40-character tested Git commit SHA")
 

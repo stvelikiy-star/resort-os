@@ -44,6 +44,13 @@ def valid_values() -> dict[str, str]:
 
 
 class MarinaProductionPreflightTest(unittest.TestCase):
+    def test_rejects_authentication_preview_in_production(self):
+        values = valid_values()
+        values['MARINA_SHARED_AUTH_PREVIEW_ENABLED'] = 'true'
+        errors = validate(values, allow_test_hosts=True)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn('MARINA_SHARED_AUTH_PREVIEW_ENABLED', errors[0])
+
     def test_blocks_reusing_existing_synthetic_stack_even_with_valid_production_paths(self):
         for slug in ("hotel01", "smart-demo", "demo"):
             with self.subTest(slug=slug):

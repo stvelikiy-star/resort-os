@@ -20,6 +20,11 @@ not the complete shared platform release.
 
 ## Confirmed source blockers for a shared backend
 
+An opt-in staging authentication slice is now implemented separately; see
+`MARINA_SHARED_AUTH_PREVIEW.md`. It addresses login/session selection only and
+blocks all workspace routes. The baseline restrictions described below still
+explain why the default per-hotel deployment cannot simply become a shared PMS.
+
 In the inspected baseline, `services/api/app/auth.py` still resolves login using
 the deployment-global `PROPERTY_CODE`. `current_user` also rejects a session
 whose property differs from that global code. `trusted_property_id` has a

@@ -2,7 +2,9 @@ import hashlib
 import ipaddress
 import os
 import secrets
+import time
 import uuid
+from collections import deque
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
@@ -18,6 +20,8 @@ PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 # the existing single-property deployment continue while the trusted context is
 # rolled through staging and verified against every property-scoped query.
 MARINA_TENANT_CONTEXT_ENABLED = os.environ.get("MARINA_TENANT_CONTEXT_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+MARINA_SHARED_AUTH_PREVIEW_ENABLED = os.environ.get("MARINA_SHARED_AUTH_PREVIEW_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+_preview_attempts: dict[str, deque[float]] = {}
 SESSION_TTL_HOURS = int(os.environ.get("SESSION_TTL_HOURS", "12"))
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
 COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN") or None
@@ -36,6 +40,8 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 class LoginPayload(BaseModel):
     username: str = Field(min_length=2, max_length=80)
     password: str = Field(min_length=3, max_length=256)
+    tenant_code: str | None = Field(default=None, min_length=3, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
+    property_code: str | None = Field(default=None, min_length=3, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 
     @model_validator(mode="after")
     def enforce_login_length(self):
@@ -47,7 +53,7 @@ class LoginPayload(BaseModel):
             and self.username.strip().lower() == "demo"
             and len(self.password) >= 6
         )
-        demo = demo or public_demo
+        demo = (demo or public_demo) and not MARINA_SHARED_AUTH_PREVIEW_ENABLED
         if not demo and len(self.password) < 8:
             raise ValueError("Password must contain at least 8 characters")
         return self
@@ -79,6 +85,45 @@ def _tenant_context_select_sql() -> str:
 
 def _optional_uuid_text(value: Any) -> str | None:
     return str(value) if value is not None else None
+
+
+def shared_auth_preview_guard() -> None:
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED and (
+        os.environ.get("APP_ENV") != "staging" or not MARINA_TENANT_CONTEXT_ENABLED
+    ):
+        raise HTTPException(503, detail="Shared authentication preview requires isolated staging and tenant context")
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED and PROPERTY_CODE in {"MARINA_DEMO", "MARINA_HOTEL01"}:
+        raise HTTPException(503, detail="Existing synthetic environments cannot host the shared authentication preview")
+
+
+def _preview_login_limit(client_ip: str) -> None:
+    # Coarse per-process protection also covers nonexistent hotel selectors,
+    # before any DB lookup. Existing DB-backed throttling remains in force for
+    # known workspaces. This preview is not a production-wide rate limiter.
+    now = time.monotonic()
+    key = _throttle_key("PREVIEW_IP", client_ip)
+    for old in [k for k, q in _preview_attempts.items() if not q or now - q[-1] >= 60]:
+        del _preview_attempts[old]
+    if key not in _preview_attempts:
+        if len(_preview_attempts) >= 5000:
+            raise _invalid_login()
+        _preview_attempts[key] = deque()
+    queue = _preview_attempts[key]
+    while queue and now - queue[0] >= 60:
+        queue.popleft()
+    if len(queue) >= 30:
+        raise _invalid_login()
+    queue.append(now)
+
+
+def _shared_session_context(token: str) -> tuple[uuid.UUID, uuid.UUID]:
+    try:
+        prefix, tenant_id, property_id, random_part = token.split(".")
+        if prefix != "ms1" or len(random_part) != 64:
+            raise ValueError
+        return uuid.UUID(tenant_id), uuid.UUID(property_id)
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(401, detail="Session expired or invalid") from None
 
 
 async def trusted_property_id(conn, user: dict[str, Any]) -> uuid.UUID:
@@ -150,9 +195,10 @@ def _throttle_key(kind: str, *parts: str) -> str:
     return f"{kind}:{digest}"
 
 
-def _throttle_keys(username: str, client_ip: str) -> tuple[str, str]:
-    pair_key = _throttle_key("PAIR", PROPERTY_CODE, username, client_ip)
-    ip_key = _throttle_key("IP", PROPERTY_CODE, client_ip)
+def _throttle_keys(username: str, client_ip: str, boundary: str | None = None) -> tuple[str, str]:
+    scope = PROPERTY_CODE if boundary is None else boundary
+    pair_key = _throttle_key("PAIR", scope, username, client_ip)
+    ip_key = _throttle_key("IP", scope, client_ip)
     return pair_key, ip_key
 
 
@@ -254,11 +300,18 @@ async def _record_pair_reset(conn, property_id: uuid.UUID, pair_key: str) -> Non
 
 
 async def current_user(request: Request) -> dict[str, Any]:
+    shared_auth_preview_guard()
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     token_hash = hash_session_token(token)
+    shared_context = _shared_session_context(token) if MARINA_SHARED_AUTH_PREVIEW_ENABLED else None
+    if not MARINA_SHARED_AUTH_PREVIEW_ENABLED and token.startswith("ms1."):
+        raise HTTPException(401, detail="Session expired or invalid")
+    active_tenant_filter = "" if not MARINA_SHARED_AUTH_PREVIEW_ENABLED else '''
+        AND EXISTS (SELECT 1 FROM tenants t WHERE t.id=p."tenantId" AND t.status='ACTIVE')
+    '''
     now = datetime.utcnow()
 
     async with request.app.state.db.acquire() as conn:
@@ -272,7 +325,7 @@ async def current_user(request: Request) -> dict[str, Any]:
             FROM auth_sessions s
             JOIN staff_users u ON u.id = s."userId"
             JOIN properties p ON p.id = u."propertyId"
-            WHERE s."tokenHash" = $1
+            WHERE s."tokenHash" = $1 {active_tenant_filter}
             ''',
             token_hash,
         )
@@ -281,7 +334,11 @@ async def current_user(request: Request) -> dict[str, Any]:
             or row["revokedAt"] is not None
             or row["expiresAt"] <= now
             or not row["isActive"]
-            or row["property_code"] != PROPERTY_CODE
+            or (not MARINA_SHARED_AUTH_PREVIEW_ENABLED and row["property_code"] != PROPERTY_CODE)
+            or (shared_context is not None and (
+                _optional_uuid_text(row["tenant_id"]) != str(shared_context[0])
+                or _optional_uuid_text(row["property_id"]) != str(shared_context[1])
+            ))
         ):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired or invalid")
 
@@ -313,22 +370,49 @@ def require_roles(*allowed_roles: str, module_grant: bool = True) -> Callable:
     return dependency
 
 
+@router.get("/mode")
+async def authentication_mode():
+    shared_auth_preview_guard()
+    return {"mode": "shared_auth_preview" if MARINA_SHARED_AUTH_PREVIEW_ENABLED else "single_property",
+            "workspaces_available": False if MARINA_SHARED_AUTH_PREVIEW_ENABLED else None}
+
+
 @router.post("/login", response_model=AuthUser)
 async def login(payload: LoginPayload, request: Request, response: Response):
+    shared_auth_preview_guard()
+    shared = MARINA_SHARED_AUTH_PREVIEW_ENABLED
+    if shared and (not payload.tenant_code or not payload.property_code):
+        raise _invalid_login()
+    if not shared and (payload.tenant_code is not None or payload.property_code is not None):
+        raise HTTPException(422, detail="Shared hotel selection is not enabled")
     username = payload.username.strip().lower()
     client_ip = _client_ip(request)
-    pair_key, ip_key = _throttle_keys(username, client_ip)
+    if shared:
+        _preview_login_limit(client_ip)
+    boundary = f"{payload.tenant_code}/{payload.property_code}" if shared else None
+    pair_key, ip_key = _throttle_keys(username, client_ip, boundary)
 
     async with request.app.state.db.acquire() as conn:
         lock_keys = await _acquire_login_locks(conn, pair_key, ip_key)
         try:
-            property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', PROPERTY_CODE)
+            if shared:
+                property_id = await conn.fetchval('''
+                    SELECT p.id FROM properties p JOIN tenants t ON t.id=p."tenantId"
+                    WHERE t.code=$1 AND p.code=$2 AND t.status='ACTIVE'
+                ''', payload.tenant_code, payload.property_code)
+            else:
+                property_id = await conn.fetchval('SELECT id FROM properties WHERE code=$1', PROPERTY_CODE)
             if not property_id:
+                if shared:
+                    raise _invalid_login()
                 raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Property not loaded")
 
             if await _login_is_throttled(conn, property_id, pair_key, ip_key):
                 raise _invalid_login()
 
+            user_filter = '''p.id = $1 AND EXISTS (
+                SELECT 1 FROM tenants t WHERE t.id=p."tenantId" AND t.status='ACTIVE'
+            )''' if shared else "p.code = $1"
             row = await conn.fetchrow(
                 f'''
                 SELECT u.id, u.username, u."displayName", u."passwordHash", u.role::text AS role,
@@ -338,13 +422,13 @@ async def login(payload: LoginPayload, request: Request, response: Response):
                        {_tenant_context_select_sql()}
                 FROM staff_users u
                 JOIN properties p ON p.id = u."propertyId"
-                WHERE p.code = $1 AND lower(u.username) = $2
+                WHERE {user_filter} AND lower(u.username) = $2
                 ''',
-                PROPERTY_CODE,
+                property_id if shared else PROPERTY_CODE,
                 username,
             )
 
-            if not row or not row["isActive"]:
+            if not row or not row["isActive"] or (shared and row["propertyId"] != property_id):
                 await _record_login_failure(conn, property_id, pair_key, ip_key)
                 raise _invalid_login()
 
@@ -362,6 +446,11 @@ async def login(payload: LoginPayload, request: Request, response: Response):
                 )
 
             raw_token = secrets.token_urlsafe(48)
+            if shared:
+                # The complete contextual token is hashed into auth_sessions.
+                # Its IDs are never trusted without a matching DB session and
+                # matching current staff/tenant membership in current_user.
+                raw_token = f"ms1.{row['tenant_id']}.{row['property_id']}.{raw_token}"
             token_hash = hash_session_token(raw_token)
             expires_at = datetime.utcnow() + timedelta(hours=SESSION_TTL_HOURS)
             session_id = uuid.uuid4()

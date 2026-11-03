@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .auth import require_roles, router as auth_router, trusted_property_id
 from .db import lifespan
+from .shared_auth_preview import SharedAuthPreviewBoundary
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
@@ -35,6 +36,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
+app.add_middleware(SharedAuthPreviewBoundary)
 app.include_router(auth_router)
 
 

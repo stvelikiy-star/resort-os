@@ -8,6 +8,7 @@ gate move together.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -166,7 +167,6 @@ def main() -> int:
     for marker in (
         '"product": "MARINA SMART"',
         '"status": "INTERNAL_CANDIDATE_STAGING_REQUIRED"',
-        '"migration_count": 32',
         '"tenant_model": "Tenant/Property"',
         '"tenant_context_enabled": false',
         '"external_staging_verified": false',
@@ -175,13 +175,15 @@ def main() -> int:
     ):
         if marker not in manifest:
             raise AssertionError(f"candidate manifest marker missing: {marker}")
+    committed_migrations = len(list((ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")))
+    if json.loads(manifest).get("migration_count") != committed_migrations:
+        raise AssertionError("candidate migration count does not match committed migration files")
 
     current_state = read("knowledge/MARINA_SMART_CURRENT_STATE_20261008.md")
     for marker in (
-        "PR: #234",
-        "CI: 29/29 SUCCESS",
         "Tenant/Property",
-        "two-tenant cross-tenant login/read/write E2E",
+        "production_cutover_authorized=false",
+        "cross_tenant_e2e_verified=false",
         "The existing roles, navigation and approved compact chessboard remain unchanged.",
     ):
         if marker not in current_state:
@@ -189,7 +191,7 @@ def main() -> int:
 
     truth_guard = read("scripts/marina_candidate_truth_guard.py")
     for marker in (
-        "EXPECTED_HEAD =",
+        "candidate_commit must be an exact 40-character Git SHA",
         "EXPECTED_BRANCH =",
         "candidate_commit",
         "cross_tenant_e2e_verified",
