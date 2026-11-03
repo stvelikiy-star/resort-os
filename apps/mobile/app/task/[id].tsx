@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -25,11 +25,13 @@ export default function TaskDetail() {
   const [msg, setMsg] = useState<string | null>(null);
   const [actionError, setActionError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionLock = useRef(false);
 
   const run = async (fn: () => Promise<Task>, okMsg?: string) => {
-    if (busy) return;
+    if (actionLock.current || !user || !api || !ws.mobileReady) return;
+    actionLock.current = true;
     setBusy(true); setMsg(null); setActionError(false);
-    try { const n = await fn(); setData(n); if (okMsg) setMsg(okMsg); } catch (e: any) { setActionError(true); setMsg(t(e?.code === 'FORBIDDEN' ? 'errors.forbidden' : e?.code === 'OFFLINE' ? 'errors.offline' : 'errors.generic')); } finally { setBusy(false); }
+    try { const n = await fn(); setData(n); if (okMsg) setMsg(okMsg); } catch (e: any) { setActionError(true); setMsg(t(e?.code === 'FORBIDDEN' ? 'errors.forbidden' : e?.code === 'OFFLINE' ? 'errors.offline' : 'errors.generic')); } finally { actionLock.current = false; setBusy(false); }
   };
 
   if (!user || !api) return <Redirect href="/connect" />;
