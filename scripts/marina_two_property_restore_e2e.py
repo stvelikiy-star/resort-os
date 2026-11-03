@@ -266,7 +266,33 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                 assert response.status_code == 401, "Foreign session crossed property boundary"
                 wrong = httpx.post(f"http://127.0.0.1:{PORTS[foreign]}/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[index]})
                 assert wrong.status_code == 401, "Foreign password authenticated wrong property"
+                # Verify finance reads are scoped by the authenticated hotel,
+                # not a caller-provided reservation UUID from a different hotel.
+                for endpoint in ("acquiring-readiness", "cancellation-finance-review"):
+                    own_finance = client.get(
+                        f"/api/v1/admin/booking/reservations/{fixtures[index]['reservation']}/{endpoint}"
+                    )
+                    assert own_finance.status_code == 200, (
+                        f"Own hotel finance {endpoint} unavailable: {own_finance.status_code} {own_finance.text[:300]}"
+                    )
+                    foreign_finance = client.get(
+                        f"/api/v1/admin/booking/reservations/{fixtures[foreign]['reservation']}/{endpoint}"
+                    )
+                    assert foreign_finance.status_code == 404, (
+                        f"Hotel {index} accessed hotel {foreign} finance {endpoint}: "
+                        f"{foreign_finance.status_code} {foreign_finance.text[:300]}"
+                    )
+                today = date.today().isoformat()
+                own_summary = client.get(
+                    "/api/v1/admin/finance/summary",
+                    params={"from_date": today, "to_date": today},
+                )
+                assert own_summary.status_code == 200, (
+                    f"Hotel {index} finance summary unavailable: "
+                    f"{own_summary.status_code} {own_summary.text[:300]}"
+                )
         print("MARINA_CROSS_PROPERTY_SESSION_PASSWORD_PASS")
+        print("MARINA_CROSS_PROPERTY_FINANCE_READ_DENIAL_PASS")
         # Real HTTP checks against property-pinned APIs and disposable PostgreSQL.
         # Two concurrent requests for one room must produce exactly one HOLD.
         from concurrent.futures import ThreadPoolExecutor
