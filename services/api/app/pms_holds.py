@@ -7,7 +7,7 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/pms/holds", tags=["admin-pms-holds"])
 access = require_roles("OWNER", "MANAGER")
@@ -47,10 +47,9 @@ async def expire_holds(conn):
 
 
 async def property_id(conn, user):
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', user["property_code"])
-    if not value:
-        raise HTTPException(503, detail={"code": "PROPERTY_NOT_LOADED"})
-    return value
+    # Trust only the authenticated session's DB-validated property context.
+    # In legacy single-property mode, trusted_property_id retains PROPERTY_CODE.
+    return await trusted_property_id(conn, user)
 
 
 @router.post("", status_code=201)
