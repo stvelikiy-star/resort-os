@@ -8,7 +8,7 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles, trusted_property_id
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, require_roles, trusted_property_id
 
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-chessboard"])
@@ -459,8 +459,9 @@ async def preview_schedule(reservation_id: uuid.UUID, payload: SchedulePreviewPa
             prop = await _property(conn, user)
             # A stale hold cannot prevent a legitimate date change just because
             # the shared periodic expiry sweep has not run yet.
-            from .pms_holds import expire_holds
-            await expire_holds(conn, prop["id"])
+            if MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+                from .pms_holds import expire_holds
+                await expire_holds(conn, prop["id"])
             reservation = await _reservation(conn, reservation_id, prop["id"])
             if not reservation:
                 raise HTTPException(status_code=404, detail="Reservation not found")
@@ -479,8 +480,9 @@ async def commit_schedule(reservation_id: uuid.UUID, payload: ScheduleCommitPayl
         async with request.app.state.db.acquire() as conn:
             async with conn.transaction():
                 prop = await _property(conn, user)
-                from .pms_holds import expire_holds
-                await expire_holds(conn, prop["id"])
+                if MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+                    from .pms_holds import expire_holds
+                    await expire_holds(conn, prop["id"])
                 reservation = await _reservation(conn, reservation_id, prop["id"], lock=True)
                 if not reservation:
                     raise HTTPException(status_code=404, detail="Reservation not found")
