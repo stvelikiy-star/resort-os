@@ -41,3 +41,36 @@ jobs:
         run: npm run web:export
       - name: Validate Expo configuration
         run: npx expo config --type public --json > /tmp/marina-staff-expo-config.json
+  android-debug:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify preinstalled Android SDK
+        run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME"
+      - name: Install mobile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install --non-interactive
+      - name: Compile Android debug APK
+        run: cd android && ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Attach debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-staff-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
