@@ -163,8 +163,18 @@ def main():
             assert result['property']['code'] == 'HOTEL_'+suffix.upper()
             assert result['rooms']['total'] == 1
             assert canonical_client.get('/api/v1/admin/staff').status_code == 503
-            assert canonical_client.get('/api/v1/pms/grid?start=2026-11-04&end=2026-11-05').status_code == 503
-    print('PASS: canonical app_entry:app with PostgreSQL: both hotel dashboards and locked remaining workspaces')
+            grid = canonical_client.get('/api/v1/pms/grid?start=2026-11-04&end=2026-11-05', headers={
+                'X-Property-Id': str(ids['property_'+foreign]), 'X-Tenant-Id': str(ids['tenant_'+foreign])})
+            assert grid.status_code == 200, grid.text
+            assert grid.json()['property'] == 'HOTEL_'+suffix.upper()
+            assert [room['id'] for room in grid.json()['rooms']] == [str(ids['room_'+suffix])]
+        execute("UPDATE staff_users SET role='WAITER' WHERE id=$1", ids['user_b'])
+        assert canonical_client.get('/api/v1/pms/grid?start=2026-11-04&end=2026-11-05').status_code == 403
+        execute("UPDATE staff_users SET role='OWNER' WHERE id=$1", ids['user_b'])
+        execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
+        assert canonical_client.get('/api/v1/pms/grid?start=2026-11-04&end=2026-11-05').status_code == 401
+        execute("UPDATE tenants SET status='ACTIVE' WHERE id=$1", ids['tenant_b'])
+    print('PASS: canonical app_entry:app with PostgreSQL: two isolated hotel dashboards and PMS grids, staff still locked, waiter/blocked tenant denied')
 
     # Exercise only the reviewed QR handlers in a test harness with the real
     # shared auth and one pool. The canonical application's preview boundary
