@@ -3,6 +3,8 @@ import { useSession } from '../state/session';
 import { isTrustedHotelOrigin } from './hotels';
 import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
+import { receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse } from './contractValidation';
+import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
 export interface Conversation {
@@ -84,34 +86,38 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
   const request = <T,>(method: HttpMethod, path: string, body?: unknown) => http.request<T>(method, path, body);
   const p = '/api/v1';
   return {
-    dashboard: () => request<Dashboard>('GET', p + '/admin/dashboard'),
+    dashboard: async () => dashboardResponse(await request<unknown>('GET', p + '/admin/dashboard')),
     reception: async () => {
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
-      if (!value || !Array.isArray(value.items)) throw new ApiError('UNKNOWN', 'Invalid reception response');
-      return value;
+      return receptionResponse(value);
     },
     reservation: (id: string) => request<Record<string, unknown>>('GET', p + '/admin/reception/reservations/' + encoded(id)),
     checkIn: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + encoded(id) + '/check-in'),
     checkOut: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + encoded(id) + '/check-out'),
-    bookingPreview: (draft: BookingDraft) => request<BookingPreview>('POST', p + '/admin/pms/reservations/new/preview', draft),
-    bookingCommit: (draft: BookingCommit) => request<{ reservation_id: string; booking_number: string; total_kgs: number; price_adjusted_at_commit: boolean }>('POST', p + '/admin/pms/reservations/new/commit', draft),
+    bookingPreview: async (draft: BookingDraft) => bookingPreviewResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/preview', draft)),
+    bookingCommit: async (draft: BookingCommit) => bookingCommitResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/commit', draft)),
     holds: async () => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not implemented in pinned backend');
       const value = await request<{ holds: Hold[] }>('GET', p + '/admin/pms/holds');
       if (!Array.isArray(value?.holds)) throw new ApiError('UNKNOWN', 'Invalid holds list');
       return value.holds;
     },
-    createHold: (draft: {room_id: string;check_in: string;check_out: string;guest_name: string;guest_phone: string}) => request<{id: string;expires_at: string;status: string}>('POST', p + '/admin/pms/holds', draft),
-    releaseHold: (id: string) => request<unknown>('DELETE', p + '/admin/pms/holds/' + encoded(id)),
+    createHold: (draft: {room_id: string;check_in: string;check_out: string;guest_name: string;guest_phone: string}) => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API missing');
+      return request<{id: string;expires_at: string;status: string}>('POST', p + '/admin/pms/holds', draft);
+    },
+    releaseHold: (id: string) => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API missing');
+      return request<unknown>('DELETE', p + '/admin/pms/holds/' + encoded(id));
+    },
     pmsGrid: async (start: string, end: string) => {
       const value = await request<Grid>('GET', p + '/pms/grid?start=' + encoded(start) + '&end=' + encoded(end));
-      if (!value || !Array.isArray(value.rooms)) throw new ApiError('UNKNOWN', 'Invalid PMS grid');
-      return value;
+      return gridResponse(value);
     },
-    conversations: async (needsReply?: boolean) => list<Conversation>(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : ''))),
+    conversations: async (needsReply?: boolean) => inboxListResponse(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : ''))),
     conversation: async (id: string) => {
       const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + encoded(id));
-      if (!value?.conversation || !Array.isArray(value.messages)) throw new ApiError('UNKNOWN', 'Invalid conversation');
-      return value;
+      return conversationResponse(value);
     },
     claimConversation: (id: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + encoded(id) + '/claim'),
     conversationStatus: (id: string, status: ConversationStatus) => request<unknown>('PATCH', p + '/admin/inbox/conversations/' + encoded(id) + '/status', { status }),

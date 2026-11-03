@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble } from
 import { Badge, Button, Empty, PressScale, SectionLabel } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
+import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
@@ -51,7 +52,7 @@ export default function Pms() {
   return <FutureScreen>
     <PremiumHeader title={copy.pms} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
     {live && user && ['OWNER','MANAGER','AGENT'].includes(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
-    {live && user && ['OWNER','MANAGER'].includes(user.role) ? <Button testID="pms-holds" variant="secondary" label={copy.holds} icon={Clock3} onPress={() => router.push('/holds')}/> : null}
+    {live && CONFIRMED_BACKEND_FEATURES.pmsHolds && user && ['OWNER','MANAGER'].includes(user.role) ? <Button testID="pms-holds" variant="secondary" label={copy.holds} icon={Clock3} onPress={() => router.push('/holds')}/> : null}
     <GlassCard style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <PressScale testID="pms-prev" accessibilityLabel={copy.previous} onPress={() => setStart(dayAt(start, -7))}

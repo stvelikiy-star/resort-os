@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Clock3 } from 'lucide-react-native';
 import { Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../src/components/ui';
 import { Hold, localDate, useLiveModules } from '../src/api/liveModules';
+import { CONFIRMED_BACKEND_FEATURES } from '../src/api/features';
 import { ApiError } from '../src/api/types';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
@@ -26,8 +27,8 @@ export default function Holds() {
   const [end, setEnd] = useState(localDate(2));
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const { data, error, loading, reload } = useAsync<Hold[] | null>(() => live ? live.holds() : Promise.resolve(null), [live, user?.id]);
-  const { data: grid } = useAsync(() => live && /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && start < end ? live.pmsGrid(start, end) : Promise.resolve(null), [live,start,end]);
+  const { data, error, loading, reload } = useAsync<Hold[] | null>(() => live && CONFIRMED_BACKEND_FEATURES.pmsHolds ? live.holds() : Promise.resolve(null), [live, user?.id]);
+  const { data: grid } = useAsync(() => live && CONFIRMED_BACKEND_FEATURES.pmsHolds && /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && start < end ? live.pmsGrid(start, end) : Promise.resolve(null), [live,start,end]);
   const mutation = async (run: () => Promise<unknown>) => {
     if (lock.current || unknown) return;
     lock.current=true; setBusy(true); setErrorMessage(null);
@@ -42,6 +43,7 @@ export default function Holds() {
   const create = () => Alert.alert(copy.confirm,'',[{text:copy.close,style:'cancel'},{text:copy.holdCreate,onPress:()=>void mutation(() => live!.createHold({room_id:room,check_in:start,check_out:end,guest_name:name.trim(),guest_phone:phone.trim()}))}]);
   const release = (id: string) => Alert.alert(copy.confirm,'',[{text:copy.close,style:'cancel'},{text:copy.release,onPress:()=>void mutation(() => live!.releaseHold(id))}]);
   if (!user || !['OWNER','MANAGER'].includes(user.role) || !user.module_permissions?.includes('PMS')) return <Screen><Empty text={copy.denied}/></Screen>;
+  if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) return <Screen><Empty text={copy.holdsUnavailable}/></Screen>;
   return <Screen>
     <PressScale onPress={() => router.back()} style={{minHeight:44,flexDirection:'row',alignItems:'center'}}><ChevronLeft color={c.primary} size={24}/><Text style={[font.body,{color:c.primary}]}>{copy.close}</Text></PressScale>
     <View style={{flexDirection:'row',gap:space.md,alignItems:'center'}}><Clock3 color={c.primary} size={28}/><Title>{copy.holds}</Title></View>

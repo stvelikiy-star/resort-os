@@ -17,7 +17,7 @@ describe('verified mobile live API boundaries', () => {
     expect('sendText' in api).toBe(false);
   });
   it('decodes the real reception camelCase list without guessing the values', async () => {
-    const original = { local_date: '2026-11-03', items: [{ id: 'r1', bookingNumber: 'M-100', remainingKgs: 1200 }] };
+    const original = { local_date: '2026-11-03', items: [{ id: 'r1', bookingNumber: 'M-100', status: 'GUARANTEED', checkIn:'2026-11-03', checkOut:'2026-11-04', remainingKgs: 1200 }] };
     const transport = jest.fn(async () => payload(original));
     const api = createLiveModules('https://hotel.example', transport as unknown as typeof fetch);
     expect((await api.reception()).items[0].remainingKgs).toBe(1200);
