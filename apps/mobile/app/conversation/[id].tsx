@@ -30,7 +30,7 @@ export default function ConversationScreen() {
     catch(e) { setFeedback(e instanceof Error ? e.message : copy.unknown); }
     finally { locked.current = false; setBusy(false); }
   };
-  if (!user || !user.module_permissions?.includes('WHATSAPP') || !['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
+  if (!user || !(user.module_permissions?.includes('WHATSAPP') || (user.role !== 'RECEPTION' && user.module_permissions?.includes('INBOX'))) || !['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const conversation = data?.conversation;
   return <FutureScreen>
     <PressScale onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6 }}><ChevronLeft size={22} color={c.primary}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
