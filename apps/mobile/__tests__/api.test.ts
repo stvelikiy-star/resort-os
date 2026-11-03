@@ -82,6 +82,24 @@ describe('real api contract (mock fetch)', () => {
     const off = createRealApi('https://h.example', (async () => { throw new TypeError('x'); }) as unknown as typeof fetch);
     await expect(off.me()).rejects.toMatchObject({ code: 'OFFLINE' });
   });
+  it('reads the canonical maintenance task after the create endpoint returns only id/status', async () => {
+    const { f, calls } = mk([
+      { status: 201, body: { id: 'created-1', status: 'OPEN' } },
+      { status: 200, body: [{ id: 'created-1', type: 'MAINTENANCE', status: 'OPEN', title: 'Leak', priority: 'HIGH' }] },
+    ]);
+    const api = createRealApi('https://hotel.example', f);
+    const created = await api.createMaintenance({ room_id: null, category: 'PLUMBING', priority: 'HIGH', description: 'Leak' });
+    expect(created).toMatchObject({ id: 'created-1', type: 'MAINTENANCE', title: 'Leak', priority: 'HIGH' });
+    expect(calls[0].url).toBe('https://hotel.example/api/v1/ops/tasks');
+    expect(calls[1].url).toBe('https://hotel.example/api/v1/ops/tasks?limit=300');
+  });
+  it('rejects an incomplete create response rather than rendering a false task', async () => {
+    const { f } = mk([{ status: 201, body: { status: 'OPEN' } }]);
+    await expect(createRealApi('https://hotel.example', f).createMaintenance({
+      room_id: null, category: 'OTHER', priority: 'NORMAL', description: 'Door issue',
+    })).rejects.toMatchObject({ code: 'UNKNOWN' });
+  });
+
   it('uses backend routes for tasks, status, assignee, complete-report', async () => {
     const { f, calls } = mk([{ body: [] }, {}, { body: [{ id: 't', type: 'MAINTENANCE', status: 'DONE' }] }, {}, { body: [{ id: 't', type: 'HOUSEKEEPING', status: 'IN_INSPECTION' }] }, {}, { body: [{ id: 't', type: 'HOUSEKEEPING', status: 'OPEN' }] }]);
     const a = createRealApi('https://h.example', f);
