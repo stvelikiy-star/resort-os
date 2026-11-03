@@ -55,7 +55,7 @@ function Probe() {
   </>;
 }
 it('theme switches without remounting the route and persists preference', async () => {
-  const result = render(<ThemeProvider initial="light"><Probe/></ThemeProvider>);
+  const result = await render(<ThemeProvider initial="light"><Probe/></ThemeProvider>);
   expect(result.getByTestId('future-theme').props.children).toEqual(['light', ':', 'light']);
   fireEvent.press(result.getByTestId('future-theme-toggle'));
   await waitFor(() => expect(result.getByTestId('future-theme').props.children).toEqual(['dark', ':', 'dark']));
