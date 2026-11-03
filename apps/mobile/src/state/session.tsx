@@ -140,7 +140,12 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const signOut = useCallback(async () => {
     if (!hotel || !api) return;
     sessionRevision.current++;
-    try { await api.logout(); } finally {
+    try {
+      await api.logout();
+    } catch {
+      // A failed network logout must not leave employee data visible locally.
+      // The server session may remain valid until it expires/revocation.
+    } finally {
       dropApi(hotel.id);
       setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
     }
