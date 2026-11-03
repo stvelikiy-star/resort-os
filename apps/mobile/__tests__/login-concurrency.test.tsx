@@ -37,7 +37,7 @@ it('ignores an earlier login response that arrives after the latest account', as
       else releaseManager = resolve;
     }),
   };
-  const screen = render(
+  const screen = await render(
     <SessionProvider initialLocale="ru" initialHotelId="demo-marina-issykkul">
       <Probe />
     </SessionProvider>,
