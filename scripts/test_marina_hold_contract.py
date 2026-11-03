@@ -36,6 +36,17 @@ class HoldContractTests(unittest.TestCase):
         self.assertIn('payload.check_in < local_today', api)
         self.assertNotIn('payload.check_out <= local_today', api)
 
+    def test_hold_uses_authenticated_property_boundary(self):
+        api = (ROOT / "services/api/app/pms_holds.py").read_text()
+        auth = (ROOT / "services/api/app/auth.py").read_text()
+        self.assertIn("from .auth import require_roles, trusted_property_id", api)
+        self.assertIn("return await trusted_property_id(conn, user)", api)
+        self.assertNotIn('SELECT id FROM properties WHERE code=$1', api)
+        self.assertIn("async def trusted_property_id(conn, user:", auth)
+        for route in ("create_hold", "list_holds", "get_hold", "release_hold"):
+            handler = api.split(f"async def {route}(", 1)[1]
+            self.assertIn("await property_id(conn, user)", handler.split("\n\n@", 1)[0])
+
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()
         grid = (ROOT / "apps/admin/components/PMSOwnerGrid.tsx").read_text()
