@@ -8,7 +8,7 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-chessboard"])
@@ -74,8 +74,13 @@ def _nights(start: date, end: date) -> list[date]:
     return [start + timedelta(days=index) for index in range((end - start).days)]
 
 
-async def _property(conn, property_code: str):
-    row = await conn.fetchrow('SELECT id,timezone,currency FROM properties WHERE code=$1', property_code)
+async def _property(conn, user: dict[str, Any]):
+    # Resolve the immutable property from the DB-validated authenticated session.
+    # The displayed property code is a label, never authority for room mutation.
+    property_id = await trusted_property_id(conn, user)
+    row = await conn.fetchrow(
+        'SELECT id,timezone,currency FROM properties WHERE id=$1', property_id
+    )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
     return row
@@ -450,16 +455,21 @@ async def _record_actual_relocation(
 async def preview_schedule(reservation_id: uuid.UUID, payload: SchedulePreviewPayload, request: Request, user: dict[str, Any] = Depends(manager_access)):
     proposed = _normalize_segments(payload.segments)
     async with request.app.state.db.acquire() as conn:
-        prop = await _property(conn, user["property_code"])
-        reservation = await _reservation(conn, reservation_id, prop["id"])
-        if not reservation:
-            raise HTTPException(status_code=404, detail="Reservation not found")
-        current_rows = await _current_blocks(conn, reservation_id)
-        current_room_ids = {row["roomId"] for row in current_rows}
-        room_ids = sorted(current_room_ids | {item.room_id for item in proposed}, key=str)
-        rooms = await _load_rooms(conn, prop["id"], room_ids)
-        local_today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
-        return await _build_preview(conn, reservation, current_rows, proposed, rooms, local_today)
+        async with conn.transaction():
+            prop = await _property(conn, user)
+            # A stale hold cannot prevent a legitimate date change just because
+            # the shared periodic expiry sweep has not run yet.
+            from .pms_holds import expire_holds
+            await expire_holds(conn, prop["id"])
+            reservation = await _reservation(conn, reservation_id, prop["id"])
+            if not reservation:
+                raise HTTPException(status_code=404, detail="Reservation not found")
+            current_rows = await _current_blocks(conn, reservation_id)
+            current_room_ids = {row["roomId"] for row in current_rows}
+            room_ids = sorted(current_room_ids | {item.room_id for item in proposed}, key=str)
+            rooms = await _load_rooms(conn, prop["id"], room_ids)
+            local_today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
+            return await _build_preview(conn, reservation, current_rows, proposed, rooms, local_today)
 
 
 @router.post("/reservations/{reservation_id}/schedule/commit")
@@ -468,7 +478,9 @@ async def commit_schedule(reservation_id: uuid.UUID, payload: ScheduleCommitPayl
     try:
         async with request.app.state.db.acquire() as conn:
             async with conn.transaction():
-                prop = await _property(conn, user["property_code"])
+                prop = await _property(conn, user)
+                from .pms_holds import expire_holds
+                await expire_holds(conn, prop["id"])
                 reservation = await _reservation(conn, reservation_id, prop["id"], lock=True)
                 if not reservation:
                     raise HTTPException(status_code=404, detail="Reservation not found")
