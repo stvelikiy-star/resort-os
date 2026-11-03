@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Building2, Link2, QrCode, ShieldCheck } from 'lucide-react-native';
@@ -60,6 +60,11 @@ export default function Connect() {
         <Button testID="connect-add" label={t('connect.addHotel')} icon={Link2} onPress={add} />
         <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
       </Card>
+      {Platform.OS === 'web' ? (
+        <Card testID="web-live-cookie-notice" style={{ backgroundColor: c.warningSoft, gap: space.sm }}>
+          <Text style={[font.small, { color: c.text }]}>{t('connect.browserLiveNotice')}</Text>
+        </Card>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <ShieldCheck size={18} color={c.success} /><Text style={[font.small, { color: c.textMuted, flex: 1 }]}>{t('connect.noSecrets')}</Text>
       </View>
