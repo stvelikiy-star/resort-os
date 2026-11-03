@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getLocales } from 'expo-localization';
 import { apiFor, dropApi } from '../api/factory';
 import { DEMO_HOTELS, HotelConnection, parseHotelAddress } from '../api/hotels';
@@ -28,6 +28,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const [hotelId, setHotelId] = useState<string | null>(initialHotelId ?? null);
   // Sessions are keyed by hotel id: signing in to hotel A never exposes data of hotel B.
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
+  const sessionRevision = useRef(0);
   initI18n(locale);
 
   useEffect(() => {
@@ -63,16 +64,26 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const api = hotel ? apiFor(hotel) : null;
 
   const setLocale = useCallback((l: Locale) => { setLocaleState(l); void setItem('marina.locale', l); }, []);
+  const selectHotel = useCallback((id: string | null) => {
+    // A hotel switch is a security boundary: do not reuse an earlier user
+    // session merely because the device previously opened that property.
+    if (id === hotelId) return;
+    sessionRevision.current++;
+    if (hotelId) dropApi(hotelId);
+    setSessions({});
+    setHotelId(id);
+  }, [hotelId]);
   const addHotel = useCallback((h: HotelConnection) => {
     setHotels((cur) => {
       const next = cur.some((x) => x.id === h.id) ? cur : [...cur, h];
       void setItem('marina.hotels', JSON.stringify(next.filter((x) => !x.demo)));
       return next;
     });
-    setHotelId(h.id);
-  }, []);
+    selectHotel(h.id);
+  }, [selectHotel]);
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
+    const revision = sessionRevision.current;
     const signedIn = await api.login(username, password);
     // A native cookie may not persist after a successful login response.
     // Confirm that subsequent authenticated requests resolve to the SAME user.
@@ -83,11 +94,13 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         verified.id !== signedIn.id || verified.property_code !== signedIn.property_code) {
       throw new ApiError('UNAUTHORIZED', 'Session or hotel identity changed during login');
     }
+    if (sessionRevision.current !== revision) throw new ApiError('UNAUTHORIZED', 'Hotel changed during login');
     setSessions((s) => ({ ...s, [hotel.id]: verified }));
     return verified;
   }, [hotel, api]);
   const signOut = useCallback(async () => {
     if (!hotel || !api) return;
+    sessionRevision.current++;
     try { await api.logout(); } finally {
       dropApi(hotel.id);
       setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
@@ -95,8 +108,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   }, [hotel, api]);
 
   const value = useMemo<SessionCtx>(() => ({
-    hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel: setHotelId, signIn, signOut, leaveHotel: () => setHotelId(null),
-  }), [hotels, hotel, user, api, locale, setLocale, addHotel, signIn, signOut]);
+    hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, signOut, leaveHotel: () => selectHotel(null),
+  }), [hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
