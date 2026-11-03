@@ -2,6 +2,7 @@ name: MARINA HOLD Contract CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/app/pms_holds.py'
       - 'services/api/app/pms_reservation_create.py'
       - 'apps/admin/components/PMSNewReservationModal.tsx'

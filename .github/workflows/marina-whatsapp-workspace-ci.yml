@@ -3,6 +3,7 @@ name: MARINA WhatsApp Workspace CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'apps/admin/components/WhatsAppWorkspace.tsx'
       - 'apps/admin/components/WhatsAppConnection.tsx'
       - 'apps/admin/components/WhatsAppWorkspace.module.css'

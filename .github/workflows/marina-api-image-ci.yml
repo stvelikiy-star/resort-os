@@ -3,6 +3,7 @@ name: MARINA SMART API Image CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/marina_staging_readiness.py'

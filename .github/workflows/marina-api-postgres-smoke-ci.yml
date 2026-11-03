@@ -3,6 +3,7 @@ name: MARINA SMART Isolated PostgreSQL API Smoke
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/bootstrap_marina_test.py'

@@ -3,6 +3,7 @@ name: MARINA zz113 Isolated Rollback Rehearsal
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - '.github/workflows/marina-zz113-rollback-ci.yml'
       - 'packages/database/prisma/migrations/**'
   workflow_dispatch:

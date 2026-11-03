@@ -2,6 +2,7 @@ name: MARINA HOLD zz114 Migration and Rollback CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'packages/database/prisma/migrations/zz114_marina_60minute_holds_20261029/**'
       - '.github/workflows/marina-hold-migration.yml'
   workflow_dispatch:
