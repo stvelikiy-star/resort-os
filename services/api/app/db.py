@@ -46,13 +46,21 @@ async def lifespan(app: FastAPI):
         command_timeout=15,
     )
     async def hold_expiration_worker():
-        # Database timestamps survive API restarts.
+        # Only a property-pinned runtime may run this background mutation.
+        # Shared authentication preview does not provide an authorized worker
+        # tenant context; a dedicated multi-hotel scheduler is required later.
+        from .auth import MARINA_TENANT_CONTEXT_ENABLED, PROPERTY_CODE
         from .pms_holds import expire_holds
         while True:
             try:
-                async with app.state.db.acquire() as conn:
-                    async with conn.transaction():
-                        await expire_holds(conn)
+                if not MARINA_TENANT_CONTEXT_ENABLED:
+                    async with app.state.db.acquire() as conn:
+                        async with conn.transaction():
+                            property_id = await conn.fetchval(
+                                'SELECT id FROM properties WHERE code=$1', PROPERTY_CODE
+                            )
+                            if property_id is not None:
+                                await expire_holds(conn, property_id)
             except Exception:
                 logging.getLogger(__name__).exception("HOLD expiration worker failed")
             await asyncio.sleep(30)
