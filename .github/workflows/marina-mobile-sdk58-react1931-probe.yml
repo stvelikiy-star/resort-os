@@ -1,0 +1,75 @@
+name: MARINA Mobile Expo 58 React 19.3.1 Isolated Compatibility Probe
+on:
+  push:
+    branches:
+      - 'probe/marina-mobile-sdk58-react1931-r2-20261104'
+    paths:
+      - '.github/workflows/marina-mobile-sdk58-react1931-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sdk58-probe:
+    name: Unmerged Expo React patched compatibility and Android trial
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Regenerate disposable compatible manifest and lock
+        run: |
+          set -euo pipefail
+          npm pkg set 'dependencies.react=19.3.1' 'dependencies.react-dom=^19.3.1' 'devDependencies.react-test-renderer=^19.3.1'
+          npm pkg set 'dependencies.@expo/metro-runtime=~58.0.17' 'dependencies.expo=~58.0.23' 'dependencies.expo-constants=~58.0.15' 'dependencies.expo-linking=~58.0.16' 'dependencies.expo-router=~58.0.30' 'dependencies.react-native-safe-area-context=~5.11.1' 'devDependencies.jest-expo=~58.0.14'
+          rm package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff -- package.json package-lock.json > /tmp/marina-sdk58-react1931-candidate.patch
+          git diff --stat -- package.json package-lock.json
+      - name: Install and capture Expo SDK alignment conflict (advisory in probe only)
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo install --check > /tmp/marina-sdk58-compatibility.txt 2>&1 || true
+          cat /tmp/marina-sdk58-compatibility.txt
+          npm ls react react-dom react-native expo expo-router react-server-dom-webpack --depth=1 || true
+      - name: Source checks and authoritative backend pin
+        run: |
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.nodecheck.mjs
+          npm run typecheck
+          npm run lint
+          npm test -- --ci --runInBand
+          npm run web:export
+      - name: Build isolated standalone Android APK
+        run: |
+          npx expo prebuild --platform android --no-install --non-interactive
+          cd android
+          ./gradlew :app:assembleRelease --no-daemon
+          test -s app/build/outputs/apk/release/app-release.apk
+          unzip -Z1 app/build/outputs/apk/release/app-release.apk | grep -Fx 'assets/index.android.bundle'
+      - name: Preserve raw audit advisory inventory
+        if: always()
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-sdk58-react1931-audit.json || true
+          node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('/tmp/marina-sdk58-react1931-audit.json','utf8')); console.log('PROBE_AUDIT:',JSON.stringify(a.metadata?.vulnerabilities??{}))"
+      - name: Strict Expo version requirement (must stay red on mismatch)
+        run: npx expo install --check
+      - name: Publish review evidence without committing patches
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-sdk58-react1931-probe
+          path: |
+            /tmp/marina-sdk58-compatibility.txt
+            /tmp/marina-sdk58-react1931-candidate.patch
+            /tmp/marina-sdk58-react1931-audit.json
+          retention-days: 7
+          if-no-files-found: warn
