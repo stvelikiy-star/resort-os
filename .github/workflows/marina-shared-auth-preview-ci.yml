@@ -12,6 +12,7 @@ on:
       - '.github/workflows/marina-shared-auth-preview-ci.yml'
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/app/auth.py'
       - 'services/api/app/shared_auth_preview.py'
       - 'services/api/app/main.py'

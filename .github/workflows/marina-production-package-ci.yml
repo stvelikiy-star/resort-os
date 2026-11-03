@@ -3,6 +3,7 @@ name: MARINA SMART Ubuntu Production Package CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'compose.marina-production.yaml'
       - '.env.marina-production.example'
       - 'deploy/marina/**'

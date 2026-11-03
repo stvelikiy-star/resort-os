@@ -3,6 +3,7 @@ name: MARINA SMART Full Stack Synthetic Smoke
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'apps/web/**'
       - 'apps/admin/**'
       - 'apps/staff/**'

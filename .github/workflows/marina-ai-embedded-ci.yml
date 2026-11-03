@@ -3,6 +3,7 @@ name: marina-ai-embedded-ci
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/app/marina_assistant.py'
       - 'services/api/app/guest_assistant.py'
       - 'services/api/app/section_permissions.py'

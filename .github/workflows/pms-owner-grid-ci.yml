@@ -3,6 +3,7 @@ name: PMS Owner Grid CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/**'
       - 'apps/admin/**'
       - 'scripts/verify_pms_owner_grid.py'

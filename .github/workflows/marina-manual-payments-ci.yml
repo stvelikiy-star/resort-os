@@ -2,6 +2,7 @@ name: MARINA Manual Payments No QR CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'apps/admin/components/ReservationFolioPanel.tsx'
       - 'services/api/app/reservation_payments.py'
       - 'compose.marina-fleet.yaml'

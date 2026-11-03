@@ -3,6 +3,7 @@ name: MARINA Two-Property Isolation and Restore CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/marina_two_property_restore_e2e.py'

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
 from pathlib import Path
 
 from release_contract import EXPECTED_MIGRATIONS
@@ -11,8 +12,47 @@ from release_contract import EXPECTED_MIGRATIONS
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "release" / "marina-smart-current-candidate.json"
 STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
-EXPECTED_BRANCH = "fix/marina-staging-preflight-20261020"
-EXPECTED_PR = 244
+EXPECTED_BRANCH = "release/marina-shared-platform-rc1-20261103"
+EXPECTED_PR = 284
+REQUIRED_WORKFLOWS = frozenset({
+    "marina-staging-readiness-ci.yml", "marina-rc1-source-gate.yml",
+    "marina-full-stack-smoke-ci.yml", "marina-two-property-restore-ci.yml",
+    "marina-shared-auth-preview-ci.yml", "marina-hold-contract.yml",
+    "marina-hold-migration.yml", "marina-zz113-rollback-ci.yml",
+    "staff-roles-ci.yml", "pms-chessboard-ci.yml", "pms-owner-grid-ci.yml",
+    "marina-smart-hotel-setup-ci.yml", "marina-ai-embedded-ci.yml",
+    "marina-whatsapp-workspace-ci.yml", "marina-hotel-knowledge-ci.yml",
+    "marina-manual-payments-ci.yml", "marina-production-package-ci.yml",
+    "marina-api-image-ci.yml", "marina-api-postgres-smoke-ci.yml",
+})
+
+
+def validate_source_lock(manifest: dict, root: Path) -> list[str]:
+    """Verify source evidence only; never infer a successful CI or deployment."""
+    errors = []
+    migration_dir = root / "packages/database/prisma/migrations"
+    actual = {p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in sorted(migration_dir.glob("*/migration.sql"))}
+    if manifest.get("migration_sha256") != actual:
+        errors.append("migration SHA-256 lock differs from committed SQL")
+    required = manifest.get("required_workflows")
+    if (not isinstance(required, list) or not all(isinstance(x, str) for x in required)
+            or len(required) != len(REQUIRED_WORKFLOWS)
+            or set(required) != REQUIRED_WORKFLOWS):
+        errors.append("mandatory workflow set is incomplete or duplicated")
+    for name in sorted(REQUIRED_WORKFLOWS):
+        path = root / ".github/workflows" / name
+        if not path.is_file():
+            errors.append(f"missing required workflow: {name}")
+            continue
+        source = path.read_text(encoding="utf-8")
+        # Restrict the check to the PR event; a push-only trigger is insufficient.
+        pr_section = source.split("  pull_request:\n", 1)[-1].split("  workflow_dispatch:", 1)[0]
+        if "  pull_request:\n" not in source or "'release/marina-smart-current-candidate.json'" not in pr_section:
+            errors.append(f"candidate manifest does not trigger required workflow: {name}")
+    if manifest.get("release_stage") != "SOURCE_LOCKED_SHARED_RUNTIME_PENDING":
+        errors.append("shared runtime acceptance must remain pending")
+    return errors
 
 
 def main() -> int:
@@ -56,6 +96,8 @@ def main() -> int:
     actual_migrations = tuple(sorted(p.parent.name for p in migrations.glob("*/migration.sql")))
     if len(actual_migrations) != len(EXPECTED_MIGRATIONS) or set(actual_migrations) != set(EXPECTED_MIGRATIONS):
         errors.append("committed migration files differ from the reviewed release contract")
+
+    errors.extend(validate_source_lock(manifest, ROOT))
 
     try:
         state = STATE_PATH.read_text(encoding="utf-8")

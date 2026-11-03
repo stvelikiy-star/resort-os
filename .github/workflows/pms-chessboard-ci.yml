@@ -11,6 +11,7 @@ on:
       - '.github/workflows/pms-chessboard-ci.yml'
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/**'
