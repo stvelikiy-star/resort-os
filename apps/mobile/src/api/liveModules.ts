@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useSession } from '../state/session';
-import { parseHotelAddress } from './hotels';
+import { isTrustedHotelOrigin, parseHotelAddress } from './hotels';
 import { ApiError } from './types';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
@@ -155,7 +155,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
 }
 export function useLiveModules() {
   const { hotel, api } = useSession();
-  return useMemo(() => hotel && api?.mode === 'LIVE' ? createLiveModules(hotel.baseUrl) : null, [hotel, api?.mode]);
+  return useMemo(() => hotel && api?.mode === 'LIVE' && isTrustedHotelOrigin(hotel.baseUrl) ? createLiveModules(hotel.baseUrl) : null, [hotel, api?.mode]);
 }
 
 /** Hotel-local calendar dates for the occupancy grid; do not use UTC toISOString(). */

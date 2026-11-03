@@ -9,7 +9,7 @@ import { FutureScreen, GlassCard, StaggerItem } from '../../src/components/Futur
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
-import { hotelConnectionId, parseHotelAddress } from '../../src/api/hotels';
+import { hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../../src/api/hotels';
 import { LOCALE_LABEL, LOCALES, Locale } from '../../src/i18n';
 
 export default function Connect() {
@@ -22,10 +22,15 @@ export default function Connect() {
   const [err, setErr] = useState<string | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
 
-  const open = (id: string) => { selectHotel(id); router.push('/login'); };
+  const open = (id: string) => {
+    const chosen = hotels.find(h => h.id === id);
+    if (!chosen || (!chosen.demo && !isTrustedHotelOrigin(chosen.baseUrl))) { setErr(t('connect.untrusted')); return; }
+    selectHotel(id); router.push('/login');
+  };
   const add = () => {
     const r = parseHotelAddress(addr);
     if (!r.ok) { setErr(t(`connect.${r.reason}`)); return; }
+    if (!isTrustedHotelOrigin(r.baseUrl)) { setErr(t('connect.untrusted')); return; }
     const host = new URL(r.baseUrl).hostname;
     addHotel({ id: hotelConnectionId(r.baseUrl), name: host, city: '', baseUrl: r.baseUrl, demo: false, accent: c.primary });
     setErr(null); router.push('/login');

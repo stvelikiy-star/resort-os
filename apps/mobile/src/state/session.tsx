@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { getLocales } from 'expo-localization';
 import { AppState } from 'react-native';
 import { apiFor, dropApi } from '../api/factory';
-import { DEMO_HOTELS, HotelConnection, hotelConnectionId, parseHotelAddress } from '../api/hotels';
+import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
 import type { AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
@@ -55,7 +55,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
           const h = item as Partial<HotelConnection>;
           if (h.demo !== false || typeof h.baseUrl !== 'string') continue;
           const parsed = parseHotelAddress(h.baseUrl);
-          if (!parsed.ok) continue;
+          if (!parsed.ok || !isTrustedHotelOrigin(parsed.baseUrl)) continue;
           const id = hotelConnectionId(parsed.baseUrl);
           const host = new URL(parsed.baseUrl).hostname;
           if (known.has(id) || hosts.has(host) || extra.length >= 20) continue;
@@ -115,13 +115,16 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // A hotel switch is a security boundary: do not reuse an earlier user
     // session merely because the device previously opened that property.
     if (id === hotelId) return;
+    const candidate = hotels.find(h => h.id === id);
+    if (candidate && !candidate.demo && !isTrustedHotelOrigin(candidate.baseUrl)) return;
     sessionRevision.current++;
     loginAttempt.current++;
     if (hotelId) dropApi(hotelId);
     setSessions({});
     setHotelId(id);
-  }, [hotelId]);
+  }, [hotelId, hotels]);
   const addHotel = useCallback((h: HotelConnection) => {
+    if (h.demo || !isTrustedHotelOrigin(h.baseUrl)) throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
     setHotels((cur) => {
       // Cookies are held in the native OS cookie jar, which is shared by
       // /api/v1 and /core/api/v1 on the same host. Avoid presenting both
@@ -166,6 +169,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
 
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
+    if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) throw new ApiError('FORBIDDEN', 'Untrusted hotel address');
     const revision = sessionRevision.current;
     const attempt = ++loginAttempt.current;
     const signedIn = await api.login(username, password);

@@ -61,8 +61,12 @@ it('replaces a same-host root API connection with /core instead of presenting sh
   const screen = await render(
     <SessionProvider initialLocale="ru"><ConnectionProbe /></SessionProvider>,
   );
+  const previousTrust = process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS;
+  process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS = 'https://hotel.example,https://hotel.example/core';
+  try {
   fireEvent.press(screen.getByTestId('add-root'));
   await waitFor(() => expect(screen.getByTestId('connected-origins').props.children).toBe('https://hotel.example'));
   fireEvent.press(screen.getByTestId('add-core'));
   await waitFor(() => expect(screen.getByTestId('connected-origins').props.children).toBe('https://hotel.example/core'));
+  } finally { if (previousTrust === undefined) delete process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS; else process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS = previousTrust; }
 });
