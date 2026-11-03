@@ -32,15 +32,15 @@ export default function Tasks() {
     <Screen>
       <FadeIn>
         <Hero>
-          <Text style={[font.label, { color: '#CDEEEC' }]}>{hotel?.name.toUpperCase()} · {t(`roles.${user!.role}`).toUpperCase()}</Text>
+          <Text style={[font.label, { color: '#D4E3F4' }]}>{hotel?.name.toUpperCase()} · {t(`roles.${user!.role}`).toUpperCase()}</Text>
           <Text style={[font.title, { color: '#fff', marginTop: 4 }]}>{user!.display_name}</Text>
           <View style={{ marginTop: space.lg, gap: 6 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={[font.small, { color: '#CDEEEC' }]}>{t('tasks.progress')}</Text>
+              <Text style={[font.small, { color: '#D4E3F4' }]}>{t('tasks.progress')}</Text>
               <Text testID="progress-pct" style={[font.small, { color: '#fff', fontWeight: '800' }]}>{pct}%</Text>
             </View>
-            <View style={{ height: 10, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.25)' }}>
-              <View style={{ width: `${pct}%`, height: 10, borderRadius: 6, backgroundColor: '#E9B872' }} />
+            <View style={{ height: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.25)' }}>
+              <View style={{ width: `${pct}%`, height: 11, borderRadius: 8, backgroundColor: c.accent }} />
             </View>
           </View>
         </Hero>
