@@ -1,4 +1,4 @@
-import { parseHotelAddress } from './hotels';
+import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError, AuthUser, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
@@ -9,36 +9,12 @@ type Fetch = typeof fetch;
  * Bearer/refresh tokens + device registry are backend work item B1/B2 (see docs) and are NOT assumed here.
  */
 export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffApi {
-  const validated = parseHotelAddress(baseUrl);
-  if (!validated.ok) throw new Error('Invalid or insecure hotel API origin');
-  const root = validated.baseUrl;
+  const http = createHotelHttpClient(baseUrl, fetchImpl);
   // Most recent server-provided records for safe post-commit readback fallback.
   // Never synthesize an unseen task or claim that a missing write succeeded.
   const lastKnownTasks = new Map<string, Task>();
 
-  async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let res: Response;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
-    try {
-      res = await fetchImpl(`${root}${path}`, {
-        method, credentials: 'include', signal: controller.signal,
-        headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-    } catch {
-      throw new ApiError('OFFLINE');
-    } finally {
-      clearTimeout(timeout);
-    }
-    if (res.status === 204) return undefined as T;
-    if (!res.ok) {
-      const code = res.status === 401 ? 'UNAUTHORIZED' : res.status === 403 ? 'FORBIDDEN' : res.status === 404 ? 'NOT_FOUND' : res.status === 409 ? 'CONFLICT' : res.status === 400 || res.status === 422 ? 'BAD_REQUEST' : 'UNKNOWN';
-      throw new ApiError(code, `HTTP ${res.status}`);
-    }
-    try { return (await res.json()) as T; }
-    catch { throw new ApiError('UNKNOWN', 'Invalid JSON response from hotel API'); }
-  }
+  const call = <T,>(method: string, path: string, body?: unknown) => http.request<T>(method as HttpMethod, path, body);
 
   const mapTask = (t: any): Task => {
     if (!t || typeof t.id !== 'string' || !t.id || !['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'].includes(t.type) || !['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(t.status)) throw new ApiError('UNKNOWN', 'Invalid task record');

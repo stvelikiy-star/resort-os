@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useSession } from '../state/session';
-import { isTrustedHotelOrigin, parseHotelAddress } from './hotels';
+import { isTrustedHotelOrigin } from './hotels';
+import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
@@ -79,35 +80,8 @@ function list<T>(payload: unknown): T[] {
   return (payload as { items: T[] }).items;
 }
 export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch) {
-  const parsed = parseHotelAddress(baseUrl);
-  if (!parsed.ok) throw new Error('HTTPS hotel origin required');
-  const root = parsed.baseUrl;
-  async function request<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
-    let response: Response;
-    try {
-      response = await transport(root + path, {
-        method, credentials: 'include', signal: controller.signal,
-        headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
-        body: body === undefined ? undefined : JSON.stringify(body),
-      });
-    } catch {
-      throw new ApiError('OFFLINE', 'Hotel connection unavailable');
-    } finally {
-      clearTimeout(timeout);
-    }
-    if (!response.ok) {
-      if (response.status === 503) throw new ApiError('UNKNOWN', 'Hotel workspace is unavailable in this environment (HTTP 503)');
-      const code = response.status === 401 ? 'UNAUTHORIZED' : response.status === 403 ? 'FORBIDDEN'
-        : response.status === 404 ? 'NOT_FOUND' : response.status === 409 ? 'CONFLICT'
-        : response.status === 400 || response.status === 422 ? 'BAD_REQUEST' : 'UNKNOWN';
-      throw new ApiError(code, 'HTTP ' + response.status);
-    }
-    if (response.status === 204) return undefined as T;
-    try { return await response.json() as T; }
-    catch { throw new ApiError('UNKNOWN', 'Invalid hotel API response'); }
-  }
+  const http = createHotelHttpClient(baseUrl, transport);
+  const request = <T,>(method: HttpMethod, path: string, body?: unknown) => http.request<T>(method, path, body);
   const p = '/api/v1';
   return {
     dashboard: () => request<Dashboard>('GET', p + '/admin/dashboard'),
