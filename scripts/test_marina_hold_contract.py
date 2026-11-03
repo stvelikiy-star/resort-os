@@ -62,9 +62,9 @@ class HoldContractTests(unittest.TestCase):
     def test_background_worker_uses_only_pinned_hotel(self):
         db = (ROOT / "services/api/app/db.py").read_text()
         self.assertIn(
-            "from .auth import MARINA_TENANT_CONTEXT_ENABLED, PROPERTY_CODE", db
+            "from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, PROPERTY_CODE", db
         )
-        self.assertIn("if not MARINA_TENANT_CONTEXT_ENABLED:", db)
+        self.assertIn("if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:", db)
         self.assertIn(
             "'SELECT id FROM properties WHERE code=$1', PROPERTY_CODE", db
         )
