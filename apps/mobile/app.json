@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MARINA STAFF",
+    "name": "MARINA SMART STAFF",
     "slug": "marina-staff",
     "scheme": "marinastaff",
     "version": "0.1.0",
@@ -18,7 +18,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Разрешите MARINA SMART сканировать QR-коды гостиниц",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ],
     "web": {
       "bundler": "metro"
