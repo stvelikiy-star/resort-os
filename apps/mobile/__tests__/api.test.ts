@@ -73,6 +73,26 @@ describe('real api contract (mock fetch)', () => {
     expect(calls[0].init.credentials).toBe('include');
     expect(JSON.stringify(calls[0].init.headers)).not.toMatch(/authorization|api[-_]?key/i);
   });
+  it('rejects invalid JSON instead of treating a corrupted API response as success', async () => {
+    const broken = (async () => ({
+      ok: true, status: 200, json: async () => { throw new SyntaxError('not json'); },
+    })) as unknown as typeof fetch;
+    await expect(createRealApi('https://hotel.example', broken).listTasks()).rejects.toMatchObject({ code: 'UNKNOWN' });
+  });
+  it('rejects malformed task and staff responses rather than showing empty work queues', async () => {
+    const { f } = mk([{ body: {} }, { body: { items: [{ id: 'bad', status: 'OPEN' }] } }, { body: {} }]);
+    const a = createRealApi('https://hotel.example', f);
+    await expect(a.listTasks()).rejects.toMatchObject({ code: 'UNKNOWN' });
+    await expect(a.listTasks()).rejects.toMatchObject({ code: 'UNKNOWN' });
+    await expect(a.listStaff()).rejects.toMatchObject({ code: 'UNKNOWN' });
+  });
+  it('uses an abort signal on requests and never stores auth tokens in request headers', async () => {
+    const { f, calls } = mk([{ body: { id: 'a', property_code: 'HOTEL', role: 'MAID' } }]);
+    await createRealApi('https://hotel.example', f).me();
+    expect(calls[0].init.signal).toBeTruthy();
+    expect(calls[0].init.credentials).toBe('include');
+    expect(JSON.stringify(calls[0].init.headers)).not.toMatch(/bearer|token|secret/i);
+  });
   it('maps http errors and network failures', async () => {
     const { f } = mk([{ status: 403 }, { status: 401 }, { status: 409 }]);
     const a = createRealApi('https://h.example', f);
