@@ -195,6 +195,15 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       if (await hasUnrevokedCookieForHost(hotel.baseUrl)) {
         throw new ApiError('PENDING_LOGOUT', 'Previous server logout is still pending');
       }
+      // An OS cookie can outlive a locally cleared or lost logout queue.
+      // Explicitly revoke any stale cookie before sending NEW credentials.
+      // The existing /auth/logout returns 204 even for an anonymous request.
+      // Fail closed if the server cannot confirm this step.
+      try {
+        await api.logout();
+      } catch {
+        throw new ApiError('PENDING_LOGOUT', 'Unable to clear previous hotel session');
+      }
     }
     // Switching hotel or signing out while a pending logout is reconciled
     // must invalidate this in-flight login BEFORE submitting credentials.
