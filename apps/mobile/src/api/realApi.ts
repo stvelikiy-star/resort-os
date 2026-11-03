@@ -13,6 +13,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
   // Most recent server-provided records for safe post-commit readback fallback.
   // Never synthesize an unseen task or claim that a missing write succeeded.
   const lastKnownTasks = new Map<string, Task>();
+  const lastKnownRooms = new Map<string, Room>();
 
   const call = <T,>(method: string, path: string, body?: unknown) => http.request<T>(method as HttpMethod, path, body);
 
@@ -114,14 +115,22 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       for (const t of tasks) if (t.room_id) {
         const existing = seen.get(t.room_id);
         const state = t.room_state ?? 'UNKNOWN';
-        if (!existing) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: 0, state });
+        if (!existing) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: null, state });
         else if (existing.state === 'UNKNOWN' && state !== 'UNKNOWN') existing.state = state;
       }
+      for (const room of seen.values()) lastKnownRooms.set(room.id, room);
       return [...seen.values()];
     },
     async setRoomState(roomId, state: RoomState) {
-      await call('PATCH', `/api/v1/ops/rooms/${roomId}/state`, { state });
-      return { id: roomId, code: '', floor: 0, state };
+      // Never invent the code/floor after changing state. The current server
+      // acknowledges only {room_id,state}; preserve an already observed room.
+      const previous = lastKnownRooms.get(roomId) ?? (await this.listRooms()).find(r => r.id === roomId);
+      if (!previous) throw new ApiError('NOT_FOUND', 'Room is not present in the staff-visible room list');
+      const ack = await call<{room_id: string;state: RoomState}>('PATCH', `/api/v1/ops/rooms/${roomId}/state`, { state });
+      if (!ack || ack.room_id !== roomId || ack.state !== state) throw new ApiError('UNKNOWN', 'Room state acknowledgment not verified');
+      const updated = {...previous, state};
+      lastKnownRooms.set(roomId, updated);
+      return updated;
     },
     async listStaff(): Promise<StaffMember[]> {
       const raw = await call<any>('GET', '/api/v1/admin/staff/overview');

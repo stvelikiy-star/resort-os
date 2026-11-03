@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Clock3 } from 'lucide-react-native';
 import { Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../src/components/ui';
 import { Hold, localDate, useLiveModules } from '../src/api/liveModules';
+import { ApiError } from '../src/api/types';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { useAsync } from '../src/lib/useAsync';
@@ -31,7 +32,11 @@ export default function Holds() {
     if (lock.current || unknown) return;
     lock.current=true; setBusy(true); setErrorMessage(null);
     try { await run(); await reload(); setUnknown(false); setErrorMessage(copy.confirmed); }
-    catch(e) { setUnknown(true); setErrorMessage(e instanceof Error ? e.message : copy.unknown); }
+    catch(e) {
+      const definitive = e instanceof ApiError && ['CONFLICT','BAD_REQUEST','FORBIDDEN','UNAUTHORIZED','RATE_LIMIT','NOT_FOUND'].includes(e.code);
+      setUnknown(!definitive);
+      setErrorMessage(definitive ? copy.conflict : copy.resultUnknown);
+    }
     finally { lock.current=false; setBusy(false); }
   };
   const create = () => Alert.alert(copy.confirm,'',[{text:copy.close,style:'cancel'},{text:copy.holdCreate,onPress:()=>void mutation(() => live!.createHold({room_id:room,check_in:start,check_out:end,guest_name:name.trim(),guest_phone:phone.trim()}))}]);
@@ -61,7 +66,7 @@ export default function Holds() {
     <Field label={copy.guestName} value={name} onChangeText={setName}/>
     <Field label={copy.phone} value={phone} onChangeText={setPhone} keyboardType="phone-pad"/>
     <Button testID="hold-create" disabled={!room||name.trim().length<2||phone.trim().length<5||busy||unknown} label={copy.holdCreate} onPress={create}/>
-    {errorMessage ? <Card><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{errorMessage} · {copy.resultUnknown}</Text></Card>:null}
+    {errorMessage ? <Card><Text accessibilityRole="alert" style={[font.body,{color:unknown?c.warning:c.text}]}>{errorMessage}</Text></Card>:null}
     {unknown ? <Card><Text style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text><Button variant="secondary" label={copy.retry} onPress={()=>{setUnknown(false);void reload();}}/></Card>:null}
   </Screen>;
 }
