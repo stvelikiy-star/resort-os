@@ -1,0 +1,81 @@
+name: MARINA STAFF Mobile Checks
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-staff-mobile-check.yml'
+  push:
+    branches:
+      - 'feat/marina-staff-mobile-foundation-20261030'
+      - 'feat/marina-staff-mobile-app-20261102'
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-staff-mobile-check.yml'
+# Do not waste Android runners rebuilding superseded commits in the same PR.
+# Keep unrelated project workflows and branches completely independent.
+concurrency:
+  group: marina-staff-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  mobile-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify Expo dependency alignment
+        run: npx expo install --check
+      - name: Verify mobile routes against actual PMS source
+        run: node scripts/verify-backend-contract.mjs
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Component, navigation, role and i18n tests
+        run: npm test -- --ci
+      - name: Export mobile web preview
+        run: npm run web:export
+      - name: Validate Expo configuration
+        run: npx expo config --type public --json > /tmp/marina-staff-expo-config.json
+  android-debug:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify preinstalled Android SDK
+        run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME"
+      - name: Install mobile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install --non-interactive
+      - name: Compile Android debug APK
+        run: cd android && ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Attach debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-staff-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
