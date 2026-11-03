@@ -30,6 +30,8 @@ class RuntimeInventoryTests(TestCase):
             def fake_command(argv):
                 if argv[:2] == ["docker", "ps"]:
                     return output
+                if argv[:2] == ["pg_restore", "--list"]:
+                    return "TOC parsed"
                 if argv[:4] == ["docker", "inspect", "--type", "container"]:
                     return "sha256:" + "a" * 64
                 return None
@@ -38,4 +40,24 @@ class RuntimeInventoryTests(TestCase):
         self.assertEqual([x["name"] for x in result["docker"]["containers"]], ["marina-hotel01-api-1"])
         self.assertEqual([x["filename"] for x in result["backups"]["files"]], ["marina-before-release.dump"])
         self.assertEqual(result["docker"]["containers"][0]["image_id"], "sha256:" + "a" * 64)
+        # Fake file is not a PostgreSQL archive and must be rejected.
+        self.assertIs(result["backups"]["files"][0]["custom_archive_listing_ok"], False)
         self.assertFalse(result["backups"]["integrity_checked"])
+
+    def test_pg_restore_listing_reads_only_custom_archive(self):
+        with tempfile.TemporaryDirectory() as root:
+            base = Path(root)
+            backups = base / "backups"
+            backups.mkdir()
+            (backups / "marina-valid.dump").write_bytes(b"PGDMP" + b"synthetic")
+            calls = []
+            def fake_command(argv):
+                calls.append(argv)
+                if argv[:2] == ["pg_restore", "--list"]:
+                    return "TOC"
+                return None
+            with patch("marina_runtime_inventory_readonly.command", side_effect=fake_command):
+                data = inventory(base / "missing", backups)
+        self.assertIs(data["backups"]["files"][0]["custom_archive_listing_ok"], True)
+        self.assertEqual([c[:2] for c in calls if c[0] == "pg_restore"], [["pg_restore", "--list"]])
+        self.assertFalse(data["backups"]["integrity_checked"])
