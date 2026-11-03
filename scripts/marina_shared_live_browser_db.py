@@ -93,6 +93,7 @@ async def verify(conn):
         JOIN properties p ON p.id=r."propertyId"
         JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib.active=true
                                     AND ib."blockType"='RESERVATION'
+        WHERE r.status='GUARANTEED'
         ORDER BY p.code
     ''')
     assert len(rows) == 2, "Exactly one committed reservation per hotel required"
@@ -123,7 +124,7 @@ async def verify(conn):
         assert payment["idempotencyKey"],"Manual payment missing replay protection"
     # The second reservation per hotel was made through real HTTP and cancelled
     # through the real browser; no financial history may be silently refunded.
-    assert await conn.fetchval('SELECT count(*) FROM reservations') == 4
+    assert await conn.fetchval('SELECT count(*) FROM reservations') == 6
     cancelled_rows=await conn.fetch('''
         SELECT r.id,r."propertyId",r.status::text AS status,p.code AS hotel
         FROM reservations r JOIN properties p ON p.id=r."propertyId"
@@ -166,9 +167,57 @@ async def verify(conn):
         assert hold["releasedAt"] is not None, "HOLD not released"
         assert hold["confirmedReservationId"] is None, "Released HOLD unexpectedly confirmed"
         assert hold["active"] is False, "Released HOLD still blocks availability"
-    assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 2
+    # Two additional late-arrival stay fixtures were checked in and checked out
+    # through the shared browser, with one-time guest access revoked on checkout.
+    stayed_rows=await conn.fetch('''
+        SELECT r.id,r."propertyId",r.status::text AS status,r."checkOut",
+               p.code AS hotel,s.id AS stay_id,s.status::text AS stay_status,
+               s."guestAccessPinHash",s."guestAccessPinIssuedAt",s."guestAccessPinExpiresAt",
+               room."operationalState"::text AS room_state
+        FROM reservations r
+        JOIN properties p ON p.id=r."propertyId"
+        JOIN stays s ON s."reservationId"=r.id AND s."propertyId"=r."propertyId"
+        JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib.active=true
+                                 AND ib."blockType"='RESERVATION'
+        JOIN rooms room ON room.id=ib."roomId" AND room."propertyId"=r."propertyId"
+        WHERE r.status='CHECKED_OUT'
+    ''')
+    assert len(stayed_rows)==2,"Expected two closed hotel-local stays"
+    for row in stayed_rows:
+        hotel=row["hotel"]
+        fixture=receipts[hotel]["stay_fixture"]
+        assert str(row["id"])==fixture["reservation_id"]
+        assert row["propertyId"]==property_ids[hotel]
+        assert str(row["stay_id"])==fixture["stay_id"]
+        assert row["stay_status"]=="CHECKED_OUT"
+        assert row["checkOut"].isoformat()==fixture["checkout_local_date"]
+        assert row["guestAccessPinHash"] is None
+        assert row["guestAccessPinIssuedAt"] is None
+        assert row["guestAccessPinExpiresAt"] is None
+        assert row["room_state"]=="DIRTY","Room not sent to cleaning"
+        assert await conn.fetchval('''
+            SELECT count(*) FROM guest_sessions WHERE "stayId"=$1 AND status='ACTIVE'
+        ''',row["stay_id"])==0,"Checkout left a live guest session"
+        assert await conn.fetchval('''
+            SELECT count(*) FROM room_assignments WHERE "stayId"=$1 AND "endedAt" IS NULL
+        ''',row["stay_id"])==0,"Checkout left a live room assignment"
+        task=await conn.fetchrow('''
+            SELECT id,"propertyId",type::text AS type
+            FROM operational_tasks WHERE id=$1
+        ''',uuid.UUID(fixture["housekeeping_task_id"]))
+        assert task and task["propertyId"]==row["propertyId"] and task["type"]=="HOUSEKEEPING"
+        assert await conn.fetchval('''
+            SELECT count(*) FROM audit_logs WHERE "propertyId"=$1
+              AND "resourceId"=$2 AND action IN ('CHECK_IN','CHECK_OUT')
+        ''',row["propertyId"],str(row["id"]))==2,"Missing stay lifecycle audit"
+        assert await conn.fetchval('''
+            SELECT count(*) FROM inventory_blocks
+            WHERE "reservationId"=$1 AND active=true
+              AND "endDate"=$2::date AND "blockType"='RESERVATION'
+        ''',row["id"],date.fromisoformat(fixture["checkout_local_date"]))==1,"Early checkout did not trim nights"
+    assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 4
     assert await conn.fetchval('SELECT count(*) FROM payments') == 2, "Unexpected extra manual payment"
-    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, 2 schedule-mutated active bookings, 2 cancelled unpaid fixtures, 2 manually recorded payments, 2 released HOLDs, tenant isolation and audit")
+    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, booked and rescheduled, 2 unpaid cancellations, 2 manual payments, 2 HOLD releases, 2 check-in/PIN/out/housekeeping lifecycles; no cross-tenant access")
 
 
 async def main():
