@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import SharedManualPaymentPanel from "./SharedManualPaymentPanel";
 
 type Reservation = { id:string; bookingNumber:string; status:string; checkIn:string; checkOut:string;
   totalKgs:number; paidKgs:number; remainingKgs:number };
@@ -168,6 +169,8 @@ export default function SharedReservationActions({booking,onExpired,onUpdated}:{
       </div>}
       <button className="btn" type="button" disabled={busy}
         onClick={()=>void cancelUnpaid()}>Отменить неоплаченную бронь</button>
+      <SharedManualPaymentPanel reservationId={booking.id} bookingNumber={booking.bookingNumber}
+        onExpired={onExpired} onUpdated={onUpdated} />
     </>}
     {notice && <p role="status">{notice}</p>}
     {error && <p role="alert">{error}</p>}
