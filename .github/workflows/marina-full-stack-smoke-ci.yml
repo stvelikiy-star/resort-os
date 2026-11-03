@@ -13,6 +13,7 @@ on:
       - 'scripts/marina_ordinary_booking_e2e.py'
       - 'scripts/marina_concurrent_booking_e2e.py'
       - 'scripts/marina_grid_browser_smoke.mjs'
+      - 'scripts/marina_shared_admin_browser.mjs'
       - 'scripts/marina_assistant_browser.mjs'
       - 'scripts/marina_season_boundary_e2e.py'
       - 'services/api/app/hotel_rules.py'
@@ -188,6 +189,10 @@ jobs:
         run: |
           npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
           ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Browser acceptance of isolated shared-mode Admin entry and role UI
+        env:
+          MARINA_ADMIN_BROWSER_URL: http://127.0.0.1:13001
+        run: node scripts/marina_shared_admin_browser.mjs
       - name: Browser acceptance of owner grid, filters and mobile viewport
         env:
           MARINA_ADMIN_BROWSER_URL: http://127.0.0.1:13001
