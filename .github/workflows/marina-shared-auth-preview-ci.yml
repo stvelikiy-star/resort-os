@@ -1,0 +1,66 @@
+name: MARINA Shared Auth Preview CI
+
+on:
+  push:
+    branches: [prep/marina-shared-platform-20261103]
+    paths:
+      - 'services/api/app/auth.py'
+      - 'services/api/app/shared_auth_preview.py'
+      - 'services/api/app/main.py'
+      - 'services/api/app/health.py'
+      - 'scripts/*marina_shared_auth*'
+      - '.github/workflows/marina-shared-auth-preview-ci.yml'
+  pull_request:
+    paths:
+      - 'services/api/app/auth.py'
+      - 'services/api/app/shared_auth_preview.py'
+      - 'services/api/app/main.py'
+      - 'services/api/app/health.py'
+      - 'scripts/*marina_shared_auth*'
+      - '.github/workflows/marina-shared-auth-preview-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shared-auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_DB: marina_shared_auth_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_auth_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_auth_ci?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_AUTH_PREVIEW
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_AUTH_CI_CONFIRM: ISOLATED_SHARED_AUTH_CI_ONLY
+      COOKIE_SECURE: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply committed migrations to the disposable CI database
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - run: pip install -r services/api/requirements.txt
+      - name: Run isolated authentication preview tests
+        run: python scripts/test_marina_shared_auth.py -v
+      - name: Verify real PostgreSQL and HTTP session isolation
+        run: python scripts/verify_marina_shared_auth_postgres.py

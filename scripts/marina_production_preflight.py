@@ -16,6 +16,10 @@ HOST_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:
 URL_SAFE_SECRET_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 CONFIRMATION = "CREATE_ONE_EMPTY_MARINA_PROPERTY"
 PLACEHOLDERS = ("change_me", "example.invalid", "example.com", "replace_me")
+# These identifiers belong to the existing synthetic environments. They are not
+# production destinations, even if someone changes APP_ENV or data-directory text.
+RESERVED_SYNTHETIC_SLUGS = {"hotel01", "smart-demo", "demo"}
+RESERVED_SYNTHETIC_CODES = {"MARINA_HOTEL01", "MARINA_DEMO"}
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
@@ -47,12 +51,19 @@ def validate(values: dict[str, str], bootstrap: bool = False, allow_test_hosts: 
 
     if values.get("APP_ENV", "").strip().lower() != "production":
         errors.append("APP_ENV must be production for this deployment package")
+    if values.get("MARINA_SHARED_AUTH_PREVIEW_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}:
+        errors.append("MARINA_SHARED_AUTH_PREVIEW_ENABLED is staging-only and must be disabled in production")
     if not re.fullmatch(r"[0-9a-f]{40}", values.get("MARINA_RELEASE_SHA", "").strip().lower()):
         errors.append("MARINA_RELEASE_SHA must be the exact 40-character tested Git commit SHA")
 
     slug = values.get("MARINA_INSTANCE_SLUG", "").strip().lower()
     if not SLUG_RE.fullmatch(slug):
         errors.append("MARINA_INSTANCE_SLUG must be 3-40 lowercase letters, digits or hyphens")
+    if slug in RESERVED_SYNTHETIC_SLUGS:
+        errors.append("MARINA_INSTANCE_SLUG belongs to an existing synthetic environment; choose a separate production identity")
+    for marker in ("MARINA_FLEET_CONFIRM", "MARINA_DEMO_CONFIRM"):
+        if values.get(marker, "").strip():
+            errors.append(f"{marker} must be absent or empty; synthetic initialization is not production provisioning")
 
     expected_root = f"/srv/marina-smart/{slug}" if slug else ""
     root = values.get("MARINA_HOST_ROOT", "").strip().rstrip("/")
@@ -98,6 +109,8 @@ def validate(values: dict[str, str], bootstrap: bool = False, allow_test_hosts: 
     property_code = values.get("PROPERTY_CODE", "").strip().upper()
     if not CODE_RE.fullmatch(property_code) or placeholder(property_code):
         errors.append("PROPERTY_CODE must be a real 3-40 character uppercase code")
+    if property_code in RESERVED_SYNTHETIC_CODES:
+        errors.append("PROPERTY_CODE belongs to an existing synthetic environment; choose a separate production identity")
     if placeholder(values.get("MARINA_PROPERTY_NAME", "")):
         errors.append("MARINA_PROPERTY_NAME is required")
     elif len(values["MARINA_PROPERTY_NAME"].strip()) > 160:
