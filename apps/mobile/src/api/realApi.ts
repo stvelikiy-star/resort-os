@@ -75,9 +75,24 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
         type: 'MAINTENANCE', room_id: req.room_id, priority: req.priority,
         title: req.description.trim().slice(0, 180), description: `[${req.category}] ${req.description.trim()}`, source: 'MOBILE',
       });
-      // POST /tasks returns only {id,status}; read the canonical record before rendering.
-      if (!created || typeof created.id !== 'string') throw new ApiError('UNKNOWN', 'Missing created task id');
-      return findTask(created.id);
+      // POST /tasks commits the mutation and returns only {id,status}.
+      // Failure to re-read the first 300 tasks must NEVER make the user repeat
+      // an already-created request (and accidentally create a duplicate).
+      if (!created || typeof created.id !== 'string' || !created.id || created.status !== 'OPEN') {
+        throw new ApiError('UNKNOWN', 'Unexpected create acknowledgment from hotel API');
+      }
+      try { return await findTask(created.id); }
+      catch (e) {
+        // The acknowledged create is already successful; show only values
+        // guaranteed by the submitted payload and server acknowledgment.
+        if (!(e instanceof ApiError) || !['NOT_FOUND', 'OFFLINE', 'UNKNOWN'].includes(e.code)) throw e;
+        return {
+          id: created.id, type: 'MAINTENANCE', status: 'OPEN',
+          priority: req.priority, title: req.description.trim().slice(0, 180),
+          room_id: req.room_id, room_code: null,
+          assigned_to_id: null, assigned_to_name: null,
+        };
+      }
     },
     async listRooms(): Promise<Room[]> {
       // The existing API exposes no staff "rooms list" endpoint: derive rooms from tasks until backend item B7 lands.
