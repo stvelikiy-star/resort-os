@@ -352,7 +352,7 @@ def main():
         # No unreviewed stay or payment writes through the same shared session.
         assert canonical_client.post(
             '/api/v1/admin/stays/reservations/'+rid_a+'/check-in').status_code == 503
-        assert canonical_client.post('/api/v1/admin/pms/holds', json={}).status_code == 503
+        assert canonical_client.post('/api/v1/admin/pms/holds', json={}).status_code == 422  # now enabled; invalid payload rejected
 
         owner_login('b')
         foreign_cancel = canonical_client.post(
@@ -414,6 +414,192 @@ def main():
         assert canonical_client.post('/api/v1/admin/booking/reservations/'+rid_b+'/payments', json={}).status_code == 503
         auth._preview_attempts.clear()
 
+        # HOLD acceptance on the actual composed MARINA API and real PostgreSQL.
+        # Both properties have room code 101. UUID identity—not the code or a
+        # client-provided header—decides inventory ownership.
+        from app.db import expire_shared_holds_once
+        hold_start = (date.today() + timedelta(days=27)).isoformat()
+        hold_end = (date.today() + timedelta(days=29)).isoformat()
+        hold_path = '/api/v1/admin/pms/holds'
+        phones = {'a': '+996701100111', 'b': '+996701100222'}
+        hold_names = {'a': 'Synthetic Hold A', 'b': 'Synthetic Hold B'}
+        def hold_payload(suffix, start=hold_start, end=hold_end):
+            return {
+                'room_id': str(ids['room_'+suffix]), 'check_in': start,
+                'check_out': end, 'guest_name': hold_names[suffix],
+                'guest_phone': phones[suffix],
+            }
+        def hold_booking(suffix, hold_id=None, start=hold_start, end=hold_end):
+            return {
+                'room_id': str(ids['room_'+suffix]), 'check_in': start,
+                'check_out': end, 'adults': 2, 'children': 0,
+                'manager_total_kgs': price, 'hold_id': hold_id,
+            }
+        def hold_commit(suffix, hold_id=None, start=hold_start, end=hold_end):
+            return {
+                **hold_booking(suffix, hold_id, start, end),
+                'guest_name': hold_names[suffix], 'phone': phones[suffix],
+                'expected_total_kgs': price,
+                'expected_pricing_source': 'MANAGER_OVERRIDE',
+            }
+
+        owner_login('a')
+        a_hold = canonical_client.post(hold_path, json=hold_payload('a'))
+        assert a_hold.status_code == 201, a_hold.text
+        hold_id_a = a_hold.json()['id']
+        assert a_hold.json()['duration_minutes'] == 60
+        assert canonical_client.post(hold_path, json=hold_payload('b')).status_code == 404
+        assert canonical_client.post(hold_path, json=hold_payload('a')).status_code == 409
+        listed_a = canonical_client.get(hold_path)
+        assert listed_a.status_code == 200
+        assert {h['id'] for h in listed_a.json()['holds']} == {hold_id_a}
+        assert canonical_client.get(hold_path+'/'+hold_id_a).status_code == 200
+        # A regular booking cannot steal an active HOLD; the hold owner can
+        # price its own reserved inventory without it counting as a conflict.
+        blocked_a = canonical_client.post(path_preview, json=hold_booking('a'))
+        assert blocked_a.status_code == 200 and not blocked_a.json()['can_commit']
+        quote_held_a = canonical_client.post(path_preview, json=hold_booking('a', hold_id_a))
+        assert quote_held_a.status_code == 200 and quote_held_a.json()['can_commit']
+        assert canonical_client.post(path_commit, json=hold_commit('a')).status_code == 409
+
+        owner_login('b')
+        b_hold = canonical_client.post(hold_path, json=hold_payload('b'))
+        assert b_hold.status_code == 201, b_hold.text
+        hold_id_b = b_hold.json()['id']
+        assert hold_id_a != hold_id_b
+        assert {h['id'] for h in canonical_client.get(hold_path).json()['holds']} == {hold_id_b}
+        assert canonical_client.get(hold_path+'/'+hold_id_a, headers={
+            'X-Property-Id': str(ids['property_a']),
+            'X-Tenant-Id': str(ids['tenant_a']), 'X-Role': 'OWNER',
+        }).status_code == 404
+        assert canonical_client.delete(hold_path+'/'+hold_id_a).status_code == 404
+        assert canonical_client.post(path_preview, json=hold_booking('b',hold_id_a)).status_code == 409
+        booked_hold_b = canonical_client.post(path_commit, json=hold_commit('b',hold_id_b))
+        assert booked_hold_b.status_code == 201, booked_hold_b.text
+        rid_hold_b = booked_hold_b.json()['reservation_id']
+        assert canonical_client.get(hold_path+'/'+hold_id_b).status_code == 404
+        assert canonical_client.delete(hold_path+'/'+hold_id_b).status_code == 409
+        assert canonical_client.post(path_commit, json=hold_commit('b',hold_id_b)).status_code == 409
+
+        owner_login('a')
+        assert canonical_client.get(hold_path+'/'+hold_id_b).status_code == 404
+        assert canonical_client.delete(hold_path+'/'+hold_id_b).status_code == 404
+        assert canonical_client.post(path_preview, json=hold_booking('a',hold_id_b)).status_code == 409
+        # Expiry must also be applied immediately by ordinary booking preview,
+        # not depend on the thirty-second background tick.
+        execute("""UPDATE marina_reservation_holds SET
+                  "createdAt"=now()-interval '2 hours',
+                  "expiresAt"=now()-interval '1 minute'
+                  WHERE id=$1""", uuid.UUID(hold_id_a))
+        released_quote = canonical_client.post(path_preview, json=hold_booking('a'))
+        assert released_quote.status_code == 200 and released_quote.json()['can_commit'], released_quote.text
+        assert canonical_client.get(hold_path+'/'+hold_id_a).status_code == 404
+        assert canonical_client.post(path_commit, json=hold_commit('a',hold_id_a)).status_code == 409
+        booked_after_expiry = canonical_client.post(path_commit, json=hold_commit('a'))
+        assert booked_after_expiry.status_code == 201, booked_after_expiry.text
+        rid_after_expiry_a = booked_after_expiry.json()['reservation_id']
+        assert rid_after_expiry_a != rid_hold_b
+
+        # Directly exercise the production shared-property sweep with DB-backed
+        # expiration in A and still-active inventory in B.
+        sweep_start = (date.today() + timedelta(days=35)).isoformat()
+        sweep_end = (date.today() + timedelta(days=37)).isoformat()
+        sweep_a = canonical_client.post(hold_path, json=hold_payload('a',sweep_start,sweep_end))
+        assert sweep_a.status_code == 201, sweep_a.text
+        sweep_a_id = sweep_a.json()['id']
+        owner_login('b')
+        sweep_b = canonical_client.post(hold_path, json=hold_payload('b',sweep_start,sweep_end))
+        assert sweep_b.status_code == 201, sweep_b.text
+        sweep_b_id = sweep_b.json()['id']
+        execute("""UPDATE marina_reservation_holds SET
+                  "createdAt"=now()-interval '2 hours',
+                  "expiresAt"=now()-interval '1 minute'
+                  WHERE id=$1""", uuid.UUID(sweep_a_id))
+        async def run_shared_sweep():
+            pool = await asyncpg.create_pool(dsn, min_size=1, max_size=2)
+            try:
+                return await expire_shared_holds_once(pool)
+            finally:
+                await pool.close()
+        asyncio.run(run_shared_sweep())
+        async def hold_states():
+            conn = await asyncpg.connect(dsn)
+            try:
+                rows = await conn.fetch("""
+                    SELECT h.id,h."propertyId",h."releasedAt",h."confirmedReservationId",
+                           i.active AS block_active
+                    FROM marina_reservation_holds h
+                    JOIN inventory_blocks i ON i.id=h."inventoryBlockId"
+                    WHERE h.id=ANY($1::uuid[])
+                """, [uuid.UUID(hold_id_a),uuid.UUID(hold_id_b),
+                       uuid.UUID(sweep_a_id),uuid.UUID(sweep_b_id)])
+                return {str(row['id']): row for row in rows}
+            finally:
+                await conn.close()
+        states = asyncio.run(hold_states())
+        assert states[hold_id_a]['releasedAt'] is not None and not states[hold_id_a]['block_active']
+        assert states[hold_id_b]['confirmedReservationId'] == uuid.UUID(rid_hold_b)
+        assert not states[hold_id_b]['block_active']
+        assert states[sweep_a_id]['releasedAt'] is not None and not states[sweep_a_id]['block_active']
+        assert states[sweep_b_id]['releasedAt'] is None and states[sweep_b_id]['block_active']
+        assert states[sweep_a_id]['propertyId'] == ids['property_a']
+        assert states[sweep_b_id]['propertyId'] == ids['property_b']
+        assert canonical_client.delete(hold_path+'/'+sweep_a_id).status_code == 404
+        released_b = canonical_client.delete(hold_path+'/'+sweep_b_id)
+        assert released_b.status_code == 200 and released_b.json()['status'] == 'RELEASED'
+        assert canonical_client.delete(hold_path+'/'+sweep_b_id).status_code == 200
+        assert canonical_client.get(hold_path).json()['holds'] == []
+        assert canonical_client.post(path_preview, json=hold_booking(
+            'b',start=sweep_start,end=sweep_end)).json()['can_commit']
+        # Competing writes for the same room on the same dates must produce
+        # exactly one winning active inventory block, never a double booking.
+        from concurrent.futures import ThreadPoolExecutor
+        race_start = (date.today() + timedelta(days=41)).isoformat()
+        race_end = (date.today() + timedelta(days=43)).isoformat()
+        owner_login('a')
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            hold_future = executor.submit(canonical_client.post, hold_path,
+                                          json=hold_payload('a',race_start,race_end))
+            book_future = executor.submit(canonical_client.post, path_commit,
+                                          json=hold_commit('a',None,race_start,race_end))
+            race_hold, race_booking = hold_future.result(), book_future.result()
+        assert sorted([race_hold.status_code, race_booking.status_code]) == [201,409], (
+            race_hold.status_code, race_hold.text, race_booking.status_code, race_booking.text)
+        async def count_race_inventory():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return await conn.fetchval("""
+                    SELECT count(*)::int FROM inventory_blocks
+                    WHERE "roomId"=$1 AND active=true
+                      AND daterange("startDate","endDate",'[)')
+                          && daterange($2::date,$3::date,'[)')
+                """, ids['room_a'], date.fromisoformat(race_start),
+                     date.fromisoformat(race_end))
+            finally:
+                await conn.close()
+        assert asyncio.run(count_race_inventory()) == 1, 'Parallel HOLD and booking created multiple active inventory blocks'
+
+        # Even without UI controls, server RBAC must keep reception and an
+        # explicitly staff-only manager outside privileged HOLD operations.
+        auth._preview_attempts.clear()
+        receptionist_signin = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-reception', password=receptionist_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert receptionist_signin.status_code == 200, receptionist_signin.text
+        assert canonical_client.get(hold_path).status_code == 403
+        assert canonical_client.post(hold_path, json=hold_payload('a')).status_code == 403
+        manager_signin = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-manager', password=manager_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert manager_signin.status_code == 200, manager_signin.text
+        assert canonical_client.get(hold_path).status_code == 403
+        assert canonical_client.post(hold_path, json=hold_payload('a')).status_code == 403
+        # Shared payment, check-in and unreviewed staff ops remain unavailable.
+        assert canonical_client.post(
+            '/api/v1/admin/stays/reservations/'+rid_hold_b+'/check-in').status_code == 503
+        auth._preview_attempts.clear()
+
+    print('PASS: canonical shared HOLD expiry/create/convert/release: independent hotels, owned inventory, no cross-hotel access, stale HOLD cannot be confirmed')
     print('PASS: canonical shared staff lifecycle: same usernames isolated, owner-only writes, cross-hotel 404, old session revocation, disabled login denial')
 
     # Separate synthetic test clients intentionally share a process and default IP.

@@ -390,11 +390,17 @@ async def preview_grid_reservation(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn, user)
-        if user["role"] == "AGENT":
-            linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
-            payload = enforce_agent_booking_scope(payload, linked_agent_id)
-        return await build_preview(conn, prop["id"], payload)
+        # Expired HOLD inventory must be released within the same transaction
+        # before quoting ordinary room availability; the background worker
+        # alone has a periodic delay and is not the source of booking authority.
+        async with conn.transaction():
+            prop = await property_context(conn, user)
+            from .pms_holds import expire_holds
+            await expire_holds(conn, prop["id"])
+            if user["role"] == "AGENT":
+                linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
+                payload = enforce_agent_booking_scope(payload, linked_agent_id)
+            return await build_preview(conn, prop["id"], payload)
 
 
 @router.post("/new/commit", status_code=status.HTTP_201_CREATED)
@@ -412,6 +418,10 @@ async def commit_grid_reservation(
         try:
             async with conn.transaction():
                 prop = await property_context(conn, user)
+                # Handle expired holds even for ordinary bookings without hold_id.
+                # Transaction rollback restores all holds if subsequent commit fails.
+                from .pms_holds import expire_holds
+                await expire_holds(conn, prop["id"])
                 is_agent = user["role"] == "AGENT"
                 if is_agent:
                     linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
@@ -422,8 +432,6 @@ async def commit_grid_reservation(
                 if payload.hold_id is not None:
                     if is_agent:
                         raise HTTPException(status_code=403, detail={"code": "AGENT_HOLD_CONFIRM_FORBIDDEN"})
-                    from .pms_holds import expire_holds
-                    await expire_holds(conn, prop["id"])
                     held = await conn.fetchrow("""
                         SELECT "roomId","inventoryBlockId","checkIn","checkOut",
                                "guestName","guestPhone","releasedAt","confirmedReservationId","expiresAt"
