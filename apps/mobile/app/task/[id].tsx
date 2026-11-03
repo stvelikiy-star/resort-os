@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Camera, Check, ChevronLeft, Play, Send, Square } from 'lucide-react-native';
 import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
@@ -18,8 +18,8 @@ export default function TaskDetail() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user } = useSession();
-  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
-  const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => (await api!.listTasks()).find((x) => x.id === id) ?? null, [api, id]);
+  const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE');
+  const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => user && api && ws.mobileReady ? (await api.listTasks()).find((x) => x.id === id) ?? null : null, [api, id, user?.id]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [comment, setComment] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
@@ -32,6 +32,8 @@ export default function TaskDetail() {
     try { const n = await fn(); setData(n); if (okMsg) setMsg(okMsg); } catch (e: any) { setActionError(true); setMsg(t(e?.code === 'FORBIDDEN' ? 'errors.forbidden' : e?.code === 'OFFLINE' ? 'errors.offline' : 'errors.generic')); } finally { setBusy(false); }
   };
 
+  if (!user || !api) return <Redirect href="/connect" />;
+  if (!ws.mobileReady) return <Redirect href="/profile" />;
   if (loading && !task) return <Screen><Empty text={t('common.loading')} /></Screen>;
   if (error) return <Screen><Card onPress={reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card></Screen>;
   if (!task) return <Screen><Empty text={t('errors.notFound')} /></Screen>;
