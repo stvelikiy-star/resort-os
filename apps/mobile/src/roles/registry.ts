@@ -24,8 +24,8 @@ export const WORKSPACES: Record<Role, Workspace> = {
   AGENT: FIELD, STORE_STAFF: FIELD, COOK: FIELD, WAITER: FIELD, CONTENT_MANAGER: FIELD, BEACH_PARTNER: FIELD,
 };
 
-export const workspaceFor = (role: Role): Workspace => WORKSPACES[role];
-export const hasTab = (role: Role, tab: TabKey) => WORKSPACES[role].tabs.includes(tab);
+export const workspaceFor = (role: Role): Workspace => WORKSPACES[role] ?? FIELD;
+export const hasTab = (role: Role, tab: TabKey) => workspaceFor(role).tabs.includes(tab);
 
 /** First tab a role may open — used as the landing route after sign-in. */
-export const homeFor = (role: Role): `/${TabKey}` => `/${WORKSPACES[role].tabs[0]}`;
+export const homeFor = (role: Role): `/${TabKey}` => `/${workspaceFor(role).tabs[0]}`;
