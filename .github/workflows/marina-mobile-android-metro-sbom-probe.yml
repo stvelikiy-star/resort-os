@@ -58,6 +58,16 @@ jobs:
             for(const source of map.sources) if(typeof source==='string') sources.add(source.replaceAll('\\','/'));
           }
           if(sources.size<10) throw Error('Insufficient Metro source information');
+          // Positive controls prevent false "zero vulnerability" if source maps
+          // contain opaque names or our matcher is unable to see dependency paths.
+          const normalizedSources=[...sources];
+          const nodeModulesSourceCount=normalizedSources.filter(x=>x.includes('node_modules/')).length;
+          const expoRouterSourceCount=normalizedSources.filter(x=>x.includes('node_modules/expo-router/')).length;
+          if(nodeModulesSourceCount<100||expoRouterSourceCount===0) {
+            throw Error('Source maps lack expected node_modules/expo-router module paths');
+          }
+          const pathMatches=(source,location)=>source.includes('/'+location+'/')||source.startsWith(location+'/')||source.endsWith('/'+location);
+          if(!pathMatches('../../node_modules/jest/index.js','node_modules/jest')) throw Error('Matcher positive-control failed');
           const affected=[];
           for(const [name,report] of Object.entries(audit.vulnerabilities)){
             if(!Array.isArray(report?.nodes)||!report.nodes.length) throw Error('Invalid advisory nodes: '+name);
@@ -69,12 +79,12 @@ jobs:
           const matches=[];
           for(const source of sources){
             for(const vuln of affected){
-              if(source.includes('/'+vuln.location+'/')||source.startsWith(vuln.location+'/')||source.endsWith('/'+vuln.location)){
+              if(pathMatches(source,vuln.location)){
                 matches.push({source,advisory:vuln.name,affectedNode:vuln.location});
               }
             }
           }
-          const result={policy:'DIAGNOSTIC_ANDROID_METRO_MODULE_SOURCES_NOT_RELEASE_CLEARANCE',sourceCommit:process.env.GITHUB_SHA,mapDigests,totalDistinctSources:sources.size,npmAdvisoryPackageNames:Object.keys(audit.vulnerabilities).length,affectedNodePaths:affected.length,matchedModulePaths:matches.length,matches};
+          const result={policy:'DIAGNOSTIC_ANDROID_METRO_MODULE_SOURCES_NOT_RELEASE_CLEARANCE',sourceCommit:process.env.GITHUB_SHA,mapDigests,totalDistinctSources:sources.size,nodeModulesSourceCount,expoRouterSourceCount,npmAdvisoryPackageNames:Object.keys(audit.vulnerabilities).length,affectedNodePaths:affected.length,matchedModulePaths:matches.length,matches};
           console.log(JSON.stringify(result,null,2));
           if(matches.length) process.exitCode=2;
           NODE
