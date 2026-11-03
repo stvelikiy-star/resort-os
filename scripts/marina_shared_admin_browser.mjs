@@ -83,6 +83,9 @@ await page.route("**/core/api/v1/**", async route => {
     if (!active.sections.includes("RESERVATIONS")) return respond(route, 403, { detail:"Forbidden" });
     return respond(route, 200, { local_date:"2026-11-03", items:[scopedBooking()] });
   }
+  if (path.startsWith("/api/v1/admin/stays/reservations/") && method === "POST") {
+    return respond(route, 409, { detail:"Synthetic browser fixture: transition denied" });
+  }
   if (path === "/api/v1/admin/staff/overview" && method === "GET") {
     if (!active.sections.includes("STAFF")) return respond(route, 403, {detail:"Forbidden"});
     return respond(route, 200, {
