@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { LogOut, Repeat } from 'lucide-react-native';
 import Constants from 'expo-constants';
@@ -16,6 +16,7 @@ export default function Profile() {
   const { c, pref, setPref } = useTheme();
   const router = useRouter();
   const { user, hotel, api, locale, setLocale, signOut, leaveHotel } = useSession();
+  if (!user || !hotel || !api) return <Redirect href="/connect" />;
   const row = (k: string, v: string) => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
       <Text style={[font.body, { color: c.textMuted }]}>{k}</Text><Text style={[font.body, { color: c.text, fontWeight: '700' }]}>{v}</Text>
