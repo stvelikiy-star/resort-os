@@ -139,3 +139,18 @@ python3 scripts/marina_runtime_inventory_readonly.py > marina-runtime-inventory-
 `scripts/marina_runtime_inventory_readonly.py` теперь запрашивает у конкретных контейнеров MARINA только `docker inspect --type container --format '{{.Image}}'`. Это иммутабельный локальный image ID (`sha256:...`), который можно сопоставлять между замерами. Скрипт НЕ читает Docker Env, mounts или network settings. Локальный image ID сам по себе не доказывает source SHA или registry digest: provenance проверяется отдельно через labels/build metadata и deployment log, с исключением секретов.
 
 Первоначальный CI проверки безопасности диагностического скрипта прошёл на старом коммите; после дополнения идентификаторами образов необходимо дождаться CI нового коммита. Эти метаданные пока не собраны на Ubuntu.
+
+## X. Fail-closed review host metadata
+
+Для исключения ложного «Готово» создан второй локальный инструмент `scripts/marina_runtime_inventory_review.py`. Он разбирает JSON от `marina_runtime_inventory_readonly.py` и выпускает статус `INCOMPLETE` либо `INVENTORY_METADATA_COLLECTED`, **но никогда** не выдаёт `release_approved=true`. Даже полный перечень контейнеров и файлов бэкапов не является проверкой восстановления или PMS.
+
+Применение после копирования подготовленных скриптов на доверенную Ubuntu (не запускалось в текущей сессии):
+
+```bash
+python3 scripts/marina_runtime_inventory_readonly.py > marina-runtime-inventory.json
+python3 scripts/marina_runtime_inventory_review.py marina-runtime-inventory.json
+```
+
+Оба инструмента работают без изменения Docker, конфигурации или БД. Инвентаризация читает только ограниченные метаданные. До передачи отчёта за пределы доверенного окружения необходимо проверить имена контейнеров и файлов, если они содержат внутренние сведения.
+
+До реальной проверки Ubuntu поле `backup_restored` всегда `false`; статус `INVENTORY_METADATA_COLLECTED` не означает `PASS` production. Тесты этого контракта выполняются в `MARINA P0 Runtime Inventory Safety CI`.
