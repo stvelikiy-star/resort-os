@@ -100,6 +100,15 @@ describe('navigation, guards and screens', () => {
     expect(screen.getByTestId('tab-requests')).toBeTruthy();
   });
 
+  it('manager can assign an unassigned cleaning task from the admin screen', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
+    const task = await screen.findByTestId('task-t8', {}, { timeout: 4000 });
+    await fireEvent.press(task);
+    await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
+    await waitFor(() => expect(screen.queryByTestId('assign-u-maid2')).toBeNull(), { timeout: 4000 });
+  });
+
   it('waiter has no operational workspace (profile only)', async () => {
     const screen = await loginAs('waiter');
     await screen.findByTestId('tab-profile', {}, { timeout: 4000 });
