@@ -16,6 +16,7 @@ class SharedAuthPreviewBoundary:
             ('GET', '/api/v1/auth/me'), ('GET', '/api/v1/auth/mode'),
             # Narrow, reviewed read-only management summary. Other workspaces remain closed.
             ('GET', '/api/v1/admin/dashboard'),
+            ('GET', '/api/v1/pms/grid'),
             ('GET', '/health/ready'), ('GET', '/health/live'),
         }
         try:
