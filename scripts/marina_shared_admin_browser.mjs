@@ -149,6 +149,7 @@ try {
   if (await page.getByText("A101").count()) throw new Error("Foreign room visible in hotel B");
   await page.getByRole("button",{name:"Бронирования"}).click();
   await page.getByText("HOTEL_B-BOOK").waitFor();
+  if (await page.getByText("HOTEL_A-BOOK").count()) throw new Error("Foreign reservation shown in B");
   await page.getByRole("button",{name:"Персонал"}).click();
   await page.getByRole("heading",{name:"Сотрудники (0)"}).waitFor();
   if (await page.getByText("Synthetic Employee A").count()) throw new Error("Foreign employee visible in hotel B");
