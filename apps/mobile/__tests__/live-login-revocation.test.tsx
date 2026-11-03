@@ -58,7 +58,7 @@ afterAll(()=>{if(priorTrust===undefined) delete process.env.EXPO_PUBLIC_MARINA_T
   else process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS=priorTrust;});
 
 async function connect() {
-  const screen=render(<SessionProvider initialLocale="ru"><Probe /></SessionProvider>);
+  const screen=await render(<SessionProvider initialLocale="ru"><Probe /></SessionProvider>);
   fireEvent.press(screen.getByTestId('add-hotel'));
   await waitFor(()=>expect(screen.getByTestId('selected-hotel').props.children).toBe('https://hotel.example'));
   return screen;
@@ -69,7 +69,7 @@ it('revoke any stale host cookie before sending new live credentials', async()=>
   fireEvent.press(screen.getByTestId('login'));
   await waitFor(()=>expect(screen.getByTestId('login-state').props.children).toBe('staff-user-1'));
   expect(events.slice(0,3)).toEqual(['logout','login','me']);
-  screen.unmount();
+  await screen.unmount();
 });
 
 it('blocks sending login credentials if stale-cookie revocation cannot be confirmed',async()=>{
@@ -79,5 +79,5 @@ it('blocks sending login credentials if stale-cookie revocation cannot be confir
   await waitFor(()=>expect(screen.getByTestId('login-error').props.children).toBe('PENDING_LOGOUT'));
   expect(events).toEqual(['logout']);
   expect(screen.getByTestId('login-state').props.children).toBe('anonymous');
-  screen.unmount();
+  await screen.unmount();
 });
