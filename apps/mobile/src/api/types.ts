@@ -11,7 +11,7 @@ export interface AuthUser {
 }
 export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: Priority;
-  title: string; room_code: string | null; room_id: string | null;
+  title: string; room_code: string | null; room_id: string | null; room_state?: RoomState;
   assigned_to_id: string | null; assigned_to_name?: string | null; due_label?: string;
 }
 export interface Room {
