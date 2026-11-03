@@ -304,6 +304,111 @@ def main():
         assert canonical_client.put('/api/v1/admin/staff').status_code == 503
         assert canonical_client.delete('/api/v1/admin/staff/'+manager_id).status_code == 503
         assert canonical_client.post('/api/v1/reservations', json={}).status_code == 503
+        # Shared PMS staging: only reviewed preview/commit/unpaid cancel are opened.
+        # Use distinct hotel UUIDs with the same room code and identical stay dates.
+        from datetime import date, timedelta
+        check_in = (date.today() + timedelta(days=14)).isoformat()
+        check_out = (date.today() + timedelta(days=16)).isoformat()
+        price = 9000
+        path_preview = '/api/v1/admin/pms/reservations/new/preview'
+        path_commit = '/api/v1/admin/pms/reservations/new/commit'
+        def reservation_data(suffix):
+            return {
+                'room_id': str(ids['room_'+suffix]), 'check_in': check_in,
+                'check_out': check_out, 'adults': 2, 'children': 0,
+                'manager_total_kgs': price,
+            }
+        def commit_data(suffix):
+            return {
+                **reservation_data(suffix), 'guest_name': 'Shared Booking Synthetic',
+                'phone': '+996555771122', 'expected_total_kgs': price,
+                'expected_pricing_source': 'MANAGER_OVERRIDE',
+            }
+        owner_login('a')
+        denied_preview = canonical_client.post(path_preview, json=reservation_data('b'))
+        assert denied_preview.status_code == 404, denied_preview.text
+        denied_commit = canonical_client.post(path_commit, json=commit_data('b'))
+        assert denied_commit.status_code == 404, denied_commit.text
+        quote_a = canonical_client.post(path_preview, json=reservation_data('a'))
+        assert quote_a.status_code == 200 and quote_a.json()['can_commit'], quote_a.text
+        assert quote_a.json()['pricing']['total_kgs'] == price
+        bad_price = canonical_client.post(path_commit, json={
+            **commit_data('a'), 'expected_total_kgs': price + 1,
+        })
+        assert bad_price.status_code == 409, bad_price.text
+        booked_a = canonical_client.post(path_commit, json=commit_data('a'))
+        assert booked_a.status_code == 201, booked_a.text
+        rid_a = booked_a.json()['reservation_id']
+        assert booked_a.json()['room_id'] == str(ids['room_a'])
+        assert booked_a.json()['payment_created'] is False
+        again_a = canonical_client.post(path_commit, json=commit_data('a'))
+        assert again_a.status_code == 409, again_a.text
+        grid_a = canonical_client.get(
+            '/api/v1/pms/grid', params={'start': check_in, 'end': check_out})
+        assert grid_a.status_code == 200
+        assert grid_a.json()['property'] == 'HOTEL_A'
+        assert any(b['reservation_id'] == rid_a
+                   for room in grid_a.json()['rooms'] for b in room['blocks'])
+        # No unreviewed stay or payment writes through the same shared session.
+        assert canonical_client.post(
+            '/api/v1/admin/stays/reservations/'+rid_a+'/check-in').status_code == 503
+        assert canonical_client.post('/api/v1/admin/pms/holds', json={}).status_code == 503
+
+        owner_login('b')
+        foreign_cancel = canonical_client.post(
+            '/api/v1/admin/pms/reservations/'+rid_a+'/cancel')
+        assert foreign_cancel.status_code == 404, foreign_cancel.text
+        quote_b = canonical_client.post(path_preview, json=reservation_data('b'))
+        assert quote_b.status_code == 200 and quote_b.json()['can_commit'], quote_b.text
+        booked_b = canonical_client.post(path_commit, json=commit_data('b'))
+        assert booked_b.status_code == 201, booked_b.text
+        rid_b = booked_b.json()['reservation_id']
+        assert rid_b != rid_a and booked_b.json()['room_id'] == str(ids['room_b'])
+        grid_b = canonical_client.get('/api/v1/pms/grid', params={
+            'start': check_in, 'end': check_out})
+        assert grid_b.status_code == 200 and grid_b.json()['property'] == 'HOTEL_B'
+        assert any(b['reservation_id'] == rid_b
+                   for room in grid_b.json()['rooms'] for b in room['blocks'])
+        assert all(b.get('reservation_id') != rid_a
+                   for room in grid_b.json()['rooms'] for b in room['blocks'])
+        cancel_b_from_wrong_hotel = canonical_client.post(
+            '/api/v1/admin/pms/reservations/'+rid_a+'/cancel')
+        assert cancel_b_from_wrong_hotel.status_code == 404
+
+        owner_login('a')
+        assert canonical_client.post(
+            '/api/v1/admin/pms/reservations/'+rid_b+'/cancel').status_code == 404
+        cancelled = canonical_client.post(
+            '/api/v1/admin/pms/reservations/'+rid_a+'/cancel')
+        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.json()['status'] == 'CANCELLED'
+        assert cancelled.json()['released_blocks'] == 1
+        assert canonical_client.post(
+            '/api/v1/admin/pms/reservations/'+rid_a+'/cancel').status_code == 409
+        available_again = canonical_client.post(path_preview, json=reservation_data('a'))
+        assert available_again.status_code == 200 and available_again.json()['can_commit']
+        owner_login('b')
+        blocked_b = canonical_client.post(path_preview, json=reservation_data('b'))
+        assert blocked_b.status_code == 200 and not blocked_b.json()['can_commit']
+        assert blocked_b.json()['conflicts']
+        # Genuine database-level isolation for the stored reservations/guests.
+        async def inspect_pms():
+            async with canonical_app.state.db.acquire() as conn:
+                rows = await conn.fetch(
+                    'SELECT id,"propertyId","primaryGuestId",status::text FROM reservations WHERE id=ANY($1::uuid[])',
+                    [uuid.UUID(rid_a), uuid.UUID(rid_b)],
+                )
+                return {str(row['id']): row for row in rows}
+        stored = asyncio.run(inspect_pms())
+        assert stored[rid_a]['propertyId'] == ids['property_a']
+        assert stored[rid_b]['propertyId'] == ids['property_b']
+        assert stored[rid_a]['primaryGuestId'] != stored[rid_b]['primaryGuestId']
+        assert stored[rid_a]['status'] == 'CANCELLED'
+        assert stored[rid_b]['status'] == 'GUARANTEED'
+        # Shared preview intentionally refuses other mutating PMS workflows.
+        assert canonical_client.post('/api/v1/admin/booking/reservations/'+rid_b+'/payments', json={}).status_code == 503
+        auth._preview_attempts.clear()
+
     print('PASS: canonical shared staff lifecycle: same usernames isolated, owner-only writes, cross-hotel 404, old session revocation, disabled login denial')
 
     # Separate synthetic test clients intentionally share a process and default IP.
