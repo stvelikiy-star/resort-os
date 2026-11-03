@@ -64,6 +64,23 @@ jobs:
           console.log(JSON.stringify(report,null,2));
           if(exposures.length||unknown.length) process.exitCode=2;
           NODE
+      - name: Trace why audit-affected Jest packages remain physically installed
+        if: always()
+        run: |
+          npm config get omit
+          npm ls --omit=dev --all jest jest-config jest-expo @jest/core glob minimatch deepmerge --json > /tmp/marina-prod-ls.json 2>&1 || true
+          npm explain jest > /tmp/marina-prod-explain-jest.txt 2>&1 || true
+          npm explain deepmerge > /tmp/marina-prod-explain-deepmerge.txt 2>&1 || true
+          npm explain glob > /tmp/marina-prod-explain-glob.txt 2>&1 || true
+          npm explain minimatch > /tmp/marina-prod-explain-minimatch.txt 2>&1 || true
+          echo 'EXPLAIN JEST:'
+          head -n 85 /tmp/marina-prod-explain-jest.txt
+          echo 'EXPLAIN DEEPMERGE:'
+          head -n 45 /tmp/marina-prod-explain-deepmerge.txt
+          echo 'EXPLAIN GLOB:'
+          head -n 65 /tmp/marina-prod-explain-glob.txt
+          echo 'EXPLAIN MINIMATCH:'
+          head -n 65 /tmp/marina-prod-explain-minimatch.txt
       - name: Print diagnostic summary
         if: always()
         run: |
@@ -77,5 +94,10 @@ jobs:
             /tmp/marina-mobile-production-audit.json
             /tmp/marina-mobile-production-provenance.json
             /tmp/marina-mobile-production-closure.json
+            /tmp/marina-prod-ls.json
+            /tmp/marina-prod-explain-jest.txt
+            /tmp/marina-prod-explain-deepmerge.txt
+            /tmp/marina-prod-explain-glob.txt
+            /tmp/marina-prod-explain-minimatch.txt
           retention-days: 7
           if-no-files-found: warn
