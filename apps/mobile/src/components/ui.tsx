@@ -182,9 +182,11 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
       {options.map((o) => {
         const on = o.key === value;
         return (
-          <PressScale key={o.key} onPress={() => onChange(o.key)} style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: on ? c.surface : 'transparent' }} accessibilityLabel={o.label}>
-            <Text style={[font.small, { fontWeight: '700', color: on ? c.primary : c.textMuted }]}>{o.label}</Text>
-          </PressScale>
+          <Pressable key={o.key} testID={`segment-${o.key}`} onPress={() => onChange(o.key)}
+            accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={o.label}
+            style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: on ? c.surface : 'transparent' }}>
+            <Text style={[font.small, { fontWeight: '700', color: on ? c.primary : c.textMuted, textAlign: 'center' }]}>{o.label}</Text>
+          </Pressable>
         );
       })}
     </View>
