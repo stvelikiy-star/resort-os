@@ -15,16 +15,24 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
   if (!parsed.ok) throw new Error('Invalid hotel API address');
   const root = parsed.baseUrl;
   async function request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
-    if (!path.startsWith('/api/v1/') || path.includes('://') || /[\r\n]/.test(path)) {
+    const pathname = path.split('?')[0];
+    // Reject relative-path tricks before URL normalization. No route may
+    // escape the hotel API prefix or smuggle another path via encoded slashes.
+    const unsafeSegments = pathname.split('/').some(
+      segment => segment === '.' || segment === '..' || /%(?:2f|5c|2e)/i.test(segment),
+    );
+    if (!path.startsWith('/api/v1/') || path.startsWith('//') ||
+        path.includes('://') || /[\\r\\n\\\\]/.test(path) || unsafeSegments) {
       throw new ApiError('BAD_REQUEST', 'Unsupported hotel API path');
     }
+    const expectedUrl = root + path;
     const attempts = method === 'GET' ? 2 : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
       let response: Response;
       try {
-        response = await transport(root + path, {
+        response = await transport(expectedUrl, {
           method, credentials: 'include', redirect: 'error', signal: controller.signal,
           headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
           body: body === undefined ? undefined : JSON.stringify(body),
@@ -36,7 +44,14 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       } finally {
         clearTimeout(timeout);
       }
-      if (response.redirected === true) throw new ApiError('FORBIDDEN', 'Unexpected hotel API redirect');
+      // Native networking adapters may not consistently set redirected.
+      // A differing final response URL is also a cross-origin/path redirect.
+      // This is defense-in-depth, not proof that the native adapter refused
+      // an initial unsafe redirect before it sent a sensitive request.
+      if (response.redirected === true || (typeof response.url === 'string' && response.url.length > 0 &&
+          response.url !== expectedUrl)) {
+        throw new ApiError('FORBIDDEN', 'Unexpected hotel API redirect');
+      }
       if (!response.ok) {
         if (method === 'GET' && attempt + 1 < attempts && [502, 503, 504].includes(response.status)) continue;
         if (response.status === 503) throw new ApiError('UNKNOWN', 'Hotel workspace is unavailable in this environment');

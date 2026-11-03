@@ -31,6 +31,26 @@ describe('one safe HTTP client for realApi and LIVE modules', () => {
     await expect(api.request('DELETE','/api/v1/admin/pms/holds/id')).rejects.toMatchObject({code:'OFFLINE'});
     expect(f).toHaveBeenCalledTimes(1);
   });
+  it('refuses path traversal and encoded slash tricks before issuing any request', async () => {
+    const transport = jest.fn(async () => response(200, {}));
+    const api = createHotelHttpClient('https://hotel.example/core', transport as unknown as typeof fetch);
+    for (const path of [
+      '/api/v1/../auth/me', '/api/v1/%2e%2e/auth/me',
+      '/api/v1/ops/tasks/a%2Fb', '/api/v1/ops/tasks/a%5Cb',
+      '/api/v1/ops\\\\evil', '//evil.example/api/v1/auth/me',
+    ]) {
+      await expect(api.request('GET', path)).rejects.toMatchObject({code:'BAD_REQUEST'});
+    }
+    expect(transport).not.toHaveBeenCalled();
+  });
+  it('refuses a final response URL different from the requested hotel endpoint', async () => {
+    const url='https://evil.example/core/api/v1/auth/me';
+    const transport=jest.fn(async () => ({...response(200,{id:'u1'}), url} as Response));
+    const api=createHotelHttpClient('https://hotel.example/core', transport as unknown as typeof fetch);
+    await expect(api.request('GET','/api/v1/auth/me')).rejects.toMatchObject({code:'FORBIDDEN'});
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
   it('hides untrusted server errors and declines off-prefix paths', async () => {
     const f = jest.fn(async () => response(409, { detail: 'PRIVATE GUEST DATA' }));
     const api = createHotelHttpClient('https://hotel.example',f as unknown as typeof fetch);
