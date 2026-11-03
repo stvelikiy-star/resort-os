@@ -22,10 +22,13 @@ The preview and legacy session formats cannot be used interchangeably.
 The ASGI boundary permits auth login/logout/me/mode and health endpoints.
 In an isolated staging-only review branch, it additionally permits the tenant-scoped
 read-only GET `/api/v1/admin/dashboard` and GET `/api/v1/pms/grid` endpoints.
+This reviewed staff-management slice additionally permits GET `/api/v1/admin/staff/overview`,
+POST `/api/v1/admin/staff` and PATCH `/api/v1/admin/staff/{staff_uuid}` with existing
+owner-only mutation rights, signed hotel sessions and server-side property scoping.
 All other HTTP routes return 503 and WebSockets are closed before their handlers
-run. PMS writes, staff administration, shared onboarding and provider operations
-remain blocked. These two read-only endpoints do NOT constitute a usable shared
-PMS rollout or production approval. The gate is installed in the canonical app;
+run. PMS writes, shared onboarding and provider operations remain blocked.
+These narrowly tested routes do NOT constitute a usable shared PMS rollout or
+production approval. The gate is installed in the canonical app;
 real PostgreSQL + canonical ASGI route acceptance is required before integration.
 
 The new `/shared-auth-preview` Admin page checks the server's explicit auth mode
