@@ -27,14 +27,14 @@ class HoldCreate(BaseModel):
         return self
 
 
-async def expire_holds(conn):
-    """Release overdue inventory atomically; safe to call repeatedly and concurrently."""
+async def expire_holds(conn, property_id: uuid.UUID):
+    """Release only this hotel's overdue inventory, atomically and idempotently."""
     rows = await conn.fetch("""
         SELECT h.id, h."inventoryBlockId" FROM marina_reservation_holds h
-        WHERE h."releasedAt" IS NULL AND h."confirmedReservationId" IS NULL
+        WHERE h."propertyId"=$1 AND h."releasedAt" IS NULL AND h."confirmedReservationId" IS NULL
           AND h."expiresAt" <= now()
         FOR UPDATE SKIP LOCKED
-    """)
+    """, property_id)
     for item in rows:
         await conn.execute("""
           UPDATE inventory_blocks SET active=false,"updatedAt"=now()
@@ -64,7 +64,7 @@ async def create_hold(payload: HoldCreate, request: Request, user: dict[str, Any
                 )
                 if payload.check_in < local_today:
                     raise HTTPException(422, detail={"code": "HOLD_DATES_IN_PAST"})
-                await expire_holds(conn)
+                await expire_holds(conn, prop)
                 room = await conn.fetchrow("""
                     SELECT id,code,"operationalState"::text AS operational_state FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
                 """, payload.room_id, prop)
@@ -100,7 +100,7 @@ async def list_holds(request: Request, user: dict[str, Any] = Depends(access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             prop = await property_id(conn, user)
-            await expire_holds(conn)
+            await expire_holds(conn, prop)
             rows = await conn.fetch("""
                 SELECT id,"roomId","checkIn","checkOut","guestName","expiresAt"
                 FROM marina_reservation_holds
@@ -116,7 +116,7 @@ async def get_hold(hold_id: uuid.UUID, request: Request, user: dict[str, Any] = 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             prop = await property_id(conn, user)
-            await expire_holds(conn)
+            await expire_holds(conn, prop)
             row = await conn.fetchrow("""
                 SELECT id,"roomId","checkIn","checkOut","guestName","guestPhone","expiresAt"
                 FROM marina_reservation_holds
