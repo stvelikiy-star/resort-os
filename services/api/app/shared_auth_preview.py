@@ -55,9 +55,19 @@ class SharedAuthPreviewBoundary:
                              isinstance(path, str) and re.fullmatch(
                                  r'/api/v1/admin/pms/reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/schedule',
                                  path) is not None)
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read
+            internal_payment = (scope['type'] == 'http' and
+                                isinstance(path, str) and re.fullmatch(
+                                    r'/api/v1/admin/booking/reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/(?:payments|acquiring-readiness|cancellation-finance-review)',
+                                    path) is not None and (
+                                        method == 'OPTIONS' or
+                                        (method == 'POST' and path.endswith('/payments')) or
+                                        (method == 'GET' and (
+                                            path.endswith('/acquiring-readiness') or
+                                            path.endswith('/cancellation-finance-review')))
+                                    ))
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
