@@ -91,6 +91,42 @@ async function book(page, hotel, roomCode) {
   assert.equal((await replayPreview.json()).can_commit,false,"Booked room must no longer be available");
   return roomId;
 }
+async function makeHold(page, hotel, roomCode) {
+  await page.getByRole("button",{name:"Показать HOLD"}).click();
+  const form = page.getByRole("form",{name:"Форма HOLD"});
+  await form.waitFor();
+  await form.getByLabel("Номер HOLD").selectOption({label:roomCode + " · CI Room"});
+  await form.getByLabel("Заезд HOLD").fill(day(6));
+  await form.getByLabel("Выезд HOLD").fill(day(8));
+  await form.getByLabel("Гость HOLD").fill("Synthetic Hold " + hotel);
+  await form.getByLabel("Телефон HOLD").fill("+996555771122");
+  const createResponse = page.waitForResponse(r =>
+    r.url().endsWith("/core/api/v1/admin/pms/holds") &&
+    r.request().method()==="POST");
+  await form.getByRole("button",{name:"Удержать на 60 минут"}).click();
+  const res = await createResponse;
+  assert.equal(res.status(),201,await res.text());
+  const result = await res.json();
+  assert.equal(result.status,"HELD");
+  assert.equal(result.duration_minutes,60);
+  assert.match(result.id,/^[0-9a-f-]{36}$/i);
+  await page.getByRole("button",{name:"Освободить HOLD"}).waitFor();
+  receipts[hotel].hold_id = result.id;
+  return result.id;
+}
+async function releaseHold(page, hotel) {
+  const releaseResponse = page.waitForResponse(r =>
+    r.url().endsWith("/core/api/v1/admin/pms/holds/" + receipts[hotel].hold_id) &&
+    r.request().method()==="DELETE");
+  await page.getByRole("button",{name:"Освободить HOLD"}).click();
+  const res = await releaseResponse;
+  assert.equal(res.status(),200,await res.text());
+  const released = await res.json();
+  assert.equal(released.id,receipts[hotel].hold_id);
+  assert.equal(released.status,"RELEASED");
+  await page.getByText("Активных удержаний нет.").waitFor();
+}
+
 try {
   const contextA = await browser.newContext({ viewport:{width:390,height:844} });
   const pageA = await contextA.newPage();
@@ -99,6 +135,7 @@ try {
   await pageA.getByRole("cell",{name:"A101 · CI Room"}).waitFor();
   assert.equal(await pageA.getByText("B202").count(),0);
   const roomA = await book(pageA,"HOTEL_A","A101");
+  await makeHold(pageA,"HOTEL_A","A101");
 
   const contextB = await browser.newContext({ viewport:{width:390,height:844} });
   const pageB = await contextB.newPage();
@@ -124,6 +161,17 @@ try {
   assert.equal(crossDetail.status(),404,"Foreign reservation must not be readable");
 
   await book(pageB,"HOTEL_B","B202");
+  const foreignHold = await contextB.request.get(
+    BASE + "/core/api/v1/admin/pms/holds/" + receipts.HOTEL_A.hold_id, {
+      headers:{"X-Property-Id":ownerA.property_id,"X-Tenant-Id":ownerA.tenant_id,"X-Role":"OWNER"},
+    });
+  assert.equal(foreignHold.status(),404,"Foreign HOLD must not be readable");
+  await makeHold(pageB,"HOTEL_B","B202");
+  const reverseHold = await contextA.request.get(
+    BASE + "/core/api/v1/admin/pms/holds/" + receipts.HOTEL_B.hold_id);
+  assert.equal(reverseHold.status(),404,"Reverse direction foreign HOLD");
+  await releaseHold(pageA,"HOTEL_A");
+  await releaseHold(pageB,"HOTEL_B");
   const aDetail = await contextA.request.get(
     BASE + "/core/api/v1/admin/reception/reservations/" + receipts.HOTEL_B.reservation_id);
   assert.equal(aDetail.status(),404,"Reverse direction foreign reservation leak");
@@ -135,7 +183,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two real sessions, server pricing, two booking commits, conflict and bidirectional tenant isolation at 390px");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two real sessions, 2 bookings, 2 created/released HOLDs, conflict, bidirectional tenant isolation at 390px");
 } finally {
   await browser.close();
 }
