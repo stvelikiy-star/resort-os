@@ -28,3 +28,45 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Fail on production moderate-or-higher advisories
         run: npm audit --omit=dev --audit-level=moderate
+
+  nonbreaking-fix-rehearsal:
+    name: Safe dependency fix rehearsal (no force, no repository write)
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Install immutable lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Save current advisory inventory
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-audit-before.json || true
+          node -e "const a=require('/tmp/marina-mobile-audit-before.json'); console.log('BEFORE:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+      - name: Rehearse only nonbreaking lockfile patches
+        run: |
+          npm audit fix --package-lock-only --ignore-scripts --no-fund > /tmp/marina-mobile-fix.log 2>&1 || true
+          tail -n 25 /tmp/marina-mobile-fix.log
+          git diff --stat -- package-lock.json
+          git diff -- package-lock.json > /tmp/marina-mobile-lockfile-candidate.patch
+          npm audit --omit=dev --json > /tmp/marina-mobile-audit-after.json || true
+          node -e "const a=require('/tmp/marina-mobile-audit-after.json'); console.log('AFTER:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+          test -s /tmp/marina-mobile-audit-after.json
+      - name: Save independently reviewable candidate
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marina-mobile-security-rehearsal
+          path: |
+            /tmp/marina-mobile-audit-before.json
+            /tmp/marina-mobile-audit-after.json
+            /tmp/marina-mobile-lockfile-candidate.patch
+            /tmp/marina-mobile-fix.log
+          retention-days: 7
+          if-no-files-found: warn
