@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import SharedBookingForm from "./SharedBookingForm";
 import SharedHoldPanel from "./SharedHoldPanel";
+import SharedReservationActions from "./SharedReservationActions";
 
 type Identity = {
   id: string; display_name: string; role: string;
@@ -65,6 +66,7 @@ export default function SharedAuthPreview() {
   const [grid, setGrid] = useState<Grid | null>(null);
   const [staff, setStaff] = useState<StaffOverview | null>(null);
   const [bookings, setBookings] = useState<ReceptionBookings | null>(null);
+  const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [issuedPin, setIssuedPin] = useState<string | null>(null);
   const [actionInfo, setActionInfo] = useState("");
   const [loadingSection, setLoadingSection] = useState(false);
@@ -107,7 +109,7 @@ export default function SharedAuthPreview() {
   useEffect(() => {
     if (!identity) {
       setSection(null); setDashboard(null); setGrid(null); setStaff(null);
-      setBookings(null); setIssuedPin(null); setActionInfo("");
+      setBookings(null); setIssuedPin(null); setActionInfo(""); setSelectedBookingId(null);
       return;
     }
     const allowed = availableSections(identity);
@@ -194,6 +196,15 @@ export default function SharedAuthPreview() {
     } catch {
       setError("Не удалось завершить сеанс. Повторите попытку.");
     } finally { setPending(false); }
+  }
+
+  async function refreshBookings() {
+    const response = await fetch("/core/api/v1/admin/reception/reservations", { cache: "no-store" });
+    if (response.status === 401) { setIdentity(null); throw new Error("expired"); }
+    if (!response.ok) throw new Error("refresh");
+    const body = await response.json() as ReceptionBookings;
+    if (!Array.isArray(body.items)) throw new Error("invalid scoped booking list");
+    setBookings(body);
   }
 
   async function transitionStay(reservationId: string, action: "check-in" | "check-out") {
@@ -354,7 +365,7 @@ export default function SharedAuthPreview() {
               Гостевой PIN (показать один раз): <strong>{issuedPin}</strong>
             </p>}
             <div style={{ overflowX: "auto" }}>
-              <table><thead><tr><th>Бронь</th><th>Гость</th><th>Номер</th><th>Заезд / выезд</th><th>Статус</th><th>Учёт оплат</th><th>Действие</th></tr></thead>
+              <table><thead><tr><th>Бронь</th><th>Гость</th><th>Номер</th><th>Заезд / выезд</th><th>Статус</th><th>Учёт оплат</th><th>Действие</th><th>Управление</th></tr></thead>
                 <tbody>{bookings.items.map(row => <tr key={row.id}>
                   <td>{row.bookingNumber}</td><td>{row.firstName || "—"}</td>
                   <td>{row.room_code || "—"} · {row.room_state || "—"}</td>
@@ -366,10 +377,18 @@ export default function SharedAuthPreview() {
                     : row.status === "CHECKED_IN" ?
                     <button type="button" className="btn" disabled={pending}
                       onClick={() => void transitionStay(row.id, "check-out")}>Выселить</button> : "—"}</td>
+                  <td>{["OWNER","MANAGER"].includes(identity.role) &&
+                    <button className="btn" type="button" disabled={pending}
+                      onClick={()=>setSelectedBookingId(id=>id===row.id?null:row.id)}>
+                      Управление
+                    </button>}</td>
                 </tr>)}</tbody>
               </table>
             </div>
             {!bookings.items.length && <p>В гостинице пока нет бронирований.</p>}
+            {["OWNER","MANAGER"].includes(identity.role) && bookings.items.filter(row=>row.id===selectedBookingId).map(row=>
+              <SharedReservationActions key={row.id} booking={row}
+                onExpired={()=>setIdentity(null)} onUpdated={refreshBookings}/>)}
           </section>}
         {!loadingSection && !sectionError && section === "staff" && staff &&
           <section aria-label="Персонал гостиницы">

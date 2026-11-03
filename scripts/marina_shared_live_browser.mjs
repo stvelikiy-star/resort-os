@@ -115,6 +115,11 @@ async function makeHold(page, hotel, roomCode) {
   return result.id;
 }
 async function releaseHold(page, hotel) {
+  // Schedule/cancellation steps navigate to the bookings section; reopen the
+  // hotel's scoped HOLD panel before releasing the earlier live hold.
+  await page.getByRole("button",{name:"Шахматка"}).click();
+  await page.getByRole("button",{name:"Показать HOLD"}).click();
+  await page.getByRole("button",{name:"Освободить HOLD"}).waitFor();
   const releaseResponse = page.waitForResponse(r =>
     r.url().endsWith("/core/api/v1/admin/pms/holds/" + receipts[hotel].hold_id) &&
     r.request().method()==="DELETE");
@@ -127,6 +132,90 @@ async function releaseHold(page, hotel) {
   await page.getByText("Активных удержаний нет.").waitFor();
 }
 
+async function changeSchedule(page,hotel) {
+  const bookingNumber = receipts[hotel].booking_number;
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  const row = page.getByRole("row").filter({hasText:bookingNumber});
+  await row.getByRole("button",{name:"Управление"}).click();
+  const section=page.getByRole("region",{name:"Управление бронью "+bookingNumber});
+  await section.getByRole("button",{name:"Загрузить график"}).click();
+  const form=section.getByRole("form",{name:"Изменение дат брони"});
+  await form.waitFor();
+  await form.getByLabel("Новый выезд").fill(day(5));
+  const previewResponse=page.waitForResponse(res =>
+    res.url().endsWith("/core/api/v1/admin/pms/reservations/"+receipts[hotel].reservation_id+"/schedule/preview") &&
+    res.request().method()==="POST");
+  await form.getByRole("button",{name:"Проверить новые даты"}).click();
+  const quoted=await previewResponse;
+  assert.equal(quoted.status(),200,await quoted.text());
+  const quote=await quoted.json();
+  assert.equal(quote.can_commit,true);
+  assert.equal(quote.proposed_check_out,day(5));
+  assert.equal(quote.pricing.stored_total_will_change_on_commit,false);
+  assert.equal(quote.pricing.suggested_total_kgs,expectedPrice[hotel]*3/2);
+  const commitResponse=page.waitForResponse(res =>
+    res.url().endsWith("/core/api/v1/admin/pms/reservations/"+receipts[hotel].reservation_id+"/schedule/commit") &&
+    res.request().method()==="POST");
+  await section.getByRole("button",{name:"Сохранить даты"}).click();
+  const response=await commitResponse;
+  assert.equal(response.status(),200,await response.text());
+  const result=await response.json();
+  assert.equal(result.ok,true);
+  assert.equal(result.stored_total_kgs,expectedPrice[hotel]);
+  assert.equal(result.check_out,day(5));
+  receipts[hotel].new_check_out=day(5);
+  await section.getByText("Даты подтверждены сервером.",{exact:false}).waitFor();
+}
+async function createCancellationFixture(context,hotel){
+  const url=BASE+"/core/api/v1/admin/pms/reservations/new/";
+  const payload={room_id:receipts[hotel].room_id,check_in:day(10),check_out:day(12),adults:2,children:0};
+  const quoteResponse=await context.request.post(url+"preview",{data:payload});
+  assert.equal(quoteResponse.status(),200,await quoteResponse.text());
+  const quote=await quoteResponse.json();
+  assert.equal(quote.can_commit,true);
+  const committed=await context.request.post(url+"commit",{data:{
+    ...payload,guest_name:"Synthetic Cancel Fixture "+hotel,phone:"+996555110022",
+    expected_total_kgs:quote.pricing.total_kgs,expected_pricing_source:quote.pricing.source,
+  }});
+  assert.equal(committed.status(),201,await committed.text());
+  const result=await committed.json();
+  receipts[hotel].cancel_fixture={reservation_id:result.reservation_id,booking_number:result.booking_number};
+}
+async function cancelFixture(page,hotel){
+  const fixture=receipts[hotel].cancel_fixture;
+  // Navigate away and back to load freshly persisted backend reservations.
+  await page.getByRole("button",{name:"Шахматка"}).click();
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  const row=page.getByRole("row").filter({hasText:fixture.booking_number});
+  await row.getByRole("button",{name:"Управление"}).click();
+  const section=page.getByRole("region",{name:"Управление бронью "+fixture.booking_number});
+  const reviewResponse=page.waitForResponse(res =>
+    res.url().endsWith("/core/api/v1/admin/booking/reservations/"+fixture.reservation_id+"/cancellation-finance-review") &&
+    res.request().method()==="GET");
+  const cancelledResponse=page.waitForResponse(res =>
+    res.url().endsWith("/core/api/v1/admin/pms/reservations/"+fixture.reservation_id+"/cancel") &&
+    res.request().method()==="POST");
+  await section.getByRole("button",{name:"Отменить неоплаченную бронь"}).click();
+  const reviewed=await reviewResponse;
+  assert.equal(reviewed.status(),200,await reviewed.text());
+  assert.equal((await reviewed.json()).unpaid_cancel_path_eligible,true);
+  const cancelled=await cancelledResponse;
+  assert.equal(cancelled.status(),200,await cancelled.text());
+  const result=await cancelled.json();
+  assert.equal(result.reservation_id,fixture.reservation_id);
+  assert.equal(result.status,"CANCELLED");
+  assert.equal(result.payment_refunded,false);
+  assert.equal(result.released_blocks,1);
+  const apiAfterCancel=await page.context().request.get(
+    BASE+"/core/api/v1/admin/reception/reservations/"+fixture.reservation_id);
+  assert.equal(apiAfterCancel.status(),200);
+  const detail=await apiAfterCancel.json();
+  assert.equal(detail.reservation?.status ?? detail.status,"CANCELLED");
+  // The Admin locale sanitizer renders Russian labels for enum statuses.
+  // Verify visible state as well as the unchanged canonical API enum.
+  await row.getByRole("cell",{name:/^(?:ОТМЕНЕНО|CANCELLED)$/}).waitFor();
+}
+
 try {
   const contextA = await browser.newContext({ viewport:{width:390,height:844} });
   const pageA = await contextA.newPage();
@@ -136,6 +225,9 @@ try {
   assert.equal(await pageA.getByText("B202").count(),0);
   const roomA = await book(pageA,"HOTEL_A","A101");
   await makeHold(pageA,"HOTEL_A","A101");
+  await changeSchedule(pageA,"HOTEL_A");
+  await createCancellationFixture(contextA,"HOTEL_A");
+  await cancelFixture(pageA,"HOTEL_A");
 
   const contextB = await browser.newContext({ viewport:{width:390,height:844} });
   const pageB = await contextB.newPage();
@@ -167,9 +259,18 @@ try {
     });
   assert.equal(foreignHold.status(),404,"Foreign HOLD must not be readable");
   await makeHold(pageB,"HOTEL_B","B202");
+  await changeSchedule(pageB,"HOTEL_B");
+  await createCancellationFixture(contextB,"HOTEL_B");
+  await cancelFixture(pageB,"HOTEL_B");
   const reverseHold = await contextA.request.get(
     BASE + "/core/api/v1/admin/pms/holds/" + receipts.HOTEL_B.hold_id);
   assert.equal(reverseHold.status(),404,"Reverse direction foreign HOLD");
+  const foreignSchedule=await contextB.request.get(BASE+
+    "/core/api/v1/admin/pms/reservations/"+receipts.HOTEL_A.reservation_id+"/schedule");
+  assert.equal(foreignSchedule.status(),404,"Foreign reservation schedule leak");
+  const foreignCancel=await contextB.request.post(BASE+
+    "/core/api/v1/admin/pms/reservations/"+receipts.HOTEL_A.reservation_id+"/cancel");
+  assert.equal(foreignCancel.status(),404,"Foreign cancellation must fail");
   await releaseHold(pageA,"HOTEL_A");
   await releaseHold(pageB,"HOTEL_B");
   const aDetail = await contextA.request.get(
@@ -183,7 +284,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two real sessions, 2 bookings, 2 created/released HOLDs, conflict, bidirectional tenant isolation at 390px");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: 2 hotel bookings, 2 schedule mutations, 2 unpaid fixture cancellations, 2 released HOLDs, bidirectional isolation in real browser/API");
 } finally {
   await browser.close();
 }

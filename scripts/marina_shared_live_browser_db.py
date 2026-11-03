@@ -113,7 +113,38 @@ async def verify(conn):
         assert await conn.fetchval('''
             SELECT count(*) FROM payments WHERE "reservationId"=$1
         ''', row["id"]) == 0, "Booking unexpectedly created payment"
-    assert await conn.fetchval('SELECT count(*) FROM reservations') == 2
+    # The second reservation per hotel was made through real HTTP and cancelled
+    # through the real browser; no financial history may be silently refunded.
+    assert await conn.fetchval('SELECT count(*) FROM reservations') == 4
+    cancelled_rows=await conn.fetch('''
+        SELECT r.id,r."propertyId",r.status::text AS status,p.code AS hotel
+        FROM reservations r JOIN properties p ON p.id=r."propertyId"
+        WHERE r.status='CANCELLED'
+    ''')
+    assert len(cancelled_rows)==2
+    for row in cancelled_rows:
+        hotel=row["hotel"]
+        fixture=receipts[hotel]["cancel_fixture"]
+        assert str(row["id"])==fixture["reservation_id"]
+        assert row["propertyId"]==property_ids[hotel]
+        assert await conn.fetchval('''
+            SELECT count(*) FROM inventory_blocks
+            WHERE "reservationId"=$1 AND active=true
+        ''',row["id"])==0,"Cancelled booking retained active inventory"
+        assert await conn.fetchval('''
+            SELECT count(*) FROM payments WHERE "reservationId"=$1
+        ''',row["id"])==0,"Cancelled fixture unexpectedly has payments"
+    for row in rows:
+        hotel=row["hotel"]
+        # Dates changed in one server transaction but original total is retained
+        # until a separately reviewed financial adjustment is made.
+        state=await conn.fetchrow('SELECT "checkOut","totalKgs" FROM reservations WHERE id=$1',row["id"])
+        assert state["checkOut"].isoformat()==receipts[hotel]["new_check_out"]
+        assert int(state["totalKgs"])==receipts[hotel]["total_kgs"],"Schedule silently repriced stored total"
+        assert await conn.fetchval('''
+            SELECT count(*) FROM audit_logs WHERE "propertyId"=$1
+              AND action='PMS_SCHEDULE_MUTATION' AND "resourceId"=$2
+        ''',row["propertyId"],str(row["id"]))==1,"Missing schedule audit"
     assert await conn.fetchval('SELECT count(*) FROM marina_reservation_holds') == 2
     for hotel, receipt in receipts.items():
         hold = await conn.fetchrow('''
@@ -128,7 +159,7 @@ async def verify(conn):
         assert hold["confirmedReservationId"] is None, "Released HOLD unexpectedly confirmed"
         assert hold["active"] is False, "Released HOLD still blocks availability"
     assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 2
-    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels; browser->Next->ASGI->PostgreSQL; 2 bookings and 2 released HOLDs, tenant isolation, real Core rates, no payments")
+    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, 2 active schedule-mutated bookings, 2 cancelled unpaid PMS fixtures, 2 released HOLDs, 2 audit mutations, tenant isolation, no payments")
 
 
 async def main():
