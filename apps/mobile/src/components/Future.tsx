@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, StyleProp, Text, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
 import { cappedStagger, useMotionAllowed } from '../theme/motion';
@@ -25,7 +26,7 @@ export function GlassCard({ children, style, onPress, testID }: { children: Reac
   const { c } = useTheme();
   return <Card testID={testID} onPress={onPress} style={[{ backgroundColor: c.glass, borderColor: c.glassBorder, borderWidth: 1, ...elevation.card }, style]}>{children}</Card>;
 }
-export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon: typeof Sparkles; label: string; value: string; detail?: string; onPress?: () => void }) {
+export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void }) {
   const { c } = useTheme();
   return <GlassCard onPress={onPress} style={{ flexGrow: 1, flexBasis: '46%', minWidth: 136, gap: 10, padding: 16 }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -37,7 +38,7 @@ export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon
     {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
   </GlassCard>;
 }
-export function QuickAction({ icon: Icon, label, onPress, testID }: { icon: typeof Sparkles; label: string; onPress: () => void; testID?: string }) {
+export function QuickAction({ icon: Icon, label, onPress, testID }: { icon: LucideIcon; label: string; onPress: () => void; testID?: string }) {
   const { c } = useTheme();
   return <PressScale onPress={onPress} testID={testID} accessibilityLabel={label} style={{ minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, borderRadius: radius.lg, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.border }}>
     <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}><Icon color={c.primary} size={22}/></View>
