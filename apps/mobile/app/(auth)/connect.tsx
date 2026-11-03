@@ -48,7 +48,7 @@ export default function Connect() {
               if (demoBusy) return;
               setDemoBusy(true); setErr(null);
               try {
-                const user = await startDemo();
+                await startDemo();
                 router.replace('/tasks');
               } catch {
                 setErr(t('errors.generic'));
