@@ -35,6 +35,8 @@ function seed(hotelId: string): { rooms: Room[]; tasks: Task[] } {
     { id: 't5', type: 'MAINTENANCE', status: 'IN_PROGRESS', priority: 'NORMAL', title: 'Течёт кран в ванной', room_code: rooms[1].code, room_id: 'r2', assigned_to_id: 'u-tech', due_label: '16:00' },
     { id: 't6', type: 'GUEST_REQUEST', status: 'OPEN', priority: 'NORMAL', title: 'Дополнительные полотенца', room_code: rooms[1].code, room_id: 'r2', assigned_to_id: null, due_label: '10:30' },
     { id: 't7', type: 'HOUSEKEEPING', status: 'DONE', priority: 'LOW', title: 'Уборка завершена', room_code: rooms[5].code, room_id: 'r6', assigned_to_id: 'u-maid', due_label: '09:00' },
+    { id: 't8', type: 'HOUSEKEEPING', status: 'OPEN', priority: 'HIGH', title: 'Уборка к заселению', room_code: rooms[5].code, room_id: 'r6', assigned_to_id: null, due_label: '14:00' },
+    { id: 't9', type: 'MAINTENANCE', status: 'OPEN', priority: 'NORMAL', title: 'Проверить освещение', room_code: rooms[1].code, room_id: 'r2', assigned_to_id: null, due_label: '17:00' },
   ];
   return { rooms, tasks };
 }
