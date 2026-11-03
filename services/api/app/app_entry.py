@@ -190,7 +190,11 @@ app.include_router(reservation_detail_router)
 # Shared staging composes the *internal manual* reservation-payment handlers
 # for explicit ASGI allowlisting below. It never enables acquiring, provider
 # callbacks or the legacy request-confirm-payment mutation.
-if PAYMENT_OPERATIONS_ENABLED or MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+if PAYMENT_OPERATIONS_ENABLED:
+    app.include_router(reservation_payments_router)
+elif MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+    # No-payment legacy launch remains closed. Isolated shared staging
+    # only exposes explicitly reviewed manual routes via ASGI allowlist.
     app.include_router(reservation_payments_router)
 app.include_router(folio_router)
 app.include_router(room_detail_router)
