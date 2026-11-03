@@ -41,3 +41,28 @@ it('clears live employee data locally even when server logout fails', async () =
   fireEvent.press(screen.getByTestId('logout'));
   await waitFor(() => expect(screen.getByTestId('session-state').props.children).toBe('signed-out'));
 });
+
+function ConnectionProbe() {
+  const { hotels, addHotel } = useSession();
+  const add = (baseUrl: string) => addHotel({
+    id: baseUrl.endsWith('/core') ? 'live-hotel.example-core' : 'live-hotel.example',
+    name: 'Hotel', city: '', baseUrl, accent: '#245E9A', demo: false,
+  });
+  return (
+    <>
+      <Text testID="connected-origins">{hotels.filter((h) => !h.demo).map((h) => h.baseUrl).join('|')}</Text>
+      <Pressable testID="add-root" onPress={() => add('https://hotel.example')}><Text>Root</Text></Pressable>
+      <Pressable testID="add-core" onPress={() => add('https://hotel.example/core')}><Text>Core</Text></Pressable>
+    </>
+  );
+}
+
+it('replaces a same-host root API connection with /core instead of presenting shared cookies as isolated hotels', async () => {
+  const screen = render(
+    <SessionProvider initialLocale="ru"><ConnectionProbe /></SessionProvider>,
+  );
+  fireEvent.press(screen.getByTestId('add-root'));
+  await waitFor(() => expect(screen.getByTestId('connected-origins').props.children).toBe('https://hotel.example'));
+  fireEvent.press(screen.getByTestId('add-core'));
+  await waitFor(() => expect(screen.getByTestId('connected-origins').props.children).toBe('https://hotel.example/core'));
+});
