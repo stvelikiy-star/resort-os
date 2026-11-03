@@ -1,0 +1,52 @@
+name: MARINA Mobile Jest Security Compatibility Probe
+on:
+  push:
+    branches:
+      - 'probe/marina-mobile-jest-security-20261103'
+    paths:
+      - '.github/workflows/marina-mobile-jest-security-probe.yml'
+permissions:
+  contents: read
+jobs:
+  jest-scoped-remediation:
+    name: Temporary Jest-only glob/minimatch override compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Generate uncommitted Jest-scoped dependency candidate
+        run: |
+          npm pkg set 'overrides.@jest/core.glob=^14.0.2' 'overrides.@jest/reporters.glob=^14.0.2' 'overrides.jest-config.glob=^14.0.2' 'overrides.jest-runner.glob=^14.0.2' 'overrides.jest-runtime.glob=^14.0.2' 'overrides.jest-snapshot.glob=^14.0.2' 'overrides.jest-expo.glob=^14.0.2' 'overrides.test-exclude.glob=^14.0.2' 'overrides.test-exclude.minimatch=^11.0.1'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --stat -- package.json package-lock.json
+          git diff -- package.json package-lock.json > /tmp/marina-mobile-jest-scoped.patch
+      - name: Verify SDK typecheck lint tests and web export
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          node scripts/verify-backend-contract.mjs
+          npm run typecheck
+          npm run lint
+          npm test -- --ci --runInBand
+          npm run web:export
+      - name: Save security advisory inventory
+        if: always()
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-jest-scoped-audit.json || true
+          node -e "const a=require('/tmp/marina-mobile-jest-scoped-audit.json'); console.log('JEST_SCOPED_AFTER:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+      - name: Upload candidate patch for manual review (never auto-commit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-jest-security-probe
+          path: |
+            /tmp/marina-mobile-jest-scoped.patch
+            /tmp/marina-mobile-jest-scoped-audit.json
+          retention-days: 7
+          if-no-files-found: warn
