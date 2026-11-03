@@ -18,9 +18,9 @@ const FIELD: Workspace = { tabs: ['profile'], taskTypes: [], canCreateMaintenanc
 export const WORKSPACES: Record<Role, Workspace> = {
   OWNER: { tabs: ['tasks', 'rooms', 'requests', 'admin', 'profile'], taskTypes: ['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'], canCreateMaintenance: true, canManage: true, canSetRoomState: true, mobileReady: true },
   MANAGER: { tabs: ['tasks', 'rooms', 'requests', 'admin', 'profile'], taskTypes: ['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'], canCreateMaintenance: true, canManage: true, canSetRoomState: true, mobileReady: true },
-  RECEPTION: { tabs: ['tasks', 'rooms', 'requests', 'profile'], taskTypes: ['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'], canCreateMaintenance: true, canManage: false, canSetRoomState: true, mobileReady: true },
-  MAID: { tabs: ['tasks', 'rooms', 'profile'], taskTypes: ['HOUSEKEEPING'], canCreateMaintenance: true, canManage: false, canSetRoomState: false, mobileReady: true },
-  TECHNICIAN: { tabs: ['tasks', 'requests', 'rooms', 'profile'], taskTypes: ['MAINTENANCE', 'GUEST_REQUEST'], canCreateMaintenance: true, canManage: false, canSetRoomState: false, mobileReady: true },
+  RECEPTION: { tabs: ['profile'], taskTypes: [], canCreateMaintenance: false, canManage: false, canSetRoomState: false, mobileReady: false },
+  MAID: { tabs: ['tasks', 'rooms', 'profile'], taskTypes: ['HOUSEKEEPING'], canCreateMaintenance: false, canManage: false, canSetRoomState: false, mobileReady: true },
+  TECHNICIAN: { tabs: ['tasks', 'requests', 'rooms', 'profile'], taskTypes: ['MAINTENANCE'], canCreateMaintenance: true, canManage: false, canSetRoomState: false, mobileReady: true },
   AGENT: FIELD, STORE_STAFF: FIELD, COOK: FIELD, WAITER: FIELD, CONTENT_MANAGER: FIELD, BEACH_PARTNER: FIELD,
 };
 
