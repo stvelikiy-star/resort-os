@@ -1,6 +1,7 @@
 import type { Dict } from './ru';
 export const en: Dict = {
   common: { appName: 'MARINA STAFF', cancel: 'Cancel', save: 'Save', back: 'Back', next: 'Next', done: 'Done', retry: 'Retry', loading: 'Loading…', empty: 'Nothing here yet', demo: 'DEMO MODE · not PMS data', room: 'Room', all: 'All' },
+  scan: {"title":"Scan hotel QR code","instructions":"Point your camera at the hotel's connection QR code.","checking":"Checking camera access…","permission":"Allow camera access","invalid":"The QR code must contain a secure HTTPS hotel address.","privacy":"The QR code contains only an address. Sign-in is separate.","back":"Back to hotel selection"},
   nav: { tasks: 'Tasks', rooms: 'Rooms', requests: 'Requests', admin: 'Manage', profile: 'Profile' },
   connect: {
     title: 'Connect to a hotel', subtitle: 'Each hotel is a separate secure connection. Hotel data is never mixed.',
