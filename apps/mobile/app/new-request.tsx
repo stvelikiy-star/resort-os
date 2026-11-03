@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -25,12 +25,24 @@ export default function NewRequest() {
   const [text, setText] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const sendLock = useRef(false);
+  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (returnTimer.current) clearTimeout(returnTimer.current); }, []);
 
   const send = async () => {
-    if (busy || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
+    if (sendLock.current || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
+    sendLock.current = true;
     setBusy(true); setMsg(null);
-    try { await api!.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text }); setMsg(t('mt.sent')); setTimeout(() => router.back(), 600); }
-    catch { setMsg(t('errors.generic')); } finally { setBusy(false); }
+    try {
+      await api.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text });
+      setMsg(t('mt.sent'));
+      returnTimer.current = setTimeout(() => router.back(), 600);
+    } catch {
+      setMsg(t('errors.generic'));
+    } finally {
+      sendLock.current = false;
+      setBusy(false);
+    }
   };
 
   if (!user || !api) return <Redirect href="/connect" />;
