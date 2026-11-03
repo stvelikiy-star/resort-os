@@ -8,6 +8,7 @@ import { Logo } from '../../src/components/Brand';
 import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
 import { useSession } from '../../src/state/session';
 import { homeFor } from '../../src/roles/registry';
+import { ApiError } from '../../src/api/types';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 
@@ -23,7 +24,7 @@ export default function Login() {
 
   const go = async (user: string, pass: string) => {
     setBusy(true); setErr(null);
-    try { const me = await signIn(user, pass); router.replace(homeFor(me.role)); } catch { setErr(t('login.wrong')); } finally { setBusy(false); }
+    try { const me = await signIn(user, pass); router.replace(homeFor(me.role)); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { setBusy(false); }
   };
 
   return (
