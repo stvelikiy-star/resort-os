@@ -41,6 +41,22 @@ export interface Dashboard {
     departures: { id: string; booking_number: string; guest_name: string | null; room_code: string | null }[] };
   attention_tasks: { id: string; title: string; priority: string; room_code: string | null }[];
 }
+export interface BookingPreview {
+  room: { id: string; code: string; room_type_name: string };
+  check_in: string; check_out: string; nights: number; can_commit: boolean;
+  conflicts: { block_type: string; start: string; end: string }[];
+  pricing: { source: 'CORE_RATE' | 'MANAGER_OVERRIDE'; sellable: boolean; total_kgs: number | null; discount_percent: number; reason?: string | null };
+}
+export interface BookingDraft {
+  room_id: string; check_in: string; check_out: string; adults: number; children: number;
+  guest_phone: string;
+}
+export interface BookingCommit extends BookingDraft {
+  guest_name: string; phone: string; expected_total_kgs: number; expected_pricing_source: 'CORE_RATE' | 'MANAGER_OVERRIDE';
+}
+export interface Hold {
+  id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
+}
 export type KitchenStatus = 'NEW' | 'ACCEPTED' | 'COOKING' | 'READY' | 'SERVED' | 'CANCELLED';
 export interface KitchenOrder {
   id: string; order_number: string; status: KitchenStatus;
@@ -63,7 +79,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
   const parsed = parseHotelAddress(baseUrl);
   if (!parsed.ok) throw new Error('HTTPS hotel origin required');
   const root = parsed.baseUrl;
-  async function request<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: 'GET' | 'POST' | 'PATCH' | 'DELETE', path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
     let response: Response;
@@ -100,6 +116,15 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     reservation: (id: string) => request<Record<string, unknown>>('GET', p + '/admin/reception/reservations/' + encoded(id)),
     checkIn: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + encoded(id) + '/check-in'),
     checkOut: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + encoded(id) + '/check-out'),
+    bookingPreview: (draft: BookingDraft) => request<BookingPreview>('POST', p + '/admin/pms/reservations/new/preview', draft),
+    bookingCommit: (draft: BookingCommit) => request<{ reservation_id: string; booking_number: string; total_kgs: number; price_adjusted_at_commit: boolean }>('POST', p + '/admin/pms/reservations/new/commit', draft),
+    holds: async () => {
+      const value = await request<{ holds: Hold[] }>('GET', p + '/admin/pms/holds');
+      if (!Array.isArray(value?.holds)) throw new ApiError('UNKNOWN', 'Invalid holds list');
+      return value.holds;
+    },
+    createHold: (draft: {room_id: string;check_in: string;check_out: string;guest_name: string;guest_phone: string}) => request<{id: string;expires_at: string;status: string}>('POST', p + '/admin/pms/holds', draft),
+    releaseHold: (id: string) => request<unknown>('DELETE', p + '/admin/pms/holds/' + encoded(id)),
     pmsGrid: async (start: string, end: string) => {
       const value = await request<Grid>('GET', p + '/pms/grid?start=' + encoded(start) + '&end=' + encoded(end));
       if (!value || !Array.isArray(value.rooms)) throw new ApiError('UNKNOWN', 'Invalid PMS grid');

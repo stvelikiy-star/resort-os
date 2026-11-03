@@ -1,8 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { Badge, Card, Empty, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, Clock3 } from 'lucide-react-native';
+import { Badge, Button, Card, Empty, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useAsync } from '../../src/lib/useAsync';
@@ -39,6 +39,8 @@ export default function Pms() {
   };
   return <Screen>
     <Title sub={hotel?.name}>{copy.pms}</Title>
+    {live && user && ['OWNER','MANAGER','AGENT'].includes(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
+    {live && user && ['OWNER','MANAGER'].includes(user.role) ? <Button testID="pms-holds" variant="secondary" label={copy.holds} icon={Clock3} onPress={() => router.push('/holds')}/> : null}
     {!live ? <Empty text={copy.unavailable} /> : null}
     <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
       <PressScale testID="pms-prev" onPress={() => setStart(dayAt(start, -7))} style={{ minHeight: 48, minWidth: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surface, borderRadius: radius.md }}><ChevronLeft color={c.primary} size={24}/></PressScale>
