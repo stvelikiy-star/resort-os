@@ -164,3 +164,15 @@ python3 scripts/marina_runtime_inventory_review.py marina-runtime-inventory.json
 Папка резервных копий в существующей диагностике по умолчанию `/home/agent/marina-backups`, тогда как скрипт fleet backup пишет также в `.marina-backups/<slug>`. Эти каталоги следует инвентаризировать раздельно, указывая `--backup-dir`; не объединять разные гостиницы в один логический backup set.
 
 **На текущую дату реальный архив Ubuntu не проверялся из этой сессии.**
+
+## XII. Конкурентная бронь и найденная HOLD-ветка
+
+На SHA `4e20e79b5f91de437e78bc92b7320626321dbef0` сквозной `MARINA SMART Full Stack Synthetic Smoke` прошёл: https://github.com/stvelikiy-star/resort-os/actions/runs/41594315767 . Добавленный `marina_concurrent_booking_e2e.py` инициирует одновременно два запросa от независимых сессий: один `201`, второй `409`, один блок в шахматке. Это PASS только синтетической CI, не Ubuntu.
+
+Выявлено, что HOLD 60 минут уже существует в отдельной ветке `feat/marina-hold-60min-20261029` SHA `cd7f7e9dc76ec070f9120b4df2d13e8ae535a27e`; в текущем release-кандидате отсутствуют `pms_holds.py` и `zz114`. Тесты HOLD migration и contract на исходной ветке прошли:
+- https://github.com/stvelikiy-star/resort-os/actions/runs/41013444437
+- https://github.com/stvelikiy-star/resort-os/actions/runs/41013444385
+
+Сравнение веток показывает существенное расхождение (66 ahead / 31 behind относительно SHA `4e20e79b5f`), поэтому **прямое слияние HOLD ветки запрещено до селективного code review и migration ledger reconciliation**. Отдельная задача интеграции: https://github.com/stvelikiy-star/resort-os/issues/275 .
+
+В исходном HOLD API истечение активируется вызовами `expire_holds(conn)` и логикой database/session processing; перед выпуском нужно подтвердить реальное освобождение просроченных HOLD **без необходимости заходить в административную панель**. Проверить race HOLD vs ordinary booking, конвертацию HOLD→бронь, TTL 60m и изоляцию отелей на текущем целевом SHA. CI старой ветки не доказывает принятие на текущем релизе.
