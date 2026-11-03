@@ -1,0 +1,97 @@
+name: MARINA Mobile Android Metro Source Map Security Probe
+on:
+  push:
+    branches:
+      - probe/marina-mobile-android-metro-sbom-20261104
+    paths:
+      - .github/workflows/marina-mobile-android-metro-sbom-probe.yml
+permissions:
+  contents: read
+jobs:
+  android-metro-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Reproducible dependency and strict Expo SDK alignment
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo install --check
+      - name: Export production Android JavaScript bundle with source maps
+        run: |
+          set -euo pipefail
+          npx expo export --platform android --source-maps --output-dir dist-metro-security --max-workers 2
+          find dist-metro-security -type f -name '*.map' -print
+      - name: Preserve unresolved npm advisory inventory
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-metro-audit.json || true
+          node scripts/audit-provenance.mjs /tmp/marina-metro-audit.json package-lock.json > /tmp/marina-metro-provenance.json
+      - name: Compare actual Metro module sources with every affected advisory path
+        run: |
+          node --input-type=module <<'NODE' > /tmp/marina-metro-bundle-evidence.json
+          import { readFileSync, readdirSync, statSync } from 'node:fs';
+          import { join } from 'node:path';
+          import { createHash } from 'node:crypto';
+          const audit=JSON.parse(readFileSync('/tmp/marina-metro-audit.json','utf8'));
+          if(!audit.vulnerabilities||typeof audit.vulnerabilities!=='object') throw Error('Missing audit inventory');
+          function recurse(dir){
+            return readdirSync(dir).flatMap(e=>{
+              const f=join(dir,e);
+              return statSync(f).isDirectory()?recurse(f):f.endsWith('.map')?[f]:[];
+            });
+          }
+          const maps=recurse('dist-metro-security');
+          if(maps.length===0) throw Error('No Metro source maps produced; cannot infer bundle contents');
+          const sources=new Set();
+          const mapDigests=[];
+          for(const file of maps){
+            const raw=readFileSync(file,'utf8');
+            const map=JSON.parse(raw);
+            if(!Array.isArray(map.sources)) throw Error('Malformed source map: '+file);
+            mapDigests.push({file,sourceCount:map.sources.length,sha256:createHash('sha256').update(raw).digest('hex')});
+            for(const source of map.sources) if(typeof source==='string') sources.add(source.replaceAll('\\','/'));
+          }
+          if(sources.size<10) throw Error('Insufficient Metro source information');
+          const affected=[];
+          for(const [name,report] of Object.entries(audit.vulnerabilities)){
+            if(!Array.isArray(report?.nodes)||!report.nodes.length) throw Error('Invalid advisory nodes: '+name);
+            for(const location of report.nodes){
+              if(typeof location!=='string'||!location.startsWith('node_modules/')) throw Error('Invalid advisory path');
+              affected.push({name,location});
+            }
+          }
+          const matches=[];
+          for(const source of sources){
+            for(const vuln of affected){
+              if(source.includes('/'+vuln.location+'/')||source.startsWith(vuln.location+'/')||source.endsWith('/'+vuln.location)){
+                matches.push({source,advisory:vuln.name,affectedNode:vuln.location});
+              }
+            }
+          }
+          const result={policy:'DIAGNOSTIC_ANDROID_METRO_MODULE_SOURCES_NOT_RELEASE_CLEARANCE',sourceCommit:process.env.GITHUB_SHA,mapDigests,totalDistinctSources:sources.size,npmAdvisoryPackageNames:Object.keys(audit.vulnerabilities).length,affectedNodePaths:affected.length,matchedModulePaths:matches.length,matches};
+          console.log(JSON.stringify(result,null,2));
+          if(matches.length) process.exitCode=2;
+          NODE
+      - name: Show proof summary
+        if: always()
+        run: |
+          if [ -s /tmp/marina-metro-bundle-evidence.json ]; then
+            node -e "let a=require('/tmp/marina-metro-bundle-evidence.json');console.log('METRO_BUNDLE_SOURCE_PROOF',JSON.stringify({maps:a.mapDigests?.length,sources:a.totalDistinctSources,advisories:a.npmAdvisoryPackageNames,affectedNodes:a.affectedNodePaths,matched:a.matchedModulePaths}))"
+          fi
+      - name: Upload review evidence (no build distribution)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-android-metro-advisory-sourcemap-audit
+          path: |
+            /tmp/marina-metro-audit.json
+            /tmp/marina-metro-provenance.json
+            /tmp/marina-metro-bundle-evidence.json
+          if-no-files-found: warn
+          retention-days: 7
