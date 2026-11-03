@@ -1,0 +1,59 @@
+name: MARINA Mobile Expo 58 Strict React 19.3.0 Compatibility Probe
+on:
+  push:
+    branches:
+      - 'probe/marina-mobile-sdk58-react1930-strict-20261104'
+    paths:
+      - '.github/workflows/marina-mobile-sdk58-react1930-strict-probe.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  sdk58-react1930:
+    name: Official Expo patches with exact React 19.3.0 no overrides
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Create isolated patched vendor manifest (never commit)
+        run: |
+          set -euo pipefail
+          npm pkg set 'dependencies.react=19.3.0' 'dependencies.react-dom=19.3.0' 'devDependencies.react-test-renderer=19.3.0'
+          npm pkg set 'dependencies.@expo/metro-runtime=~58.0.17' 'dependencies.expo=~58.0.23' 'dependencies.expo-constants=~58.0.15' 'dependencies.expo-linking=~58.0.16' 'dependencies.expo-router=~58.0.30' 'dependencies.react-native-safe-area-context=~5.11.1' 'devDependencies.jest-expo=~58.0.14'
+          rm package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund > /tmp/marina-sdk58-strict-install.log 2>&1 || { tail -n 120 /tmp/marina-sdk58-strict-install.log; exit 1; }
+          git diff -- package.json package-lock.json > /tmp/marina-sdk58-strict-candidate.patch
+          git diff --stat -- package.json package-lock.json
+      - name: Full strict Expo SDK alignment and source acceptance
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.nodecheck.mjs
+          npm run typecheck
+          npm run lint
+          npm test -- --ci --runInBand
+          npm run web:export
+      - name: Capture npm dependency security inventory (do not waive)
+        if: always()
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-sdk58-strict-audit.json || true
+          node -e "const a=require('/tmp/marina-sdk58-strict-audit.json');console.log('STRICT_PROBE_AUDIT',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+      - name: Upload isolated evidence (no commit, no deployment)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-sdk58-react1930-strict-probe
+          path: |
+            /tmp/marina-sdk58-strict-install.log
+            /tmp/marina-sdk58-strict-candidate.patch
+            /tmp/marina-sdk58-strict-audit.json
+          retention-days: 7
+          if-no-files-found: warn
