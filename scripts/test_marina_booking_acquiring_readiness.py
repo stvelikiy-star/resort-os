@@ -46,8 +46,15 @@ class Pool:
 async def totals(conn, rid):
     return {"total_kgs":conn.total,"paid_kgs":conn.paid,"remaining_kgs":max(conn.total-conn.paid,0),"overpaid_kgs":max(conn.paid-conn.total,0)}
 
+async def trusted_property_id(conn, user):
+    # This test extracts the route in isolation: preserve its verified
+    # session-derived property contract instead of falling back to a code lookup.
+    assert user["property_id"] == conn.property_id
+    return user["property_id"]
+
 namespace={"uuid":uuid,"Any":object,"HTTPException":HttpException,
-"Request":object,"Depends":lambda x:None,"payment_access":object,"_totals":totals}
+"Request":object,"Depends":lambda x:None,"payment_access":object,"_totals":totals,
+"trusted_property_id":trusted_property_id}
 fn=functions["reservation_acquiring_readiness"]
 fn.decorator_list=[]
 exec(compile(ast.Module(body=[fn],type_ignores=[]),str(ROOT), "exec"),namespace)
@@ -55,7 +62,7 @@ readiness=namespace["reservation_acquiring_readiness"]
 
 class TestAcquiringReadiness(unittest.TestCase):
     def invoke(self,conn,code="hotel01"):
-        return asyncio.run(readiness(uuid.uuid4(),type("Request",(),{"app":type("App",(),{"state":type("State",(),{"db":Pool(conn)})()})()})(),{"property_code":code}))
+        return asyncio.run(readiness(uuid.uuid4(),type("Request",(),{"app":type("App",(),{"state":type("State",(),{"db":Pool(conn)})()})()})(),{"property_code":code,"property_id":conn.property_id}))
     def test_eligible_outstanding_but_no_bank_link(self):
         conn=Connection(True,4000)
         result=self.invoke(conn)
