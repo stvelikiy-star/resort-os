@@ -46,10 +46,10 @@ jobs:
         run: npm run web:export
       - name: Validate Expo configuration
         run: npx expo config --type public --json > /tmp/marina-staff-expo-config.json
-  android-debug:
+  android-preview:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: apps/mobile
@@ -70,12 +70,29 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install --non-interactive
-      - name: Compile Android debug APK
-        run: cd android && ./gradlew :app:assembleDebug --no-daemon --stacktrace
-      - name: Attach debug APK
+      - name: Compile standalone Android preview APK (bundled JavaScript)
+        run: cd android && ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Verify bundled JS and test APK signature
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          unzip -Z1 "$apk" | grep -q '^assets/index.android.bundle
+
+          found=false
+          for signer in "$ANDROID_HOME"/build-tools/*/apksigner; do
+            if [ -x "$signer" ]; then
+              "$signer" verify --verbose "$apk"
+              found=true
+              break
+            fi
+          done
+          if [ "$found" != true ]; then echo 'Android apksigner not available' >&2; exit 1; fi
+          echo 'STANDALONE_APK_BUNDLE_AND_SIGNATURE_OK'
+      - name: Attach standalone Android preview APK
         uses: actions/upload-artifact@v4
         with:
-          name: marina-staff-debug-apk
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: marina-staff-standalone-preview-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           retention-days: 7
           if-no-files-found: error
