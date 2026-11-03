@@ -19,6 +19,18 @@ page.on("pageerror", error => errors.push(error.message));
 page.on("dialog", dialog => dialog.accept());
 let active = null;
 const staffByHotel = {};
+const bookingIds = {
+  HOTEL_A:"00000000-0000-4000-8000-000000000101",
+  HOTEL_B:"00000000-0000-4000-8000-000000000202",
+  HOTEL_R:"00000000-0000-4000-8000-000000000303",
+};
+const bookingStatus = Object.fromEntries(Object.keys(bookingIds).map(code => [code,"GUARANTEED"]));
+function scopedBooking() {
+  return {id:bookingIds[active.code],bookingNumber:active.code+"-BOOK",status:bookingStatus[active.code],
+    checkIn:"2026-11-03",checkOut:"2026-11-05",room_code:active.rooms[0],
+    room_state:"CLEAN",firstName:"Synthetic "+active.code,phone:null,
+    totalKgs:9000,paidKgs:0,remainingKgs:9000};
+}
 const respond = (route, code, body) => route.fulfill({
   status: code, contentType: "application/json", body: JSON.stringify(body),
   headers: { "Cache-Control": "no-store" },
