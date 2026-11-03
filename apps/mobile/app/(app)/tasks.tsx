@@ -8,7 +8,7 @@ import { TaskCard } from '../../src/components/domain';
 import { Hero } from '../../src/components/Brand';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 import type { Task } from '../../src/api/types';
@@ -18,7 +18,7 @@ export default function Tasks() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user, hotel } = useSession();
-  const ws = workspaceFor(user!.role);
+  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => {
