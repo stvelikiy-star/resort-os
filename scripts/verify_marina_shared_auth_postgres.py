@@ -783,9 +783,147 @@ def main():
         assert canonical_client.post(
             '/api/v1/admin/booking/requests/'+rid_after_expiry_a+'/confirm-payment',json={}).status_code == 503
         auth._preview_attempts.clear()
-        # Shared payment, check-in and unreviewed staff ops remain unavailable.
+        # Canonical two-property stay lifecycle: no bank settlement, only
+        # verified reservation and hotel-scoped operations, staff role grants.
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        local_today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
+        stay_start = (local_today-timedelta(days=1)).isoformat()
+        stay_end = (local_today+timedelta(days=2)).isoformat()
+        stay_route = '/api/v1/admin/stays/reservations/'
+        owner_login('a')
+        created_stay_a = canonical_client.post(path_commit,
+            json=hold_commit('a',None,stay_start,stay_end))
+        assert created_stay_a.status_code == 201, created_stay_a.text
+        rid_stay_a = created_stay_a.json()['reservation_id']
         assert canonical_client.post(
-            '/api/v1/admin/stays/reservations/'+rid_hold_b+'/check-in').status_code == 503
+            stay_route+rid_hold_b+'/check-in').status_code == 404
+        assert canonical_client.post(
+            stay_route+rid_stay_a+'/check-out').status_code == 409
+        # Actual CHECK_IN enforces both room readiness and current hotel-local date.
+        assert canonical_client.post(
+            stay_route+rid_after_expiry_a+'/check-in').status_code == 409
+
+        owner_login('b')
+        created_stay_b = canonical_client.post(path_commit,
+            json=hold_commit('b',None,stay_start,stay_end))
+        assert created_stay_b.status_code == 201, created_stay_b.text
+        rid_stay_b = created_stay_b.json()['reservation_id']
+        assert rid_stay_a != rid_stay_b
+        assert canonical_client.post(stay_route+rid_stay_a+'/check-in',headers={
+            'X-Property-Id':str(ids['property_a']),
+            'X-Tenant-Id':str(ids['tenant_a']), 'X-Role':'OWNER'}).status_code == 404
+        assert canonical_client.post(stay_route+rid_stay_a+'/check-out').status_code == 404
+        assert canonical_client.post(stay_route+rid_stay_b+'/check-out').status_code == 409
+        execute('UPDATE rooms SET "operationalState"=\'CLEAN\' WHERE id=$1',
+                ids['room_a'])
+        execute('UPDATE rooms SET "operationalState"=\'CLEAN\' WHERE id=$1',
+                ids['room_b'])
+        b_check_in = canonical_client.post(stay_route+rid_stay_b+'/check-in')
+        assert b_check_in.status_code == 200, b_check_in.text
+        assert b_check_in.json()['status'] == 'CHECKED_IN'
+        assert len(b_check_in.json()['guest_access_pin']) == 6
+        assert canonical_client.post(stay_route+rid_stay_b+'/check-in').status_code == 409
+        assert canonical_client.post(stay_route+rid_stay_a+'/check-out').status_code == 404
+
+        owner_login('a')
+        assert canonical_client.post(stay_route+rid_stay_b+'/check-out').status_code == 404
+        # Owner removes and restores reception permission before real check-in.
+        receptionist_id = receptionist.json()['id']
+        assert canonical_client.patch('/api/v1/admin/staff/'+receptionist_id,
+                                      json={'module_permissions':[]}).status_code == 200
+        auth._preview_attempts.clear()
+        denied_reception = canonical_client.post('/api/v1/auth/login',json=dict(
+            username='synthetic-reception',password=receptionist_password,
+            tenant_code='tenant_a',property_code='HOTEL_A'))
+        assert denied_reception.status_code == 200
+        assert canonical_client.post(stay_route+rid_stay_a+'/check-in').status_code == 403
+        owner_login('a')
+        assert canonical_client.patch('/api/v1/admin/staff/'+receptionist_id,
+                                      json={'module_permissions':['RESERVATIONS']}).status_code == 200
+        auth._preview_attempts.clear()
+        allowed_reception = canonical_client.post('/api/v1/auth/login',json=dict(
+            username='synthetic-reception',password=receptionist_password,
+            tenant_code='tenant_a',property_code='HOTEL_A'))
+        assert allowed_reception.status_code == 200
+        assert canonical_client.post(stay_route+rid_stay_b+'/check-in').status_code == 404
+        a_check_in = canonical_client.post(stay_route+rid_stay_a+'/check-in')
+        assert a_check_in.status_code == 200, a_check_in.text
+        assert a_check_in.json()['status'] == 'CHECKED_IN'
+        assert len(a_check_in.json()['guest_access_pin']) == 6
+        assert a_check_in.json()['guest_access_pin_display_once'] is True
+        assert canonical_client.post(stay_route+rid_stay_a+'/check-in').status_code == 409
+
+        owner_login('a')
+        a_check_out = canonical_client.post(stay_route+rid_stay_a+'/check-out')
+        assert a_check_out.status_code == 200, a_check_out.text
+        assert a_check_out.json()['status'] == 'CHECKED_OUT'
+        assert a_check_out.json()['room_state'] == 'DIRTY'
+        assert a_check_out.json()['housekeeping_task_id']
+        assert a_check_out.json()['early_checkout_released_inventory'] is True
+        assert a_check_out.json()['stored_total_kgs_changed'] is False
+        assert canonical_client.post(stay_route+rid_stay_a+'/check-out').status_code == 409
+        assert canonical_client.post(stay_route+rid_stay_b+'/check-out').status_code == 404
+        owner_login('b')
+        # Other hotel is still checked in and its room remains CLEAN.
+        async def inspect_before_b_checkout():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return await conn.fetchrow("""
+                    SELECT r.status::text AS booking_status,
+                           s.status::text AS stay_status,room."operationalState"::text AS room_state
+                    FROM reservations r JOIN stays s ON s."reservationId"=r.id
+                    JOIN room_assignments ra ON ra."stayId"=s.id AND ra."endedAt" IS NULL
+                    JOIN rooms room ON room.id=ra."roomId"
+                    WHERE r.id=$1 AND r."propertyId"=$2
+                """,uuid.UUID(rid_stay_b),ids['property_b'])
+            finally:
+                await conn.close()
+        b_live = asyncio.run(inspect_before_b_checkout())
+        assert b_live and b_live['booking_status'] == 'CHECKED_IN'
+        assert b_live['stay_status'] == 'ACTIVE' and b_live['room_state'] == 'CLEAN'
+        b_check_out = canonical_client.post(stay_route+rid_stay_b+'/check-out')
+        assert b_check_out.status_code == 200, b_check_out.text
+        assert b_check_out.json()['housekeeping_task_id']
+        assert b_check_out.json()['early_checkout_released_inventory'] is True
+        assert canonical_client.post(stay_route+rid_stay_b+'/check-out').status_code == 409
+
+        async def inspect_closed_stays():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return await conn.fetch("""
+                    SELECT r.id,r."propertyId",r.status::text AS reservation_status,
+                           r."totalKgs",s.id AS stay_id,
+                           s.status::text AS stay_status,s."guestAccessPinHash" AS pin_hash,
+                           room."operationalState"::text AS room_state,
+                           (SELECT count(*) FROM operational_tasks task
+                            WHERE task."propertyId"=r."propertyId"
+                              AND task."reservationId"=r.id AND task.source='CHECK_OUT')::int AS cleaning_tasks,
+                           (SELECT count(*) FROM operational_tasks task
+                            WHERE task."propertyId"=r."propertyId"
+                              AND task."reservationId"=r.id AND task.source='CHECK_IN_ARRIVAL_SYNC')::int AS arrival_tasks
+                    FROM reservations r
+                    JOIN stays s ON s."reservationId"=r.id
+                    JOIN room_assignments ra ON ra."stayId"=s.id
+                    JOIN rooms room ON room.id=ra."roomId"
+                    WHERE r.id=ANY($1::uuid[])
+                """,[uuid.UUID(rid_stay_a),uuid.UUID(rid_stay_b)])
+            finally:
+                await conn.close()
+        checked = {str(row['id']):row for row in asyncio.run(inspect_closed_stays())}
+        assert set(checked) == {rid_stay_a,rid_stay_b},checked
+        assert checked[rid_stay_a]['propertyId'] == ids['property_a']
+        assert checked[rid_stay_b]['propertyId'] == ids['property_b']
+        for item in checked.values():
+            assert item['reservation_status'] == 'CHECKED_OUT'
+            assert item['stay_status'] == 'CHECKED_OUT'
+            assert item['pin_hash'] is None
+            assert item['room_state'] == 'DIRTY'
+            assert item['totalKgs'] == price
+            assert item['cleaning_tasks'] == 1
+            assert item['arrival_tasks'] == 1
+        # Staging remains fail closed for unreviewed guest/provider operations.
+        assert canonical_client.post('/api/v1/ops/kitchen/sync-arrivals').status_code == 503
         auth._preview_attempts.clear()
 
     print('PASS: canonical shared HOLD expiry/create/convert/release: independent hotels, owned inventory, no cross-hotel access, stale HOLD cannot be confirmed')
