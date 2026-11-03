@@ -201,7 +201,15 @@ async function cancelFixture(page,hotel){
   assert.equal(result.status,"CANCELLED");
   assert.equal(result.payment_refunded,false);
   assert.equal(result.released_blocks,1);
-  await row.getByRole("cell",{name:"CANCELLED"}).waitFor();
+  const apiAfterCancel=await page.context().request.get(
+    BASE+"/core/api/v1/admin/reception/reservations/"+fixture.reservation_id);
+  assert.equal(apiAfterCancel.status(),200);
+  const detail=await apiAfterCancel.json();
+  const status=detail.reservation?.status ?? detail.status;
+  console.log("CANCEL_AFTER_API",hotel,status);
+  const listings=await page.locator("table").allInnerTexts();
+  console.log("CANCEL_AFTER_UI",hotel,JSON.stringify(listings).slice(0,2500));
+  await row.getByRole("cell",{name:"CANCELLED"}).waitFor({timeout:3000});
 }
 
 try {
