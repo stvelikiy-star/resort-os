@@ -145,7 +145,26 @@ def main():
         assert dash_client.get('/api/v1/admin/dashboard').status_code == 401
         execute("UPDATE tenants SET status='ACTIVE' WHERE id=$1", ids['tenant_b'])
         execute("UPDATE staff_users SET role='OWNER' WHERE id=$1", ids['user_b'])
-    print('PASS: canonical shared dashboard HTTP 200 for each hotel, forged headers ignored, staff still 503, waiter 403, blocked tenant 401')
+    print('PASS: isolated dashboard test harness, not yet canonical app')
+
+    # Acceptance must use the real ASGI application composition, not a test router.
+    from app.app_entry import app as canonical_app
+    with TestClient(canonical_app, base_url='https://shared-auth.test') as canonical_client:
+        for suffix, foreign in (('a', 'b'), ('b', 'a')):
+            signin = canonical_client.post('/api/v1/auth/login', json=dict(
+                username='owner', password=passwords[suffix],
+                tenant_code='tenant_'+suffix, property_code='HOTEL_'+suffix.upper()))
+            assert signin.status_code == 200, signin.text
+            response = canonical_client.get('/api/v1/admin/dashboard', headers={
+                'X-Property-Id': str(ids['property_'+foreign]),
+                'X-Tenant-Id': str(ids['tenant_'+foreign]), 'X-Role': 'OWNER'})
+            assert response.status_code == 200, response.text
+            result = response.json()
+            assert result['property']['code'] == 'HOTEL_'+suffix.upper()
+            assert result['rooms']['total'] == 1
+            assert canonical_client.get('/api/v1/admin/staff').status_code == 503
+            assert canonical_client.get('/api/v1/pms/grid?start=2026-11-04&end=2026-11-05').status_code == 503
+    print('PASS: canonical app_entry:app with PostgreSQL: both hotel dashboards and locked remaining workspaces')
 
     # Exercise only the reviewed QR handlers in a test harness with the real
     # shared auth and one pool. The canonical application's preview boundary
