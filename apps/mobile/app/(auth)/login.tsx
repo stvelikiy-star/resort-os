@@ -29,7 +29,7 @@ export default function Login() {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true); setErr(null);
-    try { const me = await signIn(user, pass); router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE')); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { busyRef.current = false; setBusy(false); }
+    try { const me = await signIn(user, pass); router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE')); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'PENDING_LOGOUT' ? t('login.logoutPending') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { busyRef.current = false; setBusy(false); }
   };
 
   if (hotel && !hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) return <Redirect href="/connect"/>;

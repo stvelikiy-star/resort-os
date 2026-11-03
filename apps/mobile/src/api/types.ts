@@ -25,7 +25,7 @@ export interface NewMaintenance { room_id: string | null; category: string; prio
 export interface HousekeepingReport { checklist: Record<string, boolean>; comment?: string }
 
 export class ApiError extends Error {
-  constructor(public code: 'OFFLINE' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'UNAUTHORIZED' | 'BAD_REQUEST' | 'RATE_LIMIT' | 'UNKNOWN', message?: string) {
+  constructor(public code: 'OFFLINE' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'UNAUTHORIZED' | 'BAD_REQUEST' | 'RATE_LIMIT' | 'PENDING_LOGOUT' | 'UNKNOWN', message?: string) {
     super(message ?? code);
   }
 }

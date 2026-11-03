@@ -193,7 +193,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       // Revoke it before sending fresh credentials to the same host.
       await flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
       if (await hasUnrevokedCookieForHost(hotel.baseUrl)) {
-        throw new ApiError('OFFLINE', 'Previous server logout is still pending');
+        throw new ApiError('PENDING_LOGOUT', 'Previous server logout is still pending');
       }
     }
     // Switching hotel or signing out while a pending logout is reconciled
