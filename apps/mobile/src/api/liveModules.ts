@@ -79,6 +79,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       clearTimeout(timeout);
     }
     if (!response.ok) {
+      if (response.status === 503) throw new ApiError('UNKNOWN', 'Hotel workspace is unavailable in this environment (HTTP 503)');
       const code = response.status === 401 ? 'UNAUTHORIZED' : response.status === 403 ? 'FORBIDDEN'
         : response.status === 404 ? 'NOT_FOUND' : response.status === 409 ? 'CONFLICT'
         : response.status === 400 || response.status === 422 ? 'BAD_REQUEST' : 'UNKNOWN';

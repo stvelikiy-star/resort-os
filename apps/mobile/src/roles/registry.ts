@@ -21,11 +21,11 @@ export const WORKSPACES: Record<Role, Workspace> = {
 };
 export const workspaceFor = (role: Role): Workspace => WORKSPACES[role] ?? FIELD;
 export const hasTab = (role: Role, tab: TabKey) => workspaceFor(role).tabs.includes(tab);
-export const homeFor = (role: Role): '/' | `/${TabKey}` => '/' + workspaceFor(role).tabs[0];
+export const homeFor = (role: Role): `/${TabKey}` => ('/' + workspaceFor(role).tabs[0]) as `/${TabKey}`;
 
 const LIVE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
-  OWNER: ['overview', 'pms', 'inbox', 'tasks', 'admin', 'profile'],
-  MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'admin', 'profile'],
+  OWNER: ['overview', 'pms', 'inbox', 'admin', 'profile'],
+  MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'profile'],
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
@@ -57,6 +57,6 @@ export function workspaceForSession(role: Role, permissions: string[] | undefine
 export function hasTabForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO', tab: TabKey) {
   return workspaceForSession(role, permissions, mode).tabs.includes(tab);
 }
-export function homeForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): '/' | `/${TabKey}` {
-  return '/' + workspaceForSession(role, permissions, mode).tabs[0];
+export function homeForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): `/${TabKey}` {
+  return ('/' + workspaceForSession(role, permissions, mode).tabs[0]) as `/${TabKey}`;
 }

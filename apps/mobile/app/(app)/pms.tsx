@@ -74,7 +74,7 @@ export default function Pms() {
           <Text style={[font.small, { color: c.textMuted }]}>{b.start} → {b.end} · {b.guest_name || copy.readOnly}</Text>
         </Card>)}
       {data.rooms.length === 0 ? <Empty text={copy.noRooms}/> : null}
-      <Text style={[font.small, { color: c.textMuted }]}>{copy.readOnly} · {copy.senderBlocked === '' ? '' : 'PMS'}</Text>
+      <Text style={[font.small, { color: c.textMuted }]}>{copy.readOnly} · PMS</Text>
     </> : null}
   </Screen>;
 }

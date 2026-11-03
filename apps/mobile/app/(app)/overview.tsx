@@ -53,7 +53,7 @@ export default function Overview() {
       <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text>
       <SectionLabel>{copy.today}</SectionLabel>
       <View style={{ flexDirection: 'row', gap: space.md }}>
-        <Card onPress={() => router.push('/reception')} style={{ flex: 1, gap: 6 }}><CalendarCheck color={c.primary} size={26}/><Text style={[font.body, { color: c.text }]}>{copy.arrivals}</Text><Text style={[font.h2, { color: c.text }]}>{data.today.arrivals.length}</Text></Card>
+        <Card onPress={() => router.push('/pms')} style={{ flex: 1, gap: 6 }}><CalendarCheck color={c.primary} size={26}/><Text style={[font.body, { color: c.text }]}>{copy.arrivals}</Text><Text style={[font.h2, { color: c.text }]}>{data.today.arrivals.length}</Text></Card>
         <Card onPress={() => router.push('/reception')} style={{ flex: 1, gap: 6 }}><CalendarClock color={c.primary} size={26}/><Text style={[font.body, { color: c.text }]}>{copy.departures}</Text><Text style={[font.h2, { color: c.text }]}>{data.today.departures.length}</Text></Card>
       </View>
       <SectionLabel>{copy.urgent} · {data.tasks.urgent_active}</SectionLabel>
