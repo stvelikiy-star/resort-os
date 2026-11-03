@@ -38,6 +38,24 @@ export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon
     {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
   </GlassCard>;
 }
+/** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
+export function OccupancyRing({ percent, label }: { percent: number; label: string }) {
+  const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
+  const circumference = 2 * Math.PI * 42;
+  const length = circumference * safe / 100;
+  return <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
+    accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
+    style={{ width: 112, height: 112, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg pointerEvents="none" width={112} height={112} viewBox="0 0 112 112">
+      <Circle cx="56" cy="56" r="42" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="8"/>
+      <Circle cx="56" cy="56" r="42" fill="none" stroke="#00D8FF" strokeWidth="8"
+        strokeLinecap="round" strokeDasharray={`${length} ${circumference}`} transform="rotate(-90 56 56)"/>
+    </Svg>
+    <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={[font.h2, { color: '#FFFFFF', fontSize: 22 }]}>{Math.round(safe)}%</Text>
+    </View>
+  </View>;
+}
 export function QuickAction({ icon: Icon, label, onPress, testID }: { icon: LucideIcon; label: string; onPress: () => void; testID?: string }) {
   const { c } = useTheme();
   return <PressScale onPress={onPress} testID={testID} accessibilityLabel={label} style={{ minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, borderRadius: radius.lg, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.border }}>

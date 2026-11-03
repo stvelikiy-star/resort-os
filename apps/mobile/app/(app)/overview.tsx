@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays } from 'lucide-react-native';
 import { Hero } from '../../src/components/Brand';
 import { DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
-import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
+import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, OccupancyRing, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useLiveModules, Dashboard } from '../../src/api/liveModules';
@@ -35,8 +35,13 @@ export default function Overview() {
           <Text style={[font.label, { color:'#C8E8F5' }]}>{data.property.name.toUpperCase()} · {data.property.local_date}</Text>
           <Text style={[font.label, { color:'#E7C480' }]}>LIVE PMS</Text>
         </View>
-        <Text style={[font.display, { color:'#FFFFFF', fontSize:45, marginTop:14 }]}>{data.stays.occupancy_percent}%</Text>
-        <Text style={[font.body, { color:'#D6E9F7' }]}>{copy.occupancy} · {data.stays.occupied_rooms}/{data.rooms.total}</Text>
+        <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginTop:8 }}>
+          <View style={{ flex:1 }}>
+            <Text style={[font.display, { color:'#FFFFFF', fontSize:43 }]}>{data.stays.occupancy_percent}%</Text>
+            <Text style={[font.body, { color:'#D6E9F7' }]}>{copy.occupancy} · {data.stays.occupied_rooms}/{data.rooms.total}</Text>
+          </View>
+          <OccupancyRing percent={data.stays.occupancy_percent} label={copy.occupancy}/>
+        </View>
         <View style={{ height:1, backgroundColor:'rgba(255,255,255,0.16)', marginTop:20, marginBottom:14 }}/>
         <View style={{ flexDirection:'row', gap:space.lg }}>
           <View style={{ flex:1 }}><Text style={[font.h2,{color:'#FFFFFF'}]}>{data.stays.arrivals_today}</Text><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.arrivals}</Text></View>
