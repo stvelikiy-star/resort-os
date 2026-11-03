@@ -117,3 +117,46 @@ jobs:
         run: npm test -- --ci --runInBand
       - name: Expo web export (SDK version gate remains separate)
         run: npm run web:export
+
+  android-metro-advisory-diagnostic:
+    name: Android Metro source map advisory check (NOT npm audit waiver)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Reproducible Expo mobile dependency install
+        run: npm ci --no-audit --no-fund
+      - name: Verify source map inspection contract and official Expo versions
+        run: |
+          node --test scripts/verify-android-source-audit.nodecheck.mjs
+          npx expo install --check
+      - name: Build production Android JavaScript bundle with source maps
+        run: npx expo export --platform android --source-maps --output-dir dist-metro-audit --max-workers 2
+      - name: Compare all npm advisory nodes with Android Metro module sources
+        env:
+          MARINA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          npm audit --omit=dev --json > /tmp/marina-metro-advisories.json || true
+          node scripts/verify-android-source-audit.mjs \
+            /tmp/marina-metro-advisories.json \
+            dist-metro-audit \
+            /tmp/marina-metro-advisory-evidence.json
+      - name: Preserve diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-android-metro-advisory-evidence
+          path: |
+            /tmp/marina-metro-advisories.json
+            /tmp/marina-metro-advisory-evidence.json
+          retention-days: 7
+          if-no-files-found: warn
