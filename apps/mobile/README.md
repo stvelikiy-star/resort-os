@@ -1,34 +1,47 @@
-# MARINA STAFF — отдельное мобильное приложение (V0.2 demo)
+# MARINA STAFF (mobile) — v0.2 first version
 
-## Реализовано в этой ветке
-- React Native + Expo + TypeScript; весь новый код только в `apps/mobile/`.
-- Демонстрационные главная, задачи и профиль.
-- Шесть демонстрационных ролей: горничная, техник, ресепшен, кухня, официант, управляющий.
-- Переключение языка интерфейса RU / KY / EN (данные задач остаются на русском в демо).
-- Локальные переходы задач NEW → IN_PROGRESS → DONE, фильтрация по роли, приоритеты.
-- `src/config/mode.ts`: жёстко выключены сетевые изменения PMS.
+One Android + iOS app (React Native + Expo + TypeScript, expo-router) for staff of **all hotels connected to MARINA SMART**.
+It is a **client** of the existing MARINA SMART API — no own PMS, no own staff database, no secrets in the app.
 
-## НЕ реализовано и НЕ подтверждено
-- Реальная авторизация, приглашения, маршрутизация гостиницы, интеграция API, push, фото, offline, полноценные переводы содержимого.
-- Сборка для Android/iOS, запуск на телефоне, результаты TypeScript и CI. Нельзя считать это production-ready.
-- Никакие данные гостиниц, пароли или токены не используются.
+## Structure
+```
+app/                 expo-router routes
+  (auth)/connect     hotel connection (list + add by https address, per-hotel)
+  (auth)/login       staff sign-in (+ demo roles in demo hotels)
+  (app)/tasks|rooms|requests|admin|profile   role-gated tabs
+  task/[id]          task card + housekeeping checklist
+  room/[id]          room card (+ status for allowed roles)
+  new-request        maintenance request
+src/theme            design tokens, light/dark ThemeProvider
+src/i18n             ru / kg / en / kz (typed against ru → key parity at compile time)
+src/api              StaffApi interface; demoApi (in-memory) and realApi (existing endpoints)
+src/roles            role → workspace registry (UI gating only; server stays the authority)
+src/state            per-hotel session (one api instance + session per hotel)
+src/components       UI kit (Button, Card, Badge, FadeIn, PressScale…)
+__tests__            i18n, roles, API contract, navigation/guards
+```
 
-## Локальный запуск
-```sh
+## Data modes (strictly separated)
+* **Demo hotels** (`demo://…`): in-memory data, never touches the network, red/amber `DEMO` banner on every screen.
+* **Real hotel** (added by `https://` address): `realApi` calls the existing routes of that hotel's own host:
+  `POST /api/v1/auth/login|logout`, `GET /auth/me`, `GET/POST /api/v1/ops/tasks`, `POST …/claim`, `PATCH …/status`,
+  `PATCH …/assignee`, `POST …/complete-report`, `PATCH /ops/rooms/{id}/state`, `GET /api/v1/admin/staff/overview`.
+  Only HTTPS is accepted. Interim auth is the server's httpOnly cookie session; bearer/refresh tokens need backend work.
+  **Not yet verified against a running server** (no test environment was available).
+
+## Run
+```
 cd apps/mobile
 npm install
-npx expo install --fix
-npm run typecheck
-npm start
+npm run check        # typecheck + lint + tests
+npm start            # Expo dev server; press "a" for Android emulator or scan QR with Expo Go
+npm run web:export   # static web build (used for screenshots)
 ```
-Версии зависимостей подлежат верификации через Expo CLI. Не переносить package-lock из других приложений.
+Demo login: open a demo hotel → tap a role chip (password `demo`).
+Android emulator reaching a local API: use `https` host or an HTTPS tunnel (`10.0.2.2` is the emulator's alias for the host machine; plain http is rejected by design).
 
-## Правило безопасности
-Не подключать live PMS до согласованного mobile-auth контракта, проверки tenant isolation, возможности отзыва устройства и отдельного staging тестирования. Никаких изменений `services/api`, `apps/admin`, `apps/staff`, PostgreSQL или Docker из этой ветки.
-
-## Порядок следующих этапов
-1. Верифицировать зависимости, typecheck, CI и Expo smoke test.
-2. Утвердить дизайн и UX реального onboarding.
-3. Разработать mobile API adapter с mock/staging конфигурацией и безопасными сессиями.
-4. Реализовать получение и подтверждение задач только с серверным ответом.
-5. Добавить фотодоказательства, уведомления и офлайн-очередь с idempotency.
+## Not implemented yet
+Push notifications; photo capture/upload (needs attachments API); QR scanner (button present, camera flow not built);
+offline queue / sync / idempotency; bearer+refresh tokens and device registry (backend B1/B2); rooms list and day summary
+endpoints for staff (derived from tasks / unavailable in real mode); biometric unlock; kitchen/waiter/store/beach workspaces;
+guest-request actions; production signing/EAS builds. Do not deploy to production without separate approval.

@@ -1,0 +1,60 @@
+import React, { useState } from 'react';
+import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { ChevronLeft } from 'lucide-react-native';
+import { Button, Card, DemoBanner, FadeIn, Field, PressScale, Screen, SectionLabel } from '../../src/components/ui';
+import { Logo } from '../../src/components/Brand';
+import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
+import { useSession } from '../../src/state/session';
+import { homeFor } from '../../src/roles/registry';
+import { useTheme } from '../../src/theme/ThemeProvider';
+import { font, radius, space } from '../../src/theme/tokens';
+
+export default function Login() {
+  const { t } = useTranslation();
+  const { c } = useTheme();
+  const router = useRouter();
+  const { hotel, signIn, leaveHotel } = useSession();
+  const [u, setU] = useState('');
+  const [p, setP] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const go = async (user: string, pass: string) => {
+    setBusy(true); setErr(null);
+    try { const me = await signIn(user, pass); router.replace(homeFor(me.role)); } catch { setErr(t('login.wrong')); } finally { setBusy(false); }
+  };
+
+  return (
+    <Screen>
+      <PressScale onPress={() => { leaveHotel(); router.replace('/connect'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('login.change')}>
+        <ChevronLeft size={22} color={c.primary} /><Text style={[font.body, { color: c.primary }]}>{t('login.change')}</Text>
+      </PressScale>
+      <FadeIn style={{ gap: space.sm }}>
+        <Logo size={56} />
+        <Text style={[font.title, { color: c.text }]}>{t('login.title')}</Text>
+        <Text style={[font.body, { color: c.textMuted }]}>{t('login.hotel')}: {hotel?.name}</Text>
+        {hotel?.demo ? <DemoBanner /> : null}
+      </FadeIn>
+      <Card style={{ gap: space.md }}>
+        <Field label={t('login.username')} value={u} onChangeText={setU} autoCapitalize="none" autoCorrect={false} testID="login-username" />
+        <Field label={t('login.password')} value={p} onChangeText={setP} secureTextEntry testID="login-password" />
+        {err ? <Text testID="login-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
+        <Button testID="login-submit" label={t('login.signIn')} onPress={() => go(u, p)} disabled={busy || !u || !p} />
+      </Card>
+      {hotel?.demo ? (
+        <>
+          <SectionLabel>{t('login.demoRole')}</SectionLabel>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {DEMO_ROLE_LOGINS.map((d) => (
+              <PressScale key={d.username} testID={`demo-${d.username}`} onPress={() => go(d.username, 'demo')} style={{ paddingHorizontal: 16, minHeight: 48, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft }}>
+                <Text style={[font.small, { color: c.primary, fontWeight: '700' }]}>{t(`roles.${d.role}`)}</Text>
+              </PressScale>
+            ))}
+          </View>
+        </>
+      ) : null}
+    </Screen>
+  );
+}

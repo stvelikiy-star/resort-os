@@ -1,0 +1,19 @@
+import type { Dict } from './ru';
+export const kz: Dict = {
+  common: { appName: 'MARINA STAFF', cancel: 'Болдырмау', save: 'Сақтау', back: 'Артқа', next: 'Келесі', done: 'Дайын', retry: 'Қайталау', loading: 'Жүктелуде…', empty: 'Әзірге ештеңе жоқ', demo: 'ДЕМО РЕЖИМ · PMS деректері емес', room: 'Бөлме', all: 'Барлығы' },
+  nav: { tasks: 'Тапсырмалар', rooms: 'Бөлмелер', requests: 'Өтініштер', admin: 'Админ', profile: 'Профиль' },
+  connect: {
+    title: 'Қонақ үйге қосылу', subtitle: 'Әр қонақ үй — жеке қорғалған қосылым. Қонақ үй деректері араласпайды.',
+    addHotel: 'Қонақ үй қосу', code: 'Шақыру коды немесе мекенжай', codePh: 'мысалы, marina-bishkek', scan: 'QR сканерлеу', demoHotels: 'Демо қонақ үйлер',
+    secureOnly: 'Тек HTTPS мекенжайларына рұқсат', invalid: 'Код немесе мекенжай қате', connected: 'Қосылған', choose: 'Қонақ үйді таңдаңыз', noSecrets: 'Қолданба сервер кілттерін сақтамайды',
+  },
+  login: { title: 'Қызметкердің кіруі', username: 'Логин', password: 'Құпиясөз', signIn: 'Кіру', demoRole: 'Демо: ретінде кіру', wrong: 'Логин немесе құпиясөз қате', hotel: 'Қонақ үй', change: 'Қонақ үйді ауыстыру' },
+  roles: { OWNER: 'Иесі', MANAGER: 'Менеджер', RECEPTION: 'Ресепшн', AGENT: 'Агент', MAID: 'Тазалаушы', TECHNICIAN: 'Техник', STORE_STAFF: 'Дүкен', COOK: 'Аспаз', WAITER: 'Даяшы', CONTENT_MANAGER: 'Контент', BEACH_PARTNER: 'Жағажай' },
+  tasks: { title: 'Менің тапсырмаларым', today: 'Бүгін', open: 'Жаңа', inProgress: 'Орындалуда', inspection: 'Тексеруде', done: 'Дайын', start: 'Бастау', finish: 'Аяқтау', toInspection: 'Тексеруге тапсыру', approve: 'Қабылдау', reject: 'Жұмысқа қайтару', urgent: 'Шұғыл', high: 'Жоғары', normal: 'Қалыпты', low: 'Төмен', none: 'Тапсырма жоқ — демалыңыз', progress: 'Орындалды', quick: 'Жылдам әрекеттер', types: { HOUSEKEEPING: 'Тазалау', MAINTENANCE: 'Жөндеу', GUEST_REQUEST: 'Қонақ сұранысы' } },
+  rooms: { title: 'Бөлмелер', state: { UNKNOWN: 'Белгісіз', CLEAN: 'Таза', DIRTY: 'Лас', IN_INSPECTION: 'Тексеру', TECH_BLOCK: 'Тех. бөгет' }, floor: 'Қабат', guest: 'Қонақ', checkout: 'Шығу', arrival: 'Келу', vacant: 'Бос', openTasks: 'Ашық тапсырмалар', setState: 'Бөлме күйі', history: 'Тарих', notes: 'Ескертпелер' },
+  hk: { title: 'Тазалау чек-листі', BED_LINEN: 'Төсек жаймасы', BATHROOM: 'Жуынатын бөлме', SURFACES: 'Беттер мен еден', AMENITIES: 'Жабдықтар', FINAL_CHECK: 'Соңғы тексеру', photo: 'Фото есеп', addPhoto: 'Фото қосу', photoSoon: 'Фото жүктеу сервер API-мен қосылады', comment: 'Пікір', submit: 'Бөлмені тапсыру', incomplete: 'Барлық тармақты белгілеңіз', sent: 'Бөлме тексеруге жіберілді' },
+  mt: { title: 'Жөндеу өтініші', newRequest: 'Жаңа өтініш', category: 'Санат', priority: 'Басымдық', describe: 'Не болды?', describePh: 'Мәселені қысқаша сипаттаңыз', send: 'Өтініш жіберу', sent: 'Өтініш жасалды', cats: { PLUMBING: 'Сантехника', ELECTRIC: 'Электр', HVAC: 'Кондиционер', FURNITURE: 'Жиһаз', OTHER: 'Басқа' }, list: 'Өтініштер', block: 'Бөлмені бұғаттау' },
+  admin: { title: 'Басқару', inspection: 'Тексеру кезегі', staff: 'Ауысымдағы қызметкерлер', assign: 'Тағайындау', unassigned: 'Тағайындалмаған', stats: 'Күн қорытындысы', occupancy: 'Толымдылық', dirty: 'Лас', blocked: 'Бұғатталған', overdue: 'Кешіккен', forbidden: 'Бұл бөлімге рұқсат жоқ' },
+  profile: { title: 'Профиль', language: 'Тіл', theme: 'Тақырып', system: 'Жүйелік', light: 'Жарық', dark: 'Қараңғы', hotel: 'Қонақ үй', role: 'Рөлі', signOut: 'Шығу', switchHotel: 'Қонақ үйді ауыстыру', about: 'Қолданба туралы', version: 'Нұсқа', mode: 'Деректер режимі', modeDemo: 'Демо', roleSoon: 'Сіздің рөліңіз үшін мобильді жұмыс орны дайындалуда', modeLive: 'Жұмыс сервері' },
+  errors: { generic: 'Бірдеңе дұрыс болмады', offline: 'Сервермен байланыс жоқ', forbidden: 'Құқық жеткіліксіз', notFound: 'Табылмады' },
+};

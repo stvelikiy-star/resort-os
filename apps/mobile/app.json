@@ -14,6 +14,14 @@
     },
     "extra": {
       "environment": "development"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-localization"
+    ],
+    "web": {
+      "bundler": "metro"
     }
   }
 }
