@@ -18,7 +18,7 @@ export interface Room {
   id: string; code: string; floor: number; state: RoomState;
   guest?: string | null; checkout?: string | null; arrival?: string | null; note?: string | null;
 }
-export interface StaffMember { id: string; display_name: string; role: Role; open_tasks: number }
+export interface StaffMember { id: string; display_name: string; role: Role; open_tasks: number; active?: boolean }
 export interface DaySummary { occupancy_pct: number; dirty: number; blocked: number; overdue: number }
 export interface NewMaintenance { room_id: string | null; category: string; priority: Priority; description: string }
 export interface HousekeepingReport { checklist: Record<string, boolean>; comment?: string }
