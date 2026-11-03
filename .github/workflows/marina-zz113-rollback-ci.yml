@@ -57,7 +57,10 @@ jobs:
           baseline="$RUNNER_TEMP/marina-prisma-before"
           mkdir -p "$baseline"
           cp -a packages/database/prisma/. "$baseline/"
+          # Reconstruct the exact historical pre-zz113 boundary, not every
+          # later migration carried by the current integration checkout.
           rm -rf "$baseline/migrations/zz113_marina_housekeeping_schedule_date_20261027"
+          rm -rf "$baseline/migrations/zz114_marina_60minute_holds_20261029"
           (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
           test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 37
           test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from information_schema.columns where table_name='operational_tasks' and column_name='scheduledFor'")" = 0
