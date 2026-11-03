@@ -19,10 +19,12 @@ class SharedAuthPreviewBoundary:
             # Narrow, reviewed read-only management summary. Other workspaces remain closed.
             ('GET', '/api/v1/admin/dashboard'),
             ('GET', '/api/v1/pms/grid'),
-            # Transactional PMS booking, tightly scoped to authenticated property.
-            # HOLDs, payments, stay transitions and other PMS writes stay closed.
+            # Transactional PMS booking and hotel-scoped 60-minute inventory HOLDs.
+            # Payment, stay transitions and unreviewed PMS writes stay closed.
             ('POST', '/api/v1/admin/pms/reservations/new/preview'),
             ('POST', '/api/v1/admin/pms/reservations/new/commit'),
+            ('GET', '/api/v1/admin/pms/holds'),
+            ('POST', '/api/v1/admin/pms/holds'),
             # Reviewed hotel-scoped staff lifecycle (stage 2 / isolated staging only).
             ('GET', '/api/v1/admin/staff/overview'),
             ('POST', '/api/v1/admin/staff'),
@@ -39,9 +41,13 @@ class SharedAuthPreviewBoundary:
                           isinstance(path, str) and re.fullmatch(
                               r'/api/v1/admin/pms/reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/cancel',
                               path) is not None)
-            valid = (method, path) in allowed or staff_patch or pms_cancel
+            hold_item = (scope['type'] == 'http' and method in {'GET', 'DELETE', 'OPTIONS'} and
+                         isinstance(path, str) and re.fullmatch(
+                             r'/api/v1/admin/pms/holds/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}',
+                             path) is not None)
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
