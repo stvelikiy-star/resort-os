@@ -7,7 +7,8 @@ export type RoomState = 'UNKNOWN' | 'CLEAN' | 'DIRTY' | 'IN_INSPECTION' | 'TECH_
 
 export interface AuthUser {
   id: string; username: string; display_name: string; role: Role;
-  property_code: string; module_permissions: string[];
+  property_code: string; property_id?: string | null; tenant_id?: string | null;
+  module_permissions: string[]; module_permissions_custom?: boolean;
 }
 export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: Priority;

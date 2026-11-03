@@ -32,9 +32,14 @@ describe('role → workspace', () => {
       expect(workspaceFor(r).tabs).toEqual(['profile']);
     }
   });
-  it('live staff missing OPS permission see profile only despite a valid role', () => {
+  it('live module grants do not require unrelated OPS and hard role guards remain enforced', () => {
     expect(workspaceForSession('MAID', ['OPS'], 'LIVE').tabs).toContain('tasks');
-    expect(workspaceForSession('MANAGER', ['PMS', 'STAFF'], 'LIVE').mobileReady).toBe(false);
+    expect(workspaceForSession('MANAGER', ['PMS', 'STAFF'], 'LIVE').mobileReady).toBe(true);
+    expect(workspaceForSession('MANAGER', ['PMS', 'WHATSAPP'], 'LIVE').tabs).toEqual(['pms', 'inbox', 'profile']);
+    expect(workspaceForSession('RECEPTION', ['WHATSAPP', 'PMS', 'RESERVATIONS'], 'LIVE').tabs).toEqual(['reception', 'pms', 'inbox', 'profile']);
+    expect(workspaceForSession('COOK', ['DINING'], 'LIVE').tabs).toEqual(['dining', 'profile']);
+    expect(workspaceForSession('WAITER', ['DINING'], 'LIVE').tabs).toEqual(['dining', 'profile']);
+    expect(workspaceForSession('RECEPTION', ['OPS'], 'LIVE').tabs).toEqual(['profile']);
     expect(hasTabForSession('MANAGER', [], 'LIVE', 'admin')).toBe(false);
     expect(homeForSession('MAID', [], 'LIVE')).toBe('/profile');
     expect(workspaceForSession('MAID', ['housekeeping'], 'DEMO').tabs).toContain('tasks');

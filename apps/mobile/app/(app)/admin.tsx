@@ -2,26 +2,15 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { BedDouble, CheckCircle2, Clock, Percent, Wrench } from 'lucide-react-native';
-import { Badge, Button, Card, Empty, FadeIn, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
+import { CheckCircle2 } from 'lucide-react-native';
+import { Badge, Button, Card, Empty, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
 import { TaskCard } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
-import type { DaySummary, StaffMember, Task } from '../../src/api/types';
-
-function Stat({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone: string }) {
-  const { c } = useTheme();
-  return (
-    <Card style={{ flexBasis: '47%', flexGrow: 1, gap: 4 }}>
-      <Icon size={22} color={tone} />
-      <Text style={[font.title, { color: c.text }]}>{value}</Text>
-      <Text style={[font.small, { color: c.textMuted }]}>{label}</Text>
-    </Card>
-  );
-}
+import type { StaffMember, Task } from '../../src/api/types';
 
 export default function Admin() {
   const { t } = useTranslation();
@@ -34,21 +23,18 @@ export default function Admin() {
   const actionLock = useRef(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const summary = useAsync<DaySummary | null>(() => (allowed ? api!.daySummary().catch(() => null) : Promise.resolve(null)), [api, tick]);
   const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick]);
   const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff() : Promise.resolve([])), [api, tick]);
-  const reloadSummary = summary.reload;
   const reloadTasks = tasks.reload;
   const reloadStaff = staff.reload;
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => {
     if (hasFocused.current) {
-      void reloadSummary(); void reloadTasks(); void reloadStaff();
+      void reloadTasks(); void reloadStaff();
     } else hasFocused.current = true;
-  }, [reloadSummary, reloadTasks, reloadStaff]));
+  }, [reloadTasks, reloadStaff]));
 
   if (!allowed) return <Screen><Title>{t('admin.title')}</Title><Empty text={t('admin.forbidden')} /></Screen>;
-  const s = summary.data;
   const queue = (tasks.data ?? []).filter((x) => x.status === 'IN_INSPECTION');
   const unassigned = (tasks.data ?? []).filter((x) => !x.assigned_to_id && x.status === 'OPEN' && (x.type === 'HOUSEKEEPING' || x.type === 'MAINTENANCE'));
   const eligibleStaff = (task: Task) => (staff.data ?? []).filter((member) => member.active !== false && member.role === (task.type === 'HOUSEKEEPING' ? 'MAID' : 'TECHNICIAN'));
@@ -80,14 +66,6 @@ export default function Admin() {
       {actionError ? <Text testID="admin-action-error" accessibilityRole="alert" style={[font.body, { color: c.danger }]}>{actionError}</Text> : null}
       {tasks.error ? <Card onPress={tasks.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card> : null}
       {staff.error ? <Card onPress={staff.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.forbidden')} · {t('common.retry')}</Text></Card> : null}
-      {s ? (
-        <FadeIn style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-          <Stat icon={Percent} label={t('admin.occupancy')} value={`${s.occupancy_pct}%`} tone={c.primary} />
-          <Stat icon={BedDouble} label={t('admin.dirty')} value={String(s.dirty)} tone={c.warning} />
-          <Stat icon={Wrench} label={t('admin.blocked')} value={String(s.blocked)} tone={c.danger} />
-          <Stat icon={Clock} label={t('admin.overdue')} value={String(s.overdue)} tone={c.info} />
-        </FadeIn>
-      ) : null}
 
       <SectionLabel>{t('admin.inspection')}</SectionLabel>
       {!tasks.loading && !tasks.error && queue.length === 0 ? <Empty text={t('common.empty')} /> : null}
