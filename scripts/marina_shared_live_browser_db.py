@@ -97,8 +97,10 @@ async def verify(conn):
     ''')
     assert len(rows) == 2, "Exactly one committed reservation per hotel required"
     assert len({row["id"] for row in rows}) == 2
+    property_ids = {}
     for row in rows:
         hotel = row["hotel"]
+        property_ids[hotel] = row["propertyId"]
         receipt = receipts[hotel]
         assert str(row["id"]) == receipt["reservation_id"], "Browser/API and DB reservation IDs differ"
         assert str(row["roomId"]) == receipt["room_id"], "Browser room differs from persisted room"
@@ -112,8 +114,21 @@ async def verify(conn):
             SELECT count(*) FROM payments WHERE "reservationId"=$1
         ''', row["id"]) == 0, "Booking unexpectedly created payment"
     assert await conn.fetchval('SELECT count(*) FROM reservations') == 2
+    assert await conn.fetchval('SELECT count(*) FROM marina_reservation_holds') == 2
+    for hotel, receipt in receipts.items():
+        hold = await conn.fetchrow('''
+            SELECT h."propertyId",h."releasedAt",h."confirmedReservationId",b.active
+            FROM marina_reservation_holds h
+            JOIN inventory_blocks b ON b.id=h."inventoryBlockId"
+            WHERE h.id=$1
+        ''', uuid.UUID(receipt["hold_id"]))
+        assert hold is not None, "Missing browser-created HOLD"
+        assert hold["propertyId"] == property_ids[hotel], "Cross-hotel HOLD ownership"
+        assert hold["releasedAt"] is not None, "HOLD not released"
+        assert hold["confirmedReservationId"] is None, "Released HOLD unexpectedly confirmed"
+        assert hold["active"] is False, "Released HOLD still blocks availability"
     assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 2
-    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels; browser->Next->ASGI->PostgreSQL; IDs, tenant ownership, Core rates, inventory and zero payments")
+    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels; browser->Next->ASGI->PostgreSQL; 2 bookings and 2 released HOLDs, tenant isolation, real Core rates, no payments")
 
 
 async def main():
