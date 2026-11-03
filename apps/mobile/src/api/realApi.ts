@@ -63,7 +63,9 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
         type: 'MAINTENANCE', room_id: req.room_id, priority: req.priority,
         title: req.description.trim().slice(0, 180), description: `[${req.category}] ${req.description.trim()}`, source: 'MOBILE',
       });
-      return mapTask(created);
+      // POST /tasks returns only {id,status}; read the canonical record before rendering.
+      if (!created || typeof created.id !== 'string') throw new ApiError('UNKNOWN', 'Missing created task id');
+      return findTask(created.id);
     },
     async listRooms(): Promise<Room[]> {
       // The existing API exposes no staff "rooms list" endpoint: derive rooms from tasks until backend item B7 lands.
@@ -92,7 +94,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
   };
 
   async function findTask(id: string): Promise<Task> {
-    const list = await call<any>('GET', '/api/v1/ops/tasks?limit=200');
+    const list = await call<any>('GET', '/api/v1/ops/tasks?limit=300');
     const t = (Array.isArray(list) ? list : list.items ?? []).find((x: any) => String(x.id) === id);
     if (!t) throw new ApiError('NOT_FOUND');
     return mapTask(t);
