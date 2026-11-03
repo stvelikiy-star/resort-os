@@ -8,7 +8,7 @@ import { Logo } from '../../src/components/Brand';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
-import { parseHotelAddress } from '../../src/api/hotels';
+import { hotelConnectionId, parseHotelAddress } from '../../src/api/hotels';
 import { LOCALE_LABEL, LOCALES, Locale } from '../../src/i18n';
 
 export default function Connect() {
@@ -25,7 +25,7 @@ export default function Connect() {
     const r = parseHotelAddress(addr);
     if (!r.ok) { setErr(t(`connect.${r.reason}`)); return; }
     const host = new URL(r.baseUrl).hostname;
-    addHotel({ id: `live-${host}`, name: host, city: '', baseUrl: r.baseUrl, demo: false, accent: c.primary });
+    addHotel({ id: hotelConnectionId(r.baseUrl), name: host, city: '', baseUrl: r.baseUrl, demo: false, accent: c.primary });
     setErr(null); router.push('/login');
   };
 
