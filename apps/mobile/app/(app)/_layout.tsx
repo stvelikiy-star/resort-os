@@ -1,5 +1,5 @@
 import React from 'react';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, usePathname } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ClipboardCheck, BedDouble, ChartNoAxesCombined, CircleUserRound, Wrench } from 'lucide-react-native';
 import { useSession } from '../../src/state/session';
@@ -11,9 +11,12 @@ const ORDER: TabKey[] = ['tasks', 'rooms', 'requests', 'admin', 'profile'];
 
 export default function AppTabs() {
   const { user, api } = useSession();
+  const pathname = usePathname();
   const { t } = useTranslation();
   const { c } = useTheme();
   if (!user) return <Redirect href="/connect" />;
+  const selected = pathname.split('/')[1] as TabKey;
+  if (ORDER.includes(selected) && !hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', selected)) return <Redirect href="/profile" />;
   return (
     <Tabs screenOptions={{
       headerShown: false, tabBarActiveTintColor: c.primary, tabBarInactiveTintColor: c.textMuted,
