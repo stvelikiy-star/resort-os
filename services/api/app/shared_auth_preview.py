@@ -65,9 +65,13 @@ class SharedAuthPreviewBoundary:
                                             path.endswith('/acquiring-readiness') or
                                             path.endswith('/cancellation-finance-review')))
                                     ))
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment
+            stay_transition = (scope['type'] == 'http' and method in {'POST', 'OPTIONS'} and
+                               isinstance(path, str) and re.fullmatch(
+                                   r'/api/v1/admin/stays/reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/check-(?:in|out)',
+                                   path) is not None)
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
