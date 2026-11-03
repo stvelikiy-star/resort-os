@@ -1,4 +1,5 @@
 import { dictionaries, LOCALES, localeFromDevice } from '../src/i18n';
+import { mobileCopyStrings } from '../src/i18n/mobileCopy';
 
 const flat = (o: any, p = ''): Record<string, string> =>
   Object.entries(o).reduce((a, [k, v]) => (typeof v === 'object' ? { ...a, ...flat(v, `${p}${k}.`) } : { ...a, [`${p}${k}`]: String(v) }), {});
@@ -14,6 +15,13 @@ describe('localization RU/KG/EN/KZ', () => {
       for (const k of Object.keys(base)) { expect(d[k].trim()).not.toBe(''); expect(ph(d[k])).toBe(ph(base[k])); }
     });
   }
+  it('LIVE mobile copy has equal keys and non-empty values in RU/KG/EN/KZ', () => {
+    const baseline = Object.keys(mobileCopyStrings.ru).sort();
+    for (const locale of LOCALES) {
+      expect(Object.keys(mobileCopyStrings[locale]).sort()).toEqual(baseline);
+      for (const value of Object.values(mobileCopyStrings[locale])) expect(value.trim()).not.toBe('');
+    }
+  });
   it('maps device language codes', () => {
     expect(localeFromDevice('ky')).toBe('kg');
     expect(localeFromDevice('kk-KZ')).toBe('kz');

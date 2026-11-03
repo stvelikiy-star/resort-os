@@ -96,10 +96,10 @@ export default function NewBooking() {
     </View>
     <Button testID="booking-preview" label={copy.preview} disabled={!validate() || busy || unknown || completed} onPress={() => void doPreview()}/>
     {preview ? <Card style={{gap:8}}>
-      <Text style={[font.h2,{color:c.text}]}>{preview.room.code} · {preview.nights} nights</Text>
+      <Text style={[font.h2,{color:c.text}]}>{preview.room.code} · {preview.nights} {copy.nights}</Text>
       <Badge label={preview.pricing.source} tone="primary"/>
       <Text style={[font.title,{color:c.text}]}>{preview.pricing.total_kgs === null ? '—' : preview.pricing.total_kgs.toLocaleString('ru-RU')} KGS</Text>
-      {preview.pricing.discount_percent ? <Text style={[font.small,{color:c.textMuted}]}>Discount: {preview.pricing.discount_percent}%</Text> : null}
+      {preview.pricing.discount_percent ? <Text style={[font.small,{color:c.textMuted}]} >{copy.discount}: {preview.pricing.discount_percent}%</Text> : null}
       {!preview.can_commit ? <Text style={[font.body,{color:c.danger}]}>{copy.conflict} · {preview.pricing.reason || ''}</Text> : null}
       <Button testID="booking-commit" label={copy.commit} disabled={!preview.can_commit || busy || unknown || completed} onPress={doCommit}/>
     </Card> : null}
