@@ -209,32 +209,42 @@ export default function SharedAuthPreview() {
       });
       if (response.status === 401) {
         setIdentity(null);
-        throw new Error("session");
+        throw new Error("expired session");
       }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const result = await response.json();
       if (result.reservation_id !== reservationId ||
         result.status !== (action === "check-in" ? "CHECKED_IN" : "CHECKED_OUT")
       ) throw new Error("unverified result");
-      const refreshed = await fetch("/core/api/v1/admin/reception/reservations", { cache: "no-store" });
-      if (!refreshed.ok) throw new Error(`HTTP ${refreshed.status}`);
-      const next = await refreshed.json() as ReceptionBookings;
-      if (!Array.isArray(next.items) || !next.items.some(row =>
-        row.id === reservationId && row.status === result.status
-      )) throw new Error("unverified booking state");
-      setBookings(next);
+
+      // The server has already committed the transition. Never report it
+      // as a failed check-in merely because the follow-up list refresh fails.
       if (action === "check-in") {
-        // This one-time PIN stays only in volatile component memory, never in
-        // localStorage, logs, analytics, a URL or a persistent booking record.
-        if (typeof result.guest_access_pin !== "string" ||
-          !/^\\d{6}$/.test(result.guest_access_pin)) throw new Error("invalid PIN");
-        setIssuedPin(result.guest_access_pin);
-        setActionInfo("Заселение подтверждено. Передайте гостю PIN — он показан только сейчас.");
+        if (typeof result.guest_access_pin === "string" &&
+          /^\d{6}$/.test(result.guest_access_pin)) {
+          // Volatile memory only; clear on logout, section switch, next action.
+          setIssuedPin(result.guest_access_pin);
+          setActionInfo("Заселение подтверждено. Передайте гостю PIN — он показан только сейчас.");
+        } else {
+          setActionInfo("Заселение подтверждено, но PIN не получен. Свяжитесь с администратором.");
+        }
       } else {
         setActionInfo("Выселение подтверждено. Гостевой доступ закрыт, уборка назначена.");
       }
+
+      try {
+        const refreshed = await fetch("/core/api/v1/admin/reception/reservations", { cache: "no-store" });
+        if (!refreshed.ok) throw new Error(`HTTP ${refreshed.status}`);
+        const next = await refreshed.json() as ReceptionBookings;
+        if (!Array.isArray(next.items) || !next.items.some(row =>
+          row.id === reservationId && row.status === result.status
+        )) throw new Error("booking state not reflected yet");
+        setBookings(next);
+      } catch {
+        setSectionError("Операция подтверждена сервером, но список пока не обновлён. Откройте раздел заново.");
+      }
     } catch {
-      setSectionError("Операция не подтверждена. Проверьте дату, состояние номера и полномочия; обновите список.");
+      setSectionError("Статус операции не подтверждён. Проверьте дату, готовность номера и права; обновите список перед повтором.");
     } finally {
       setPending(false);
     }
