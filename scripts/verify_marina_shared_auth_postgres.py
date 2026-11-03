@@ -393,12 +393,17 @@ def main():
         assert blocked_b.json()['conflicts']
         # Genuine database-level isolation for the stored reservations/guests.
         async def inspect_pms():
-            async with canonical_app.state.db.acquire() as conn:
+            # TestClient's ASGI pool belongs to a different thread/event loop.
+            # Read persisted data through an independent CI-only DB connection.
+            conn = await asyncpg.connect(dsn)
+            try:
                 rows = await conn.fetch(
                     'SELECT id,"propertyId","primaryGuestId",status::text FROM reservations WHERE id=ANY($1::uuid[])',
                     [uuid.UUID(rid_a), uuid.UUID(rid_b)],
                 )
                 return {str(row['id']): row for row in rows}
+            finally:
+                await conn.close()
         stored = asyncio.run(inspect_pms())
         assert stored[rid_a]['propertyId'] == ids['property_a']
         assert stored[rid_b]['propertyId'] == ids['property_b']
