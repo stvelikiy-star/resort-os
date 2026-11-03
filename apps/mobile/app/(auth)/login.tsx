@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -21,10 +21,13 @@ export default function Login() {
   const [p, setP] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
 
   const go = async (user: string, pass: string) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true); setErr(null);
-    try { const me = await signIn(user, pass); router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE')); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { setBusy(false); }
+    try { const me = await signIn(user, pass); router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE')); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { busyRef.current = false; setBusy(false); }
   };
 
   return (
@@ -49,7 +52,7 @@ export default function Login() {
           <SectionLabel>{t('login.demoRole')}</SectionLabel>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
             {DEMO_ROLE_LOGINS.map((d) => (
-              <PressScale key={d.username} testID={`demo-${d.username}`} onPress={() => go(d.username, 'demo')} style={{ paddingHorizontal: 16, minHeight: 48, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft }}>
+              <PressScale key={d.username} testID={`demo-${d.username}`} onPress={() => go(d.username, 'demo')} disabled={busy} style={{ paddingHorizontal: 16, minHeight: 48, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft }}>
                 <Text style={[font.small, { color: c.primary, fontWeight: '700' }]}>{t(`roles.${d.role}`)}</Text>
               </PressScale>
             ))}
