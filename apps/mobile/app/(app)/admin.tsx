@@ -34,12 +34,15 @@ export default function Admin() {
   const summary = useAsync<DaySummary | null>(() => (allowed ? api!.daySummary().catch(() => null) : Promise.resolve(null)), [api, tick]);
   const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick]);
   const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff() : Promise.resolve([])), [api, tick]);
+  const reloadSummary = summary.reload;
+  const reloadTasks = tasks.reload;
+  const reloadStaff = staff.reload;
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => {
     if (hasFocused.current) {
-      void summary.reload(); void tasks.reload(); void staff.reload();
+      void reloadSummary(); void reloadTasks(); void reloadStaff();
     } else hasFocused.current = true;
-  }, [summary.reload, tasks.reload, staff.reload]));
+  }, [reloadSummary, reloadTasks, reloadStaff]));
 
   if (!allowed) return <Screen><Title>{t('admin.title')}</Title><Empty text={t('admin.forbidden')} /></Screen>;
   const s = summary.data;
