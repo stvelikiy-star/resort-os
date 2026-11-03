@@ -22,7 +22,7 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       segment => segment === '.' || segment === '..' || /%(?:2f|5c|2e)/i.test(segment),
     );
     if (!path.startsWith('/api/v1/') || path.startsWith('//') ||
-        path.includes('://') || /[\\r\\n\\\\]/.test(path) || unsafeSegments) {
+        path.includes('://') || /[\r\n\\]/.test(path) || unsafeSegments) {
       throw new ApiError('BAD_REQUEST', 'Unsupported hotel API path');
     }
     const expectedUrl = root + path;
