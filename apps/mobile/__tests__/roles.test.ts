@@ -57,3 +57,21 @@ describe('role → workspace', () => {
     expect(homeFor('MAID')).toBe('/tasks');
   });
 });
+
+describe('LIVE backend section permissions vs mobile tab policy', () => {
+  it('OWNER with OPS but without STAFF cannot open staff assignment module', () => {
+    const role = workspaceForSession('OWNER', ['DASHBOARD','PMS','OPS'], 'LIVE');
+    expect(role.tabs).not.toContain('admin');
+    expect(role.canManage).toBe(false);
+  });
+  it('OWNER with both OPS and STAFF can manage assignments', () => {
+    const role = workspaceForSession('OWNER', ['DASHBOARD','PMS','OPS','STAFF'], 'LIVE');
+    expect(role.tabs).toContain('admin');
+    expect(role.canManage).toBe(true);
+  });
+  it('MANAGER with INBOX grant sees Inbox; RECEPTION requires WHATSAPP grant', () => {
+    expect(workspaceForSession('MANAGER',['INBOX'], 'LIVE').tabs).toContain('inbox');
+    expect(workspaceForSession('RECEPTION',['INBOX'], 'LIVE').tabs).not.toContain('inbox');
+    expect(workspaceForSession('RECEPTION',['WHATSAPP'], 'LIVE').tabs).toContain('inbox');
+  });
+});
