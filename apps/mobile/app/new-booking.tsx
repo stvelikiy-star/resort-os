@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../src/components/ui';
 import { BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
-import { ApiError } from '../src/api/types';
+import { wasWriteRejected } from '../src/lib/writeOutcome';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { useAsync } from '../src/lib/useAsync';
@@ -63,7 +63,7 @@ export default function NewBooking() {
       // A POST may have committed even if its response was lost. Never automatically repeat it.
       // A definitive 4xx response means the server rejected the write.
       // A lost response is ambiguous and must not be resubmitted without readback.
-      const knownRejected = e instanceof ApiError && ['CONFLICT','BAD_REQUEST','FORBIDDEN','UNAUTHORIZED','RATE_LIMIT'].includes(e.code);
+      const knownRejected = wasWriteRejected(e);
       setUnknown(!knownRejected);
       setError(knownRejected ? copy.conflict : copy.resultUnknown);
     } finally { busyLock.current = false; setBusy(false); }

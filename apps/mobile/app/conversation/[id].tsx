@@ -7,6 +7,7 @@ import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } fr
 import { ConversationDetail, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useAsync } from '../../src/lib/useAsync';
+import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
@@ -22,12 +23,17 @@ export default function ConversationScreen() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
+  const [unknownResult, setUnknownResult] = useState(false);
   const { data, loading, error, reload } = useAsync<ConversationDetail | null>(() => live && id ? live.conversation(id) : Promise.resolve(null), [live, id, user?.id]);
   const act = async (run: () => Promise<unknown>, clear = false) => {
-    if (locked.current) return;
+    if (locked.current || unknownResult) return;
     locked.current = true; setBusy(true); setFeedback(null);
     try { await run(); if (clear) setNote(''); setFeedback(copy.confirmed); await reload(); }
-    catch(e) { setFeedback(e instanceof Error ? e.message : copy.unknown); }
+    catch(error: unknown) {
+      const rejected = wasWriteRejected(error);
+      if (!rejected) setUnknownResult(true);
+      setFeedback(rejected ? copy.conflict : copy.resultUnknown);
+    }
     finally { locked.current = false; setBusy(false); }
   };
   if (!user || !(user.module_permissions?.includes('WHATSAPP') || (user.role !== 'RECEPTION' && user.module_permissions?.includes('INBOX'))) || !['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
@@ -50,16 +56,16 @@ export default function ConversationScreen() {
         {m.delivery_status ? <Text style={[font.small, { color: c.textMuted }]}>{m.delivery_status}</Text> : null}
       </GlassCard>)}
       {data?.messages.length === 0 ? <Empty text={copy.empty}/> : null}
-      {conversation.assigned_to_id === null ? <Button testID="claim-conversation" label={copy.claim} disabled={busy} onPress={() => void act(() => live!.claimConversation(id!))}/> : null}
+      {conversation.assigned_to_id === null ? <Button testID="claim-conversation" label={copy.claim} disabled={busy || unknownResult} onPress={() => void act(() => live!.claimConversation(id!))}/> : null}
       <View style={{ flexDirection: 'row', gap: space.sm }}>
-        <View style={{ flex: 1 }}><Button variant="secondary" label={conversation.status === 'RESOLVED' ? copy.reopen : copy.resolve} disabled={busy}
+        <View style={{ flex: 1 }}><Button variant="secondary" label={conversation.status === 'RESOLVED' ? copy.reopen : copy.resolve} disabled={busy || unknownResult}
           onPress={() => Alert.alert(copy.confirm, '', [{text: copy.close, style:'cancel'}, {text: copy.choose, onPress: () => void act(() => live!.conversationStatus(id!, conversation.status === 'RESOLVED' ? 'OPEN' : 'RESOLVED'))}])}/></View>
       </View>
       <SectionLabel>{copy.note}</SectionLabel>
       <Field label={copy.notePlaceholder} value={note} onChangeText={setNote} multiline maxLength={12000} testID="internal-note-input"/>
-      <Button label={copy.saveNote} testID="save-internal-note" disabled={busy || !note.trim()} onPress={() => void act(() => live!.internalNote(id!, note.trim()), true)}/>
+      <Button label={copy.saveNote} testID="save-internal-note" disabled={busy || unknownResult || !note.trim()} onPress={() => void act(() => live!.internalNote(id!, note.trim()), true)}/>
       <GlassCard><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><MessageSquareText size={22} color={c.warning}/><Text style={[font.small, { flex: 1, color: c.textMuted }]}>{copy.noSend}</Text></View></GlassCard>
-      {feedback ? <Text accessibilityRole="alert" style={[font.small, { color: c.primary }]}>{feedback}</Text> : null}
+      {feedback ? <Text testID={unknownResult ? 'inbox-unknown-result' : 'inbox-feedback'} accessibilityRole="alert" style={[font.small, { color: unknownResult ? c.warning : c.primary }]}>{feedback}</Text> : null}
     </> : null}
   </FutureScreen>;
 }

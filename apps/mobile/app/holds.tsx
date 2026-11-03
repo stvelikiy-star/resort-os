@@ -5,7 +5,7 @@ import { ChevronLeft, Clock3 } from 'lucide-react-native';
 import { Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../src/components/ui';
 import { Hold, localDate, useLiveModules } from '../src/api/liveModules';
 import { CONFIRMED_BACKEND_FEATURES } from '../src/api/features';
-import { ApiError } from '../src/api/types';
+import { wasWriteRejected } from '../src/lib/writeOutcome';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { useAsync } from '../src/lib/useAsync';
@@ -34,7 +34,7 @@ export default function Holds() {
     lock.current=true; setBusy(true); setErrorMessage(null);
     try { await run(); await reload(); setUnknown(false); setErrorMessage(copy.confirmed); }
     catch(e) {
-      const definitive = e instanceof ApiError && ['CONFLICT','BAD_REQUEST','FORBIDDEN','UNAUTHORIZED','RATE_LIMIT','NOT_FOUND'].includes(e.code);
+      const definitive = wasWriteRejected(e);
       setUnknown(!definitive);
       setErrorMessage(definitive ? copy.conflict : copy.resultUnknown);
     }
@@ -69,6 +69,6 @@ export default function Holds() {
     <Field label={copy.phone} value={phone} onChangeText={setPhone} keyboardType="phone-pad"/>
     <Button testID="hold-create" disabled={!room||name.trim().length<2||phone.trim().length<5||busy||unknown} label={copy.holdCreate} onPress={create}/>
     {errorMessage ? <Card><Text accessibilityRole="alert" style={[font.body,{color:unknown?c.warning:c.text}]}>{errorMessage}</Text></Card>:null}
-    {unknown ? <Card><Text style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text><Button variant="secondary" label={copy.retry} onPress={()=>{setUnknown(false);void reload();}}/></Card>:null}
+    {unknown ? <Card><Text accessibilityRole="alert" style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text><Button variant="secondary" label={copy.close} onPress={() => router.back()}/></Card>:null}
   </Screen>;
 }

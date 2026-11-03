@@ -15,6 +15,7 @@ import RoomCard from '../app/room/[id]';
 import NewRequest from '../app/new-request';
 import { apiFor } from '../src/api/factory';
 import { DEMO_HOTELS } from '../src/api/hotels';
+import { ApiError } from '../src/api/types';
 
 jest.mock('react-native-safe-area-context', () => {
   const actual = jest.requireActual('react-native-safe-area-context');
@@ -134,6 +135,40 @@ describe('navigation, guards and screens', () => {
       await screen.findByTestId('mt-msg', {}, { timeout: 4000 });
       await fireEvent.press(submit);
       expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('never submits maintenance twice after an unknown/lost POST response', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('quick-new-request', {}, {timeout: 4000}));
+    await fireEvent.changeText(await screen.findByTestId('mt-text', {}, {timeout: 4000}), 'Water leak in bathroom');
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'createMaintenance').mockRejectedValueOnce(new ApiError('OFFLINE', 'no response'));
+    try {
+      await fireEvent.press(screen.getByTestId('mt-send'));
+      await screen.findByTestId('mt-unknown-result', {}, {timeout: 4000});
+      const send = screen.getByTestId('mt-send');
+      expect(send.props.accessibilityState?.disabled).toBe(true);
+      await fireEvent.press(send);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('mt-check-existing')).toBeTruthy();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('allows fixing and retrying a definitively rejected maintenance request', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('quick-new-request', {}, {timeout: 4000}));
+    await fireEvent.changeText(await screen.findByTestId('mt-text', {}, {timeout: 4000}), 'Replace damaged lamp');
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'createMaintenance').mockRejectedValueOnce(new ApiError('BAD_REQUEST'));
+    try {
+      await fireEvent.press(screen.getByTestId('mt-send'));
+      await screen.findByTestId('mt-msg', {}, {timeout: 4000});
+      expect(screen.queryByTestId('mt-unknown-result')).toBeNull();
+      await fireEvent.press(screen.getByTestId('mt-send'));
+      await waitFor(() => expect(spy).toHaveBeenCalledTimes(2), {timeout: 4000});
     } finally {
       spy.mockRestore();
     }
