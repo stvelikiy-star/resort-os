@@ -11,6 +11,16 @@ describe('role → workspace', () => {
     expect(workspaceFor('TECHNICIAN').taskTypes).not.toContain('HOUSEKEEPING');
     expect(hasTab('TECHNICIAN', 'requests')).toBe(true);
   });
+  it('default mobile rights never offer actions denied by the current server role contract', () => {
+    expect(workspaceFor('MAID').canCreateMaintenance).toBe(false);
+    expect(workspaceFor('RECEPTION').canSetRoomState).toBe(false);
+    expect(workspaceFor('RECEPTION').mobileReady).toBe(false);
+    expect(workspaceFor('TECHNICIAN').taskTypes).toEqual(['MAINTENANCE']);
+    for (const r of ['OWNER', 'MANAGER'] as Role[]) {
+      expect(workspaceFor(r).canManage).toBe(true);
+      expect(workspaceFor(r).canSetRoomState).toBe(true);
+    }
+  });
   it('only manager/owner get admin and manage rights', () => {
     const withAdmin = (Object.keys(WORKSPACES) as Role[]).filter((r) => hasTab(r, 'admin')).sort();
     expect(withAdmin).toEqual(['MANAGER', 'OWNER']);
