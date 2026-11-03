@@ -123,6 +123,15 @@ describe('hotel address parsing', () => {
     expect(parseHotelAddress('api.marina.example')).toEqual({ ok: true, baseUrl: 'https://api.marina.example' });
     expect(parseHotelAddress('https://api.marina.example/path?x=1')).toEqual({ ok: true, baseUrl: 'https://api.marina.example' });
   });
+  it('rejects alternate ports, IP literals and internal targets embedded in QR codes', () => {
+    for (const address of [
+      'https://127.0.0.1', 'https://192.168.1.12', 'https://169.254.169.254',
+      'https://hotel.local', 'https://hotel.internal', 'https://hotel.example:8443',
+      'https://hotel.example.', 'https://a..example', 'https://[::1]/',
+    ]) {
+      expect(parseHotelAddress(address)).toMatchObject({ ok: false });
+    }
+  });
   it('rejects http, credentials, empty and dotless hosts', () => {
     expect(parseHotelAddress('http://api.marina.example')).toEqual({ ok: false, reason: 'secureOnly' });
     expect(parseHotelAddress('https://u:p@api.marina.example')).toMatchObject({ ok: false });
