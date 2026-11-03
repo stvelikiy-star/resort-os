@@ -64,5 +64,23 @@
     "moduleNameMapper": {
       "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"
     }
+  },
+  "overrides": {
+    "@expo/cli": {
+      "glob": "^14.0.2"
+    },
+    "@expo/config": {
+      "glob": "^14.0.2"
+    },
+    "@expo/config-plugins": {
+      "glob": "^14.0.2"
+    },
+    "@expo/fingerprint": {
+      "glob": "^14.0.2",
+      "minimatch": "^11.0.1"
+    },
+    "@expo/metro-config": {
+      "glob": "^14.0.2"
+    }
   }
 }
