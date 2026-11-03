@@ -9,7 +9,7 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .guest_identity import resolve_or_create_guest
 from .main import price_room_type
 
@@ -61,10 +61,13 @@ class GridReservationCommitPayload(GridReservationPreviewPayload):
     expected_pricing_source: str = Field(pattern="^(CORE_RATE|MANAGER_OVERRIDE)$")
 
 
-async def property_context(conn, property_code: str):
+async def property_context(conn, user: dict[str, Any]):
+    # Resolve property ID from the server-validated authenticated session.
+    # Reuse this boundary for individual and group reservation operations.
+    property_id = await trusted_property_id(conn, user)
     row = await conn.fetchrow(
-        'SELECT id,timezone,currency FROM properties WHERE code=$1',
-        property_code,
+        'SELECT id,timezone,currency FROM properties WHERE id=$1',
+        property_id,
     )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -387,7 +390,7 @@ async def preview_grid_reservation(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn, user["property_code"])
+        prop = await property_context(conn, user)
         if user["role"] == "AGENT":
             linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
             payload = enforce_agent_booking_scope(payload, linked_agent_id)
@@ -408,7 +411,7 @@ async def commit_grid_reservation(
     async with request.app.state.db.acquire() as conn:
         try:
             async with conn.transaction():
-                prop = await property_context(conn, user["property_code"])
+                prop = await property_context(conn, user)
                 is_agent = user["role"] == "AGENT"
                 if is_agent:
                     linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
@@ -678,7 +681,7 @@ async def cancel_grid_reservation(
     """
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn, user["property_code"])
+            prop = await property_context(conn, user)
             row = await conn.fetchrow(
                 """SELECT id,status::text AS status,"requestId","bookingNumber"
                    FROM reservations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE""",
