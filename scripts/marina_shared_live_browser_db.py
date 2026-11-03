@@ -214,7 +214,7 @@ async def verify(conn):
             SELECT count(*) FROM inventory_blocks
             WHERE "reservationId"=$1 AND active=true
               AND "endDate"=$2::date AND "blockType"='RESERVATION'
-        ''',row["id"],fixture["checkout_local_date"])==1,"Early checkout did not trim nights"
+        ''',row["id"],date.fromisoformat(fixture["checkout_local_date"]))==1,"Early checkout did not trim nights"
     assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 4
     assert await conn.fetchval('SELECT count(*) FROM payments') == 2, "Unexpected extra manual payment"
     print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, booked and rescheduled, 2 unpaid cancellations, 2 manual payments, 2 HOLD releases, 2 check-in/PIN/out/housekeeping lifecycles; no cross-tenant access")
