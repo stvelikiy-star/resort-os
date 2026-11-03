@@ -7,7 +7,7 @@ import { Button, Card, DemoBanner, FadeIn, Field, PressScale, Screen, SectionLab
 import { Logo } from '../../src/components/Brand';
 import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
 import { useSession } from '../../src/state/session';
-import { homeFor } from '../../src/roles/registry';
+import { homeForSession } from '../../src/roles/registry';
 import { ApiError } from '../../src/api/types';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
@@ -16,7 +16,7 @@ export default function Login() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { hotel, signIn, leaveHotel } = useSession();
+  const { hotel, api, signIn, leaveHotel } = useSession();
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export default function Login() {
 
   const go = async (user: string, pass: string) => {
     setBusy(true); setErr(null);
-    try { const me = await signIn(user, pass); router.replace(homeFor(me.role)); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { setBusy(false); }
+    try { const me = await signIn(user, pass); router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE')); } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { setBusy(false); }
   };
 
   return (
