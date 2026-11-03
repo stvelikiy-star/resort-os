@@ -34,7 +34,9 @@ CI additionally runs Expo dependency alignment, TypeScript, ESLint, Jest, Expo w
 
 ## Native branding status
 
-Expo now points to `assets/marina-compass-seal.png` for the mobile UI seal, app icon, adaptive Android icon, splash, and browser favicon. The embedded source is a 72×72 approved-brand crop. **Its low resolution is temporary; replace it with the original high-resolution brand master before public store submission.** The real premium icon pack has been prepared separately; this branch currently contains only the smaller approved source.
+The repository includes the **original 512×512 MARINA SMART ship/compass emblem** as `assets/marina-staff-app-icon.png`. Git blob SHA `73250f43d351de12c05e5aeb6bb59fabf1cff488` was independently checked against the source PNG. The bundled emblem is used by the UI and Expo's app icon, Android adaptive foreground, splash and web favicon. The earlier low-resolution 72px seal is no longer referenced by the runtime.
+
+This is an authentic 512px source rather than a fabricated 1024px image. A 1024px master/vector export is still preferable before public app-store submission; physical-device icon and splash inspection remain required.
 
 ## Android build preparation
 
