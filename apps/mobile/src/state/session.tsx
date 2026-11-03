@@ -186,6 +186,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
     if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) throw new ApiError('FORBIDDEN', 'Untrusted hotel address');
+    const revision = sessionRevision.current;
+    const attempt = ++loginAttempt.current;
     if (!hotel.demo) {
       // A cookie from a previous offline sign-out could still be active.
       // Revoke it before sending fresh credentials to the same host.
@@ -194,8 +196,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         throw new ApiError('OFFLINE', 'Previous server logout is still pending');
       }
     }
-    const revision = sessionRevision.current;
-    const attempt = ++loginAttempt.current;
+    // Switching hotel or signing out while a pending logout is reconciled
+    // must invalidate this in-flight login BEFORE submitting credentials.
+    if (sessionRevision.current !== revision || loginAttempt.current !== attempt) throw new ApiError('UNAUTHORIZED', 'Session context changed');
     const signedIn = await api.login(username, password);
     // A native cookie may not persist after a successful login response.
     // Confirm that subsequent authenticated requests resolve to the SAME user.
@@ -214,8 +217,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel || !api) return;
     sessionRevision.current++;
     loginAttempt.current++;
+    let queued = hotel.demo;
     if (!hotel.demo) {
-      try { await queueCookieLogout(hotel.baseUrl); }
+      try { await queueCookieLogout(hotel.baseUrl); queued = true; }
       catch { /* local clearance still takes priority */ }
     }
     // Clear on-device identity immediately; never await network to sign out.
@@ -223,10 +227,14 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
     if (hotel.demo) {
       try { await api.logout(); } catch { /* isolated demo only */ }
-    } else {
+    } else if (queued) {
       // Retry asynchronously here, at next app foreground and before sign-in.
       // A pending entry is only removed after the server confirms logout.
       void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+    } else if (isTrustedHotelOrigin(hotel.baseUrl)) {
+      // If durable queueing failed, still attempt an immediate remote revoke.
+      // This cannot guarantee a revoke after process termination.
+      void api.logout().catch(() => {});
     }
   }, [hotel, api]);
 
