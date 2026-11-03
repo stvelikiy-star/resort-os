@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
 
 // Real network acceptance: DO NOT route/mock/intercept API calls.
@@ -166,6 +167,53 @@ async function changeSchedule(page,hotel) {
   receipts[hotel].new_check_out=day(5);
   await section.getByText("Даты подтверждены сервером.",{exact:false}).waitFor();
 }
+async function recordManualPayment(page,hotel){
+  const receipt=receipts[hotel], amount=hotel==="HOTEL_A"?1000:1500;
+  const row=page.getByRole("row").filter({hasText:receipt.booking_number});
+  await row.getByRole("button",{name:"Управление"}).click();
+  const section=page.getByRole("region",{name:"Управление бронью "+receipt.booking_number});
+  const panel=section.getByRole("region",{name:"Внутренняя оплата "+receipt.booking_number});
+  await panel.getByRole("button",{name:"Записать полученную оплату"}).click();
+  const readinessResponse=page.waitForResponse(res =>
+    res.url().endsWith("/core/api/v1/admin/booking/reservations/"+receipt.reservation_id+"/acquiring-readiness") &&
+    res.request().method()==="GET");
+  await panel.getByRole("button",{name:"Проверить остаток"}).click();
+  const readiness=await readinessResponse;
+  assert.equal(readiness.status(),200,await readiness.text());
+  const read=await readiness.json();
+  assert.equal(read.reservation_id,receipt.reservation_id);
+  assert.equal(read.provider_connected,false,"No external acquiring should be claimed");
+  assert.equal(read.remaining_kgs,receipt.total_kgs);
+  const form=panel.getByRole("form",{name:"Форма ручной оплаты"});
+  await form.getByLabel("Полученная сумма, KGS").fill(String(amount));
+  await form.getByLabel("Способ получения").selectOption("CASH");
+  await form.getByRole("checkbox",{name:"Деньги действительно уже получены, я проверил(а) сумму"}).check();
+  const recordedResponse=page.waitForResponse(res =>
+    res.url().endsWith("/core/api/v1/admin/booking/reservations/"+receipt.reservation_id+"/payments") &&
+    res.request().method()==="POST");
+  await form.getByRole("button",{name:"Записать полученную сумму"}).click();
+  const response=await recordedResponse;
+  assert.equal(response.status(),201,await response.text());
+  const recorded=await response.json();
+  assert.equal(recorded.reservation_id,receipt.reservation_id);
+  assert.equal(recorded.idempotent_replay,false);
+  assert.equal(recorded.payment.status,"RECEIVED");
+  assert.equal(recorded.payment.provider,"MANAGER_MANUAL");
+  assert.equal(recorded.payment.amount_kgs,amount);
+  assert.equal(recorded.finance.paid_kgs,amount);
+  receipt.manual_payment_id=recorded.payment_id;
+  receipt.manual_amount_kgs=amount;
+  await panel.getByText("Учтена ранее полученная оплата",{exact:false}).waitFor();
+
+  const review=await page.context().request.get(
+    BASE+"/core/api/v1/admin/booking/reservations/"+receipt.reservation_id+"/acquiring-readiness");
+  assert.equal(review.status(),200);
+  assert.equal((await review.json()).remaining_kgs,receipt.total_kgs-amount);
+  const forbiddenCancel=await page.context().request.post(
+    BASE+"/core/api/v1/admin/pms/reservations/"+receipt.reservation_id+"/cancel");
+  assert.equal(forbiddenCancel.status(),409,"Paid booking must not cancel on unpaid path");
+}
+
 async function createCancellationFixture(context,hotel){
   const url=BASE+"/core/api/v1/admin/pms/reservations/new/";
   const payload={room_id:receipts[hotel].room_id,check_in:day(10),check_out:day(12),adults:2,children:0};
@@ -228,6 +276,7 @@ try {
   await changeSchedule(pageA,"HOTEL_A");
   await createCancellationFixture(contextA,"HOTEL_A");
   await cancelFixture(pageA,"HOTEL_A");
+  await recordManualPayment(pageA,"HOTEL_A");
 
   const contextB = await browser.newContext({ viewport:{width:390,height:844} });
   const pageB = await contextB.newPage();
@@ -262,9 +311,16 @@ try {
   await changeSchedule(pageB,"HOTEL_B");
   await createCancellationFixture(contextB,"HOTEL_B");
   await cancelFixture(pageB,"HOTEL_B");
+  await recordManualPayment(pageB,"HOTEL_B");
   const reverseHold = await contextA.request.get(
     BASE + "/core/api/v1/admin/pms/holds/" + receipts.HOTEL_B.hold_id);
   assert.equal(reverseHold.status(),404,"Reverse direction foreign HOLD");
+  const crossPayment=await contextB.request.post(
+    BASE+"/core/api/v1/admin/booking/reservations/"+receipts.HOTEL_A.reservation_id+"/payments",{
+      headers:{"X-Property-Id":ownerA.property_id,"X-Tenant-Id":ownerA.tenant_id,"X-Role":"OWNER"},
+      data:{amount_kgs:100,method:"CASH",idempotency_key:randomUUID()},
+    });
+  assert.equal(crossPayment.status(),404,"Foreign manual payment must not be allowed");
   const foreignSchedule=await contextB.request.get(BASE+
     "/core/api/v1/admin/pms/reservations/"+receipts.HOTEL_A.reservation_id+"/schedule");
   assert.equal(foreignSchedule.status(),404,"Foreign reservation schedule leak");
@@ -284,7 +340,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: 2 hotel bookings, 2 schedule mutations, 2 unpaid fixture cancellations, 2 released HOLDs, bidirectional isolation in real browser/API");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two hotel bookings, schedules, unpaid cancellations, 2 independently recorded manual payments, 2 released HOLDs, cross-tenant rejection");
 } finally {
   await browser.close();
 }
