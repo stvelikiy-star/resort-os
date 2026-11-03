@@ -174,7 +174,95 @@ def main():
         execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
         assert canonical_client.get('/api/v1/pms/grid?start=2026-11-04&end=2026-11-05').status_code == 401
         execute("UPDATE tenants SET status='ACTIVE' WHERE id=$1", ids['tenant_b'])
-    print('PASS: canonical app_entry:app with PostgreSQL: two isolated hotel dashboards and PMS grids, staff still locked, waiter/blocked tenant denied')
+        # Owner-managed staff lifecycle in the REAL assembled ASGI app and isolated PostgreSQL.
+        # Both hotels use the same username; scoped identity is resolved server-side.
+        staff_username = 'synthetic-worker'
+        staff_password_a = 'WorkerA-'+secrets.token_urlsafe(20)
+        staff_password_b = 'WorkerB-'+secrets.token_urlsafe(20)
+        def owner_login(suffix):
+            res = canonical_client.post('/api/v1/auth/login', json=dict(
+                username='owner', password=passwords[suffix],
+                tenant_code='tenant_'+suffix, property_code='HOTEL_'+suffix.upper()))
+            assert res.status_code == 200, res.text
+
+        owner_login('a')
+        a_overview = canonical_client.get('/api/v1/admin/staff/overview')
+        assert a_overview.status_code == 200, a_overview.text
+        assert {row['id'] for row in a_overview.json()['staff']} == {str(ids['user_a'])}
+        worker_a = canonical_client.post('/api/v1/admin/staff', json=dict(
+            username=staff_username, display_name='Synthetic Worker A',
+            password=staff_password_a, role='MAID'))
+        assert worker_a.status_code == 201, worker_a.text
+        worker_a_id = worker_a.json()['id']
+        assert canonical_client.post('/api/v1/admin/staff', json=dict(
+            username=staff_username, display_name='Duplicate A',
+            password=staff_password_a, role='MAID')).status_code == 409
+        assert worker_a_id in {row['id'] for row in canonical_client.get('/api/v1/admin/staff/overview').json()['staff']}
+
+        owner_login('b')
+        b_overview = canonical_client.get('/api/v1/admin/staff/overview')
+        assert b_overview.status_code == 200, b_overview.text
+        assert {row['id'] for row in b_overview.json()['staff']} == {str(ids['user_b'])}
+        worker_b = canonical_client.post('/api/v1/admin/staff', json=dict(
+            username=staff_username, display_name='Synthetic Worker B',
+            password=staff_password_b, role='MAID'))
+        assert worker_b.status_code == 201, worker_b.text
+        worker_b_id = worker_b.json()['id']
+        assert worker_a_id != worker_b_id
+        assert canonical_client.patch('/api/v1/admin/staff/'+worker_a_id,
+                                      json={'active': False}).status_code == 404
+        assert canonical_client.patch('/api/v1/admin/staff/'+str(ids['user_b']),
+                                      json={'active': False}).status_code == 403
+
+        owner_login('a')
+        assert canonical_client.patch('/api/v1/admin/staff/'+worker_b_id,
+                                      json={'active': False}).status_code == 404
+        assert canonical_client.post('/api/v1/auth/login', json=dict(
+            username=staff_username, password=staff_password_b,
+            tenant_code='tenant_a', property_code='HOTEL_A')).status_code == 401
+        maid_login = canonical_client.post('/api/v1/auth/login', json=dict(
+            username=staff_username, password=staff_password_a,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert maid_login.status_code == 200, maid_login.text
+        maid_token = canonical_client.cookies.get(auth.SESSION_COOKIE)
+        assert canonical_client.get('/api/v1/admin/staff/overview').status_code == 403
+        assert canonical_client.post('/api/v1/admin/staff', json=dict(
+            username='forbidden-staff', display_name='Forbidden Staff',
+            password=staff_password_a, role='MAID')).status_code == 403
+        assert canonical_client.patch('/api/v1/admin/staff/'+worker_a_id,
+                                      json={'active': False}).status_code == 403
+        owner_login('a')
+        changed = canonical_client.patch('/api/v1/admin/staff/'+worker_a_id,
+                                         json={'role':'TECHNICIAN','module_permissions':['OPS']})
+        assert changed.status_code == 200 and changed.json()['role'] == 'TECHNICIAN', changed.text
+        revoked = canonical_client.get('/api/v1/auth/me', headers={
+            'Cookie': auth.SESSION_COOKIE+'='+maid_token})
+        assert revoked.status_code == 401, 'Old staff session survived a permission change'
+        disabled = canonical_client.patch('/api/v1/admin/staff/'+worker_a_id, json={'active':False})
+        assert disabled.status_code == 200 and disabled.json()['active'] is False
+        assert canonical_client.post('/api/v1/auth/login', json=dict(
+            username=staff_username, password=staff_password_a,
+            tenant_code='tenant_a', property_code='HOTEL_A')).status_code == 401
+
+        # A has no authority over B's same-username worker, even after A revocation.
+        worker_b_login = canonical_client.post('/api/v1/auth/login', json=dict(
+            username=staff_username, password=staff_password_b,
+            tenant_code='tenant_b', property_code='HOTEL_B'))
+        assert worker_b_login.status_code == 200, worker_b_login.text
+        assert canonical_client.get('/api/v1/auth/me').json()['property_code'] == 'HOTEL_B'
+        owner_login('a')
+        manager = canonical_client.post('/api/v1/admin/staff', json=dict(
+            username='synthetic-manager', display_name='Synthetic Manager A',
+            password='ManagerA-'+secrets.token_urlsafe(20), role='MANAGER'))
+        assert manager.status_code == 201, manager.text
+        manager_id = manager.json()['id']
+        assert canonical_client.patch('/api/v1/admin/staff/'+manager_id,
+                                      json={'module_permissions':['STAFF']}).status_code == 200
+        # Unreviewed operations remain blocked by the canonical boundary.
+        assert canonical_client.put('/api/v1/admin/staff').status_code == 503
+        assert canonical_client.delete('/api/v1/admin/staff/'+manager_id).status_code == 503
+        assert canonical_client.post('/api/v1/reservations', json={}).status_code == 503
+    print('PASS: canonical shared staff lifecycle: same usernames isolated, owner-only writes, cross-hotel 404, old session revocation, disabled login denial')
 
     # Exercise only the reviewed QR handlers in a test harness with the real
     # shared auth and one pool. The canonical application's preview boundary
