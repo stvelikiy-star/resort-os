@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
 from app import auth
+from app import guest_os
 from app.shared_auth_preview import SharedAuthPreviewBoundary
 from app.health import router as health_router
 
@@ -26,7 +27,8 @@ def main():
     assert target.hostname in {'localhost', '127.0.0.1'} and target.path == '/marina_shared_auth_ci'
     assert auth.MARINA_SHARED_AUTH_PREVIEW_ENABLED and auth.MARINA_TENANT_CONTEXT_ENABLED
     auth.shared_auth_preview_guard()
-    ids = {name: uuid.uuid4() for name in ('tenant_a','tenant_b','property_a','property_b','user_a','user_b')}
+    ids = {name: uuid.uuid4() for name in ('tenant_a','tenant_b','property_a','property_b',
+                                         'user_a','user_b','type_a','type_b','room_a','room_b')}
     passwords = {suffix: secrets.token_urlsafe(24) for suffix in ('a','b')}
 
     async def seed():
@@ -42,6 +44,14 @@ def main():
                     await conn.execute('''INSERT INTO staff_users
                         (id,"propertyId",username,"displayName","passwordHash",role,"isActive","updatedAt")
                         VALUES ($1,$2,'owner',$3,$4,'OWNER',true,now())''', ids['user_'+suffix], ids['property_'+suffix], 'Synthetic owner '+suffix, auth.password_hasher.hash(passwords[suffix]))
+                    await conn.execute('''INSERT INTO room_types
+                        (id,"propertyId",code,name,"capacityAdults","updatedAt")
+                        VALUES ($1,$2,'STANDARD','Synthetic standard',2,now())''',
+                        ids['type_'+suffix], ids['property_'+suffix])
+                    await conn.execute('''INSERT INTO rooms
+                        (id,"propertyId","roomTypeId",code,name,"updatedAt")
+                        VALUES ($1,$2,$3,'101','Synthetic room',now())''',
+                        ids['room_'+suffix], ids['property_'+suffix], ids['type_'+suffix])
         finally:
             await conn.close()
     asyncio.run(seed())
@@ -101,6 +111,40 @@ def main():
         assert client.post('/api/v1/auth/logout',headers={'Cookie':auth.SESSION_COOKIE+'='+tokens['b']}).status_code == 204
         assert me('b').status_code == 401
     print('PASS: PostgreSQL shared login, same usernames, tenant/session isolation, tampering, revocation and closed workspace boundary')
+
+    # Exercise only the reviewed QR handlers in a test harness with the real
+    # shared auth and one pool. The canonical application's preview boundary
+    # above remains closed; this is not a general shared-workspace rollout.
+    execute('UPDATE staff_users SET "propertyId"=$1,username=\'owner\' WHERE id=$2',
+            ids['property_a'], ids['user_a'])
+    qr_app = FastAPI(lifespan=lifespan)
+    qr_app.include_router(auth.router)
+    qr_app.include_router(guest_os.admin_router)
+    with TestClient(qr_app, base_url='https://shared-auth.test') as qr_client:
+        for suffix, foreign in (('a','b'), ('b','a')):
+            result = qr_client.post('/api/v1/auth/login', json=dict(
+                username='owner', password=passwords[suffix], tenant_code='tenant_'+suffix,
+                property_code='HOTEL_'+suffix.upper()))
+            assert result.status_code == 200, 'Shared QR owner sign-in failed'
+            forged = {'X-Tenant-Id': str(ids['tenant_'+foreign]),
+                      'X-Property-Id': str(ids['property_'+foreign])}
+            listed = qr_client.get('/api/v1/admin/guest-os/room-qrs', headers=forged)
+            assert listed.status_code == 200
+            assert listed.json()['property'] == 'HOTEL_'+suffix.upper()
+            assert [r['room_id'] for r in listed.json()['items']] == [str(ids['room_'+suffix])]
+            for action in ('issue','rotate'):
+                denied = qr_client.post(
+                    f"/api/v1/admin/guest-os/room-qrs/{ids['room_'+foreign]}/{action}", headers=forged)
+                assert denied.status_code == 404, 'Foreign room QR mutation must be denied'
+            own = qr_client.post(f"/api/v1/admin/guest-os/room-qrs/{ids['room_'+suffix]}/issue")
+            assert own.status_code == 201, 'Own room QR issue failed'
+            rotated = qr_client.post(f"/api/v1/admin/guest-os/room-qrs/{ids['room_'+suffix]}/rotate")
+            assert rotated.status_code == 201 and rotated.json()['qr_id'] != own.json()['qr_id']
+            batch = qr_client.post('/api/v1/admin/guest-os/room-qrs/issue-missing', json={})
+            assert batch.status_code == 201 and batch.json()['issued_count'] == 0
+        execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
+        assert qr_client.get('/api/v1/admin/guest-os/room-qrs').status_code == 401
+    print('PASS: single test runtime + PostgreSQL: two-hotel QR list/issue/rotate/batch, foreign IDs/headers and blocked tenant denial; canonical preview remains closed')
 
 
 if __name__ == '__main__': main()
