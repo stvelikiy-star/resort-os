@@ -14,6 +14,7 @@ function Shell() {
         <Stack.Screen name="task/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="room/[id]" options={{ presentation: 'card' }} />
         <Stack.Screen name="new-request" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="scan" options={{ presentation: 'modal' }} />
       </Stack>
     </>
   );
