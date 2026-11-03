@@ -33,6 +33,20 @@ uses server-trusted hotel ID and validates the quoted price, and the room
 inventory exclusion constraint prevents concurrent double booking.
 The shared PMS endpoints are API-only in this staging slice; the Admin UI
 still displays a read-only grid, without booking mutation controls.
+The next reviewed financial slice composes only internal manual booking payment
+records in shared staging even when legacy ENABLE_PAYMENT_OPERATIONS is false,
+then explicitly allows authenticated OWNER/MANAGER GET
+`/api/v1/admin/booking/reservations/{reservation_uuid}/acquiring-readiness`,
+GET `/cancellation-finance-review`, and POST `/payments`.
+Payments are restricted to internal manual CASH/CARD/CARD_POS/BANK_TRANSFER/OTHER
+entries, require unique idempotency keys, and in shared mode ALWAYS enforce
+the actual outstanding financial balance with the reservation locked.
+This does **not** connect a bank, initiate acquiring, verify funds receipt,
+issue a payment link, provide online checkout or perform refunds. The
+receipts are staff-recorded internal facts only; third-party payment,
+service-point QR and MKassa entry points remain gated off. The shared
+Admin UI does not offer these payment actions in this staging slice.
+
 The shared reservation schedule slice also permits GET
 `/api/v1/admin/pms/reservations/{reservation_uuid}/schedule` and POST to
 `/schedule/preview` and `/schedule/commit` under existing OWNER/MANAGER PMS
