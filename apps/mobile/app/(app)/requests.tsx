@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react-native';
 import { Button, Card, Empty, FadeIn, Screen, Title } from '../../src/components/ui';
@@ -19,6 +19,11 @@ export default function Requests() {
   const { api, user } = useSession();
   const ws = workspaceFor(user!.role);
   const { data, loading, error, reload } = useAsync<Task[]>(() => api!.listTasks({ type: 'MAINTENANCE' }), [api]);
+  const hasFocused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (hasFocused.current) void reload();
+    else hasFocused.current = true;
+  }, [reload]));
   return (
     <Screen>
       <Title>{t('mt.list')}</Title>

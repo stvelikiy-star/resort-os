@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Card, Empty, FadeIn, Screen, Title, toneColors } from '../../src/components/ui';
 import { RoomStateBadge, roomTone } from '../../src/components/domain';
@@ -16,6 +16,11 @@ export default function Rooms() {
   const router = useRouter();
   const { api, hotel } = useSession();
   const { data, loading, error, reload } = useAsync<Room[]>(() => api!.listRooms(), [api]);
+  const hasFocused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (hasFocused.current) void reload();
+    else hasFocused.current = true;
+  }, [reload]));
   return (
     <Screen>
       <Title sub={hotel?.name}>{t('rooms.title')}</Title>

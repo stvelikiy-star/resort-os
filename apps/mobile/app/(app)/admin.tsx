@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { BedDouble, CheckCircle2, Clock, Percent, Wrench } from 'lucide-react-native';
 import { Badge, Button, Card, Empty, FadeIn, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
@@ -34,6 +34,12 @@ export default function Admin() {
   const summary = useAsync<DaySummary | null>(() => (allowed ? api!.daySummary().catch(() => null) : Promise.resolve(null)), [api, tick]);
   const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick]);
   const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff() : Promise.resolve([])), [api, tick]);
+  const hasFocused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (hasFocused.current) {
+      void summary.reload(); void tasks.reload(); void staff.reload();
+    } else hasFocused.current = true;
+  }, [summary.reload, tasks.reload, staff.reload]));
 
   if (!allowed) return <Screen><Title>{t('admin.title')}</Title><Empty text={t('admin.forbidden')} /></Screen>;
   const s = summary.data;

@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react-native';
 import { AnimatedProgressBar, Card, DemoBanner, Empty, FadeIn, PressScale, Screen, SectionLabel } from '../../src/components/ui';
@@ -20,6 +20,11 @@ export default function Tasks() {
   const { api, user, hotel } = useSession();
   const ws = workspaceFor(user!.role);
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
+  const hasFocused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (hasFocused.current) void reload();
+    else hasFocused.current = true;
+  }, [reload]));
 
   const { active, finished, pct } = useMemo(() => {
     const list = data ?? [];
