@@ -104,7 +104,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       if (state === 'active') void verifySession();
     });
     return () => sub.remove();
-  }, [hotel, api, user?.id, user?.property_code]);
+  }, [hotel, api, user]);
 
   const setLocale = useCallback((l: Locale) => { setLocaleState(l); void setItem('marina.locale', l); }, []);
   const selectHotel = useCallback((id: string | null) => {
