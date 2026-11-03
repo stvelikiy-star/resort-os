@@ -161,6 +161,8 @@ try {
   if (await page.getByRole("button",{name:"Персонал"}).count()) throw new Error("Reception shown staff admin");
   if (await page.getByRole("button",{name:"Дашборд"}).count()) throw new Error("Reception shown owner dashboard");
   await page.getByText("R303").waitFor();
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  await page.getByText("HOTEL_R-BOOK").waitFor();
   if (errors.length) throw new Error(JSON.stringify(errors));
   console.log("MARINA_SHARED_ADMIN_BROWSER_PASS: main entry redirect, two hotel UI isolation, owner staff creation and revocation, reception restricted, 390px viewport");
 } finally {
