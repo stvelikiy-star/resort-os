@@ -1,3 +1,9 @@
+## Connecting an existing MARINA SMART API
+
+The hotel's HTTPS address may be the API origin (`https://hotel.example`) or the existing reverse-proxy base path (`https://hotel.example/core`). In the latter case requests use `/core/api/v1/...`; otherwise they use `/api/v1/...`.
+
+The QR/manual input deliberately rejects other URL paths, query strings, fragments, credentials, IP addresses and nonstandard ports. The app verifies the server's cookie-based session with `auth/me` after login. Availability of the mobile API from an Android device, reverse-proxy cookie behavior and the server's role policies must be checked on a dedicated test hotel before production use.
+
 # MARINA SMART STAFF — mobile client
 
 An isolated Expo / React Native application for staff of hotels using MARINA SMART.
