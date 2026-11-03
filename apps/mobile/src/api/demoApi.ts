@@ -48,9 +48,12 @@ export function createDemoApi(hotelId: string, latency = 120): StaffApi {
   const find = (id: string) => { const t = data.tasks.find((x) => x.id === id); if (!t) throw new ApiError('NOT_FOUND'); return t; };
   const nameOf = (id: string | null) => STAFF.find((s) => s.id === id)?.display_name ?? null;
   const out = (t: Task): Task => ({ ...t, assigned_to_name: nameOf(t.assigned_to_id) });
-  const allowedTypes = (u: AuthUser): TaskType[] =>
-    u.role === 'MAID' ? ['HOUSEKEEPING'] : u.role === 'TECHNICIAN' ? ['MAINTENANCE', 'GUEST_REQUEST'] : ['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'];
   const isManager = (u: AuthUser) => u.role === 'MANAGER' || u.role === 'OWNER';
+  const allowedTypes = (u: AuthUser): TaskType[] =>
+    isManager(u) ? ['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'] :
+    u.role === 'MAID' ? ['HOUSEKEEPING'] :
+    u.role === 'TECHNICIAN' ? ['MAINTENANCE'] : [];
+  const mayOperate = (u: AuthUser, task: Task) => allowedTypes(u).includes(task.type);
 
   return {
     mode: 'DEMO',
@@ -69,28 +72,36 @@ export function createDemoApi(hotelId: string, latency = 120): StaffApi {
       const allowed = allowedTypes(u);
       return data.tasks
         .filter((t) => allowed.includes(t.type) && (!filter?.type || t.type === filter.type) && (!filter?.status || t.status === filter.status))
-        .filter((t) => isManager(u) || u.role === 'RECEPTION' || t.assigned_to_id === u.id || t.assigned_to_id === null)
+        .filter((t) => isManager(u) || t.assigned_to_id === u.id || t.assigned_to_id === null)
         .map(out);
     },
     async claimTask(id) {
       await delay(latency); const u = need(); const t = find(id);
+      if (!mayOperate(u, t)) throw new ApiError('FORBIDDEN');
+      if (t.assigned_to_id && t.assigned_to_id !== u.id) throw new ApiError('CONFLICT');
       if (t.status !== 'OPEN' && t.status !== 'IN_PROGRESS') throw new ApiError('CONFLICT');
       t.assigned_to_id = u.id; t.status = 'IN_PROGRESS'; return out(t);
     },
     async setTaskStatus(id, status: TaskStatus) {
       await delay(latency); const u = need(); const t = find(id);
+      if (!mayOperate(u, t)) throw new ApiError('FORBIDDEN');
+      if (!isManager(u) && t.assigned_to_id !== u.id) throw new ApiError('FORBIDDEN');
+      if (status === 'CANCELLED' && !isManager(u)) throw new ApiError('FORBIDDEN');
+      if (t.type === 'HOUSEKEEPING' && t.status === 'IN_INSPECTION' && !isManager(u)) throw new ApiError('FORBIDDEN');
       if (!canTransition(t.type, t.status, status)) throw new ApiError('CONFLICT');
-      if (t.type === 'HOUSEKEEPING' && t.status === 'IN_INSPECTION' && !isManager(u) && u.role !== 'RECEPTION') throw new ApiError('FORBIDDEN');
       t.status = status; return out(t);
     },
     async completeHousekeeping(id, report: HousekeepingReport) {
-      await delay(latency); need(); const t = find(id);
+      await delay(latency); const u = need(); const t = find(id);
+      if (u.role !== 'MAID' || t.type !== 'HOUSEKEEPING') throw new ApiError('FORBIDDEN');
+      if (t.assigned_to_id !== u.id) throw new ApiError('FORBIDDEN');
       if (t.status !== 'IN_PROGRESS') throw new ApiError('CONFLICT');
       if (!HOUSEKEEPING_CHECKLIST.every((c) => report.checklist[c])) throw new ApiError('BAD_REQUEST');
       t.status = 'IN_INSPECTION'; return out(t);
     },
     async createMaintenance(req: NewMaintenance) {
       await delay(latency); const u = need();
+      if (!allowedTypes(u).includes('MAINTENANCE')) throw new ApiError('FORBIDDEN');
       if (req.description.trim().length < 2) throw new ApiError('BAD_REQUEST');
       const room = data.rooms.find((r) => r.id === req.room_id) ?? null;
       const t: Task = { id: `t${data.tasks.length + 1}`, type: 'MAINTENANCE', status: 'OPEN', priority: req.priority, title: req.description.trim().slice(0, 80), room_code: room?.code ?? null, room_id: room?.id ?? null, assigned_to_id: null, due_label: '—' };
@@ -100,7 +111,7 @@ export function createDemoApi(hotelId: string, latency = 120): StaffApi {
     async setRoomState(roomId, state: RoomState) {
       await delay(latency); const u = need(); const r = data.rooms.find((x) => x.id === roomId);
       if (!r) throw new ApiError('NOT_FOUND');
-      if (u.role === 'MAID' || u.role === 'TECHNICIAN') throw new ApiError('FORBIDDEN');
+      if (!isManager(u)) throw new ApiError('FORBIDDEN');
       r.state = state; return { ...r };
     },
     async listStaff() {
@@ -110,9 +121,10 @@ export function createDemoApi(hotelId: string, latency = 120): StaffApi {
     async assignTask(taskId, staffId) {
       await delay(latency); if (!isManager(need())) throw new ApiError('FORBIDDEN');
       const t = find(taskId); const s = STAFF.find((x) => x.id === staffId);
+      if (t.status === 'DONE' || t.status === 'CANCELLED') throw new ApiError('CONFLICT');
       if (staffId && !s) throw new ApiError('NOT_FOUND');
       const expected = t.type === 'HOUSEKEEPING' ? 'MAID' : t.type === 'MAINTENANCE' ? 'TECHNICIAN' : null;
-      if (s && expected && s.role !== expected) throw new ApiError('BAD_REQUEST');
+      if (s && (!expected || s.role !== expected || s.active === false)) throw new ApiError('BAD_REQUEST');
       t.assigned_to_id = staffId; return out(t);
     },
     async daySummary(): Promise<DaySummary> {
