@@ -29,3 +29,25 @@ export const hasTab = (role: Role, tab: TabKey) => workspaceFor(role).tabs.inclu
 
 /** First tab a role may open — used as the landing route after sign-in. */
 export const homeFor = (role: Role): `/${TabKey}` => `/${workspaceFor(role).tabs[0]}`;
+
+/**
+ * Server-provided permission grants are authoritative for LIVE accounts.
+ * A role alone does not prove access when the owner has revoked OPS.
+ * Demo users use simplified local labels, so this gate applies only to LIVE.
+ */
+export function workspaceForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): Workspace {
+  const base = workspaceFor(role);
+  if (mode === 'DEMO') return base;
+  if (!Array.isArray(permissions) || !permissions.includes('OPS')) {
+    return FIELD;
+  }
+  return base;
+}
+
+export function hasTabForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO', tab: TabKey): boolean {
+  return workspaceForSession(role, permissions, mode).tabs.includes(tab);
+}
+
+export function homeForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): `/${TabKey}` {
+  return `/${workspaceForSession(role, permissions, mode).tabs[0]}`;
+}
