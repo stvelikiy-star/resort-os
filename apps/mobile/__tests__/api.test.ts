@@ -37,7 +37,7 @@ describe('demo api', () => {
     await expect(m.daySummary()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     await expect(m.setRoomState('r1', 'CLEAN')).rejects.toMatchObject({ code: 'FORBIDDEN' });
     const g = await login('h', 'manager');
-    expect((await g.assignTask('t6', 'u-maid')).assigned_to_id).toBe('u-maid');
+    expect((await g.assignTask('t3', 'u-maid')).assigned_to_id).toBe('u-maid');
     await expect(g.assignTask('t4', 'u-maid')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
   it('demo denies claiming work assigned to another employee and denies other role types', async () => {
