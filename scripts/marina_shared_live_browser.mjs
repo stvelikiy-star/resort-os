@@ -92,6 +92,75 @@ async function book(page, hotel, roomCode) {
   assert.equal((await replayPreview.json()).can_commit,false,"Booked room must no longer be available");
   return roomId;
 }
+function localShift(value, days) {
+  const d=new Date(value+"T12:00:00Z");
+  assert(!Number.isNaN(d.getTime()),"Invalid hotel-local business date");
+  d.setUTCDate(d.getUTCDate()+days);
+  return d.toISOString().slice(0,10);
+}
+async function createStayFixture(context,hotel) {
+  const receipt=receipts[hotel];
+  const list=await context.request.get(BASE+"/core/api/v1/admin/reception/reservations");
+  assert.equal(list.status(),200);
+  const localToday=(await list.json()).local_date;
+  assert.match(localToday,/^\\d{4}-\\d{2}-\\d{2}$/);
+  const stayStart=localShift(localToday,-1);
+  const stayEnd=localShift(localToday,1);
+  const input={room_id:receipt.room_id,check_in:stayStart,check_out:stayEnd,adults:2,children:0};
+  const preview=await context.request.post(BASE+"/core/api/v1/admin/pms/reservations/new/preview",
+    {data:input});
+  assert.equal(preview.status(),200,await preview.text());
+  const quoted=await preview.json();
+  assert.equal(quoted.can_commit,true,"Stay fixture room must be available");
+  const created=await context.request.post(BASE+"/core/api/v1/admin/pms/reservations/new/commit",{
+    data:{...input,guest_name:"Synthetic Same-Day Guest "+hotel,
+      phone:"+996555440011",expected_total_kgs:quoted.pricing.total_kgs,
+      expected_pricing_source:quoted.pricing.source},
+  });
+  assert.equal(created.status(),201,await created.text());
+  const booking=await created.json();
+  receipt.stay_fixture={reservation_id:booking.reservation_id,
+    booking_number:booking.booking_number,planned_start:stayStart,
+    planned_end:stayEnd,checkout_local_date:localToday};
+}
+async function completeStayViaBrowser(page,hotel){
+  const fixture=receipts[hotel].stay_fixture;
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  const row=page.getByRole("row").filter({hasText:fixture.booking_number});
+  const checkInResponse=page.waitForResponse(res=>
+    res.url().endsWith("/core/api/v1/admin/stays/reservations/"+fixture.reservation_id+"/check-in") &&
+    res.request().method()==="POST");
+  await row.getByRole("button",{name:"Заселить"}).click();
+  const checkedIn=await checkInResponse;
+  assert.equal(checkedIn.status(),200,await checkedIn.text());
+  const inData=await checkedIn.json();
+  assert.equal(inData.reservation_id,fixture.reservation_id);
+  assert.equal(inData.status,"CHECKED_IN");
+  assert.match(inData.guest_access_pin,/^\\d{6}$/,"Missing one-time guest PIN");
+  assert.equal(inData.guest_access_pin_display_once,true);
+  await page.getByLabel("Одноразовый гостевой PIN").waitFor();
+  const checkOutResponse=page.waitForResponse(res=>
+    res.url().endsWith("/core/api/v1/admin/stays/reservations/"+fixture.reservation_id+"/check-out") &&
+    res.request().method()==="POST");
+  await row.getByRole("button",{name:"Выселить"}).click();
+  const checkedOut=await checkOutResponse;
+  assert.equal(checkedOut.status(),200,await checkedOut.text());
+  const outData=await checkedOut.json();
+  assert.equal(outData.reservation_id,fixture.reservation_id);
+  assert.equal(outData.status,"CHECKED_OUT");
+  assert.equal(outData.room_state,"DIRTY");
+  assert.equal(outData.early_checkout_released_inventory,true);
+  assert.match(outData.housekeeping_task_id,/^[0-9a-f-]{36}$/i);
+  await page.getByLabel("Одноразовый гостевой PIN").waitFor({state:"detached"});
+  fixture.stay_id=outData.stay_id;
+  fixture.housekeeping_task_id=outData.housekeeping_task_id;
+  const detail=await page.context().request.get(BASE+
+    "/core/api/v1/admin/reception/reservations/"+fixture.reservation_id);
+  assert.equal(detail.status(),200);
+  const data=await detail.json();
+  assert.equal(data.reservation?.status??data.status,"CHECKED_OUT");
+}
+
 async function makeHold(page, hotel, roomCode) {
   await page.getByRole("button",{name:"Показать HOLD"}).click();
   const form = page.getByRole("form",{name:"Форма HOLD"});
@@ -329,6 +398,10 @@ try {
   assert.equal(foreignCancel.status(),404,"Foreign cancellation must fail");
   await releaseHold(pageA,"HOTEL_A");
   await releaseHold(pageB,"HOTEL_B");
+  await createStayFixture(contextA,"HOTEL_A");
+  await createStayFixture(contextB,"HOTEL_B");
+  await completeStayViaBrowser(pageA,"HOTEL_A");
+  await completeStayViaBrowser(pageB,"HOTEL_B");
   const aDetail = await contextA.request.get(
     BASE + "/core/api/v1/admin/reception/reservations/" + receipts.HOTEL_B.reservation_id);
   assert.equal(aDetail.status(),404,"Reverse direction foreign reservation leak");
@@ -340,7 +413,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two hotel bookings, schedules, unpaid cancellations, 2 independently recorded manual payments, 2 released HOLDs, cross-tenant rejection");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: 2 hotels booking, schedule, HOLD, cancellation, manual receipt, check-in+one-time PIN, check-out+housekeeping, tenant isolation");
 } finally {
   await browser.close();
 }
