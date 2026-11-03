@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { getLocales } from 'expo-localization';
 import { AppState } from 'react-native';
 import { apiFor, dropApi } from '../api/factory';
-import { DEMO_HOTELS, HotelConnection, parseHotelAddress } from '../api/hotels';
+import { DEMO_HOTELS, HotelConnection, hotelConnectionId, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
 import type { AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
@@ -50,7 +50,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
           if (h.demo !== false || typeof h.baseUrl !== 'string') continue;
           const parsed = parseHotelAddress(h.baseUrl);
           if (!parsed.ok) continue;
-          const id = `live-${new URL(parsed.baseUrl).hostname}`;
+          const id = hotelConnectionId(parsed.baseUrl);
           if (known.has(id) || extra.length >= 20) continue;
           known.add(id);
           extra.push({ id, baseUrl: parsed.baseUrl, name: id.slice(5), city: '', demo: false, accent: '#245E9A' });
