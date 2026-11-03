@@ -1,7 +1,7 @@
 import { createDemoApi } from '../src/api/demoApi';
 import { createRealApi } from '../src/api/realApi';
 import { ApiError, canTransition } from '../src/api/types';
-import { parseHotelAddress } from '../src/api/hotels';
+import { hotelConnectionId, parseHotelAddress } from '../src/api/hotels';
 
 describe('transitions mirror backend', () => {
   it('housekeeping needs inspection before done', () => {
@@ -203,7 +203,23 @@ describe('real api contract (mock fetch)', () => {
 describe('hotel address parsing', () => {
   it('accepts https hosts and bare hostnames', () => {
     expect(parseHotelAddress('api.marina.example')).toEqual({ ok: true, baseUrl: 'https://api.marina.example' });
-    expect(parseHotelAddress('https://api.marina.example/path?x=1')).toEqual({ ok: true, baseUrl: 'https://api.marina.example' });
+    expect(parseHotelAddress('https://api.marina.example/core/')).toEqual({ ok: true, baseUrl: 'https://api.marina.example/core' });
+    expect(hotelConnectionId('https://api.marina.example')).not.toBe(hotelConnectionId('https://api.marina.example/core'));
+  });
+  it('accepts the approved /core proxy prefix without allowing URLs to supply arbitrary API paths', async () => {
+    const { f, calls } = (() => {
+      const calls: string[] = [];
+      const fetchStub = (async (url: string) => {
+        calls.push(url);
+        return { ok: true, status: 200, json: async () => ({ id: 'staff', role: 'MAID' }) } as Response;
+      }) as typeof fetch;
+      return { f: fetchStub, calls };
+    })();
+    await createRealApi('https://api.marina.example/core', f).me();
+    expect(calls).toEqual(['https://api.marina.example/core/api/v1/auth/me']);
+    for (const address of ['https://api.marina.example/path?x=1', 'https://api.marina.example/core/api/v1/auth/login', 'https://api.marina.example/core?url=https://evil.example', 'https://api.marina.example/core#fragment']) {
+      expect(parseHotelAddress(address)).toMatchObject({ ok: false });
+    }
   });
   it('rejects alternate ports, IP literals and internal targets embedded in QR codes', () => {
     for (const address of [
