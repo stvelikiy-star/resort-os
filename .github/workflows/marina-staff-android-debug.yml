@@ -1,0 +1,44 @@
+name: MARINA STAFF Android Debug APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-staff-android-debug.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install --non-interactive
+      - name: Build debug APK
+        run: cd android && ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Publish debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-staff-android-debug
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
