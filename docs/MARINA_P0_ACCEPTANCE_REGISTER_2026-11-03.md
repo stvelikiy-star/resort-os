@@ -123,3 +123,19 @@ python3 scripts/marina_runtime_inventory_readonly.py > marina-runtime-inventory-
 - MARINA Two-Property Isolation and Restore CI: https://github.com/stvelikiy-star/resort-os/actions/runs/41584060779
 
 Эти проверки выполнялись на CI-окружениях; они не означают, что соответствующий SHA развёрнут на сервере.
+
+## VIII. Разбор красного CI в общей монорепозитории — 03.11.2026
+
+На SHA `d3617f316b` workflow `Three Crowns Full Staging Gate` завершился с ошибкой: https://github.com/stvelikiy-star/resort-os/actions/runs/41589592136
+
+В шаге `Validate release/data truth and seed canonical hotel` проверка ожидает специфические тексты и данные гостиницы Three Crowns (пляж, пирс, размеры бассейна, roomCategories и контакт), которые не найдены в `apps/web/app/page.tsx` и `apps/web/lib/siteContent.ts`.
+
+**Классификация:** cross-project regression / test scope mismatch, не доказанный дефект MARINA PMS. Не дополнять сайт чужими утверждениями ради прохождения теста. Не объявлять релиз зелёным, пока обязательные gates не определены по продуктовой области и failure не разрешён корректным владельцем Three Crowns.
+
+Ветка аудита MARINA не меняет `apps/web`, `siteContent.ts`, данные гостиницы Three Crowns или этот staging gate. Требуется самостоятельная диагностика ownership и корректного scope-gating в общем CI с минимальными изменениями вне продуктов.
+
+## IX. Идентификаторы работающих Docker-образов
+
+`scripts/marina_runtime_inventory_readonly.py` теперь запрашивает у конкретных контейнеров MARINA только `docker inspect --type container --format '{{.Image}}'`. Это иммутабельный локальный image ID (`sha256:...`), который можно сопоставлять между замерами. Скрипт НЕ читает Docker Env, mounts или network settings. Локальный image ID сам по себе не доказывает source SHA или registry digest: provenance проверяется отдельно через labels/build metadata и deployment log, с исключением секретов.
+
+Первоначальный CI проверки безопасности диагностического скрипта прошёл на старом коммите; после дополнения идентификаторами образов необходимо дождаться CI нового коммита. Эти метаданные пока не собраны на Ubuntu.
