@@ -10,6 +10,7 @@ import { workspaceForSession } from '../src/roles/registry';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { font, radius, space } from '../src/theme/tokens';
 import type { Priority, Room } from '../src/api/types';
+import { wasWriteRejected } from '../src/lib/writeOutcome';
 
 const CATS = [{ k: 'PLUMBING', I: Droplets }, { k: 'ELECTRIC', I: Zap }, { k: 'HVAC', I: Fan }, { k: 'FURNITURE', I: Lamp }, { k: 'OTHER', I: Package }] as const;
 
@@ -25,29 +26,31 @@ export default function NewRequest() {
   const [text, setText] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [unknownResult, setUnknownResult] = useState(false);
   const sendLock = useRef(false);
   const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => { if (returnTimer.current) clearTimeout(returnTimer.current); }, []);
 
   const send = async () => {
-    if (sendLock.current || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
+    if (sendLock.current || unknownResult || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
     sendLock.current = true;
     setBusy(true); setMsg(null);
     let accepted = false;
+    let rejected = false;
     try {
       await api.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text });
       accepted = true;
       setMsg(t('mt.sent'));
       returnTimer.current = setTimeout(() => router.back(), 600);
-    } catch {
-      setMsg(t('errors.generic'));
+    } catch (error: unknown) {
+      rejected = wasWriteRejected(error);
+      if (!rejected) setUnknownResult(true);
+      setMsg(rejected ? t('errors.generic') : t('mt.resultUnknown'));
     } finally {
-      // Keep the form locked after an accepted POST until navigation unmounts it.
-      // Otherwise another tap in the 600ms confirmation window can create a duplicate.
-      if (!accepted) {
-        sendLock.current = false;
-        setBusy(false);
-      }
+      // Never unlock an ambiguous POST. The server might have committed it
+      // even though the acknowledgment could not reach this device.
+      if (!accepted && rejected) sendLock.current = false;
+      if (!accepted) setBusy(false);
     }
   };
 
@@ -79,8 +82,9 @@ export default function NewRequest() {
       <SectionLabel>{t('mt.priority')}</SectionLabel>
       <Segmented<Priority> value={prio} onChange={setPrio} options={[{ key: 'LOW', label: t('tasks.low') }, { key: 'NORMAL', label: t('tasks.normal') }, { key: 'HIGH', label: t('tasks.high') }, { key: 'URGENT', label: t('tasks.urgent') }]} />
       <Field label={t('mt.describe')} placeholder={t('mt.describePh')} value={text} onChangeText={setText} multiline testID="mt-text" style={{ minHeight: 110, paddingTop: 14, textAlignVertical: 'top' }} />
-      <Button testID="mt-send" label={t('mt.send')} onPress={send} disabled={busy || text.trim().length < 2} />
-      {msg ? <Text testID="mt-msg" style={[font.body, { color: c.primary, fontWeight: '700' }]}>{msg}</Text> : null}
+      <Button testID="mt-send" label={t('mt.send')} onPress={send} disabled={busy || unknownResult || text.trim().length < 2} />
+      {unknownResult ? <Button testID="mt-check-existing" variant="secondary" label={t('mt.checkExisting')} onPress={() => router.back()} /> : null}
+      {msg ? <Text testID={unknownResult ? 'mt-unknown-result' : 'mt-msg'} accessibilityRole="alert" style={[font.body, { color: unknownResult ? c.warning : c.primary, fontWeight: '700' }]}>{msg}</Text> : null}
     </Screen>
   );
 }

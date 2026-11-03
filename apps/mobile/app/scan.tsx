@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { QrCode, ShieldCheck } from 'lucide-react-native';
 import { Button, Card, Screen, Title } from '../src/components/ui';
-import { parseHotelAddress } from '../src/api/hotels';
+import { isTrustedHotelOrigin, parseHotelAddress } from '../src/api/hotels';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { font, space } from '../src/theme/tokens';
 
@@ -23,6 +23,11 @@ export default function ScanHotel() {
     const parsed = parseHotelAddress(data);
     if (!parsed.ok) {
       setError(t('scan.invalid'));
+      scanLocked.current = false;
+      return;
+    }
+    if (!isTrustedHotelOrigin(parsed.baseUrl)) {
+      setError(t('connect.untrusted'));
       scanLocked.current = false;
       return;
     }

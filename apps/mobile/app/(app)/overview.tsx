@@ -52,12 +52,12 @@ export default function Overview() {
       <View style={{ flexDirection:'row', flexWrap:'wrap', gap:space.md }}>
         <MetricCard icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
         <MetricCard icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
-        <MetricCard icon={MessageCircle} label={copy.needsReply} value={String(data.communications.needs_reply)} onPress={user?.module_permissions?.includes('WHATSAPP') ? () => router.push('/inbox') : undefined}/>
+        <MetricCard icon={MessageCircle} label={copy.needsReply} value={String(data.communications.needs_reply)} onPress={(user?.module_permissions?.includes('WHATSAPP') || user?.module_permissions?.includes('INBOX')) ? () => router.push('/inbox') : undefined}/>
         <MetricCard icon={BedDouble} label={copy.dirty} value={String(data.rooms.dirty)} onPress={user?.module_permissions?.includes('PMS') ? () => router.push('/pms') : undefined}/>
       </View>
       <SectionLabel>{copy.available}</SectionLabel>
       {user?.module_permissions?.includes('PMS') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
-      {user?.module_permissions?.includes('WHATSAPP') ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
+      {(user?.module_permissions?.includes('WHATSAPP') || user?.module_permissions?.includes('INBOX')) ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
       <SectionLabel>{copy.urgent} · {data.tasks.urgent_active}</SectionLabel>
       {data.attention_tasks.length === 0 ? <Empty text={copy.empty}/> : data.attention_tasks.slice(0,8).map((t, i) => <StaggerItem index={i+1} key={t.id}>
         <GlassCard onPress={() => router.push({pathname:'/task/[id]',params:{id:t.id}})} style={{ flexDirection:'row',alignItems:'center',gap:12 }}>

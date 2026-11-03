@@ -144,6 +144,7 @@ describe('real api contract (mock fetch)', () => {
     expect(rooms[0]).toMatchObject({ id: 'r1', code: '101', state: 'DIRTY' });
     expect(rooms[1]).toMatchObject({ id: 'r2', code: '202', state: 'UNKNOWN' });
     expect(rooms[0].guest).toBeUndefined();
+    expect(rooms[0].floor).toBeNull();
   });
   it('maps active staff and real active_tasks from PMS overview', async () => {
     const { f, calls } = mk([{ body: { staff: [

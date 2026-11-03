@@ -1,4 +1,4 @@
-import { parseHotelAddress } from './hotels';
+import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError, AuthUser, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
@@ -9,36 +9,13 @@ type Fetch = typeof fetch;
  * Bearer/refresh tokens + device registry are backend work item B1/B2 (see docs) and are NOT assumed here.
  */
 export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffApi {
-  const validated = parseHotelAddress(baseUrl);
-  if (!validated.ok) throw new Error('Invalid or insecure hotel API origin');
-  const root = validated.baseUrl;
+  const http = createHotelHttpClient(baseUrl, fetchImpl);
   // Most recent server-provided records for safe post-commit readback fallback.
   // Never synthesize an unseen task or claim that a missing write succeeded.
   const lastKnownTasks = new Map<string, Task>();
+  const lastKnownRooms = new Map<string, Room>();
 
-  async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-    let res: Response;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
-    try {
-      res = await fetchImpl(`${root}${path}`, {
-        method, credentials: 'include', signal: controller.signal,
-        headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-      });
-    } catch {
-      throw new ApiError('OFFLINE');
-    } finally {
-      clearTimeout(timeout);
-    }
-    if (res.status === 204) return undefined as T;
-    if (!res.ok) {
-      const code = res.status === 401 ? 'UNAUTHORIZED' : res.status === 403 ? 'FORBIDDEN' : res.status === 404 ? 'NOT_FOUND' : res.status === 409 ? 'CONFLICT' : res.status === 400 || res.status === 422 ? 'BAD_REQUEST' : 'UNKNOWN';
-      throw new ApiError(code, `HTTP ${res.status}`);
-    }
-    try { return (await res.json()) as T; }
-    catch { throw new ApiError('UNKNOWN', 'Invalid JSON response from hotel API'); }
-  }
+  const call = <T,>(method: string, path: string, body?: unknown) => http.request<T>(method as HttpMethod, path, body);
 
   const mapTask = (t: any): Task => {
     if (!t || typeof t.id !== 'string' || !t.id || !['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'].includes(t.type) || !['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(t.status)) throw new ApiError('UNKNOWN', 'Invalid task record');
@@ -138,14 +115,22 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       for (const t of tasks) if (t.room_id) {
         const existing = seen.get(t.room_id);
         const state = t.room_state ?? 'UNKNOWN';
-        if (!existing) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: 0, state });
+        if (!existing) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: null, state });
         else if (existing.state === 'UNKNOWN' && state !== 'UNKNOWN') existing.state = state;
       }
+      for (const room of seen.values()) lastKnownRooms.set(room.id, room);
       return [...seen.values()];
     },
     async setRoomState(roomId, state: RoomState) {
-      await call('PATCH', `/api/v1/ops/rooms/${roomId}/state`, { state });
-      return { id: roomId, code: '', floor: 0, state };
+      // Never invent the code/floor after changing state. The current server
+      // acknowledges only {room_id,state}; preserve an already observed room.
+      const previous = lastKnownRooms.get(roomId) ?? (await this.listRooms()).find(r => r.id === roomId);
+      if (!previous) throw new ApiError('NOT_FOUND', 'Room is not present in the staff-visible room list');
+      const ack = await call<{room_id: string;state: RoomState}>('PATCH', `/api/v1/ops/rooms/${roomId}/state`, { state });
+      if (!ack || ack.room_id !== roomId || ack.state !== state) throw new ApiError('UNKNOWN', 'Room state acknowledgment not verified');
+      const updated = {...previous, state};
+      lastKnownRooms.set(roomId, updated);
+      return updated;
     },
     async listStaff(): Promise<StaffMember[]> {
       const raw = await call<any>('GET', '/api/v1/admin/staff/overview');

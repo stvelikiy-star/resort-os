@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Clock3 } from 'lucide-react-native';
 import { Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../src/components/ui';
 import { Hold, localDate, useLiveModules } from '../src/api/liveModules';
+import { CONFIRMED_BACKEND_FEATURES } from '../src/api/features';
+import { wasWriteRejected } from '../src/lib/writeOutcome';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { useAsync } from '../src/lib/useAsync';
@@ -25,18 +27,23 @@ export default function Holds() {
   const [end, setEnd] = useState(localDate(2));
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const { data, error, loading, reload } = useAsync<Hold[] | null>(() => live ? live.holds() : Promise.resolve(null), [live, user?.id]);
-  const { data: grid } = useAsync(() => live && /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && start < end ? live.pmsGrid(start, end) : Promise.resolve(null), [live,start,end]);
+  const { data, error, loading, reload } = useAsync<Hold[] | null>(() => live && CONFIRMED_BACKEND_FEATURES.pmsHolds ? live.holds() : Promise.resolve(null), [live, user?.id]);
+  const { data: grid } = useAsync(() => live && CONFIRMED_BACKEND_FEATURES.pmsHolds && /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && start < end ? live.pmsGrid(start, end) : Promise.resolve(null), [live,start,end]);
   const mutation = async (run: () => Promise<unknown>) => {
     if (lock.current || unknown) return;
     lock.current=true; setBusy(true); setErrorMessage(null);
     try { await run(); await reload(); setUnknown(false); setErrorMessage(copy.confirmed); }
-    catch(e) { setUnknown(true); setErrorMessage(e instanceof Error ? e.message : copy.unknown); }
+    catch(e) {
+      const definitive = wasWriteRejected(e);
+      setUnknown(!definitive);
+      setErrorMessage(definitive ? copy.conflict : copy.resultUnknown);
+    }
     finally { lock.current=false; setBusy(false); }
   };
   const create = () => Alert.alert(copy.confirm,'',[{text:copy.close,style:'cancel'},{text:copy.holdCreate,onPress:()=>void mutation(() => live!.createHold({room_id:room,check_in:start,check_out:end,guest_name:name.trim(),guest_phone:phone.trim()}))}]);
   const release = (id: string) => Alert.alert(copy.confirm,'',[{text:copy.close,style:'cancel'},{text:copy.release,onPress:()=>void mutation(() => live!.releaseHold(id))}]);
   if (!user || !['OWNER','MANAGER'].includes(user.role) || !user.module_permissions?.includes('PMS')) return <Screen><Empty text={copy.denied}/></Screen>;
+  if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) return <Screen><Empty text={copy.holdsUnavailable}/></Screen>;
   return <Screen>
     <PressScale onPress={() => router.back()} style={{minHeight:44,flexDirection:'row',alignItems:'center'}}><ChevronLeft color={c.primary} size={24}/><Text style={[font.body,{color:c.primary}]}>{copy.close}</Text></PressScale>
     <View style={{flexDirection:'row',gap:space.md,alignItems:'center'}}><Clock3 color={c.primary} size={28}/><Title>{copy.holds}</Title></View>
@@ -61,7 +68,7 @@ export default function Holds() {
     <Field label={copy.guestName} value={name} onChangeText={setName}/>
     <Field label={copy.phone} value={phone} onChangeText={setPhone} keyboardType="phone-pad"/>
     <Button testID="hold-create" disabled={!room||name.trim().length<2||phone.trim().length<5||busy||unknown} label={copy.holdCreate} onPress={create}/>
-    {errorMessage ? <Card><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{errorMessage} · {copy.resultUnknown}</Text></Card>:null}
-    {unknown ? <Card><Text style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text><Button variant="secondary" label={copy.retry} onPress={()=>{setUnknown(false);void reload();}}/></Card>:null}
+    {errorMessage ? <Card><Text accessibilityRole="alert" style={[font.body,{color:unknown?c.warning:c.text}]}>{errorMessage}</Text></Card>:null}
+    {unknown ? <Card><Text accessibilityRole="alert" style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text><Button variant="secondary" label={copy.close} onPress={() => router.back()}/></Card>:null}
   </Screen>;
 }

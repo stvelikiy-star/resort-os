@@ -2,7 +2,9 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { getLocales } from 'expo-localization';
 import { AppState } from 'react-native';
 import { apiFor, dropApi } from '../api/factory';
-import { DEMO_HOTELS, HotelConnection, hotelConnectionId, parseHotelAddress } from '../api/hotels';
+import { createRealApi } from '../api/realApi';
+import { flushPendingCookieLogouts, hasUnrevokedCookieForHost, queueCookieLogout } from '../lib/pendingLogout';
+import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
 import type { AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
@@ -55,7 +57,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
           const h = item as Partial<HotelConnection>;
           if (h.demo !== false || typeof h.baseUrl !== 'string') continue;
           const parsed = parseHotelAddress(h.baseUrl);
-          if (!parsed.ok) continue;
+          if (!parsed.ok || !isTrustedHotelOrigin(parsed.baseUrl)) continue;
           const id = hotelConnectionId(parsed.baseUrl);
           const host = new URL(parsed.baseUrl).hostname;
           if (known.has(id) || hosts.has(host) || extra.length >= 20) continue;
@@ -110,18 +112,35 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     return () => sub.remove();
   }, [hotel, api, user]);
 
+  // Retry an unfinished logout on startup / foreground; no user data is
+  // exposed while the OS cookie may still exist. A signed app trust anchor
+  // must approve the target origin before any automatic request.
+  useEffect(() => {
+    const tryRevoke = () => {
+      void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+    };
+    tryRevoke();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') tryRevoke();
+    });
+    return () => sub.remove();
+  }, []);
+
   const setLocale = useCallback((l: Locale) => { initI18n(l); setLocaleState(l); void setItem('marina.locale', l); }, []);
   const selectHotel = useCallback((id: string | null) => {
     // A hotel switch is a security boundary: do not reuse an earlier user
     // session merely because the device previously opened that property.
     if (id === hotelId) return;
+    const candidate = hotels.find(h => h.id === id);
+    if (candidate && !candidate.demo && !isTrustedHotelOrigin(candidate.baseUrl)) return;
     sessionRevision.current++;
     loginAttempt.current++;
     if (hotelId) dropApi(hotelId);
     setSessions({});
     setHotelId(id);
-  }, [hotelId]);
+  }, [hotelId, hotels]);
   const addHotel = useCallback((h: HotelConnection) => {
+    if (h.demo || !isTrustedHotelOrigin(h.baseUrl)) throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
     setHotels((cur) => {
       // Cookies are held in the native OS cookie jar, which is shared by
       // /api/v1 and /core/api/v1 on the same host. Avoid presenting both
@@ -166,8 +185,20 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
 
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
+    if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) throw new ApiError('FORBIDDEN', 'Untrusted hotel address');
     const revision = sessionRevision.current;
     const attempt = ++loginAttempt.current;
+    if (!hotel.demo) {
+      // A cookie from a previous offline sign-out could still be active.
+      // Revoke it before sending fresh credentials to the same host.
+      await flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+      if (await hasUnrevokedCookieForHost(hotel.baseUrl)) {
+        throw new ApiError('PENDING_LOGOUT', 'Previous server logout is still pending');
+      }
+    }
+    // Switching hotel or signing out while a pending logout is reconciled
+    // must invalidate this in-flight login BEFORE submitting credentials.
+    if (sessionRevision.current !== revision || loginAttempt.current !== attempt) throw new ApiError('UNAUTHORIZED', 'Session context changed');
     const signedIn = await api.login(username, password);
     // A native cookie may not persist after a successful login response.
     // Confirm that subsequent authenticated requests resolve to the SAME user.
@@ -186,14 +217,24 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel || !api) return;
     sessionRevision.current++;
     loginAttempt.current++;
-    try {
-      await api.logout();
-    } catch {
-      // A failed network logout must not leave employee data visible locally.
-      // The server session may remain valid until it expires/revocation.
-    } finally {
-      dropApi(hotel.id);
-      setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
+    let queued = hotel.demo;
+    if (!hotel.demo) {
+      try { await queueCookieLogout(hotel.baseUrl); queued = true; }
+      catch { /* local clearance still takes priority */ }
+    }
+    // Clear on-device identity immediately; never await network to sign out.
+    dropApi(hotel.id);
+    setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
+    if (hotel.demo) {
+      try { await api.logout(); } catch { /* isolated demo only */ }
+    } else if (queued) {
+      // Retry asynchronously here, at next app foreground and before sign-in.
+      // A pending entry is only removed after the server confirms logout.
+      void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+    } else if (isTrustedHotelOrigin(hotel.baseUrl)) {
+      // If durable queueing failed, still attempt an immediate remote revoke.
+      // This cannot guarantee a revoke after process termination.
+      void api.logout().catch(() => {});
     }
   }, [hotel, api]);
 

@@ -16,7 +16,7 @@ export interface Task {
   assigned_to_id: string | null; assigned_to_name?: string | null; due_label?: string;
 }
 export interface Room {
-  id: string; code: string; floor: number; state: RoomState;
+  id: string; code: string; floor: number | null; state: RoomState;
   guest?: string | null; checkout?: string | null; arrival?: string | null; note?: string | null;
 }
 export interface StaffMember { id: string; display_name: string; role: Role; open_tasks: number; active?: boolean }
@@ -25,7 +25,7 @@ export interface NewMaintenance { room_id: string | null; category: string; prio
 export interface HousekeepingReport { checklist: Record<string, boolean>; comment?: string }
 
 export class ApiError extends Error {
-  constructor(public code: 'OFFLINE' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'UNAUTHORIZED' | 'BAD_REQUEST' | 'UNKNOWN', message?: string) {
+  constructor(public code: 'OFFLINE' | 'FORBIDDEN' | 'NOT_FOUND' | 'CONFLICT' | 'UNAUTHORIZED' | 'BAD_REQUEST' | 'RATE_LIMIT' | 'PENDING_LOGOUT' | 'UNKNOWN', message?: string) {
     super(message ?? code);
   }
 }

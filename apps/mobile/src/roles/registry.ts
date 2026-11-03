@@ -35,21 +35,25 @@ const LIVE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
 };
 const MODULE: Record<TabKey, string | null> = {
   overview: 'DASHBOARD', reception: 'RESERVATIONS', pms: 'PMS', inbox: 'WHATSAPP',
-  dining: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'OPS', profile: null,
+  dining: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'STAFF', profile: null,
 };
 /** UI visibility is only a convenience. Every endpoint still enforces hard role, property and custom module grants. */
 export function workspaceForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): Workspace {
   if (mode === 'DEMO') return workspaceFor(role);
   const candidates = LIVE_TABS[role];
   if (!candidates || !Array.isArray(permissions)) return FIELD;
-  const tabs = candidates.filter((tab) => !MODULE[tab] || permissions.includes(MODULE[tab]!));
+  const tabs = candidates.filter((tab) => {
+    if (tab === 'inbox') return permissions.includes('WHATSAPP') || (role !== 'RECEPTION' && permissions.includes('INBOX'));
+    if (tab === 'admin') return permissions.includes('OPS') && permissions.includes('STAFF');
+    return !MODULE[tab] || permissions.includes(MODULE[tab]!);
+  });
   const ops = permissions.includes('OPS');
   const manager = role === 'OWNER' || role === 'MANAGER';
   return {
     tabs: tabs.length ? [...tabs] : ['profile'],
     taskTypes: ops ? workspaceFor(role).taskTypes : [],
     canCreateMaintenance: ops && workspaceFor(role).canCreateMaintenance,
-    canManage: ops && manager,
+    canManage: ops && permissions.includes('STAFF') && manager,
     canSetRoomState: ops && manager,
     mobileReady: tabs.some((tab) => tab !== 'profile'),
   };
