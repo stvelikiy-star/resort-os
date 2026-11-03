@@ -551,6 +551,49 @@ def main():
         assert canonical_client.get(hold_path).json()['holds'] == []
         assert canonical_client.post(path_preview, json=hold_booking(
             'b',start=sweep_start,end=sweep_end)).json()['can_commit']
+        # Competing writes for the same room on the same dates must produce
+        # exactly one winning active inventory block, never a double booking.
+        from concurrent.futures import ThreadPoolExecutor
+        race_start = (date.today() + timedelta(days=41)).isoformat()
+        race_end = (date.today() + timedelta(days=43)).isoformat()
+        owner_login('a')
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            hold_future = executor.submit(canonical_client.post, hold_path,
+                                          json=hold_payload('a',race_start,race_end))
+            book_future = executor.submit(canonical_client.post, path_commit,
+                                          json=hold_commit('a',None,race_start,race_end))
+            race_hold, race_booking = hold_future.result(), book_future.result()
+        assert sorted([race_hold.status_code, race_booking.status_code]) == [201,409], (
+            race_hold.status_code, race_hold.text, race_booking.status_code, race_booking.text)
+        async def count_race_inventory():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return await conn.fetchval("""
+                    SELECT count(*)::int FROM inventory_blocks
+                    WHERE "roomId"=$1 AND active=true
+                      AND daterange("startDate","endDate",'[)')
+                          && daterange($2::date,$3::date,'[)')
+                """, ids['room_a'], date.fromisoformat(race_start),
+                     date.fromisoformat(race_end))
+            finally:
+                await conn.close()
+        assert asyncio.run(count_race_inventory()) == 1, 'Parallel HOLD and booking created multiple active inventory blocks'
+
+        # Even without UI controls, server RBAC must keep reception and an
+        # explicitly staff-only manager outside privileged HOLD operations.
+        auth._preview_attempts.clear()
+        receptionist_signin = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-reception', password=receptionist_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert receptionist_signin.status_code == 200, receptionist_signin.text
+        assert canonical_client.get(hold_path).status_code == 403
+        assert canonical_client.post(hold_path, json=hold_payload('a')).status_code == 403
+        manager_signin = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-manager', password=manager_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert manager_signin.status_code == 200, manager_signin.text
+        assert canonical_client.get(hold_path).status_code == 403
+        assert canonical_client.post(hold_path, json=hold_payload('a')).status_code == 403
         # Shared payment, check-in and unreviewed staff ops remain unavailable.
         assert canonical_client.post(
             '/api/v1/admin/stays/reservations/'+rid_hold_b+'/check-in').status_code == 503
