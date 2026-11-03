@@ -5,13 +5,13 @@ const response = (status: number, data: unknown) => ({
 } as Response);
 describe('one safe HTTP client for realApi and LIVE modules', () => {
   it('uses cookie auth, exact prefixed endpoint, redirect refusal and abort signal', async () => {
-    const f = jest.fn(async () => response(200, { ok: true }));
+    const f = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => response(200, { ok: true }));
     const api = createHotelHttpClient('https://hotel.example/core', f as unknown as typeof fetch);
     await api.request('GET', '/api/v1/auth/me');
     expect(f).toHaveBeenCalledTimes(1);
     expect(f.mock.calls[0][0]).toBe('https://hotel.example/core/api/v1/auth/me');
     expect(f.mock.calls[0][1]).toMatchObject({ credentials:'include', redirect:'error' });
-    expect(f.mock.calls[0][1].signal).toBeTruthy();
+    expect(f.mock.calls[0]?.[1]?.signal).toBeTruthy();
   });
   it('never retries a mutation, even on 503 or lost response', async () => {
     const f = jest.fn(async () => response(503, {}));
