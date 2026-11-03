@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -17,9 +17,8 @@ export default function Connect() {
   const router = useRouter();
   const { hotelAddress } = useLocalSearchParams<{ hotelAddress?: string }>();
   const { hotels, addHotel, selectHotel, locale, setLocale } = useSession();
-  const [addr, setAddr] = useState('');
+  const [addr, setAddr] = useState(typeof hotelAddress === 'string' ? hotelAddress : '');
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (typeof hotelAddress === 'string') setAddr(hotelAddress); }, [hotelAddress]);
 
   const open = (id: string) => { selectHotel(id); router.push('/login'); };
   const add = () => {
