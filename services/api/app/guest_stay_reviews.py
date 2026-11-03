@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
 from .hotel_rules import load_rules
-from .guest_os import PROPERTY_CODE
 
 router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-stay-review"])
 
@@ -56,8 +55,11 @@ async def guest_review_links(
     from urllib.parse import urlsplit
 
     async with request.app.state.db.acquire() as conn:
-        await authorized_context(conn, token, tc_guest_session)
-        data = await load_rules(conn, PROPERTY_CODE)
+        qr, _, _ = await authorized_context(conn, token, tc_guest_session)
+        property_code = await conn.fetchval('SELECT code FROM properties WHERE id=$1', qr["propertyId"])
+        if not property_code:
+            raise HTTPException(status_code=404, detail="Hotel is not loaded")
+        data = await load_rules(conn, property_code)
     approved_hosts = {
         "google.com", "www.google.com", "maps.google.com", "maps.app.goo.gl",
         "2gis.kg", "2gis.ru", "go.2gis.com", "2gis.com", "www.2gis.kg",

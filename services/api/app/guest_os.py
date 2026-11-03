@@ -14,7 +14,7 @@ import qrcode.image.svg
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 PUBLIC_BASE_URL = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "https://3korony.com").rstrip("/")
@@ -71,8 +71,9 @@ def client_key_hash(request: Request) -> str:
     return hashlib.sha256(f"{host}|{agent}".encode("utf-8")).hexdigest()
 
 
-async def property_context(conn):
-    prop = await conn.fetchrow('SELECT id,code,name,timezone FROM properties WHERE code=$1', PROPERTY_CODE)
+async def property_context(conn, user):
+    property_id = await trusted_property_id(conn, user)
+    prop = await conn.fetchrow('SELECT id,code,name,timezone FROM properties WHERE id=$1', property_id)
     if not prop:
         raise HTTPException(status_code=503, detail="Property not loaded")
     return prop
@@ -265,7 +266,7 @@ async def issue_room_qr(conn, *, property_id: uuid.UUID, room_id: uuid.UUID, roo
 @admin_router.get("/room-qrs")
 async def list_room_qrs(request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn)
+        prop = await property_context(conn, user)
         rows = await conn.fetch(
             '''
             SELECT room.id AS room_id,room.code AS room_code,room."bedConfiguration",
@@ -300,7 +301,7 @@ async def list_room_qrs(request: Request, user: dict[str, object] = Depends(admi
 async def issue_qr(room_id: uuid.UUID, request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn)
+            prop = await property_context(conn, user)
             room = await conn.fetchrow('SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', room_id, prop["id"])
             if not room:
                 raise HTTPException(status_code=404, detail="Room not found")
@@ -321,7 +322,7 @@ async def issue_qr(room_id: uuid.UUID, request: Request, user: dict[str, object]
 async def rotate_qr(room_id: uuid.UUID, request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn)
+            prop = await property_context(conn, user)
             room = await conn.fetchrow('SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', room_id, prop["id"])
             if not room:
                 raise HTTPException(status_code=404, detail="Room not found")
@@ -347,7 +348,7 @@ async def rotate_qr(room_id: uuid.UUID, request: Request, user: dict[str, object
 async def issue_missing_qrs(payload: BatchIssuePayload, request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn)
+            prop = await property_context(conn, user)
             rooms = await conn.fetch(
                 '''
                 SELECT room.id,room.code,
