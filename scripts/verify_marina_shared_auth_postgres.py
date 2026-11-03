@@ -251,13 +251,55 @@ def main():
         assert worker_b_login.status_code == 200, worker_b_login.text
         assert canonical_client.get('/api/v1/auth/me').json()['property_code'] == 'HOTEL_B'
         owner_login('a')
+        manager_password = 'ManagerA-'+secrets.token_urlsafe(20)
         manager = canonical_client.post('/api/v1/admin/staff', json=dict(
             username='synthetic-manager', display_name='Synthetic Manager A',
-            password='ManagerA-'+secrets.token_urlsafe(20), role='MANAGER'))
+            password=manager_password, role='MANAGER'))
         assert manager.status_code == 201, manager.text
         manager_id = manager.json()['id']
         assert canonical_client.patch('/api/v1/admin/staff/'+manager_id,
                                       json={'module_permissions':['STAFF']}).status_code == 200
+        manager_login = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-manager', password=manager_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert manager_login.status_code == 200, manager_login.text
+        manager_token = canonical_client.cookies.get(auth.SESSION_COOKIE)
+        manager_overview = canonical_client.get('/api/v1/admin/staff/overview')
+        assert manager_overview.status_code == 200, manager_overview.text
+        assert manager_overview.json()['can_manage_access'] is False
+        assert canonical_client.post('/api/v1/admin/staff', json=dict(
+            username='forbidden-manager-create', display_name='Forbidden Manager Create',
+            password=manager_password, role='MAID')).status_code == 403
+        assert canonical_client.patch('/api/v1/admin/staff/'+worker_a_id,
+                                      json={'active':True}).status_code == 403
+
+        owner_login('a')
+        assert canonical_client.patch('/api/v1/admin/staff/'+manager_id,
+                                      json={'module_permissions':[]}).status_code == 200
+        assert canonical_client.get('/api/v1/auth/me', headers={
+            'Cookie': auth.SESSION_COOKIE+'='+manager_token}).status_code == 401
+        manager_login = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-manager', password=manager_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert manager_login.status_code == 200
+        assert canonical_client.get('/api/v1/admin/staff/overview').status_code == 403
+
+        owner_login('a')
+        receptionist_password = 'ReceptionA-'+secrets.token_urlsafe(20)
+        receptionist = canonical_client.post('/api/v1/admin/staff', json=dict(
+            username='synthetic-reception', display_name='Synthetic Reception A',
+            password=receptionist_password, role='RECEPTION'))
+        assert receptionist.status_code == 201, receptionist.text
+        receptionist_login = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-reception', password=receptionist_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert receptionist_login.status_code == 200
+        assert canonical_client.get('/api/v1/admin/staff/overview').status_code == 403
+        assert canonical_client.post('/api/v1/admin/staff', json=dict(
+            username='reception-forbidden', display_name='Reception Forbidden',
+            password=receptionist_password, role='MAID')).status_code == 403
+
+        owner_login('a')
         # Unreviewed operations remain blocked by the canonical boundary.
         assert canonical_client.put('/api/v1/admin/staff').status_code == 503
         assert canonical_client.delete('/api/v1/admin/staff/'+manager_id).status_code == 503
