@@ -44,6 +44,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         // Saved connections are preferences, not trusted configuration.
         // Re-validate every origin before a network client can be constructed.
         const known = new Set(DEMO_HOTELS.map((h) => h.id));
+        const hosts = new Set<string>();
         const extra: HotelConnection[] = [];
         for (const item of saved.slice(0, 50)) {
           if (!item || typeof item !== 'object') continue;
@@ -52,7 +53,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
           const parsed = parseHotelAddress(h.baseUrl);
           if (!parsed.ok) continue;
           const id = hotelConnectionId(parsed.baseUrl);
-          if (known.has(id) || extra.length >= 20) continue;
+          const host = new URL(parsed.baseUrl).hostname;
+          if (known.has(id) || hosts.has(host) || extra.length >= 20) continue;
+          hosts.add(host);
           known.add(id);
           extra.push({ id, baseUrl: parsed.baseUrl, name: id.slice(5), city: '', demo: false, accent: '#245E9A' });
         }
@@ -116,7 +119,17 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   }, [hotelId]);
   const addHotel = useCallback((h: HotelConnection) => {
     setHotels((cur) => {
-      const next = cur.some((x) => x.id === h.id) ? cur : [...cur, h];
+      // Cookies are held in the native OS cookie jar, which is shared by
+      // /api/v1 and /core/api/v1 on the same host. Avoid presenting both
+      // connections as independently authenticated hotels.
+      const host = new URL(h.baseUrl).hostname;
+      for (const previous of cur) {
+        if (!previous.demo && new URL(previous.baseUrl).hostname === host && previous.id !== h.id) {
+          dropApi(previous.id);
+        }
+      }
+      const remaining = cur.filter((x) => x.demo || new URL(x.baseUrl).hostname !== host);
+      const next = [...remaining, h];
       void setItem('marina.hotels', JSON.stringify(next.filter((x) => !x.demo)));
       return next;
     });
