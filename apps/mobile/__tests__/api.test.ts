@@ -142,6 +142,27 @@ describe('real api contract (mock fetch)', () => {
     expect(calls[0].url).toBe('https://hotel.example/api/v1/ops/tasks');
     expect(calls[1].url).toBe('https://hotel.example/api/v1/ops/tasks?limit=300');
   });
+  it('does not report committed maintenance creation as failed when read-back misses recent ticket', async () => {
+    const { f, calls } = mk([
+      { status: 201, body: { id: 'created-2', status: 'OPEN' } },
+      { status: 200, body: { items: [] } },
+    ]);
+    const api = createRealApi('https://hotel.example', f);
+    const ticket = await api.createMaintenance({ room_id: 'r2', category: 'PLUMBING', priority: 'HIGH', description: 'Fix shower' });
+    expect(ticket).toMatchObject({ id: 'created-2', type: 'MAINTENANCE', status: 'OPEN', title: 'Fix shower', priority: 'HIGH', room_id: 'r2' });
+    expect(calls.filter((x) => x.init.method === 'POST')).toHaveLength(1);
+  });
+  it('does not retry a committed create when the follow-up GET loses connectivity', async () => {
+    let calls = 0;
+    const f = (async (_url: string, init: RequestInit) => {
+      calls++;
+      if (init.method === 'POST') return { ok: true, status: 201, json: async () => ({ id: 'created-3', status: 'OPEN' }) } as Response;
+      throw new TypeError('disconnected after commit');
+    }) as typeof fetch;
+    const ticket = await createRealApi('https://hotel.example', f).createMaintenance({ room_id: null, category: 'OTHER', priority: 'LOW', description: 'Broken handle' });
+    expect(ticket.id).toBe('created-3');
+    expect(calls).toBe(2);
+  });
   it('rejects an incomplete create response rather than rendering a false task', async () => {
     const { f } = mk([{ status: 201, body: { status: 'OPEN' } }]);
     await expect(createRealApi('https://hotel.example', f).createMaintenance({
