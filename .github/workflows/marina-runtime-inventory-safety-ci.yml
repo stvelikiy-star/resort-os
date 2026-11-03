@@ -5,6 +5,8 @@ on:
     paths:
       - 'scripts/marina_runtime_inventory_readonly.py'
       - 'scripts/test_marina_runtime_inventory_readonly.py'
+      - 'scripts/marina_runtime_inventory_review.py'
+      - 'scripts/test_marina_runtime_inventory_review.py'
       - '.github/workflows/marina-runtime-inventory-safety-ci.yml'
   workflow_dispatch:
 
@@ -21,9 +23,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile read-only inventory
-        run: python -m py_compile scripts/marina_runtime_inventory_readonly.py
+        run: python -m py_compile scripts/marina_runtime_inventory_readonly.py scripts/marina_runtime_inventory_review.py
       - name: Run isolated inventory safety tests
-        run: python -m unittest discover -s scripts -p 'test_marina_runtime_inventory_readonly.py' -v
+        run: python -m unittest discover -s scripts -p 'test_marina_runtime_inventory*.py' -v
       - name: Verify no environment values are collected
         run: |
           ! grep -En 'docker.*exec|compose.*up|os\.environ|printenv|env_file|DATABASE_URL|TOKEN_INSTANCE' scripts/marina_runtime_inventory_readonly.py
