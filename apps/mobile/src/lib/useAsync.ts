@@ -32,7 +32,7 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   useEffect(() => {
     mounted.current = true;
     void run();
-    return () => { mounted.current = false; generation.current++; };
+    return () => { mounted.current = false; };
   }, [run]);
 
   return { data, error, loading, reload: run, setData };
