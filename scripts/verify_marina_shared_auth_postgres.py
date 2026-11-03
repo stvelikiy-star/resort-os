@@ -352,7 +352,7 @@ def main():
         # No unreviewed stay or payment writes through the same shared session.
         assert canonical_client.post(
             '/api/v1/admin/stays/reservations/'+rid_a+'/check-in').status_code == 503
-        assert canonical_client.post('/api/v1/admin/pms/holds', json={}).status_code == 503
+        assert canonical_client.post('/api/v1/admin/pms/holds', json={}).status_code == 422  # now enabled; invalid payload rejected
 
         owner_login('b')
         foreign_cancel = canonical_client.post(
