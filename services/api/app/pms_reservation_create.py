@@ -420,7 +420,7 @@ async def commit_grid_reservation(
                     if is_agent:
                         raise HTTPException(status_code=403, detail={"code": "AGENT_HOLD_CONFIRM_FORBIDDEN"})
                     from .pms_holds import expire_holds
-                    await expire_holds(conn)
+                    await expire_holds(conn, prop["id"])
                     held = await conn.fetchrow("""
                         SELECT "roomId","inventoryBlockId","checkIn","checkOut",
                                "guestName","guestPhone","releasedAt","confirmedReservationId","expiresAt"

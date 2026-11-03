@@ -36,6 +36,42 @@ class HoldContractTests(unittest.TestCase):
         self.assertIn('payload.check_in < local_today', api)
         self.assertNotIn('payload.check_out <= local_today', api)
 
+    def test_hold_uses_authenticated_property_boundary(self):
+        api = (ROOT / "services/api/app/pms_holds.py").read_text()
+        auth = (ROOT / "services/api/app/auth.py").read_text()
+        self.assertIn("from .auth import require_roles, trusted_property_id", api)
+        self.assertIn("return await trusted_property_id(conn, user)", api)
+        self.assertNotIn('SELECT id FROM properties WHERE code=$1', api)
+        self.assertIn("async def trusted_property_id(conn, user:", auth)
+        for route in ("create_hold", "list_holds", "get_hold", "release_hold"):
+            handler = api.split(f"async def {route}(", 1)[1]
+            self.assertIn("await property_id(conn, user)", handler.split("\n\n@", 1)[0])
+
+    def test_expiry_never_mutates_another_hotel(self):
+        api = (ROOT / "services/api/app/pms_holds.py").read_text()
+        commit = (ROOT / "services/api/app/pms_reservation_create.py").read_text()
+        self.assertIn("async def expire_holds(conn, property_id: uuid.UUID):", api)
+        expire_body = api.split("async def expire_holds(", 1)[1].split("\n\nasync def property_id(", 1)[0]
+        self.assertIn('WHERE h."propertyId"=$1', expire_body)
+        self.assertIn('FOR UPDATE SKIP LOCKED', expire_body)
+        self.assertIn('""", property_id)', expire_body)
+        self.assertEqual(api.count("await expire_holds(conn, prop)"), 3)
+        self.assertIn('await expire_holds(conn, prop["id"])', commit)
+        self.assertNotIn("await expire_holds(conn)", api + commit)
+
+    def test_background_worker_uses_only_pinned_hotel(self):
+        db = (ROOT / "services/api/app/db.py").read_text()
+        self.assertIn(
+            "from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, PROPERTY_CODE", db
+        )
+        self.assertIn("if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:", db)
+        self.assertIn(
+            "'SELECT id FROM properties WHERE code=$1', PROPERTY_CODE", db
+        )
+        self.assertIn("await expire_holds(conn, property_id)", db)
+        self.assertNotIn("await expire_holds(conn)", db)
+        self.assertIn("await asyncio.sleep(30)", db)
+
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()
         grid = (ROOT / "apps/admin/components/PMSOwnerGrid.tsx").read_text()
