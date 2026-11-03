@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { getLocales } from 'expo-localization';
+import { AppState } from 'react-native';
 import { apiFor, dropApi } from '../api/factory';
 import { DEMO_HOTELS, HotelConnection, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
@@ -62,6 +63,44 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const hotel = hotels.find((h) => h.id === hotelId) ?? null;
   const user = hotel ? sessions[hotel.id] ?? null : null;
   const api = hotel ? apiFor(hotel) : null;
+
+  useEffect(() => {
+    if (!hotel || !api || !user || api.mode !== 'LIVE') return;
+    const revision = sessionRevision.current;
+    let checking = false;
+    const verifySession = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const verified = await api.me();
+        if (sessionRevision.current !== revision) return;
+        if (!verified || verified.id !== user.id || verified.property_code !== user.property_code) {
+          sessionRevision.current++;
+          dropApi(hotel.id);
+          setSessions((current) => { const next = { ...current }; delete next[hotel.id]; return next; });
+          return;
+        }
+        // Permission or role changes on the PMS become visible when the app resumes.
+        setSessions((current) => current[hotel.id]
+          ? { ...current, [hotel.id]: verified }
+          : current);
+      } catch (e) {
+        if (sessionRevision.current !== revision) return;
+        if (e instanceof ApiError && (e.code === 'UNAUTHORIZED' || e.code === 'FORBIDDEN')) {
+          sessionRevision.current++;
+          dropApi(hotel.id);
+          setSessions((current) => { const next = { ...current }; delete next[hotel.id]; return next; });
+        }
+        // Do not mistake a temporary network outage for an explicit revocation.
+      } finally {
+        checking = false;
+      }
+    };
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void verifySession();
+    });
+    return () => sub.remove();
+  }, [hotel, api, user?.id, user?.property_code]);
 
   const setLocale = useCallback((l: Locale) => { setLocaleState(l); void setItem('marina.locale', l); }, []);
   const selectHotel = useCallback((id: string | null) => {
