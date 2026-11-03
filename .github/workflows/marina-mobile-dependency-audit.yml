@@ -70,3 +70,47 @@ jobs:
             /tmp/marina-mobile-fix.log
           retention-days: 7
           if-no-files-found: warn
+
+  scoped-expo-compat-probe:
+    name: Scoped Expo tooling security patch compatibility (temporary)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Construct isolated Expo-only override candidate
+        run: |
+          npm pkg set 'overrides.@expo/cli.glob=^14.0.2' 'overrides.@expo/config.glob=^14.0.2' 'overrides.@expo/config-plugins.glob=^14.0.2' 'overrides.@expo/fingerprint.glob=^14.0.2' 'overrides.@expo/fingerprint.minimatch=^11.0.1' 'overrides.@expo/metro-config.glob=^14.0.2'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --stat -- package.json package-lock.json
+          git diff -- package.json package-lock.json > /tmp/marina-mobile-expo-tooling-candidate.patch
+      - name: Verify Expo SDK and toolchain still work
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          npm run typecheck
+          npm run lint
+          npm test -- --ci --runInBand
+          npm run web:export
+      - name: Capture remaining vulnerabilities after scoped override
+        if: always()
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-expo-scoped-audit.json || true
+          node -e "const a=require('/tmp/marina-mobile-expo-scoped-audit.json'); console.log('EXPO_SCOPED_AFTER:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+      - name: Store unmerged review files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-expo-scoped-compat
+          path: |
+            /tmp/marina-mobile-expo-tooling-candidate.patch
+            /tmp/marina-mobile-expo-scoped-audit.json
+          retention-days: 7
+          if-no-files-found: warn
