@@ -13,6 +13,8 @@ import Profile from '../app/(app)/profile';
 import TaskDetail from '../app/task/[id]';
 import RoomCard from '../app/room/[id]';
 import NewRequest from '../app/new-request';
+import { apiFor } from '../src/api/factory';
+import { DEMO_HOTELS } from '../src/api/hotels';
 
 jest.mock('react-native-safe-area-context', () => {
   const actual = jest.requireActual('react-native-safe-area-context');
@@ -107,6 +109,22 @@ describe('navigation, guards and screens', () => {
     await fireEvent.press(task);
     await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
     await waitFor(() => expect(screen.queryByTestId('assign-u-maid2')).toBeNull(), { timeout: 4000 });
+  });
+
+  it('does not create a second maintenance ticket after successful submission', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('quick-new-request', {}, { timeout: 4000 }));
+    await fireEvent.changeText(await screen.findByTestId('mt-text', {}, { timeout: 4000 }), 'Broken water valve');
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'createMaintenance');
+    try {
+      const submit = screen.getByTestId('mt-send');
+      await fireEvent.press(submit);
+      await screen.findByTestId('mt-msg', {}, { timeout: 4000 });
+      await fireEvent.press(submit);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('waiter has no operational workspace (profile only)', async () => {
