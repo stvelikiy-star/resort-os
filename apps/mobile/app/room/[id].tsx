@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react-native';
 import { Card, Empty, PressScale, Screen, SectionLabel, Title, toneColors } from '../../src/components/ui';
@@ -22,9 +22,11 @@ export default function RoomCard() {
   const { api, user } = useSession();
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState(false);
-  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
-  const room = useAsync<Room | null>(async () => (await api!.listRooms()).find((r) => r.id === id) ?? null, [api, id]);
-  const tasks = useAsync<Task[]>(async () => (await api!.listTasks()).filter((x) => x.room_id === id && x.status !== 'DONE' && x.status !== 'CANCELLED'), [api, id]);
+  const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE');
+  const room = useAsync<Room | null>(async () => user && api && ws.mobileReady ? (await api.listRooms()).find((r) => r.id === id) ?? null : null, [api, id, user?.id]);
+  const tasks = useAsync<Task[]>(async () => user && api && ws.mobileReady ? (await api.listTasks()).filter((x) => x.room_id === id && x.status !== 'DONE' && x.status !== 'CANCELLED') : [], [api, id, user?.id]);
+  if (!user || !api) return <Redirect href="/connect" />;
+  if (!ws.mobileReady) return <Redirect href="/profile" />;
   if (room.error) return <Screen><Card onPress={room.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card></Screen>;
   if (!room.data) return <Screen><Empty text={room.loading ? t('common.loading') : t('errors.notFound')} /></Screen>;
   const r = room.data;
