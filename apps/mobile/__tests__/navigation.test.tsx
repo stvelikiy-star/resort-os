@@ -49,6 +49,18 @@ async function loginAs(role: string) {
 }
 
 describe('navigation, guards and screens', () => {
+  it('browser demo can open manager workspace without username or password', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/connect' });
+    await fireEvent.press(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 }));
+    expect(await screen.findByTestId('tab-admin', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('task-t1', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('unauthenticated direct profile link goes to hotel selection, not empty settings', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/profile' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
   it('unauthenticated users land on hotel connection with demo banner', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/tasks' });
     await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 });
