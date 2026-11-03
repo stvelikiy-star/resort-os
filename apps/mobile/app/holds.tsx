@@ -30,7 +30,7 @@ export default function Holds() {
   const mutation = async (run: () => Promise<unknown>) => {
     if (lock.current || unknown) return;
     lock.current=true; setBusy(true); setErrorMessage(null);
-    try { await run(); await reload(); setUnknown(true); }
+    try { await run(); await reload(); setUnknown(false); setErrorMessage(copy.confirmed); }
     catch(e) { setUnknown(true); setErrorMessage(e instanceof Error ? e.message : copy.unknown); }
     finally { lock.current=false; setBusy(false); }
   };

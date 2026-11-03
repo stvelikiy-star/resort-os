@@ -95,6 +95,6 @@ export default function NewBooking() {
     </Card> : null}
     {result ? <Card><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text></Card> : null}
     {error ? <Card><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{error}</Text></Card> : null}
-    {unknown ? <Text style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text> : null}
+    {unknown && !result ? <Text style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text> : null}
   </Screen>;
 }

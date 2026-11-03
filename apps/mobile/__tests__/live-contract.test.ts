@@ -4,7 +4,7 @@ import { ApiError } from '../src/api/types';
 describe('verified mobile live API boundaries', () => {
   const payload = (v: unknown, status = 200) => ({ ok: status < 400, status, json: async () => v }) as Response;
   it('uses the existing /core proxy exactly once with cookie credentials', async () => {
-    const transport = jest.fn(async () => payload({ items: [] }));
+    const transport = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => payload({ items: [] }));
     const api = createLiveModules('https://hotel.example/core', transport as unknown as typeof fetch);
     expect(await api.conversations(true)).toEqual([]);
     expect(transport).toHaveBeenCalledTimes(1);
