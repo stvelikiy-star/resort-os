@@ -13,6 +13,35 @@ assert os.environ.get('MARINA_TENANT_CONTEXT_ENABLED', 'false').lower() == 'fals
 from services.api.app import whatsapp_connection
 print('PRIVATE_HOTEL_SCOPE_OK')
 PY
+# BOOTSTRAP_OWNER_* is an initial seed, not a current account credential.
+# Validate the operator's current OWNER login before writing config or restarting.
+if [[ -z "${MARINA_GREEN_CHECK_USERNAME:-}" ]]; then
+  read -r -p 'Действующий логин собственника основной MARINA: ' MARINA_GREEN_CHECK_USERNAME </dev/tty
+fi
+if [[ -z "${MARINA_GREEN_CHECK_PASSWORD:-}" ]]; then
+  read -r -s -p 'Пароль этого собственника (ввод скрыт): ' MARINA_GREEN_CHECK_PASSWORD </dev/tty
+  printf '\n' >/dev/tty
+fi
+export MARINA_GREEN_CHECK_USERNAME MARINA_GREEN_CHECK_PASSWORD
+trap 'unset MARINA_GREEN_CHECK_USERNAME MARINA_GREEN_CHECK_PASSWORD' EXIT
+"${base[@]}" exec -T -e MARINA_GREEN_CHECK_USERNAME -e MARINA_GREEN_CHECK_PASSWORD api python - <<'PY'
+import json, os, sys, urllib.error, urllib.request
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+payload = {'username': os.environ['MARINA_GREEN_CHECK_USERNAME'], 'password': os.environ['MARINA_GREEN_CHECK_PASSWORD']}
+request = urllib.request.Request('http://127.0.0.1:8000/api/v1/auth/login', data=json.dumps(payload).encode(), headers={'Content-Type':'application/json'})
+try:
+    opener = urllib.request.build_opener(NoRedirect())
+    with opener.open(request, timeout=20) as response:
+        who = json.load(response)
+except urllib.error.HTTPError as error:
+    print(f'OWNER_LOGIN_FAILED: HTTP {error.code}; configuration unchanged', file=sys.stderr)
+    sys.exit(1)
+if who.get('role') != 'OWNER' or who.get('property_code') != 'MARINA_HOTEL01':
+    sys.exit('OWNER_LOGIN_FAILED: a hotel01 OWNER is required; configuration unchanged')
+print('OWNER_LOGIN_OK')
+PY
 container=$("${base[@]}" ps -q api)
 test -n "$container"
 image=$(docker inspect --format '{{.Image}}' "$container")
@@ -24,7 +53,7 @@ chmod 700 "$secret_dir"
 secret="$secret_dir/hotel01-green.env"
 overlay=.marina-hotel01-green.yaml
 previous=$(mktemp -d)
-trap 'rm -rf "$previous"' EXIT
+trap 'unset MARINA_GREEN_CHECK_USERNAME MARINA_GREEN_CHECK_PASSWORD; rm -rf "$previous"' EXIT
 had_secret=false
 had_overlay=false
 if [[ -f "$secret" ]]; then cp "$secret" "$previous/secret"; had_secret=true; fi
@@ -65,7 +94,7 @@ rollback() {
 trap rollback ERR
 "${compose[@]}" config --quiet
 "${compose[@]}" up -d --no-deps --no-build --pull never --wait api
-"${compose[@]}" exec -T api python - <<'PY'
+"${compose[@]}" exec -T -e MARINA_GREEN_CHECK_USERNAME -e MARINA_GREEN_CHECK_PASSWORD api python - <<'PY'
 import http.cookiejar, json, os, urllib.request
 assert os.environ['PROPERTY_CODE'] == 'MARINA_HOTEL01'
 cookies = http.cookiejar.CookieJar()
@@ -82,7 +111,7 @@ def call(path, payload=None):
         req.add_header('Cookie', '; '.join(f'{c.name}={c.value}' for c in cookies))
     with opener.open(req, timeout=45) as response:
         return json.load(response)
-who = call('/auth/login', {'username':os.environ['BOOTSTRAP_OWNER_USERNAME'], 'password':os.environ['BOOTSTRAP_OWNER_PASSWORD']})
+who = call('/auth/login', {'username':os.environ['MARINA_GREEN_CHECK_USERNAME'], 'password':os.environ['MARINA_GREEN_CHECK_PASSWORD']})
 assert who['property_code'] == 'MARINA_HOTEL01' and who['role'] == 'OWNER'
 state = call('/admin/whatsapp/connection')
 assert state.get('configured') is True
