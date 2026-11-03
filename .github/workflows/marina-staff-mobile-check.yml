@@ -12,6 +12,11 @@ on:
     paths:
       - 'apps/mobile/**'
       - '.github/workflows/marina-staff-mobile-check.yml'
+# Do not waste Android runners rebuilding superseded commits in the same PR.
+# Keep unrelated project workflows and branches completely independent.
+concurrency:
+  group: marina-staff-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
