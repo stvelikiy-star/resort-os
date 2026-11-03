@@ -4,7 +4,8 @@ import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { LogOut, Repeat } from 'lucide-react-native';
 import Constants from 'expo-constants';
-import { Button, Card, DemoBanner, Screen, SectionLabel, Segmented, Title } from '../../src/components/ui';
+import { Button, DemoBanner, SectionLabel, Segmented } from '../../src/components/ui';
+import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
 import { useTheme, ThemePref } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
@@ -23,16 +24,16 @@ export default function Profile() {
     </View>
   );
   return (
-    <Screen>
-      <Title sub={user?.username}>{user?.display_name}</Title>
+    <FutureScreen>
+      <PremiumHeader title={user.display_name} subtitle={user.username} eyebrow="MARINA SMART"/>
       {hotel?.demo ? <DemoBanner /> : null}
-      <Card>
+      <GlassCard>
         {row(t('profile.hotel'), hotel?.name ?? '')}
         {row(t('profile.role'), user ? t(`roles.${user.role}`) : '')}
         {row(t('profile.mode'), hotel?.demo ? t('profile.modeDemo') : t('profile.modeLive'))}
-        {row(t('profile.version'), String(Constants.expoConfig?.version ?? '0.1.0'))}
-      </Card>
-      {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE').mobileReady ? <Card testID="role-soon"><Text style={[font.body, { color: c.textMuted }]}>{t('profile.roleSoon')}</Text></Card> : null}
+        {row(t('profile.version'), String(Constants.expoConfig?.version ?? '0.2.0'))}
+      </GlassCard>
+      {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE').mobileReady ? <GlassCard testID="role-soon"><Text style={[font.body, { color: c.textMuted }]}>{t('profile.roleSoon')}</Text></GlassCard> : null}
       <SectionLabel>{t('profile.language')}</SectionLabel>
       <Segmented<Locale> value={locale} onChange={setLocale} options={LOCALES.map((l) => ({ key: l, label: LOCALE_LABEL[l] }))} />
       <SectionLabel>{t('profile.theme')}</SectionLabel>
@@ -41,6 +42,6 @@ export default function Profile() {
         <Button label={t('profile.switchHotel')} icon={Repeat} variant="secondary" onPress={() => { leaveHotel(); router.replace('/connect'); }} />
         <Button testID="sign-out" label={t('profile.signOut')} icon={LogOut} variant="danger" onPress={async () => { await signOut(); router.replace('/login'); }} />
       </View>
-    </Screen>
+    </FutureScreen>
   );
 }
