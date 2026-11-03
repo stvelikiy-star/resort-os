@@ -267,6 +267,129 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                 wrong = httpx.post(f"http://127.0.0.1:{PORTS[foreign]}/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[index]})
                 assert wrong.status_code == 401, "Foreign password authenticated wrong property"
         print("MARINA_CROSS_PROPERTY_SESSION_PASSWORD_PASS")
+        # Real HTTP checks against property-pinned APIs and disposable PostgreSQL.
+        # Two concurrent requests for one room must produce exactly one HOLD.
+        from concurrent.futures import ThreadPoolExecutor
+        start, end = date.today() + timedelta(days=14), date.today() + timedelta(days=16)
+        async def hold_rooms():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return [
+                    str(await conn.fetchval(
+                        'SELECT r.id FROM rooms r JOIN properties p ON p.id=r."propertyId" '
+                        'WHERE p.code=$1 AND r."operationalState" <> \'TECH_BLOCK\' '
+                        'AND NOT EXISTS (SELECT 1 FROM inventory_blocks b WHERE b."roomId"=r.id AND b.active '
+                        'AND daterange(b."startDate",b."endDate",\'[)\') && daterange($2::date,$3::date,\'[)\')) '
+                        'ORDER BY r.code LIMIT 1', code, start, end
+                    )) for code in CODES
+                ]
+            finally:
+                await conn.close()
+        room_ids = asyncio.run(hold_rooms())
+        assert all(room_id != "None" for room_id in room_ids), "Synthetic HOLD room missing"
+        check_in, check_out = start.isoformat(), end.isoformat()
+        payload = {"room_id": room_ids[0], "check_in": check_in, "check_out": check_out,
+                   "guest_name": "Synthetic Hold Guest", "guest_phone": "+996700111222"}
+        with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}") as client:
+            login = client.post("/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[0]})
+            assert login.status_code == 200, f"HOLD owner login failed: {login.status_code}"
+            token = client.cookies.get("resort_session")
+            assert token, "HOLD owner session cookie missing"
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                calls = [executor.submit(httpx.post, f"http://127.0.0.1:{PORTS[0]}/api/v1/admin/pms/holds",
+                        json=payload, cookies={"resort_session": token}, timeout=15) for _ in range(2)]
+                responses = [future.result() for future in calls]
+            codes = sorted(response.status_code for response in responses)
+            assert codes == [201, 409], f"Concurrent HOLD requests failed safety gate: {codes} {[r.text[:500] for r in responses]}"
+            held = next(response.json() for response in responses if response.status_code == 201)
+            # Authenticate independently as the owner of the *other* hotel:
+            # an invalid foreign cookie alone would not prove tenant isolation.
+            with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}") as other_hotel:
+                second_login = other_hotel.post("/api/v1/auth/login",
+                    json={"username": USERNAME, "password": PASSWORDS[1]})
+                assert second_login.status_code == 200, "Second hotel owner login failed"
+                foreign = other_hotel.get(f"/api/v1/admin/pms/holds/{held['id']}")
+                assert foreign.status_code == 404, (
+                    f"Authenticated owner of hotel B could inspect hotel A HOLD: {foreign.status_code}"
+                )
+                forbidden_release = other_hotel.delete(f"/api/v1/admin/pms/holds/{held['id']}")
+                assert forbidden_release.status_code == 404, (
+                    f"Authenticated owner of hotel B could release hotel A HOLD: {forbidden_release.status_code}"
+                )
+            detail = client.get(f"/api/v1/admin/pms/holds/{held['id']}")
+            assert detail.status_code == 200, f"HOLD owner cannot read active HOLD: {detail.status_code}"
+            released = client.delete(f"/api/v1/admin/pms/holds/{held['id']}")
+            assert released.status_code == 200, f"HOLD release failed: {released.status_code}"
+            renewed = client.post("/api/v1/admin/pms/holds", json=payload)
+            assert renewed.status_code == 201, f"Released HOLD still blocks inventory: {renewed.status_code}"
+            renewed_id = renewed.json()["id"]
+            # Convert a real HOLD to a confirmed reservation through the same
+            # preview/commit API used by the owner chessboard.
+            preview_request = {
+                **payload, "hold_id": renewed_id, "manager_total_kgs": 9000,
+                "guest_phone": payload["guest_phone"],
+            }
+            preview = client.post("/api/v1/admin/pms/reservations/new/preview", json=preview_request)
+            assert preview.status_code == 200, f"HOLD booking preview failed: {preview.status_code} {preview.text[:500]}"
+            priced = preview.json()
+            assert priced["can_commit"], f"HOLD reservation preview unavailable: {priced}"
+            commit_request = {
+                **preview_request, "guest_name": payload["guest_name"],
+                "phone": payload["guest_phone"],
+                "expected_total_kgs": priced["pricing"]["total_kgs"],
+                "expected_pricing_source": priced["pricing"]["source"],
+            }
+            committed = client.post("/api/v1/admin/pms/reservations/new/commit", json=commit_request)
+            assert committed.status_code == 201, f"HOLD conversion failed: {committed.status_code} {committed.text[:500]}"
+            repeated = client.post("/api/v1/admin/pms/reservations/new/commit", json=commit_request)
+            assert repeated.status_code == 409, f"Confirmed HOLD converted twice: {repeated.status_code}"
+            confirmed_release = client.delete(f"/api/v1/admin/pms/holds/{renewed_id}")
+            assert confirmed_release.status_code == 409, "Confirmed HOLD was released"
+        print("MARINA_HOLD_CONCURRENT_API_TENANT_RELEASE_CONVERSION_PASS")
+        # Verify owner-managed PMS permission revocation takes effect in an
+        # already-authenticated MANAGER session without a server restart.
+        async def seed_hold_manager():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return str(await conn.fetchval("""
+                    INSERT INTO staff_users
+                      (id,"propertyId",username,"displayName","passwordHash",role,"modulePermissions","createdAt","updatedAt")
+                    SELECT $1,u."propertyId",$2,'HOLD CI Manager',u."passwordHash",'MANAGER',
+                           '["PMS"]'::jsonb,now(),now()
+                    FROM staff_users u JOIN properties p ON p.id=u."propertyId"
+                    WHERE p.code=$3 AND u.username=$4
+                    ON CONFLICT ("propertyId",username) DO UPDATE SET
+                      "modulePermissions"=EXCLUDED."modulePermissions",
+                      "passwordHash"=EXCLUDED."passwordHash",
+                      role='MANAGER',"isActive"=true,"updatedAt"=now()
+                    RETURNING id
+                """, uuid.uuid4(), "hold-ci-manager", CODES[0], USERNAME))
+            finally:
+                await conn.close()
+        manager_id = asyncio.run(seed_hold_manager())
+        assert manager_id != "None", "HOLD manager seed failed"
+        with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[0]}") as manager:
+            login = manager.post("/api/v1/auth/login",
+                                 json={"username": "hold-ci-manager", "password": PASSWORDS[0]})
+            assert login.status_code == 200, "HOLD manager login failed"
+            allowed = manager.get("/api/v1/admin/pms/holds")
+            assert allowed.status_code == 200, f"Granted PMS manager denied: {allowed.status_code}"
+            async def change_grants(value):
+                conn = await asyncpg.connect(dsn)
+                try:
+                    await conn.execute('UPDATE staff_users SET "modulePermissions"=$1::jsonb,"updatedAt"=now() WHERE id=$2',
+                                       value, uuid.UUID(manager_id))
+                finally:
+                    await conn.close()
+            asyncio.run(change_grants("[]"))
+            denied = manager.get("/api/v1/admin/pms/holds")
+            assert denied.status_code == 403, f"Revoked PMS manager retained access: {denied.status_code}"
+            asyncio.run(change_grants('["PMS"]'))
+            restored = manager.get("/api/v1/admin/pms/holds")
+            assert restored.status_code == 200, f"Regranted PMS manager denied: {restored.status_code}"
+        print("MARINA_HOLD_MANAGER_PERMISSION_REVOCATION_PASS")
+
+
         if os.environ.get("MARINA_CI_CHANNEL_IMPORT") == "true":
             subprocess.run([sys.executable, "scripts/verify_channel_reservations.py"], cwd=ROOT, env=env, check=True)
     except Exception:

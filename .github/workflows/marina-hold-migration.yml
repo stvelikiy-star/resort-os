@@ -1,0 +1,78 @@
+name: MARINA HOLD zz114 Migration and Rollback CI
+on:
+  pull_request:
+    paths:
+      - 'packages/database/prisma/migrations/zz114_marina_60minute_holds_20261029/**'
+      - '.github/workflows/marina-hold-migration.yml'
+  workflow_dispatch:
+jobs:
+  migration-restore:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hold_ci
+          POSTGRES_PASSWORD: hold_ci_only
+          POSTGRES_DB: hold_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hold_ci -d hold_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://hold_ci:hold_ci_only@localhost:5432/hold_ci?schema=public
+      PGPASSWORD: hold_ci_only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Prisma dependencies
+        run: cd packages/database && npm ci
+      - name: Apply migration chain through zz113
+        shell: bash
+        run: |
+          set -euo pipefail
+          baseline="$RUNNER_TEMP/prisma-pre-hold"
+          cp -a packages/database/prisma "$baseline"
+          rm -rf "$baseline/migrations/zz114_marina_60minute_holds_20261029"
+          (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = 38
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 0
+      - name: Snapshot previous state and install HOLD
+        run: |
+          set -euo pipefail
+          pg_dump -h localhost -U hold_ci -d hold_ci -Fc -f "$RUNNER_TEMP/backup.dump"
+          (cd packages/database && npx prisma migrate deploy --schema prisma/schema.prisma)
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 1
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 39
+      - name: Verify HOLD 60-minute database invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          expiry_default="$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT pg_get_expr(d.adbin,d.adrelid) FROM pg_attrdef d JOIN pg_attribute a ON a.attrelid=d.adrelid AND a.attnum=d.adnum WHERE d.adrelid='marina_reservation_holds'::regclass AND a.attname='expiresAt'")"
+          echo "HOLD expiry default: $expiry_default"
+          echo "$expiry_default" | grep -Eq '60 minutes|01:00:00|1 hour'
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "SELECT count(*) FROM pg_indexes WHERE tablename='marina_reservation_holds' AND indexname='marina_holds_expiry_active_idx' AND indexdef LIKE '%releasedAt%'")" = 1
+      - name: Verify synthetic HOLD overlap release and hotel isolation
+        run: psql -h localhost -U hold_ci -d hold_ci -v ON_ERROR_STOP=1 -f scripts/marina_hold_postgres_invariants.sql
+      - name: Verify upgraded database survives dump and restore
+        run: |
+          set -euo pipefail
+          pg_dump -h localhost -U hold_ci -d hold_ci -Fc -f "$RUNNER_TEMP/upgraded.dump"
+          createdb -h localhost -U hold_ci hold_upgraded_restore
+          pg_restore -h localhost -U hold_ci -d hold_upgraded_restore --exit-on-error --no-owner --no-acl "$RUNNER_TEMP/upgraded.dump"
+          for db in hold_ci hold_upgraded_restore; do
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")" = 39
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_name='marina_reservation_holds'")" = 1
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
+          done
+      - name: Verify backup restore into pristine PostgreSQL 16
+        run: |
+          set -euo pipefail
+          createdb -h localhost -U hold_ci hold_restore
+          pg_restore -h localhost -U hold_ci -d hold_restore --exit-on-error --no-owner --no-acl "$RUNNER_TEMP/backup.dump"
+          test "$(psql -h localhost -U hold_ci -d hold_restore -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 0
+          test "$(psql -h localhost -U hold_ci -d hold_restore -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 38
