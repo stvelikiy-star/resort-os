@@ -116,6 +116,37 @@ def main():
         assert me('b').status_code == 401
     print('PASS: PostgreSQL shared login, same usernames, tenant/session isolation, tampering, revocation and closed workspace boundary')
 
+    # Canonical boundary: one deliberately reviewed tenant-scoped read-only cabinet.
+    # All other operational routes remain closed until separately accepted.
+    execute('UPDATE staff_users SET "propertyId"=$1,username=\'owner\' WHERE id=$2',
+            ids['property_a'], ids['user_a'])
+    from app.manager_dashboard import router as manager_dashboard_router
+    dash_app = FastAPI(lifespan=lifespan)
+    dash_app.add_middleware(SharedAuthPreviewBoundary)
+    dash_app.include_router(auth.router)
+    dash_app.include_router(manager_dashboard_router)
+    with TestClient(dash_app, base_url='https://shared-auth.test') as dash_client:
+        for suffix, foreign in (('a','b'), ('b','a')):
+            signed_in = dash_client.post('/api/v1/auth/login', json=dict(
+                username='owner', password=passwords[suffix], tenant_code='tenant_'+suffix,
+                property_code='HOTEL_'+suffix.upper()))
+            assert signed_in.status_code == 200, 'Shared dashboard sign-in failed'
+            forged = {'X-Property-Id': str(ids['property_'+foreign]),
+                      'X-Tenant-Id': str(ids['tenant_'+foreign]), 'X-Role': 'OWNER'}
+            dashboard = dash_client.get('/api/v1/admin/dashboard', headers=forged)
+            assert dashboard.status_code == 200, dashboard.text
+            data = dashboard.json()
+            assert data['property']['code'] == 'HOTEL_'+suffix.upper()
+            assert data['rooms']['total'] == 1, 'Dashboard leaked or lost hotel room inventory'
+            assert dash_client.get('/api/v1/admin/staff', headers=forged).status_code == 503
+        execute("UPDATE staff_users SET role='WAITER' WHERE id=$1", ids['user_b'])
+        assert dash_client.get('/api/v1/admin/dashboard').status_code == 403
+        execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
+        assert dash_client.get('/api/v1/admin/dashboard').status_code == 401
+        execute("UPDATE tenants SET status='ACTIVE' WHERE id=$1", ids['tenant_b'])
+        execute("UPDATE staff_users SET role='OWNER' WHERE id=$1", ids['user_b'])
+    print('PASS: canonical shared dashboard HTTP 200 for each hotel, forged headers ignored, staff still 503, waiter 403, blocked tenant 401')
+
     # Exercise only the reviewed QR handlers in a test harness with the real
     # shared auth and one pool. The canonical application's preview boundary
     # above remains closed; this is not a general shared-workspace rollout.
