@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import { resolve } from 'node:path';
 
 /**
