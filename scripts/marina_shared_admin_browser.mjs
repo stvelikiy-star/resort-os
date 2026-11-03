@@ -8,14 +8,15 @@ if (!["localhost", "127.0.0.1"].includes(new URL(BASE).hostname)) {
   throw new Error("Shared preview browser checks must target disposable localhost only");
 }
 const profiles = {
-  HOTEL_A: { tenant: "tenant_a", user: "owner", role: "OWNER", name: "Owner A", rooms: ["A101"], sections: ["DASHBOARD","PMS","STAFF"] },
-  HOTEL_B: { tenant: "tenant_b", user: "owner", role: "OWNER", name: "Owner B", rooms: ["B202"], sections: ["DASHBOARD","PMS","STAFF"] },
-  HOTEL_R: { tenant: "tenant_r", user: "reception", role: "RECEPTION", name: "Reception R", rooms: ["R303"], sections: ["PMS"] },
+  HOTEL_A: { tenant: "tenant_a", user: "owner", role: "OWNER", name: "Owner A", rooms: ["A101"], sections: ["DASHBOARD","PMS","RESERVATIONS","STAFF"] },
+  HOTEL_B: { tenant: "tenant_b", user: "owner", role: "OWNER", name: "Owner B", rooms: ["B202"], sections: ["DASHBOARD","PMS","RESERVATIONS","STAFF"] },
+  HOTEL_R: { tenant: "tenant_r", user: "reception", role: "RECEPTION", name: "Reception R", rooms: ["R303"], sections: ["PMS","RESERVATIONS"] },
 };
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("pageerror", error => errors.push(error.message));
+page.on("dialog", dialog => dialog.accept());
 let active = null;
 const staffByHotel = {};
 const respond = (route, code, body) => route.fulfill({
