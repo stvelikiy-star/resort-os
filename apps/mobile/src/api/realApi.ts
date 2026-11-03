@@ -4,6 +4,18 @@ import { ApiError, AuthUser, DaySummary, HousekeepingReport, NewMaintenance, Roo
 type Fetch = typeof fetch;
 
 /**
+ * PMS identifiers are opaque server references, never user-provided URL syntax.
+ * Reject reserved/encoded separators before building any authenticated route.
+ * The backend uses UUID/CUID-style IDs; do not normalize a malformed ID.
+ */
+function safeRouteId(value: string): string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
+    throw new ApiError('BAD_REQUEST', 'Invalid hotel record reference');
+  }
+  return value;
+}
+
+/**
  * Real implementation against the EXISTING MARINA SMART API of ONE hotel (property-pinned host).
  * Interim auth = the server's httpOnly cookie session (`resort_session`). No secrets live in the app.
  * Bearer/refresh tokens + device registry are backend work item B1/B2 (see docs) and are NOT assumed here.
@@ -74,15 +86,16 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
       return items.map(mapTask);
     },
-    async claimTask(id) { const ack = await call('POST', `/api/v1/ops/tasks/${id}/claim`); return committedTask(id, ack); },
-    async setTaskStatus(id, status) { const ack = await call('PATCH', `/api/v1/ops/tasks/${id}/status`, { status }); return committedTask(id, ack); },
+    async claimTask(id) { const key = safeRouteId(id); const ack = await call('POST', `/api/v1/ops/tasks/${key}/claim`); return committedTask(key, ack); },
+    async setTaskStatus(id, status) { const key = safeRouteId(id); const ack = await call('PATCH', `/api/v1/ops/tasks/${key}/status`, { status }); return committedTask(key, ack); },
     async completeHousekeeping(id, report: HousekeepingReport) {
-      const ack = await call('POST', `/api/v1/ops/tasks/${id}/complete-report`, {
+      const key = safeRouteId(id);
+      const ack = await call('POST', `/api/v1/ops/tasks/${key}/complete-report`, {
         summary: report.comment?.trim() || 'Cleaning completed',
         checklist: HOUSEKEEPING_CHECKLIST.map((code) => ({ code, label: code, done: !!report.checklist[code] })),
         evidence_urls: [], // photo upload needs the attachments API (backend item B5)
       });
-      return committedTask(id, ack);
+      return committedTask(key, ack);
     },
     async createMaintenance(req: NewMaintenance) {
       const created = await call<any>('POST', '/api/v1/ops/tasks', {
@@ -122,14 +135,15 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       return [...seen.values()];
     },
     async setRoomState(roomId, state: RoomState) {
+      const key = safeRouteId(roomId);
       // Never invent the code/floor after changing state. The current server
       // acknowledges only {room_id,state}; preserve an already observed room.
-      const previous = lastKnownRooms.get(roomId) ?? (await this.listRooms()).find(r => r.id === roomId);
+      const previous = lastKnownRooms.get(key) ?? (await this.listRooms()).find(r => r.id === key);
       if (!previous) throw new ApiError('NOT_FOUND', 'Room is not present in the staff-visible room list');
-      const ack = await call<{room_id: string;state: RoomState}>('PATCH', `/api/v1/ops/rooms/${roomId}/state`, { state });
-      if (!ack || ack.room_id !== roomId || ack.state !== state) throw new ApiError('UNKNOWN', 'Room state acknowledgment not verified');
+      const ack = await call<{room_id: string;state: RoomState}>('PATCH', `/api/v1/ops/rooms/${key}/state`, { state });
+      if (!ack || ack.room_id !== key || ack.state !== state) throw new ApiError('UNKNOWN', 'Room state acknowledgment not verified');
       const updated = {...previous, state};
-      lastKnownRooms.set(roomId, updated);
+      lastKnownRooms.set(key, updated);
       return updated;
     },
     async listStaff(): Promise<StaffMember[]> {
@@ -139,8 +153,10 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.active_tasks ?? s.open_tasks ?? 0, active: s.active !== false }));
     },
     async assignTask(taskId, staffId) {
-      const ack = await call('PATCH', `/api/v1/ops/tasks/${taskId}/assignee`, { assigned_to_id: staffId });
-      return committedTask(taskId, ack);
+      const key = safeRouteId(taskId);
+      const assignedTo = staffId === null ? null : safeRouteId(staffId);
+      const ack = await call('PATCH', `/api/v1/ops/tasks/${key}/assignee`, { assigned_to_id: assignedTo });
+      return committedTask(key, ack);
     },
     async daySummary(): Promise<DaySummary> {
       // No aggregate endpoint in the existing contract yet (backend item B8).
