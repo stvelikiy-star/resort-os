@@ -349,9 +349,9 @@ def main():
         assert grid_a.json()['property'] == 'HOTEL_A'
         assert any(b['reservation_id'] == rid_a
                    for room in grid_a.json()['rooms'] for b in room['blocks'])
-        # No unreviewed stay or payment writes through the same shared session.
+        # Check-in is now staged, but a future-dated reservation is refused.
         assert canonical_client.post(
-            '/api/v1/admin/stays/reservations/'+rid_a+'/check-in').status_code == 503
+            '/api/v1/admin/stays/reservations/'+rid_a+'/check-in').status_code == 409
         assert canonical_client.post('/api/v1/admin/pms/holds', json={}).status_code == 422  # now enabled; invalid payload rejected
 
         owner_login('b')
