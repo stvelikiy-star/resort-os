@@ -47,13 +47,14 @@ async def lifespan(app: FastAPI):
     )
     async def hold_expiration_worker():
         # Only a property-pinned runtime may run this background mutation.
-        # Shared authentication preview does not provide an authorized worker
-        # tenant context; a dedicated multi-hotel scheduler is required later.
-        from .auth import MARINA_TENANT_CONTEXT_ENABLED, PROPERTY_CODE
+        # Tenant-context can be enabled in separate property-pinned processes.
+        # Only shared-auth preview lacks an authorized property-bound worker;
+        # a dedicated shared multi-hotel scheduler is required later.
+        from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, PROPERTY_CODE
         from .pms_holds import expire_holds
         while True:
             try:
-                if not MARINA_TENANT_CONTEXT_ENABLED:
+                if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:
                     async with app.state.db.acquire() as conn:
                         async with conn.transaction():
                             property_id = await conn.fetchval(
