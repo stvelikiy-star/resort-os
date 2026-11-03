@@ -27,3 +27,13 @@ jobs:
       - name: Verify no environment values are collected
         run: |
           ! grep -En 'docker.*inspect|docker.*exec|compose.*up|os\.environ|printenv|env_file|DATABASE_URL|TOKEN_INSTANCE' scripts/marina_runtime_inventory_readonly.py
+      - name: Permit only narrow container image ID inspection
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("scripts/marina_runtime_inventory_readonly.py").read_text()
+          assert '["docker", "inspect", "--type", "container"' in source
+          assert '"--format", "{{.Image}}", name]' in source
+          assert '["docker", "inspect"]' not in source
+          print("MARINA_IMAGE_ID_INSPECTION_SCOPE_PASS")
+          PY
