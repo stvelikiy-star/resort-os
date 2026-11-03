@@ -13,7 +13,7 @@ import Profile from '../app/(app)/profile';
 import TaskDetail from '../app/task/[id]';
 import RoomCard from '../app/room/[id]';
 import NewRequest from '../app/new-request';
-import { apiFor } from '../src/api/factory';
+import { apiFor, dropApi } from '../src/api/factory';
 import { DEMO_HOTELS } from '../src/api/hotels';
 import { ApiError } from '../src/api/types';
 
@@ -125,6 +125,7 @@ describe('navigation, guards and screens', () => {
   });
 
   it('blocks resubmission of admin assignment after lost server acknowledgment', async () => {
+    dropApi(DEMO_HOTELS[0].id); // Reset mutated demo seed from earlier test cases.
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
     await fireEvent.press(await screen.findByTestId('task-t8', {}, { timeout: 4000 }));
@@ -140,6 +141,7 @@ describe('navigation, guards and screens', () => {
   });
 
   it('allows corrected admin assignment after explicit server rejection', async () => {
+    dropApi(DEMO_HOTELS[0].id); // Reset mutated demo seed from earlier test cases.
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
     await fireEvent.press(await screen.findByTestId('task-t8', {}, { timeout: 4000 }));
@@ -154,6 +156,7 @@ describe('navigation, guards and screens', () => {
   });
 
   it('blocks resubmission of admin inspection approval after lost acknowledgment', async () => {
+    dropApi(DEMO_HOTELS[0].id); // Reset mutated demo seed from earlier test cases.
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
     const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'setTaskStatus').mockRejectedValueOnce(new ApiError('UNKNOWN', 'ack missing'));
