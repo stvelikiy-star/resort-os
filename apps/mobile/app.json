@@ -16,7 +16,11 @@
         "foregroundImage": "./assets/marina-staff-app-icon.png",
         "backgroundColor": "#071D3C"
       },
-      "package": "kg.go.ms.staff"
+      "package": "kg.go.ms.staff",
+      "allowBackup": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "extra": {
       "environment": "development"
