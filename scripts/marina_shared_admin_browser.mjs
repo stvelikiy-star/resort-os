@@ -19,6 +19,12 @@ page.on("pageerror", error => errors.push(error.message));
 page.on("dialog", dialog => dialog.accept());
 let active = null;
 const staffByHotel = {};
+const roomIds = {
+  HOTEL_A:"00000000-0000-4000-8000-000000001101",
+  HOTEL_B:"00000000-0000-4000-8000-000000002202",
+  HOTEL_R:"00000000-0000-4000-8000-000000003303",
+};
+const committedBookings = {};
 const bookingIds = {
   HOTEL_A:"00000000-0000-4000-8000-000000000101",
   HOTEL_B:"00000000-0000-4000-8000-000000000202",
@@ -76,8 +82,27 @@ await page.route("**/core/api/v1/**", async route => {
     if (!active.sections.includes("PMS")) return respond(route, 403, {detail:"Forbidden"});
     return respond(route, 200, {
       property:active.code,
-      rooms:active.rooms.map(code=>({id:code,code,name:"Synthetic",operational_state:"CLEAN",blocks:[]})),
+      rooms:active.rooms.map(code=>({id:roomIds[active.code],code,name:"Synthetic",operational_state:"CLEAN",blocks:[]})),
     });
+  }
+  if (path === "/api/v1/admin/pms/reservations/new/preview" && method === "POST") {
+    const data = request.postDataJSON();
+    if (!["OWNER","MANAGER"].includes(active.role)) return respond(route,403,{detail:"Forbidden"});
+    if (data.room_id !== roomIds[active.code]) return respond(route,404,{detail:"Foreign room"});
+    return respond(route,200,{
+      room:{id:data.room_id}, check_in:data.check_in, check_out:data.check_out,
+      can_commit:true, pricing:{source:"CORE_RATE",total_kgs:9000},
+    });
+  }
+  if (path === "/api/v1/admin/pms/reservations/new/commit" && method === "POST") {
+    const data = request.postDataJSON();
+    if (!["OWNER","MANAGER"].includes(active.role)) return respond(route,403,{detail:"Forbidden"});
+    if (data.room_id !== roomIds[active.code]) return respond(route,404,{detail:"Foreign room"});
+    if (data.expected_total_kgs !== 9000 || data.expected_pricing_source !== "CORE_RATE")
+      return respond(route,409,{detail:"Price changed"});
+    committedBookings[active.code]=(committedBookings[active.code]||0)+1;
+    return respond(route,201,{reservation_id:bookingIds[active.code],room_id:data.room_id,
+      booking_number:active.code+"-SYNTH-"+committedBookings[active.code],status:"GUARANTEED",total_kgs:9000});
   }
   if (path === "/api/v1/admin/reception/reservations" && method === "GET") {
     if (!active.sections.includes("RESERVATIONS")) return respond(route, 403, { detail:"Forbidden" });
@@ -127,8 +152,16 @@ try {
   await login("HOTEL_A");
   await page.getByRole("heading",{name:"HOTEL_A"}).waitFor();
   await page.getByRole("button",{name:"Шахматка"}).click();
-  await page.getByText("A101").waitFor();
+  await page.getByRole("cell",{name:/^A101 · Synthetic$/}).waitFor();
   if (await page.getByText("B202").count()) throw new Error("Foreign room visible in hotel A");
+  const bookingForm = page.getByRole("form",{name:"Форма бронирования"});
+  await bookingForm.getByLabel("Номер").selectOption(roomIds.HOTEL_A);
+  await bookingForm.getByLabel("Имя гостя").fill("Synthetic A Booking");
+  await bookingForm.getByLabel("Телефон гостя").fill("+996555771122");
+  await bookingForm.getByRole("button",{name:"Проверить доступность и цену"}).click();
+  await page.getByRole("button",{name:"Подтвердить бронь"}).click();
+  await page.getByText("Бронирование HOTEL_A-SYNTH-1 создано сервером.",{exact:false}).waitFor();
+  if (committedBookings.HOTEL_A !== 1) throw new Error("UI booking commit not performed exactly once");
   await page.getByRole("button",{name:"Бронирования"}).click();
   await page.getByText("HOTEL_A-BOOK").waitFor();
   if (await page.getByText("HOTEL_B-BOOK").count()) throw new Error("Foreign reservation visible in hotel A");
@@ -148,8 +181,10 @@ try {
   await login("HOTEL_B");
   await page.getByRole("heading",{name:"HOTEL_B"}).waitFor();
   await page.getByRole("button",{name:"Шахматка"}).click();
-  await page.getByText("B202").waitFor();
+  await page.getByRole("cell",{name:/^B202 · Synthetic$/}).waitFor();
   if (await page.getByText("A101").count()) throw new Error("Foreign room visible in hotel B");
+  if (committedBookings.HOTEL_B) throw new Error("Hotel B inherited hotel A booking");
+  if (await page.getByText("HOTEL_A-SYNTH-1").count()) throw new Error("Foreign UI booking confirmation visible in hotel B");
   await page.getByRole("button",{name:"Бронирования"}).click();
   await page.getByText("HOTEL_B-BOOK").waitFor();
   if (await page.getByText("HOTEL_A-BOOK").count()) throw new Error("Foreign reservation shown in B");
@@ -162,6 +197,7 @@ try {
   await login("HOTEL_R","reception");
   await page.getByRole("button",{name:"Шахматка"}).waitFor();
   if (await page.getByRole("button",{name:"Персонал"}).count()) throw new Error("Reception shown staff admin");
+  if (await page.getByRole("form",{name:"Форма бронирования"}).count()) throw new Error("Reception can create manager booking");
   if (await page.getByRole("button",{name:"Дашборд"}).count()) throw new Error("Reception shown owner dashboard");
   await page.getByText("R303").waitFor();
   await page.getByRole("button",{name:"Бронирования"}).click();
@@ -169,7 +205,7 @@ try {
   await page.getByRole("button",{name:"Заселить"}).click();
   await page.getByRole("alert").getByText("Статус операции не подтверждён.",{exact:false}).waitFor();
   if (errors.length) throw new Error(JSON.stringify(errors));
-  console.log("MARINA_SHARED_ADMIN_BROWSER_PASS: main entry redirect, two hotel UI isolation, owner staff creation and revocation, reception restricted, 390px viewport");
+  console.log("MARINA_SHARED_ADMIN_BROWSER_PASS: entry, two-hotel UI isolation, one confirmed synthetic booking commit, staff lifecycle, reception restrictions, 390px viewport");
 } finally {
   await browser.close();
 }

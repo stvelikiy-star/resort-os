@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import SharedBookingForm from "./SharedBookingForm";
 
 type Identity = {
   id: string; display_name: string; role: string;
@@ -338,6 +339,8 @@ export default function SharedAuthPreview() {
                   <td>{room.operational_state}</td><td>{room.blocks.length ? room.blocks.map(b => `${b.start}–${b.end} (${b.type})`).join("; ") : "Свободно"}</td></tr>)}</tbody>
               </table>
             </div>
+            {["OWNER", "MANAGER"].includes(identity.role) &&
+              <SharedBookingForm rooms={grid.rooms} onExpired={() => setIdentity(null)} />}
           </section>}
         {!loadingSection && section === "reservations" && bookings &&
           <section aria-label="Бронирования гостиницы">
