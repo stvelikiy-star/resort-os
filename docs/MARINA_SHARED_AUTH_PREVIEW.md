@@ -33,6 +33,21 @@ uses server-trusted hotel ID and validates the quoted price, and the room
 inventory exclusion constraint prevents concurrent double booking.
 The shared PMS endpoints are API-only in this staging slice; the Admin UI
 still displays a read-only grid, without booking mutation controls.
+The isolated shared Admin also exposes a compact role-aware reception
+**Bookings** view, backed by the canonical scoped GET
+`/api/v1/admin/reception/reservations` and GET
+`/api/v1/admin/reception/reservations/{reservation_uuid}`. Only a user
+granted RESERVATIONS may see the view; the existing server-side permission
+dependency and DB-validated property ID remain authoritative. The view can
+submit the previously reviewed check-in and checkout actions, shows a guest
+PIN only after a confirmed check-in (in volatile browser memory), and clears
+it when switching sections, logging out, or starting another action. If the
+post-action list refresh fails, it does not claim the server action failed;
+it retains a confirmed check-in PIN and labels the list as stale. Client-side
+checks are conveniences, never substitutes for server RBAC/room-date checks.
+No new reception booking creation, financial charge, provider or cross-hotel
+API is granted by this UI slice.
+
 An additional narrowly reviewed stay-operation slice allows only POST
 `/api/v1/admin/stays/reservations/{reservation_uuid}/check-in` and
 POST `/check-out` for authenticated OWNER/MANAGER/RECEPTION according to

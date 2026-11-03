@@ -810,6 +810,16 @@ def main():
         assert created_stay_b.status_code == 201, created_stay_b.text
         rid_stay_b = created_stay_b.json()['reservation_id']
         assert rid_stay_a != rid_stay_b
+        # The real receptionist list must never return records of another hotel.
+        booking_list = '/api/v1/admin/reception/reservations'
+        listed_b = canonical_client.get(booking_list)
+        assert listed_b.status_code == 200, listed_b.text
+        listed_b_ids = {row['id'] for row in listed_b.json()['items']}
+        assert rid_stay_b in listed_b_ids and rid_stay_a not in listed_b_ids
+        assert canonical_client.get(booking_list+'/'+rid_stay_b).status_code == 200
+        assert canonical_client.get(booking_list+'/'+rid_stay_a, headers={
+            'X-Property-Id':str(ids['property_a']),
+            'X-Tenant-Id':str(ids['tenant_a'])}).status_code == 404
         assert canonical_client.post(stay_route+rid_stay_a+'/check-in',headers={
             'X-Property-Id':str(ids['property_a']),
             'X-Tenant-Id':str(ids['tenant_a']), 'X-Role':'OWNER'}).status_code == 404
@@ -828,6 +838,12 @@ def main():
 
         owner_login('a')
         assert canonical_client.post(stay_route+rid_stay_b+'/check-out').status_code == 404
+        listed_a = canonical_client.get(booking_list)
+        assert listed_a.status_code == 200, listed_a.text
+        listed_a_ids = {row['id'] for row in listed_a.json()['items']}
+        assert rid_stay_a in listed_a_ids and rid_stay_b not in listed_a_ids
+        assert canonical_client.get(booking_list+'/'+rid_stay_a).status_code == 200
+        assert canonical_client.get(booking_list+'/'+rid_stay_b).status_code == 404
         # Owner removes and restores reception permission before real check-in.
         receptionist_id = receptionist.json()['id']
         assert canonical_client.patch('/api/v1/admin/staff/'+receptionist_id,
@@ -838,6 +854,7 @@ def main():
             tenant_code='tenant_a',property_code='HOTEL_A'))
         assert denied_reception.status_code == 200
         assert canonical_client.post(stay_route+rid_stay_a+'/check-in').status_code == 403
+        assert canonical_client.get(booking_list).status_code == 403
         owner_login('a')
         assert canonical_client.patch('/api/v1/admin/staff/'+receptionist_id,
                                       json={'module_permissions':['RESERVATIONS']}).status_code == 200
@@ -847,6 +864,11 @@ def main():
             tenant_code='tenant_a',property_code='HOTEL_A'))
         assert allowed_reception.status_code == 200
         assert canonical_client.post(stay_route+rid_stay_b+'/check-in').status_code == 404
+        listed_reception = canonical_client.get(booking_list)
+        assert listed_reception.status_code == 200
+        assert rid_stay_a in {row['id'] for row in listed_reception.json()['items']}
+        assert rid_stay_b not in {row['id'] for row in listed_reception.json()['items']}
+        assert canonical_client.get(booking_list+'/'+rid_stay_b).status_code == 404
         a_check_in = canonical_client.post(stay_route+rid_stay_a+'/check-in')
         assert a_check_in.status_code == 200, a_check_in.text
         assert a_check_in.json()['status'] == 'CHECKED_IN'

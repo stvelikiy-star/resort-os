@@ -8,16 +8,29 @@ if (!["localhost", "127.0.0.1"].includes(new URL(BASE).hostname)) {
   throw new Error("Shared preview browser checks must target disposable localhost only");
 }
 const profiles = {
-  HOTEL_A: { tenant: "tenant_a", user: "owner", role: "OWNER", name: "Owner A", rooms: ["A101"], sections: ["DASHBOARD","PMS","STAFF"] },
-  HOTEL_B: { tenant: "tenant_b", user: "owner", role: "OWNER", name: "Owner B", rooms: ["B202"], sections: ["DASHBOARD","PMS","STAFF"] },
-  HOTEL_R: { tenant: "tenant_r", user: "reception", role: "RECEPTION", name: "Reception R", rooms: ["R303"], sections: ["PMS"] },
+  HOTEL_A: { tenant: "tenant_a", user: "owner", role: "OWNER", name: "Owner A", rooms: ["A101"], sections: ["DASHBOARD","PMS","RESERVATIONS","STAFF"] },
+  HOTEL_B: { tenant: "tenant_b", user: "owner", role: "OWNER", name: "Owner B", rooms: ["B202"], sections: ["DASHBOARD","PMS","RESERVATIONS","STAFF"] },
+  HOTEL_R: { tenant: "tenant_r", user: "reception", role: "RECEPTION", name: "Reception R", rooms: ["R303"], sections: ["PMS","RESERVATIONS"] },
 };
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("pageerror", error => errors.push(error.message));
+page.on("dialog", dialog => dialog.accept());
 let active = null;
 const staffByHotel = {};
+const bookingIds = {
+  HOTEL_A:"00000000-0000-4000-8000-000000000101",
+  HOTEL_B:"00000000-0000-4000-8000-000000000202",
+  HOTEL_R:"00000000-0000-4000-8000-000000000303",
+};
+const bookingStatus = Object.fromEntries(Object.keys(bookingIds).map(code => [code,"GUARANTEED"]));
+function scopedBooking() {
+  return {id:bookingIds[active.code],bookingNumber:active.code+"-BOOK",status:bookingStatus[active.code],
+    checkIn:"2026-11-03",checkOut:"2026-11-05",room_code:active.rooms[0],
+    room_state:"CLEAN",firstName:"Synthetic "+active.code,phone:null,
+    totalKgs:9000,paidKgs:0,remainingKgs:9000};
+}
 const respond = (route, code, body) => route.fulfill({
   status: code, contentType: "application/json", body: JSON.stringify(body),
   headers: { "Cache-Control": "no-store" },
@@ -66,6 +79,13 @@ await page.route("**/core/api/v1/**", async route => {
       rooms:active.rooms.map(code=>({id:code,code,name:"Synthetic",operational_state:"CLEAN",blocks:[]})),
     });
   }
+  if (path === "/api/v1/admin/reception/reservations" && method === "GET") {
+    if (!active.sections.includes("RESERVATIONS")) return respond(route, 403, { detail:"Forbidden" });
+    return respond(route, 200, { local_date:"2026-11-03", items:[scopedBooking()] });
+  }
+  if (path.startsWith("/api/v1/admin/stays/reservations/") && method === "POST") {
+    return respond(route, 409, { detail:"Synthetic browser fixture: transition denied" });
+  }
   if (path === "/api/v1/admin/staff/overview" && method === "GET") {
     if (!active.sections.includes("STAFF")) return respond(route, 403, {detail:"Forbidden"});
     return respond(route, 200, {
@@ -109,6 +129,10 @@ try {
   await page.getByRole("button",{name:"Шахматка"}).click();
   await page.getByText("A101").waitFor();
   if (await page.getByText("B202").count()) throw new Error("Foreign room visible in hotel A");
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  await page.getByText("HOTEL_A-BOOK").waitFor();
+  if (await page.getByText("HOTEL_B-BOOK").count()) throw new Error("Foreign reservation visible in hotel A");
+  await page.getByRole("button",{name:"Заселить"}).waitFor();
   await page.getByRole("button",{name:"Персонал"}).click();
   await page.getByRole("heading",{name:"Сотрудники (0)"}).waitFor();
   await page.getByLabel("Создание сотрудника").getByLabel("Логин").fill("employee-a");
@@ -126,6 +150,9 @@ try {
   await page.getByRole("button",{name:"Шахматка"}).click();
   await page.getByText("B202").waitFor();
   if (await page.getByText("A101").count()) throw new Error("Foreign room visible in hotel B");
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  await page.getByText("HOTEL_B-BOOK").waitFor();
+  if (await page.getByText("HOTEL_A-BOOK").count()) throw new Error("Foreign reservation shown in B");
   await page.getByRole("button",{name:"Персонал"}).click();
   await page.getByRole("heading",{name:"Сотрудники (0)"}).waitFor();
   if (await page.getByText("Synthetic Employee A").count()) throw new Error("Foreign employee visible in hotel B");
@@ -137,6 +164,10 @@ try {
   if (await page.getByRole("button",{name:"Персонал"}).count()) throw new Error("Reception shown staff admin");
   if (await page.getByRole("button",{name:"Дашборд"}).count()) throw new Error("Reception shown owner dashboard");
   await page.getByText("R303").waitFor();
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  await page.getByText("HOTEL_R-BOOK").waitFor();
+  await page.getByRole("button",{name:"Заселить"}).click();
+  await page.getByRole("alert").getByText("Статус операции не подтверждён.",{exact:false}).waitFor();
   if (errors.length) throw new Error(JSON.stringify(errors));
   console.log("MARINA_SHARED_ADMIN_BROWSER_PASS: main entry redirect, two hotel UI isolation, owner staff creation and revocation, reception restricted, 390px viewport");
 } finally {
