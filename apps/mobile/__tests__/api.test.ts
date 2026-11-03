@@ -82,6 +82,17 @@ describe('real api contract (mock fetch)', () => {
     const off = createRealApi('https://h.example', (async () => { throw new TypeError('x'); }) as unknown as typeof fetch);
     await expect(off.me()).rejects.toMatchObject({ code: 'OFFLINE' });
   });
+  it('maps active staff and real active_tasks from PMS overview', async () => {
+    const { f, calls } = mk([{ body: { staff: [
+      { id: 'm1', display_name: 'Housekeeper', role: 'MAID', active_tasks: 4, active: true },
+      { id: 'm2', display_name: 'Former staff', role: 'MAID', active_tasks: 0, active: false },
+    ] } }]);
+    const members = await createRealApi('https://hotel.example', f).listStaff();
+    expect(calls[0].url).toBe('https://hotel.example/api/v1/admin/staff/overview');
+    expect(members[0]).toMatchObject({ id: 'm1', open_tasks: 4, active: true });
+    expect(members[1]).toMatchObject({ id: 'm2', open_tasks: 0, active: false });
+  });
+
   it('reads the canonical maintenance task after the create endpoint returns only id/status', async () => {
     const { f, calls } = mk([
       { status: 201, body: { id: 'created-1', status: 'OPEN' } },
