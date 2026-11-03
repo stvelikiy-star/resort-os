@@ -26,7 +26,7 @@ jobs:
         run: python -m unittest discover -s scripts -p 'test_marina_runtime_inventory_readonly.py' -v
       - name: Verify no environment values are collected
         run: |
-          ! grep -En 'docker.*inspect|docker.*exec|compose.*up|os\.environ|printenv|env_file|DATABASE_URL|TOKEN_INSTANCE' scripts/marina_runtime_inventory_readonly.py
+          ! grep -En 'docker.*exec|compose.*up|os\.environ|printenv|env_file|DATABASE_URL|TOKEN_INSTANCE' scripts/marina_runtime_inventory_readonly.py
       - name: Permit only narrow container image ID inspection
         run: |
           python - <<'PY'
