@@ -1,0 +1,58 @@
+name: MARINA Mobile React 19.3.1 Expo 58 Compatibility Probe
+on:
+  push:
+    branches:
+      - 'probe/marina-mobile-react-1931-sdk58-20261103'
+    paths:
+      - '.github/workflows/marina-mobile-react-patch-probe.yml'
+permissions:
+  contents: read
+jobs:
+  patch-probe:
+    name: Test React patched version without a production commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Build isolated package manifest and lockfile
+        run: |
+          npm pkg set 'dependencies.react=19.3.1' 'dependencies.react-dom=^19.3.1' 'devDependencies.react-test-renderer=^19.3.1'
+          npm pkg set 'dependencies.@expo/metro-runtime=~58.0.17' 'dependencies.expo=~58.0.23' 'dependencies.expo-constants=~58.0.15' 'dependencies.expo-linking=~58.0.16' 'dependencies.expo-router=~58.0.30' 'dependencies.react-native-safe-area-context=~5.11.1' 'devDependencies.jest-expo=~58.0.14'
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          git diff --stat -- package.json package-lock.json
+          git diff -- package.json package-lock.json > /tmp/react-patch-candidate.patch
+      - name: Show Expo vendor SDK version compatibility
+        run: |
+          npx expo install --check > /tmp/expo-version-check.txt 2>&1 || true
+          cat /tmp/expo-version-check.txt
+      - name: Check patched React and Expo do not break the mobile app
+        run: |
+          npm ci --no-audit --no-fund
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.test.mjs
+          npm run typecheck
+          npm run lint
+          npm test -- --ci --runInBand
+          npm run web:export
+      - name: Capture dependency audit and draft for review
+        if: always()
+        run: |
+          npm audit --omit=dev --json > /tmp/react-patch-audit.json || true
+          node -e "const a=require('/tmp/react-patch-audit.json'); console.log('PATCHED_REACT_AUDIT:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+      - name: Upload evidence, no source changes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-react-patch-sdk58-probe
+          path: |
+            /tmp/react-patch-candidate.patch
+            /tmp/expo-version-check.txt
+            /tmp/react-patch-audit.json
+          retention-days: 7
+          if-no-files-found: warn
