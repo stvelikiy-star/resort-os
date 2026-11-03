@@ -26,6 +26,10 @@ npm start
 
 CI additionally runs Expo dependency alignment, TypeScript, ESLint, Jest, Expo web export, and Expo config validation.
 
+## Native branding status
+
+Expo now points to `assets/marina-compass-seal.png` for the mobile UI seal, app icon, adaptive Android icon, splash, and browser favicon. The embedded source is a 72×72 approved-brand crop. **Its low resolution is temporary; replace it with the original high-resolution brand master before public store submission.** The real premium icon pack has been prepared separately; this branch currently contains only the smaller approved source.
+
 ## Android build preparation
 
 The `eas.json` profiles are **configuration only**, not evidence of an APK or AAB:
