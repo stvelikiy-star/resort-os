@@ -10,11 +10,17 @@ export interface HotelConnection {
 
 /** Demo catalogue — never contacts a network. */
 export const DEMO_HOTELS: HotelConnection[] = [
-  { id: 'demo-marina-issykkul', name: 'MARINA Issyk-Kul', city: 'Cholpon-Ata', baseUrl: 'demo://marina-issykkul', demo: true, accent: '#0A9996' },
-  { id: 'demo-sunrise-bishkek', name: 'Sunrise Bishkek', city: 'Bishkek', baseUrl: 'demo://sunrise-bishkek', demo: true, accent: '#E9B872' },
+  { id: 'demo-marina-issykkul', name: 'MARINA Issyk-Kul', city: 'Cholpon-Ata', baseUrl: 'demo://marina-issykkul', demo: true, accent: '#245E9A' },
+  { id: 'demo-sunrise-bishkek', name: 'Sunrise Bishkek', city: 'Bishkek', baseUrl: 'demo://sunrise-bishkek', demo: true, accent: '#BBCFE6' },
 ];
 
-/** Only https hosts (and demo://) are accepted; no credentials/ports tricks, no http. */
+/** A hotel may expose API at its origin or behind the known /core reverse-proxy prefix. */
+export function hotelConnectionId(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  return `live-${url.hostname}${url.pathname === '/core' ? '-core' : ''}`;
+}
+
+/** HTTPS only, one explicitly approved API prefix and no credentials/ports tricks. */
 export function parseHotelAddress(input: string): { ok: true; baseUrl: string } | { ok: false; reason: 'secureOnly' | 'invalid' } {
   const raw = input.trim();
   if (!raw) return { ok: false, reason: 'invalid' };
@@ -22,8 +28,21 @@ export function parseHotelAddress(input: string): { ok: true; baseUrl: string } 
   const candidate = /^https:\/\//i.test(raw) ? raw : `https://${raw}`;
   try {
     const u = new URL(candidate);
-    if (u.protocol !== 'https:' || u.username || u.password || !u.hostname.includes('.')) return { ok: false, reason: 'invalid' };
-    return { ok: true, baseUrl: `https://${u.host}` };
+    const hostname = u.hostname.toLowerCase();
+    const prefix = u.pathname.replace(/\/+$/, '');
+    // Hotel connections carry authenticated cookies: reject IP literals, internal
+    // names, alternate ports and ambiguous hostnames from untrusted QR codes.
+    const labels = hostname.split('.');
+    const validDns = labels.length >= 2 && labels.every((part) =>
+      part.length > 0 && part.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(part));
+    const ipAddress = /^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.includes(':');
+    const internal = ['local', 'localhost', 'internal', 'test', 'invalid'].includes(labels[labels.length - 1]);
+    if (u.protocol !== 'https:' || u.username || u.password || u.port ||
+        !validDns || ipAddress || internal || hostname.length > 253 ||
+        (prefix !== '' && prefix !== '/core') || u.search || u.hash) {
+      return { ok: false, reason: 'invalid' };
+    }
+    return { ok: true, baseUrl: `https://${hostname}${prefix}` };
   } catch {
     return { ok: false, reason: 'invalid' };
   }

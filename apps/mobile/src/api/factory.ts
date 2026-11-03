@@ -4,7 +4,7 @@ import type { HotelConnection } from './hotels';
 import type { StaffApi } from './types';
 
 const cache = new Map<string, StaffApi>();
-/** One api instance per hotel connection: state/cookies never cross hotels. */
+/** API instances are keyed per connection. Native cookies are managed by the OS per host, not per instance; the PMS must enforce tenant isolation. */
 export function apiFor(h: HotelConnection): StaffApi {
   let a = cache.get(h.id);
   if (!a) { a = h.demo ? createDemoApi(h.id) : createRealApi(h.baseUrl); cache.set(h.id, a); }

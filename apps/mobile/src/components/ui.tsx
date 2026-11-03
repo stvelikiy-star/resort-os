@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
@@ -9,15 +9,56 @@ import type { LucideIcon } from 'lucide-react-native';
 
 export function FadeIn({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
   const [v] = useState(() => new Animated.Value(0));
-  useEffect(() => { Animated.timing(v, { toValue: 1, duration: 320, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(); }, [v, delay]);
-  return <Animated.View style={[style, { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>{children}</Animated.View>;
+  useEffect(() => {
+    let mounted = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!mounted) return;
+      if (reduceMotion) { v.setValue(1); return; }
+      animation = Animated.timing(v, { toValue: 1, duration: 460, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true });
+      animation.start();
+    }).catch(() => { if (mounted) v.setValue(1); });
+    return () => { mounted = false; animation?.stop(); };
+  }, [v, delay]);
+  return <Animated.View style={[style, { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>{children}</Animated.View>;
 }
 
 const OUTER_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'width', 'alignSelf'] as const;
 
+
+/** Animated progress with reduced-motion support and screen-reader value. */
+export function AnimatedProgressBar({ percent }: { percent: number }) {
+  const { c } = useTheme();
+  const safePercent = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    let active = true;
+    let animation: Animated.CompositeAnimation | undefined;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (!active) return;
+      if (reduceMotion) { progress.setValue(safePercent); return; }
+      animation = Animated.timing(progress, { toValue: safePercent, duration: 750, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+      animation.start();
+    }).catch(() => { if (active) progress.setValue(safePercent); });
+    return () => { active = false; animation?.stop(); };
+  }, [progress, safePercent]);
+  return (
+    <View accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: safePercent }}
+      style={{ height: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.22)', overflow: 'hidden' }}>
+      <Animated.View style={{ width: progress.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }), height: 11, borderRadius: 8, backgroundColor: c.accent }} />
+    </View>
+  );
+}
+
 export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string }) {
   const [s] = useState(() => new Animated.Value(1));
-  const to = (x: number) => Animated.spring(s, { toValue: x, useNativeDriver: true, speed: 40, bounciness: 4 }).start();
+  const to = (x: number) => {
+    if (disabled) return;
+    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (reduceMotion) { s.setValue(1); return; }
+      Animated.spring(s, { toValue: x, useNativeDriver: true, speed: 32, bounciness: 6 }).start();
+    }).catch(() => s.setValue(1));
+  };
   // Layout props belong to the touchable wrapper so flex rows (segmented controls, button pairs) share width.
   const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
   const outer: Record<string, unknown> = {};
@@ -63,7 +104,7 @@ export function Title({ children, sub }: { children: React.ReactNode; sub?: stri
 
 export function Card({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
   const { c } = useTheme();
-  const base: ViewStyle = { backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, shadowColor: c.shadow, shadowOpacity: 0.08, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 2 };
+  const base: ViewStyle = { backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, borderWidth: StyleSheet.hairlineWidth, borderColor: c.border, shadowColor: c.shadow, shadowOpacity: 0.10, shadowRadius: 22, shadowOffset: { width: 0, height: 9 }, elevation: 3 };
   return onPress ? <PressScale testID={testID} onPress={onPress} style={[base, style]}>{children}</PressScale> : <View testID={testID} style={[base, style]}>{children}</View>;
 }
 
@@ -96,7 +137,7 @@ export function Button({ label, onPress, icon: Icon, variant = 'primary', disabl
   const fg = variant === 'primary' ? c.primaryText : variant === 'danger' ? '#fff' : c.primary;
   return (
     <PressScale testID={testID} disabled={disabled} onPress={onPress} accessibilityLabel={label}
-      style={{ minHeight: TOUCH, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: space.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm }}>
+      style={{ minHeight: TOUCH, borderRadius: radius.lg, backgroundColor: bg, paddingHorizontal: space.xl, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm }}>
       {Icon ? <Icon size={22} color={fg} /> : null}
       <Text style={[font.h2, { color: fg, fontSize: 17 }]}>{label}</Text>
     </PressScale>
@@ -141,9 +182,11 @@ export function Segmented<T extends string>({ value, options, onChange }: { valu
       {options.map((o) => {
         const on = o.key === value;
         return (
-          <PressScale key={o.key} onPress={() => onChange(o.key)} style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: on ? c.surface : 'transparent' }} accessibilityLabel={o.label}>
-            <Text style={[font.small, { fontWeight: '700', color: on ? c.primary : c.textMuted }]}>{o.label}</Text>
-          </PressScale>
+          <Pressable key={o.key} testID={`segment-${o.key}`} onPress={() => onChange(o.key)}
+            accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={o.label}
+            style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: on ? c.surface : 'transparent' }}>
+            <Text style={[font.small, { fontWeight: '700', color: on ? c.primary : c.textMuted, textAlign: 'center' }]}>{o.label}</Text>
+          </Pressable>
         );
       })}
     </View>

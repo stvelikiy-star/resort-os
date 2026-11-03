@@ -11,14 +11,14 @@ export interface AuthUser {
 }
 export interface Task {
   id: string; type: TaskType; status: TaskStatus; priority: Priority;
-  title: string; room_code: string | null; room_id: string | null;
+  title: string; room_code: string | null; room_id: string | null; room_state?: RoomState;
   assigned_to_id: string | null; assigned_to_name?: string | null; due_label?: string;
 }
 export interface Room {
   id: string; code: string; floor: number; state: RoomState;
   guest?: string | null; checkout?: string | null; arrival?: string | null; note?: string | null;
 }
-export interface StaffMember { id: string; display_name: string; role: Role; open_tasks: number }
+export interface StaffMember { id: string; display_name: string; role: Role; open_tasks: number; active?: boolean }
 export interface DaySummary { occupancy_pct: number; dirty: number; blocked: number; overdue: number }
 export interface NewMaintenance { room_id: string | null; category: string; priority: Priority; description: string }
 export interface HousekeepingReport { checklist: Record<string, boolean>; comment?: string }

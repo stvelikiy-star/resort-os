@@ -12,6 +12,11 @@ on:
     paths:
       - 'apps/mobile/**'
       - '.github/workflows/marina-staff-mobile-check.yml'
+# Do not waste Android runners rebuilding superseded commits in the same PR.
+# Keep unrelated project workflows and branches completely independent.
+concurrency:
+  group: marina-staff-mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -29,11 +34,65 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Expo dependency alignment
         run: npx expo install --check
+      - name: Verify mobile routes against actual PMS source
+        run: node scripts/verify-backend-contract.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
         run: npm run lint
       - name: Component, navigation, role and i18n tests
         run: npm test -- --ci
+      - name: Export mobile web preview
+        run: npm run web:export
       - name: Validate Expo configuration
         run: npx expo config --type public --json > /tmp/marina-staff-expo-config.json
+  android-preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify preinstalled Android SDK
+        run: test -d "$ANDROID_HOME" && echo "ANDROID_HOME=$ANDROID_HOME"
+      - name: Install mobile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install --non-interactive
+      - name: Compile standalone Android preview APK (bundled JavaScript)
+        run: cd android && ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Verify bundled JS and test APK signature
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          unzip -Z1 "$apk" | grep -Fx 'assets/index.android.bundle' > /dev/null
+
+          found=false
+          for signer in "$ANDROID_HOME"/build-tools/*/apksigner; do
+            if [ -x "$signer" ]; then
+              "$signer" verify --verbose "$apk"
+              found=true
+              break
+            fi
+          done
+          if [ "$found" != true ]; then echo 'Android apksigner not available' >&2; exit 1; fi
+          echo 'STANDALONE_APK_BUNDLE_AND_SIGNATURE_OK'
+      - name: Attach standalone Android preview APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-staff-standalone-preview-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+          if-no-files-found: error

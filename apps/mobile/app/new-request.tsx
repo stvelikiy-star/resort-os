@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Droplets, Fan, Lamp, Package, Zap, X } from 'lucide-react-native';
 import { Button, Field, PressScale, Screen, SectionLabel, Segmented, Title } from '../src/components/ui';
 import { useAsync } from '../src/lib/useAsync';
 import { useSession } from '../src/state/session';
+import { workspaceForSession } from '../src/roles/registry';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { font, radius, space } from '../src/theme/tokens';
 import type { Priority, Room } from '../src/api/types';
@@ -16,20 +17,42 @@ export default function NewRequest() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api } = useSession();
-  const rooms = useAsync<Room[]>(() => api!.listRooms(), [api]);
+  const { api, user } = useSession();
+  const rooms = useAsync<Room[]>(() => api ? api.listRooms() : Promise.resolve([]), [api]);
   const [cat, setCat] = useState<string>('PLUMBING');
   const [prio, setPrio] = useState<Priority>('NORMAL');
   const [roomId, setRoomId] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const sendLock = useRef(false);
+  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (returnTimer.current) clearTimeout(returnTimer.current); }, []);
 
   const send = async () => {
+    if (sendLock.current || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
+    sendLock.current = true;
     setBusy(true); setMsg(null);
-    try { await api!.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text }); setMsg(t('mt.sent')); setTimeout(() => router.back(), 600); }
-    catch { setMsg(t('errors.generic')); } finally { setBusy(false); }
+    let accepted = false;
+    try {
+      await api.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text });
+      accepted = true;
+      setMsg(t('mt.sent'));
+      returnTimer.current = setTimeout(() => router.back(), 600);
+    } catch {
+      setMsg(t('errors.generic'));
+    } finally {
+      // Keep the form locked after an accepted POST until navigation unmounts it.
+      // Otherwise another tap in the 600ms confirmation window can create a duplicate.
+      if (!accepted) {
+        sendLock.current = false;
+        setBusy(false);
+      }
+    }
   };
+
+  if (!user || !api) return <Redirect href="/connect" />;
+  if (!workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return <Redirect href="/profile" />;
 
   return (
     <Screen>

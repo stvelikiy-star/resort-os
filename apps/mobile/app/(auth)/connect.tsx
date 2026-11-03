@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Platform, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Building2, Link2, QrCode, ShieldCheck } from 'lucide-react-native';
 import { Badge, Button, Card, DemoBanner, FadeIn, Field, Screen, SectionLabel, Segmented } from '../../src/components/ui';
@@ -8,23 +8,25 @@ import { Logo } from '../../src/components/Brand';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
-import { parseHotelAddress } from '../../src/api/hotels';
+import { hotelConnectionId, parseHotelAddress } from '../../src/api/hotels';
 import { LOCALE_LABEL, LOCALES, Locale } from '../../src/i18n';
 
 export default function Connect() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { hotels, addHotel, selectHotel, locale, setLocale } = useSession();
-  const [addr, setAddr] = useState('');
+  const { hotelAddress } = useLocalSearchParams<{ hotelAddress?: string }>();
+  const { hotels, addHotel, selectHotel, startDemo, locale, setLocale } = useSession();
+  const [addr, setAddr] = useState(typeof hotelAddress === 'string' ? hotelAddress : '');
   const [err, setErr] = useState<string | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
 
   const open = (id: string) => { selectHotel(id); router.push('/login'); };
   const add = () => {
     const r = parseHotelAddress(addr);
     if (!r.ok) { setErr(t(`connect.${r.reason}`)); return; }
     const host = new URL(r.baseUrl).hostname;
-    addHotel({ id: `live-${host}`, name: host, city: '', baseUrl: r.baseUrl, demo: false, accent: c.primary });
+    addHotel({ id: hotelConnectionId(r.baseUrl), name: host, city: '', baseUrl: r.baseUrl, demo: false, accent: c.primary });
     setErr(null); router.push('/login');
   };
 
@@ -37,6 +39,23 @@ export default function Connect() {
         <Segmented<Locale> value={locale} onChange={setLocale} options={LOCALES.map((l) => ({ key: l, label: LOCALE_LABEL[l].slice(0, 3).toUpperCase() }))} />
       </FadeIn>
 
+      {
+        <Card testID="web-demo-launcher" style={{ gap: space.md, backgroundColor: c.primarySoft }}>
+          <Text style={[font.h2, { color: c.text }]}>{t('connect.tryDemoTitle')}</Text>
+          <Text style={[font.body, { color: c.textMuted }]}>{t('connect.tryDemoHint')}</Text>
+          <Button testID="web-demo-start" label={t('connect.tryDemoButton')} disabled={demoBusy}
+            onPress={async () => {
+              if (demoBusy) return;
+              setDemoBusy(true); setErr(null);
+              try {
+                await startDemo();
+                router.replace('/tasks');
+              } catch {
+                setErr(t('errors.generic'));
+              } finally { setDemoBusy(false); }
+            }} />
+        </Card>
+      }
       <SectionLabel>{t('connect.demoHotels')}</SectionLabel>
       <DemoBanner />
       {hotels.map((h, i) => (
@@ -57,8 +76,13 @@ export default function Connect() {
         <Field label={t('connect.code')} placeholder={t('connect.codePh')} value={addr} onChangeText={setAddr} autoCapitalize="none" autoCorrect={false} keyboardType="url" testID="hotel-address" />
         {err ? <Text testID="connect-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
         <Button testID="connect-add" label={t('connect.addHotel')} icon={Link2} onPress={add} />
-        <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => setErr(t('hk.photoSoon'))} />
+        <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
       </Card>
+      {Platform.OS === 'web' ? (
+        <Card testID="web-live-cookie-notice" style={{ backgroundColor: c.warningSoft, gap: space.sm }}>
+          <Text style={[font.small, { color: c.text }]}>{t('connect.browserLiveNotice')}</Text>
+        </Card>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
         <ShieldCheck size={18} color={c.success} /><Text style={[font.small, { color: c.textMuted, flex: 1 }]}>{t('connect.noSecrets')}</Text>
       </View>

@@ -13,6 +13,8 @@ import Profile from '../app/(app)/profile';
 import TaskDetail from '../app/task/[id]';
 import RoomCard from '../app/room/[id]';
 import NewRequest from '../app/new-request';
+import { apiFor } from '../src/api/factory';
+import { DEMO_HOTELS } from '../src/api/hotels';
 
 jest.mock('react-native-safe-area-context', () => {
   const actual = jest.requireActual('react-native-safe-area-context');
@@ -47,11 +49,38 @@ async function loginAs(role: string) {
 }
 
 describe('navigation, guards and screens', () => {
+  it('browser demo can open manager workspace without username or password', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/connect' });
+    await fireEvent.press(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 }));
+    expect(await screen.findByTestId('tab-admin', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('task-t1', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('unauthenticated direct profile link goes to hotel selection, not empty settings', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/profile' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
   it('unauthenticated users land on hotel connection with demo banner', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/tasks' });
     await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 });
     expect(screen.getByTestId('demo-banner')).toBeTruthy();
     expect(screen.getByTestId('hotel-demo-sunrise-bishkek')).toBeTruthy();
+  });
+
+  it('protects a direct task detail deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/task/t1' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('protects a direct room detail deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/room/r1' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('protects a direct maintenance creation deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/new-request' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('rejects insecure hotel address', async () => {
@@ -83,6 +112,43 @@ describe('navigation, guards and screens', () => {
     await screen.findByTestId('task-t1', {}, { timeout: 4000 });
     expect(screen.getByTestId('tab-admin')).toBeTruthy();
     expect(screen.getByTestId('tab-requests')).toBeTruthy();
+  });
+
+  it('manager can assign an unassigned cleaning task from the admin screen', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
+    const task = await screen.findByTestId('task-t8', {}, { timeout: 4000 });
+    await fireEvent.press(task);
+    await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
+    await waitFor(() => expect(screen.queryByTestId('assign-u-maid2')).toBeNull(), { timeout: 4000 });
+  });
+
+  it('does not create a second maintenance ticket after successful submission', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('quick-new-request', {}, { timeout: 4000 }));
+    await fireEvent.changeText(await screen.findByTestId('mt-text', {}, { timeout: 4000 }), 'Broken water valve');
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'createMaintenance');
+    try {
+      const submit = screen.getByTestId('mt-send');
+      await fireEvent.press(submit);
+      await screen.findByTestId('mt-msg', {}, { timeout: 4000 });
+      await fireEvent.press(submit);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('profile language and theme selectors respond to taps', async () => {
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-profile', {}, { timeout: 4000 }));
+    const en = await screen.findByTestId('segment-en', {}, { timeout: 4000 });
+    await fireEvent.press(en);
+    await waitFor(() => expect(screen.getByTestId('segment-en').props.accessibilityState.checked).toBe(true), { timeout: 4000 });
+    await fireEvent.press(screen.getByTestId('segment-dark'));
+    await waitFor(() => expect(screen.getByTestId('segment-dark').props.accessibilityState.checked).toBe(true), { timeout: 4000 });
+    await fireEvent.press(screen.getByTestId('segment-ru'));
+    await fireEvent.press(screen.getByTestId('segment-system'));
   });
 
   it('waiter has no operational workspace (profile only)', async () => {

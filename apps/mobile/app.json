@@ -1,16 +1,22 @@
 {
   "expo": {
-    "name": "MARINA STAFF",
+    "name": "MARINA SMART STAFF",
     "slug": "marina-staff",
     "scheme": "marinastaff",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/marina-staff-app-icon.png"
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/marina-staff-app-icon.png",
+        "backgroundColor": "#071D3C"
+      },
+      "package": "kg.go.ms.staff"
     },
     "extra": {
       "environment": "development"
@@ -18,10 +24,25 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Разрешите MARINA SMART сканировать QR-коды гостиниц",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ],
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/marina-staff-app-icon.png"
+    },
+    "icon": "./assets/marina-staff-app-icon.png",
+    "splash": {
+      "image": "./assets/marina-staff-app-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#071D3C"
     }
   }
 }

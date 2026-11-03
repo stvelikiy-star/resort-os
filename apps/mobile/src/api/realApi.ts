@@ -1,3 +1,4 @@
+import { parseHotelAddress } from './hotels';
 import { ApiError, AuthUser, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
@@ -8,33 +9,79 @@ type Fetch = typeof fetch;
  * Bearer/refresh tokens + device registry are backend work item B1/B2 (see docs) and are NOT assumed here.
  */
 export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffApi {
-  if (!/^https:\/\//i.test(baseUrl)) throw new Error('Only https base URLs are allowed');
-  const root = baseUrl.replace(/\/+$/, '');
+  const validated = parseHotelAddress(baseUrl);
+  if (!validated.ok) throw new Error('Invalid or insecure hotel API origin');
+  const root = validated.baseUrl;
+  // Most recent server-provided records for safe post-commit readback fallback.
+  // Never synthesize an unseen task or claim that a missing write succeeded.
+  const lastKnownTasks = new Map<string, Task>();
 
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
     try {
       res = await fetchImpl(`${root}${path}`, {
-        method, credentials: 'include',
+        method, credentials: 'include', signal: controller.signal,
         headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
     } catch {
       throw new ApiError('OFFLINE');
+    } finally {
+      clearTimeout(timeout);
     }
     if (res.status === 204) return undefined as T;
     if (!res.ok) {
       const code = res.status === 401 ? 'UNAUTHORIZED' : res.status === 403 ? 'FORBIDDEN' : res.status === 404 ? 'NOT_FOUND' : res.status === 409 ? 'CONFLICT' : res.status === 400 || res.status === 422 ? 'BAD_REQUEST' : 'UNKNOWN';
       throw new ApiError(code, `HTTP ${res.status}`);
     }
-    return (await res.json()) as T;
+    try { return (await res.json()) as T; }
+    catch { throw new ApiError('UNKNOWN', 'Invalid JSON response from hotel API'); }
   }
 
-  const mapTask = (t: any): Task => ({
-    id: String(t.id), type: t.type, status: t.status, priority: t.priority ?? 'NORMAL',
-    title: t.title ?? '', room_code: t.room_code ?? t.roomCode ?? null, room_id: t.room_id ?? t.roomId ?? null,
-    assigned_to_id: t.assigned_to_id ?? t.assignedToId ?? null, assigned_to_name: t.assigned_to_name ?? null,
-  });
+  const mapTask = (t: any): Task => {
+    if (!t || typeof t.id !== 'string' || !t.id || !['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'].includes(t.type) || !['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(t.status)) throw new ApiError('UNKNOWN', 'Invalid task record');
+    const mapped: Task = {
+      id: String(t.id), type: t.type, status: t.status, priority: t.priority ?? 'NORMAL',
+      title: t.title ?? '', room_code: t.room_code ?? t.roomCode ?? null, room_id: t.room_id ?? t.roomId ?? null,
+      room_state: ['CLEAN', 'DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(t.room_state) ? t.room_state : 'UNKNOWN',
+      assigned_to_id: t.assigned_to_id ?? t.assignedToId ?? null, assigned_to_name: t.assigned_to_name ?? null,
+    };
+    lastKnownTasks.set(mapped.id, mapped);
+    return mapped;
+  };
+
+  /**
+   * A mutation can commit even when its subsequent GET fails (e.g., >300 tasks,
+   * temporary network failure). Accept only the server's acknowledged fields
+   * and merge them into a previously observed task; never fabricate details.
+   */
+  async function committedTask(id: string, acknowledged: unknown): Promise<Task> {
+    if (!acknowledged || typeof acknowledged !== 'object' ||
+        ((acknowledged as { id?: unknown; task_id?: unknown }).id ?? (acknowledged as { task_id?: unknown }).task_id) !== id) {
+      throw new ApiError('UNKNOWN', 'Invalid mutation acknowledgment');
+    }
+    const ack = acknowledged as { status?: TaskStatus; assigned_to_id?: string | null; assigned_to_name?: string | null; room_state?: RoomState };
+    try {
+      return await findTask(id);
+    } catch (error) {
+      if (!(error instanceof ApiError) || !['NOT_FOUND', 'OFFLINE', 'UNKNOWN'].includes(error.code)) throw error;
+      const previous = lastKnownTasks.get(id);
+      if (!previous) throw new ApiError('UNKNOWN', 'Mutation committed, but task details are unavailable');
+      const status = ack.status && ['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(ack.status)
+        ? ack.status : previous.status;
+      const hasAssignee = Object.prototype.hasOwnProperty.call(ack, 'assigned_to_id');
+      const updated: Task = {
+        ...previous, status,
+        assigned_to_id: hasAssignee ? ack.assigned_to_id ?? null : previous.assigned_to_id,
+        assigned_to_name: hasAssignee ? (ack.assigned_to_name ?? (ack.assigned_to_id === previous.assigned_to_id ? previous.assigned_to_name : null)) : previous.assigned_to_name,
+        room_state: ack.room_state && ['CLEAN', 'DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(ack.room_state) ? ack.room_state : previous.room_state,
+      };
+      lastKnownTasks.set(id, updated);
+      return updated;
+    }
+  }
 
   return {
     mode: 'LIVE',
@@ -46,30 +93,54 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       if (filter?.type) q.set('type', filter.type);
       if (filter?.status) q.set('status', filter.status);
       const raw = await call<any>('GET', `/api/v1/ops/tasks${q.size ? `?${q}` : ''}`);
-      return (Array.isArray(raw) ? raw : raw.items ?? []).map(mapTask);
+      const items = Array.isArray(raw) ? raw : raw?.items;
+      if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
+      return items.map(mapTask);
     },
-    async claimTask(id) { await call('POST', `/api/v1/ops/tasks/${id}/claim`); return findTask(id); },
-    async setTaskStatus(id, status) { await call('PATCH', `/api/v1/ops/tasks/${id}/status`, { status }); return findTask(id); },
+    async claimTask(id) { const ack = await call('POST', `/api/v1/ops/tasks/${id}/claim`); return committedTask(id, ack); },
+    async setTaskStatus(id, status) { const ack = await call('PATCH', `/api/v1/ops/tasks/${id}/status`, { status }); return committedTask(id, ack); },
     async completeHousekeeping(id, report: HousekeepingReport) {
-      await call('POST', `/api/v1/ops/tasks/${id}/complete-report`, {
+      const ack = await call('POST', `/api/v1/ops/tasks/${id}/complete-report`, {
         summary: report.comment?.trim() || 'Cleaning completed',
         checklist: HOUSEKEEPING_CHECKLIST.map((code) => ({ code, label: code, done: !!report.checklist[code] })),
         evidence_urls: [], // photo upload needs the attachments API (backend item B5)
       });
-      return findTask(id);
+      return committedTask(id, ack);
     },
     async createMaintenance(req: NewMaintenance) {
       const created = await call<any>('POST', '/api/v1/ops/tasks', {
         type: 'MAINTENANCE', room_id: req.room_id, priority: req.priority,
         title: req.description.trim().slice(0, 180), description: `[${req.category}] ${req.description.trim()}`, source: 'MOBILE',
       });
-      return mapTask(created);
+      // POST /tasks commits the mutation and returns only {id,status}.
+      // Failure to re-read the first 300 tasks must NEVER make the user repeat
+      // an already-created request (and accidentally create a duplicate).
+      if (!created || typeof created.id !== 'string' || !created.id || created.status !== 'OPEN') {
+        throw new ApiError('UNKNOWN', 'Unexpected create acknowledgment from hotel API');
+      }
+      try { return await findTask(created.id); }
+      catch (e) {
+        // The acknowledged create is already successful; show only values
+        // guaranteed by the submitted payload and server acknowledgment.
+        if (!(e instanceof ApiError) || !['NOT_FOUND', 'OFFLINE', 'UNKNOWN'].includes(e.code)) throw e;
+        return {
+          id: created.id, type: 'MAINTENANCE', status: 'OPEN',
+          priority: req.priority, title: req.description.trim().slice(0, 180),
+          room_id: req.room_id, room_code: null,
+          assigned_to_id: null, assigned_to_name: null,
+        };
+      }
     },
     async listRooms(): Promise<Room[]> {
       // The existing API exposes no staff "rooms list" endpoint: derive rooms from tasks until backend item B7 lands.
       const tasks = await this.listTasks();
       const seen = new Map<string, Room>();
-      for (const t of tasks) if (t.room_id && !seen.has(t.room_id)) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: 0, state: 'UNKNOWN' });
+      for (const t of tasks) if (t.room_id) {
+        const existing = seen.get(t.room_id);
+        const state = t.room_state ?? 'UNKNOWN';
+        if (!existing) seen.set(t.room_id, { id: t.room_id, code: t.room_code ?? '—', floor: 0, state });
+        else if (existing.state === 'UNKNOWN' && state !== 'UNKNOWN') existing.state = state;
+      }
       return [...seen.values()];
     },
     async setRoomState(roomId, state: RoomState) {
@@ -78,12 +149,13 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
     },
     async listStaff(): Promise<StaffMember[]> {
       const raw = await call<any>('GET', '/api/v1/admin/staff/overview');
-      const list: any[] = raw.staff ?? raw.items ?? [];
-      return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.open_tasks ?? 0 }));
+      const list: any[] = raw?.staff ?? raw?.items;
+      if (!Array.isArray(list)) throw new ApiError('UNKNOWN', 'Invalid staff overview response');
+      return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.active_tasks ?? s.open_tasks ?? 0, active: s.active !== false }));
     },
     async assignTask(taskId, staffId) {
-      await call('PATCH', `/api/v1/ops/tasks/${taskId}/assignee`, { assigned_to_id: staffId });
-      return findTask(taskId);
+      const ack = await call('PATCH', `/api/v1/ops/tasks/${taskId}/assignee`, { assigned_to_id: staffId });
+      return committedTask(taskId, ack);
     },
     async daySummary(): Promise<DaySummary> {
       // No aggregate endpoint in the existing contract yet (backend item B8).
@@ -92,8 +164,10 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
   };
 
   async function findTask(id: string): Promise<Task> {
-    const list = await call<any>('GET', '/api/v1/ops/tasks?limit=200');
-    const t = (Array.isArray(list) ? list : list.items ?? []).find((x: any) => String(x.id) === id);
+    const list = await call<any>('GET', '/api/v1/ops/tasks?limit=300');
+    const items = Array.isArray(list) ? list : list?.items;
+    if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
+    const t = items.find((x: any) => String(x.id) === id);
     if (!t) throw new ApiError('NOT_FOUND');
     return mapTask(t);
   }

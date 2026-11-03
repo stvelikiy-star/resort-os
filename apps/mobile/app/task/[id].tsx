@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Camera, Check, ChevronLeft, Play, Send, Square } from 'lucide-react-native';
 import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
 import { prioKey, priorityTone, statusKey } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space, TOUCH } from '../../src/theme/tokens';
 import { canTransition, HOUSEKEEPING_CHECKLIST, Task } from '../../src/api/types';
@@ -18,23 +18,30 @@ export default function TaskDetail() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user } = useSession();
-  const ws = workspaceFor(user!.role);
-  const { data: task, loading, setData } = useAsync<Task | null>(async () => (await api!.listTasks()).find((x) => x.id === id) ?? null, [api, id]);
+  const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE');
+  const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => user && api && ws.mobileReady ? (await api.listTasks()).find((x) => x.id === id) ?? null : null, [api, id, user?.id]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [comment, setComment] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
+  const [actionError, setActionError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const actionLock = useRef(false);
 
   const run = async (fn: () => Promise<Task>, okMsg?: string) => {
-    setBusy(true); setMsg(null);
-    try { const n = await fn(); setData(n); if (okMsg) setMsg(okMsg); } catch (e: any) { setMsg(t(e?.code === 'FORBIDDEN' ? 'errors.forbidden' : e?.code === 'OFFLINE' ? 'errors.offline' : 'errors.generic')); } finally { setBusy(false); }
+    if (actionLock.current || !user || !api || !ws.mobileReady) return;
+    actionLock.current = true;
+    setBusy(true); setMsg(null); setActionError(false);
+    try { const n = await fn(); setData(n); if (okMsg) setMsg(okMsg); } catch (e: any) { setActionError(true); setMsg(t(e?.code === 'FORBIDDEN' ? 'errors.forbidden' : e?.code === 'OFFLINE' ? 'errors.offline' : 'errors.generic')); } finally { actionLock.current = false; setBusy(false); }
   };
 
+  if (!user || !api) return <Redirect href="/connect" />;
+  if (!ws.mobileReady) return <Redirect href="/profile" />;
   if (loading && !task) return <Screen><Empty text={t('common.loading')} /></Screen>;
+  if (error) return <Screen><Card onPress={reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card></Screen>;
   if (!task) return <Screen><Empty text={t('errors.notFound')} /></Screen>;
   const isHk = task.type === 'HOUSEKEEPING';
   const allChecked = HOUSEKEEPING_CHECKLIST.every((k) => checks[k]);
-  const canInspect = ws.canManage || user!.role === 'RECEPTION';
+  const canInspect = ws.canManage;
 
   return (
     <Screen>
@@ -86,7 +93,7 @@ export default function TaskDetail() {
           <Button label={t('tasks.reject')} variant="secondary" disabled={busy} onPress={() => run(() => api!.setTaskStatus(task.id, 'IN_PROGRESS'))} />
         </View>
       ) : null}
-      {msg ? <Text testID="task-msg" style={[font.body, { color: c.primary, fontWeight: '700' }]}>{msg}</Text> : null}
+      {msg ? <Text testID="task-msg" style={[font.body, { color: actionError ? c.danger : c.success, fontWeight: '700' }]}>{msg}</Text> : null}
     </Screen>
   );
 }

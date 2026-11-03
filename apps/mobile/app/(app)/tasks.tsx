@@ -1,14 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Plus } from 'lucide-react-native';
-import { Card, DemoBanner, Empty, FadeIn, PressScale, Screen, SectionLabel } from '../../src/components/ui';
+import { AnimatedProgressBar, Card, DemoBanner, Empty, FadeIn, PressScale, Screen, SectionLabel } from '../../src/components/ui';
 import { TaskCard } from '../../src/components/domain';
 import { Hero } from '../../src/components/Brand';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 import type { Task } from '../../src/api/types';
@@ -18,8 +18,13 @@ export default function Tasks() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user, hotel } = useSession();
-  const ws = workspaceFor(user!.role);
+  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
+  const hasFocused = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (hasFocused.current) void reload();
+    else hasFocused.current = true;
+  }, [reload]));
 
   const { active, finished, pct } = useMemo(() => {
     const list = data ?? [];
@@ -32,16 +37,14 @@ export default function Tasks() {
     <Screen>
       <FadeIn>
         <Hero>
-          <Text style={[font.label, { color: '#CDEEEC' }]}>{hotel?.name.toUpperCase()} · {t(`roles.${user!.role}`).toUpperCase()}</Text>
+          <Text style={[font.label, { color: '#D4E3F4' }]}>{hotel?.name.toUpperCase()} · {t(`roles.${user!.role}`).toUpperCase()}</Text>
           <Text style={[font.title, { color: '#fff', marginTop: 4 }]}>{user!.display_name}</Text>
           <View style={{ marginTop: space.lg, gap: 6 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={[font.small, { color: '#CDEEEC' }]}>{t('tasks.progress')}</Text>
+              <Text style={[font.small, { color: '#D4E3F4' }]}>{t(api?.mode === 'LIVE' ? 'tasks.progressVisible' : 'tasks.progress')}</Text>
               <Text testID="progress-pct" style={[font.small, { color: '#fff', fontWeight: '800' }]}>{pct}%</Text>
             </View>
-            <View style={{ height: 10, borderRadius: 6, backgroundColor: 'rgba(255,255,255,0.25)' }}>
-              <View style={{ width: `${pct}%`, height: 10, borderRadius: 6, backgroundColor: '#E9B872' }} />
-            </View>
+            <AnimatedProgressBar percent={pct} />
           </View>
         </Hero>
       </FadeIn>
@@ -56,7 +59,7 @@ export default function Tasks() {
         </>
       ) : null}
 
-      <SectionLabel>{t('tasks.today')}</SectionLabel>
+      <SectionLabel>{t(api?.mode === 'LIVE' ? 'tasks.visible' : 'tasks.today')}</SectionLabel>
       {loading && !data ? <Empty text={t('common.loading')} /> : null}
       {error ? <Card onPress={reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card> : null}
       {!loading && !error && !ws.mobileReady ? <Empty text={t('admin.forbidden')} /> : null}
