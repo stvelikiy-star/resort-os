@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { getLocales } from 'expo-localization';
 import { AppState } from 'react-native';
 import { apiFor, dropApi } from '../api/factory';
+import { createRealApi } from '../api/realApi';
+import { flushPendingCookieLogouts, hasUnrevokedCookieForHost, queueCookieLogout } from '../lib/pendingLogout';
 import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
 import type { AuthUser, StaffApi } from '../api/types';
@@ -110,6 +112,20 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     return () => sub.remove();
   }, [hotel, api, user]);
 
+  // Retry an unfinished logout on startup / foreground; no user data is
+  // exposed while the OS cookie may still exist. A signed app trust anchor
+  // must approve the target origin before any automatic request.
+  useEffect(() => {
+    const tryRevoke = () => {
+      void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+    };
+    tryRevoke();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') tryRevoke();
+    });
+    return () => sub.remove();
+  }, []);
+
   const setLocale = useCallback((l: Locale) => { initI18n(l); setLocaleState(l); void setItem('marina.locale', l); }, []);
   const selectHotel = useCallback((id: string | null) => {
     // A hotel switch is a security boundary: do not reuse an earlier user
@@ -170,6 +186,14 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
     if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) throw new ApiError('FORBIDDEN', 'Untrusted hotel address');
+    if (!hotel.demo) {
+      // A cookie from a previous offline sign-out could still be active.
+      // Revoke it before sending fresh credentials to the same host.
+      await flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+      if (await hasUnrevokedCookieForHost(hotel.baseUrl)) {
+        throw new ApiError('OFFLINE', 'Previous server logout is still pending');
+      }
+    }
     const revision = sessionRevision.current;
     const attempt = ++loginAttempt.current;
     const signedIn = await api.login(username, password);
@@ -190,14 +214,19 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel || !api) return;
     sessionRevision.current++;
     loginAttempt.current++;
-    try {
-      await api.logout();
-    } catch {
-      // A failed network logout must not leave employee data visible locally.
-      // The server session may remain valid until it expires/revocation.
-    } finally {
-      dropApi(hotel.id);
-      setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
+    if (!hotel.demo) {
+      try { await queueCookieLogout(hotel.baseUrl); }
+      catch { /* local clearance still takes priority */ }
+    }
+    // Clear on-device identity immediately; never await network to sign out.
+    dropApi(hotel.id);
+    setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
+    if (hotel.demo) {
+      try { await api.logout(); } catch { /* isolated demo only */ }
+    } else {
+      // Retry asynchronously here, at next app foreground and before sign-in.
+      // A pending entry is only removed after the server confirms logout.
+      void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
     }
   }, [hotel, api]);
 

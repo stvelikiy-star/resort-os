@@ -39,7 +39,7 @@ export default function Profile() {
       <SectionLabel>{t('profile.theme')}</SectionLabel>
       <Segmented<ThemePref> value={pref} onChange={setPref} options={[{ key: 'system', label: t('profile.system') }, { key: 'light', label: t('profile.light') }, { key: 'dark', label: t('profile.dark') }]} />
       <View style={{ gap: space.sm, marginTop: space.md }}>
-        <Button label={t('profile.switchHotel')} icon={Repeat} variant="secondary" onPress={() => { leaveHotel(); router.replace('/connect'); }} />
+        <Button label={t('profile.switchHotel')} icon={Repeat} variant="secondary" onPress={async () => { await signOut(); leaveHotel(); router.replace('/connect'); }} />
         <Button testID="sign-out" label={t('profile.signOut')} icon={LogOut} variant="danger" onPress={async () => { await signOut(); router.replace('/login'); }} />
       </View>
     </FutureScreen>
