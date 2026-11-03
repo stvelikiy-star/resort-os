@@ -1,0 +1,30 @@
+name: MARINA Mobile Dependency Audit
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/package-lock.json'
+      - '.github/workflows/marina-mobile-dependency-audit.yml'
+  schedule:
+    # Scheduled workflows run only from GitHub's default branch after an approved merge.
+    - cron: '15 3 * * 1'
+permissions:
+  contents: read
+jobs:
+  audit:
+    name: npm audit of production dependency tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Reproducible install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Fail on production moderate-or-higher advisories
+        run: npm audit --omit=dev --audit-level=moderate

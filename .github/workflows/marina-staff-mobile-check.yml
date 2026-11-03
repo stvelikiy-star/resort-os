@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: '22.13.1'
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Verify Expo dependency alignment
         run: npx expo install --check
       - name: Verify mobile routes against actual PMS source
