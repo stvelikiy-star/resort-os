@@ -57,6 +57,9 @@ export interface BookingCommit extends BookingDraft {
 export interface Hold {
   id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
 }
+export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
+export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
+export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
 export type KitchenStatus = 'NEW' | 'ACCEPTED' | 'COOKING' | 'READY' | 'SERVED' | 'CANCELLED';
 export interface KitchenOrder {
   id: string; order_number: string; status: KitchenStatus;
@@ -144,7 +147,10 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     kitchenStatus: (id: string, status: KitchenStatus) => request<unknown>('PATCH', p + '/kitchen/orders/' + encoded(id) + '/status', { status }),
     diningFloor: () => request<DiningFloor>('GET', p + '/dining/floor'),
     claimWaiterOrder: (id: string, waiterId: string) => request<unknown>('PATCH', p + '/dining/orders/' + encoded(id) + '/waiter', { waiter_id: waiterId }),
-    assistantCapabilities: () => request<Record<string, unknown>>('GET', p + '/assistant/capabilities'),
+    assistantCapabilities: () => request<AssistantCapabilities>('GET', p + '/assistant/capabilities'),
+    assistantChat: (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => request<AssistantAnswer>('POST', p + '/assistant/chat', {
+      messages: messages.slice(-10), locale, current_screen: currentScreen,
+    }),
   };
 }
 export function useLiveModules() {

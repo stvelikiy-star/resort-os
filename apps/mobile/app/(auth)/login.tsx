@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react-native';
 import { Button, Card, DemoBanner, FadeIn, Field, PressScale, Screen, SectionLabel } from '../../src/components/ui';
-import { Logo } from '../../src/components/Brand';
+import { Hero, Logo, Wordmark } from '../../src/components/Brand';
+import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
 import { useSession } from '../../src/state/session';
 import { homeForSession } from '../../src/roles/registry';
@@ -31,22 +32,24 @@ export default function Login() {
   };
 
   return (
-    <Screen>
+    <FutureScreen>
       <PressScale onPress={() => { leaveHotel(); router.replace('/connect'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('login.change')}>
         <ChevronLeft size={22} color={c.primary} /><Text style={[font.body, { color: c.primary }]}>{t('login.change')}</Text>
       </PressScale>
       <FadeIn style={{ gap: space.sm }}>
-        <Logo size={56} />
-        <Text style={[font.title, { color: c.text }]}>{t('login.title')}</Text>
+        <Hero height={170}>
+          <View style={{ flexDirection:'row',alignItems:'center',gap:12 }}><Logo size={56}/><Wordmark color="#FFFFFF"/></View>
+          <Text style={[font.title,{color:'#FFFFFF',marginTop:14}]}>{t('login.title')}</Text>
+        </Hero>
         <Text style={[font.body, { color: c.textMuted }]}>{t('login.hotel')}: {hotel?.name}</Text>
         {hotel?.demo ? <DemoBanner /> : null}
       </FadeIn>
-      <Card style={{ gap: space.md }}>
+      <GlassCard style={{ gap: space.md }}>
         <Field label={t('login.username')} value={u} onChangeText={setU} autoCapitalize="none" autoCorrect={false} testID="login-username" />
         <Field label={t('login.password')} value={p} onChangeText={setP} secureTextEntry testID="login-password" />
         {err ? <Text testID="login-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
         <Button testID="login-submit" label={t('login.signIn')} onPress={() => go(u, p)} disabled={busy || !u || !p} />
-      </Card>
+      </GlassCard>
       {hotel?.demo ? (
         <>
           <SectionLabel>{t('login.demoRole')}</SectionLabel>
@@ -59,6 +62,6 @@ export default function Login() {
           </View>
         </>
       ) : null}
-    </Screen>
+    </FutureScreen>
   );
 }

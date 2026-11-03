@@ -1,9 +1,10 @@
 import React, { useCallback, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { BedDouble, CalendarCheck, CalendarClock, MessageCircle, ShieldAlert, Wallet } from 'lucide-react-native';
-import { Hero, Logo } from '../../src/components/Brand';
-import { Card, Empty, FadeIn, Screen, SectionLabel, Title } from '../../src/components/ui';
+import { BedDouble, CalendarCheck, CalendarClock, MessageCircle, ShieldAlert, Wallet, Sparkles, CalendarDays } from 'lucide-react-native';
+import { Hero } from '../../src/components/Brand';
+import { DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
+import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useLiveModules, Dashboard } from '../../src/api/liveModules';
@@ -20,47 +21,45 @@ export default function Overview() {
   const { data, loading, error, reload } = useAsync<Dashboard | null>(() => live ? live.dashboard() : Promise.resolve(null), [live, user?.id, user?.module_permissions?.join(',')]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
-  const currency = 'KGS';
-  const money = (value: number) => Number(value || 0).toLocaleString('ru-RU') + ' ' + currency;
-  return <Screen>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-      <Logo size={54} />
-      <View style={{ flex: 1 }}><Title sub={hotel?.name}>{copy.overview}</Title><Text style={[font.small, { color: c.textMuted }]}>{user?.display_name} · {user?.role}</Text></View>
-    </View>
-    {!live ? <Empty text={copy.unavailable} /> : null}
-    {loading && live ? <Empty text={copy.loading} /> : null}
-    {error ? <Card onPress={reload}><Text accessibilityRole="alert" style={[font.body, { color: c.danger }]}>{error.message} · {copy.retry}</Text></Card> : null}
+  const money = (value: number) => Number(value).toLocaleString('ru-RU') + ' KGS';
+  return <FutureScreen>
+    <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user?.display_name || 'MARINA SMART'}
+      right={live && user && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={46} onPress={() => router.push('/ai')}/> : null}/>
+    {hotel?.demo ? <DemoBanner/> : null}
+    {!live ? <Empty text={copy.unavailable}/> : null}
+    {loading && live ? <LoadingShimmer count={3}/> : null}
+    {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
-      <FadeIn><Hero>
-        <Text style={[font.small, { color: '#D4E3F4' }]}>{data.property.name} · {data.property.local_date}</Text>
-        <Text style={[font.title, { color: '#FFFFFF', fontSize: 38, marginTop: 8 }]}>{data.stays.occupancy_percent}%</Text>
-        <Text style={[font.body, { color: '#D4E3F4' }]}>{copy.occupancy}: {data.stays.occupied_rooms} / {data.rooms.total}</Text>
-        <View style={{ flexDirection: 'row', gap: space.md, marginTop: space.lg }}>
-          <View style={{ flex: 1 }}><Text style={[font.h2, { color: '#fff' }]}>{data.stays.arrivals_today}</Text><Text style={[font.small, { color: '#D4E3F4' }]}>{copy.arrivals}</Text></View>
-          <View style={{ flex: 1 }}><Text style={[font.h2, { color: '#fff' }]}>{data.stays.departures_today}</Text><Text style={[font.small, { color: '#D4E3F4' }]}>{copy.departures}</Text></View>
+      <StaggerItem index={0}><Hero>
+        <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
+          <Text style={[font.label, { color:'#C8E8F5' }]}>{data.property.name.toUpperCase()} · {data.property.local_date}</Text>
+          <Text style={[font.label, { color:'#E7C480' }]}>LIVE PMS</Text>
         </View>
-      </Hero></FadeIn>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-        {[
-          { icon: Wallet, label: copy.revenue, value: money(data.finance.confirmed_payments_today_kgs) },
-          { icon: ShieldAlert, label: copy.debt, value: money(data.finance.active_reservations_remaining_kgs) },
-          { icon: MessageCircle, label: copy.needsReply, value: String(data.communications.needs_reply), go: '/inbox' },
-          { icon: BedDouble, label: copy.dirty, value: String(data.rooms.dirty), go: '/pms' },
-        ].map((x) => <Card key={x.label} onPress={x.go ? () => router.push(x.go as '/pms') : undefined} style={{ width: '47%', flexGrow: 1, gap: 8 }}>
-          <x.icon size={22} color={c.primary} /><Text style={[font.h2, { color: c.text }]}>{x.value}</Text><Text style={[font.small, { color: c.textMuted }]}>{x.label}</Text>
-        </Card>)}
-      </View>
-      <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text>
+        <Text style={[font.display, { color:'#FFFFFF', fontSize:45, marginTop:14 }]}>{data.stays.occupancy_percent}%</Text>
+        <Text style={[font.body, { color:'#D6E9F7' }]}>{copy.occupancy} · {data.stays.occupied_rooms}/{data.rooms.total}</Text>
+        <View style={{ height:1, backgroundColor:'rgba(255,255,255,0.16)', marginTop:20, marginBottom:14 }}/>
+        <View style={{ flexDirection:'row', gap:space.lg }}>
+          <View style={{ flex:1 }}><Text style={[font.h2,{color:'#FFFFFF'}]}>{data.stays.arrivals_today}</Text><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.arrivals}</Text></View>
+          <View style={{ flex:1 }}><Text style={[font.h2,{color:'#FFFFFF'}]}>{data.stays.departures_today}</Text><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.departures}</Text></View>
+        </View>
+      </Hero></StaggerItem>
       <SectionLabel>{copy.today}</SectionLabel>
-      <View style={{ flexDirection: 'row', gap: space.md }}>
-        <Card onPress={() => router.push('/pms')} style={{ flex: 1, gap: 6 }}><CalendarCheck color={c.primary} size={26}/><Text style={[font.body, { color: c.text }]}>{copy.arrivals}</Text><Text style={[font.h2, { color: c.text }]}>{data.today.arrivals.length}</Text></Card>
-        <Card onPress={() => router.push('/reception')} style={{ flex: 1, gap: 6 }}><CalendarClock color={c.primary} size={26}/><Text style={[font.body, { color: c.text }]}>{copy.departures}</Text><Text style={[font.h2, { color: c.text }]}>{data.today.departures.length}</Text></Card>
+      <View style={{ flexDirection:'row', flexWrap:'wrap', gap:space.md }}>
+        <MetricCard icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
+        <MetricCard icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
+        <MetricCard icon={MessageCircle} label={copy.needsReply} value={String(data.communications.needs_reply)} onPress={user?.module_permissions?.includes('WHATSAPP') ? () => router.push('/inbox') : undefined}/>
+        <MetricCard icon={BedDouble} label={copy.dirty} value={String(data.rooms.dirty)} onPress={user?.module_permissions?.includes('PMS') ? () => router.push('/pms') : undefined}/>
       </View>
+      <SectionLabel>{copy.available}</SectionLabel>
+      {user?.module_permissions?.includes('PMS') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
+      {user?.module_permissions?.includes('WHATSAPP') ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
       <SectionLabel>{copy.urgent} · {data.tasks.urgent_active}</SectionLabel>
-      {data.attention_tasks.length === 0 ? <Empty text={copy.empty} /> : data.attention_tasks.slice(0, 8).map(t =>
-        <Card key={t.id} onPress={() => router.push({ pathname: '/task/[id]', params: { id: t.id } })}>
-          <Text style={[font.body, { color: c.text }]}>{t.title}</Text><Text style={[font.small, { color: c.textMuted }]}>{t.room_code ?? '—'} · {t.priority}</Text>
-        </Card>)}
+      {data.attention_tasks.length === 0 ? <Empty text={copy.empty}/> : data.attention_tasks.slice(0,8).map((t, i) => <StaggerItem index={i+1} key={t.id}>
+        <GlassCard onPress={() => router.push({pathname:'/task/[id]',params:{id:t.id}})} style={{ flexDirection:'row',alignItems:'center',gap:12 }}>
+          <View style={{width:42,height:42,borderRadius:14,backgroundColor:c.warningSoft,alignItems:'center',justifyContent:'center'}}><ShieldAlert size={22} color={c.warning}/></View>
+          <View style={{flex:1}}><Text style={[font.h2,{color:c.text}]}>{t.title}</Text><Text style={[font.small,{color:c.textMuted}]}>{t.room_code||'—'} · {t.priority}</Text></View>
+        </GlassCard>
+      </StaggerItem>)}
     </> : null}
-  </Screen>;
+  </FutureScreen>;
 }
