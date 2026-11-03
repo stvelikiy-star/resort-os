@@ -40,6 +40,22 @@ describe('demo api', () => {
     expect((await g.assignTask('t6', 'u-maid')).assigned_to_id).toBe('u-maid');
     await expect(g.assignTask('t4', 'u-maid')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
+  it('demo denies claiming work assigned to another employee and denies other role types', async () => {
+    const maid = await login('h', 'maid');
+    await expect(maid.claimTask('t3')).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(maid.claimTask('t4')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const tech = await login('h2', 'tech');
+    expect((await tech.listTasks()).every((task) => task.type === 'MAINTENANCE')).toBe(true);
+    await expect(tech.completeHousekeeping('t2', { checklist: {} })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+  it('demo inspection is reserved for managers and only compatible task assignees are accepted', async () => {
+    const reception = await login('h', 'reception');
+    expect(await reception.listTasks()).toEqual([]);
+    await expect(reception.setTaskStatus('t3', 'DONE')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const manager = await login('hotel-management', 'manager');
+    await expect(manager.assignTask('t6', 'u-maid')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(manager.assignTask('t7', 'u-maid')).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
   it('hotels are isolated: different data and no shared state', async () => {
     const a = await login('demo-marina', 'manager'); const b = await login('demo-sunrise', 'manager');
     expect((await a.listRooms())[0].code.startsWith('M-')).toBe(true);
@@ -48,7 +64,9 @@ describe('demo api', () => {
     expect((await b.listRooms())[0].state).toBe('DIRTY');
   });
   it('creates maintenance requests and validates text', async () => {
-    const a = await login('h', 'reception');
+    const reception = await login('h-reception', 'reception');
+    await expect(reception.createMaintenance({ room_id: 'r1', category: 'OTHER', priority: 'LOW', description: 'Door' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    const a = await login('h', 'tech');
     await expect(a.createMaintenance({ room_id: null, category: 'OTHER', priority: 'LOW', description: ' ' })).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect((await a.createMaintenance({ room_id: 'r1', category: 'PLUMBING', priority: 'HIGH', description: 'Leak' })).type).toBe('MAINTENANCE');
   });
