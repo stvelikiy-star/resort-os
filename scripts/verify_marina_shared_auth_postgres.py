@@ -411,7 +411,7 @@ def main():
         assert stored[rid_a]['status'] == 'CANCELLED'
         assert stored[rid_b]['status'] == 'GUARANTEED'
         # Shared preview intentionally refuses other mutating PMS workflows.
-        assert canonical_client.post('/api/v1/admin/booking/reservations/'+rid_b+'/payments', json={}).status_code == 503
+        assert canonical_client.post('/api/v1/admin/booking/reservations/'+rid_b+'/payments', json={}).status_code == 422  # only well-formed internal payments allowed
         auth._preview_attempts.clear()
 
         # HOLD acceptance on the actual composed MARINA API and real PostgreSQL.
@@ -686,6 +686,103 @@ def main():
         for item in dates_stored.values():
             assert item['totalKgs'] == price and item['payments'] == 0
 
+        # Strictly internal manual payment facts, NOT acquiring/bank settlement.
+        # The shared staging gate must not open legacy provider/QR callbacks.
+        pay_base = '/api/v1/admin/booking/reservations/'
+        def payment_payload(label, amount):
+            return {
+                'amount_kgs':amount,'method':'CASH',
+                'idempotency_key':'shared-manual-'+label+'-'+secrets.token_hex(12),
+                'external_ref':'synthetic-cash-'+label+'-'+secrets.token_hex(8),
+                'note':'Synthetic CI cash recorded, no bank confirmation',
+            }
+        owner_login('a')
+        status_a = canonical_client.get(pay_base+rid_after_expiry_a+'/acquiring-readiness')
+        assert status_a.status_code == 200, status_a.text
+        assert status_a.json()['paid_kgs'] == 0
+        assert status_a.json()['provider_connected'] is False
+        assert status_a.json()['acquiring_status'] == 'NOT_CONFIGURED'
+        assert canonical_client.get(pay_base+rid_hold_b+'/acquiring-readiness').status_code == 404
+        assert canonical_client.get(pay_base+rid_hold_b+'/cancellation-finance-review').status_code == 404
+        assert canonical_client.post(pay_base+rid_hold_b+'/payments', json=payment_payload(
+            'foreign-b',1000)).status_code == 404
+        assert canonical_client.post(pay_base+rid_a+'/payments', json=payment_payload(
+            'cancelled-a',1000)).status_code == 409
+        assert canonical_client.post(pay_base+rid_after_expiry_a+'/payments',json={
+            'method':'QR','amount_kgs':100,
+            'idempotency_key':'shared-disallowed-method-'+secrets.token_hex(8)}).status_code == 422
+
+        pay_a = payment_payload('hotel-a',4000)
+        accepted_a = canonical_client.post(pay_base+rid_after_expiry_a+'/payments',json=pay_a)
+        assert accepted_a.status_code == 201, accepted_a.text
+        assert accepted_a.json()['idempotent_replay'] is False
+        pay_id_a = accepted_a.json()['payment_id']
+        assert accepted_a.json()['payment']['provider'] == 'MANAGER_MANUAL'
+        assert accepted_a.json()['finance']['paid_kgs'] == 4000
+        assert accepted_a.json()['finance']['remaining_kgs'] == price-4000
+        replay_a = canonical_client.post(pay_base+rid_after_expiry_a+'/payments',json=pay_a)
+        assert replay_a.status_code == 201 and replay_a.json()['idempotent_replay'] is True, replay_a.text
+        assert replay_a.json()['payment_id'] == pay_id_a
+        changed_key = canonical_client.post(pay_base+rid_after_expiry_a+'/payments',
+            json={**pay_a,'amount_kgs':4001})
+        assert changed_key.status_code == 409
+        overpayment = canonical_client.post(pay_base+rid_after_expiry_a+'/payments',
+                                            json=payment_payload('overpayment',price))
+        assert overpayment.status_code == 409, overpayment.text
+        after_a = canonical_client.get(pay_base+rid_after_expiry_a+'/acquiring-readiness')
+        assert after_a.status_code == 200 and after_a.json()['paid_kgs'] == 4000
+        assert after_a.json()['provider_connected'] is False
+        finance_a = canonical_client.get(pay_base+rid_after_expiry_a+'/cancellation-finance-review')
+        assert finance_a.status_code == 200 and finance_a.json()['requires_manual_review'] is True
+        assert canonical_client.post(
+            '/api/v1/admin/pms/reservations/'+rid_after_expiry_a+'/cancel').status_code == 409
+
+        owner_login('b')
+        assert canonical_client.get(pay_base+rid_after_expiry_a+'/acquiring-readiness').status_code == 404
+        assert canonical_client.post(pay_base+rid_after_expiry_a+'/payments',
+                                    json=payment_payload('foreign-a',500)).status_code == 404
+        status_b = canonical_client.get(pay_base+rid_hold_b+'/acquiring-readiness')
+        assert status_b.status_code == 200 and status_b.json()['paid_kgs'] == 0
+        pay_b = payment_payload('hotel-b',2000)
+        accepted_b = canonical_client.post(pay_base+rid_hold_b+'/payments',json=pay_b)
+        assert accepted_b.status_code == 201 and accepted_b.json()['finance']['paid_kgs'] == 2000
+        pay_id_b = accepted_b.json()['payment_id']
+        assert pay_id_b != pay_id_a
+        assert canonical_client.get(pay_base+rid_hold_b+'/cancellation-finance-review').json()['requires_manual_review']
+
+        # Unauthorized RECEPTION cannot read or manufacture a manual payment.
+        auth._preview_attempts.clear()
+        reception_auth = canonical_client.post('/api/v1/auth/login', json=dict(
+            username='synthetic-reception', password=receptionist_password,
+            tenant_code='tenant_a', property_code='HOTEL_A'))
+        assert reception_auth.status_code == 200, reception_auth.text
+        assert canonical_client.get(pay_base+rid_after_expiry_a+'/acquiring-readiness').status_code == 403
+        assert canonical_client.post(pay_base+rid_after_expiry_a+'/payments',
+                                    json=payment_payload('unauthorized',100)).status_code == 403
+
+        async def persisted_payment_scope():
+            conn = await asyncpg.connect(dsn)
+            try:
+                rows = await conn.fetch("""
+                    SELECT p.id,p."reservationId",r."propertyId",p."amountKgs",
+                           p.provider,p.status::text AS status
+                    FROM payments p JOIN reservations r ON r.id=p."reservationId"
+                    WHERE r.id=ANY($1::uuid[]) ORDER BY r."propertyId"
+                """, [uuid.UUID(rid_after_expiry_a),uuid.UUID(rid_hold_b)])
+                return rows
+            finally:
+                await conn.close()
+        paid_rows = asyncio.run(persisted_payment_scope())
+        assert len(paid_rows) == 2, paid_rows
+        scope_by_payment = {str(row['id']):row for row in paid_rows}
+        assert scope_by_payment[pay_id_a]['propertyId'] == ids['property_a']
+        assert scope_by_payment[pay_id_b]['propertyId'] == ids['property_b']
+        assert {row['status'] for row in paid_rows} == {'RECEIVED'}
+        assert {row['provider'] for row in paid_rows} == {'MANAGER_MANUAL'}
+        assert sum(int(row['amountKgs']) for row in paid_rows) == 6000
+        assert canonical_client.post(
+            '/api/v1/admin/booking/requests/'+rid_after_expiry_a+'/confirm-payment',json={}).status_code == 503
+        auth._preview_attempts.clear()
         # Shared payment, check-in and unreviewed staff ops remain unavailable.
         assert canonical_client.post(
             '/api/v1/admin/stays/reservations/'+rid_hold_b+'/check-in').status_code == 503
