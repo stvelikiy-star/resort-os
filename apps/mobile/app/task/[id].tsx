@@ -7,7 +7,7 @@ import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Ti
 import { prioKey, priorityTone, statusKey } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space, TOUCH } from '../../src/theme/tokens';
 import { canTransition, HOUSEKEEPING_CHECKLIST, Task } from '../../src/api/types';
@@ -18,7 +18,7 @@ export default function TaskDetail() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user } = useSession();
-  const ws = workspaceFor(user!.role);
+  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
   const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => (await api!.listTasks()).find((x) => x.id === id) ?? null, [api, id]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [comment, setComment] = useState('');
