@@ -33,15 +33,21 @@ export default function NewRequest() {
     if (sendLock.current || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
     sendLock.current = true;
     setBusy(true); setMsg(null);
+    let accepted = false;
     try {
       await api.createMaintenance({ room_id: roomId, category: cat, priority: prio, description: text });
+      accepted = true;
       setMsg(t('mt.sent'));
       returnTimer.current = setTimeout(() => router.back(), 600);
     } catch {
       setMsg(t('errors.generic'));
     } finally {
-      sendLock.current = false;
-      setBusy(false);
+      // Keep the form locked after an accepted POST until navigation unmounts it.
+      // Otherwise another tap in the 600ms confirmation window can create a duplicate.
+      if (!accepted) {
+        sendLock.current = false;
+        setBusy(false);
+      }
     }
   };
 
