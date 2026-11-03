@@ -32,6 +32,13 @@ describe('role → workspace', () => {
       expect(workspaceFor(r).tabs).toEqual(['profile']);
     }
   });
+  it('unknown future server roles fail closed to profile only', () => {
+    const unknown = 'DINING_STAFF' as Role;
+    expect(workspaceFor(unknown).mobileReady).toBe(false);
+    expect(homeFor(unknown)).toBe('/profile');
+    expect(hasTab(unknown, 'admin')).toBe(false);
+    expect(hasTab(unknown, 'tasks')).toBe(false);
+  });
   it('landing route is always an allowed tab', () => {
     for (const r of Object.keys(WORKSPACES) as Role[]) expect(WORKSPACES[r].tabs).toContain(homeFor(r).slice(1));
     expect(homeFor('WAITER')).toBe('/profile');
