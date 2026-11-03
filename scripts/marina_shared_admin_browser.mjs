@@ -126,6 +126,10 @@ try {
   await page.getByRole("button",{name:"Шахматка"}).click();
   await page.getByText("A101").waitFor();
   if (await page.getByText("B202").count()) throw new Error("Foreign room visible in hotel A");
+  await page.getByRole("button",{name:"Бронирования"}).click();
+  await page.getByText("HOTEL_A-BOOK").waitFor();
+  if (await page.getByText("HOTEL_B-BOOK").count()) throw new Error("Foreign reservation visible in hotel A");
+  await page.getByRole("button",{name:"Заселить"}).waitFor();
   await page.getByRole("button",{name:"Персонал"}).click();
   await page.getByRole("heading",{name:"Сотрудники (0)"}).waitFor();
   await page.getByLabel("Создание сотрудника").getByLabel("Логин").fill("employee-a");
