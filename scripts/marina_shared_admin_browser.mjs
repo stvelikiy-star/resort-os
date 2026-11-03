@@ -166,6 +166,8 @@ try {
   await page.getByText("R303").waitFor();
   await page.getByRole("button",{name:"Бронирования"}).click();
   await page.getByText("HOTEL_R-BOOK").waitFor();
+  await page.getByRole("button",{name:"Заселить"}).click();
+  await page.getByRole("alert").getByText("Статус операции не подтверждён.",{exact:false}).waitFor();
   if (errors.length) throw new Error(JSON.stringify(errors));
   console.log("MARINA_SHARED_ADMIN_BROWSER_PASS: main entry redirect, two hotel UI isolation, owner staff creation and revocation, reception restricted, 390px viewport");
 } finally {
