@@ -1,0 +1,81 @@
+name: MARINA Mobile Production Dependency Closure Diagnostic
+on:
+  push:
+    branches:
+      - probe/marina-mobile-runtime-dependency-closure-20261104
+    paths:
+      - .github/workflows/marina-mobile-runtime-dependency-closure-probe.yml
+permissions:
+  contents: read
+jobs:
+  production-closure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Recreate production-only install without test dependencies
+        run: |
+          set -euo pipefail
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Capture npm audit without relaxing the independent release gate
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-production-audit.json || true
+          node scripts/audit-provenance.mjs /tmp/marina-mobile-production-audit.json package-lock.json > /tmp/marina-mobile-production-provenance.json
+      - name: Verify actual on-disk closure against every audit-reported affected node
+        run: |
+          node --input-type=module <<'NODE' > /tmp/marina-mobile-production-closure.json
+          import { readFileSync, existsSync, realpathSync } from 'node:fs';
+          import { resolve, sep } from 'node:path';
+          const root=realpathSync(process.cwd());
+          const audit=JSON.parse(readFileSync('/tmp/marina-mobile-production-audit.json','utf8'));
+          const lock=JSON.parse(readFileSync('package-lock.json','utf8'));
+          if(!audit.vulnerabilities || typeof audit.vulnerabilities!=='object' || !lock.packages) throw Error('Audit or lockfile missing');
+          const evidence=[];
+          const exposures=[];
+          const unknown=[];
+          for(const [name,issue] of Object.entries(audit.vulnerabilities)){
+            if(!Array.isArray(issue?.nodes)||issue.nodes.length===0) throw Error('Missing affected package nodes: '+name);
+            for(const relative of issue.nodes){
+              if(typeof relative!=='string'||!/^node_modules\/(?:@[^/]+\/)?[^./][^/]*(?:\/node_modules\/(?:@[^/]+\/)?[^./][^/]*)*$/.test(relative)) {
+                throw Error('Unsafe or malformed affected package path: '+String(relative));
+              }
+              const manifest=lock.packages[relative];
+              const installedPath=resolve(root,relative,'package.json');
+              if(!installedPath.startsWith(root+sep)) throw Error('Outside dependency root');
+              const physicallyPresent=existsSync(installedPath);
+              if(physicallyPresent){
+                const real=realpathSync(installedPath);
+                if(!real.startsWith(root+sep)) throw Error('Unexpected dependency symlink out of tree');
+              }
+              const classification=manifest?.dev===true||manifest?.devOptional===true?'devOrDevOptional':manifest?'potentialRuntimeOrBuild':'unknown';
+              const row={advisory:name,severity:issue.severity,path:relative,version:manifest?.version??null,classification,physicallyPresent};
+              evidence.push(row);
+              if(physicallyPresent) exposures.push(row);
+              if(classification==='unknown'||classification==='potentialRuntimeOrBuild') unknown.push(row);
+            }
+          }
+          const report={disclaimer:'PRODUCTION_INSTALL_DIAGNOSTIC_ONLY__NOT_NATIVE_BUNDLE_PROOF__NOT_RELEASE_AUDIT_WAIVER',reportedAdvisories:Object.keys(audit.vulnerabilities).length,affectedNodes:evidence.length,presentAffectedNodes:exposures.length,unknownOrProductionNodes:unknown.length,evidence};
+          console.log(JSON.stringify(report,null,2));
+          if(exposures.length||unknown.length) process.exitCode=2;
+          NODE
+      - name: Print diagnostic summary
+        if: always()
+        run: |
+          node -e "const a=require('/tmp/marina-mobile-production-closure.json');console.log('PRODUCTION_INSTALL_CLOSURE',JSON.stringify({reportedAdvisories:a.reportedAdvisories,affectedNodes:a.affectedNodes,presentAffectedNodes:a.presentAffectedNodes,unknownOrProductionNodes:a.unknownOrProductionNodes}))"
+      - name: Upload diagnostic evidence (not a security exception)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-production-dependency-closure
+          path: |
+            /tmp/marina-mobile-production-audit.json
+            /tmp/marina-mobile-production-provenance.json
+            /tmp/marina-mobile-production-closure.json
+          retention-days: 7
+          if-no-files-found: warn
