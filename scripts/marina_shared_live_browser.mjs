@@ -139,32 +139,24 @@ async function completeStayViaBrowser(page,hotel){
   assert.match(inData.guest_access_pin,/^[0-9]{6}$/,"Missing one-time guest PIN");
   assert.equal(inData.guest_access_pin_display_once,true);
   await page.getByLabel("Одноразовый гостевой PIN").waitFor();
+  // The guest PIN is also shown by a blocking security modal. The operator
+  // must acknowledge/close that PIN window before any other PMS action.
+  const pinBackdrop=page.locator(".guest-pin-backdrop");
+  await pinBackdrop.waitFor();
+  await pinBackdrop.getByRole("button",{name:"Закрыть"}).click();
+  await pinBackdrop.waitFor({state:"detached"});
   const checkOutButton=row.getByRole("button",{name:"Выселить"});
   await checkOutButton.waitFor();
   await page.waitForFunction(() =>
     [...document.querySelectorAll("button")].some(button =>
       button.textContent?.trim()==="Выселить" && !button.disabled));
   console.log("STAY_PRE_CHECKOUT",hotel,"button-enabled",await checkOutButton.isEnabled());
-  const checkOutResponse=page.waitForResponse(res=>
-    res.url().endsWith("/core/api/v1/admin/stays/reservations/"+fixture.reservation_id+"/check-out") &&
-    res.request().method()==="POST");
-  try {
-    await checkOutButton.click({timeout:6000});
-  } catch (error) {
-    const facts=await checkOutButton.evaluate(button=>{
-      const r=button.getBoundingClientRect();
-      const midpoint=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-      return {disabled:button.disabled, text:button.textContent,
-        rect:{x:r.x,y:r.y,width:r.width,height:r.height},
-        pointerEvents:getComputedStyle(button).pointerEvents,
-        centerElement:midpoint?.outerHTML?.slice(0,400)??null,
-        documentHeight:document.documentElement.scrollHeight};
-    }).catch(e=>({lookupError:String(e)}));
-    console.log("STAY_CHECKOUT_ACTIONABILITY_ERROR",hotel,String(error).slice(0,1800),JSON.stringify(facts));
-    throw error;
-  }
-  console.log("STAY_POST_CHECKOUT_CLICK",hotel,"button-enabled",await checkOutButton.isEnabled());
-  const checkedOut=await checkOutResponse;
+  const [checkedOut] = await Promise.all([
+    page.waitForResponse(res=>
+      res.url().endsWith("/core/api/v1/admin/stays/reservations/"+fixture.reservation_id+"/check-out") &&
+      res.request().method()==="POST"),
+    checkOutButton.click(),
+  ]);
   assert.equal(checkedOut.status(),200,await checkedOut.text());
   const outData=await checkedOut.json();
   assert.equal(outData.reservation_id,fixture.reservation_id);
