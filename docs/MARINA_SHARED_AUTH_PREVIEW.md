@@ -33,6 +33,17 @@ uses server-trusted hotel ID and validates the quoted price, and the room
 inventory exclusion constraint prevents concurrent double booking.
 The shared PMS endpoints are API-only in this staging slice; the Admin UI
 still displays a read-only grid, without booking mutation controls.
+The shared reservation schedule slice also permits GET
+`/api/v1/admin/pms/reservations/{reservation_uuid}/schedule` and POST to
+`/schedule/preview` and `/schedule/commit` under existing OWNER/MANAGER PMS
+authorization. The schedule mutator was changed to resolve the property ID from
+the DB-validated authenticated session instead of looking up the displayed hotel
+code. Both schedule preview and commit clear only that property's expired HOLDs
+inside a transaction before checking room conflicts. The commit retains the
+reservation's stored amount, checks its expected version, logs the date move and
+refuses overlapping inventory. It does **not** recalculate or collect payments,
+and the shared Admin page still has no date-edit UI in this isolated stage.
+
 A reviewed shared HOLD slice additionally permits GET/POST
 `/api/v1/admin/pms/holds` and GET/DELETE
 `/api/v1/admin/pms/holds/{hold_uuid}` for OWNER/MANAGER.
