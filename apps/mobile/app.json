@@ -7,10 +7,16 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/marina-compass-seal.png"
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/marina-compass-seal.png",
+        "backgroundColor": "#071D3C"
+      },
+      "package": "kg.go.ms.staff"
     },
     "extra": {
       "environment": "development"
@@ -29,7 +35,14 @@
       ]
     ],
     "web": {
-      "bundler": "metro"
+      "bundler": "metro",
+      "favicon": "./assets/marina-compass-seal.png"
+    },
+    "icon": "./assets/marina-compass-seal.png",
+    "splash": {
+      "image": "./assets/marina-compass-seal.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#071D3C"
     }
   }
 }
