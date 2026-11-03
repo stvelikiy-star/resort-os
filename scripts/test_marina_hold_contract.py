@@ -59,6 +59,19 @@ class HoldContractTests(unittest.TestCase):
         self.assertIn('await expire_holds(conn, prop["id"])', commit)
         self.assertNotIn("await expire_holds(conn)", api + commit)
 
+    def test_background_worker_uses_only_pinned_hotel(self):
+        db = (ROOT / "services/api/app/db.py").read_text()
+        self.assertIn(
+            "from .auth import MARINA_TENANT_CONTEXT_ENABLED, PROPERTY_CODE", db
+        )
+        self.assertIn("if not MARINA_TENANT_CONTEXT_ENABLED:", db)
+        self.assertIn(
+            "'SELECT id FROM properties WHERE code=$1', PROPERTY_CODE", db
+        )
+        self.assertIn("await expire_holds(conn, property_id)", db)
+        self.assertNotIn("await expire_holds(conn)", db)
+        self.assertIn("await asyncio.sleep(30)", db)
+
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()
         grid = (ROOT / "apps/admin/components/PMSOwnerGrid.tsx").read_text()
