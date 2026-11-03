@@ -6,6 +6,7 @@ export const en: Dict = {
   connect: {
     title: 'Connect to a hotel', subtitle: 'Each hotel is a separate secure connection. Hotel data is never mixed.',
     addHotel: 'Add hotel', code: 'Invitation code or address', codePh: 'e.g. marina-bishkek', scan: 'Scan QR', demoHotels: 'Demo hotels',
+    tryDemoTitle: 'Explore MARINA STAFF', tryDemoHint: 'Open the manager workspace, tasks and rooms. All content uses synthetic demo data.', tryDemoButton: 'Open manager demo',
     browserLiveNotice: 'In a browser, sign-in to a hotel on another domain may fail due to cookie and CORS restrictions. Use the Android app or an approved test domain for PMS access.',
     secureOnly: 'Only HTTPS addresses are allowed', invalid: 'Invalid code or address', connected: 'Connected', choose: 'Choose a hotel', noSecrets: 'The app stores no server secrets',
   },
