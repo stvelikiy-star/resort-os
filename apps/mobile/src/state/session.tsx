@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { getLocales } from 'expo-localization';
 import { apiFor, dropApi } from '../api/factory';
 import { DEMO_HOTELS, HotelConnection } from '../api/hotels';
+import { ApiError } from '../api/types';
 import type { AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
 import { getItem, setItem } from '../lib/storage';
@@ -53,9 +54,15 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   }, []);
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
-    const u = await api.login(username, password);
-    setSessions((s) => ({ ...s, [hotel.id]: u }));
-    return u;
+    const signedIn = await api.login(username, password);
+    // A native cookie may not persist after a successful login response.
+    // Confirm that subsequent authenticated requests resolve to the SAME user.
+    const verified = api.mode === 'LIVE' ? await api.me() : signedIn;
+    if (!verified || verified.id !== signedIn.id || verified.property_code !== signedIn.property_code) {
+      throw new ApiError('UNAUTHORIZED', 'Session or hotel identity changed during login');
+    }
+    setSessions((s) => ({ ...s, [hotel.id]: verified }));
+    return verified;
   }, [hotel, api]);
   const signOut = useCallback(async () => {
     if (!hotel || !api) return;
