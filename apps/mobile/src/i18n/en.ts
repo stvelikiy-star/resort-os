@@ -1,12 +1,12 @@
 import type { Dict } from './ru';
 export const en: Dict = {
-  common: { appName: 'MARINA STAFF', cancel: 'Cancel', save: 'Save', back: 'Back', next: 'Next', done: 'Done', retry: 'Retry', loading: 'Loading…', empty: 'Nothing here yet', demo: 'DEMO MODE · not PMS data', room: 'Room', all: 'All' },
+  common: { appName: 'MARINA SMART', cancel: 'Cancel', save: 'Save', back: 'Back', next: 'Next', done: 'Done', retry: 'Retry', loading: 'Loading…', empty: 'Nothing here yet', demo: 'DEMO MODE · not PMS data', room: 'Room', all: 'All' },
   scan: {"title":"Scan hotel QR code","instructions":"Point your camera at the hotel's connection QR code.","checking":"Checking camera access…","permission":"Allow camera access","invalid":"The QR code must contain a secure HTTPS hotel address.","privacy":"The QR code contains only an address. Sign-in is separate.","back":"Back to hotel selection"},
   nav: { tasks: 'Tasks', rooms: 'Rooms', requests: 'Requests', admin: 'Manage', profile: 'Profile' },
   connect: {
     title: 'Connect to a hotel', subtitle: 'Each hotel is a separate secure connection. Hotel data is never mixed.',
     addHotel: 'Add hotel', code: 'Invitation code or address', codePh: 'e.g. marina-bishkek', scan: 'Scan QR', demoHotels: 'Demo hotels',
-    tryDemoTitle: 'Explore MARINA STAFF', tryDemoHint: 'Open the manager workspace, tasks and rooms. All content uses synthetic demo data.', tryDemoButton: 'Open manager demo',
+    tryDemoTitle: 'Explore MARINA SMART', tryDemoHint: 'Open the manager workspace, tasks and rooms. All content uses synthetic demo data.', tryDemoButton: 'Open manager demo',
     browserLiveNotice: 'In a browser, sign-in to a hotel on another domain may fail due to cookie and CORS restrictions. Use the Android app or an approved test domain for PMS access.',
     secureOnly: 'Only HTTPS addresses are allowed', invalid: 'Invalid code or address', connected: 'Connected', choose: 'Choose a hotel', noSecrets: 'The app stores no server secrets',
   },

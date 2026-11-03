@@ -16,5 +16,5 @@ export function Logo({ size = 56 }: { size?: number }) {
 export function Hero({ children, height }: { children: React.ReactNode; height?: number }) {
   return <LinearGradientFallback style={{ borderRadius: 28, padding: 22, minHeight: height, overflow: 'hidden' }}>{children}</LinearGradientFallback>;
 }
-export const Wordmark = ({ color }: { color: string }) => <Text style={[font.h2, { color, letterSpacing: 1.7 }]}>MARINA SMART <Text style={{ fontSize: 12, fontWeight: '600' }}>STAFF</Text></Text>;
+export const Wordmark = ({ color }: { color: string }) => <Text style={[font.h2, { color, letterSpacing: 1.7 }]}>MARINA SMART</Text>;
 export const _v = View;
