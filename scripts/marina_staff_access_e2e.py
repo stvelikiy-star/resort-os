@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Synthetic MARINA only: owner creates, grants, revokes and disables staff access."""
 import asyncio
+from datetime import date, timedelta
 import os
 from urllib.parse import urlsplit
 
@@ -14,6 +15,11 @@ async def main():
     assert os.environ.get("APP_ENV") in {"ci", "staging"}
     assert os.environ.get("PROPERTY_CODE") == "MARINA_FULL_CI", "Never test against a customer property"
 
+    # Keep authorization probes on a valid future interval on every CI run.
+    start_date = (date.today() + timedelta(days=41)).isoformat()
+    end_date = (date.today() + timedelta(days=43)).isoformat()
+    grid_params = {"start": start_date, "end": end_date}
+
     username = "synthetic-rbac-maid"
     password = "Synthetic-RBAC-Maid-2026!"
     url = "/api/v1/admin/staff"
@@ -26,7 +32,7 @@ async def main():
         # Exercise every owner-assignable role against the real synthetic API.
         role_routes = {
             "MANAGER": ("/api/v1/kitchen/orders", "/api/v1/admin/whatsapp/connection"),
-            "RECEPTION": ("/api/v1/pms/grid?start=2026-11-01&end=2026-11-02", "/api/v1/kitchen/orders"),
+            "RECEPTION": (f"/api/v1/pms/grid?start={start_date}&end={end_date}", "/api/v1/kitchen/orders"),
             "MAID": ("/api/v1/ops/tasks", "/api/v1/kitchen/orders"),
             "TECHNICIAN": ("/api/v1/ops/tasks", "/api/v1/admin/finance/summary"),
             "COOK": ("/api/v1/kitchen/orders", "/api/v1/dining/floor"),
@@ -64,7 +70,7 @@ async def main():
         async with httpx.AsyncClient(base_url=origin, timeout=20) as staff:
             signed_in = await staff.post("/api/v1/auth/login", json={"username": username, "password": password})
             assert signed_in.status_code == 200, (signed_in.status_code, signed_in.text)
-            denied = await staff.get("/api/v1/pms/grid", params={"start": "2026-11-01", "end": "2026-11-02"})
+            denied = await staff.get("/api/v1/pms/grid", params=grid_params)
             assert denied.status_code == 403, (denied.status_code, denied.text)
             assert (await staff.post(url, json={
                 "username": "forbidden-child", "display_name": "Forbidden Child",
@@ -76,7 +82,7 @@ async def main():
             assert (await staff.get("/api/v1/auth/me")).status_code == 401, "Grant must revoke old session"
             again = await staff.post("/api/v1/auth/login", json={"username": username, "password": password})
             assert again.status_code == 200, (again.status_code, again.text)
-            allowed = await staff.get("/api/v1/pms/grid", params={"start": "2026-11-01", "end": "2026-11-02"})
+            allowed = await staff.get("/api/v1/pms/grid", params=grid_params)
             assert allowed.status_code == 200, (allowed.status_code, allowed.text)
             # Module grants may allow calendar access but never owner-only cancellation.
             cancel = await staff.post("/api/v1/admin/pms/reservations/00000000-0000-0000-0000-000000000000/cancel")
@@ -99,7 +105,7 @@ async def main():
             assert (await staff.get("/api/v1/auth/me")).status_code == 401, "Revoking PMS must revoke existing session"
             again = await staff.post("/api/v1/auth/login", json={"username": username, "password": password})
             assert again.status_code == 200, (again.status_code, again.text)
-            denied_again = await staff.get("/api/v1/pms/grid", params={"start": "2026-11-01", "end": "2026-11-02"})
+            denied_again = await staff.get("/api/v1/pms/grid", params=grid_params)
             assert denied_again.status_code == 403, (denied_again.status_code, denied_again.text)
 
             rotated_password = "Synthetic-Rotated-RBAC-2026!"
