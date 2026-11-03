@@ -33,10 +33,22 @@ uses server-trusted hotel ID and validates the quoted price, and the room
 inventory exclusion constraint prevents concurrent double booking.
 The shared PMS endpoints are API-only in this staging slice; the Admin UI
 still displays a read-only grid, without booking mutation controls.
+A reviewed shared HOLD slice additionally permits GET/POST
+`/api/v1/admin/pms/holds` and GET/DELETE
+`/api/v1/admin/pms/holds/{hold_uuid}` for OWNER/MANAGER.
+HOLD ownership, dates and room inventory are checked on the server against
+the verified hotel context. The 60-minute expiration sweep now visits each
+database-linked hotel with a separate transaction and uses row-level
+SKIP LOCKED to avoid duplicate releases in multi-process runs. Ordinary
+booking preview and commit also clear expired HOLDs for their authenticated
+hotel before checking availability; the periodic sweep is not the sole
+enforcement of expiration. Guest-facing/public availability remains a
+separate verification gate; no claim that all OTA or background consumers
+already implement the same expiry/availability contract is made.
 All other HTTP routes return 503 and WebSockets are closed before their handlers
-run. Shared HOLD endpoints and expiry scheduler, payments, stay check-in/out,
-shared onboarding and provider operations remain blocked. Narrow booking APIs
-do NOT constitute a usable shared PMS rollout or production approval. The gate is installed in the canonical app;
+run. Payments, stay check-in/out, shared onboarding and providers remain
+blocked. Shared HOLD and booking API changes do NOT establish a complete
+production-ready PMS; Admin shared UI is still read-only for these actions. The gate is installed in the canonical app;
 real PostgreSQL + canonical ASGI route acceptance is required before integration.
 
 The regular Admin root checks the server authentication mode first. Only in
