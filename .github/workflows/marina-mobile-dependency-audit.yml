@@ -87,3 +87,32 @@ jobs:
             /tmp/marina-mobile-fix.log
           retention-days: 7
           if-no-files-found: warn
+
+  source-diagnostics:
+    name: Mobile source diagnostics (NOT a release gate substitute)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Install exact lockfile with native build support
+        run: npm ci --no-audit --no-fund
+      - name: Verify backend declaration pin and advisory classifier
+        run: |
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.test.mjs
+      - name: TypeScript and ESLint code checks
+        run: |
+          npm run typecheck
+          npm run lint
+      - name: Full Jest regression (SDK version gate remains separate)
+        run: npm test -- --ci --runInBand
+      - name: Expo web export (SDK version gate remains separate)
+        run: npm run web:export
