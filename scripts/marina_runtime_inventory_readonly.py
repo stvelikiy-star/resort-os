@@ -25,7 +25,7 @@ def inventory(repo: Path, backups: Path):
         "backups": {"directory_present": backups.is_dir(), "files": [], "integrity_checked": False},
         "limitations": [
             "No DB queries, volume checks, backup validation, host HTTPS checks or deploy performed.",
-            "Git HEAD does not establish the running image version."
+            "Git HEAD does not establish the running image version; immutable image_id is a local Docker image ID, not a repository commit or registry digest."
         ]
     }
     if repo.is_dir():
@@ -46,8 +46,15 @@ def inventory(repo: Path, backups: Path):
                 name = item.get("Names")
                 if not isinstance(name, str) or not re.match(r"^marina[-_]", name, re.I):
                     continue
+                # Only the immutable container image ID is read. Never run a
+                # general docker inspect: its Environment may contain secrets.
+                image_id = command(["docker", "inspect", "--type", "container",
+                                    "--format", "{{.Image}}", name])
+                if image_id and not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
+                    image_id = None
                 report["docker"]["containers"].append({
                     "name": name, "image": item.get("Image", ""),
+                    "image_id": image_id,
                     "state": item.get("State", ""), "status": item.get("Status", "")
                 })
             except (ValueError, TypeError):
