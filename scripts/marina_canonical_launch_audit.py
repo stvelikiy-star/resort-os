@@ -148,10 +148,18 @@ def measure(base, fixtures, roles, read_paths):
                                                          'X-Tenant-Id':foreign['tenant_id']})
                 record['identity_verified'] = (me.status_code == 200 and
                     me.json().get('property_id') == fixture['property_id'] and me.json().get('role') == role)
-                record['reads'] = [dict(path=path, http=client.get(path).status_code) for path in read_paths]
+                record['reads'] = []
+                for path in read_paths:
+                    response = client.get(path)
+                    record['reads'].append(dict(path=path,http=response.status_code))
+                    if role == 'OWNER' and response.status_code == 503 and 'sample_blocker_detail' not in record:
+                        record['sample_blocker_detail'] = response.json().get('detail')
                 if role == 'OWNER':
                     token = client.cookies.get('resort_session')
                     with httpx.Client(base_url=base, timeout=10) as outsider:
+                        plain_form = outsider.post('/api/v1/auth/login', json={
+                            'username':'audit_owner', 'password':fixture['password']})
+                        record['ordinary_admin_staff_login_payload_http'] = plain_form.status_code
                         denied = outsider.post('/api/v1/auth/login', json={
                             'tenant_code':foreign['tenant_code'], 'property_code':foreign['property_code'],
                             'username':'audit_owner', 'password':fixture['password']})
