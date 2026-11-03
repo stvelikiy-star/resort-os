@@ -1,0 +1,56 @@
+name: MARINA Mobile SDK58 Exact React Candidate (isolated branch)
+on:
+  push:
+    branches:
+      - 'probe/marina-mobile-sdk58-react1930-candidate-20261104'
+    paths:
+      - '.github/workflows/marina-mobile-sdk58-react1930-candidate.yml'
+permissions:
+  contents: read
+jobs:
+  candidate:
+    if: github.repository == 'stvelikiy-star/resort-os' && github.ref == 'refs/heads/probe/marina-mobile-sdk58-react1930-candidate-20261104'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Generate isolated official Expo 58 patch candidate
+        run: |
+          set -euo pipefail
+          npm pkg set 'dependencies.react=19.3.0' 'dependencies.react-dom=19.3.0' 'devDependencies.react-test-renderer=19.3.0'
+          npm pkg set 'dependencies.@expo/metro-runtime=~58.0.17' 'dependencies.expo=~58.0.23' 'dependencies.expo-constants=~58.0.15' 'dependencies.expo-linking=~58.0.16' 'dependencies.expo-router=~58.0.30' 'dependencies.react-native-safe-area-context=~5.11.1' 'devDependencies.jest-expo=~58.0.14'
+          rm package-lock.json
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Require strict dependency and mobile source acceptance
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.nodecheck.mjs
+          npm run typecheck
+          npm run lint
+          npm test -- --ci --runInBand
+          npm run web:export
+      - name: Save candidate only in isolated probe branch after source checks pass
+        env:
+          BRANCH: probe/marina-mobile-sdk58-react1930-candidate-20261104
+        run: |
+          set -euo pipefail
+          git add -- package.json package-lock.json
+          git diff --cached --name-only | grep -Fx 'apps/mobile/package.json'
+          git diff --cached --name-only | grep -Fx 'apps/mobile/package-lock.json'
+          test "$(git diff --cached --name-only | wc -l)" -eq 2
+          git -c user.name='MARINA SDK58 Probe' -c user.email='marina-probe@users.noreply.github.com' commit -m 'test(mobile): stage vendor-aligned Expo 58 dependencies (NO-GO)'
+          git push origin "HEAD:refs/heads/$BRANCH"
+          echo 'EXPERIMENTAL CANDIDATE ONLY. Security audit, native device QA, and production release gate remain mandatory.'
