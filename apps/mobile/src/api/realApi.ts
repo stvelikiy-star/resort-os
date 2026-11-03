@@ -12,6 +12,9 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
   const validated = parseHotelAddress(baseUrl);
   if (!validated.ok) throw new Error('Invalid or insecure hotel API origin');
   const root = validated.baseUrl;
+  // Most recent server-provided records for safe post-commit readback fallback.
+  // Never synthesize an unseen task or claim that a missing write succeeded.
+  const lastKnownTasks = new Map<string, Task>();
 
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
@@ -39,13 +42,45 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
 
   const mapTask = (t: any): Task => {
     if (!t || typeof t.id !== 'string' || !t.id || !['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'].includes(t.type) || !['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(t.status)) throw new ApiError('UNKNOWN', 'Invalid task record');
-    return ({
-    id: String(t.id), type: t.type, status: t.status, priority: t.priority ?? 'NORMAL',
-    title: t.title ?? '', room_code: t.room_code ?? t.roomCode ?? null, room_id: t.room_id ?? t.roomId ?? null,
-    room_state: ['CLEAN', 'DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(t.room_state) ? t.room_state : 'UNKNOWN',
-    assigned_to_id: t.assigned_to_id ?? t.assignedToId ?? null, assigned_to_name: t.assigned_to_name ?? null,
-  });
+    const mapped: Task = {
+      id: String(t.id), type: t.type, status: t.status, priority: t.priority ?? 'NORMAL',
+      title: t.title ?? '', room_code: t.room_code ?? t.roomCode ?? null, room_id: t.room_id ?? t.roomId ?? null,
+      room_state: ['CLEAN', 'DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(t.room_state) ? t.room_state : 'UNKNOWN',
+      assigned_to_id: t.assigned_to_id ?? t.assignedToId ?? null, assigned_to_name: t.assigned_to_name ?? null,
+    };
+    lastKnownTasks.set(mapped.id, mapped);
+    return mapped;
   };
+
+  /**
+   * A mutation can commit even when its subsequent GET fails (e.g., >300 tasks,
+   * temporary network failure). Accept only the server's acknowledged fields
+   * and merge them into a previously observed task; never fabricate details.
+   */
+  async function committedTask(id: string, acknowledged: unknown): Promise<Task> {
+    if (!acknowledged || typeof acknowledged !== 'object' ||
+        (acknowledged as { id?: unknown }).id !== id) {
+      throw new ApiError('UNKNOWN', 'Invalid mutation acknowledgment');
+    }
+    const ack = acknowledged as { status?: TaskStatus; assigned_to_id?: string | null };
+    try {
+      return await findTask(id);
+    } catch (error) {
+      if (!(error instanceof ApiError) || !['NOT_FOUND', 'OFFLINE', 'UNKNOWN'].includes(error.code)) throw error;
+      const previous = lastKnownTasks.get(id);
+      if (!previous) throw new ApiError('UNKNOWN', 'Mutation committed, but task details are unavailable');
+      const status = ack.status && ['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(ack.status)
+        ? ack.status : previous.status;
+      const hasAssignee = Object.prototype.hasOwnProperty.call(ack, 'assigned_to_id');
+      const updated: Task = {
+        ...previous, status,
+        assigned_to_id: hasAssignee ? ack.assigned_to_id ?? null : previous.assigned_to_id,
+        assigned_to_name: hasAssignee && ack.assigned_to_id !== previous.assigned_to_id ? null : previous.assigned_to_name,
+      };
+      lastKnownTasks.set(id, updated);
+      return updated;
+    }
+  }
 
   return {
     mode: 'LIVE',
@@ -61,15 +96,15 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
       return items.map(mapTask);
     },
-    async claimTask(id) { await call('POST', `/api/v1/ops/tasks/${id}/claim`); return findTask(id); },
-    async setTaskStatus(id, status) { await call('PATCH', `/api/v1/ops/tasks/${id}/status`, { status }); return findTask(id); },
+    async claimTask(id) { const ack = await call('POST', `/api/v1/ops/tasks/${id}/claim`); return committedTask(id, ack); },
+    async setTaskStatus(id, status) { const ack = await call('PATCH', `/api/v1/ops/tasks/${id}/status`, { status }); return committedTask(id, ack); },
     async completeHousekeeping(id, report: HousekeepingReport) {
-      await call('POST', `/api/v1/ops/tasks/${id}/complete-report`, {
+      const ack = await call('POST', `/api/v1/ops/tasks/${id}/complete-report`, {
         summary: report.comment?.trim() || 'Cleaning completed',
         checklist: HOUSEKEEPING_CHECKLIST.map((code) => ({ code, label: code, done: !!report.checklist[code] })),
         evidence_urls: [], // photo upload needs the attachments API (backend item B5)
       });
-      return findTask(id);
+      return committedTask(id, ack);
     },
     async createMaintenance(req: NewMaintenance) {
       const created = await call<any>('POST', '/api/v1/ops/tasks', {
@@ -118,8 +153,8 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.active_tasks ?? s.open_tasks ?? 0, active: s.active !== false }));
     },
     async assignTask(taskId, staffId) {
-      await call('PATCH', `/api/v1/ops/tasks/${taskId}/assignee`, { assigned_to_id: staffId });
-      return findTask(taskId);
+      const ack = await call('PATCH', `/api/v1/ops/tasks/${taskId}/assignee`, { assigned_to_id: staffId });
+      return committedTask(taskId, ack);
     },
     async daySummary(): Promise<DaySummary> {
       // No aggregate endpoint in the existing contract yet (backend item B8).
