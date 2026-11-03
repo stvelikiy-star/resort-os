@@ -70,6 +70,23 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Generate Android project
         run: npx expo prebuild --platform android --no-install --non-interactive
+      - name: Require private Android app manifest before Gradle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path=Path('android/app/src/main/AndroidManifest.xml')
+          root=ET.parse(path).getroot()
+          android='{http://schemas.android.com/apk/res/android}'
+          tools='{http://schemas.android.com/tools}'
+          app=root.find('application')
+          assert app is not None, 'application missing'
+          assert app.attrib.get(android+'allowBackup')=='false', 'Android backup must be disabled'
+          permissions=root.findall('uses-permission')+root.findall('uses-permission-sdk-23')
+          overlay=[e for e in permissions if e.attrib.get(android+'name')=='android.permission.SYSTEM_ALERT_WINDOW']
+          assert overlay and all(e.attrib.get(tools+'node')=='remove' for e in overlay), 'overlay permission must be removed at merge'
+          print('ANDROID_MANIFEST_SOURCE_BACKUP_DISABLED_AND_OVERLAY_REMOVED')
+          PY
       - name: Compile standalone Android preview APK (bundled JavaScript)
         run: cd android && ./gradlew :app:assembleRelease --no-daemon --stacktrace
       - name: Verify bundled JS and test APK signature
@@ -89,6 +106,25 @@ jobs:
           done
           if [ "$found" != true ]; then echo 'Android apksigner not available' >&2; exit 1; fi
           echo 'STANDALONE_APK_BUNDLE_AND_SIGNATURE_OK'
+      - name: Inspect final APK permissions and package identity
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          aapt=''
+          for tool in "$ANDROID_HOME"/build-tools/*/aapt; do
+            if [ -x "$tool" ]; then aapt="$tool"; break; fi
+          done
+          if [ -z "$aapt" ]; then echo 'aapt not available for final manifest inspection' >&2; exit 1; fi
+          "$aapt" dump badging "$apk" > /tmp/marina-apk-badging.txt
+          "$aapt" dump permissions "$apk" > /tmp/marina-apk-permissions.txt
+          grep -Fq "package: name='kg.go.ms.staff'" /tmp/marina-apk-badging.txt
+          if grep -Fq 'android.permission.SYSTEM_ALERT_WINDOW' /tmp/marina-apk-permissions.txt; then
+            echo 'APK unexpectedly requests system overlay permission' >&2
+            exit 1
+          fi
+          grep -Fq 'android.permission.CAMERA' /tmp/marina-apk-permissions.txt
+          grep -Fq 'android.permission.INTERNET' /tmp/marina-apk-permissions.txt
+          echo 'FINAL_APK_IDENTITY_AND_PERMISSION_POLICY_OK'
       - name: Attach standalone Android preview APK
         uses: actions/upload-artifact@v4
         with:
