@@ -1,0 +1,118 @@
+import { fireEvent, renderRouter, waitFor } from 'expo-router/testing-library';
+import RootLayout from '../app/_layout';
+import Index from '../app/index';
+import AuthLayout from '../app/(auth)/_layout';
+import Connect from '../app/(auth)/connect';
+import Login from '../app/(auth)/login';
+import AppTabs from '../app/(app)/_layout';
+import Tasks from '../app/(app)/tasks';
+import Rooms from '../app/(app)/rooms';
+import Requests from '../app/(app)/requests';
+import Admin from '../app/(app)/admin';
+import Profile from '../app/(app)/profile';
+import TaskDetail from '../app/task/[id]';
+import RoomCard from '../app/room/[id]';
+import NewRequest from '../app/new-request';
+
+jest.mock('react-native-safe-area-context', () => {
+  const actual = jest.requireActual('react-native-safe-area-context');
+  return { ...actual, SafeAreaProvider: ({ children }: any) => children, useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) };
+});
+
+const routes = {
+  _layout: RootLayout,
+  index: Index,
+  '(auth)/_layout': AuthLayout,
+  '(auth)/connect': Connect,
+  '(auth)/login': Login,
+  '(app)/_layout': AppTabs,
+  '(app)/tasks': Tasks,
+  '(app)/rooms': Rooms,
+  '(app)/requests': Requests,
+  '(app)/admin': Admin,
+  '(app)/profile': Profile,
+  'task/[id]': TaskDetail,
+  'room/[id]': RoomCard,
+  'new-request': NewRequest,
+};
+
+async function loginAs(role: string) {
+  const screen = await renderRouter(routes, { initialUrl: '/connect' });
+  await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 });
+  await fireEvent.press(screen.getByTestId('hotel-demo-marina-issykkul'));
+  await screen.findByTestId('login-submit');
+  await fireEvent.press(screen.getByTestId(`demo-${role}`));
+  await screen.findByTestId('progress-pct', {}, { timeout: 4000 }).catch(() => null);
+  return screen;
+}
+
+describe('navigation, guards and screens', () => {
+  it('unauthenticated users land on hotel connection with demo banner', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/tasks' });
+    await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 });
+    expect(screen.getByTestId('demo-banner')).toBeTruthy();
+    expect(screen.getByTestId('hotel-demo-sunrise-bishkek')).toBeTruthy();
+  });
+
+  it('protects a direct task detail deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/task/t1' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('protects a direct room detail deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/room/r1' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('protects a direct maintenance creation deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/new-request' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('rejects insecure hotel address', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/connect' });
+    await fireEvent.changeText(await screen.findByTestId('hotel-address'), 'http://evil.example');
+    await fireEvent.press(screen.getByTestId('connect-add'));
+    expect((await screen.findByTestId('connect-error')).props.children).toMatch(/HTTPS/);
+  });
+
+  it('maid: signs in, sees tasks tab only for her workspace, no admin tab', async () => {
+    const screen = await loginAs('maid');
+    await screen.findByTestId('task-t1', {}, { timeout: 4000 });
+    expect(screen.queryByTestId('tab-admin')).toBeNull();
+    expect(screen.queryByTestId('tab-requests')).toBeNull();
+    expect(screen.getByTestId('tab-rooms')).toBeTruthy();
+  });
+
+  it('maid housekeeping flow reaches inspection via checklist', async () => {
+    const screen = await loginAs('maid');
+    await fireEvent.press(await screen.findByTestId('task-t2', {}, { timeout: 4000 }));
+    await screen.findByTestId('hk-submit', {}, { timeout: 4000 });
+    for (const k of ['BED_LINEN', 'BATHROOM', 'SURFACES', 'AMENITIES', 'FINAL_CHECK']) await fireEvent.press(screen.getByTestId(`check-${k}`));
+    await fireEvent.press(screen.getByTestId('hk-submit'));
+    await waitFor(() => expect(screen.getByTestId('task-msg')).toBeTruthy(), { timeout: 4000 });
+  });
+
+  it('manager sees admin tab', async () => {
+    const screen = await loginAs('manager');
+    await screen.findByTestId('task-t1', {}, { timeout: 4000 });
+    expect(screen.getByTestId('tab-admin')).toBeTruthy();
+    expect(screen.getByTestId('tab-requests')).toBeTruthy();
+  });
+
+  it('waiter has no operational workspace (profile only)', async () => {
+    const screen = await loginAs('waiter');
+    await screen.findByTestId('tab-profile', {}, { timeout: 4000 });
+    expect(screen.queryByTestId('tab-tasks')).toBeNull();
+    expect(screen.queryByTestId('tab-admin')).toBeNull();
+  });
+
+  it('wrong password shows error', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/connect' });
+    await fireEvent.press(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 }));
+    await fireEvent.changeText(await screen.findByTestId('login-username'), 'maid');
+    await fireEvent.changeText(screen.getByTestId('login-password'), 'nope');
+    await fireEvent.press(screen.getByTestId('login-submit'));
+    await screen.findByTestId('login-error', {}, { timeout: 4000 });
+  });
+});

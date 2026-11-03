@@ -6,6 +6,7 @@ on:
       - 'apps/web/**'
       - 'apps/admin/**'
       - 'apps/staff/**'
+      - 'apps/mobile/**'
       - 'services/api/**'
       - 'packages/database/**'
       - '.github/workflows/marina-full-stack-smoke-ci.yml'
