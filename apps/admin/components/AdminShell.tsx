@@ -87,22 +87,42 @@ export default function AdminShell() {
   const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
 
   useEffect(() => {
-    fetch("/core/api/v1/auth/me", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as User;
-      })
-      .then((payload) => {
+    let disposed = false;
+    void (async () => {
+      try {
+        // Shared preview requires a hotel selector: the legacy login form cannot authenticate it.
+        // This check is read-only and preserves the existing single-property DEMO login flow.
+        const modeResponse = await fetch("/core/api/v1/auth/mode", { cache: "no-store" });
+        if (disposed) return;
+        if (modeResponse.ok) {
+          const mode = await modeResponse.json() as { mode?: string };
+          if (mode.mode === "shared_auth_preview") {
+            window.location.replace("/shared-auth-preview");
+            return;
+          }
+        }
+        const response = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
+        if (disposed) return;
+        if (!response.ok) {
+          setUser(null);
+          return;
+        }
+        const payload = await response.json() as User;
+        if (disposed) return;
         if (payload && !canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
           void fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
           setUser(null);
           return;
         }
         setUser(payload);
-        setTab(initialTab(payload?.role, payload?.module_permissions));
-      })
-      .catch(() => setUser(null))
-      .finally(() => setChecking(false));
+        setTab(initialTab(payload.role, payload.module_permissions));
+      } catch {
+        if (!disposed) setUser(null);
+      } finally {
+        if (!disposed) setChecking(false);
+      }
+    })();
+    return () => { disposed = true; };
   }, []);
 
   useEffect(() => {

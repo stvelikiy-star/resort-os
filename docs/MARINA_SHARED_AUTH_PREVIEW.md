@@ -31,9 +31,17 @@ These narrowly tested routes do NOT constitute a usable shared PMS rollout or
 production approval. The gate is installed in the canonical app;
 real PostgreSQL + canonical ASGI route acceptance is required before integration.
 
-The new `/shared-auth-preview` Admin page checks the server's explicit auth mode
-before offering the form. It displays the verified session, without opening PMS.
-The regular demo/Admin/Staff login forms and deployment files are not modified.
+The regular Admin root checks the server authentication mode first. Only in
+isolated `shared_auth_preview` staging it routes to `/shared-auth-preview`,
+which requires the verified tenant and property codes at login. The page exposes
+only reviewed read-only dashboard/PMS grid, a hotel-scoped staff overview, and
+owner-only staff creation/activation controls through the existing Core API.
+Other modules and PMS mutations are **not enabled**. It is NOT the general
+Admin/PMS interface or proof of a production-ready shared platform. In legacy
+single-property mode the existing Admin login and DEMO workflow are unchanged.
+The separate Staff/mobile app and deployment files remain untouched.
+Browser acceptance uses synthetic intercepted API responses; PostgreSQL/canonical
+ASGI isolation is accepted independently in the shared-auth CI.
 
 Known-workspace attempts retain database-backed throttling, scoped by the hotel
 selector. A bounded per-process IP limiter covers all attempts, including unknown
