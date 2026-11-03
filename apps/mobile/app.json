@@ -8,12 +8,12 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "icon": "./assets/marina-compass-seal.png"
+      "icon": "./assets/marina-staff-app-icon.png"
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/marina-compass-seal.png",
+        "foregroundImage": "./assets/marina-staff-app-icon.png",
         "backgroundColor": "#071D3C"
       },
       "package": "kg.go.ms.staff"
@@ -36,11 +36,11 @@
     ],
     "web": {
       "bundler": "metro",
-      "favicon": "./assets/marina-compass-seal.png"
+      "favicon": "./assets/marina-staff-app-icon.png"
     },
-    "icon": "./assets/marina-compass-seal.png",
+    "icon": "./assets/marina-staff-app-icon.png",
     "splash": {
-      "image": "./assets/marina-compass-seal.png",
+      "image": "./assets/marina-staff-app-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#071D3C"
     }

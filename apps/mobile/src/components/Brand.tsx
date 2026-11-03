@@ -7,7 +7,7 @@ import { font } from '../theme/tokens';
  * The MARINA SMART compass-and-ship seal, cropped from the approved project artwork.
  * Embedded to keep Expo native/web self-contained and avoid remote image dependencies.
  */
-const APPROVED_SEAL = require('../../assets/marina-compass-seal.png');
+const APPROVED_SEAL = require('../../assets/marina-staff-app-icon.png');
 
 export function Logo({ size = 56 }: { size?: number }) {
   return <Image source={APPROVED_SEAL} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="contain" accessibilityLabel="MARINA SMART — компас и корабль" />;
