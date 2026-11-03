@@ -32,7 +32,7 @@ function Probe() {
 }
 
 it('clears live employee data locally even when server logout fails', async () => {
-  const screen = render(
+  const screen = await render(
     <SessionProvider initialLocale="ru" initialHotelId="demo-marina-issykkul" initialUser={account}>
       <Probe />
     </SessionProvider>,
@@ -58,7 +58,7 @@ function ConnectionProbe() {
 }
 
 it('replaces a same-host root API connection with /core instead of presenting shared cookies as isolated hotels', async () => {
-  const screen = render(
+  const screen = await render(
     <SessionProvider initialLocale="ru"><ConnectionProbe /></SessionProvider>,
   );
   fireEvent.press(screen.getByTestId('add-root'));
