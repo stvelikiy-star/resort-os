@@ -30,6 +30,9 @@ export default function Admin() {
   const { api, user } = useSession();
   const allowed = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE').canManage;
   const [pick, setPick] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const actionLock = useRef(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const summary = useAsync<DaySummary | null>(() => (allowed ? api!.daySummary().catch(() => null) : Promise.resolve(null)), [api, tick]);
   const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick]);
@@ -49,13 +52,32 @@ export default function Admin() {
   const queue = (tasks.data ?? []).filter((x) => x.status === 'IN_INSPECTION');
   const unassigned = (tasks.data ?? []).filter((x) => !x.assigned_to_id && x.status === 'OPEN' && (x.type === 'HOUSEKEEPING' || x.type === 'MAINTENANCE'));
   const eligibleStaff = (task: Task) => (staff.data ?? []).filter((member) => member.active !== false && member.role === (task.type === 'HOUSEKEEPING' ? 'MAID' : 'TECHNICIAN'));
-  const assign = async (staffId: string) => { if (!pick) return; await api!.assignTask(pick, staffId); setPick(null); setTick((n) => n + 1); };
-  const approve = async (id: string) => { await api!.setTaskStatus(id, 'DONE'); setTick((n) => n + 1); };
-  const back = async (id: string) => { await api!.setTaskStatus(id, 'IN_PROGRESS'); setTick((n) => n + 1); };
+  const runMutation = async (operation: () => Promise<unknown>) => {
+    if (actionLock.current || !api || !allowed) return;
+    actionLock.current = true;
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      await operation();
+      setPick(null);
+      setTick((n) => n + 1);
+    } catch (e: unknown) {
+      const code = e && typeof e === 'object' && 'code' in e ? String(e.code) : '';
+      setActionError(t(code === 'FORBIDDEN' ? 'errors.forbidden' : code === 'OFFLINE' ? 'errors.offline' : 'errors.generic'));
+      // Keep the selection and cached task until the server confirms the write.
+    } finally {
+      actionLock.current = false;
+      setActionBusy(false);
+    }
+  };
+  const assign = (staffId: string) => { if (pick) void runMutation(() => api!.assignTask(pick, staffId)); };
+  const approve = (id: string) => { void runMutation(() => api!.setTaskStatus(id, 'DONE')); };
+  const back = (id: string) => { void runMutation(() => api!.setTaskStatus(id, 'IN_PROGRESS')); };
 
   return (
     <Screen>
       <Title>{t('admin.title')}</Title>
+      {actionError ? <Text testID="admin-action-error" accessibilityRole="alert" style={[font.body, { color: c.danger }]}>{actionError}</Text> : null}
       {tasks.error ? <Card onPress={tasks.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card> : null}
       {staff.error ? <Card onPress={staff.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.forbidden')} · {t('common.retry')}</Text></Card> : null}
       {s ? (
@@ -73,8 +95,8 @@ export default function Admin() {
         <View key={task.id} style={{ gap: space.sm }}>
           <TaskCard task={task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })} />
           <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <View style={{ flex: 1 }}><Button testID={`approve-${task.id}`} label={t('tasks.approve')} icon={CheckCircle2} onPress={() => approve(task.id)} /></View>
-            <View style={{ flex: 1 }}><Button label={t('tasks.reject')} variant="secondary" onPress={() => back(task.id)} /></View>
+            <View style={{ flex: 1 }}><Button testID={`approve-${task.id}`} label={t('tasks.approve')} icon={CheckCircle2} onPress={() => approve(task.id)} disabled={actionBusy} /></View>
+            <View style={{ flex: 1 }}><Button label={t('tasks.reject')} variant="secondary" onPress={() => back(task.id)} disabled={actionBusy} /></View>
           </View>
         </View>
       ))}
@@ -87,7 +109,7 @@ export default function Admin() {
           {pick === task.id ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
               {eligibleStaff(task).map((m) => (
-                <PressScale key={m.id} testID={`assign-${m.id}`} onPress={() => assign(m.id)} style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft }}>
+                <PressScale key={m.id} testID={`assign-${m.id}`} onPress={() => assign(m.id)} disabled={actionBusy} style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft }}>
                   <Text style={[font.small, { color: c.primary, fontWeight: '700' }]}>{m.display_name} · {m.open_tasks}</Text>
                 </PressScale>
               ))}
