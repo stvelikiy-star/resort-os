@@ -1,4 +1,4 @@
-import { hasTab, homeFor, WORKSPACES, workspaceFor } from '../src/roles/registry';
+import { hasTab, hasTabForSession, homeFor, homeForSession, WORKSPACES, workspaceFor, workspaceForSession } from '../src/roles/registry';
 import type { Role } from '../src/api/types';
 
 describe('role → workspace', () => {
@@ -31,6 +31,13 @@ describe('role → workspace', () => {
       expect(workspaceFor(r).mobileReady).toBe(false);
       expect(workspaceFor(r).tabs).toEqual(['profile']);
     }
+  });
+  it('live staff missing OPS permission see profile only despite a valid role', () => {
+    expect(workspaceForSession('MAID', ['OPS'], 'LIVE').tabs).toContain('tasks');
+    expect(workspaceForSession('MANAGER', ['PMS', 'STAFF'], 'LIVE').mobileReady).toBe(false);
+    expect(hasTabForSession('MANAGER', [], 'LIVE', 'admin')).toBe(false);
+    expect(homeForSession('MAID', [], 'LIVE')).toBe('/profile');
+    expect(workspaceForSession('MAID', ['housekeeping'], 'DEMO').tabs).toContain('tasks');
   });
   it('unknown future server roles fail closed to profile only', () => {
     const unknown = 'DINING_STAFF' as Role;
