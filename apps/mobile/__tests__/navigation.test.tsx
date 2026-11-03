@@ -54,6 +54,21 @@ describe('navigation, guards and screens', () => {
     expect(screen.getByTestId('hotel-demo-sunrise-bishkek')).toBeTruthy();
   });
 
+  it('protects a direct task detail deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/task/t1' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('protects a direct room detail deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/room/r1' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
+  it('protects a direct maintenance creation deep link without login', async () => {
+    const screen = await renderRouter(routes, { initialUrl: '/new-request' });
+    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+  });
+
   it('rejects insecure hotel address', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/connect' });
     await fireEvent.changeText(await screen.findByTestId('hotel-address'), 'http://evil.example');
