@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Plus } from 'lucide-react-native';
+import { CheckCircle2, ClipboardList, Plus } from 'lucide-react-native';
 import { Card, DemoBanner, Empty, FadeIn, PressScale, Screen, SectionLabel } from '../../src/components/ui';
 import { TaskCard } from '../../src/components/domain';
 import { Hero } from '../../src/components/Brand';
@@ -44,6 +44,20 @@ export default function Tasks() {
             </View>
           </View>
         </Hero>
+      </FadeIn>
+      <FadeIn delay={90}>
+        <View style={{ flexDirection: 'row', gap: space.md }}>
+          <View style={{ flex: 1, minHeight: 104, backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, borderWidth: 1, borderColor: c.border, justifyContent: 'space-between' }}>
+            <ClipboardList size={20} color={c.primary} />
+            <Text testID="active-count" style={[font.title, { color: c.text, fontSize: 26 }]}>{active.length}</Text>
+            <Text style={[font.small, { color: c.textMuted }]}>{t('tasks.today')}</Text>
+          </View>
+          <View style={{ flex: 1, minHeight: 104, backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, borderWidth: 1, borderColor: c.border, justifyContent: 'space-between' }}>
+            <CheckCircle2 size={20} color={c.success} />
+            <Text testID="finished-count" style={[font.title, { color: c.text, fontSize: 26 }]}>{finished.length}</Text>
+            <Text style={[font.small, { color: c.textMuted }]}>{t('tasks.done')}</Text>
+          </View>
+        </View>
       </FadeIn>
       {hotel?.demo ? <DemoBanner /> : null}
 
