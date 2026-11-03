@@ -139,10 +139,17 @@ async function completeStayViaBrowser(page,hotel){
   assert.match(inData.guest_access_pin,/^[0-9]{6}$/,"Missing one-time guest PIN");
   assert.equal(inData.guest_access_pin_display_once,true);
   await page.getByLabel("Одноразовый гостевой PIN").waitFor();
+  const checkOutButton=row.getByRole("button",{name:"Выселить"});
+  await checkOutButton.waitFor();
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll("button")].some(button =>
+      button.textContent?.trim()==="Выселить" && !button.disabled));
+  console.log("STAY_PRE_CHECKOUT",hotel,"button-enabled",await checkOutButton.isEnabled());
   const checkOutResponse=page.waitForResponse(res=>
     res.url().endsWith("/core/api/v1/admin/stays/reservations/"+fixture.reservation_id+"/check-out") &&
     res.request().method()==="POST");
-  await row.getByRole("button",{name:"Выселить"}).click();
+  await checkOutButton.click();
+  console.log("STAY_POST_CHECKOUT_CLICK",hotel,"button-enabled",await checkOutButton.isEnabled());
   const checkedOut=await checkOutResponse;
   assert.equal(checkedOut.status(),200,await checkedOut.text());
   const outData=await checkedOut.json();
@@ -336,7 +343,7 @@ async function cancelFixture(page,hotel){
 try {
   const contextA = await browser.newContext({ viewport:{width:390,height:844} });
   const pageA = await contextA.newPage();
-  pageA.on("dialog",dialog=>dialog.accept());
+  pageA.on("dialog",dialog=>{console.log("STAY_DIALOG_A",dialog.message());void dialog.accept();});
   const ownerA = await signIn(pageA,"HOTEL_A");
   await pageA.getByRole("cell",{name:"A101 · CI Room"}).waitFor();
   assert.equal(await pageA.getByText("B202").count(),0);
@@ -349,7 +356,7 @@ try {
 
   const contextB = await browser.newContext({ viewport:{width:390,height:844} });
   const pageB = await contextB.newPage();
-  pageB.on("dialog",dialog=>dialog.accept());
+  pageB.on("dialog",dialog=>{console.log("STAY_DIALOG_B",dialog.message());void dialog.accept();});
   const ownerB = await signIn(pageB,"HOTEL_B");
   await pageB.getByRole("cell",{name:"B202 · CI Room"}).waitFor();
   assert.notEqual(ownerA.property_id,ownerB.property_id);
