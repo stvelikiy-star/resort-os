@@ -19,11 +19,14 @@ after the DB lookup; they cannot grant authority on their own. Changed tenant
 membership, revoked/expired session, inactive user or inactive tenant is refused.
 The preview and legacy session formats cannot be used interchangeably.
 
-The ASGI boundary permits only auth login/logout/me/mode and health endpoints.
-Every other HTTP route returns 503 and every WebSocket is closed before its
-handler runs. This prevents newly accepted cross-property sessions from reaching
-the remaining single-property routes. The preview is not a usable PMS rollout.
-The gate is installed in the canonical application, not only the test harness.
+The ASGI boundary permits auth login/logout/me/mode and health endpoints.
+In an isolated staging-only review branch, it additionally permits the tenant-scoped
+read-only GET `/api/v1/admin/dashboard` and GET `/api/v1/pms/grid` endpoints.
+All other HTTP routes return 503 and WebSockets are closed before their handlers
+run. PMS writes, staff administration, shared onboarding and provider operations
+remain blocked. These two read-only endpoints do NOT constitute a usable shared
+PMS rollout or production approval. The gate is installed in the canonical app;
+real PostgreSQL + canonical ASGI route acceptance is required before integration.
 
 The new `/shared-auth-preview` Admin page checks the server's explicit auth mode
 before offering the form. It displays the verified session, without opening PMS.
