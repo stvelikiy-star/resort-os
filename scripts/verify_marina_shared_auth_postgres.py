@@ -594,6 +594,98 @@ def main():
         assert manager_signin.status_code == 200, manager_signin.text
         assert canonical_client.get(hold_path).status_code == 403
         assert canonical_client.post(hold_path, json=hold_payload('a')).status_code == 403
+        # Hotel-scoped schedule/date changes must use the verified session, not
+        # user-supplied hotel codes or forged X-Property-Id headers.
+        schedule_a = '/api/v1/admin/pms/reservations/'+rid_after_expiry_a+'/schedule'
+        schedule_b = '/api/v1/admin/pms/reservations/'+rid_hold_b+'/schedule'
+        def proposed_segments(suffix, start, end):
+            return [{'room_id': str(ids['room_'+suffix]), 'start': start, 'end': end}]
+        new_checkout = (date.today() + timedelta(days=31)).isoformat()
+        collision_start = (date.today() + timedelta(days=32)).isoformat()
+        collision_end = (date.today() + timedelta(days=34)).isoformat()
+        assert canonical_client.get(schedule_a).status_code == 403
+        assert canonical_client.post(schedule_a+'/preview', json={
+            'segments':proposed_segments('a',hold_start,new_checkout)}).status_code == 403
+
+        owner_login('b')
+        assert canonical_client.get(schedule_a, headers={
+            'X-Tenant-Id': str(ids['tenant_a']),
+            'X-Property-Id': str(ids['property_a']),
+            'X-Role': 'OWNER'}).status_code == 404
+        assert canonical_client.post(schedule_a+'/preview', json={
+            'segments':proposed_segments('b',hold_start,new_checkout)}).status_code == 404
+        foreign_commit = canonical_client.post(schedule_a+'/commit', json={
+            'segments':proposed_segments('b',hold_start,new_checkout),
+            'expected_version': '2026-11-03T00:00:00.000000'})
+        assert foreign_commit.status_code == 404, foreign_commit.text
+        b_original = canonical_client.get(schedule_b)
+        assert b_original.status_code == 200 and b_original.json()['reservation']['status'] == 'GUARANTEED'
+
+        owner_login('a')
+        details_a = canonical_client.get(schedule_a)
+        assert details_a.status_code == 200, details_a.text
+        version_a = details_a.json()['reservation']['version']
+        assert details_a.json()['reservation']['stored_total_kgs'] == price
+        target = proposed_segments('a',hold_start,new_checkout)
+        wrong_room = canonical_client.post(schedule_a+'/preview', json={
+            'segments':proposed_segments('b',hold_start,new_checkout)})
+        assert wrong_room.status_code == 422, wrong_room.text
+        quote = canonical_client.post(schedule_a+'/preview',json={'segments':target})
+        assert quote.status_code == 200 and quote.json()['can_commit'], quote.text
+        moved = canonical_client.post(schedule_a+'/commit', json={
+            'segments':target,'expected_version':version_a})
+        assert moved.status_code == 200 and moved.json()['ok'], moved.text
+        assert moved.json()['check_out'] == new_checkout
+        assert moved.json()['stored_total_kgs'] == price
+        assert canonical_client.post(schedule_a+'/commit', json={
+            'segments':target,'expected_version':version_a}).status_code == 409
+        updated_a = canonical_client.get(schedule_a)
+        assert updated_a.status_code == 200
+        assert updated_a.json()['reservation']['check_out'] == new_checkout
+        assert updated_a.json()['reservation']['stored_total_kgs'] == price
+        # A live HOLD must block an extension into those dates; failed commit
+        # must preserve the previously confirmed dates and monetary total.
+        hold_a_collision = canonical_client.post(hold_path, json=hold_payload(
+            'a',collision_start,collision_end))
+        assert hold_a_collision.status_code == 201, hold_a_collision.text
+        collision_target = proposed_segments('a',hold_start,collision_end)
+        conflict_quote = canonical_client.post(schedule_a+'/preview', json={
+            'segments':collision_target})
+        assert conflict_quote.status_code == 200 and not conflict_quote.json()['can_commit']
+        rejected_change = canonical_client.post(schedule_a+'/commit', json={
+            'segments':collision_target,'expected_version':updated_a.json()['reservation']['version']})
+        assert rejected_change.status_code == 409, rejected_change.text
+        stable_a = canonical_client.get(schedule_a)
+        assert stable_a.json()['reservation']['check_out'] == new_checkout
+        assert stable_a.json()['reservation']['stored_total_kgs'] == price
+        assert canonical_client.delete(hold_path+'/'+hold_a_collision.json()['id']).status_code == 200
+        unlocked = canonical_client.post(schedule_a+'/preview', json={
+            'segments':collision_target})
+        assert unlocked.status_code == 200 and unlocked.json()['can_commit'], unlocked.text
+        owner_login('b')
+        unchanged_b = canonical_client.get(schedule_b)
+        assert unchanged_b.status_code == 200
+        assert unchanged_b.json()['reservation']['check_out'] == hold_end
+        assert unchanged_b.json()['reservation']['stored_total_kgs'] == price
+        # Confirm persisted schedule and financial invariants in PostgreSQL.
+        async def verify_schedule_db():
+            conn = await asyncpg.connect(dsn)
+            try:
+                return await conn.fetch("""
+                    SELECT r.id,r."propertyId",r."checkIn",r."checkOut",r."totalKgs",
+                           (SELECT count(*) FROM payments p WHERE p."reservationId"=r.id)::int AS payments
+                    FROM reservations r WHERE r.id=ANY($1::uuid[])
+                """, [uuid.UUID(rid_after_expiry_a),uuid.UUID(rid_hold_b)])
+            finally:
+                await conn.close()
+        dates_stored = {str(row['id']): row for row in asyncio.run(verify_schedule_db())}
+        assert dates_stored[rid_after_expiry_a]['propertyId'] == ids['property_a']
+        assert dates_stored[rid_after_expiry_a]['checkOut'].isoformat() == new_checkout
+        assert dates_stored[rid_hold_b]['propertyId'] == ids['property_b']
+        assert dates_stored[rid_hold_b]['checkOut'].isoformat() == hold_end
+        for item in dates_stored.values():
+            assert item['totalKgs'] == price and item['payments'] == 0
+
         # Shared payment, check-in and unreviewed staff ops remain unavailable.
         assert canonical_client.post(
             '/api/v1/admin/stays/reservations/'+rid_hold_b+'/check-in').status_code == 503
