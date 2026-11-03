@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/hotel-setup", tags=["hotel-setup"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -158,10 +158,13 @@ async def _ensure_product_settings(conn, property_id: uuid.UUID):
     }
 
 
-async def _property(conn, property_code: str):
+async def _property(conn, user: dict[str, Any]):
+    # A hotel selector supplied by the client must not choose which hotel
+    # an OWNER/MANAGER may configure. The session-bound property is authoritative.
+    property_id = await trusted_property_id(conn, user)
     row = await conn.fetchrow(
-        'SELECT id,code,name,timezone,currency,"updatedAt" FROM properties WHERE code=$1',
-        property_code,
+        'SELECT id,code,name,timezone,currency,"updatedAt" FROM properties WHERE id=$1',
+        property_id,
     )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -275,7 +278,7 @@ async def _ensure_unique_room_code(conn, property_id, code: str, exclude_id=None
 @router.get("")
 async def overview(request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
-        prop = await _property(conn, user["property_code"])
+        prop = await _property(conn, user)
         room_types = await conn.fetch(
             '''
             SELECT rt.id,rt.code,rt.name,rt."capacityAdults",rt."capacityChildren",rt."areaLabel",
@@ -362,7 +365,7 @@ async def overview(request: Request, user: dict[str, Any] = Depends(manager_acce
 async def patch_property(payload: PropertyPatch, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             product = await _ensure_product_settings(conn, prop["id"])
             before = {"name": prop["name"], "timezone": prop["timezone"], "currency": prop["currency"], "hotel_logo_url": product["hotel_logo_url"]}
             supplied = payload.model_fields_set
@@ -402,7 +405,7 @@ async def patch_property(payload: PropertyPatch, request: Request, user: dict[st
 @router.get("/modules")
 async def get_modules(request: Request, user: dict[str, Any] = Depends(module_read_access)):
     async with request.app.state.db.acquire() as conn:
-        prop = await _property(conn, user["property_code"])
+        prop = await _property(conn, user)
         settings = await _ensure_product_settings(conn, prop["id"])
     return {
         "enabled_modules": settings["enabled_modules"],
@@ -417,7 +420,7 @@ async def get_modules(request: Request, user: dict[str, Any] = Depends(module_re
 async def patch_modules(payload: ModulesPatch, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             settings = await _ensure_product_settings(conn, prop["id"])
             before = {"enabled_modules": settings["enabled_modules"]}
             await conn.execute(
@@ -441,7 +444,7 @@ async def create_room_type(payload: RoomTypeCreate, request: Request, user: dict
     name = payload.name.strip()
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             await _ensure_unique_room_type(conn, prop["id"], code, name)
             room_type_id = uuid.uuid4()
             row = await conn.fetchrow(
@@ -463,7 +466,7 @@ async def patch_room_type(room_type_id: uuid.UUID, payload: RoomTypePatch, reque
                           user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             current = await _room_type(conn, prop["id"], room_type_id, lock=True)
             before = _room_type_payload(current)
             supplied = payload.model_fields_set
@@ -489,7 +492,7 @@ async def patch_room_type(room_type_id: uuid.UUID, payload: RoomTypePatch, reque
 async def delete_room_type(room_type_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             current = await _room_type(conn, prop["id"], room_type_id, lock=True)
             usage = await conn.fetchrow(
                 '''SELECT
@@ -514,7 +517,7 @@ async def create_room(payload: RoomCreate, request: Request, user: dict[str, Any
     code = payload.code.strip()
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             rt = await _room_type(conn, prop["id"], payload.room_type_id)
             await _ensure_unique_room_code(conn, prop["id"], code)
             room_id = uuid.uuid4()
@@ -540,7 +543,7 @@ async def patch_room(room_id: uuid.UUID, payload: RoomPatch, request: Request,
                      user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             current = await _room(conn, prop["id"], room_id, lock=True)
             before = _room_payload(current)
             supplied = payload.model_fields_set
@@ -576,7 +579,7 @@ async def patch_room(room_id: uuid.UUID, payload: RoomPatch, request: Request,
 async def delete_room(room_id: uuid.UUID, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             current = await _room(conn, prop["id"], room_id, lock=True)
             usage = await conn.fetchrow(
                 '''SELECT
@@ -602,7 +605,7 @@ async def bulk_create_rooms(payload: BulkRoomsCreate, request: Request,
                             user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             await _room_type(conn, prop["id"], payload.room_type_id)
             codes = [f"{payload.prefix}{number:0{payload.pad_width}d}" for number in range(payload.start_number, payload.end_number + 1)]
             existing = await conn.fetch(
@@ -639,7 +642,7 @@ async def compact_demo_layout(payload: DemoLayoutRequest, request: Request,
         raise HTTPException(status_code=403, detail={"code": "DEMO_LAYOUT_DISABLED"})
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             activity = await conn.fetchrow(
                 '''SELECT
                   (SELECT count(*) FROM reservations WHERE "propertyId"=$1)::int AS reservations,

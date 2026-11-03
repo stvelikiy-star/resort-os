@@ -8,6 +8,7 @@ on:
       - 'apps/admin/**'
       - 'scripts/bootstrap_marina_test.py'
       - 'scripts/verify_marina_hotel_setup.py'
+      - 'scripts/test_marina_hotel_setup_tenant_boundary.py'
       - 'scripts/verify_marina_client_cycle.py'
       - 'scripts/verify_marina_client_cycle.py'
       - 'deploy/marina-test-api.Dockerfile'
@@ -179,6 +180,9 @@ jobs:
           done
           cat /tmp/marina-core.log
           exit 1
+
+      - name: Verify hotel setup property boundary
+        run: python -m unittest discover -s scripts -p 'test_marina_hotel_setup_tenant_boundary.py' -v
 
       - name: Verify self-service hotel setup
         run: python scripts/verify_marina_hotel_setup.py
