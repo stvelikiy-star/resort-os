@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import SharedBookingForm from "./SharedBookingForm";
+import SharedHoldPanel from "./SharedHoldPanel";
 
 type Identity = {
   id: string; display_name: string; role: string;
@@ -341,6 +342,8 @@ export default function SharedAuthPreview() {
             </div>
             {["OWNER", "MANAGER"].includes(identity.role) &&
               <SharedBookingForm rooms={grid.rooms} onExpired={() => setIdentity(null)} />}
+            {["OWNER", "MANAGER"].includes(identity.role) &&
+              <SharedHoldPanel rooms={grid.rooms} onExpired={() => setIdentity(null)} />}
           </section>}
         {!loadingSection && section === "reservations" && bookings &&
           <section aria-label="Бронирования гостиницы">
