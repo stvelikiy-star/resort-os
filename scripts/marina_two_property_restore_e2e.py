@@ -266,22 +266,26 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                 assert response.status_code == 401, "Foreign session crossed property boundary"
                 wrong = httpx.post(f"http://127.0.0.1:{PORTS[foreign]}/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[index]})
                 assert wrong.status_code == 401, "Foreign password authenticated wrong property"
-                # Verify finance reads are scoped by the authenticated hotel,
-                # not a caller-provided reservation UUID from a different hotel.
+                # In the no-payment profile these acquiring routes are deliberately
+                # not mounted. Do not enable payment mutations merely for this test.
                 for endpoint in ("acquiring-readiness", "cancellation-finance-review"):
-                    own_finance = client.get(
+                    dormant = client.get(
                         f"/api/v1/admin/booking/reservations/{fixtures[index]['reservation']}/{endpoint}"
                     )
-                    assert own_finance.status_code == 200, (
-                        f"Own hotel finance {endpoint} unavailable: {own_finance.status_code} {own_finance.text[:300]}"
+                    assert dormant.status_code == 404, (
+                        f"Disabled payment endpoint unexpectedly available: {dormant.status_code}"
                     )
-                    foreign_finance = client.get(
-                        f"/api/v1/admin/booking/reservations/{fixtures[foreign]['reservation']}/{endpoint}"
-                    )
-                    assert foreign_finance.status_code == 404, (
-                        f"Hotel {index} accessed hotel {foreign} finance {endpoint}: "
-                        f"{foreign_finance.status_code} {foreign_finance.text[:300]}"
-                    )
+                # The financial requirements module is active even without bank
+                # acquiring. A foreign reservation request must be denied before
+                # it can be modified by the owner of another property.
+                foreign_requirement = client.post(
+                    f"/api/v1/admin/finance/requests/{fixtures[foreign]['request']}/payment-requirement",
+                    json={"amount_kgs": 100},
+                )
+                assert foreign_requirement.status_code == 404, (
+                    f"Hotel {index} could modify hotel {foreign} payment requirement: "
+                    f"{foreign_requirement.status_code} {foreign_requirement.text[:300]}"
+                )
                 today = date.today().isoformat()
                 own_summary = client.get(
                     "/api/v1/admin/finance/summary",
@@ -292,7 +296,7 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
                     f"{own_summary.status_code} {own_summary.text[:300]}"
                 )
         print("MARINA_CROSS_PROPERTY_SESSION_PASSWORD_PASS")
-        print("MARINA_CROSS_PROPERTY_FINANCE_READ_DENIAL_PASS")
+        print("MARINA_CROSS_PROPERTY_FINANCE_DENIAL_AND_DISABLED_PAYMENTS_PASS")
         # Real HTTP checks against property-pinned APIs and disposable PostgreSQL.
         # Two concurrent requests for one room must produce exactly one HOLD.
         from concurrent.futures import ThreadPoolExecutor
