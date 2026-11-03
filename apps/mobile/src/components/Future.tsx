@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -70,7 +70,7 @@ export function ErrorState({ text, retry, onRetry }: { text: string; retry: stri
 export function LoadingShimmer({ count = 3 }: { count?: number }) {
   const { c } = useTheme();
   const allowed = useMotionAllowed();
-  const alpha = useRef(new Animated.Value(0.65)).current;
+  const [alpha] = useState(() => new Animated.Value(0.65));
   useEffect(() => {
     if (!allowed) { alpha.setValue(0.85); return; }
     const animation = Animated.loop(Animated.sequence([
@@ -89,7 +89,7 @@ export type AIOrbState = 'idle' | 'processing' | 'error' | 'offline';
 export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: AIOrbState; size?: number; label: string; onPress?: () => void }) {
   const { c } = useTheme();
   const allowed = useMotionAllowed();
-  const progress = useRef(new Animated.Value(0)).current;
+  const [progress] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!allowed || state !== 'processing') { progress.setValue(0); return; }
     const loop = Animated.loop(Animated.timing(progress, { toValue: 1, duration: 1700, useNativeDriver: true }));
@@ -110,7 +110,7 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
 }
 export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
   const allowed = useMotionAllowed();
-  const fade = useRef(new Animated.Value(allowed ? 0 : 1)).current;
+  const [fade] = useState(() => new Animated.Value(1));
   useEffect(() => {
     if (!allowed) { fade.setValue(1); return; }
     fade.setValue(0);

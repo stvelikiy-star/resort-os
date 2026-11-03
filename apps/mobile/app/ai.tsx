@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Keyboard, Text, TextInput, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { ChevronLeft, Send, ShieldCheck } from 'lucide-react-native';
@@ -39,7 +39,7 @@ export default function Assistant() {
   const lock = useRef(false);
   const [busy, setBusy] = useState(false);
   const { data: capabilities, loading, error: capsError, reload } = useAsync<AssistantCapabilities | null>(() => live ? live.assistantCapabilities() : Promise.resolve(null), [live, user?.id]);
-  const send = useCallback(async () => {
+  const send = async () => {
     const query = prompt.trim();
     if (!live || !capabilities?.configured || lock.current || !query || query.length > 3000) return;
     lock.current = true; setBusy(true); setError(null);
@@ -55,7 +55,7 @@ export default function Assistant() {
       Keyboard.dismiss();
     } catch (e) { setError(e instanceof Error ? e.message : copy.unknown); }
     finally { lock.current = false; setBusy(false); }
-  }, [live, capabilities, prompt, messages, locale, user?.property_code, copy.unknown]);
+  };
   if (!user) return <Redirect href="/connect"/>;
   if (!['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>

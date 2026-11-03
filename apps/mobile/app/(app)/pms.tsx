@@ -9,7 +9,7 @@ import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { font, radius, space } from '../../src/theme/tokens';
+import { font, radius } from '../../src/theme/tokens';
 
 function dayAt(start: string, offset: number): string {
   const d = new Date(start + 'T12:00:00'); d.setDate(d.getDate() + offset);

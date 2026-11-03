@@ -2,21 +2,19 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Plus, ClipboardCheck, ShieldCheck } from 'lucide-react-native';
+import { Plus, ShieldCheck } from 'lucide-react-native';
 import { AnimatedProgressBar, DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
-import { FutureScreen, ErrorState, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
+import { FutureScreen, ErrorState, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { TaskCard } from '../../src/components/domain';
 import { Hero } from '../../src/components/Brand';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { workspaceForSession } from '../../src/roles/registry';
-import { useTheme } from '../../src/theme/ThemeProvider';
-import { font, space } from '../../src/theme/tokens';
+import { font } from '../../src/theme/tokens';
 import type { Task } from '../../src/api/types';
 
 export default function Tasks() {
   const { t } = useTranslation();
-  const { c } = useTheme();
   const router = useRouter();
   const { api, user, hotel } = useSession();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
