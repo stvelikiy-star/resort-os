@@ -47,6 +47,18 @@ class HoldContractTests(unittest.TestCase):
             handler = api.split(f"async def {route}(", 1)[1]
             self.assertIn("await property_id(conn, user)", handler.split("\n\n@", 1)[0])
 
+    def test_expiry_never_mutates_another_hotel(self):
+        api = (ROOT / "services/api/app/pms_holds.py").read_text()
+        commit = (ROOT / "services/api/app/pms_reservation_create.py").read_text()
+        self.assertIn("async def expire_holds(conn, property_id: uuid.UUID):", api)
+        expire_body = api.split("async def expire_holds(", 1)[1].split("\n\nasync def property_id(", 1)[0]
+        self.assertIn('WHERE h."propertyId"=$1', expire_body)
+        self.assertIn('FOR UPDATE SKIP LOCKED', expire_body)
+        self.assertIn('""", property_id)', expire_body)
+        self.assertEqual(api.count("await expire_holds(conn, prop)"), 3)
+        self.assertIn('await expire_holds(conn, prop["id"])', commit)
+        self.assertNotIn("await expire_holds(conn)", api + commit)
+
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()
         grid = (ROOT / "apps/admin/components/PMSOwnerGrid.tsx").read_text()
