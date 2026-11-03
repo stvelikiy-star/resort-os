@@ -152,7 +152,7 @@ try {
   await login("HOTEL_A");
   await page.getByRole("heading",{name:"HOTEL_A"}).waitFor();
   await page.getByRole("button",{name:"Шахматка"}).click();
-  await page.getByText("A101").waitFor();
+  await page.getByRole("cell",{name:/^A101 · Synthetic$/}).waitFor();
   if (await page.getByText("B202").count()) throw new Error("Foreign room visible in hotel A");
   const bookingForm = page.getByRole("form",{name:"Форма бронирования"});
   await bookingForm.getByLabel("Номер").selectOption(roomIds.HOTEL_A);
@@ -181,7 +181,7 @@ try {
   await login("HOTEL_B");
   await page.getByRole("heading",{name:"HOTEL_B"}).waitFor();
   await page.getByRole("button",{name:"Шахматка"}).click();
-  await page.getByText("B202").waitFor();
+  await page.getByRole("cell",{name:/^B202 · Synthetic$/}).waitFor();
   if (await page.getByText("A101").count()) throw new Error("Foreign room visible in hotel B");
   if (committedBookings.HOTEL_B) throw new Error("Hotel B inherited hotel A booking");
   if (await page.getByText("HOTEL_A-SYNTH-1").count()) throw new Error("Foreign UI booking confirmation visible in hotel B");
