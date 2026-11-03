@@ -346,6 +346,74 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
             confirmed_release = client.delete(f"/api/v1/admin/pms/holds/{renewed_id}")
             assert confirmed_release.status_code == 409, "Confirmed HOLD was released"
         print("MARINA_HOLD_CONCURRENT_API_TENANT_RELEASE_CONVERSION_PASS")
+
+        # The background expiry worker MUST release an overdue HOLD even when
+        # nobody opens the owner UI or calls the HOLD endpoints. Only this
+        # disposable CI database clock is advanced for one synthetic HOLD.
+        with httpx.Client(base_url=f"http://127.0.0.1:{PORTS[1]}") as other_owner:
+            login = other_owner.post("/api/v1/auth/login",
+                                     json={"username": USERNAME, "password": PASSWORDS[1]})
+            assert login.status_code == 200, "Hotel B owner login failed"
+            hotel_b_payload = {**payload, "room_id": room_ids[1]}
+            created = other_owner.post("/api/v1/admin/pms/holds", json=hotel_b_payload)
+            assert created.status_code == 201, (
+                f"Hotel B synthetic HOLD failed: {created.status_code} {created.text[:500]}"
+            )
+            expiring_id = uuid.UUID(created.json()["id"])
+
+            async def expire_synthetic_hold_by_db_clock():
+                conn = await asyncpg.connect(dsn)
+                try:
+                    return await conn.fetchval("""
+                        UPDATE marina_reservation_holds
+                        SET "createdAt"=now()-interval '2 hours',
+                            "expiresAt"=now()-interval '1 hour'
+                        WHERE id=$1 AND "propertyId"=(
+                            SELECT id FROM properties WHERE code=$2
+                        ) AND "releasedAt" IS NULL
+                        RETURNING "inventoryBlockId"
+                    """, expiring_id, CODES[1])
+                finally:
+                    await conn.close()
+
+            block_id = asyncio.run(expire_synthetic_hold_by_db_clock())
+            assert block_id, "Synthetic HOLD expiry fixture update failed"
+
+            async def get_expiration_state():
+                conn = await asyncpg.connect(dsn)
+                try:
+                    return await conn.fetchrow("""
+                        SELECT h."releasedAt" IS NOT NULL AS released,
+                               ib.active AS block_active
+                        FROM marina_reservation_holds h
+                        JOIN inventory_blocks ib ON ib.id=h."inventoryBlockId"
+                        WHERE h.id=$1 AND h."propertyId"=(
+                            SELECT id FROM properties WHERE code=$2
+                        )
+                    """, expiring_id, CODES[1])
+                finally:
+                    await conn.close()
+
+            deadline = time.monotonic() + 50
+            while time.monotonic() < deadline:
+                expiry = asyncio.run(get_expiration_state())
+                if expiry and expiry["released"] and not expiry["block_active"]:
+                    break
+                time.sleep(1)
+            else:
+                raise AssertionError(
+                    "Overdue HOLD remained active without HTTP calls; background expiry worker did not release inventory"
+                )
+            # The old room must become available again, even without an owner
+            # action to clean up its inventory block.
+            replaced = other_owner.post("/api/v1/admin/pms/holds", json=hotel_b_payload)
+            assert replaced.status_code == 201, (
+                f"Expiry did not free room B: {replaced.status_code} {replaced.text[:500]}"
+            )
+            cleaned = other_owner.delete(f"/api/v1/admin/pms/holds/{replaced.json()['id']}")
+            assert cleaned.status_code == 200, "Synthetic cleanup of renewed HOLD failed"
+        print("MARINA_HOLD_BACKGROUND_EXPIRATION_WITHOUT_UI_PASS")
+
         # Verify owner-managed PMS permission revocation takes effect in an
         # already-authenticated MANAGER session without a server restart.
         async def seed_hold_manager():
