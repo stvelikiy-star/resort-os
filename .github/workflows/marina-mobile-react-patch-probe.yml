@@ -24,6 +24,8 @@ jobs:
         run: |
           npm pkg set 'dependencies.react=19.3.1' 'dependencies.react-dom=^19.3.1' 'devDependencies.react-test-renderer=^19.3.1'
           npm pkg set 'dependencies.@expo/metro-runtime=~58.0.17' 'dependencies.expo=~58.0.23' 'dependencies.expo-constants=~58.0.15' 'dependencies.expo-linking=~58.0.16' 'dependencies.expo-router=~58.0.30' 'dependencies.react-native-safe-area-context=~5.11.1' 'devDependencies.jest-expo=~58.0.14'
+          # Regenerate in an isolated probe: npm can retain stale 19.3.0 peers from the old lock.
+          rm package-lock.json
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           git diff --stat -- package.json package-lock.json
           git diff -- package.json package-lock.json > /tmp/react-patch-candidate.patch
