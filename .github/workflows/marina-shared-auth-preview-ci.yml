@@ -5,6 +5,10 @@ on:
     branches: [prep/marina-shared-platform-20261103]
     paths:
       - 'services/api/app/auth.py'
+      - 'services/api/app/realtime.py'
+      - 'services/api/app/dining_realtime.py'
+      - 'services/api/app/websocket_security.py'
+      - 'scripts/test_marina_realtime_tenant_boundary.py'
       - 'services/api/app/shared_auth_preview.py'
       - 'services/api/app/guest_os.py'
       - 'services/api/app/guest_stay_reviews.py'
@@ -17,6 +21,10 @@ on:
     paths:
       - 'release/marina-smart-current-candidate.json'
       - 'services/api/app/auth.py'
+      - 'services/api/app/realtime.py'
+      - 'services/api/app/dining_realtime.py'
+      - 'services/api/app/websocket_security.py'
+      - 'scripts/test_marina_realtime_tenant_boundary.py'
       - 'services/api/app/shared_auth_preview.py'
       - 'services/api/app/guest_os.py'
       - 'services/api/app/guest_stay_reviews.py'
@@ -71,5 +79,6 @@ jobs:
         run: |
           python scripts/test_marina_shared_auth.py -v
           python scripts/test_marina_guest_tenant_boundary.py -v
+          python scripts/test_marina_realtime_tenant_boundary.py -v
       - name: Verify real PostgreSQL and HTTP session isolation
-        run: python scripts/verify_marina_shared_auth_postgres.py
+        run: timeout 90s python scripts/verify_marina_shared_auth_postgres.py

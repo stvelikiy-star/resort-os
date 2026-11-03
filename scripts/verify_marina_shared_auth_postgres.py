@@ -6,16 +6,20 @@ import os
 from pathlib import Path
 import secrets
 import sys
+import time
 from urllib.parse import urlsplit
 import uuid
+from unittest.mock import patch
 
 import asyncpg
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
 from app import auth
 from app import guest_os
+from app import realtime, dining_realtime, websocket_security
 from app.shared_auth_preview import SharedAuthPreviewBoundary
 from app.health import router as health_router
 
@@ -145,6 +149,96 @@ def main():
         execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
         assert qr_client.get('/api/v1/admin/guest-os/room-qrs').status_code == 401
     print('PASS: single test runtime + PostgreSQL: two-hotel QR list/issue/rotate/batch, foreign IDs/headers and blocked tenant denial; canonical preview remains closed')
+
+    # Test only the reviewed socket routers with real shared sessions and one
+    # PostgreSQL pool. Do not open canonical shared-preview routes here.
+    execute("UPDATE tenants SET status='ACTIVE' WHERE id=$1", ids['tenant_b'])
+    orders = {key: uuid.uuid4() for key in ('a','b','unassigned_a','unassigned_b')}
+    for suffix in ('a','b'):
+        for key, waiter in ((suffix, ids['user_'+suffix]), ('unassigned_'+suffix, None)):
+            execute('''INSERT INTO kitchen_orders
+                (id,"propertyId","orderNumber",status,source,"waiterId","totalKgs","readyAt")
+                VALUES ($1,$2,$3,'READY','MANAGER',$4,100,now())''',
+                orders[key], ids['property_'+suffix], 'WS-'+key, waiter)
+    ws_app = FastAPI(lifespan=lifespan)
+    ws_app.include_router(auth.router)
+    ws_app.include_router(realtime.router)
+    ws_app.include_router(dining_realtime.router)
+    with patch.object(realtime, 'POLL_SECONDS', 0.25), \
+            patch.object(dining_realtime, 'POLL_SECONDS', 0.25), \
+            patch.object(websocket_security, 'WS_ENFORCE_SAME_ORIGIN', True), \
+            TestClient(ws_app, base_url='https://shared-auth.test') as ws_client:
+        def login_ws(suffix):
+            result = ws_client.post('/api/v1/auth/login', json=dict(
+                username='owner', password=passwords[suffix], tenant_code='tenant_'+suffix,
+                property_code='HOTEL_'+suffix.upper()))
+            assert result.status_code == 200, 'Shared realtime sign-in failed'
+            return ws_client.cookies.get(auth.SESSION_COOKIE)
+
+        def socket_headers(token):
+            return {'Cookie':auth.SESSION_COOKIE+'='+token, 'Origin':'https://shared-auth.test',
+                    'X-Property-Id':str(ids['property_b']), 'X-Tenant-Id':str(ids['tenant_b'])}
+
+        def expect_close(ws, code):
+            try:
+                ws.receive_json()
+            except WebSocketDisconnect as error:
+                assert error.code == code, 'Wrong realtime denial code'
+            else:
+                raise AssertionError('Unauthorized frame delivered after permission recheck')
+
+        for suffix in ('a','b'):
+            token = login_ws(suffix)
+            with ws_client.websocket_connect('wss://shared-auth.test/ws/pms/grid', headers=socket_headers(token)) as ws:
+                message = ws.receive_json()
+                assert message['data']['property'] == 'HOTEL_'+suffix.upper()
+                assert [r['id'] for r in message['data']['rooms']] == [str(ids['room_'+suffix])]
+                deadline = time.monotonic() + 2
+                while ws_app.state.db.get_idle_size() != ws_app.state.db.get_size() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                assert ws_app.state.db.get_idle_size() == ws_app.state.db.get_size(), 'Socket pinned a DB connection'
+            with ws_client.websocket_connect('wss://shared-auth.test/ws/dining/ready', headers=socket_headers(token)) as ws:
+                message = ws.receive_json()
+                assert {o['id'] for o in message['orders']} == {str(orders[suffix]), str(orders['unassigned_'+suffix])}
+                assert message['scope'] == 'ALL'
+
+        # Update grants without revoking the session so this proves periodic
+        # authorization, independently of the staff API's session revocation.
+        execute("UPDATE staff_users SET role='MANAGER' WHERE id=$1", ids['user_a'])
+        for path in ('/ws/pms/grid','/ws/dining/ready'):
+            for revoke_session in (False, True):
+                execute('UPDATE staff_users SET "modulePermissions"=$1::jsonb WHERE id=$2',
+                        '["PMS","DINING"]', ids['user_a'])
+                token = login_ws('a')
+                with ws_client.websocket_connect('wss://shared-auth.test'+path, headers=socket_headers(token)) as ws:
+                    ws.receive_json()
+                    if revoke_session:
+                        execute('UPDATE auth_sessions SET "revokedAt"=now() WHERE "tokenHash"=$1',
+                                auth.hash_session_token(token))
+                    else:
+                        execute('UPDATE staff_users SET "modulePermissions"=$1::jsonb WHERE id=$2', '[]', ids['user_a'])
+                    expect_close(ws, 4401 if revoke_session else 4403)
+
+        execute('UPDATE staff_users SET role=\'WAITER\',"modulePermissions"=NULL WHERE id=$1', ids['user_a'])
+        token = login_ws('a')
+        with ws_client.websocket_connect('wss://shared-auth.test/ws/dining/ready', headers=socket_headers(token)) as ws:
+            message = ws.receive_json()
+            assert message['scope'] == 'ASSIGNED_TO_ME'
+            assert [o['id'] for o in message['orders']] == [str(orders['a'])]
+        try:
+            with ws_client.websocket_connect('wss://shared-auth.test/ws/pms/grid', headers=socket_headers(token)):
+                pass
+        except WebSocketDisconnect as error:
+            assert error.code == 4403
+        else:
+            raise AssertionError('Waiter accessed PMS realtime')
+
+        token = login_ws('b')
+        with ws_client.websocket_connect('wss://shared-auth.test/ws/pms/grid', headers=socket_headers(token)) as ws:
+            ws.receive_json()
+            execute("UPDATE tenants SET status='BLOCKED' WHERE id=$1", ids['tenant_b'])
+            expect_close(ws, 4401)
+    print('PASS: shared PostgreSQL WebSockets: two-hotel room/order isolation, same usernames, forged headers, waiter scope, live session/grant revocation, blocked tenant and released pool connections; canonical preview remains closed')
 
 
 if __name__ == '__main__': main()
