@@ -120,6 +120,18 @@ describe('real api contract (mock fetch)', () => {
     const off = createRealApi('https://h.example', (async () => { throw new TypeError('x'); }) as unknown as typeof fetch);
     await expect(off.me()).rejects.toMatchObject({ code: 'OFFLINE' });
   });
+  it('maps real room operational state from task-linked rooms without inventing occupancy', async () => {
+    const { f } = mk([{ body: { items: [
+      { id: 't1', type: 'HOUSEKEEPING', status: 'OPEN', room_id: 'r1', room_code: '101', room_state: 'DIRTY' },
+      { id: 't2', type: 'MAINTENANCE', status: 'OPEN', room_id: 'r1', room_code: '101', room_state: 'DIRTY' },
+      { id: 't3', type: 'MAINTENANCE', status: 'OPEN', room_id: 'r2', room_code: '202', room_state: 'INVALID' },
+    ] } }]);
+    const rooms = await createRealApi('https://hotel.example', f).listRooms();
+    expect(rooms).toHaveLength(2);
+    expect(rooms[0]).toMatchObject({ id: 'r1', code: '101', state: 'DIRTY' });
+    expect(rooms[1]).toMatchObject({ id: 'r2', code: '202', state: 'UNKNOWN' });
+    expect(rooms[0].guest).toBeUndefined();
+  });
   it('maps active staff and real active_tasks from PMS overview', async () => {
     const { f, calls } = mk([{ body: { staff: [
       { id: 'm1', display_name: 'Housekeeper', role: 'MAID', active_tasks: 4, active: true },
