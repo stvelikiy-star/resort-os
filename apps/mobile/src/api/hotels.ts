@@ -28,7 +28,7 @@ export function parseHotelAddress(input: string): { ok: true; baseUrl: string } 
     const labels = hostname.split('.');
     const validDns = labels.length >= 2 && labels.every((part) =>
       part.length > 0 && part.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(part));
-    const ipAddress = /^\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(hostname) || hostname.includes(':');
+    const ipAddress = /^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.includes(':');
     const internal = ['local', 'localhost', 'internal', 'test', 'invalid'].includes(labels[labels.length - 1]);
     if (u.protocol !== 'https:' || u.username || u.password || u.port ||
         !validDns || ipAddress || internal || hostname.length > 253) {
