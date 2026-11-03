@@ -6,7 +6,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, require_roles, trusted_property_id
+from .auth import require_roles, trusted_property_id
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .payment_idempotency import (
     ensure_same_payment_payload,
     lock_payment_identity,
