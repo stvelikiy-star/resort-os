@@ -27,7 +27,7 @@ jobs:
       - name: Reproducible install
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Verify diagnostic parser behavior
-        run: node --test scripts/audit-provenance.test.mjs
+        run: node --test scripts/audit-provenance.nodecheck.mjs
       - name: Preserve complete audit inventory with dependency provenance
         run: |
           npm audit --omit=dev --json > /tmp/marina-mobile-audit.json || true
@@ -107,7 +107,7 @@ jobs:
       - name: Verify backend declaration pin and advisory classifier
         run: |
           node scripts/verify-backend-contract.mjs
-          node --test scripts/audit-provenance.test.mjs
+          node --test scripts/audit-provenance.nodecheck.mjs
       - name: TypeScript and ESLint code checks
         run: |
           npm run typecheck
