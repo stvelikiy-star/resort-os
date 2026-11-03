@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .payment_idempotency import (
     ensure_same_payment_payload,
     lock_payment_identity,
@@ -91,9 +91,7 @@ async def reservation_acquiring_readiness(
     external provider link or confirmed booking.
     """
     async with request.app.state.db.acquire() as conn:
-        pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", user["property_code"])
-        if not pid:
-            raise HTTPException(status_code=503, detail="Property not loaded")
+        pid = await trusted_property_id(conn, user)
         row = await conn.fetchrow(
             '''SELECT id,"bookingNumber",status::text AS status,"totalKgs"
                FROM reservations WHERE id=$1 AND "propertyId"=$2''',
@@ -131,11 +129,7 @@ async def cancellation_finance_review(
 ):
     """Read-only decision support. Not a refund instruction or cancellation."""
     async with request.app.state.db.acquire() as conn:
-        pid = await conn.fetchval(
-            "SELECT id FROM properties WHERE code=$1", user["property_code"],
-        )
-        if not pid:
-            raise HTTPException(status_code=503, detail="Property not loaded")
+        pid = await trusted_property_id(conn, user)
         reservation = await conn.fetchrow(
             """SELECT id,"bookingNumber",status::text AS status,"totalKgs"
                FROM reservations WHERE id=$1 AND "propertyId"=$2""",
@@ -210,12 +204,7 @@ async def record_reservation_payment(
         async with conn.transaction():
             await lock_payment_identity(conn, payload.idempotency_key, external_ref)
 
-            pid = await conn.fetchval(
-                "SELECT id FROM properties WHERE code=$1",
-                user["property_code"],
-            )
-            if not pid:
-                raise HTTPException(status_code=503, detail="Property not loaded")
+            pid = await trusted_property_id(conn, user)
 
             reservation = await conn.fetchrow(
                 '''

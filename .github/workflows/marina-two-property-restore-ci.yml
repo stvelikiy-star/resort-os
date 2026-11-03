@@ -18,6 +18,7 @@ on:
       - '.github/workflows/marina-full-stack-smoke-ci.yml'
       - 'scripts/test_marina_grid_property.py'
       - 'scripts/test_marina_booking_property_context.py'
+      - 'scripts/test_marina_finance_tenant_boundary.py'
   workflow_dispatch:
 
 permissions:
@@ -87,5 +88,6 @@ jobs:
           python scripts/test_channel_reservation_contract.py
           python scripts/test_marina_grid_property.py
           python scripts/test_marina_booking_property_context.py
+          python -m unittest discover -s scripts -p 'test_marina_finance_tenant_boundary.py' -v
       - name: Verify two-property API isolation before and after full restoration
         run: python scripts/marina_two_property_restore_e2e.py
