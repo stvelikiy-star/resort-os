@@ -10,6 +10,7 @@ on:
       - 'packages/database/**'
       - '.github/workflows/marina-full-stack-smoke-ci.yml'
       - 'scripts/marina_ordinary_booking_e2e.py'
+      - 'scripts/marina_concurrent_booking_e2e.py'
       - 'scripts/marina_grid_browser_smoke.mjs'
       - 'scripts/marina_assistant_browser.mjs'
       - 'scripts/marina_season_boundary_e2e.py'
@@ -158,6 +159,10 @@ jobs:
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
         run: python scripts/marina_ordinary_booking_e2e.py
+      - name: Reject simultaneous booking commits for the same room
+        env:
+          MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
+        run: python scripts/marina_concurrent_booking_e2e.py
       - name: Verify owner-managed staff permissions, session revocation and strict cancellation RBAC
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
