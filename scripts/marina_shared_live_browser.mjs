@@ -115,6 +115,11 @@ async function makeHold(page, hotel, roomCode) {
   return result.id;
 }
 async function releaseHold(page, hotel) {
+  // Schedule/cancellation steps navigate to the bookings section; reopen the
+  // hotel's scoped HOLD panel before releasing the earlier live hold.
+  await page.getByRole("button",{name:"Шахматка"}).click();
+  await page.getByRole("button",{name:"Показать HOLD"}).click();
+  await page.getByRole("button",{name:"Освободить HOLD"}).waitFor();
   const releaseResponse = page.waitForResponse(r =>
     r.url().endsWith("/core/api/v1/admin/pms/holds/" + receipts[hotel].hold_id) &&
     r.request().method()==="DELETE");
