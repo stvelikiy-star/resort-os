@@ -7,7 +7,7 @@ import { Card, Empty, PressScale, Screen, SectionLabel, Title, toneColors } from
 import { RoomStateBadge, roomTone, TaskCard } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 import type { Room, RoomState, Task } from '../../src/api/types';
@@ -22,7 +22,7 @@ export default function RoomCard() {
   const { api, user } = useSession();
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState(false);
-  const ws = workspaceFor(user!.role);
+  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
   const room = useAsync<Room | null>(async () => (await api!.listRooms()).find((r) => r.id === id) ?? null, [api, id]);
   const tasks = useAsync<Task[]>(async () => (await api!.listTasks()).filter((x) => x.room_id === id && x.status !== 'DONE' && x.status !== 'CANCELLED'), [api, id]);
   if (room.error) return <Screen><Card onPress={room.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card></Screen>;
