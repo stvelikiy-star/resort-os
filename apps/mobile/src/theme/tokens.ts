@@ -1,16 +1,16 @@
 export type ThemeName = 'light' | 'dark';
 
-/** MARINA SMART: midnight navy, deep ocean blue and silver, derived from the approved compass/ship brand artwork. */
+/**
+ * MARINA FUTURE LUXURY — design targets from the 03.11.2026 brief.
+ * Keep the existing compass-and-ship image as the ONLY mobile logo pending a
+ * pixel-level sign-off against original source artwork. Accent is not body text.
+ */
 export const palette = {
-  teal: '#245E9A', // compatibility alias for existing components
-  tealDeep: '#071D3C',
-  navy: '#081B35',
-  sand: '#DDE6F1', // silver, not the old gold
-  coral: '#DA655B',
-  green: '#21815D',
-  amber: '#BD851F',
-  blue: '#3275C1',
-};
+  teal: '#087F96', tealDeep: '#073B70', navy: '#073B70',
+  sand: '#D5A64B', coral: '#C64E55', green: '#17745F',
+  amber: '#AE7022', blue: '#1665A2',
+  champagne: '#D5A64B', cyan: '#00CFE8', iris: '#9C6BFF',
+} as const;
 
 export interface Colors {
   bg: string; surface: string; surfaceAlt: string; border: string;
@@ -18,33 +18,47 @@ export interface Colors {
   primarySoft: string; accent: string; success: string; successSoft: string;
   warning: string; warningSoft: string; danger: string; dangerSoft: string;
   info: string; infoSoft: string; heroFrom: string; heroTo: string; shadow: string;
+  glass: string; glassBorder: string; gold: string; cyan: string; iris: string;
+  glow: string; navActive: string; navInactive: string;
 }
-
 export const colors: Record<ThemeName, Colors> = {
   light: {
-    bg: '#F3F6FB', surface: '#FFFFFF', surfaceAlt: '#E8EFF7', border: '#D9E3EE',
-    text: '#071D3C', textMuted: '#526981', primary: '#164B85', primaryText: '#FFFFFF',
-    primarySoft: '#E1ECF8', accent: '#DDE6F1', success: '#1F805A', successSoft: '#DDF3E9',
-    warning: '#976412', warningSoft: '#FFF1D3', danger: '#B73A35', dangerSoft: '#FBE5E4',
-    info: '#2263AF', infoSoft: '#DFECFB', heroFrom: '#06172E', heroTo: '#174B85', shadow: '#071D3C',
+    bg: '#F5FAFF', surface: '#FFFFFF', surfaceAlt: '#EEF7FC', border: '#DCE8F3',
+    text: '#10243D', textMuted: '#586D80', primary: '#073B70', primaryText: '#FFFFFF',
+    primarySoft: '#DFF2FB', accent: '#D5A64B', success: '#176A54', successSoft: '#E2F5EC',
+    warning: '#8D590E', warningSoft: '#FFF2D9', danger: '#AA303A', dangerSoft: '#FBE6EA',
+    info: '#14659A', infoSoft: '#E0F2FC', heroFrom: '#061B38', heroTo: '#155A87',
+    shadow: '#0C3455', glass: '#FFFFFF', glassBorder: '#DFEBF4', gold: '#D5A64B',
+    cyan: '#007E9B', iris: '#6743B4', glow: '#E2F7FF', navActive: '#073B70',
+    navInactive: '#64798F',
   },
   dark: {
-    bg: '#051327', surface: '#0B2140', surfaceAlt: '#112D53', border: '#244468',
-    text: '#F5F8FD', textMuted: '#AEC1D8', primary: '#91BDEB', primaryText: '#06172E',
-    primarySoft: '#17385F', accent: '#DDE6F1', success: '#67D3A4', successSoft: '#103E35',
-    warning: '#EFC56D', warningSoft: '#433414', danger: '#FF9892', dangerSoft: '#4C2628',
-    info: '#99C9FF', infoSoft: '#173557', heroFrom: '#020C1C', heroTo: '#143C71', shadow: '#000000',
+    bg: '#061225', surface: '#10213D', surfaceAlt: '#172A49', border: '#2C4260',
+    text: '#F4F8FF', textMuted: '#B3C6DC', primary: '#00D8FF', primaryText: '#061225',
+    primarySoft: '#103B56', accent: '#E6BD70', success: '#61DFB7', successSoft: '#103C37',
+    warning: '#F4CC7B', warningSoft: '#44351F', danger: '#FF9CA4', dangerSoft: '#48252D',
+    info: '#91D6FF', infoSoft: '#163656', heroFrom: '#020C1D', heroTo: '#15385D',
+    shadow: '#000000', glass: '#122A47', glassBorder: '#36506C', gold: '#E6BD70',
+    cyan: '#00D8FF', iris: '#A987FF', glow: '#123951', navActive: '#00D8FF',
+    navInactive: '#B3C6DC',
   },
 };
-
-export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
-export const radius = { sm: 12, md: 18, lg: 24, pill: 999 };
+export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, huge: 40 } as const;
+export const radius = { sm: 12, md: 18, lg: 24, xl: 30, pill: 999 } as const;
 export const font = {
-  title: { fontSize: 27, fontWeight: '800' as const, letterSpacing: -0.5 },
-  h2: { fontSize: 19, fontWeight: '700' as const },
-  body: { fontSize: 16, fontWeight: '500' as const },
-  small: { fontSize: 13, fontWeight: '500' as const },
+  display: { fontSize: 34, fontWeight: '800' as const, letterSpacing: -1.1 },
+  title: { fontSize: 27, fontWeight: '800' as const, letterSpacing: -0.6 },
+  h2: { fontSize: 19, fontWeight: '700' as const, letterSpacing: -0.3 },
+  body: { fontSize: 16, fontWeight: '500' as const, lineHeight: 24 },
+  small: { fontSize: 13, fontWeight: '500' as const, lineHeight: 19 },
   label: { fontSize: 12, fontWeight: '700' as const, letterSpacing: 0.6 },
-};
-/** Accessible minimum touch target, including one-handed use. */
+  metric: { fontSize: 30, fontWeight: '800' as const, letterSpacing: -0.6 },
+} as const;
+export const elevation = { card: { shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, floating: { shadowOpacity: 0.18, shadowRadius: 26, shadowOffset: { width: 0, height: 12 }, elevation: 9 } } as const;
 export const TOUCH = 56;
+export const motion = {
+  press: 125, tab: 220, card: 320, modal: 340, chart: 700,
+  cardStagger: 55, maxStaggerCards: 6,
+  spring: { speed: 30, bounciness: 5 },
+} as const;
+export const iconography = { nav: 23, action: 22, metric: 24, stroke: 1.9, strokeActive: 2.5 } as const;
