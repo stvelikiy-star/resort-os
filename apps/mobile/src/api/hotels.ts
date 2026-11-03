@@ -14,7 +14,13 @@ export const DEMO_HOTELS: HotelConnection[] = [
   { id: 'demo-sunrise-bishkek', name: 'Sunrise Bishkek', city: 'Bishkek', baseUrl: 'demo://sunrise-bishkek', demo: true, accent: '#BBCFE6' },
 ];
 
-/** Only https hosts (and demo://) are accepted; no credentials/ports tricks, no http. */
+/** A hotel may expose API at its origin or behind the known /core reverse-proxy prefix. */
+export function hotelConnectionId(baseUrl: string): string {
+  const url = new URL(baseUrl);
+  return `live-${url.hostname}${url.pathname === '/core' ? '-core' : ''}`;
+}
+
+/** HTTPS only, one explicitly approved API prefix and no credentials/ports tricks. */
 export function parseHotelAddress(input: string): { ok: true; baseUrl: string } | { ok: false; reason: 'secureOnly' | 'invalid' } {
   const raw = input.trim();
   if (!raw) return { ok: false, reason: 'invalid' };
@@ -23,6 +29,7 @@ export function parseHotelAddress(input: string): { ok: true; baseUrl: string } 
   try {
     const u = new URL(candidate);
     const hostname = u.hostname.toLowerCase();
+    const prefix = u.pathname.replace(/\/+$/, '');
     // Hotel connections carry authenticated cookies: reject IP literals, internal
     // names, alternate ports and ambiguous hostnames from untrusted QR codes.
     const labels = hostname.split('.');
@@ -31,10 +38,11 @@ export function parseHotelAddress(input: string): { ok: true; baseUrl: string } 
     const ipAddress = /^\d+\.\d+\.\d+\.\d+$/.test(hostname) || hostname.includes(':');
     const internal = ['local', 'localhost', 'internal', 'test', 'invalid'].includes(labels[labels.length - 1]);
     if (u.protocol !== 'https:' || u.username || u.password || u.port ||
-        !validDns || ipAddress || internal || hostname.length > 253) {
+        !validDns || ipAddress || internal || hostname.length > 253 ||
+        (prefix !== '' && prefix !== '/core') || u.search || u.hash) {
       return { ok: false, reason: 'invalid' };
     }
-    return { ok: true, baseUrl: `https://${hostname}` };
+    return { ok: true, baseUrl: `https://${hostname}${prefix}` };
   } catch {
     return { ok: false, reason: 'invalid' };
   }
