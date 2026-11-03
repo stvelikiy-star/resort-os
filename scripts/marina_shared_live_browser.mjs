@@ -103,7 +103,7 @@ async function createStayFixture(context,hotel) {
   const list=await context.request.get(BASE+"/core/api/v1/admin/reception/reservations");
   assert.equal(list.status(),200);
   const localToday=(await list.json()).local_date;
-  assert.match(localToday,/^\\d{4}-\\d{2}-\\d{2}$/);
+  assert.match(localToday,/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
   const stayStart=localShift(localToday,-1);
   const stayEnd=localShift(localToday,1);
   const input={room_id:receipt.room_id,check_in:stayStart,check_out:stayEnd,adults:2,children:0};
@@ -136,7 +136,7 @@ async function completeStayViaBrowser(page,hotel){
   const inData=await checkedIn.json();
   assert.equal(inData.reservation_id,fixture.reservation_id);
   assert.equal(inData.status,"CHECKED_IN");
-  assert.match(inData.guest_access_pin,/^\\d{6}$/,"Missing one-time guest PIN");
+  assert.match(inData.guest_access_pin,/^[0-9]{6}$/,"Missing one-time guest PIN");
   assert.equal(inData.guest_access_pin_display_once,true);
   await page.getByLabel("Одноразовый гостевой PIN").waitFor();
   const checkOutResponse=page.waitForResponse(res=>
