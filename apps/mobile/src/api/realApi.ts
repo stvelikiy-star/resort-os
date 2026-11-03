@@ -83,7 +83,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
     async listStaff(): Promise<StaffMember[]> {
       const raw = await call<any>('GET', '/api/v1/admin/staff/overview');
       const list: any[] = raw.staff ?? raw.items ?? [];
-      return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.open_tasks ?? 0 }));
+      return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.active_tasks ?? s.open_tasks ?? 0, active: s.active !== false }));
     },
     async assignTask(taskId, staffId) {
       await call('PATCH', `/api/v1/ops/tasks/${taskId}/assignee`, { assigned_to_id: staffId });
