@@ -30,6 +30,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   // Sessions are keyed by hotel id: signing in to hotel A never exposes data of hotel B.
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
   const sessionRevision = useRef(0);
+  const loginAttempt = useRef(0);
   initI18n(locale);
 
   useEffect(() => {
@@ -108,6 +109,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // session merely because the device previously opened that property.
     if (id === hotelId) return;
     sessionRevision.current++;
+    loginAttempt.current++;
     if (hotelId) dropApi(hotelId);
     setSessions({});
     setHotelId(id);
@@ -123,6 +125,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const signIn = useCallback(async (username: string, password: string) => {
     if (!hotel || !api) throw new Error('no hotel');
     const revision = sessionRevision.current;
+    const attempt = ++loginAttempt.current;
     const signedIn = await api.login(username, password);
     // A native cookie may not persist after a successful login response.
     // Confirm that subsequent authenticated requests resolve to the SAME user.
@@ -133,13 +136,14 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         verified.id !== signedIn.id || verified.property_code !== signedIn.property_code) {
       throw new ApiError('UNAUTHORIZED', 'Session or hotel identity changed during login');
     }
-    if (sessionRevision.current !== revision) throw new ApiError('UNAUTHORIZED', 'Hotel changed during login');
+    if (sessionRevision.current !== revision || loginAttempt.current !== attempt) throw new ApiError('UNAUTHORIZED', 'Session context changed during login');
     setSessions((s) => ({ ...s, [hotel.id]: verified }));
     return verified;
   }, [hotel, api]);
   const signOut = useCallback(async () => {
     if (!hotel || !api) return;
     sessionRevision.current++;
+    loginAttempt.current++;
     try {
       await api.logout();
     } catch {
