@@ -66,6 +66,7 @@ from .pms_chessboard import router as pms_chessboard_router
 from .pms_chessboard_read import router as pms_chessboard_read_router
 from .pms_control_snapshot import router as pms_control_snapshot_router
 from .pms_reservation_create import router as pms_reservation_create_router
+from .pms_holds import router as pms_holds_router
 from .public_ai_admin import router as public_ai_admin_router
 from .marina_assistant import router as marina_assistant_router
 from .rate_management import router as rate_management_router
@@ -213,6 +214,7 @@ app.include_router(agent_context_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)
+app.include_router(pms_holds_router)
 app.include_router(group_bookings_router)
 app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)

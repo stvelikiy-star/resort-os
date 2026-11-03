@@ -1,0 +1,24 @@
+name: MARINA HOLD Contract CI
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/pms_holds.py'
+      - 'services/api/app/pms_reservation_create.py'
+      - 'apps/admin/components/PMSNewReservationModal.tsx'
+      - 'apps/admin/components/PMSOwnerGrid.tsx'
+      - 'packages/database/prisma/migrations/zz114_marina_60minute_holds_20261029/**'
+      - 'scripts/test_marina_hold_contract.py'
+      - '.github/workflows/marina-hold-contract.yml'
+  workflow_dispatch:
+jobs:
+  hold-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify HOLD transaction, expiry and UI contracts
+        run: python -m unittest discover -s scripts -p 'test_marina_hold_contract.py' -v
+      - name: Syntax-check HOLD API and PMS commit
+        run: python -m py_compile services/api/app/pms_holds.py services/api/app/pms_reservation_create.py services/api/app/db.py

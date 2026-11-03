@@ -82,6 +82,7 @@ export default function PMSNewReservationModal({
   onClose,
   onCreated,
   agentMode = false,
+  initialHoldId,
 }: {
   roomId: string;
   roomCode: string;
@@ -91,6 +92,7 @@ export default function PMSNewReservationModal({
   onClose: () => void;
   onCreated: () => void;
   agentMode?: boolean;
+  initialHoldId?: string;
 }) {
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
@@ -108,6 +110,7 @@ export default function PMSNewReservationModal({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [hold, setHold] = useState<{ id: string; expires_at: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ booking_number: string; total_kgs: number } | null>(null);
 
@@ -122,6 +125,25 @@ export default function PMSNewReservationModal({
       .then((body) => setAgents((body.items || []).filter((item: Agent) => item.status === "ACTIVE")))
       .catch(() => setAgents([]));
   }, [agentMode]);
+
+  useEffect(() => {
+    if (!initialHoldId) return;
+    let active = true;
+    fetch(`/core/api/v1/admin/pms/holds/${initialHoldId}`, { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error("Удержание уже истекло или снято");
+        return body;
+      })
+      .then((item) => {
+        if (!active) return;
+        setGuestName(item.guestName);
+        setPhone(item.guestPhone);
+        setHold({ id: item.id, expires_at: item.expiresAt });
+      })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "HOLD недоступен"); });
+    return () => { active = false; };
+  }, [initialHoldId]);
 
   const normalizedDiscount = useMemo(() => {
     if (!discountPercent.trim()) return null;
@@ -152,6 +174,7 @@ export default function PMSNewReservationModal({
           room_id: roomId,
           check_in: checkIn,
           check_out: checkOut,
+          hold_id: hold?.id ?? null,
           adults,
           children,
           manager_total_kgs: agentMode ? null : (override || null),
@@ -171,7 +194,7 @@ export default function PMSNewReservationModal({
     } finally {
       setLoading(false);
     }
-  }, [roomId, checkIn, checkOut, adults, children, phone, extraBedCount, normalizedExtraUnit, discountPercent, normalizedDiscount, discountReason, agentId, agentMode]);
+  }, [roomId, checkIn, checkOut, adults, children, phone, extraBedCount, normalizedExtraUnit, discountPercent, normalizedDiscount, discountReason, agentId, agentMode, hold?.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadPreview(null), phone.trim() ? 350 : 0);
@@ -187,9 +210,50 @@ export default function PMSNewReservationModal({
     await loadPreview(value);
   }
 
+  async function createHold() {
+    if (agentMode || busy || !guestName.trim() || !phone.trim() || !preview?.can_commit) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/core/api/v1/admin/pms/holds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room_id: roomId, check_in: checkIn, check_out: checkOut,
+          guest_name: guestName.trim(), guest_phone: phone.trim(),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(errorText(body, "Не удалось удержать номер"));
+      setHold({ id: body.id, expires_at: body.expires_at });
+      onCreated();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ошибка создания HOLD");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function releaseHold() {
+    if (!hold || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/pms/holds/${hold.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Не удалось освободить номер");
+      setHold(null);
+      await loadPreview();
+      onCreated();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ошибка снятия HOLD");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!preview?.can_commit || !preview.pricing.total_kgs) {
+    if ((!hold && !preview?.can_commit) || !preview?.pricing.total_kgs) {
       setError("Сначала получите корректный preview цены и доступности.");
       return;
     }
@@ -219,6 +283,7 @@ export default function PMSNewReservationModal({
           notes: notes.trim() || null,
           expected_total_kgs: preview.pricing.total_kgs,
           expected_pricing_source: agentMode ? "CORE_RATE" : preview.pricing.source,
+          hold_id: hold?.id ?? null,
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -330,8 +395,11 @@ export default function PMSNewReservationModal({
 
             <footer className="owner-booking-actions">
               <span>{agentMode ? "Бронь агентства создаётся только по открытому штатному тарифу MARINA SMART." : "Клетки — ночи. Допместа и скидки подтверждаются Core и сохраняются в аудите."}</span>
-              <button type="submit" disabled={busy || loading || !preview?.can_commit || !guestName.trim() || !phone.trim()}>
-                {busy ? "Создаём…" : "Подтвердить бронь"}
+              {!agentMode && !hold && <button type="button" onClick={() => void createHold()} disabled={busy || loading || !preview?.can_commit || !guestName.trim() || !phone.trim()}>
+                HOLD на 60 минут
+              </button>}
+              <button type="submit" disabled={busy || loading || (!hold && !preview?.can_commit) || !guestName.trim() || !phone.trim()}>
+                {busy ? "Создаём…" : hold ? "Подтвердить HOLD → бронь" : "Подтвердить бронь"}
               </button>
             </footer>
           </form>
