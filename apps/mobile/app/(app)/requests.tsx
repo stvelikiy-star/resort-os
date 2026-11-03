@@ -7,7 +7,7 @@ import { Button, Card, Empty, FadeIn, Screen, Title } from '../../src/components
 import { TaskCard } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
-import { workspaceFor } from '../../src/roles/registry';
+import { workspaceForSession } from '../../src/roles/registry';
 import type { Task } from '../../src/api/types';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font } from '../../src/theme/tokens';
@@ -17,7 +17,7 @@ export default function Requests() {
   const router = useRouter();
   const { c } = useTheme();
   const { api, user } = useSession();
-  const ws = workspaceFor(user!.role);
+  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
   const { data, loading, error, reload } = useAsync<Task[]>(() => api!.listTasks({ type: 'MAINTENANCE' }), [api]);
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => {
