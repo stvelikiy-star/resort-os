@@ -44,6 +44,41 @@ def valid_values() -> dict[str, str]:
 
 
 class MarinaProductionPreflightTest(unittest.TestCase):
+    def test_blocks_reusing_existing_synthetic_stack_even_with_valid_production_paths(self):
+        for slug in ("hotel01", "smart-demo", "demo"):
+            with self.subTest(slug=slug):
+                values = valid_values()
+                values.update(MARINA_INSTANCE_SLUG=slug,
+                              MARINA_HOST_ROOT=f"/srv/marina-smart/{slug}",
+                              MARINA_HOST_DATA_DIR=f"/srv/marina-smart/{slug}/data",
+                              MARINA_POSTGRES_DB="marina_"+slug.replace("-", "_"),
+                              MARINA_TENANT_CODE="tenant_"+slug.replace("-", "_"),
+                              S3_BACKUP_PREFIX=f"marina/{slug}")
+                errors = validate(values, allow_test_hosts=True)
+                self.assertEqual(len(errors), 1, errors)
+                self.assertIn("MARINA_INSTANCE_SLUG belongs", errors[0])
+
+    def test_blocks_synthetic_property_under_new_production_stack_name(self):
+        for code in ("MARINA_DEMO", "MARINA_HOTEL01", "marina_demo"):
+            with self.subTest(code=code):
+                values = valid_values()
+                values["PROPERTY_CODE"] = code
+                errors = validate(values, allow_test_hosts=True)
+                self.assertEqual(len(errors), 1, errors)
+                self.assertIn("PROPERTY_CODE belongs", errors[0])
+
+    def test_blocks_synthetic_initializer_markers(self):
+        for marker, value in (("MARINA_FLEET_CONFIRM", "SYNTHETIC_EMPTY_PROPERTY_ONLY"),
+                              ("MARINA_DEMO_CONFIRM", "EMPTY_SYNTHETIC_DB_ONLY")):
+            with self.subTest(marker=marker):
+                values = valid_values()
+                values[marker] = value
+                errors = validate(values, allow_test_hosts=True)
+                self.assertEqual(len(errors), 1, errors)
+                self.assertIn(marker, errors[0])
+                values[marker] = ""
+                self.assertEqual(validate(values, allow_test_hosts=True), [])
+
     def test_accepts_isolated_ci_profile_and_bootstrap(self):
         self.assertEqual(validate(valid_values(), bootstrap=True, allow_test_hosts=True), [])
 
