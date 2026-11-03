@@ -149,7 +149,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
 }
 export function useLiveModules() {
   const { hotel, api } = useSession();
-  return useMemo(() => hotel && api?.mode === 'LIVE' ? createLiveModules(hotel.baseUrl) : null, [hotel?.id, hotel?.baseUrl, api?.mode]);
+  return useMemo(() => hotel && api?.mode === 'LIVE' ? createLiveModules(hotel.baseUrl) : null, [hotel, api?.mode]);
 }
 
 /** Hotel-local calendar dates for the occupancy grid; do not use UTC toISOString(). */
