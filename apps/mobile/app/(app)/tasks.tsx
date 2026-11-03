@@ -41,7 +41,7 @@ export default function Tasks() {
           <Text style={[font.title, { color: '#fff', marginTop: 4 }]}>{user!.display_name}</Text>
           <View style={{ marginTop: space.lg, gap: 6 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={[font.small, { color: '#D4E3F4' }]}>{t('tasks.progress')}</Text>
+              <Text style={[font.small, { color: '#D4E3F4' }]}>{t(api?.mode === 'LIVE' ? 'tasks.progressVisible' : 'tasks.progress')}</Text>
               <Text testID="progress-pct" style={[font.small, { color: '#fff', fontWeight: '800' }]}>{pct}%</Text>
             </View>
             <AnimatedProgressBar percent={pct} />
@@ -59,7 +59,7 @@ export default function Tasks() {
         </>
       ) : null}
 
-      <SectionLabel>{t('tasks.today')}</SectionLabel>
+      <SectionLabel>{t(api?.mode === 'LIVE' ? 'tasks.visible' : 'tasks.today')}</SectionLabel>
       {loading && !data ? <Empty text={t('common.loading')} /> : null}
       {error ? <Card onPress={reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card> : null}
       {!loading && !error && !ws.mobileReady ? <Empty text={t('admin.forbidden')} /> : null}
