@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getLocales } from 'expo-localization';
 import { apiFor, dropApi } from '../api/factory';
-import { DEMO_HOTELS, HotelConnection } from '../api/hotels';
+import { DEMO_HOTELS, HotelConnection, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
 import type { AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
@@ -35,7 +35,26 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     void getItem('marina.locale').then((v) => { if (v && ['ru', 'kg', 'en', 'kz'].includes(v)) setLocaleState(v as Locale); });
     void getItem('marina.hotels').then((v) => {
       if (!v) return;
-      try { const extra = (JSON.parse(v) as HotelConnection[]).filter((h) => !h.demo && h.baseUrl.startsWith('https://')); setHotels([...DEMO_HOTELS, ...extra]); } catch { /* ignore corrupt */ }
+      try {
+        const saved: unknown = JSON.parse(v);
+        if (!Array.isArray(saved)) return;
+        // Saved connections are preferences, not trusted configuration.
+        // Re-validate every origin before a network client can be constructed.
+        const known = new Set(DEMO_HOTELS.map((h) => h.id));
+        const extra: HotelConnection[] = [];
+        for (const item of saved.slice(0, 50)) {
+          if (!item || typeof item !== 'object') continue;
+          const h = item as Partial<HotelConnection>;
+          if (h.demo !== false || typeof h.baseUrl !== 'string') continue;
+          const parsed = parseHotelAddress(h.baseUrl);
+          if (!parsed.ok) continue;
+          const id = `live-${new URL(parsed.baseUrl).hostname}`;
+          if (known.has(id) || extra.length >= 20) continue;
+          known.add(id);
+          extra.push({ id, baseUrl: parsed.baseUrl, name: id.slice(5), city: '', demo: false, accent: '#245E9A' });
+        }
+        setHotels([...DEMO_HOTELS, ...extra]);
+      } catch { /* ignore corrupt preferences */ }
     });
   }, [initialLocale]);
 
@@ -58,7 +77,10 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // A native cookie may not persist after a successful login response.
     // Confirm that subsequent authenticated requests resolve to the SAME user.
     const verified = api.mode === 'LIVE' ? await api.me() : signedIn;
-    if (!verified || verified.id !== signedIn.id || verified.property_code !== signedIn.property_code) {
+    if (!verified || typeof verified.id !== 'string' || !verified.id ||
+        typeof verified.property_code !== 'string' || !verified.property_code ||
+        typeof verified.role !== 'string' || !verified.role ||
+        verified.id !== signedIn.id || verified.property_code !== signedIn.property_code) {
       throw new ApiError('UNAUTHORIZED', 'Session or hotel identity changed during login');
     }
     setSessions((s) => ({ ...s, [hotel.id]: verified }));
