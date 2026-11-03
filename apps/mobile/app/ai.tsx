@@ -49,7 +49,7 @@ export default function Assistant() {
       if (!answer || !answer.read_only || typeof answer.answer !== 'string' || answer.property_code !== user?.property_code) {
         throw new Error('Invalid assistant response context');
       }
-      setMessages([...transcript, { role: 'assistant', content: answer.answer }].slice(-10));
+      setMessages([...transcript, { role: 'assistant' as const, content: answer.answer }].slice(-10));
       setLastLive(answer.live_context_available);
       setPrompt('');
       Keyboard.dismiss();
