@@ -17,8 +17,6 @@ type Preview = {
 };
 type FinanceReview = {reservation_id:string;unpaid_cancel_path_eligible:boolean;requires_manual_review:boolean};
 
-const idPattern = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
-
 export default function SharedReservationActions({booking,onExpired,onUpdated}:{
   booking:Reservation; onExpired:()=>void; onUpdated:()=>Promise<void>;
 }) {
