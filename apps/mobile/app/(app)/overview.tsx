@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { BedDouble, CalendarCheck, CalendarClock, MessageCircle, ShieldAlert, Wallet, Sparkles, CalendarDays } from 'lucide-react-native';
+import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays } from 'lucide-react-native';
 import { Hero } from '../../src/components/Brand';
 import { DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';

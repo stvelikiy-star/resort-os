@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react-native';
-import { Button, Card, DemoBanner, FadeIn, Field, PressScale, Screen, SectionLabel } from '../../src/components/ui';
+import { Button, DemoBanner, FadeIn, Field, PressScale, SectionLabel } from '../../src/components/ui';
 import { Hero, Logo, Wordmark } from '../../src/components/Brand';
 import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
