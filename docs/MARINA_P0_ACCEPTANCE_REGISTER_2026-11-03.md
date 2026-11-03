@@ -103,3 +103,23 @@ PASS / FAIL / BLOCKED:
 ## VI. Непосредственно следующий безопасный шаг
 
 Сопоставить ветку, из которой **фактически** запущен публичный DEMO, с `image digest` и текущим `git SHA` Ubuntu, не допуская предположения, что ветка `prep/marina-shared-platform-20261103` уже развёрнута. После этого проверить существующие read-only API и backup metadata. Никакие production endpoints, пароли и адреса не придумывать.
+
+## VII. Подготовленная диагностика хоста (без изменений инфраструктуры)
+
+В этой аудиторской ветке добавлен `scripts/marina_runtime_inventory_readonly.py`. Он читает только `git HEAD`, название ветки и состояние tracked-файлов, список контейнеров MARINA через `docker ps --all`, а также **только метаданные** файлов `marina-*.dump/.backup/.sql/.gz` в указанной папке. Не выводит значения env, секреты, Docker mount paths или содержимое базы.
+
+На доверенном Ubuntu-хосте оператор может запустить:
+
+```bash
+python3 scripts/marina_runtime_inventory_readonly.py > marina-runtime-inventory-20261103.json
+```
+
+Проверка `MARINA P0 Runtime Inventory Safety CI` прошла на PR #272: https://github.com/stvelikiy-star/resort-os/actions/runs/41589504170 . Это тест безопасности диагностического кода **в GitHub CI**, а не доказательство его выполнения на Ubuntu. Проверка `git HEAD` НЕ подтверждает SHA работающих Docker-образов. Следующим отдельным шагом необходима проверка образов по digest, сетей, томов, backup restore и реальных endpoint’ов целевого хоста.
+
+Подтверждённые успешные проверки базового коммита `8a68e48bd` включают:
+- Full Stack Synthetic Smoke: https://github.com/stvelikiy-star/resort-os/actions/runs/41584060560
+- Staff Roles CI: https://github.com/stvelikiy-star/resort-os/actions/runs/41584060713
+- PMS Chessboard Mutation CI: https://github.com/stvelikiy-star/resort-os/actions/runs/41584060791
+- MARINA Two-Property Isolation and Restore CI: https://github.com/stvelikiy-star/resort-os/actions/runs/41584060779
+
+Эти проверки выполнялись на CI-окружениях; они не означают, что соответствующий SHA развёрнут на сервере.
