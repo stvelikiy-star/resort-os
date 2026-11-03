@@ -174,6 +174,22 @@ describe('navigation, guards and screens', () => {
     }
   });
 
+  it('does not repeat a staff task mutation if the server response is lost', async () => {
+    const screen = await loginAs('maid');
+    await fireEvent.press(await screen.findByTestId('task-t1', {}, { timeout: 4000 }));
+    const button = await screen.findByTestId('task-start', {}, { timeout: 4000 });
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'claimTask').mockRejectedValueOnce(new ApiError('OFFLINE', 'no acknowledgment'));
+    try {
+      await fireEvent.press(button);
+      expect(await screen.findByTestId('task-unknown-result', {}, { timeout: 4000 })).toBeTruthy();
+      expect(button.props.accessibilityState?.disabled).toBe(true);
+      await fireEvent.press(button);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('profile language and theme selectors respond to taps', async () => {
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('tab-profile', {}, { timeout: 4000 }));
