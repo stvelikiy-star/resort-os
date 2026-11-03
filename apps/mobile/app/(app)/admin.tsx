@@ -33,7 +33,7 @@ export default function Admin() {
   const [tick, setTick] = useState(0);
   const summary = useAsync<DaySummary | null>(() => (allowed ? api!.daySummary().catch(() => null) : Promise.resolve(null)), [api, tick]);
   const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick]);
-  const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff().catch(() => []) : Promise.resolve([])), [api, tick]);
+  const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff() : Promise.resolve([])), [api, tick]);
 
   if (!allowed) return <Screen><Title>{t('admin.title')}</Title><Empty text={t('admin.forbidden')} /></Screen>;
   const s = summary.data;
@@ -46,6 +46,8 @@ export default function Admin() {
   return (
     <Screen>
       <Title>{t('admin.title')}</Title>
+      {tasks.error ? <Card onPress={tasks.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card> : null}
+      {staff.error ? <Card onPress={staff.reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.forbidden')} · {t('common.retry')}</Text></Card> : null}
       {s ? (
         <FadeIn style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
           <Stat icon={Percent} label={t('admin.occupancy')} value={`${s.occupancy_pct}%`} tone={c.primary} />
@@ -56,7 +58,7 @@ export default function Admin() {
       ) : null}
 
       <SectionLabel>{t('admin.inspection')}</SectionLabel>
-      {queue.length === 0 ? <Empty text={t('common.empty')} /> : null}
+      {!tasks.loading && !tasks.error && queue.length === 0 ? <Empty text={t('common.empty')} /> : null}
       {queue.map((task) => (
         <View key={task.id} style={{ gap: space.sm }}>
           <TaskCard task={task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })} />
@@ -68,7 +70,7 @@ export default function Admin() {
       ))}
 
       <SectionLabel>{t('admin.unassigned')}</SectionLabel>
-      {unassigned.length === 0 ? <Empty text={t('common.empty')} /> : null}
+      {!tasks.loading && !tasks.error && unassigned.length === 0 ? <Empty text={t('common.empty')} /> : null}
       {unassigned.map((task) => (
         <View key={task.id} style={{ gap: space.sm }}>
           <TaskCard task={task} onPress={() => setPick(pick === task.id ? null : task.id)} />
