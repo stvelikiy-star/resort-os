@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only MARINA host inventory. No secrets, Docker inspect, network, restart or DB queries."""
+"""Read-only MARINA host inventory: image-ID-only Docker inspect; no secrets, restart or DB queries."""
 from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
