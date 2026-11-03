@@ -16,9 +16,10 @@ export default function Connect() {
   const { c } = useTheme();
   const router = useRouter();
   const { hotelAddress } = useLocalSearchParams<{ hotelAddress?: string }>();
-  const { hotels, addHotel, selectHotel, locale, setLocale } = useSession();
+  const { hotels, addHotel, selectHotel, startDemo, locale, setLocale } = useSession();
   const [addr, setAddr] = useState(typeof hotelAddress === 'string' ? hotelAddress : '');
   const [err, setErr] = useState<string | null>(null);
+  const [demoBusy, setDemoBusy] = useState(false);
 
   const open = (id: string) => { selectHotel(id); router.push('/login'); };
   const add = () => {
@@ -38,6 +39,23 @@ export default function Connect() {
         <Segmented<Locale> value={locale} onChange={setLocale} options={LOCALES.map((l) => ({ key: l, label: LOCALE_LABEL[l].slice(0, 3).toUpperCase() }))} />
       </FadeIn>
 
+      {Platform.OS === 'web' ? (
+        <Card testID="web-demo-launcher" style={{ gap: space.md, backgroundColor: c.primarySoft }}>
+          <Text style={[font.h2, { color: c.text }]}>{t('connect.tryDemoTitle')}</Text>
+          <Text style={[font.body, { color: c.textMuted }]}>{t('connect.tryDemoHint')}</Text>
+          <Button testID="web-demo-start" label={t('connect.tryDemoButton')} disabled={demoBusy}
+            onPress={async () => {
+              if (demoBusy) return;
+              setDemoBusy(true); setErr(null);
+              try {
+                const user = await startDemo();
+                router.replace('/tasks');
+              } catch {
+                setErr(t('errors.generic'));
+              } finally { setDemoBusy(false); }
+            }} />
+        </Card>
+      ) : null}
       <SectionLabel>{t('connect.demoHotels')}</SectionLabel>
       <DemoBanner />
       {hotels.map((h, i) => (
