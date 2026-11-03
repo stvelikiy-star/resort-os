@@ -25,3 +25,34 @@ export async function removeItem(key: string): Promise<void> {
   if (web) { try { web.removeItem(key); } catch { /* ignore */ } return; }
   try { await SecureStore.deleteItemAsync(key); } catch { /* ignore */ }
 }
+
+/** Security decisions must never rely on memory-only fallback.
+ * These methods report real persistence/read failures to callers.
+ * The pending logout journal contains ONLY public host origins, never tokens.
+ */
+export async function getDurableItem(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    const web = webStorage();
+    if (!web) throw new Error('Durable browser storage unavailable');
+    return web.getItem(key);
+  }
+  return SecureStore.getItemAsync(key);
+}
+export async function setDurableItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const web = webStorage();
+    if (!web) throw new Error('Durable browser storage unavailable');
+    web.setItem(key, value);
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
+}
+export async function removeDurableItem(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const web = webStorage();
+    if (!web) throw new Error('Durable browser storage unavailable');
+    web.removeItem(key);
+    return;
+  }
+  await SecureStore.deleteItemAsync(key);
+}

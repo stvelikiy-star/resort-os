@@ -6,11 +6,12 @@ import { Camera, Check, ChevronLeft, Play, Send, Square } from 'lucide-react-nat
 import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
 import { prioKey, priorityTone, statusKey } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
+import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
 import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space, TOUCH } from '../../src/theme/tokens';
-import { canTransition, HOUSEKEEPING_CHECKLIST, Task } from '../../src/api/types';
+import { ApiError, canTransition, HOUSEKEEPING_CHECKLIST, Task } from '../../src/api/types';
 
 export default function TaskDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,13 +26,27 @@ export default function TaskDetail() {
   const [msg, setMsg] = useState<string | null>(null);
   const [actionError, setActionError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [unknownResult, setUnknownResult] = useState(false);
   const actionLock = useRef(false);
 
   const run = async (fn: () => Promise<Task>, okMsg?: string) => {
-    if (actionLock.current || !user || !api || !ws.mobileReady) return;
+    if (actionLock.current || unknownResult || !user || !api || !ws.mobileReady) return;
     actionLock.current = true;
     setBusy(true); setMsg(null); setActionError(false);
-    try { const n = await fn(); setData(n); if (okMsg) setMsg(okMsg); } catch (e: any) { setActionError(true); setMsg(t(e?.code === 'FORBIDDEN' ? 'errors.forbidden' : e?.code === 'OFFLINE' ? 'errors.offline' : 'errors.generic')); } finally { actionLock.current = false; setBusy(false); }
+    try {
+      const n = await fn();
+      setData(n);
+      if (okMsg) setMsg(okMsg);
+    } catch (e: unknown) {
+      const rejected = wasWriteRejected(e);
+      if (!rejected) setUnknownResult(true);
+      setActionError(rejected);
+      const code = e instanceof ApiError ? e.code : 'UNKNOWN';
+      setMsg(!rejected ? t('errors.resultUnknown') : t(code === 'FORBIDDEN' ? 'errors.forbidden' : 'errors.generic'));
+    } finally {
+      actionLock.current = false;
+      setBusy(false);
+    }
   };
 
   if (!user || !api) return <Redirect href="/connect" />;
@@ -79,21 +94,22 @@ export default function TaskDetail() {
             <Camera size={26} color={c.textMuted} /><Text style={[font.small, { color: c.textMuted, flex: 1 }]}>{t('hk.photoSoon')}</Text>
           </Card>
           <Field label={t('hk.comment')} value={comment} onChangeText={setComment} multiline />
-          <Button testID="hk-submit" label={t('hk.submit')} icon={Send} disabled={busy || !allChecked}
+          <Button testID="hk-submit" label={t('hk.submit')} icon={Send} disabled={busy || unknownResult || !allChecked}
             onPress={() => run(() => api!.completeHousekeeping(task.id, { checklist: checks, comment }), t('hk.sent'))} />
           {!allChecked ? <Text style={[font.small, { color: c.textMuted }]}>{t('hk.incomplete')}</Text> : null}
         </>
       ) : null}
 
-      {task.status === 'OPEN' ? <Button testID="task-start" label={t('tasks.start')} icon={Play} disabled={busy} onPress={() => run(() => api!.claimTask(task.id))} /> : null}
-      {!isHk && task.status === 'IN_PROGRESS' && canTransition(task.type, 'IN_PROGRESS', 'DONE') ? <Button testID="task-finish" label={t('tasks.finish')} icon={Check} disabled={busy} onPress={() => run(() => api!.setTaskStatus(task.id, 'DONE'))} /> : null}
+      {task.status === 'OPEN' ? <Button testID="task-start" label={t('tasks.start')} icon={Play} disabled={busy || unknownResult} onPress={() => run(() => api!.claimTask(task.id))} /> : null}
+      {!isHk && task.status === 'IN_PROGRESS' && canTransition(task.type, 'IN_PROGRESS', 'DONE') ? <Button testID="task-finish" label={t('tasks.finish')} icon={Check} disabled={busy || unknownResult} onPress={() => run(() => api!.setTaskStatus(task.id, 'DONE'))} /> : null}
       {isHk && task.status === 'IN_INSPECTION' && canInspect ? (
         <View style={{ gap: space.sm }}>
-          <Button testID="task-approve" label={t('tasks.approve')} icon={Check} disabled={busy} onPress={() => run(() => api!.setTaskStatus(task.id, 'DONE'))} />
-          <Button label={t('tasks.reject')} variant="secondary" disabled={busy} onPress={() => run(() => api!.setTaskStatus(task.id, 'IN_PROGRESS'))} />
+          <Button testID="task-approve" label={t('tasks.approve')} icon={Check} disabled={busy || unknownResult} onPress={() => run(() => api!.setTaskStatus(task.id, 'DONE'))} />
+          <Button label={t('tasks.reject')} variant="secondary" disabled={busy || unknownResult} onPress={() => run(() => api!.setTaskStatus(task.id, 'IN_PROGRESS'))} />
         </View>
       ) : null}
-      {msg ? <Text testID="task-msg" style={[font.body, { color: actionError ? c.danger : c.success, fontWeight: '700' }]}>{msg}</Text> : null}
+      {msg ? <Text testID={unknownResult ? "task-unknown-result" : "task-msg"} accessibilityRole="alert"
+        style={[font.body, { color: unknownResult ? c.warning : actionError ? c.danger : c.success, fontWeight: '700' }]}>{msg}</Text> : null}
     </Screen>
   );
 }

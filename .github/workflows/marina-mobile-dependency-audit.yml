@@ -3,8 +3,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'apps/mobile/package.json'
-      - 'apps/mobile/package-lock.json'
+      # Independently run source diagnostics for every mobile change,
+      # even when the strict Expo version gate fails before Jest.
+      - 'apps/mobile/**'
       - '.github/workflows/marina-mobile-dependency-audit.yml'
   schedule:
     # Scheduled workflows run only from GitHub's default branch after an approved merge.
@@ -26,6 +27,23 @@ jobs:
           node-version: '22.13.1'
       - name: Reproducible install
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify diagnostic parser behavior
+        run: node --test scripts/audit-provenance.nodecheck.mjs
+      - name: Preserve complete audit inventory with dependency provenance
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-audit.json || true
+          node scripts/audit-provenance.mjs /tmp/marina-mobile-audit.json package-lock.json > /tmp/marina-mobile-audit-provenance.json
+          node -e "const a=require('/tmp/marina-mobile-audit-provenance.json'); console.log('AUDIT_PROVENANCE:',JSON.stringify(a.counts),'DIAGNOSTIC_NOT_RELEASE_CLEARANCE')"
+      - name: Upload security evidence even on failed gate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-audit-provenance
+          path: |
+            /tmp/marina-mobile-audit.json
+            /tmp/marina-mobile-audit-provenance.json
+          retention-days: 7
+          if-no-files-found: warn
       - name: Fail on production moderate-or-higher advisories
         run: npm audit --omit=dev --audit-level=moderate
 
@@ -71,10 +89,10 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  scoped-expo-compat-probe:
-    name: Scoped Expo tooling security patch compatibility (temporary)
+  source-diagnostics:
+    name: Mobile source diagnostics (NOT a release gate substitute)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     permissions:
       contents: read
     defaults:
@@ -85,32 +103,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.13.1'
-      - name: Construct isolated Expo-only override candidate
+      - name: Install exact lockfile with native build support
+        run: npm ci --no-audit --no-fund
+      - name: Verify backend declaration pin and advisory classifier
         run: |
-          npm pkg set 'overrides.@expo/cli.glob=^14.0.2' 'overrides.@expo/config.glob=^14.0.2' 'overrides.@expo/config-plugins.glob=^14.0.2' 'overrides.@expo/fingerprint.glob=^14.0.2' 'overrides.@expo/fingerprint.minimatch=^11.0.1' 'overrides.@expo/metro-config.glob=^14.0.2'
-          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-          git diff --stat -- package.json package-lock.json
-          git diff -- package.json package-lock.json > /tmp/marina-mobile-expo-tooling-candidate.patch
-      - name: Verify Expo SDK and toolchain still work
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.nodecheck.mjs
+      - name: TypeScript and ESLint code checks
         run: |
-          npm ci --no-audit --no-fund
-          npx expo install --check
           npm run typecheck
           npm run lint
-          npm test -- --ci --runInBand
-          npm run web:export
-      - name: Capture remaining vulnerabilities after scoped override
-        if: always()
-        run: |
-          npm audit --omit=dev --json > /tmp/marina-mobile-expo-scoped-audit.json || true
-          node -e "const a=require('/tmp/marina-mobile-expo-scoped-audit.json'); console.log('EXPO_SCOPED_AFTER:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
-      - name: Store unmerged review files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: marina-mobile-expo-scoped-compat
-          path: |
-            /tmp/marina-mobile-expo-tooling-candidate.patch
-            /tmp/marina-mobile-expo-scoped-audit.json
-          retention-days: 7
-          if-no-files-found: warn
+      - name: Full Jest regression (SDK version gate remains separate)
+        run: npm test -- --ci --runInBand
+      - name: Expo web export (SDK version gate remains separate)
+        run: npm run web:export

@@ -13,7 +13,7 @@ import Profile from '../app/(app)/profile';
 import TaskDetail from '../app/task/[id]';
 import RoomCard from '../app/room/[id]';
 import NewRequest from '../app/new-request';
-import { apiFor } from '../src/api/factory';
+import { apiFor, dropApi } from '../src/api/factory';
 import { DEMO_HOTELS } from '../src/api/hotels';
 import { ApiError } from '../src/api/types';
 
@@ -124,6 +124,51 @@ describe('navigation, guards and screens', () => {
     await waitFor(() => expect(screen.queryByTestId('assign-u-maid2')).toBeNull(), { timeout: 4000 });
   });
 
+  it('blocks resubmission of admin assignment after lost server acknowledgment', async () => {
+    dropApi(DEMO_HOTELS[0].id); // Reset mutated demo seed from earlier test cases.
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('task-t8', {}, { timeout: 4000 }));
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'assignTask').mockRejectedValueOnce(new ApiError('OFFLINE', 'lost ack'));
+    try {
+      await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
+      expect(await screen.findByTestId('admin-unknown-result', {}, { timeout: 4000 })).toBeTruthy();
+      const button = screen.getByTestId('assign-u-maid2');
+      expect(button.props.accessibilityState?.disabled).toBe(true);
+      await fireEvent.press(button);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally { spy.mockRestore(); }
+  });
+
+  it('allows corrected admin assignment after explicit server rejection', async () => {
+    dropApi(DEMO_HOTELS[0].id); // Reset mutated demo seed from earlier test cases.
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('task-t8', {}, { timeout: 4000 }));
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'assignTask').mockRejectedValueOnce(new ApiError('CONFLICT', 'rejected'));
+    try {
+      await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
+      expect(await screen.findByTestId('admin-action-error', {}, { timeout: 4000 })).toBeTruthy();
+      expect(screen.queryByTestId('admin-unknown-result')).toBeNull();
+      await fireEvent.press(screen.getByTestId('assign-u-maid2'));
+      await waitFor(() => expect(spy).toHaveBeenCalledTimes(2), { timeout: 4000 });
+    } finally { spy.mockRestore(); }
+  });
+
+  it('blocks resubmission of admin inspection approval after lost acknowledgment', async () => {
+    dropApi(DEMO_HOTELS[0].id); // Reset mutated demo seed from earlier test cases.
+    const screen = await loginAs('manager');
+    await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'setTaskStatus').mockRejectedValueOnce(new ApiError('UNKNOWN', 'ack missing'));
+    try {
+      await fireEvent.press(await screen.findByTestId('approve-t3', {}, { timeout: 4000 }));
+      expect(await screen.findByTestId('admin-unknown-result', {}, { timeout: 4000 })).toBeTruthy();
+      const button = screen.getByTestId('approve-t3');
+      expect(button.props.accessibilityState?.disabled).toBe(true);
+      await fireEvent.press(button);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally { spy.mockRestore(); }
+  });
   it('does not create a second maintenance ticket after successful submission', async () => {
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('quick-new-request', {}, { timeout: 4000 }));
@@ -169,6 +214,22 @@ describe('navigation, guards and screens', () => {
       expect(screen.queryByTestId('mt-unknown-result')).toBeNull();
       await fireEvent.press(screen.getByTestId('mt-send'));
       await waitFor(() => expect(spy).toHaveBeenCalledTimes(2), {timeout: 4000});
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not repeat a staff task mutation if the server response is lost', async () => {
+    const screen = await loginAs('maid');
+    await fireEvent.press(await screen.findByTestId('task-t1', {}, { timeout: 4000 }));
+    const button = await screen.findByTestId('task-start', {}, { timeout: 4000 });
+    const spy = jest.spyOn(apiFor(DEMO_HOTELS[0]), 'claimTask').mockRejectedValueOnce(new ApiError('OFFLINE', 'no acknowledgment'));
+    try {
+      await fireEvent.press(button);
+      expect(await screen.findByTestId('task-unknown-result', {}, { timeout: 4000 })).toBeTruthy();
+      expect(button.props.accessibilityState?.disabled).toBe(true);
+      await fireEvent.press(button);
+      expect(spy).toHaveBeenCalledTimes(1);
     } finally {
       spy.mockRestore();
     }
