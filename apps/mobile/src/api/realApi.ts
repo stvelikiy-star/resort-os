@@ -15,28 +15,36 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
 
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     let res: Response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
     try {
       res = await fetchImpl(`${root}${path}`, {
-        method, credentials: 'include',
+        method, credentials: 'include', signal: controller.signal,
         headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
     } catch {
       throw new ApiError('OFFLINE');
+    } finally {
+      clearTimeout(timeout);
     }
     if (res.status === 204) return undefined as T;
     if (!res.ok) {
       const code = res.status === 401 ? 'UNAUTHORIZED' : res.status === 403 ? 'FORBIDDEN' : res.status === 404 ? 'NOT_FOUND' : res.status === 409 ? 'CONFLICT' : res.status === 400 || res.status === 422 ? 'BAD_REQUEST' : 'UNKNOWN';
       throw new ApiError(code, `HTTP ${res.status}`);
     }
-    return (await res.json()) as T;
+    try { return (await res.json()) as T; }
+    catch { throw new ApiError('UNKNOWN', 'Invalid JSON response from hotel API'); }
   }
 
-  const mapTask = (t: any): Task => ({
+  const mapTask = (t: any): Task => {
+    if (!t || typeof t.id !== 'string' || !t.id || !['HOUSEKEEPING', 'MAINTENANCE', 'GUEST_REQUEST'].includes(t.type) || !['OPEN', 'IN_PROGRESS', 'IN_INSPECTION', 'DONE', 'CANCELLED'].includes(t.status)) throw new ApiError('UNKNOWN', 'Invalid task record');
+    return ({
     id: String(t.id), type: t.type, status: t.status, priority: t.priority ?? 'NORMAL',
     title: t.title ?? '', room_code: t.room_code ?? t.roomCode ?? null, room_id: t.room_id ?? t.roomId ?? null,
     assigned_to_id: t.assigned_to_id ?? t.assignedToId ?? null, assigned_to_name: t.assigned_to_name ?? null,
   });
+  };
 
   return {
     mode: 'LIVE',
@@ -48,7 +56,9 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       if (filter?.type) q.set('type', filter.type);
       if (filter?.status) q.set('status', filter.status);
       const raw = await call<any>('GET', `/api/v1/ops/tasks${q.size ? `?${q}` : ''}`);
-      return (Array.isArray(raw) ? raw : raw.items ?? []).map(mapTask);
+      const items = Array.isArray(raw) ? raw : raw?.items;
+      if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
+      return items.map(mapTask);
     },
     async claimTask(id) { await call('POST', `/api/v1/ops/tasks/${id}/claim`); return findTask(id); },
     async setTaskStatus(id, status) { await call('PATCH', `/api/v1/ops/tasks/${id}/status`, { status }); return findTask(id); },
@@ -82,7 +92,8 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
     },
     async listStaff(): Promise<StaffMember[]> {
       const raw = await call<any>('GET', '/api/v1/admin/staff/overview');
-      const list: any[] = raw.staff ?? raw.items ?? [];
+      const list: any[] = raw?.staff ?? raw?.items;
+      if (!Array.isArray(list)) throw new ApiError('UNKNOWN', 'Invalid staff overview response');
       return list.map((s) => ({ id: String(s.id), display_name: s.display_name ?? s.username, role: s.role, open_tasks: s.active_tasks ?? s.open_tasks ?? 0, active: s.active !== false }));
     },
     async assignTask(taskId, staffId) {
@@ -97,7 +108,9 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
 
   async function findTask(id: string): Promise<Task> {
     const list = await call<any>('GET', '/api/v1/ops/tasks?limit=300');
-    const t = (Array.isArray(list) ? list : list.items ?? []).find((x: any) => String(x.id) === id);
+    const items = Array.isArray(list) ? list : list?.items;
+    if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
+    const t = items.find((x: any) => String(x.id) === id);
     if (!t) throw new ApiError('NOT_FOUND');
     return mapTask(t);
   }
