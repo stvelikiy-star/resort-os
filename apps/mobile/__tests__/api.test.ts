@@ -56,6 +56,19 @@ describe('demo api', () => {
     await expect(manager.assignTask('t6', 'u-maid')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     await expect(manager.assignTask('t7', 'u-maid')).rejects.toMatchObject({ code: 'CONFLICT' });
   });
+  it('manager assigns real demo unassigned cleaning and repair work to matching staff roles', async () => {
+    const manager = await login('assign-demo', 'manager');
+    const before = await manager.listTasks();
+    expect(before.find((task) => task.id === 't8')).toMatchObject({ type: 'HOUSEKEEPING', assigned_to_id: null });
+    expect(before.find((task) => task.id === 't9')).toMatchObject({ type: 'MAINTENANCE', assigned_to_id: null });
+    await expect(manager.assignTask('t8', 'u-tech')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(manager.assignTask('t9', 'u-maid')).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(await manager.assignTask('t8', 'u-maid2')).toMatchObject({ assigned_to_id: 'u-maid2' });
+    expect(await manager.assignTask('t9', 'u-tech')).toMatchObject({ assigned_to_id: 'u-tech' });
+    const after = await manager.listTasks();
+    expect(after.find((task) => task.id === 't8')?.assigned_to_name).toBe('Гульзат М.');
+    expect(after.find((task) => task.id === 't9')?.assigned_to_name).toBe('Бакыт Э.');
+  });
   it('hotels are isolated: different data and no shared state', async () => {
     const a = await login('demo-marina', 'manager'); const b = await login('demo-sunrise', 'manager');
     expect((await a.listRooms())[0].code.startsWith('M-')).toBe(true);
