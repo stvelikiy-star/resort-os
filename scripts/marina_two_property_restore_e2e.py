@@ -260,6 +260,10 @@ def run_api_gate(dsn: str, fixtures: list[dict], directory: Path) -> None:
             with httpx.Client(base_url=f"http://127.0.0.1:{port}") as client:
                 own = client.post("/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORDS[index]})
                 assert own.status_code == 200, "Own account login failed"
+                setup_response = client.get("/api/v1/admin/hotel-setup")
+                assert setup_response.status_code == 200, "Own hotel setup must be available"
+                assert setup_response.json()["property"]["code"] == CODES[index]
+                assert setup_response.json()["property"]["id"]
                 cookie = client.cookies.get("resort_session")
                 assert cookie, "Own login did not create session"
                 response = httpx.get(f"http://127.0.0.1:{PORTS[foreign]}/api/v1/auth/me", cookies={"resort_session": cookie})
