@@ -37,8 +37,15 @@ def review(data: dict) -> dict:
             findings.append(f"Immutable image ID unavailable: {name}")
     if backups.get("directory_present") is not True:
         findings.append("Backup directory not present")
-    if not backups.get("files"):
+    files = backups.get("files") or []
+    if not files:
         findings.append("No matching backup files listed")
+    elif not any(
+        isinstance(item, dict) and item.get("custom_archive_listing_ok") is True
+        for item in files
+    ):
+        findings.append("No PostgreSQL custom backup with a verified readable archive TOC")
+    # TOC readability is not successful database restoration.
     # Metadata presence is not evidence of validity. Never emit READY or PASS.
     return {
         "schema": "marina-inventory-review-v1",
