@@ -19,6 +19,10 @@ class SharedAuthPreviewBoundary:
             # Narrow, reviewed read-only management summary. Other workspaces remain closed.
             ('GET', '/api/v1/admin/dashboard'),
             ('GET', '/api/v1/pms/grid'),
+            # Transactional PMS booking, tightly scoped to authenticated property.
+            # HOLDs, payments, stay transitions and other PMS writes stay closed.
+            ('POST', '/api/v1/admin/pms/reservations/new/preview'),
+            ('POST', '/api/v1/admin/pms/reservations/new/commit'),
             # Reviewed hotel-scoped staff lifecycle (stage 2 / isolated staging only).
             ('GET', '/api/v1/admin/staff/overview'),
             ('POST', '/api/v1/admin/staff'),
@@ -31,9 +35,13 @@ class SharedAuthPreviewBoundary:
                            isinstance(path, str) and re.fullmatch(
                                r'/api/v1/admin/staff/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}',
                                path) is not None)
-            valid = (method, path) in allowed or staff_patch
+            pms_cancel = (scope['type'] == 'http' and method in {'POST', 'OPTIONS'} and
+                          isinstance(path, str) and re.fullmatch(
+                              r'/api/v1/admin/pms/reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/cancel',
+                              path) is not None)
+            valid = (method, path) in allowed or staff_patch or pms_cancel
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
