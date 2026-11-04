@@ -452,6 +452,14 @@ async def room_context(token: str, request: Request, tc_guest_session: str | Non
             "guest": {"first_name": stay["firstName"] or "Гость"},
             "stay": {"check_in": stay["checkIn"], "check_out": stay["checkOut"]},
             "privacy": "MINIMAL_GUEST_CONTEXT",
+            # Capabilities are server-authoritative. In shared RC4 the guest
+            # UI must not advertise financial/provider actions or unavailable AI.
+            "guest_capabilities": (
+                {"request_codes": ["MAINTENANCE", "ADMIN"], "ai_available": False}
+                if (MARINA_SHARED_AUTH_PREVIEW_ENABLED
+                    and os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true")
+                else None
+            ),
         }
 
 
