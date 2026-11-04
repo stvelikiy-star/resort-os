@@ -43,10 +43,10 @@ export default function Rooms() {
           const tc = toneColors(c, roomTone(r.state));
           return (
             <View key={r.id} style={{ width: singleColumn ? '100%' : '47%' }}><StaggerItem index={i}>
-              <GlassCard testID={`room-${r.id}`} onPress={() => router.push({ pathname: '/room/[id]', params: { id: r.id } })} style={{ gap: 8, minHeight: singleColumn ? 130 : 152, borderLeftWidth: 5, borderLeftColor: tc.fg }}>
+              <GlassCard testID={`room-${r.id}`} onPress={() => router.push({ pathname: '/room/[id]', params: { id: r.id } })} style={{ gap: 8, minHeight: singleColumn ? 146 : 168, borderLeftWidth: 5, borderLeftColor: tc.fg }}>
                 <Text style={[font.title, { color: c.text, fontSize: 24 }]}>{r.code}</Text>
                 <RoomStateBadge state={r.state} />
-                <Text style={[font.small, { color: c.textMuted }]} numberOfLines={1}>{r.guest ?? (r.arrival ? `${t('rooms.arrival')}: ${r.arrival}` : api?.mode === 'LIVE' ? t('rooms.state.UNKNOWN') : t('rooms.vacant'))}</Text>
+                <Text style={[font.small, { color: c.textMuted, flexShrink: 1 }]} numberOfLines={2}>{r.guest ?? (r.arrival ? `${t('rooms.arrival')}: ${r.arrival}` : api?.mode === 'LIVE' ? t('rooms.state.UNKNOWN') : t('rooms.vacant'))}</Text>
               </GlassCard></StaggerItem>
             </View>
           );
