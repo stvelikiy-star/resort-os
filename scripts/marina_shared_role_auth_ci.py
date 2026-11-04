@@ -176,6 +176,14 @@ def main():
                           "/api/v1/admin/staff/overview"):
             assert client.get(forbidden).status_code == 403, forbidden
         assert client.get("/api/v1/ops/tasks").status_code == 200
+        # Management's staff overview must report the same effective grants
+        # as /auth/me, not owner-provided but forbidden extras.
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_A", "OWNER")])
+        overview = client.get("/api/v1/admin/staff/overview")
+        assert overview.status_code == 200
+        maid_row = next(item for item in overview.json()["staff"] if item["username"] == "maid")
+        assert maid_row["module_permissions"] == ["OPS"], maid_row["module_permissions"]
         client.cookies.clear()
         client.cookies.set(token_cookie, seen[("HOTEL_B", "MAID")])
         assert client.get("/api/v1/auth/me").json()["module_permissions"] == ["OPS"]
