@@ -116,6 +116,10 @@ try {
   await page.locator(".concierge-modal textarea").fill("Synthetic browser maintenance request B");
   await page.locator(".concierge-modal .concierge-submit").click();
   await page.locator(".concierge-request-list").getByText("Synthetic browser maintenance request B").waitFor({ timeout: 20000 });
+  // The success dialog intentionally stays open. Close it before clicking
+  // the underlying request row; do not force-click through the backdrop.
+  await page.locator(".concierge-modal-head button").click();
+  await page.locator(".concierge-modal-backdrop").waitFor({ state: "hidden" });
   const safeTask = page.locator(".concierge-request-list article")
     .filter({ hasText: "Synthetic browser maintenance request B" });
   await safeTask.locator("button").click();
