@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
 from app import auth, guest_os, guest_requests, guest_stay_reviews as reviews
+from app.shared_auth_preview import SharedAuthPreviewBoundary
 
 
 class Store:
@@ -210,6 +211,36 @@ class GuestTenantTests(unittest.TestCase):
         self.assertIn('g."propertyId"=s."propertyId"', sql)
         self.assertIn('s."propertyId"=gs."propertyId"', sql)
         self.assertIn('s."guestId"=gs."guestId"', sql)
+
+
+    def test_unreviewed_guest_qr_endpoints_remain_closed_in_shared_preview(self):
+        # The two-hotel Guest OS source is hardened but NOT yet an admitted
+        # shared-staging feature. Only the boundary is exercised here; no DB.
+        app = FastAPI()
+        app.state.db = self.store
+        app.add_middleware(SharedAuthPreviewBoundary)
+        app.include_router(guest_os.admin_router)
+        app.include_router(guest_os.public_router)
+        paths = (
+            ('GET', '/api/v1/admin/guest-os/room-qrs'),
+            ('POST', '/api/v1/admin/guest-os/room-qrs/11111111-1111-4111-8111-111111111111/issue'),
+            ('POST', '/api/v1/admin/guest-os/room-qrs/11111111-1111-4111-8111-111111111111/rotate'),
+            ('GET', '/api/v1/guest-os/rooms/' + 'x' * 32),
+            ('POST', '/api/v1/guest-os/rooms/' + 'x' * 32 + '/verify'),
+            ('POST', '/api/v1/guest-os/logout'),
+            ('GET', '/api/v1/guest-os/rooms/' + 'x' * 32 + '/requests'),
+        )
+        with patch.object(auth, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', True), \
+                patch.object(auth, 'shared_auth_preview_guard', lambda: None), \
+                TestClient(app, base_url='https://testserver') as client:
+            for method, url in paths:
+                with self.subTest(method=method, url=url):
+                    response = client.request(method, url)
+                    self.assertEqual(response.status_code, 503)
+        self.assertEqual(self.store.room_lookups, [])
+        self.assertEqual(self.store.code_lookups, [])
+
+
 
 
 if __name__ == '__main__':
