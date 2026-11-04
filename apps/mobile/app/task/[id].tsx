@@ -3,9 +3,10 @@ import { Text, View } from 'react-native';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Camera, Check, ChevronLeft, Play, Send, Square } from 'lucide-react-native';
-import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../../src/components/ui';
+import { AnimatedProgressBar, Badge, Button, Empty, Field, PressScale, SectionLabel } from '../../src/components/ui';
 import { prioKey, priorityTone, statusKey } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
+import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
 import { workspaceForSession } from '../../src/roles/registry';
@@ -18,8 +19,8 @@ export default function TaskDetail() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api, user } = useSession();
-  const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE');
+  const { api, user, hotel, serverAuthMode } = useSession();
+  const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => user && api && ws.mobileReady ? (await api.listTasks()).find((x) => x.id === id) ?? null : null, [api, id, user?.id]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [comment, setComment] = useState('');
@@ -51,32 +52,37 @@ export default function TaskDetail() {
 
   if (!user || !api) return <Redirect href="/connect" />;
   if (!ws.mobileReady) return <Redirect href="/profile" />;
-  if (loading && !task) return <Screen><Empty text={t('common.loading')} /></Screen>;
-  if (error) return <Screen><Card onPress={reload}><Text style={[font.body, { color: c.danger }]}>{t('errors.generic')} · {t('common.retry')}</Text></Card></Screen>;
-  if (!task) return <Screen><Empty text={t('errors.notFound')} /></Screen>;
+  if (loading && !task) return <FutureScreen><LoadingShimmer count={3}/></FutureScreen>;
+  if (error) return <FutureScreen><ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/></FutureScreen>;
+  if (!task) return <FutureScreen><Empty text={t('errors.notFound')} /></FutureScreen>;
   const isHk = task.type === 'HOUSEKEEPING';
   const allChecked = HOUSEKEEPING_CHECKLIST.every((k) => checks[k]);
+  const checkedCount = HOUSEKEEPING_CHECKLIST.filter(k => checks[k]).length;
   const canInspect = ws.canManage;
 
   return (
-    <Screen>
+    <FutureScreen>
       <PressScale onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('common.back')}>
         <ChevronLeft size={22} color={c.primary} /><Text style={[font.body, { color: c.primary }]}>{t('common.back')}</Text>
       </PressScale>
-      <Title sub={t(`tasks.types.${task.type}`)}>{task.room_code ?? t('common.room')}</Title>
-      <Card style={{ gap: space.sm }}>
+      <PremiumHeader title={task.room_code ?? t('common.room')} subtitle={hotel?.name} eyebrow={t(`tasks.types.${task.type}`)}/>
+      <GlassCard style={{ gap: space.sm, borderLeftWidth: 4, borderLeftColor: priorityTone(task.priority) === 'danger' ? c.danger : priorityTone(task.priority) === 'warning' ? c.warning : c.primary }}>
         <Text style={[font.h2, { color: c.text }]}>{task.title}</Text>
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-          <Badge label={t(statusKey(task.status))} tone="primary" />
+          <Badge label={t(statusKey(task.status))} tone={task.status === 'DONE' ? 'success' : task.status === 'IN_INSPECTION' ? 'info' : task.status === 'IN_PROGRESS' ? 'primary' : 'neutral'} />
           <Badge label={t(prioKey(task.priority))} tone={priorityTone(task.priority)} />
           {task.due_label ? <Badge label={task.due_label} /> : null}
         </View>
         {task.assigned_to_name ? <Text style={[font.small, { color: c.textMuted }]}>{task.assigned_to_name}</Text> : null}
-      </Card>
+      </GlassCard>
 
       {isHk && task.status === 'IN_PROGRESS' ? (
         <>
-          <SectionLabel>{t('hk.title')}</SectionLabel>
+          <SectionLabel>{t('hk.title')} · {checkedCount}/{HOUSEKEEPING_CHECKLIST.length}</SectionLabel>
+          <GlassCard style={{ gap: 7 }}>
+            <Text style={[font.small, { color: c.textMuted }]}>{t('tasks.progress')} · {checkedCount}/{HOUSEKEEPING_CHECKLIST.length}</Text>
+            <AnimatedProgressBar percent={Math.round(checkedCount / HOUSEKEEPING_CHECKLIST.length * 100)}/>
+          </GlassCard>
           {HOUSEKEEPING_CHECKLIST.map((k) => {
             const on = !!checks[k];
             return (
@@ -90,9 +96,9 @@ export default function TaskDetail() {
             );
           })}
           <SectionLabel>{t('hk.photo')}</SectionLabel>
-          <Card style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, opacity: 0.7 }}>
+          <GlassCard style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, opacity: 0.7 }}>
             <Camera size={26} color={c.textMuted} /><Text style={[font.small, { color: c.textMuted, flex: 1 }]}>{t('hk.photoSoon')}</Text>
-          </Card>
+          </GlassCard>
           <Field label={t('hk.comment')} value={comment} onChangeText={setComment} multiline />
           <Button testID="hk-submit" label={t('hk.submit')} icon={Send} disabled={busy || unknownResult || !allChecked}
             onPress={() => run(() => api!.completeHousekeeping(task.id, { checklist: checks, comment }), t('hk.sent'))} />
@@ -110,6 +116,6 @@ export default function TaskDetail() {
       ) : null}
       {msg ? <Text testID={unknownResult ? "task-unknown-result" : "task-msg"} accessibilityRole="alert"
         style={[font.body, { color: unknownResult ? c.warning : actionError ? c.danger : c.success, fontWeight: '700' }]}>{msg}</Text> : null}
-    </Screen>
+    </FutureScreen>
   );
 }
