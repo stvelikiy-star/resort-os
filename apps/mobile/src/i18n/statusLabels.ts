@@ -4,7 +4,8 @@ type Translations = Pick<MobileCopy,
   'chatOpen' | 'chatWaitingGuest' | 'chatWaitingStaff' | 'chatResolved' | 'chatArchived' |
   'messageIncoming' | 'messageOutgoing' | 'messageInternal' |
   'messageSent' | 'messageDelivered' | 'messageRead' | 'messageFailed' |
-  'orderNew' | 'orderAccepted' | 'orderCooking' | 'orderReady' | 'orderServed' | 'orderCancelled'
+  'orderNew' | 'orderAccepted' | 'orderCooking' | 'orderReady' | 'orderServed' | 'orderCancelled' |
+  'tableAvailable' | 'tableOccupied' | 'tableReserved' | 'tableUnknown'
 >;
 
 /** Display-only mapping: never changes the server status or grants an operation. */
@@ -44,6 +45,16 @@ export function orderStatusLabel(code: string, c: Translations): string {
     case 'SERVED': return c.orderServed;
     case 'CANCELLED': return c.orderCancelled;
     default: return code;
+  }
+}
+/** Table state comes from the server; unrecognized codes never mean an empty table. */
+export function diningTableStatusLabel(code: string, copy: Translations): string {
+  switch (code) {
+    case 'AVAILABLE':
+    case 'FREE': return copy.tableAvailable;
+    case 'OCCUPIED': return copy.tableOccupied;
+    case 'RESERVED': return copy.tableReserved;
+    default: return copy.tableUnknown;
   }
 }
 export function contactInitials(name: string | null): string | null {
