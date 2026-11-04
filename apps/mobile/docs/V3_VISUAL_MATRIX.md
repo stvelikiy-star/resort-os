@@ -73,6 +73,14 @@ MANAGER: task queue RU/light and EN/dark, team EN/dark at 320/375/430, profile R
 This polish does not expand permissions, seed fake platform metrics or modify any backend API. The previously captured 21 Expo Web screenshots predate these two changes and do not evidence their final appearance; their route statuses above remain unchanged.
 
 
+## Desktop browser preview — user-reported defect
+
+**Evidence:** user-supplied 1728 px browser screenshot of the actual Expo Web staff login, showing an edge-to-edge login form with disproportionate inputs, header and CTA. This is a real **Web** bug; it is not evidence of a native Android issue.
+
+**Fix:** `app/_layout.tsx` now renders the existing navigation inside a centered, maximum **440 px** mobile viewport on desktop Web (`>=700 px`), while Web phones, native Android and iOS retain fluid full width. No new UI routes, screen rewrites or platform changes. `app/+html.tsx` additionally opts out of browser auto-translation, since the screenshot showed the branded `MARINA SMART` wordmark incorrectly translated to `МАРИНА УМНЫЙ` despite the source `Brand.tsx` rendering English.
+
+**Acceptance:** CI must capture actual Expo Web `connect_ru_desktop_1440_after_mobile_frame.jpg` and `login_en_dark_desktop_1440_after_mobile_frame.jpg`, verify the rendered frame is **300–444 px** and horizontally centered, then recheck mobile at 375 px. **AFTER screenshots: PENDING** until a successful run on the updated SHA. Android native remains **NOT TESTED**.
+
 ## Verified fresh Expo Web evidence after V3 fixes
 
 Three screenshots were captured from the **real running Expo Web UI** in headless Chrome at GitHub Actions [run 41880546889](https://github.com/stvelikiy-star/resort-os/actions/runs/41880546889), job 126752023955, source SHA `4f6ce9dd5d58ab6ad16463059e114a405ce3f28c`, built-in synthetic DEMO fixture, no live hotel and no staff write. **The workflow was subsequently canceled by a newer commit after logging the images.** This does not imply a CI PASS for that commit. Screenshot authenticity is supported by the `WEB_VISUAL_JPEG:` job log records and [provenance](qa-evidence/PROVENANCE_V3_POLISH.json).
