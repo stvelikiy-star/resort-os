@@ -1,6 +1,7 @@
+import type { SharedHotelSelector } from './sharedHotelAuth';
+
 /** Types mirror the existing MARINA SMART contract (services/api/app/operations.py, auth.py). */
 export type AuthMode = 'demo' | 'single_property' | 'shared_auth_preview';
-import type { SharedHotelSelector } from './sharedHotelAuth';
 
 export type Role = 'OWNER' | 'MANAGER' | 'RECEPTION' | 'AGENT' | 'MAID' | 'TECHNICIAN' | 'STORE_STAFF' | 'DINING_STAFF' | 'COOK' | 'WAITER' | 'CONTENT_MANAGER' | 'BEACH_PARTNER';
 export type TaskType = 'HOUSEKEEPING' | 'MAINTENANCE' | 'GUEST_REQUEST';
