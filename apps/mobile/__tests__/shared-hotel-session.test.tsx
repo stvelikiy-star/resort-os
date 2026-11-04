@@ -182,8 +182,8 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
     const screen = await setup();
     fireEvent.press(screen.getByTestId('login-a'));
     await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_A'));
-    let releaseQueue: (() => void) | null = null;
-    const blockedQueue = new Promise<void>(resolve => { releaseQueue = resolve; });
+    const queueGate = { release: () => {} };
+    const blockedQueue = new Promise<void>(resolve => { queueGate.release = () => resolve(); });
     const { queueCookieLogout } = jest.requireMock('../src/lib/pendingLogout') as {
       queueCookieLogout: jest.Mock;
     };
@@ -195,7 +195,7 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
     await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('none'));
     expect(screen.getByTestId('selected-tenant').props.children).toBe('none');
     expect(queueCookieLogout).toHaveBeenCalledWith('https://platform.example');
-    releaseQueue?.();
+    queueGate.release();
   });
 
   it('does not expose an earlier hotel after leaving the shared connection', async () => {
