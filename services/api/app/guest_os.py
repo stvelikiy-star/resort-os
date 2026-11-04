@@ -14,7 +14,7 @@ import qrcode.image.svg
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles, trusted_property_id
+from .auth import _client_ip, require_roles, trusted_property_id
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 PUBLIC_BASE_URL = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "https://3korony.com").rstrip("/")
@@ -65,10 +65,12 @@ def verify_pin_hash(pin: str, stored: str | None) -> bool:
 
 
 def client_key_hash(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    host = forwarded or (request.client.host if request.client else "unknown")
+    # Share authentication's trusted-proxy policy: a caller-supplied
+    # X-Forwarded-For header must never reset the guest PIN failure counter.
+    # Only an explicitly trusted deployment reverse proxy may supply the IP.
+    client_ip = _client_ip(request)
     agent = request.headers.get("user-agent", "unknown")[:300]
-    return hashlib.sha256(f"{host}|{agent}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{client_ip}|{agent}".encode("utf-8")).hexdigest()
 
 
 async def property_context(conn, user):
