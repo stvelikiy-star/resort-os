@@ -7,13 +7,14 @@ import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, Sta
 import { Conversation, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { chatStatusLabel, contactInitials } from '../../src/i18n/statusLabels';
+import { formatChatTimestamp } from '../../src/i18n/dateLabels';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Inbox() {
-  const { hotel, user } = useSession();
+  const { hotel, user, locale } = useSession();
   const live = useLiveModules();
   const router = useRouter();
   const copy = useMobileCopy();
@@ -49,14 +50,16 @@ export default function Inbox() {
           </View>
           <View style={{flex:1,gap:6}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6}}>
-              <Text style={[font.h2,{color:c.text,flex:1}]} numberOfLines={1}>{x.contact_name || x.contact_phone || '—'}</Text>
-              {x.needs_reply ? <View style={{width:9,height:9,borderRadius:5,backgroundColor:c.warning}}/> : null}
+              <Text style={[font.h2,{color:c.text,flex:1,minWidth:0}]} numberOfLines={1}>{x.contact_name || x.contact_phone || '—'}</Text>
+              {x.needs_reply ? <View accessible accessibilityLabel={copy.needsReply} style={{width:9,height:9,borderRadius:5,backgroundColor:c.warning}}/> : null}
             </View>
+            {formatChatTimestamp(x.last_message_at, locale) ? <Text style={[font.label,{color:c.textMuted}]}>{formatChatTimestamp(x.last_message_at, locale)}</Text> : null}
             <Text style={[font.small,{color:c.textMuted}]} numberOfLines={2}>{x.last_message_text || copy.empty}</Text>
             <View style={{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'}}>
               <Badge label={x.channel_kind} tone="info"/>
               <Badge label={chatStatusLabel(x.status, copy)} tone={x.status === 'RESOLVED' ? 'success' : 'primary'}/>
               {x.needs_reply ? <Badge label={copy.needsReply} tone="warning"/> : null}
+              {x.assigned_to_name ? <Badge label={copy.assigned + ': ' + x.assigned_to_name} tone="neutral"/> : null}
             </View>
           </View>
           <ChevronRight color={c.primary} size={21}/>
