@@ -7,11 +7,11 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .service_auth import require_automation_service
+from .shared_inbox_rc5_identity import require_hotel_channel_service, require_bound_channel, resolve_channel_property
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 router = APIRouter(prefix="/api/v1/automation/inbox", tags=["automation-inbox"])
-service_access = require_automation_service
+service_access = require_hotel_channel_service
 
 
 class NormalizedChannelMessage(BaseModel):
@@ -255,6 +255,9 @@ async def ingest_normalized_channel_message(
     communication tables directly. Only provider-confirmed SENT/DELIVERED
     outbound messages count as an actual response to the guest.
     """
+    # In a shared runtime, the authenticated service secret (not the event
+    # body or a globally pinned PROPERTY_CODE) selects the tenant and channel.
+    require_bound_channel(payload, service)
     code = normalized_channel_code(payload.channel_code)
     source = f"INBOX_{code}"[:60]
     message_time = normalized_message_time(payload.sent_at)
@@ -267,7 +270,7 @@ async def ingest_normalized_channel_message(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await conn.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY_CODE)
+            pid = await resolve_channel_property(conn, service)
             if not pid:
                 raise HTTPException(status_code=503, detail="Property is not loaded")
 

@@ -1,0 +1,151 @@
+name: MARINA Shared Inbox RC5 Two-Hotel HTTPS CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/shared_inbox_rc5.py'
+      - 'services/api/app/shared_inbox_rc5_identity.py'
+      - 'services/api/app/communication_ingest.py'
+      - 'services/api/app/ai_sales.py'
+      - 'services/api/app/main.py'
+      - 'scripts/test_marina_shared_inbox_rc5.py'
+      - 'scripts/marina_shared_inbox_rc5_https_ci.py'
+      - '.github/workflows/marina-shared-inbox-rc5-https-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inbox-rc5-two-hotels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 28
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      PYTHONPATH: services/api:scripts
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_INBOX_RC5_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_INBOX_CI_ONLY
+      MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'true'
+      MARINA_SHARED_GUEST_QR_RC4_CONFIRM: REVIEWED_SHARED_GUEST_QR_STAGING_ONLY
+      MARINA_SHARED_GUEST_QR_RC4_ORIGIN: https://localhost:18446
+      GUEST_OS_PUBLIC_BASE_URL: https://localhost:18446
+      MARINA_GUEST_QR_CI_CONFIRM: ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY
+      MARINA_SHARED_INBOX_RC5_ENABLED: 'true'
+      MARINA_SHARED_INBOX_RC5_CONFIRM: REVIEWED_SHARED_INBOX_STAGING_ONLY
+      MARINA_SHARED_INBOX_RC5_AI_MOCK_ENABLED: 'true'
+      MARINA_SHARED_INBOX_RC5_AI_MOCK_CONFIRM: ISOLATED_SYNTHETIC_AI_DRAFT_ONLY
+      OPENAI_API_BASE_URL: http://127.0.0.1:18081/v1
+      OPENAI_API_KEY: synthetic-local-mock-ai-key
+      OPENAI_SALES_MODEL: synthetic-mock-ai-model
+      COOKIE_SECURE: 'true'
+      COOKIE_DOMAIN: ''
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create independent synthetic credentials for two WhatsApp instances
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          python - <<'PY'
+          import json,os,secrets
+          pwd="synthetic-ci-only-"+secrets.token_hex(24)
+          adapters=[]
+          for hotel,instance in (("A","10000001"),("B","20000002")):
+              key=secrets.token_urlsafe(48)
+              print("::add-mask::"+key)
+              adapters.append({
+                  "tenant_code":"tenant_"+hotel.lower(),
+                  "property_code":"HOTEL_"+hotel,
+                  "channel_code":"WA_MAIN",
+                  "external_account_id":instance,
+                  "service_key":key,
+              })
+          print("::add-mask::"+pwd)
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf-8") as env:
+              env.write("MARINA_SHARED_BROWSER_CI_PASSWORD="+pwd+"\n")
+              env.write("MARINA_SHARED_INBOX_RC5_ADAPTERS_JSON="+json.dumps(adapters,separators=(",",":"))+"\n")
+          PY
+      - name: Apply unchanged Prisma migrations to empty CI database
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - name: Install canonical Core dependencies
+        run: python -m pip install -r services/api/requirements.txt
+      - name: Enforce RC5 exact-path and per-hotel service-key contract
+        run: python scripts/test_marina_shared_inbox_rc5.py -v
+      - name: Seed two unrelated hotel owners, reception, managers and rooms
+        run: python scripts/marina_shared_live_browser_db.py seed
+      - name: Create self-signed local-only TLS certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/marina-shared-inbox-rc5-ci
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+            -keyout /tmp/marina-shared-inbox-rc5-ci/key.pem \
+            -out /tmp/marina-shared-inbox-rc5-ci/cert.pem 2>/dev/null
+      - name: Start isolated OpenAI mock that records all model prompts
+        shell: bash
+        env:
+          MOCK_OPENAI_COUNT_FILE: /tmp/marina-shared-inbox-rc5-ci/mock-openai-count
+          MOCK_OPENAI_PROMPT_FILE: /tmp/marina-shared-inbox-rc5-ci/mock-openai-prompt
+        run: |
+          set -euo pipefail
+          python scripts/mock_openai_responses.py \
+            > /tmp/marina-shared-inbox-rc5-ci/ai-mock.log 2>&1 &
+          echo $! > /tmp/marina-shared-inbox-rc5-ci/ai-mock.pid
+      - name: Boot real shared app_entry on loopback HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.app_entry:app --app-dir services/api \
+            --host 127.0.0.1 --port 18446 --no-proxy-headers \
+            --ssl-keyfile /tmp/marina-shared-inbox-rc5-ci/key.pem \
+            --ssl-certfile /tmp/marina-shared-inbox-rc5-ci/cert.pem \
+            > /tmp/marina-shared-inbox-rc5-ci/api.log 2>&1 &
+          echo $! > /tmp/marina-shared-inbox-rc5-ci/api.pid
+          curl -fsS --cacert /tmp/marina-shared-inbox-rc5-ci/cert.pem \
+            --retry 20 --retry-connrefused --retry-delay 1 \
+            https://localhost:18446/api/v1/auth/mode > /dev/null
+      - name: Two-hotel real HTTPS Inbox, service idempotency, reception and AI mock E2E
+        run: python scripts/marina_shared_inbox_rc5_https_ci.py
+      - name: Show server and mock diagnostics on failure
+        if: failure()
+        run: |
+          tail -n 130 /tmp/marina-shared-inbox-rc5-ci/api.log || true
+          tail -n 60 /tmp/marina-shared-inbox-rc5-ci/ai-mock.log || true
+      - name: Stop isolated processes
+        if: always()
+        run: |
+          for file in /tmp/marina-shared-inbox-rc5-ci/api.pid /tmp/marina-shared-inbox-rc5-ci/ai-mock.pid; do
+            if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi
+          done

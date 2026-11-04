@@ -13,6 +13,7 @@ from .auth import require_roles, router as auth_router, trusted_property_id
 from .db import lifespan
 from .shared_auth_preview import SharedAuthPreviewBoundary
 from .shared_guest_qr_rc4 import SharedGuestQrRc4Boundary
+from .shared_inbox_rc5 import SharedInboxRc5Boundary
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
@@ -40,9 +41,13 @@ app.add_middleware(
 # RC3 remains the exact default; RC4 only when explicitly requested in
 # reviewed, isolated shared staging. Every non-Guest request still uses RC3.
 app.add_middleware(
-    SharedGuestQrRc4Boundary
-    if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
-    else SharedAuthPreviewBoundary
+    SharedInboxRc5Boundary
+    if os.environ.get("MARINA_SHARED_INBOX_RC5_ENABLED") == "true"
+    else (
+        SharedGuestQrRc4Boundary
+        if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+        else SharedAuthPreviewBoundary
+    )
 )
 app.include_router(auth_router)
 
