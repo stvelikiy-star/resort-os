@@ -6,6 +6,7 @@ import { Badge, Button, Empty, PressScale, SectionLabel } from '../../src/compon
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
 import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
+import { canOpenPmsReservation, pmsCellState } from '../../src/roles/pmsPresentation';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
@@ -32,18 +33,21 @@ export default function Pms() {
   const cell = (room: GridRoom, day: string) => {
     const blocks = occupancyFor(room, day);
     const block = blocks[0];
-    const clash = blocks.length > 1;
-    const booked = block?.type === 'RESERVATION';
-    const filled = !!block || clash;
-    const tone = clash ? c.danger : booked ? c.primary : filled ? c.warning : c.surfaceAlt;
-    const label = clash ? '!' : filled ? booked ? '●' : 'H' : '—';
-    const semantic = clash ? copy.conflict : !block ? copy.available : booked ? copy.bookings : copy.holds;
-    const canOpen = !clash && !!block?.reservation_id && user?.role !== 'AGENT';
+    const state = pmsCellState(blocks, day);
+    const tone = state === 'RESERVATION' ? c.primary : state === 'HOLD' ? c.warningSoft
+      : state === 'BLOCKED' || state === 'CONFLICT' ? c.dangerSoft : c.surfaceAlt;
+    const ink = state === 'RESERVATION' ? c.primaryText : state === 'HOLD' ? c.warning
+      : state === 'BLOCKED' || state === 'CONFLICT' ? c.danger : c.textMuted;
+    const label = state === 'RESERVATION' ? '●' : state === 'HOLD' ? 'H'
+      : state === 'BLOCKED' ? '×' : state === 'CONFLICT' ? '!' : '—';
+    const semantic = state === 'RESERVATION' ? copy.bookings : state === 'HOLD' ? copy.holds
+      : state === 'BLOCKED' ? copy.blocked : state === 'CONFLICT' ? copy.conflict : copy.available;
+    const canOpen = canOpenPmsReservation(blocks, day, user?.role);
     return <PressScale key={day} testID={'pms-' + room.id + '-' + day}
       accessibilityLabel={room.code + ' ' + day + ' · ' + semantic}
       disabled={!canOpen} onPress={() => { if (canOpen) router.push({ pathname: '/reservation/[id]', params: { id: block.reservation_id! } }); }}
-      style={{ width: CELL_WIDTH - 4, height: ROW_HEIGHT - 6, marginRight: 4, borderRadius: radius.sm, backgroundColor: tone, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: filled ? tone : c.border }}>
-      <Text style={[font.h2, { color: filled ? booked ? c.primaryText : c.bg : c.textMuted }]}>{label}</Text>
+      style={{ width: CELL_WIDTH - 4, height: ROW_HEIGHT - 6, marginRight: 4, borderRadius: radius.sm, backgroundColor: tone, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: state === 'RESERVATION' ? tone : c.border }}>
+      <Text style={[font.h2, { color: ink }]}>{label}</Text>
     </PressScale>;
   };
   const roomState = (room: GridRoom) =>
@@ -70,6 +74,7 @@ export default function Pms() {
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <SectionLabel>{copy.available} · {data.rooms.length}</SectionLabel>
+      <Text style={[font.small, { color: c.textMuted }]}>{copy.gridHint}</Text>
       <GlassCard style={{ padding: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
           <View style={{ width: LABEL_WIDTH, flexShrink: 0 }}>
@@ -84,7 +89,7 @@ export default function Pms() {
           <ScrollView horizontal showsHorizontalScrollIndicator accessibilityLabel={copy.pms}>
             <View>
               <View style={{ flexDirection: 'row', height: 46, alignItems: 'center' }}>
-                {dates.map(date => <View key={date} style={{ width: CELL_WIDTH, alignItems: 'center' }}>
+                {dates.map(date => <View key={date} style={{ width: CELL_WIDTH, alignItems: 'center', paddingVertical: 7, borderRadius: radius.sm, backgroundColor: date === localDate() ? c.primarySoft : 'transparent' }}>
                   <Text style={[font.small, { color: c.text, fontWeight: '700' }]}>{date.slice(5)}</Text>
                 </View>)}
               </View>
@@ -99,6 +104,7 @@ export default function Pms() {
         <Badge label={'● ' + copy.bookings} tone="primary"/>
         <Badge label={'H ' + copy.holds} tone="warning"/>
         <Badge label={'— ' + copy.available} tone="neutral"/>
+        <Badge label={'× ' + copy.blocked} tone="danger"/>
         <Badge label={'! ' + copy.conflict} tone="danger"/>
       </View>
       <SectionLabel>{copy.bookings}</SectionLabel>
