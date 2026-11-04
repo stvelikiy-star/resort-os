@@ -8,13 +8,14 @@ import secrets
 import uuid
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
+from urllib.parse import urlsplit
 
 import qrcode
 import qrcode.image.svg
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles, trusted_property_id
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, _client_ip, require_roles, trusted_property_id
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 PUBLIC_BASE_URL = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "https://3korony.com").rstrip("/")
@@ -65,10 +66,13 @@ def verify_pin_hash(pin: str, stored: str | None) -> bool:
 
 
 def client_key_hash(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    host = forwarded or (request.client.host if request.client else "unknown")
-    agent = request.headers.get("user-agent", "unknown")[:300]
-    return hashlib.sha256(f"{host}|{agent}".encode("utf-8")).hexdigest()
+    # Share authentication's trusted-proxy policy: a caller-supplied
+    # X-Forwarded-For header must never reset the guest PIN failure counter.
+    # Only an explicitly trusted deployment reverse proxy may supply the IP.
+    # User-Agent is attacker-controlled too; varying it must not reset the
+    # PIN failure budget. The counter is per QR and validated client IP.
+    client_ip = _client_ip(request)
+    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
 
 
 async def property_context(conn, user):
@@ -235,7 +239,40 @@ async def write_verify_audit(
     )
 
 
+
+def guest_qr_public_origin() -> str:
+    """An unrelated hotel's permanent QR must never default to a legacy domain.
+
+    Legacy single-property deployments retain their configured historical
+    default. Shared staging requires an explicitly configured HTTPS origin
+    serving all tenants; no tenant or request header may select its hostname.
+    """
+    if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        return PUBLIC_BASE_URL
+    value = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "").strip()
+    try:
+        parsed = urlsplit(value)
+        valid = (parsed.scheme == "https" and bool(parsed.hostname)
+                 and not parsed.username and not parsed.password
+                 and parsed.path in {"", "/"} and not parsed.query and not parsed.fragment)
+        # A private loopback QR is valid only for the disposable acceptance
+        # harness, never for an externally accessible shared deployment.
+        if parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+            valid = valid and os.environ.get("MARINA_GUEST_QR_CI_CONFIRM") == (
+                "ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY"
+            )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "SHARED_GUEST_QR_ORIGIN_NOT_CONFIGURED"},
+        )
+    return value.rstrip("/")
+
+
 async def issue_room_qr(conn, *, property_id: uuid.UUID, room_id: uuid.UUID, room_code: str, label: str | None = None):
+    public_origin = guest_qr_public_origin()
     existing = await conn.fetchrow('SELECT id FROM room_qrs WHERE "roomId"=$1 AND status=\'ACTIVE\' FOR UPDATE', room_id)
     if existing:
         raise HTTPException(
@@ -244,7 +281,7 @@ async def issue_room_qr(conn, *, property_id: uuid.UUID, room_id: uuid.UUID, roo
         )
     raw_token = secrets.token_urlsafe(32)
     qr_id = uuid.uuid4()
-    public_url = f"{PUBLIC_BASE_URL}/g/{raw_token}"
+    public_url = f"{public_origin}/g/{raw_token}"
     await conn.execute(
         '''
         INSERT INTO room_qrs (

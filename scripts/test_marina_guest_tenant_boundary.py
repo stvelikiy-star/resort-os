@@ -1,5 +1,6 @@
 """Guest QR administration and review links must follow authenticated hotel IDs."""
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 import sys
@@ -240,6 +241,35 @@ class GuestTenantTests(unittest.TestCase):
         self.assertEqual(self.store.room_lookups, [])
         self.assertEqual(self.store.code_lookups, [])
 
+
+
+
+
+    def test_shared_guest_qr_origin_requires_explicit_https_front_door(self):
+        # Legacy 3korony.com fallback must never be printed on unrelated
+        # hotels' QR codes in the shared multi-tenant platform.
+        with patch.object(guest_os, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', True), \
+                patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('GUEST_OS_PUBLIC_BASE_URL', None)
+            os.environ.pop('MARINA_GUEST_QR_CI_CONFIRM', None)
+            with self.assertRaises(HTTPException) as missing:
+                guest_os.guest_qr_public_origin()
+            self.assertEqual(missing.exception.status_code, 503)
+            for invalid in (
+                'http://ms.go.kg', 'https://ms.go.kg/g',
+                'https://user@ms.go.kg', 'https://ms.go.kg?tenant=hotel_a',
+                'https://localhost:18443', 'https://127.0.0.1:18443',
+            ):
+                with self.subTest(invalid=invalid):
+                    os.environ['GUEST_OS_PUBLIC_BASE_URL'] = invalid
+                    with self.assertRaises(HTTPException) as blocked:
+                        guest_os.guest_qr_public_origin()
+                    self.assertEqual(blocked.exception.status_code, 503)
+            os.environ['GUEST_OS_PUBLIC_BASE_URL'] = 'https://ms.go.kg/'
+            self.assertEqual(guest_os.guest_qr_public_origin(), 'https://ms.go.kg')
+            os.environ['GUEST_OS_PUBLIC_BASE_URL'] = 'https://localhost:18443'
+            os.environ['MARINA_GUEST_QR_CI_CONFIRM'] = 'ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY'
+            self.assertEqual(guest_os.guest_qr_public_origin(), 'https://localhost:18443')
 
 
 
