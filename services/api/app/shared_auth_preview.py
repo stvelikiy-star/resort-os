@@ -19,6 +19,8 @@ class SharedAuthPreviewBoundary:
             # Narrow, reviewed read-only management summary. Other workspaces remain closed.
             ('GET', '/api/v1/admin/dashboard'),
             ('GET', '/api/v1/pms/grid'),
+            # Reviewed role-limited operations; no room-state override in shared mode.
+            ('GET', '/api/v1/ops/tasks'), ('POST', '/api/v1/ops/tasks'),
             # Reception bookings are read-only and bound to authenticated property.
             ('GET', '/api/v1/admin/reception/reservations'),
             # Transactional PMS booking and hotel-scoped 60-minute inventory HOLDs.
@@ -75,9 +77,16 @@ class SharedAuthPreviewBoundary:
                                 isinstance(path, str) and re.fullmatch(
                                     r'/api/v1/admin/reception/reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}',
                                     path) is not None)
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail
+            ops_task_action = (scope['type'] == 'http' and isinstance(path, str) and
+                               re.fullmatch(
+                                   r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/(?:claim|status)',
+                                   path) is not None and
+                               (method == 'OPTIONS' or
+                                (method == 'POST' and path.endswith('/claim')) or
+                                (method == 'PATCH' and path.endswith('/status'))))
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
