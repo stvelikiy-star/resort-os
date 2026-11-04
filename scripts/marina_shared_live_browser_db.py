@@ -258,6 +258,28 @@ async def verify(conn):
                 WHERE "propertyId"=$1 AND "resourceId"=$2
                   AND action='STATUS_CHANGE'
             ''',pid,task_id)>=1,"Missing operation transition audit"
+    for hotel,receipt in receipts.items():
+        pid=property_ids[hotel]
+        assert await conn.fetchval('''
+            SELECT count(*) FROM audit_logs
+            WHERE "propertyId"=$1 AND "resourceId"=$2
+              AND action='ASSIGN'
+              AND "afterJson"->>'assigned_to_id'=$3
+        ''',pid,receipt["maintenance_task_id"],receipt["technician_id"])==1, \
+            "Hotel-local assignment/audit missing"
+    hotel_b=receipts["HOTEL_B"]
+    assert await conn.fetchval('''
+        SELECT count(*) FROM audit_logs
+        WHERE "propertyId"=$1 AND "resourceId"=$2
+          AND action='HOUSEKEEPING_REPORT'
+          AND "afterJson"->>'status'='IN_INSPECTION'
+          AND jsonb_array_length("afterJson"->'checklist')=5
+    ''',property_ids["HOTEL_B"],hotel_b["stay_fixture"]["housekeeping_task_id"])==1, \
+        "Mobile-format inspection report missing"
+    assert await conn.fetchval('''
+        SELECT count(*) FROM audit_logs WHERE action='HOUSEKEEPING_REPORT'
+    ''')==1,"Duplicate or foreign housekeeping report persisted"
+
     assert await conn.fetchval('''
         SELECT count(*) FROM operational_tasks
         WHERE type='MAINTENANCE' AND status='DONE'
