@@ -15,6 +15,7 @@ from .shared_auth_preview import SharedAuthPreviewBoundary
 from .shared_guest_qr_rc4 import SharedGuestQrRc4Boundary
 from .shared_inbox_rc5 import SharedInboxRc5Boundary
 from .shared_green_rc6 import SharedGreenQrRc6Boundary
+from .shared_green_rc7 import SharedGreenWebhookRc7Boundary
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
@@ -42,15 +43,19 @@ app.add_middleware(
 # RC3 remains the exact default; RC4 only when explicitly requested in
 # reviewed, isolated shared staging. Every non-Guest request still uses RC3.
 app.add_middleware(
-    SharedGreenQrRc6Boundary
-    if os.environ.get("MARINA_SHARED_GREEN_RC6_ENABLED") == "true"
+    SharedGreenWebhookRc7Boundary
+    if os.environ.get("MARINA_SHARED_GREEN_RC7_ENABLED") == "true"
     else (
-        SharedInboxRc5Boundary
-        if os.environ.get("MARINA_SHARED_INBOX_RC5_ENABLED") == "true"
+        SharedGreenQrRc6Boundary
+        if os.environ.get("MARINA_SHARED_GREEN_RC6_ENABLED") == "true"
         else (
-            SharedGuestQrRc4Boundary
-            if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
-            else SharedAuthPreviewBoundary
+            SharedInboxRc5Boundary
+            if os.environ.get("MARINA_SHARED_INBOX_RC5_ENABLED") == "true"
+            else (
+                SharedGuestQrRc4Boundary
+                if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+                else SharedAuthPreviewBoundary
+            )
         )
     )
 )

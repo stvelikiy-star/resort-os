@@ -9,6 +9,7 @@ from .automation_read import router as automation_read_router
 from .booking_admin import router as booking_admin_router
 from .channel_outbound import router as channel_outbound_router
 from .communication_ingest import router as communication_ingest_router
+from .green_api_webhook import router as green_api_webhook_router
 from .crm_sync import router as crm_sync_router
 from .dining_control import router as dining_control_router
 from .dining_entitlements import router as dining_entitlements_router
@@ -267,6 +268,7 @@ app.include_router(owner_pace_automation_router)
 app.include_router(crm_sync_router)
 app.include_router(google_control_router)
 app.include_router(communication_ingest_router)
+app.include_router(green_api_webhook_router)
 app.include_router(inbox_router)
 app.include_router(whatsapp_connection_router)
 app.include_router(channel_outbound_router)
