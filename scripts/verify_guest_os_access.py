@@ -254,6 +254,24 @@ def main():
     assert locked_body["active_stay"] is True and locked_body["verification_required"] is True
     assert_no_pii(locked_body)
 
+    verified = client.post(f"/api/v1/guest-os/rooms/{token}/verify", json={"pin": pin})
+    verified.raise_for_status()
+    set_cookie = verified.headers.get("set-cookie", "")
+    assert COOKIE_NAME in set_cookie and "HttpOnly" in set_cookie and "SameSite=lax" in set_cookie
+    raw_session = client.cookies.get(COOKIE_NAME)
+    assert raw_session and len(raw_session) >= 40
+    session_id = asyncio.run(prove_session(raw_session, stay_id))
+
+    personalized = client.get(f"/api/v1/guest-os/rooms/{token}")
+    personalized.raise_for_status()
+    personal_body = personalized.json()
+    assert personal_body["authenticated"] is True
+    assert personal_body["guest"]["first_name"] == "Guest Access CI"
+    assert personal_body["room"]["code"] == chosen["code"]
+    personal_raw = str(personal_body).lower()
+    assert "phone" not in personal_raw and "email" not in personal_raw and "passport" not in personal_raw
+
+    # Authenticate legitimate guest before exhausting the same room/IP PIN budget.
     # A photographed room QR is insufficient; brute-force attempts are durably rate-limited.
     brute = httpx.Client(base_url=BASE_URL, timeout=30.0, headers={"user-agent": "guest-os-ci-bruteforce"})
     wrong = "000000" if pin != "000000" else "111111"
@@ -267,23 +285,7 @@ def main():
     assert blocked.status_code == 429
     brute.close()
 
-    verified = client.post(f"/api/v1/guest-os/rooms/{token}/verify", json={"pin": pin})
-    verified.raise_for_status()
-    set_cookie = verified.headers.get("set-cookie", "")
-    assert COOKIE_NAME in set_cookie and "HttpOnly" in set_cookie and "SameSite=lax" in set_cookie
-    raw_session = client.cookies.get(COOKIE_NAME)
-    assert raw_session and len(raw_session) >= 40
-    session_id = asyncio.run(prove_session(raw_session, stay_id))
     asyncio.run(prove_attempt_audit(qr_id))
-
-    personalized = client.get(f"/api/v1/guest-os/rooms/{token}")
-    personalized.raise_for_status()
-    personal_body = personalized.json()
-    assert personal_body["authenticated"] is True
-    assert personal_body["guest"]["first_name"] == "Guest Access CI"
-    assert personal_body["room"]["code"] == chosen["code"]
-    personal_raw = str(personal_body).lower()
-    assert "phone" not in personal_raw and "email" not in personal_raw and "passport" not in personal_raw
 
     target_id, target_code = asyncio.run(target_room(chosen["id"], chosen["room_type_code"], today, end))
     target_issue = client.post(f"/api/v1/admin/guest-os/room-qrs/{target_id}/issue")
