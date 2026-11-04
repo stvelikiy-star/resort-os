@@ -358,7 +358,7 @@ async function signInOps(page,hotel,username) {
   await page.getByRole("button",{name:"Войти"}).click();
   const login=await responsePromise;
   assert.equal(login.status(),200,await login.text());
-  await page.getByRole("button",{name:"Задачи"}).waitFor();
+  await page.getByRole("button",{name:"Задачи",exact:true}).waitFor();
   await page.getByRole("region",{name:"Операционные задачи гостиницы"}).waitFor();
   const me=await page.context().request.get(BASE+"/core/api/v1/auth/me");
   assert.equal(me.status(),200);
@@ -367,7 +367,7 @@ async function signInOps(page,hotel,username) {
   assert.equal(data.role,username==="maid"?"MAID":"TECHNICIAN");
 }
 async function ownerCreateRepair(page,hotel) {
-  await page.getByRole("button",{name:"Задачи"}).click();
+  await page.getByRole("button",{name:"Задачи",exact:true}).click();
   const panel=page.getByRole("region",{name:"Операционные задачи гостиницы"});
   const form=panel.getByRole("form",{name:"Создать операционную задачу"});
   await form.waitFor();
