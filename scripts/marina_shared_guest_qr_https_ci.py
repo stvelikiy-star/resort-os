@@ -213,18 +213,6 @@ def main():
                 headers={"X-Property-Id": identities[h]["property_id"]}), 200, "foreign anonymous")
             assert foreign["authenticated"] is False and foreign["guest"] is None
 
-        # Five bad PIN attempts MUST throttle even when spoofed XFF changes.
-        wrong = "000000" if fixtures["A"]["pin"] != "000000" else "111111"
-        for attempt in range(5):
-            response = brute.post(
-                "/api/v1/guest-os/rooms/" + fixtures["A"]["token"] + "/verify",
-                json={"pin": wrong}, headers={"X-Forwarded-For": f"203.0.113.{attempt + 1}"})
-            assert_status(response, 401 if attempt < 4 else 429, "PIN spoof-resistant rate limit")
-        assert_status(brute.post(
-            "/api/v1/guest-os/rooms/" + fixtures["A"]["token"] + "/verify",
-            json={"pin": fixtures["A"]["pin"]}, headers={"X-Forwarded-For": "203.0.113.250"}),
-            429, "PIN lockout persists")
-
         for h in ("A", "B"):
             own = fixtures[h]
             auth = assert_status(guest[h].post(
@@ -266,6 +254,20 @@ def main():
                 401, "foreign task list denied")
 
         asyncio.run(database_evidence(fixtures))
+        # Five bad PIN attempts MUST throttle even when spoofed XFF and User-Agent change.
+        wrong = "000000" if fixtures["A"]["pin"] != "000000" else "111111"
+        for attempt in range(5):
+            response = brute.post(
+                "/api/v1/guest-os/rooms/" + fixtures["A"]["token"] + "/verify",
+                json={"pin": wrong}, headers={"X-Forwarded-For": f"203.0.113.{attempt + 1}",
+                                                   "User-Agent": f"spoofed-agent-{attempt}"})
+            assert_status(response, 401 if attempt < 4 else 429, "PIN spoof-resistant rate limit")
+        assert_status(brute.post(
+            "/api/v1/guest-os/rooms/" + fixtures["A"]["token"] + "/verify",
+            json={"pin": fixtures["A"]["pin"]}, headers={"X-Forwarded-For": "203.0.113.250",
+                                                "User-Agent": "another-spoofed-agent"}),
+            429, "PIN lockout persists")
+
         assert_status(guest["A"].post("/api/v1/guest-os/logout"), 200, "guest logout A")
         assert_status(guest["A"].get("/api/v1/guest-os/rooms/" + fixtures["A"]["token"]),
                       200, "anonymous after logout")
