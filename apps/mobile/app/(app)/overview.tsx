@@ -1,10 +1,11 @@
 import React, { useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays, ClipboardCheck, Users, Wrench, Sparkles } from 'lucide-react-native';
 import { Hero } from '../../src/components/Brand';
 import { DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
-import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, OccupancyRing, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
+import { AIOrb, AnimatedKpi, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, OccupancyRing, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
@@ -25,7 +26,8 @@ export default function Overview() {
   const { data, loading, error, reload } = useAsync<Dashboard | null>(() => live ? live.dashboard() : Promise.resolve(null), [live, user?.id, user?.module_permissions?.join(',')]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
-  const money = (value: number) => Number(value).toLocaleString('ru-RU') + ' KGS';
+  const money = (value: number) => Number.isFinite(value) ? Number(value).toLocaleString('ru-RU') + ' KGS' : '—';
+  const count = (value: number) => Number.isFinite(value) && value >= 0 ? String(value) : '—';
   return <FutureScreen>
     <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user ? copy.welcome + ', ' + user.display_name : 'MARINA SMART'}
       right={!shared && live && user && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={46} onPress={() => router.push('/ai')}/> : null}/>
@@ -41,23 +43,30 @@ export default function Overview() {
         </View>
         <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginTop:8 }}>
           <View style={{ flex:1 }}>
-            <Text style={[font.display, { color:'#FFFFFF', fontSize:43 }]}>{data.stays.occupancy_percent}%</Text>
+            <AnimatedKpi value={data.stays.occupancy_percent} suffix="%" style={[font.display, { color:'#FFFFFF', fontSize:43 }]}/>
             <Text style={[font.body, { color:'#D6E9F7' }]}>{copy.occupancy} · {data.stays.occupied_rooms}/{data.rooms.total}</Text>
           </View>
           <OccupancyRing percent={data.stays.occupancy_percent} label={copy.occupancy}/>
         </View>
         <View style={{ height:1, backgroundColor:'rgba(255,255,255,0.16)', marginTop:20, marginBottom:14 }}/>
         <View style={{ flexDirection:'row', gap:space.lg }}>
-          <View style={{ flex:1 }}><Text style={[font.h2,{color:'#FFFFFF'}]}>{data.stays.arrivals_today}</Text><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.arrivals}</Text></View>
-          <View style={{ flex:1 }}><Text style={[font.h2,{color:'#FFFFFF'}]}>{data.stays.departures_today}</Text><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.departures}</Text></View>
+          <View style={{ flex:1 }}><AnimatedKpi value={data.stays.arrivals_today} style={[font.h2,{color:'#FFFFFF'}]}/><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.arrivals}</Text></View>
+          <View style={{ flex:1 }}><AnimatedKpi value={data.stays.departures_today} style={[font.h2,{color:'#FFFFFF'}]}/><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.departures}</Text></View>
         </View>
       </Hero></StaggerItem>
+      {user?.role === 'MANAGER' ? <GlassCard style={{ gap: 8, borderLeftWidth: 4, borderLeftColor: c.warning }}>
+        <Text style={[font.h2, { color: c.text }]}>{copy.shiftBriefing}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <Text style={[font.body, { color: c.textMuted }]}>{copy.urgent}: <Text style={{ color: c.warning, fontWeight: '800' }}>{count(data.tasks.urgent_active)}</Text></Text>
+          <Text style={[font.body, { color: c.textMuted }]}>{copy.needsReply}: <Text style={{ color: c.text, fontWeight: '800' }}>{count(data.communications.needs_reply)}</Text></Text>
+        </View>
+      </GlassCard> : null}
       <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
       <View style={{ flexDirection:'row', flexWrap:'wrap', gap:space.md }}>
         <MetricCard icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
         <MetricCard icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
-        <MetricCard icon={MessageCircle} label={copy.needsReply} value={String(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
-        <MetricCard icon={BedDouble} label={copy.dirty} value={String(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
+        <MetricCard icon={MessageCircle} label={copy.needsReply} value={count(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
+        <MetricCard icon={BedDouble} label={copy.dirty} value={count(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
       </View>
       <SectionLabel>{copy.available}</SectionLabel>
       {canOpen('pms') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
@@ -66,19 +75,19 @@ export default function Overview() {
       {canOpen('admin') ? <QuickAction icon={Users} label={copy.staffOverview} onPress={() => router.push('/admin')}/> : null}
       <SectionLabel>{copy.tasks}</SectionLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-        <MetricCard icon={Sparkles} label={copy.housekeepingOverview} value={String(data.tasks.housekeeping_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
-        <MetricCard icon={Wrench} label={copy.maintenanceOverview} value={String(data.tasks.maintenance_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
+        <MetricCard icon={Sparkles} label={copy.housekeepingOverview} value={count(data.tasks.housekeeping_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
+        <MetricCard icon={Wrench} label={copy.maintenanceOverview} value={count(data.tasks.maintenance_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
       </View>
       {data.today.arrivals.length ? <SectionLabel>{copy.arrivalList} · {data.today.arrivals.length}</SectionLabel> : null}
       {data.today.arrivals.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
-        <GlassCard onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}>
+        <GlassCard onPress={canOpen('pms') ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}>
           <Text style={[font.h2, { color: c.text }]}>{x.guest_name || x.booking_number}</Text>
           <Text style={[font.small, { color: c.textMuted }]}>{x.booking_number} · {x.room_code || '—'}</Text>
         </GlassCard>
       </StaggerItem>)}
       {data.today.departures.length ? <SectionLabel>{copy.departureList} · {data.today.departures.length}</SectionLabel> : null}
       {data.today.departures.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
-        <GlassCard onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}>
+        <GlassCard onPress={canOpen('pms') ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}>
           <Text style={[font.h2, { color: c.text }]}>{x.guest_name || x.booking_number}</Text>
           <Text style={[font.small, { color: c.textMuted }]}>{x.booking_number} · {x.room_code || '—'}</Text>
         </GlassCard>
