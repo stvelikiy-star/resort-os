@@ -120,8 +120,9 @@ describe('navigation, guards and screens', () => {
   it('manager can assign an unassigned cleaning task from the admin screen', async () => {
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
-    const task = await screen.findByTestId('task-t8', {}, { timeout: 4000 });
-    await fireEvent.press(task);
+    const assignButton = await screen.findByTestId('open-assign-t8', {}, { timeout: 4000 });
+    expect(assignButton.props.accessibilityRole).toBe('button');
+    await fireEvent.press(assignButton);
     await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
     await waitFor(() => expect(screen.queryByTestId('assign-u-maid2')).toBeNull(), { timeout: 4000 });
   });
