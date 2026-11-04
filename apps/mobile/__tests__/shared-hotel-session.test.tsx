@@ -17,6 +17,8 @@ let mode: AuthMode = 'shared_auth_preview';
 let cookie: AuthUser | null = null;
 let meOverride: AuthUser | null = null;
 let revoked = false;
+let holdHotelA: Promise<void> | null = null;
+let releaseHotelA: (() => void) | null = null;
 
 const selected = (property: 'HOTEL_A' | 'HOTEL_B'): SharedHotelSelector =>
   ({ tenant_code: property === 'HOTEL_A' ? 'tenant_a' : 'tenant_b', property_code: property });
@@ -34,6 +36,7 @@ const mockApi = {
   login: async (_username: string, _password: string, selector?: SharedHotelSelector): Promise<AuthUser> => {
     calls.push('login:' + (selector?.property_code ?? 'legacy'));
     const property = selector?.property_code === 'HOTEL_B' ? 'HOTEL_B' : 'HOTEL_A';
+    if (property === 'HOTEL_A' && holdHotelA) await holdHotelA;
     cookie = identity(property);
     return cookie;
   },
@@ -90,6 +93,8 @@ beforeEach(() => {
   cookie = null;
   meOverride = null;
   revoked = false;
+  holdHotelA = null;
+  releaseHotelA = null;
   mode = 'shared_auth_preview';
   process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS = 'https://platform.example';
   jest.clearAllMocks();
@@ -117,6 +122,30 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
     expect(screen.getByTestId('selected-tenant').props.children).toBe(TENANT_B);
     expect(calls.filter(x => x === 'logout')).toHaveLength(2);
     expect(calls).toEqual(['mode', 'logout', 'login:HOTEL_A', 'me', 'mode', 'logout', 'login:HOTEL_B', 'me']);
+  });
+
+  it('serializes overlapping LIVE logins so a stale A cookie cannot overwrite or revoke B', async () => {
+    const screen = await setup();
+    holdHotelA = new Promise<void>(resolve => { releaseHotelA = resolve; });
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(calls).toContain('login:HOTEL_A'));
+
+    // Two hotels share ONE Android cookie jar. The second attempt must not
+    // issue a logout or new login while A's first cookie write is unresolved.
+    fireEvent.press(screen.getByTestId('login-b'));
+    await act(async () => { await Promise.resolve(); });
+    expect(calls.filter(x => x === 'logout')).toHaveLength(1);
+    expect(calls).not.toContain('login:HOTEL_B');
+    expect(screen.getByTestId('selected-property').props.children).toBe('none');
+
+    await act(async () => { releaseHotelA?.(); });
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_B'));
+    expect(screen.getByTestId('selected-tenant').props.children).toBe(TENANT_B);
+    expect(calls).toEqual([
+      'mode', 'logout', 'login:HOTEL_A', 'me',
+      'mode', 'logout', 'login:HOTEL_B', 'me',
+    ]);
+    await screen.unmount();
   });
 
   it('requires both shared selectors before sending any password or changing cookie', async () => {
