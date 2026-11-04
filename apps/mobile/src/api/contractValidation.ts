@@ -93,14 +93,14 @@ const uuid=(v:unknown,k:string):string=>{
 };
 const dateOnly=(v:unknown,k:string):string=>{
   const value=str(v,k);
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) invalid(k);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value)) invalid(k);
   const candidate=new Date(value+'T12:00:00Z');
   return !Number.isNaN(candidate.getTime())&&candidate.toISOString().slice(0,10)===value?value:invalid(k);
 };
 const timestamp=(v:unknown,k:string):string=>{
   const value=str(v,k);
   // Server returns Python datetime.isoformat() with explicit timezone offset.
-  return /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$/.test(value)&&
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&
     !Number.isNaN(Date.parse(value))?value:invalid(k);
 };
 export function holdListResponse(v:unknown):Hold[] {
