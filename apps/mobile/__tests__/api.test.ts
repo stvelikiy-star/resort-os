@@ -97,7 +97,7 @@ describe('real api contract (mock fetch)', () => {
   };
   it('refuses non-https base urls', () => expect(() => createRealApi('http://x.example')).toThrow());
   it('login posts credentials to existing auth route with cookie credentials and no secrets', async () => {
-    const { f, calls } = mk([{ body: { id: '1', username: 'a', role: 'MAID' } }]);
+    const { f, calls } = mk([{ body: { id: '1', username: 'a', display_name: 'A', role: 'MAID', property_code: 'HOTEL', module_permissions: ['OPS'] } }]);
     await createRealApi('https://api.hotel.example/', f).login('a', 'b');
     expect(calls[0].url).toBe('https://api.hotel.example/api/v1/auth/login');
     expect(calls[0].init.method).toBe('POST');
@@ -118,7 +118,7 @@ describe('real api contract (mock fetch)', () => {
     await expect(a.listStaff()).rejects.toMatchObject({ code: 'UNKNOWN' });
   });
   it('uses an abort signal on requests and never stores auth tokens in request headers', async () => {
-    const { f, calls } = mk([{ body: { id: 'a', property_code: 'HOTEL', role: 'MAID' } }]);
+    const { f, calls } = mk([{ body: { id: 'a', username: 'a', display_name: 'A', property_code: 'HOTEL', role: 'MAID', module_permissions: ['OPS'] } }]);
     await createRealApi('https://hotel.example', f).me();
     expect(calls[0].init.signal).toBeTruthy();
     expect(calls[0].init.credentials).toBe('include');
@@ -283,7 +283,7 @@ describe('hotel address parsing', () => {
       const calls: string[] = [];
       const fetchStub = (async (url: string) => {
         calls.push(url);
-        return { ok: true, status: 200, json: async () => ({ id: 'staff', role: 'MAID' }) } as Response;
+        return { ok: true, status: 200, json: async () => ({ id: 'staff', username: 's', display_name: 'S', property_code: 'HOTEL', role: 'MAID', module_permissions: ['OPS'] }) } as Response;
       }) as typeof fetch;
       return { f: fetchStub, calls };
     })();

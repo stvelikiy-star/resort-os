@@ -10,6 +10,20 @@ type Transport = typeof fetch;
  * This function is a transport primitive; public sign-in is independently gated
  * by a signed-build trust allowlist in hotels.ts + SessionProvider.
  */
+type ErrorCode = ApiError['code'];
+const STATUS_CODE: Record<number, ErrorCode> = { 400: 'BAD_REQUEST', 401: 'UNAUTHORIZED', 403: 'FORBIDDEN', 404: 'NOT_FOUND', 409: 'CONFLICT', 422: 'BAD_REQUEST', 429: 'RATE_LIMIT' };
+const SAFE_MESSAGE: Partial<Record<ErrorCode, string>> = {
+  UNAUTHORIZED: 'Authentication required', FORBIDDEN: 'Access denied',
+  NOT_FOUND: 'Record not found', CONFLICT: 'Data was changed; refresh before retrying',
+  RATE_LIMIT: 'Too many requests; try again later', BAD_REQUEST: 'Check the entered data',
+  UNKNOWN: 'Hotel service is temporarily unavailable',
+};
+/** Single HTTP-status -> ApiError mapping; messages are fixed strings, never server text. */
+export function errorForStatus(status: number): { code: ErrorCode; message: string } {
+  const code = STATUS_CODE[status] ?? 'UNKNOWN';
+  return { code, message: SAFE_MESSAGE[code] ?? SAFE_MESSAGE.UNKNOWN! };
+}
+
 export function createHotelHttpClient(baseUrl: string, transport: Transport = fetch) {
   const parsed = parseHotelAddress(baseUrl);
   if (!parsed.ok) throw new Error('Invalid hotel API address');
@@ -55,17 +69,8 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       if (!response.ok) {
         if (method === 'GET' && attempt + 1 < attempts && [502, 503, 504].includes(response.status)) continue;
         if (response.status === 503) throw new ApiError('UNKNOWN', 'Hotel workspace is unavailable in this environment');
-        const code = response.status === 401 ? 'UNAUTHORIZED' : response.status === 403 ? 'FORBIDDEN'
-          : response.status === 404 ? 'NOT_FOUND' : response.status === 409 ? 'CONFLICT'
-          : response.status === 429 ? 'RATE_LIMIT' : response.status === 400 || response.status === 422 ? 'BAD_REQUEST'
-          : 'UNKNOWN';
-        const safe = ({
-          UNAUTHORIZED: 'Authentication required', FORBIDDEN: 'Access denied',
-          NOT_FOUND: 'Record not found', CONFLICT: 'Data was changed; refresh before retrying',
-          RATE_LIMIT: 'Too many requests; try again later', BAD_REQUEST: 'Check the entered data',
-          UNKNOWN: 'Hotel service is temporarily unavailable',
-        } as const)[code];
-        throw new ApiError(code, safe);
+        const { code, message } = errorForStatus(response.status);
+        throw new ApiError(code, message);
       }
       if (response.status === 204) return undefined as T;
       try { return await response.json() as T; }

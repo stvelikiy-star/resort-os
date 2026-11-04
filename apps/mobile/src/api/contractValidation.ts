@@ -1,5 +1,6 @@
 import { ApiError } from './types';
-import type { Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview } from './liveModules';
+import type { Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, AssistantCapabilities, AssistantAnswer } from './liveModules';
+import type { AuthUser } from './types';
 const invalid=(where:string):never=>{ throw new ApiError('UNKNOWN','Hotel response contract mismatch: '+where); };
 const obj=(v:unknown,k:string):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:invalid(k);
 const str=(v:unknown,k:string)=>typeof v==='string'&&v.trim()?v:invalid(k);
@@ -47,4 +48,63 @@ export function bookingPreviewResponse(v:unknown):BookingPreview {
 }
 export function bookingCommitResponse(v:unknown):{reservation_id:string;booking_number:string;total_kgs:number;price_adjusted_at_commit:boolean} {
   const x=obj(v,'commit');str(x.reservation_id,'commit.id');str(x.booking_number,'commit.number');num(x.total_kgs,'commit.total');bool(x.price_adjusted_at_commit,'commit.price_changed');return v as {reservation_id:string;booking_number:string;total_kgs:number;price_adjusted_at_commit:boolean};
+}
+
+/** `{items: [...]}` envelope; a bare array is accepted only where the server contract allows it. */
+export function itemsEnvelope(v:unknown,k:string,allowBareArray=false):unknown[]{
+  if(allowBareArray&&Array.isArray(v))return v;
+  return arr(obj(v,k).items,k+'.items');
+}
+/** /auth/login and /auth/me: the identity and permissions drive every role gate in the app. */
+export function authUserResponse(v:unknown):AuthUser {
+  const x=obj(v,'auth');
+  for(const k of ['id','username','display_name','role','property_code'])str(x[k],'auth.'+k);
+  arr(x.module_permissions,'auth.module_permissions').forEach((p,i)=>str(p,'auth.module_permissions'+i));
+  return v as AuthUser;
+}
+export function kitchenOrdersResponse(v:unknown):KitchenOrder[] {
+  const items=itemsEnvelope(v,'kitchen');
+  items.forEach((r,i)=>{const o=obj(r,'kitchen.order'+i);str(o.id,'kitchen.id');str(o.order_number,'kitchen.order_number');str(o.status,'kitchen.status');if(!Array.isArray(o.items))invalid('kitchen.items');});
+  return items as KitchenOrder[];
+}
+export function diningFloorResponse(v:unknown):DiningFloor {
+  const x=obj(v,'dining');
+  arr(x.tables,'dining.tables').forEach((t,i)=>{const o=obj(t,'dining.table'+i);str(o.id,'dining.table.id');str(o.code,'dining.table.code');});
+  arr(x.orders,'dining.orders').forEach((t,i)=>{const o=obj(t,'dining.order'+i);str(o.id,'dining.order.id');str(o.order_number,'dining.order.number');str(o.status,'dining.order.status');});
+  return v as DiningFloor;
+}
+export function assistantCapabilitiesResponse(v:unknown):AssistantCapabilities {
+  const x=obj(v,'assistant.capabilities');
+  for(const k of ['configured','read_only','can_mutate','live_read_only'])bool(x[k],'assistant.'+k);
+  str(x.role,'assistant.role');str(x.property_code,'assistant.property_code');
+  return v as AssistantCapabilities;
+}
+export function assistantAnswerResponse(v:unknown):AssistantAnswer {
+  const x=obj(v,'assistant.answer');str(x.answer,'assistant.answer');
+  if(x.read_only!==true)invalid('assistant.read_only');
+  return v as AssistantAnswer;
+}
+/** Detail payloads whose fields are rendered defensively: only the envelope shape is enforced. */
+export function objectResponse(v:unknown,k:string):Record<string,unknown>{return obj(v,k);}
+
+/**
+ * Mutation acknowledgments must echo the record the app addressed (and, where the
+ * server returns it, the resulting state). A mismatch is a contract violation, and
+ * because the write may already be committed it surfaces as UNKNOWN (fail closed).
+ */
+function ack(v:unknown,k:string,idKey:string,id:string,state?:{key:string;value:string}):Record<string,unknown>{
+  const x=obj(v,k);
+  if(str(x[idKey],k+'.'+idKey)!==id)invalid(k+'.'+idKey+' mismatch');
+  if(state&&x[state.key]!==state.value)invalid(k+'.'+state.key);
+  return x;
+}
+export const stayAck=(v:unknown,reservationId:string,status:'CHECKED_IN'|'CHECKED_OUT')=>ack(v,'stay','reservation_id',reservationId,{key:'status',value:status});
+export const kitchenStatusAck=(v:unknown,orderId:string,status:string)=>ack(v,'kitchen.status','id',orderId,{key:'status',value:status});
+export const conversationStatusAck=(v:unknown,id:string,status:string)=>ack(v,'conversation.status','id',id,{key:'status',value:status});
+export const conversationClaimAck=(v:unknown,id:string)=>ack(v,'conversation.claim','id',id);
+export const noteAck=(v:unknown,id:string)=>{const x=ack(v,'note','conversation_id',id);str(x.id,'note.id');return x;};
+export function waiterClaimAck(v:unknown,orderId:string,waiterId:string){
+  const x=ack(v,'waiter.claim','id',orderId);
+  if(x.waiter_id!==waiterId)invalid('waiter.claim.waiter_id');
+  return x;
 }
