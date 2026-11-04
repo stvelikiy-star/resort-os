@@ -26,8 +26,9 @@ const labels = {
     source: 'Платформа контексі', yes: 'Бар', no: 'Расталмаған', empty: 'Серверден жауап алу үшін сұрақ қойыңыз.', back: 'Артқа' },
 };
 export default function Assistant() {
-  const { user, locale } = useSession();
-  const live = useLiveModules();
+  const { user, locale, serverAuthMode } = useSession();
+  const modules = useLiveModules();
+  const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
   const copy = useMobileCopy();
   const { c } = useTheme();
   const t = labels[locale];
@@ -57,6 +58,7 @@ export default function Assistant() {
     finally { lock.current = false; setBusy(false); }
   };
   if (!user) return <Redirect href="/connect"/>;
+  if (serverAuthMode === 'shared_auth_preview') return <FutureScreen><Empty text={copy.unavailable}/></FutureScreen>;
   if (!['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PressScale accessibilityLabel={t.back} onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 4 }}>
