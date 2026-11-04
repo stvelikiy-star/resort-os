@@ -9,6 +9,7 @@ on:
       - 'packages/database/**'
       - 'scripts/marina_shared_live_browser.mjs'
       - 'scripts/marina_shared_live_browser_db.py'
+      - 'scripts/marina_shared_role_auth_ci.py'
       - '.github/workflows/marina-shared-live-browser-postgres-ci.yml'
   workflow_dispatch:
 
@@ -98,6 +99,8 @@ jobs:
           ./scripts/node_modules/.bin/playwright install --with-deps chromium
       - name: Real browser > Next rewrite > ASGI > PostgreSQL acceptance
         run: node scripts/marina_shared_live_browser.mjs
+      - name: Verify every server role across both hotel identities in canonical FastAPI + PostgreSQL
+        run: python scripts/marina_shared_role_auth_ci.py
       - name: Verify both browser receipts against real PostgreSQL facts
         run: python scripts/marina_shared_live_browser_db.py verify
       - name: Print sanitized diagnostics only on failure

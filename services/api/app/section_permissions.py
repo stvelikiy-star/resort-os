@@ -39,6 +39,20 @@ def effective_section_permissions(role: str, configured: Any) -> list[str]:
     return list(DEFAULT_ROLE_MODULES.get(role, ()))
 
 
+def shared_role_module_permissions(role: str, configured: Any) -> list[str]:
+    """Fail-closed multi-hotel role ceiling; grants cannot promote another role.
+
+    The legacy single-property permission model remains unchanged. A shared
+    MANAGER can be narrowed by an owner; an OWNER always retains full hotel
+    ownership authority. Unknown/legacy roles without reviewed workspaces get
+    zero active modules rather than arbitrary caller-supplied privileges.
+    """
+    if role == "OWNER":
+        return sorted(SECTION_MODULES)
+    allowed = set(DEFAULT_ROLE_MODULES.get(role, ()))
+    return sorted(allowed.intersection(effective_section_permissions(role, configured)))
+
+
 # Longest path prefix wins. Where two screens intentionally share an API, either
 # section grant is accepted; all other unmapped paths remain role-protected.
 SECTION_PATHS: tuple[tuple[str, tuple[str, ...]], ...] = (
