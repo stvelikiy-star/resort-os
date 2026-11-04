@@ -84,7 +84,7 @@ jobs:
           pwd="synthetic-ci-only-"+secrets.token_hex(24)
           print("::add-mask::"+pwd)
           channels=[]
-          for hotel,account in (("A","10000001"),("B","20000002")):
+          for hotel,account in (("A","7103000001"),("B","7103000002")):
               key=secrets.token_urlsafe(48)
               print("::add-mask::"+key)
               channels.append({
