@@ -1,9 +1,11 @@
 // Real Chromium acceptance against /g/[token] Next on one HTTPS origin,
 // canonical Guest OS routes, and disposable PostgreSQL. No mocked APIs.
 import assert from "node:assert/strict";
+import { writeFileSync } from "node:fs";
 import { chromium, request } from "playwright";
 
-const BASE = "https://localhost:18443";
+const BASE = process.env.MARINA_GUEST_BROWSER_ORIGIN || "https://localhost:18443";
+assert(["https://localhost:18443", "https://localhost:13445"].includes(BASE), "Only isolated localhost TLS origins allowed");
 const password = process.env.MARINA_SHARED_BROWSER_CI_PASSWORD;
 assert.equal(process.env.MARINA_GUEST_QR_CI_CONFIRM, "ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY");
 assert(password?.startsWith("synthetic-ci-only-") && password.length >= 30);
@@ -76,6 +78,10 @@ try {
   await prepare("B");
   assert.notEqual(fixtures.A.property_id, fixtures.B.property_id);
   assert.notEqual(fixtures.A.url, fixtures.B.url);
+  // Fixed disposable CI location: rollover script must know the exact issued QR.
+  if (process.env.MARINA_GUEST_RC4_ROLLBACK_EVIDENCE === "ISOLATED_COMPOSE_ROLLBACK") {
+    writeFileSync("/tmp/marina-guest-rc4-ci-token", fixtures.A.url.split("/").at(-1) + "\n", { mode: 0o600 });
+  }
   // This IS the full shared Resort Core app: unrelated capabilities must
   // remain closed by the frozen RC3 boundary while Guest QR is admitted.
   for (const path of [
