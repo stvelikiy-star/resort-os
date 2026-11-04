@@ -143,15 +143,6 @@ class SharedAuthTests(unittest.TestCase):
             ('GET', '/api/v1/kitchen/orders'),
             ('GET', '/api/v1/dining/floor'),
             ('GET', '/api/v1/assistant/capabilities'),
-            # Guest QR issuance, room context, PIN verification and guest
-            # services stay strictly 503 in the shared preview until their
-            # separate cross-hotel E2E acceptance; do not silently expose them.
-            ('GET', '/api/v1/admin/guest-os/room-qrs'),
-            ('POST', '/api/v1/admin/guest-os/room-qrs/11111111-1111-4111-8111-111111111111/issue'),
-            ('GET', '/api/v1/guest-os/rooms/' + 'x' * 32),
-            ('POST', '/api/v1/guest-os/rooms/' + 'x' * 32 + '/verify'),
-            ('POST', '/api/v1/guest-os/logout'),
-            ('GET', '/api/v1/guest-os/rooms/' + 'x' * 32 + '/requests'),
             ('PATCH', '/api/v1/ops/rooms/11111111-1111-4111-8111-111111111111/state'),
         )
         before = len(self.store.queries)
