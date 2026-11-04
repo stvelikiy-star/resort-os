@@ -104,7 +104,9 @@ def main():
                     ("/api/v1/pms/grid?start=" +
                      (date.today()+timedelta(days=2)).isoformat() + "&end=" +
                      (date.today()+timedelta(days=4)).isoformat(),
-                     role in ("OWNER", "MANAGER", "RECEPTION", "AGENT")),
+                     # AGENT requires a separate ACTIVE booking_agent link.
+                     # A raw role enum without that membership must receive 403.
+                     role in ("OWNER", "MANAGER", "RECEPTION")),
                     ("/api/v1/admin/reception/reservations",
                      role in ("OWNER", "MANAGER", "RECEPTION")),
                     ("/api/v1/ops/tasks", role in ("OWNER", "MANAGER", "MAID", "TECHNICIAN")),
