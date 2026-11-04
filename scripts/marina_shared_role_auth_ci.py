@@ -138,7 +138,7 @@ def main():
                         assert summary["period_payments"]["received_kgs"] == (
                             1000 if hotel=="HOTEL_A" else 1500
                         )
-                        assert not any(row["id"]==receipts[foreign]["reservation_id"]
+                        assert not any(row["reservation_id"]==receipts[foreign]["reservation_id"]
                                        for row in summary["reservation_ledger"])
                     if granted and url.endswith("/history"):
                         assert response.json()["task"]["id"] == receipts[hotel]["maintenance_task_id"]
