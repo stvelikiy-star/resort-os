@@ -206,6 +206,24 @@ def main():
         expect(svc.post(ENDPOINT, json=callback("A", "inbound-msg-001", "hello")), 401, "anonymous webhook")
         expect(deliver("A", callback("A", "inbound-msg-001", "hello"),
                        token="not-a-valid-webhook-key"), 401, "invalid bearer")
+        # A reverse proxy can forward duplicate Authorization headers; neither
+        # credential may be silently preferred in the shared webhook.
+        expect(svc.post(
+            ENDPOINT,
+            headers=[
+                ("Authorization", "Bearer " + accounts["A"]["webhook_key"]),
+                ("Authorization", "Bearer " + accounts["B"]["webhook_key"]),
+            ],
+            json=callback("A", "inbound-msg-001", "hello"),
+        ), 401, "duplicated Authorization headers fail closed")
+        expect(svc.post(
+            ENDPOINT,
+            headers={
+                "Authorization": "Bearer " + accounts["A"]["webhook_key"],
+                "Content-Type": "text/plain",
+            },
+            content=json.dumps(callback("A", "inbound-msg-001", "hello")),
+        ), 415, "provider requires JSON content type")
         expect(deliver("A", callback("A", "inbound-msg-001", "hello", instance="20000002")),
                403, "cross-hotel instance spoof")
         expect(deliver("A", callback("A", "inbound-msg-001", "hello", chat="12345678@g.us")),
@@ -318,6 +336,26 @@ def main():
             expect(deliver("B", callback(
                 "B", "inbound-msg-002", "disabled",
             )), 503, "RC7 missing confirmation")
+        # PR #361 active-UUID security delta, now enforced by the ONE canonical
+        # RC7 handler that also reconciles real tracked outbound status events.
+        paired = json.loads(os.environ["MARINA_SHARED_GREEN_RC6_CONFIG_JSON"])
+        for field in ("tenant_id", "property_id"):
+            altered = [{**paired[0], field: paired[1][field]}, paired[1]]
+            with patch.dict(os.environ, {
+                "MARINA_SHARED_GREEN_RC6_CONFIG_JSON": json.dumps(altered),
+            }):
+                expect(deliver("A", callback(
+                    "A", "inbound-msg-002", "must-not-store",
+                )), 503, "stale owner provider " + field)
+        duplicate_instance = [
+            {**paired[0], "instance": paired[1]["instance"]}, paired[1],
+        ]
+        with patch.dict(os.environ, {
+            "MARINA_SHARED_GREEN_RC6_CONFIG_JSON": json.dumps(duplicate_instance),
+        }):
+            expect(deliver("A", callback(
+                "A", "inbound-msg-002", "must-not-store",
+            )), 503, "duplicate owner GreenAPI instance")
         asyncio.run(evidence(fixtures))
     print(
         "PASS: two hotel GREEN-API webhook bearer/instance isolation, real "
