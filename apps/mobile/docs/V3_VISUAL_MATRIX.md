@@ -1,50 +1,69 @@
-# MARINA SMART MOBILE · FUTURE LUXURY V3 — visual acceptance matrix
+# MARINA SMART MOBILE · FUTURE LUXURY V3 — visual QA acceptance matrix
 
-**Scope:** `apps/mobile` only, Draft PR #342 (base: `fix/marina-mobile-session-boundary`). The evidence status below is intentionally conservative. Passing TypeScript/Jest/Expo export/Android APK build **does not** constitute visual acceptance.
+**Scope:** `apps/mobile` only · Draft PR #342. The matrix contains **22 named routes**, rather than 21.
 
-## Route-by-route device matrix
+## Evidence basis and strict distinctions
 
-For each route, validate **light/dark**, **RU/KG/EN/KZ**, **320 / 375 / 430 dp**, **100 / 150 / 200% font**, successful / loading / empty / error states, roles/permissions, TalkBack accessibility and Reduce Motion.
+The genuine screenshots below were captured from the **running Expo Web export** in headless Google Chrome, with a built-in **DEMO-only fixture** at localhost. They are **NOT Android**, not generated illustrations and not substituted for native visual evidence. The screen source was `1b55a5a48a4ca5c616d4b0d8aa179591882d82ef`, GitHub Actions [run 41875555127](https://github.com/stvelikiy-star/resort-os/actions/runs/41875555127), mobile-check job 126734622122. The screenshot assets and this report only add documentation, not executable UI changes.
 
-| Route | Roles / purpose | New V3 UI / regression checks | Real-device screenshots |
-| --- | --- | --- | --- |
-| `/connect` | Select demo/trusted hotel | Hotel identity, secure entry, QR route, label distinction | NOT CAPTURED |
-| `/login` | All server-supported roles | Branded sign-in, keyboard, errors, auth-mode unavailable | NOT CAPTURED |
-| `/scan` | Hotel QR connection | Permission and camera-unavailable state | NOT CAPTURED |
-| `/overview` | OWNER/MANAGER | Responsive occupancy ring, genuine paid/debt KPI, actual room conditions, role-safe shortcuts | NOT CAPTURED |
-| `/reception` | RECEPTION | Search/clear, arrivals/departures/staying filters, badges/guest initials | NOT CAPTURED |
-| `/pms` | OWNER/MANAGER/AGENT | Sticky room labels, 7-day horizontal scroll, weekdays, HOLD vs tech block, today, state filter | NOT CAPTURED |
-| `/new-booking` | Permitted booking creator | Valid dates, available inventory, confirmed server price, unknown-write lock | NOT CAPTURED |
-| `/reservation/[id]` | Permitted booking detail | No unauthorized booking changes | NOT CAPTURED |
-| `/holds` | OWNER/MANAGER where server supported | Hold card, correct dark-theme selected state; 503 remains blocked | NOT CAPTURED |
-| `/inbox` | Permitted OWNER/MANAGER/RECEPTION | Needs reply, search, server-confirmed timestamp and assignee; no fake unread count | NOT CAPTURED |
-| `/conversation/[id]` | Permitted inbox users | Real inbound/outbound/internal bubbles, timestamps and delivery; notes only, no outbound send | NOT CAPTURED |
-| `/ai` | Permitted OWNER/MANAGER/RECEPTION | AI Orb, processing placeholder, answer after server ACK, disabled composer offline | NOT CAPTURED |
-| `/tasks` | MAID/TECHNICIAN and other permitted staff | Sorted priorities, visible/urgent filters, honest completion count | NOT CAPTURED |
-| `/task/[id]` | Permitted task detail | Badge semantics, checklist progress, photo feature unavailable, server ACK-only write | NOT CAPTURED |
-| `/rooms` | Permitted staff | 1/2 column responsive cards, clean/attention filtering, partial-data notice | NOT CAPTURED |
-| `/room/[id]` | Permitted staff | Premium state card, contrast, task list, no invented occupancy | NOT CAPTURED |
-| `/requests` | TECHNICIAN and permitted maintenance staff | Active/urgent queue + completed history | NOT CAPTURED |
-| `/new-request` | Maintenance creator | Premium form, category icons, room-loading state and unknown-POST lock | NOT CAPTURED |
-| `/admin` | OWNER/MANAGER if authorized | Team initials, inspection/assignment queues, write-lock behavior | NOT CAPTURED |
-| `/dining` | COOK/WAITER/authorized management | Actual menu items where present, kitchen statuses, unknown-safe table status | NOT CAPTURED |
-| `/profile` | All authenticated staff | Role identity, translated labels, four language choices at large font, theme switching | NOT CAPTURED |
-| `/more` | Roles with >4 allowed navigation tabs | Hidden tab buttons remain routable, unauthorized routes still denied | NOT CAPTURED |
+**Expo Web route QA:** 0 PASS / 0 FAIL / **11 PARTIAL** / **11 NOT TESTED**.
+**Android native visual QA:** 0 PASS / 0 FAIL / 0 PARTIAL / **22 NOT TESTED**.
+**Screenshots:** 21 authentic Expo Web JPEGs, at 320 / 375 / 430 viewport widths, RU / KG / EN / KZ and light / dark where noted.
 
-Also test the redirect root `/` and modal navigation/back behavior.
+**PARTIAL** means a screen was really rendered and captured in the safe DEMO context but the complete cross-product of viewport/font scale/locale/theme/data states/accessibility was not checked. **NOT TESTED** means the route was not actually rendered; source analysis and Jest never count as a visual PASS.
 
-## Required original evidence
+## Route-by-route status
 
-For each priority screen capture a **real running app screenshot** (both themes) at 320/375/430 dp. Compare before/after by same hotel, role, fixture, locale and device dimensions. Include keyboard, enlarged font, loading/error and reduced-motion recordings. Save native images in review artifacts; **do not substitute design renders**.
+| Route | Purpose / access | Expo Web visual | Android visual | Screenshot evidence |
+| --- | --- | --- | --- | --- |
+| `/connect` | Select demo/trusted hotel | PARTIAL | NOT TESTED | [Web 1](qa-evidence/connect_ru_light_375.jpg) |
+| `/login` | All server-supported roles | PARTIAL | NOT TESTED | [Web 1](qa-evidence/login_en_dark_375.jpg) |
+| `/scan` | Hotel QR connection | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/overview` | OWNER/MANAGER | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/reception` | RECEPTION | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/pms` | OWNER/MANAGER/AGENT | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/new-booking` | Permitted booking creator | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/reservation/[id]` | Permitted booking detail | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/holds` | OWNER/MANAGER where server supported | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/inbox` | Permitted OWNER/MANAGER/RECEPTION | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/conversation/[id]` | Permitted inbox users | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/ai` | Permitted OWNER/MANAGER/RECEPTION | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/tasks` | MAID/TECHNICIAN and other permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_tasks_ru_light_375_after_tab_fix.jpg) · [Web 2](qa-evidence/maid_tasks_en_dark_375.jpg) · [Web 3](qa-evidence/tech_tasks_en_dark_375.jpg) |
+| `/task/[id]` | Permitted task detail | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_housekeeping_detail_en_dark_375.jpg) |
+| `/rooms` | Permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_rooms_en_dark_375_after_wrap_fix.jpg) |
+| `/room/[id]` | Permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_room_detail_en_dark_375.jpg) |
+| `/requests` | TECHNICIAN and permitted maintenance staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/tech_repairs_en_dark_375.jpg) |
+| `/new-request` | Maintenance creator | PARTIAL | NOT TESTED | [Web 1](qa-evidence/tech_new_request_en_dark_320.jpg) · [Web 2](qa-evidence/tech_new_request_en_dark_375.jpg) |
+| `/admin` | OWNER/MANAGER if authorized | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_team_en_dark_320_after_nav_fix.jpg) · [Web 2](qa-evidence/manager_team_en_dark_375.jpg) · [Web 3](qa-evidence/manager_team_en_dark_430.jpg) |
+| `/dining` | COOK/WAITER/authorized management | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/profile` | All authenticated staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_profile_ru_light_375.jpg) · [Web 2](qa-evidence/manager_profile_ru_dark_375.jpg) · [Web 3](qa-evidence/manager_profile_kg_dark_375.jpg) · [Web 4](qa-evidence/manager_profile_kz_dark_375.jpg) · [Web 5](qa-evidence/manager_profile_en_dark_375.jpg) |
+| `/more` | Roles with >4 allowed navigation tabs | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_more_ru_light_375.jpg) |
 
-**Current visual acceptance:** NOT RUN — this environment has no Android emulator/ADB configured and no authenticated on-device screenshot pipeline. Android APK compilation checks binary correctness, not pixel appearance or interaction on a device.
+## Confirmed UI fixes — same-condition before / after
 
-## Separately tracked backend dependencies (not part of this PR)
+Every comparison pairs **the same viewport, role, language, theme and DEMO data**.
 
-- WhatsApp outbound messaging not permitted by confirmed server API; no send input.
-- Shared-auth preview may return 503 for Inbox, Dining and MARINA AI; no bypass.
-- AI read-only, no voice/audio promise.
-- Historical revenue/occupancy time-series unsupported; no fabricated trend chart.
-- Live multi-hotel Android E2E must be validated against an approved isolated environment after UX QA.
+| Observed defect | BEFORE: real Expo Web | AFTER: real Expo Web |
+| --- | --- | --- |
+| RU MANAGER 375px: clipped team tab | ![Before: RU MANAGER 375px: clipped team tab](qa-evidence/before_manager_tasks_ru_light_375.jpg) | ![After: RU MANAGER 375px: clipped team tab](qa-evidence/manager_tasks_ru_light_375_after_tab_fix.jpg) |
+| EN MANAGER 320px: clipped Repairs tab | ![Before: EN MANAGER 320px: clipped Repairs tab](qa-evidence/before_manager_team_en_dark_320.jpg) | ![After: EN MANAGER 320px: clipped Repairs tab](qa-evidence/manager_team_en_dark_320_after_nav_fix.jpg) |
+| EN MAID 375px: clipped arrival text | ![Before: EN MAID 375px: clipped arrival text](qa-evidence/before_maid_rooms_en_dark_375.jpg) | ![After: EN MAID 375px: clipped arrival text](qa-evidence/maid_rooms_en_dark_375_after_wrap_fix.jpg) |
+| KG MANAGER 375px: clipped task/room tabs | ![Before: KG MANAGER 375px: clipped task/room tabs](qa-evidence/before_manager_profile_kg_dark_375.jpg) | ![After: KG MANAGER 375px: clipped task/room tabs](qa-evidence/manager_profile_kg_dark_375.jpg) |
+| KZ MANAGER 375px: clipped task/room/repair tabs | ![Before: KZ MANAGER 375px: clipped task/room/repair tabs](qa-evidence/before_manager_profile_kz_dark_375.jpg) | ![After: KZ MANAGER 375px: clipped task/room/repair tabs](qa-evidence/manager_profile_kz_dark_375.jpg) |
 
-**Merge policy:** Draft PR stays unmerged until visual evidence is supplied and reviewed. The exact source SHA, CI result, and APK run must match the candidate being accepted.
+## Additional screenshot coverage
+
+MANAGER: task queue RU/light and EN/dark, team EN/dark at 320/375/430, profile RU/light+dark and KG/KZ/EN dark, More menu. MAID: tasks, room cards, room detail and housekeeping checklist EN/dark. TECHNICIAN: task queue, repair queue and new-request form EN/dark 375 and 320. Connect RU/light; login EN/dark. No business writes were performed.
+
+[Authentic screenshot provenance](qa-evidence/PROVENANCE.json) includes the exact source SHA, GitHub Actions run, DEMO fixture and files.
+
+## Explicitly unverified or blocked
+
+- **Android visual QA remains NOT TESTED for all 22 routes.** This review container has no Android SDK, ADB or emulator; the available GitHub workflow only builds and signs the APK. An APK build PASS is **not** a native UI PASS.
+- OWNER LIVE overview, RECEPTION LIVE operations, PMS grid, booking/hold editing, WhatsApp and AI states, Dining, and QR camera were not opened with a safe authenticated server-backed fixture. No fake API responses or hotel data were injected.
+- Android font scaling 150/200%, keyboard overlays, native modals, accessibility TalkBack, reduced-motion animations and safe area variants require actual-device tests.
+- Some pre-existing DEMO task titles and notes are written in Russian even when the app UI is EN/KG/KZ. These are raw seed **data fields**, not app chrome; they were not silently translated.
+- Full brand master comparison remains **PENDING BRAND APPROVAL**. Existing MARINA SMART original mobile raster/logo/icons were not changed.
+- Backend dependencies remain unchanged: shared-auth preview 503 for Inbox/Dining/AI, no WhatsApp outbound API, AI read-only, no verified historical chart data and HOLD endpoint still blocked by existing feature checks.
+
+**Status:** WEB VISUAL PARTIAL, ANDROID VISUAL NOT TESTED. PR remains Draft and must not be merged as an approved Android UI release without real native screenshots and manual role acceptance.
