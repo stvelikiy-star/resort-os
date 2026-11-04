@@ -197,6 +197,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel.demo) {
       // This canonical endpoint distinguishes shared tenant login from legacy
       // one-property login without guessing from a hostname or user input.
+      if (!api.authMode) throw new ApiError('UNKNOWN', 'Server authentication mode unavailable');
       const mode = await api.authMode();
       if (mode === 'shared_auth_preview') {
         if (!selector) throw new ApiError('BAD_REQUEST', 'Organization and hotel codes are required');
