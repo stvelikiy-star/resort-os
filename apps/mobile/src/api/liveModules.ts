@@ -1,3 +1,4 @@
+import { clientSessionGuard } from './unauthorizedSession';
 import { useMemo } from 'react';
 import { useSession } from '../state/session';
 import { isTrustedHotelOrigin } from './hotels';
@@ -76,8 +77,8 @@ export interface DiningFloor {
   orders: { id: string; order_number: string; status: string; table_code: string | null;
     room_code: string | null; waiter_id: string | null; waiter_name: string | null }[];
 }
-export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch, serverAuthMode: AuthMode | null = null) {
-  const http = createHotelHttpClient(baseUrl, transport);
+export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch, serverAuthMode: AuthMode | null = null, sessionIsActive?: () => boolean) {
+  const http = createHotelHttpClient(baseUrl, transport, sessionIsActive);
   const request = <T,>(method: HttpMethod, path: string, body?: unknown) => http.request<T>(method, path, body);
   const p = '/api/v1';
   const reviewGate = () => {
@@ -176,7 +177,7 @@ export function useLiveModules() {
   // so dependent screens invalidate old hotel data before issuing fresh reads.
   return useMemo(() =>
     hotel && user && api?.mode === 'LIVE' && isTrustedHotelOrigin(hotel.baseUrl)
-      ? createLiveModules(hotel.baseUrl, fetch, serverAuthMode) : null,
+      ? createLiveModules(hotel.baseUrl, fetch, serverAuthMode, clientSessionGuard(api)) : null,
     [hotel, api, user, serverAuthMode],
   );
 }

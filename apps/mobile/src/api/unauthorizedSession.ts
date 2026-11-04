@@ -36,3 +36,23 @@ export function rejectVerifiedHost(baseUrl: string, snapshot: object | null): vo
   const current = verifiedHosts.get(hostOf(baseUrl));
   if (current === snapshot) current.notify();
 }
+
+interface ClientSession {
+  active: boolean;
+  revoked: boolean;
+}
+const clientSessions = new WeakMap<object, ClientSession>();
+
+export function registerClientSession(client: object, session: ClientSession): void {
+  clientSessions.set(client, session);
+}
+
+export function activateClientSession(client: object): void {
+  const session = clientSessions.get(client);
+  if (session && !session.revoked) session.active = true;
+}
+
+export function clientSessionGuard(client: object): (() => boolean) | undefined {
+  const session = clientSessions.get(client);
+  return session ? () => session.active && !session.revoked : undefined;
+}
