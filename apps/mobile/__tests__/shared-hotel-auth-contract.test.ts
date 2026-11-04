@@ -21,30 +21,30 @@ const response = (data: unknown) =>
 
 describe('marina-shared-auth-v1 mobile transport (isolated mocked HTTP)', () => {
   it('detects the existing server mode without submitting credentials', async () => {
-    const transport = jest.fn(async () => response({ mode: 'shared_auth_preview', workspaces_available: false }));
+    const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response({ mode: 'shared_auth_preview', workspaces_available: false }));
     const api = createRealApi('https://platform.example/core', transport as unknown as typeof fetch);
     expect(await api.authMode()).toBe('shared_auth_preview');
     expect(transport.mock.calls[0][0]).toBe('https://platform.example/core/api/v1/auth/mode');
     expect(transport.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'include', redirect: 'error' });
-    expect(transport.mock.calls[0][1].body).toBeUndefined();
+    expect(transport.mock.calls[0][1]?.body).toBeUndefined();
   });
 
   it('sends only issued organization/hotel selectors and credentials to the existing login endpoint', async () => {
-    const transport = jest.fn(async () => response(user));
+    const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response(user));
     const api = createRealApi('https://platform.example/core', transport as unknown as typeof fetch);
     expect((await api.login('manager', 'synthetic-password', selector)).id).toBe('employee-1');
     const [url, opts] = transport.mock.calls[0];
     expect(url).toBe('https://platform.example/core/api/v1/auth/login');
     expect(opts).toMatchObject({ method: 'POST', credentials: 'include', redirect: 'error' });
-    expect(JSON.parse(opts.body)).toEqual({
+    expect(JSON.parse(String(opts?.body))).toEqual({
       username: 'manager', password: 'synthetic-password',
       tenant_code: 'tenant_a', property_code: 'HOTEL_A',
     });
-    expect(JSON.stringify(opts.headers)).not.toMatch(/x-tenant-id|x-property-id|authorization|bearer/i);
+    expect(JSON.stringify(opts?.headers)).not.toMatch(/x-tenant-id|x-property-id|authorization|bearer/i);
   });
 
   it('leaves legacy single-property login unchanged without selectors', async () => {
-    const transport = jest.fn(async () => response(user));
+    const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response(user));
     await createRealApi('https://platform.example', transport as unknown as typeof fetch)
       .login('manager', 'synthetic-password');
     expect(JSON.parse(transport.mock.calls[0][1].body)).toEqual({
@@ -53,7 +53,7 @@ describe('marina-shared-auth-v1 mobile transport (isolated mocked HTTP)', () => 
   });
 
   it('rejects forged, missing and URL-like selectors before any network request', async () => {
-    const transport = jest.fn(async () => response(user));
+    const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response(user));
     const api = createRealApi('https://platform.example', transport as unknown as typeof fetch);
     for (const wrong of [
       { tenant_code: '', property_code: 'HOTEL_A' },
@@ -71,7 +71,7 @@ describe('marina-shared-auth-v1 mobile transport (isolated mocked HTTP)', () => 
   });
 
   it('does not assume that an unknown /auth/mode response is legacy auth', async () => {
-    const transport = jest.fn(async () => response({ mode: 'unexpected' }));
+    const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response({ mode: 'unexpected' }));
     await expect(createRealApi('https://platform.example', transport as unknown as typeof fetch)
       .authMode()).rejects.toMatchObject({ code: 'UNKNOWN' });
   });
