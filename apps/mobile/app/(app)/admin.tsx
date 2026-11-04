@@ -107,7 +107,10 @@ export default function Admin() {
               ))}
               {eligibleStaff(task).length === 0 ? <Empty text={t('admin.noEligible')} /> : null}
             </View>
-          ) : <Badge label={t('admin.assign')} tone="primary" />}
+          ) : <PressScale testID={`open-assign-${task.id}`} accessibilityLabel={t('admin.assign')} onPress={() => setPick(task.id)} disabled={actionBusy || unknownResult}
+              style={{ alignSelf: 'flex-start', minHeight: 48, paddingHorizontal: 18, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.border }}>
+              <Text style={[font.body, { color: c.primary, fontWeight: '700' }]}>{t('admin.assign')}</Text>
+            </PressScale>}
         </View>
       ))}
 
