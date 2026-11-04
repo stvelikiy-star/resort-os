@@ -160,6 +160,16 @@ async function main() {
     throw new Error('Expo Web connect screen did not mount');
   }
   try {
+    // Actual desktop-size regression from user screenshot: mobile login must never
+    // stretch to browser width. These are real rendered Expo Web measurements.
+    await viewport(1440, 900);
+    const desktop = await evaluate('(() => { const node = document.querySelector(\'[data-testid="mobile-web-viewport"]\'); const rect = node?.getBoundingClientRect(); return { width: rect?.width ?? 0, x: rect?.x ?? 0, viewport: innerWidth, translate: document.documentElement.getAttribute("translate") }; })()');
+    if (desktop.width < 300 || desktop.width > 444 || Math.abs((desktop.x + desktop.width / 2) - desktop.viewport / 2) > 5) {
+      throw new Error('Desktop Expo Web is not centered in the mobile viewport: ' + JSON.stringify(desktop));
+    }
+    if (desktop.translate !== 'no') throw new Error('Browser translation may corrupt MARINA SMART brand text');
+    await screenshot('connect_ru_desktop_1440_after_mobile_frame');
+    await viewport(375, 812);
     await click('[data-testid="segment-ru"]', 'Russian language');
     await screenshot('connect_ru_light_375');
     // The built-in quick DEMO launcher starts as MANAGER, not MAID.
@@ -202,6 +212,13 @@ async function main() {
     await click('[data-testid="more-profile"]', 'manager profile');
     await click('[data-testid="sign-out"]', 'manager signout for isolated MAID fixture');
     await screenshot('login_en_dark_375');
+    await viewport(1440, 900);
+    const loginFrame = await evaluate('(() => { const node = document.querySelector(\'[data-testid="mobile-web-viewport"]\'); const rect = node?.getBoundingClientRect(); return { width: rect?.width ?? 0, x: rect?.x ?? 0, viewport: innerWidth }; })()');
+    if (loginFrame.width < 300 || loginFrame.width > 444) {
+      throw new Error('Login stretches across desktop rather than mobile preview: ' + JSON.stringify(loginFrame));
+    }
+    await screenshot('login_en_dark_desktop_1440_after_mobile_frame');
+    await viewport(375, 812);
     await click('[data-testid="demo-maid"]', 'built-in MAID fixture');
     if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('DEMO MAID tasks navigation absent');
     await screenshot('maid_tasks_en_dark_375');
