@@ -6,6 +6,9 @@ on:
       - 'scripts/marina_shared_add_hotel.py'
       - 'scripts/marina_shared_third_hotel_ci.py'
       - 'scripts/test_marina_shared_add_hotel.py'
+      - 'scripts/marina_shared_third_hotel_browser.mjs'
+      - 'scripts/marina_shared_three_hotel_restore_ci.py'
+      - 'scripts/test_marina_three_hotel_restore_guard.py'
       - '.github/workflows/marina-shared-third-hotel-ci.yml'
       - 'services/api/app/auth.py'
       - 'services/api/app/shared_auth_preview.py'
@@ -110,6 +113,33 @@ jobs:
         run: python scripts/marina_shared_live_browser_db.py verify
       - name: Atomic add of hotel C, forced rollback, duplicate and complete previous-data preservation, three live sessions
         run: PYTHONDONTWRITEBYTECODE=1 python scripts/marina_shared_third_hotel_ci.py
+      - name: Real Chromium confirms owner of newly added HOTEL_C can open empty hotel cabinet
+        run: node scripts/marina_shared_third_hotel_browser.mjs
+      - name: Verify PostgreSQL 16 client tools match the isolated database version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/lib/postgresql/16/bin/pg_dump; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\.'
+      - name: Prove three-hotel restore URLs reject remote, overwritten or production targets
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_three_hotel_restore_guard.py' -v
+      - name: Create an empty third-hotel restore target with no customer records
+        env:
+          PGPASSWORD: synthetic-ci-database-only
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -p 5432 -U marina_ci -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE marina_shared_third_restore_ci;'
+      - name: Prove full three-hotel logical dump and recovered FastAPI isolation, preserving populated source
+        env:
+          RESTORE_DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_third_restore_ci?schema=public
+          MARINA_SHARED_THREE_RESTORE_CONFIRM: ISOLATED_THREE_HOTEL_LOGICAL_RESTORE_ONLY
+        run: PYTHONDONTWRITEBYTECODE=1 python scripts/marina_shared_three_hotel_restore_ci.py
       - name: Sanitized process diagnostics if a test fails
         if: failure()
         run: |
