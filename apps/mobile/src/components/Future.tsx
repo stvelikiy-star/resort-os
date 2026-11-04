@@ -43,7 +43,7 @@ export function AnimatedKpi({ value, suffix = '', style, testID }: { value: numb
   const allowed = useMotionAllowed();
   const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
   const [shown, setShown] = useState(safe);
-  const progress = useRef(new Animated.Value(safe)).current;
+  const [progress] = useState(() => new Animated.Value(safe));
   const previous = useRef(safe);
   useEffect(() => {
     const from = previous.current;
