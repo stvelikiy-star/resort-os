@@ -17,8 +17,8 @@ export default function Admin() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api, user } = useSession();
-  const allowed = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE').canManage;
+  const { api, user, serverAuthMode } = useSession();
+  const allowed = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).canManage;
   const [pick, setPick] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const actionLock = useRef(false);
