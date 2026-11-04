@@ -12,7 +12,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerificationError
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field, model_validator
-from .section_permissions import effective_section_permissions, role_or_section_allowed
+from .section_permissions import effective_section_permissions, role_or_section_allowed, shared_role_module_permissions
 
 SESSION_COOKIE = "resort_session"
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -85,6 +85,13 @@ def _tenant_context_select_sql() -> str:
 
 def _optional_uuid_text(value: Any) -> str | None:
     return str(value) if value is not None else None
+
+
+def granted_modules_for_session(role: str, configured: Any) -> list[str]:
+    # Preview only: no change to historical single-property module delegation.
+    return (shared_role_module_permissions(role, configured)
+            if MARINA_SHARED_AUTH_PREVIEW_ENABLED
+            else effective_section_permissions(role, configured))
 
 
 def shared_auth_preview_guard() -> None:
@@ -356,7 +363,7 @@ async def resolve_session_user(conn, token: str | None, *, touch: bool = True) -
         "property_code": row["property_code"],
         "property_id": _optional_uuid_text(row["property_id"]),
         "tenant_id": _optional_uuid_text(row["tenant_id"]),
-        "module_permissions": effective_section_permissions(row["role"], row["module_permissions"]),
+        "module_permissions": granted_modules_for_session(row["role"], row["module_permissions"]),
         "module_permissions_custom": bool(row["module_permissions_custom"]),
     }
 
@@ -372,6 +379,10 @@ async def current_user(request: Request) -> dict[str, Any]:
 
 def require_roles(*allowed_roles: str, module_grant: bool = True) -> Callable:
     async def dependency(request: Request, user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+        # A custom module grant never turns RECEPTION, MAID or an unreviewed
+        # role into OWNER/MANAGER in the shared multi-hotel staging runtime.
+        if MARINA_SHARED_AUTH_PREVIEW_ENABLED and user.get("role") not in allowed_roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permission")
         if not role_or_section_allowed(user, request.url.path, allowed_roles, module_grant=module_grant):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permission")
         return user
@@ -507,7 +518,7 @@ async def login(payload: LoginPayload, request: Request, response: Response):
         property_code=row["property_code"],
         property_id=_optional_uuid_text(row["property_id"]),
         tenant_id=_optional_uuid_text(row["tenant_id"]),
-        module_permissions=effective_section_permissions(row["role"], row["module_permissions"]),
+        module_permissions=granted_modules_for_session(row["role"], row["module_permissions"]),
         module_permissions_custom=bool(row["module_permissions_custom"]),
     )
 
