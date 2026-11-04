@@ -67,7 +67,9 @@ def main():
     receipts = json.loads(RECEIPTS.read_text())
     assert set(receipts) == {"HOTEL_A", "HOTEL_B"}
     token_cookie = auth.SESSION_COOKIE
-    with TestClient(app, base_url="http://127.0.0.1:18000") as client:
+    # ASGI in-process HTTPS origin: httpx must send Secure session cookies.
+    # No external TLS listener or production endpoint is started by TestClient.
+    with TestClient(app, base_url="https://localhost:18000") as client:
         assert client.get("/api/v1/auth/me").status_code == 401
         mode = client.get("/api/v1/auth/mode")
         assert mode.status_code == 200 and mode.json()["mode"] == "shared_auth_preview"

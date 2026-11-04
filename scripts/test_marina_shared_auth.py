@@ -94,6 +94,7 @@ class SharedAuthTests(unittest.TestCase):
         self.patches = [patch.object(auth, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', True),
             patch.object(auth, 'MARINA_TENANT_CONTEXT_ENABLED', True),
             patch.object(auth, 'PROPERTY_CODE', 'UNUSED_GLOBAL'),
+            patch.object(auth, 'COOKIE_SECURE', True),
             patch.object(auth, 'password_hasher', self.hasher),
             patch.dict('os.environ', APP_ENV='staging')]
         for p in self.patches: p.start()
@@ -189,6 +190,32 @@ class SharedAuthTests(unittest.TestCase):
                      patch.object(auth, 'MARINA_TENANT_CONTEXT_ENABLED', change!='tenant_off'), \
                      patch.object(auth, 'PROPERTY_CODE', {'demo':'MARINA_DEMO','hotel01':'MARINA_HOTEL01'}.get(change,'UNUSED_GLOBAL')):
                     self.assertEqual(self.login().status_code, 503)
+
+    def test_shared_auth_fails_closed_when_secure_cookie_is_disabled(self):
+        # A staging operator must not accidentally deploy a shared tenant
+        # session in a cookie that could be transmitted over plain HTTP.
+        with patch.object(auth, 'COOKIE_SECURE', False):
+            before = len(self.store.queries)
+            for action in (
+                lambda: self.login(),
+                lambda: self.client.get('/health/ready'),
+                lambda: self.client.get('/api/v1/auth/mode'),
+            ):
+                response = action()
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()['detail'], 'Shared authentication requires Secure session cookies')
+            self.assertEqual(len(self.store.queries), before, 'Insecure shared auth must fail before database access')
+            self.assertFalse(self.store.sessions)
+
+        # Preserve single-property legacy behavior; the shared preview
+        # security prerequisite must not change historical login policy.
+        with patch.object(auth, 'COOKIE_SECURE', False), \
+             patch.object(auth, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', False), \
+             patch.object(auth, 'PROPERTY_CODE', 'HOTEL_A'):
+            response = self.client.post('/api/v1/auth/login', json={
+                'username': 'owner', 'password': 'Password-HOTEL_A'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['property_code'], 'HOTEL_A')
 
     def test_unknown_workspace_attempts_are_limited_before_database(self):
         payload={'username':'owner','password':'long-password','tenant_code':'missing','property_code':'HOTEL_A'}
