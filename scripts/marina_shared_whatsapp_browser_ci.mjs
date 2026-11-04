@@ -56,8 +56,15 @@ async function login(hotel, role) {
 
 async function verifyHotel(hotel, role) {
   await page.goto(BASE + "/shared-whatsapp", { waitUntil: "domcontentloaded" });
-  await page.getByText("Гостиница: HOTEL_" + hotel + " · Роль: " + role).waitFor({ timeout: 20000 });
-  await page.getByRole("heading", { name: "Диалоги WhatsApp" }).waitFor({ timeout: 20000 });
+  try {
+    await page.getByRole("heading", { name: "Диалоги WhatsApp" }).waitFor({ timeout: 20000 });
+  } catch (error) {
+    console.error("WhatsApp workspace render debug:", await page.locator("body").innerText().catch(() => "<unavailable>"));
+    throw error;
+  }
+  const status = await page.locator('section[aria-label="WhatsApp своей гостиницы"] p[role="status"]').innerText();
+  assert.match(status, new RegExp("HOTEL_" + hotel), "Hotel header: " + status);
+  assert.match(status, new RegExp(role), "Role header: " + status);
   await page.locator(".inbox-row").getByText("CI WhatsApp Guest " + hotel).waitFor({ timeout: 20000 });
   const foreign = hotel === "A" ? "B" : "A";
   assert.equal(await page.getByText("CI WhatsApp Guest " + foreign).count(), 0,
