@@ -1,0 +1,167 @@
+name: MARINA Shared Guest RC4 Compose Rollback CI
+
+on:
+  pull_request:
+    paths:
+      - 'compose.marina-shared-staging.yaml'
+      - 'compose.marina-shared-guest-rc4-ci.yaml'
+      - 'scripts/marina_shared_guest_qr_browser_ci.mjs'
+      - 'services/api/app/shared_guest_qr_rc4.py'
+      - 'services/api/app/guest_requests.py'
+      - '.github/workflows/marina-shared-guest-rc4-compose-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guest-rc4-compose-rollback:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      COMPOSE_FILE: compose.marina-shared-staging.yaml:compose.marina-shared-guest-rc4-ci.yaml
+      MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'false'
+      MARINA_SHARED_GUEST_QR_RC4_CONFIRM: REVIEWED_SHARED_GUEST_QR_STAGING_ONLY
+      MARINA_SHARED_GUEST_QR_RC4_ORIGIN: https://localhost:13445
+      GUEST_OS_PUBLIC_BASE_URL: https://localhost:13445
+      MARINA_GUEST_QR_CI_CONFIRM: ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY
+      MARINA_GUEST_BROWSER_ORIGIN: https://localhost:13445
+      MARINA_GUEST_RC4_ROLLBACK_EVIDENCE: ISOLATED_COMPOSE_ROLLBACK
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate disposable staging credentials and pin exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          db="$(openssl rand -hex 24)"
+          fixture="synthetic-ci-only-$(openssl rand -hex 24)"
+          echo "::add-mask::$db"
+          echo "::add-mask::$fixture"
+          {
+            echo "MARINA_STAGING_SHA=$(git rev-parse HEAD)"
+            echo "MARINA_STAGING_DB_PASSWORD=$db"
+            echo "MARINA_STAGING_FIXTURE_PASSWORD=$fixture"
+            echo "MARINA_SHARED_BROWSER_CI_PASSWORD=$fixture"
+          } >> "$GITHUB_ENV"
+      - name: Boot fresh two-hotel Compose with Guest RC4 disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose config --quiet
+          docker compose up -d --wait postgres
+          docker compose run --rm --build seed
+          docker compose up -d --build --wait admin web
+      - name: Prepare isolated TLS front door for both admin API and guest Next
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/marina-shared-rc4-compose-ci
+          cd /tmp/marina-shared-rc4-compose-ci
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+            -keyout key.pem -out cert.pem 2>/dev/null
+          cat > Caddyfile <<'CADDY'
+          https://localhost:13445 {
+            tls /tls/cert.pem /tls/key.pem
+            @plain_api path /api/v1/* /health/*
+            handle @plain_api {
+              rewrite * /core{uri}
+              reverse_proxy 127.0.0.1:13201
+            }
+            @core path /core/*
+            handle @core {
+              reverse_proxy 127.0.0.1:13201
+            }
+            handle {
+              reverse_proxy 127.0.0.1:13203
+            }
+          }
+          CADDY
+          docker run -d --name marina-guest-rc4-compose-proxy --network host \
+            -v "$PWD:/tls:ro" \
+            -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine
+          curl -fsS --cacert cert.pem --retry 20 --retry-connrefused \
+            --retry-delay 1 https://localhost:13445/api/v1/auth/mode | \
+            jq -e '.mode == "shared_auth_preview"'
+      - name: Assert default RC3 rejects Guest OS while PMS is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          cert=/tmp/marina-shared-rc4-compose-ci/cert.pem
+          curl_tls() { curl --silent --show-error --cacert "$cert" "$@"; }
+          token=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+          status="$(curl_tls -o /dev/null -w '%{http_code}' \
+            "https://localhost:13445/api/v1/guest-os/rooms/$token")"
+          test "$status" = 503
+          status="$(curl_tls -o /dev/null -w '%{http_code}' \
+            "https://localhost:13445/api/v1/pms/grid")"
+          test "$status" = 401
+      - name: Enable reviewed RC4 in SAME Compose API without changing DB or web
+        env:
+          MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose up -d --no-deps --force-recreate --wait api
+          curl -fsS --cacert /tmp/marina-shared-rc4-compose-ci/cert.pem \
+            --retry 20 --retry-connrefused --retry-delay 1 \
+            https://localhost:13445/api/v1/auth/mode | jq -e '.mode == "shared_auth_preview"'
+      - name: Verify genuine Chromium and complete two-hotel Guest QR lifecycle
+        env:
+          MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'true'
+        run: |
+          npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+          node scripts/marina_shared_guest_qr_browser_ci.mjs
+      - name: Roll back to RC3 and prove 503, session access and unchanged data
+        env:
+          MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /tmp/marina-guest-rc4-ci-token
+          token="$(cat /tmp/marina-guest-rc4-ci-token)"
+          [[ "$token" =~ ^[A-Za-z0-9_-]{16,128}$ ]]
+          docker compose up -d --no-deps --force-recreate --wait api
+          cert=/tmp/marina-shared-rc4-compose-ci/cert.pem
+          base=https://localhost:13445/api/v1
+          curl_tls() { curl --silent --show-error --cacert "$cert" "$@"; }
+          test "$(curl_tls -o /dev/null -w '%{http_code}' \
+            "$base/guest-os/rooms/$token")" = 503
+          test "$(curl_tls -X POST -o /dev/null -w '%{http_code}' \
+            "$base/guest-os/logout")" = 503
+          curl_tls -fsS "$base/auth/mode" | jq -e '.mode == "shared_auth_preview"'
+          jq -n --arg password "$MARINA_STAGING_FIXTURE_PASSWORD" \
+            '{tenant_code:"tenant_a",property_code:"HOTEL_A",username:"owner",password:$password}' | \
+            curl_tls -fsS -H 'Content-Type: application/json' --data-binary @- \
+            -c /tmp/marina-shared-rc4-compose-ci/a.cookies "$base/auth/login" | \
+            jq -e '.property_code == "HOTEL_A"'
+          curl_tls -fsS -b /tmp/marina-shared-rc4-compose-ci/a.cookies \
+            "$base/auth/me" | jq -e '.property_code == "HOTEL_A"'
+          curl_tls -fsS -b /tmp/marina-shared-rc4-compose-ci/a.cookies \
+            "$base/pms/grid" | jq -e 'type == "object"'
+          qr_properties="$(docker compose exec -T postgres psql -U marina_ci \
+            -d marina_shared_browser_ci -Atc \
+            "SELECT COUNT(DISTINCT \"propertyId\") FROM room_qrs WHERE status='ACTIVE'")"
+          test "$qr_properties" = 2
+          completed_stays="$(docker compose exec -T postgres psql -U marina_ci \
+            -d marina_shared_browser_ci -Atc \
+            "SELECT COUNT(*) FROM stays WHERE status='CHECKED_OUT'")"
+          test "$completed_stays" = 2
+          echo 'PASS: RC3 default 503 -> RC4 two-hotel HTTPS Guest QR -> RC3 503; owners, PMS and both hotel DB partitions survive'
+      - name: Diagnose isolated failures
+        if: failure()
+        run: |
+          docker compose ps || true
+          docker compose logs --tail 90 api admin web || true
+          docker logs --tail 90 marina-guest-rc4-compose-proxy || true
+      - name: Destroy disposable services and database volume
+        if: always()
+        run: |
+          docker rm -f marina-guest-rc4-compose-proxy || true
+          docker compose down --volumes --remove-orphans
+          rm -f /tmp/marina-guest-rc4-ci-token
