@@ -1,4 +1,4 @@
-"""P0 server-side mobile task contracts: fail closed without a connected hotel."""
+"""P0 compatibility checks against the canonical task API (no test DB required)."""
 import sys
 from pathlib import Path
 import unittest
@@ -6,65 +6,67 @@ import unittest
 from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api"))
-from app.operations import (
-    HOUSEKEEPING_REQUIRED_CODES,
-    HousekeepingChecklistItem, HousekeepingCompletionReport,
-    TaskAssigneePatch, TaskCreate, allowed_types_for_user,
-    has_full_operations_access, router,
+from app.operations import TaskCreate, allowed_types_for_user, has_full_operations_access
+from app.operations_assignment import AssigneePatch
+from app.staff_task_reports import (
+    ChecklistItem, TaskCompletionReport, SHARED_HOUSEKEEPING_CODES,
 )
+from app.app_entry import app
 
 
 def checked_items():
-    return [
-        {"code": code, "label": code, "done": True}
-        for code in sorted(HOUSEKEEPING_REQUIRED_CODES)
-    ]
+    return [{"code": code, "label": code, "done": True}
+            for code in sorted(SHARED_HOUSEKEEPING_CODES)]
 
 
 class ServerMobileTaskContractTests(unittest.TestCase):
-    def test_task_routes_are_registered_and_not_duplicate(self):
-        paths = [route.path for route in router.routes]
-        for path in ("/api/v1/ops/tasks/{task_id}/assignee",
-                     "/api/v1/ops/tasks/{task_id}/complete-report"):
-            self.assertEqual(paths.count(path), 1)
+    def test_exactly_one_canonical_route_per_method(self):
+        routes = [(route.path, method) for route in app.routes
+                  for method in getattr(route, "methods", ()) or ()]
+        for method, path in (
+            ("PATCH", "/api/v1/ops/tasks/{task_id}/assignee"),
+            ("POST", "/api/v1/ops/tasks/{task_id}/complete-report"),
+        ):
+            self.assertEqual(routes.count((path, method)), 1,
+                             "Duplicate server route could silently bypass RBAC")
 
-    def test_existing_task_create_remains_backward_compatible(self):
-        payload = TaskCreate(type="HOUSEKEEPING", title="Test daily cleaning")
+    def test_task_create_keeps_legacy_optional_assignee(self):
+        payload = TaskCreate(type="HOUSEKEEPING", title="Daily cleaning")
         self.assertIsNone(payload.assigned_to_id)
-        self.assertEqual(payload.status if hasattr(payload, "status") else payload.type,
-                         "HOUSEKEEPING")
+        self.assertEqual(payload.type, "HOUSEKEEPING")
 
-    def test_assignment_requires_explicit_intent(self):
+    def test_assignment_requires_explicit_uuid_or_null(self):
         with self.assertRaises(ValidationError):
-            TaskAssigneePatch()
-        self.assertIsNone(TaskAssigneePatch(assigned_to_id=None).assigned_to_id)
+            AssigneePatch()
+        self.assertIsNone(AssigneePatch(assigned_to_id=None).assigned_to_id)
         with self.assertRaises(ValidationError):
-            TaskAssigneePatch(assigned_to_id="foreign-text-not-uuid")
+            AssigneePatch(assigned_to_id="URL-not-a-uuid")
 
-    def test_five_reviewed_checklist_items(self):
+    def test_shared_checklist_codes_match_mobile_contract(self):
         self.assertEqual(
-            HOUSEKEEPING_REQUIRED_CODES,
+            SHARED_HOUSEKEEPING_CODES,
             {"BED_LINEN", "BATHROOM", "SURFACES", "AMENITIES", "FINAL_CHECK"},
         )
-        data = HousekeepingCompletionReport(
+        payload = TaskCompletionReport(
             summary="Checked room after cleaning", checklist=checked_items(),
             evidence_urls=[],
         )
-        self.assertEqual(len(data.checklist), 5)
-        self.assertTrue(all(isinstance(i, HousekeepingChecklistItem) for i in data.checklist))
+        self.assertEqual(len(payload.checklist), 5)
+        self.assertTrue(all(isinstance(item, ChecklistItem) for item in payload.checklist))
 
-    def test_report_rejects_missing_checklist_and_unreviewed_uploads(self):
+    def test_invalid_report_payloads_fail_validation(self):
         with self.assertRaises(ValidationError):
-            HousekeepingCompletionReport(summary="ok", checklist=checked_items()[:-1])
+            TaskCompletionReport(summary=" ", checklist=checked_items())
         with self.assertRaises(ValidationError):
-            HousekeepingCompletionReport(
-                summary="ok", checklist=checked_items(),
-                evidence_urls=["https://unverified.example/test.jpg"],
-            )
+            TaskCompletionReport(summary="ok", checklist=checked_items(),
+                                 evidence_urls=["file:///tmp/unsafe-photo.jpg"])
         with self.assertRaises(ValidationError):
-            HousekeepingCompletionReport(summary=" ", checklist=checked_items())
+            TaskCompletionReport(summary="ok", checklist=checked_items(),
+                                 evidence_urls=["https://example.test/photo.jpg"] * 9)
+        # Shared-specific photo and exact checklist denial is verified through
+        # real isolated HTTP, not inferred from the legacy Pydantic model.
 
-    def test_custom_ops_still_cannot_promote_non_manager(self):
+    def test_custom_grants_cannot_escalate_line_roles(self):
         for role in ("MAID", "TECHNICIAN", "RECEPTION", "WAITER", "COOK"):
             with self.subTest(role=role):
                 user = {"role": role, "module_permissions_custom": True,
@@ -72,7 +74,7 @@ class ServerMobileTaskContractTests(unittest.TestCase):
                 self.assertFalse(has_full_operations_access(user))
                 self.assertNotIn("GUEST_REQUEST", allowed_types_for_user(user))
 
-    def test_manager_revocation_disables_assignment(self):
+    def test_management_revoke_denies_assignment(self):
         for role in ("OWNER", "MANAGER"):
             user = {"role": role, "module_permissions_custom": True,
                     "module_permissions": ["PMS"]}
