@@ -87,7 +87,7 @@ afterAll(() => {
   else process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS = TRUST;
 });
 const setup = async () => {
-  const screen = render(<SessionProvider initialLocale="ru"><Panel /></SessionProvider>);
+  const screen = await render(<SessionProvider initialLocale="ru"><Panel /></SessionProvider>);
   fireEvent.press(screen.getByTestId('connect'));
   await waitFor(() => expect(screen.getByTestId('hotel-host').props.children).toBe('https://platform.example'));
   return screen;
