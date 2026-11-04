@@ -236,7 +236,35 @@ def main():
                 SELECT id FROM properties WHERE code='HOTEL_A')
         ''')
 
-    print("MARINA_SHARED_ROLE_AUTH_2_HOTEL_PASS: 24 role identities, role ceiling, grants/revocation, tenant selectors and foreign-data denial")
+        # Read-only finance and task history must be separately revocable
+        # from a manager, without deleting their unrelated STAFF permission.
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_A","OWNER")])
+        manager_row=next(s for s in client.get("/api/v1/admin/staff/overview").json()["staff"]
+                         if s["username"]=="manager")
+        narrowed=client.patch("/api/v1/admin/staff/"+manager_row["id"],
+                              json={"module_permissions":["STAFF"]})
+        assert narrowed.status_code==200,narrowed.text
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_A","MANAGER")])
+        assert client.get("/api/v1/auth/me").status_code==401
+        login(client,"HOTEL_A","MANAGER")
+        assert client.get("/api/v1/admin/staff/overview").status_code==200
+        assert client.get("/api/v1/admin/finance/summary?from_date="+
+                          date.today().isoformat()+"&to_date="+date.today().isoformat()).status_code==403
+        assert client.get("/api/v1/ops/tasks/"+
+                          receipts["HOTEL_A"]["maintenance_task_id"]+"/history").status_code==403
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_B","MANAGER")])
+        assert client.get("/api/v1/admin/finance/summary?from_date="+
+                          date.today().isoformat()+"&to_date="+date.today().isoformat()).status_code==200
+        mutate('''
+            UPDATE staff_users SET "modulePermissions"=NULL
+            WHERE username='manager' AND "propertyId"=(
+                SELECT id FROM properties WHERE code='HOTEL_A')
+        ''')
+
+    print("MARINA_SHARED_ROLE_AUTH_2_HOTEL_PASS: 24 roles, finance+audit role ceiling, grants/revocation, tenant selectors and denied foreign data")
 
 
 if __name__ == "__main__":
