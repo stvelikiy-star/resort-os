@@ -62,7 +62,7 @@ export default function Holds() {
     <View style={{flexDirection:'row',flexWrap:'wrap',gap:space.sm}}>
       {(grid?.rooms ?? []).filter(r => !r.blocks.length && r.operational_state!=='TECH_BLOCK').map(r =>
         <PressScale key={r.id} onPress={()=>setRoom(r.id)} disabled={busy||unknown} style={{minWidth:85,minHeight:48,backgroundColor:room===r.id?c.primary:c.surfaceAlt,borderRadius:12,justifyContent:'center',alignItems:'center'}}>
-          <Text style={[font.h2,{color:room===r.id?'#fff':c.text}]}>{r.code}</Text>
+          <Text style={[font.h2,{color:room===r.id?c.primaryText:c.text}]}>{r.code}</Text>
         </PressScale>)}
     </View>
     <Field label={copy.guestName} value={name} onChangeText={setName}/>
