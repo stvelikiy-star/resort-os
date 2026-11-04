@@ -16,7 +16,7 @@ const ICONS = {
 } as const;
 const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
 export default function AppTabs() {
-  const { user, api } = useSession();
+  const { user, api, serverAuthMode } = useSession();
   const pathname = usePathname();
   const copy = useMobileCopy();
   const { c } = useTheme();
@@ -24,8 +24,8 @@ export default function AppTabs() {
   if (!user) return <Redirect href="/connect" />;
   const mode = api?.mode ?? 'LIVE';
   const selected = pathname.split('/')[1] as TabKey;
-  if (ORDER.includes(selected) && !hasTabForSession(user.role, user.module_permissions, mode, selected)) {
-    return <Redirect href={homeForSession(user.role, user.module_permissions, mode)} />;
+  if (ORDER.includes(selected) && !hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)) {
+    return <Redirect href={homeForSession(user.role, user.module_permissions, mode, serverAuthMode)} />;
   }
   return <Tabs screenOptions={{
     headerShown: false,
@@ -40,7 +40,7 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], href: hasTabForSession(user.role, user.module_permissions, mode, key) ? undefined : null,
+        title: copy[key], href: hasTabForSession(user.role, user.module_permissions, mode, key, serverAuthMode) ? undefined : null,
         tabBarIcon: ({ color, focused }) =>
           <View style={{ minWidth: 50, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}>
             <Icon size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/>
