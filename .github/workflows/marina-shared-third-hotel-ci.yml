@@ -1,0 +1,157 @@
+name: MARINA Shared Third Hotel Additive Onboarding CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/marina_shared_add_hotel.py'
+      - 'scripts/marina_shared_third_hotel_ci.py'
+      - 'scripts/test_marina_shared_add_hotel.py'
+      - 'scripts/marina_shared_third_hotel_browser.mjs'
+      - 'scripts/marina_shared_three_hotel_restore_ci.py'
+      - 'scripts/test_marina_three_hotel_restore_guard.py'
+      - '.github/workflows/marina-shared-third-hotel-ci.yml'
+      - 'services/api/app/auth.py'
+      - 'services/api/app/shared_auth_preview.py'
+      - 'packages/database/prisma/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  three-hotel-shared-onboarding:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_THIRD_HOTEL_CONFIRM: DISPOSABLE_THIRD_HOTEL_ADDITIVE_CI_ONLY
+      MARINA_SHARED_BROWSER_CI_PASSWORD: synthetic-ci-only-browser-two-hotels-2026
+      MARINA_SHARED_BROWSER_URL: http://localhost:13001
+      COOKIE_SECURE: 'true'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      CORE_API_URL: http://127.0.0.1:18000
+      NEXT_TELEMETRY_DISABLED: '1'
+      OPENAI_API_KEY: ''
+      MARINA_AI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify frozen RC3 source/39 Prisma SQL migrations remain unchanged
+        run: python scripts/marina_rc3_source_gate.py
+      - name: Apply existing migrations to disposable empty PostgreSQL
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma validate
+          npx prisma migrate deploy
+      - name: Install canonical API requirements and seed TWO distinct active hotels
+        run: |
+          python -m pip install -r services/api/requirements.txt
+          python scripts/marina_shared_live_browser_db.py seed
+      - name: Validate third-hotel onboarding code and fail-closed safety cases
+        run: |
+          python -m py_compile scripts/marina_shared_add_hotel.py scripts/marina_shared_third_hotel_ci.py scripts/test_marina_shared_add_hotel.py
+          PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_shared_add_hotel.py' -v
+      - name: Typecheck and build the real shared Next Admin
+        working-directory: apps/admin
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm run build
+      - name: Launch canonical shared FastAPI and Next Admin
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 18000 > /tmp/marina-three-api.log 2>&1 &
+          echo "$!" > /tmp/marina-three-api.pid
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:18000/health/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18000/health/ready
+          (cd apps/admin && npx next start -p 13001 > /tmp/marina-three-admin.log 2>&1) &
+          echo "$!" > /tmp/marina-three-admin.pid
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:13001/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:13001/ > /dev/null
+      - name: Install actual headless Chromium
+        run: |
+          npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run existing real browser PMS/payment/repair workflow for TWO hotels
+        run: node scripts/marina_shared_live_browser.mjs
+      - name: Recheck all TWENTY FOUR existing staff identities, role ceilings and revoked grants
+        run: python scripts/marina_shared_role_auth_ci.py
+      - name: Verify original two-hotel browser receipts in PostgreSQL
+        run: python scripts/marina_shared_live_browser_db.py verify
+      - name: Atomic add of hotel C, forced rollback, duplicate and complete previous-data preservation, three live sessions
+        run: PYTHONDONTWRITEBYTECODE=1 python scripts/marina_shared_third_hotel_ci.py
+      - name: Real Chromium confirms owner of newly added HOTEL_C can open empty hotel cabinet
+        run: node scripts/marina_shared_third_hotel_browser.mjs
+      - name: Verify PostgreSQL 16 client tools match the isolated database version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/lib/postgresql/16/bin/pg_dump; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\.'
+      - name: Prove three-hotel restore URLs reject remote, overwritten or production targets
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_three_hotel_restore_guard.py' -v
+      - name: Create an empty third-hotel restore target with no customer records
+        env:
+          PGPASSWORD: synthetic-ci-database-only
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -p 5432 -U marina_ci -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE marina_shared_third_restore_ci;'
+      - name: Prove full three-hotel logical dump and recovered FastAPI isolation, preserving populated source
+        env:
+          RESTORE_DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_third_restore_ci?schema=public
+          MARINA_SHARED_THREE_RESTORE_CONFIRM: ISOLATED_THREE_HOTEL_LOGICAL_RESTORE_ONLY
+        run: PYTHONDONTWRITEBYTECODE=1 python scripts/marina_shared_three_hotel_restore_ci.py
+      - name: Sanitized process diagnostics if a test fails
+        if: failure()
+        run: |
+          for name in api admin; do
+            echo "=== $name ==="
+            tail -100 "/tmp/marina-three-$name.log" 2>/dev/null || true
+          done
+      - name: Stop isolated app processes
+        if: always()
+        run: |
+          for name in api admin; do
+            if [ -f "/tmp/marina-three-$name.pid" ]; then
+              kill "$(cat "/tmp/marina-three-$name.pid")" 2>/dev/null || true
+            fi
+          done
