@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import password_hasher, require_roles, trusted_property_id
+from .auth import password_hasher, require_roles, trusted_property_id, granted_modules_for_session
 from .section_permissions import SECTION_MODULES, effective_section_permissions, normalized_configured_permissions
 
 router = APIRouter(prefix="/api/v1/admin/staff", tags=["admin-staff"])
@@ -91,7 +91,7 @@ def _staff_payload(row) -> dict[str, Any]:
         "username": row["username"],
         "display_name": row["displayName"],
         "role": row["role"],
-        "module_permissions": effective_section_permissions(row["role"], row["modulePermissions"]),
+        "module_permissions": granted_modules_for_session(row["role"], row["modulePermissions"]),
         "active": bool(row["isActive"]),
         "telegram_linked": row["telegramUserId"] is not None,
         "telegram_username": row["telegramUsername"],
@@ -212,7 +212,7 @@ async def staff_overview(
                 "username": row["username"],
                 "display_name": row["displayName"],
                 "role": row["role"],
-                "module_permissions": effective_section_permissions(row["role"], row["modulePermissions"]),
+                "module_permissions": granted_modules_for_session(row["role"], row["modulePermissions"]),
                 "active": row["isActive"],
                 "telegram_linked": row["telegramUserId"] is not None,
                 "telegram_username": row["telegramUsername"],
