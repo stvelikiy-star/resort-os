@@ -17,13 +17,20 @@ const ICONS = {
 } as const;
 const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
 export default function AppTabs() {
-  const { user, api, serverAuthMode } = useSession();
+  const { user, api, serverAuthMode, locale } = useSession();
   const pathname = usePathname();
   const copy = useMobileCopy();
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
   const compact = width < 355 || fontScale > 1.35;
+  const tabTitle = (key: TabKey) => {
+    if (key === 'admin') return copy.teamShort;
+    if (key === 'tasks' && (locale === 'kg' || locale === 'kz')) return copy.tasksTabShort;
+    if (key === 'rooms' && (locale === 'kg' || locale === 'kz')) return copy.roomsTabShort;
+    if (key === 'requests' && (compact || locale === 'kz')) return copy.repairShort;
+    return copy[key];
+  };
   if (!user) return <Redirect href="/connect" />;
   const mode = api?.mode ?? 'LIVE';
   const selected = pathname.split('/')[1] as TabKey | 'more';
@@ -46,7 +53,7 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], tabBarLabel: key === 'admin' ? copy.teamShort : key === 'requests' && compact ? copy.repairShort : copy[key], href: workspace.tabs.includes(key) ? undefined : null,
+        title: copy[key], tabBarLabel: tabTitle(key), href: workspace.tabs.includes(key) ? undefined : null,
         // Overflow routes remain registered in the navigator; only their tab buttons are hidden.
         // A null href here would make the screen unreachable from the More hub.
         tabBarButton: plan.overflow.includes(key) ? () => null : undefined,
