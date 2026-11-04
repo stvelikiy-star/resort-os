@@ -72,15 +72,24 @@ def allowed_types_for_role(role: str) -> set[str]:
 
 
 def allowed_types_for_user(user: dict[str, Any]) -> set[str]:
-    if user.get("module_permissions_custom"):
-        return TASK_TYPES if user_has_section(user, "OPS") else set()
-    return allowed_types_for_role(user["role"])
+    """A module grant can restrict access, never promote a staff role.
+
+    An MAID with custom OPS access must not suddenly see MAINTENANCE or
+    GUEST_REQUEST, and a COOK with OPS selected must not gain task powers.
+    """
+    role_types = allowed_types_for_role(user.get("role", ""))
+    if not role_types:
+        return set()
+    if user.get("module_permissions_custom") and not user_has_section(user, "OPS"):
+        return set()
+    return role_types
 
 
 def has_full_operations_access(user: dict[str, Any]) -> bool:
-    if user.get("module_permissions_custom"):
-        return user_has_section(user, "OPS")
-    return user["role"] in {"OWNER", "MANAGER"}
+    """Manager authority is role-bound even with custom section grants."""
+    if user.get("role") not in {"OWNER", "MANAGER"}:
+        return False
+    return not user.get("module_permissions_custom") or user_has_section(user, "OPS")
 
 
 def task_to_dict(row) -> dict[str, Any]:
