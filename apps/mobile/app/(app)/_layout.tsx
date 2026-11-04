@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 import { Redirect, Tabs, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Grid2X2, ClipboardCheck, BedDouble, ChartNoAxesCombined, CircleUserRound, Wrench, MessageCircle, CalendarDays, ConciergeBell, UtensilsCrossed } from 'lucide-react-native';
@@ -22,6 +22,8 @@ export default function AppTabs() {
   const copy = useMobileCopy();
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width, fontScale } = useWindowDimensions();
+  const compact = width < 355 || fontScale > 1.35;
   if (!user) return <Redirect href="/connect" />;
   const mode = api?.mode ?? 'LIVE';
   const selected = pathname.split('/')[1] as TabKey | 'more';
@@ -44,7 +46,7 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], tabBarLabel: key === 'admin' ? copy.teamShort : copy[key], href: workspace.tabs.includes(key) ? undefined : null,
+        title: copy[key], tabBarLabel: key === 'admin' ? copy.teamShort : key === 'requests' && compact ? copy.repairShort : copy[key], href: workspace.tabs.includes(key) ? undefined : null,
         // Overflow routes remain registered in the navigator; only their tab buttons are hidden.
         // A null href here would make the screen unreachable from the More hub.
         tabBarButton: plan.overflow.includes(key) ? () => null : undefined,
