@@ -11,7 +11,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from .communication_ingest import NormalizedChannelMessage, ingest_normalized_channel_message
 from .shared_inbox_rc5_identity import (
@@ -38,6 +38,19 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
         provider_bindings = json.loads(os.environ.get("MARINA_SHARED_GREEN_RC6_CONFIG_JSON", ""))
         if not isinstance(provider_bindings, list) or len(provider_bindings) != len(adapters):
             raise ValueError("Missing paired provider identities")
+        # The same owner-approved UUID binding as RC6 pairing is required for
+        # every webhook instance; configuration with duplicate accounts fails.
+        for provider in provider_bindings:
+            if not isinstance(provider, dict) or set(provider) != {
+                "tenant_id", "property_id", "property_code",
+                "provider_origin", "instance", "token",
+            }:
+                raise ValueError("Invalid owner provider configuration")
+            uuid.UUID(provider["tenant_id"])
+            uuid.UUID(provider["property_id"])
+        for field in ("instance", "property_id", "token"):
+            if len({p[field] for p in provider_bindings}) != len(provider_bindings):
+                raise ValueError("Ambiguous owner provider configuration")
         result = []
         for item in values:
             if not isinstance(item, dict) or set(item) != {
@@ -60,12 +73,20 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
                 raise ValueError("Webhook binding does not match an independent inbox adapter")
             # The owner-paired GREEN API instance must match as well. Token
             # authentication may never silently retarget a different account.
-            if len([p for p in provider_bindings if isinstance(p, dict)
-                    and p.get("property_code") == item["property_code"]
-                    and p.get("instance") == item["instance"]
-                    and p.get("token") != item["webhook_token"]]) != 1:
+            paired = [p for p in provider_bindings
+                      if p["property_code"] == item["property_code"]
+                      and p["instance"] == item["instance"]
+                      and p["token"] != item["webhook_token"]]
+            if len(paired) != 1:
                 raise ValueError("Webhook instance does not match owner pairing")
-            result.append(item)
+            # Never use caller-provided hotel codes or the provider instance as
+            # tenant authority. The matched UUID pair is verified against the
+            # current ACTIVE DB relationship before any Inbox mutation.
+            result.append({
+                **item,
+                "bound_tenant_id": str(uuid.UUID(paired[0]["tenant_id"])),
+                "bound_property_id": str(uuid.UUID(paired[0]["property_id"])),
+            })
         for field in ("instance", "property_code", "webhook_token"):
             if len({r[field] for r in result}) != len(result):
                 raise ValueError("Duplicate webhook binding")
@@ -96,7 +117,29 @@ def _bearer_identity(authorization: str | None) -> dict[str, str]:
         "property_code": row["property_code"],
         "channel_code": row["channel_code"],
         "external_account_id": row["instance"],
+        "bound_tenant_id": row["bound_tenant_id"],
+        "bound_property_id": row["bound_property_id"],
     }
+
+
+async def _verify_active_provider_hotel(request: Request, service: dict[str, str]) -> None:
+    """RC7 callback must agree with the owner-paired UUIDs in live PostgreSQL.
+
+    This is a read-only check. It fails closed for a stale/misbound tenant or
+    instance, before any customer conversation, message or status is written.
+    """
+    async with request.app.state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            '''SELECT p.id,p."tenantId" FROM properties p
+               JOIN tenants t ON t.id=p."tenantId"
+               WHERE p.code=$1 AND t.code=$2 AND t.status='ACTIVE' ''',
+            service["property_code"], service["tenant_code"],
+        )
+    if (not row or str(row["id"]) != service["bound_property_id"]
+            or str(row["tenantId"]) != service["bound_tenant_id"]):
+        raise HTTPException(
+            503, detail="GREEN-API hotel/provider configuration is not active",
+        )
 
 
 def _valid_instance(event: dict, service: dict[str, str]) -> None:
@@ -226,13 +269,21 @@ async def _outbound_status(event: dict, service: dict[str, str], request: Reques
 
 
 @router.post("/webhook", status_code=202)
-async def green_api_webhook(
-    request: Request,
-    authorization: str | None = Header(default=None, alias="Authorization"),
-):
+async def green_api_webhook(request: Request):
+    # Require exactly ONE raw Authorization header; reverse proxies may not
+    # agree on which duplicate credential to accept.
+    credentials = [
+        value.decode("latin-1") for key, value in request.scope.get("headers", [])
+        if key.lower() == b"authorization"
+    ]
+    if len(credentials) != 1:
+        raise HTTPException(401, detail="Invalid GREEN-API webhook credential")
     # The RC7 middleware authorizes the explicit staging stage; token picks
     # one hotel. Neither URL params nor payload can supply a property ID.
-    service = _bearer_identity(authorization)
+    service = _bearer_identity(credentials[0])
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        raise HTTPException(415, detail="GREEN-API webhook requires JSON")
+    await _verify_active_provider_hotel(request, service)
     chunks = []
     total = 0
     async for chunk in request.stream():
