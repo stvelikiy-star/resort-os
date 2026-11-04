@@ -23,7 +23,7 @@ describe('marina-shared-auth-v1 mobile transport (isolated mocked HTTP)', () => 
   it('detects the existing server mode without submitting credentials', async () => {
     const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response({ mode: 'shared_auth_preview', workspaces_available: false }));
     const api = createRealApi('https://platform.example/core', transport as unknown as typeof fetch);
-    expect(await api.authMode()).toBe('shared_auth_preview');
+    expect(await api.authMode!()).toBe('shared_auth_preview');
     expect(transport.mock.calls[0][0]).toBe('https://platform.example/core/api/v1/auth/mode');
     expect(transport.mock.calls[0][1]).toMatchObject({ method: 'GET', credentials: 'include', redirect: 'error' });
     expect(transport.mock.calls[0][1]?.body).toBeUndefined();
