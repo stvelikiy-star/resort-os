@@ -138,11 +138,36 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (id === hotelId) return;
     const candidate = hotels.find(h => h.id === id);
     if (candidate && !candidate.demo && !isTrustedHotelOrigin(candidate.baseUrl)) return;
+    const leaving = hotelId ? hotels.find(h => h.id === hotelId) : null;
     sessionRevision.current++;
     loginAttempt.current++;
     if (hotelId) dropApi(hotelId);
+    // Switching hotel is a local security boundary even when remote logout
+    // is offline. Do not expose the old staff identity during any network I/O.
     setSessions({});
     setHotelId(id);
+    if (leaving && !leaving.demo && isTrustedHotelOrigin(leaving.baseUrl)) {
+      const origin = leaving.baseUrl;
+      const revoke = async () => {
+        let queued = false;
+        try { await queueCookieLogout(origin); queued = true; }
+        catch { /* keep the UI signed out even if secure storage is unavailable */ }
+        if (queued) {
+          await flushPendingCookieLogouts(async url => createRealApi(url).logout());
+        } else {
+          // No durable retry guarantee if journal writing failed, but do not
+          // leave a live cookie unchallenged when the trusted host is reachable.
+          try { await createRealApi(origin).logout(); }
+          catch { /* the next sign-in must still clear the host cookie */ }
+        }
+      };
+      // A pending login can still install Set-Cookie after the hotel changed.
+      // Serialize its completion BEFORE revoking the old hotel session; the
+      // next selected hotel's sign-in waits for this same revocation tail.
+      const previous = liveSignInTail.current;
+      const current = previous.then(revoke, revoke);
+      liveSignInTail.current = current.then(() => undefined, () => undefined);
+    }
   }, [hotelId, hotels]);
   const addHotel = useCallback((h: HotelConnection) => {
     if (h.demo || !isTrustedHotelOrigin(h.baseUrl)) throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
