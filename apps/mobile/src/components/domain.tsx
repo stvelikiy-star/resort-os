@@ -31,8 +31,9 @@ export function TaskCard({ task, onPress }: { task: Task; onPress: () => void })
       <View style={{ flex: 1, gap: 4 }}>
         <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{task.room_code ?? t('common.room')} · {t(`tasks.types.${task.type}`)}</Text>
         <Text style={[font.small, { color: c.textMuted }]} numberOfLines={1}>{task.title}</Text>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
           <Badge label={t(statusKey(task.status))} tone={tone} />
+          {['URGENT', 'HIGH'].includes(task.priority) ? <Badge label={t(prioKey(task.priority))} tone={priorityTone(task.priority)}/> : null}
           {task.due_label ? <Badge label={task.due_label} /> : null}
         </View>
       </View>
