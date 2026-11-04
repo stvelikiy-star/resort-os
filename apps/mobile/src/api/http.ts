@@ -47,6 +47,11 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
     // never act as a global log-out event.
     const verifiedAtStart = pathname.startsWith('/api/v1/auth/')
       ? null : captureVerifiedHost(root);
+    const requireSameSession = () => {
+      if (verifiedAtStart && captureVerifiedHost(root) !== verifiedAtStart) {
+        throw new ApiError('STALE_SESSION', 'The active hotel session changed');
+      }
+    };
     const attempts = method === 'GET' ? 2 : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
       const controller = new AbortController();
@@ -61,6 +66,7 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       } catch {
         // A native redirect refusal and an offline error both fail closed. No
         // automatic retry after an unknown transport failure (lost write ACK).
+        requireSameSession();
         throw new ApiError('OFFLINE', 'Hotel connection unavailable; check connection before retrying');
       } finally {
         clearTimeout(timeout);
@@ -74,15 +80,24 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
         throw new ApiError('FORBIDDEN', 'Unexpected hotel API redirect');
       }
       if (!response.ok) {
-        if (response.status === 401) rejectVerifiedHost(root, verifiedAtStart);
+        if (response.status === 401) {
+          rejectVerifiedHost(root, verifiedAtStart);
+          const { code, message } = errorForStatus(401);
+          throw new ApiError(code, message);
+        }
+        requireSameSession();
         if (method === 'GET' && attempt + 1 < attempts && [502, 503, 504].includes(response.status)) continue;
         if (response.status === 503) throw new ApiError('UNKNOWN', 'Hotel workspace is unavailable in this environment');
         const { code, message } = errorForStatus(response.status);
         throw new ApiError(code, message);
       }
+      requireSameSession();
       if (response.status === 204) return undefined as T;
-      try { return await response.json() as T; }
+      let value: T;
+      try { value = await response.json() as T; }
       catch { throw new ApiError('UNKNOWN', 'Invalid hotel API response'); }
+      requireSameSession();
+      return value;
     }
     throw new ApiError('UNKNOWN', 'Hotel service unavailable');
   }
