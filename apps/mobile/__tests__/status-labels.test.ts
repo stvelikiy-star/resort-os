@@ -1,4 +1,4 @@
-import { chatStatusLabel, contactInitials, deliveryStatusLabel, messageDirectionLabel, orderStatusLabel } from '../src/i18n/statusLabels';
+import { chatStatusLabel, contactInitials, deliveryStatusLabel, messageDirectionLabel, orderStatusLabel, diningTableStatusLabel } from '../src/i18n/statusLabels';
 import { mobileCopyStrings } from '../src/i18n/mobileCopy';
 
 describe('server status presentation is localized and does not change semantics', () => {
@@ -9,6 +9,10 @@ describe('server status presentation is localized and does not change semantics'
       expect(messageDirectionLabel('INBOUND', c)).toBe(c.messageIncoming);
       expect(deliveryStatusLabel('DELIVERED', c)).toBe(c.messageDelivered);
       expect(orderStatusLabel('COOKING', c)).toBe(c.orderCooking);
+      expect(diningTableStatusLabel('OCCUPIED', c)).toBe(c.tableOccupied);
+      expect(diningTableStatusLabel('FREE', c)).toBe(c.tableAvailable);
+      expect(diningTableStatusLabel('RESERVED', c)).toBe(c.tableReserved);
+      expect(diningTableStatusLabel('UNRECOGNIZED_SERVER_STATE', c)).toBe(c.tableUnknown);
       expect(chatStatusLabel('FUTURE_STATE', c)).toBe('FUTURE_STATE');
     });
   }
