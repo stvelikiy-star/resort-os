@@ -408,7 +408,10 @@ async function technicianCompletesRepair(hotel) {
   await item.getByRole("button",{name:"Ремонт выполнен"}).click();
   const finished=await done;
   assert.equal(finished.status(),200,await finished.text());
-  assert.equal((await finished.json()).status,"DONE");
+  const result=await finished.json();
+  assert.equal(result.status,"DONE");
+  assert.equal(result.room_state,"DIRTY","Repair must not sell a room before housekeeping");
+  assert.match(result.housekeeping_task_id,/^[0-9a-f-]{36}$/i);
   const deny=await ctx.request.patch(BASE+"/core/api/v1/ops/tasks/"+
     receipts[hotel].stay_fixture.housekeeping_task_id+"/status",{
       data:{status:"DONE"}});
