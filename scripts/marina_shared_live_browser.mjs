@@ -385,6 +385,27 @@ async function ownerCreateRepair(page,hotel) {
   assert.match(task.id,/^[0-9a-f-]{36}$/i);
   receipts[hotel].maintenance_task_id=task.id;
   await panel.getByRole("article",{name:"Задача Synthetic Repair "+hotel}).waitFor();
+  const context=page.context();
+  const overview=await context.request.get(BASE+"/core/api/v1/admin/staff/overview");
+  assert.equal(overview.status(),200);
+  const staff=(await overview.json()).staff;
+  const tech=staff.find(x=>x.username==="technician"&&x.role==="TECHNICIAN");
+  const maid=staff.find(x=>x.username==="maid"&&x.role==="MAID");
+  assert(tech && maid && tech.active && maid.active,"Hotel local staff identities required");
+  const wrongAssignee=await context.request.patch(
+    BASE+"/core/api/v1/ops/tasks/"+task.id+"/assignee",{
+      data:{assigned_to_id:maid.id}});
+  assert.equal(wrongAssignee.status(),422,"Repair cannot be assigned to MAID");
+  const assignment=await context.request.patch(
+    BASE+"/core/api/v1/ops/tasks/"+task.id+"/assignee",{
+      data:{assigned_to_id:tech.id}});
+  assert.equal(assignment.status(),200,await assignment.text());
+  const assigned=await assignment.json();
+  assert.equal(assigned.id,task.id);
+  assert.equal(assigned.status,"OPEN");
+  assert.equal(assigned.assigned_to_id,tech.id);
+  receipts[hotel].technician_id=tech.id;
+  receipts[hotel].maid_id=maid.id;
 }
 async function technicianCompletesRepair(hotel) {
   const ctx=await browser.newContext({viewport:{width:390,height:844}});
@@ -400,7 +421,7 @@ async function technicianCompletesRepair(hotel) {
   await item.waitFor();
   const claim=page.waitForResponse(res=>res.url().endsWith(
     "/core/api/v1/ops/tasks/"+receipts[hotel].maintenance_task_id+"/claim"));
-  await item.getByRole("button",{name:"Взять задачу"}).click();
+  await item.getByRole("button",{name:"Начать"}).click();
   assert.equal((await claim).status(),200);
   const done=page.waitForResponse(res=>res.url().endsWith(
     "/core/api/v1/ops/tasks/"+receipts[hotel].maintenance_task_id+"/status") &&
@@ -437,13 +458,37 @@ async function maidPreparesInspection(hotel){
     "/core/api/v1/ops/tasks/"+housekeeping.id+"/claim"));
   await item.getByRole("button",{name:"Взять задачу"}).click();
   assert.equal((await claim).status(),200);
-  const inspect=page.waitForResponse(res=>res.url().endsWith(
-    "/core/api/v1/ops/tasks/"+housekeeping.id+"/status") &&
-    res.request().method()==="PATCH");
-  await item.getByRole("button",{name:"На проверку"}).click();
-  const result=await inspect;
-  assert.equal(result.status(),200,await result.text());
-  assert.equal((await result.json()).status,"IN_INSPECTION");
+  if(hotel==="HOTEL_B"){
+    // Native mobile sends these exact five checklist records.
+    const report={summary:"Synthetic verified cleaning "+hotel,checklist:
+      ["BED_LINEN","BATHROOM","SURFACES","AMENITIES","FINAL_CHECK"]
+        .map(code=>({code,label:code,done:true})),evidence_urls:[]};
+    const foreign=await ctx.request.post(BASE+"/core/api/v1/ops/tasks/"+
+      receipts.HOTEL_A.stay_fixture.housekeeping_task_id+"/complete-report",{data:report});
+    assert.equal(foreign.status(),404,"Foreign housekeeping report must not be accepted");
+    const incomplete=await ctx.request.post(BASE+"/core/api/v1/ops/tasks/"+
+      housekeeping.id+"/complete-report",{data:{...report,
+      checklist:report.checklist.map((row,i)=>({...row,done:i>0}))}});
+    assert.equal(incomplete.status(),422,"Incomplete checklist must be refused");
+    const completion=await ctx.request.post(BASE+"/core/api/v1/ops/tasks/"+
+      housekeeping.id+"/complete-report",{data:report});
+    assert.equal(completion.status(),200,await completion.text());
+    const acknowledged=await completion.json();
+    assert.equal(acknowledged.id,housekeeping.id);
+    assert.equal(acknowledged.status,"IN_INSPECTION");
+    assert.equal(acknowledged.room_state,"IN_INSPECTION");
+    const replay=await ctx.request.post(BASE+"/core/api/v1/ops/tasks/"+
+      housekeeping.id+"/complete-report",{data:report});
+    assert.equal(replay.status(),409,"Housekeeping report must not apply twice");
+  }else{
+    const inspect=page.waitForResponse(res=>res.url().endsWith(
+      "/core/api/v1/ops/tasks/"+housekeeping.id+"/status") &&
+      res.request().method()==="PATCH");
+    await item.getByRole("button",{name:"На проверку"}).click();
+    const result=await inspect;
+    assert.equal(result.status(),200,await result.text());
+    assert.equal((await result.json()).status,"IN_INSPECTION");
+  }
   const deny=await ctx.request.patch(BASE+"/core/api/v1/ops/tasks/"+
     receipts[hotel].maintenance_task_id+"/status",{data:{status:"DONE"}});
   assert.equal(deny.status(),403,"MAID must not complete maintenance");
@@ -542,6 +587,11 @@ try {
     BASE+"/core/api/v1/ops/tasks/"+receipts.HOTEL_A.maintenance_task_id+"/claim",{
       headers:{"X-Property-Id":ownerA.property_id,"X-Tenant-Id":ownerA.tenant_id,"X-Role":"OWNER"}});
   assert.equal(foreignTask.status(),404,"Foreign hotel task claim");
+  const foreignAssignment=await contextB.request.patch(
+    BASE+"/core/api/v1/ops/tasks/"+receipts.HOTEL_A.maintenance_task_id+"/assignee",{
+      headers:{"X-Property-Id":ownerA.property_id,"X-Tenant-Id":ownerA.tenant_id,"X-Role":"OWNER"},
+      data:{assigned_to_id:receipts.HOTEL_B.technician_id}});
+  assert.equal(foreignAssignment.status(),404,"Foreign task reassignment denied");
   const reverseTask=await contextA.request.patch(
     BASE+"/core/api/v1/ops/tasks/"+receipts.HOTEL_B.maintenance_task_id+"/status",{
       data:{status:"DONE"}});
@@ -568,7 +618,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: 2 hotels: full PMS + OPS repair by TECH, housekeeping by MAID, owner inspection; denied cross-tenant tasks and privilege escalation");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two hotels PMS + OPS, server-side assignee RBAC, mobile-shaped housekeeping report, audit and cross-tenant denial");
 } finally {
   await browser.close();
 }
