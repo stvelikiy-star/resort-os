@@ -278,27 +278,39 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel || !api) return;
     sessionRevision.current++;
     loginAttempt.current++;
-    // Logout is a local security boundary BEFORE durable storage or network.
-    // A slow encrypted-storage write must not leave staff data or LIVE modules
-    // visible while a logout is already requested.
+    // A logout request invalidates visible identity synchronously. Never wait
+    // for encrypted storage or a network call to remove the previous hotel.
     dropApi(hotel.id);
     setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
-    let queued = hotel.demo;
-    if (!hotel.demo) {
-      try { await queueCookieLogout(hotel.baseUrl); queued = true; }
-      catch { /* local clearance still takes priority */ }
-    }
+
     if (hotel.demo) {
       try { await api.logout(); } catch { /* isolated demo only */ }
-    } else if (queued) {
-      // Retry asynchronously here, at next app foreground and before sign-in.
-      // A pending entry is only removed after the server confirms logout.
-      void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
-    } else if (isTrustedHotelOrigin(hotel.baseUrl)) {
-      // If durable queueing failed, still attempt an immediate remote revoke.
-      // This cannot guarantee a revoke after process termination.
-      void api.logout().catch(() => {});
+      return;
     }
+
+    const origin = hotel.baseUrl;
+    const revoke = async () => {
+      // An in-flight /auth/login may still install a native HttpOnly cookie.
+      // Wait for that request to settle BEFORE issuing the final logout;
+      // otherwise a late login response could recreate a supposedly
+      // revoked cross-property cookie after sign-out.
+      let queued = false;
+      try { await queueCookieLogout(origin); queued = true; }
+      catch { /* no durable guarantee, but local identity is already gone */ }
+      if (queued) {
+        // Keep the journal entry if the server did not acknowledge revocation.
+        await flushPendingCookieLogouts(async url => createRealApi(url).logout());
+      } else if (isTrustedHotelOrigin(origin)) {
+        // Best-effort remote cleanup when durable queueing is unavailable.
+        try { await api.logout(); } catch { /* do not restore stale identity */ }
+      }
+    };
+    // One cookie jar per native host: serialize both sign-ins AND sign-outs.
+    // Later sign-ins must not overtake an earlier requested logout.
+    const previous = liveSignInTail.current;
+    const current = previous.then(revoke, revoke);
+    liveSignInTail.current = current.then(() => undefined, () => undefined);
+    await current;
   }, [hotel, api]);
 
   const value = useMemo<SessionCtx>(() => ({
