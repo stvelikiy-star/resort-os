@@ -151,7 +151,7 @@ async function main() {
     await click('[data-testid="web-demo-start"]', 'demo manager launcher');
     if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('Demo manager tasks navigation absent');
     await diagnose('manager_tasks');
-    await screenshot('manager_tasks_ru_light_375_before_tab_fix');
+    await screenshot('manager_tasks_ru_light_375_after_tab_fix');
     await click('[data-testid="tab-more"]', 'manager More menu');
     await click('[data-testid="more-profile"]', 'manager profile in More');
     if (!await waitFor('[data-testid="segment-dark"]')) throw new Error('Theme selector not visible');
