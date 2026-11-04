@@ -6,7 +6,7 @@ import { createRealApi } from '../api/realApi';
 import { flushPendingCookieLogouts, hasUnrevokedCookieForHost, queueCookieLogout } from '../lib/pendingLogout';
 import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
-import { bindVerifiedHost } from '../api/unauthorizedSession';
+import { activateClientSession, bindVerifiedHost } from '../api/unauthorizedSession';
 import { checkedHotelSelector, matchesSelectedHotel, sameSessionIdentity } from '../api/sharedHotelAuth';
 import type { SharedHotelSelector } from '../api/sharedHotelAuth';
 import type { AuthMode, AuthUser, StaffApi } from '../api/types';
@@ -231,6 +231,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     setSessions({});
     setServerAuthMode(null);
 
+    if (!hotel.demo) dropApi(hotel.id);
+    const loginApi = hotel.demo ? api : apiFor(hotel);
+
     const perform = async (): Promise<AuthUser> => {
       // A hotel switch or later login can supersede this queued request.
       // Never send stale credentials or mutate cookies for that request.
@@ -242,8 +245,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel.demo) {
       // This canonical endpoint distinguishes shared tenant login from legacy
       // one-property login without guessing from a hostname or user input.
-      if (!api.authMode) throw new ApiError('UNKNOWN', 'Server authentication mode unavailable');
-      const mode = await api.authMode();
+      if (!loginApi.authMode) throw new ApiError('UNKNOWN', 'Server authentication mode unavailable');
+      const mode = await loginApi.authMode();
       chosenMode = mode;
       if (mode === 'shared_auth_preview') {
         if (!selector) throw new ApiError('BAD_REQUEST', 'Organization and hotel codes are required');
@@ -264,7 +267,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       // The existing /auth/logout returns 204 even for an anonymous request.
       // Fail closed if the server cannot confirm this step.
       try {
-        await api.logout();
+        await loginApi.logout();
       } catch {
         throw new ApiError('PENDING_LOGOUT', 'Unable to clear previous hotel session');
       }
@@ -277,8 +280,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     let loginStarted = false;
     try {
       loginStarted = true;
-      const signedIn = await api.login(username, password, selected);
-      const verified = api.mode === 'LIVE' ? await api.me() : signedIn;
+      const signedIn = await loginApi.login(username, password, selected);
+      const verified = loginApi.mode === 'LIVE' ? await loginApi.me() : signedIn;
       if (!verified || !sameSessionIdentity(signedIn, verified) ||
           (selected && !matchesSelectedHotel(signedIn, verified, selected))) {
         throw new ApiError('UNAUTHORIZED', 'Session or selected hotel identity changed during login');
@@ -286,6 +289,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       if (sessionRevision.current !== revision || loginAttempt.current !== attempt) {
         throw new ApiError('UNAUTHORIZED', 'Session context changed during login');
       }
+      activateClientSession(loginApi);
       setServerAuthMode(chosenMode);
       setSessions({ [hotel.id]: verified });
       return verified;
