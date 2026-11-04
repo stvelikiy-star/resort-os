@@ -125,8 +125,8 @@ def main():
 
             assert requested[0][0][1] == "7103000001"
             assert requested[0][0][2] == A_TOKEN
-            assert requested[2][0][1] == "7103000002"
-            assert requested[2][0][2] == B_TOKEN
+            assert requested[3][0][1] == "7103000002"
+            assert requested[3][0][2] == B_TOKEN
             count = len(requested)
             for path2, method in (
                 ("/api/v1/admin/inbox/outbound-capabilities", "GET"),
