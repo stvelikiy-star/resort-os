@@ -2,13 +2,13 @@
   "schema_version": 1,
   "product": "MARINA SMART",
   "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
-  "candidate_commit": "59cdba4d098538c705998e32a924d9b5c62ed4b3",
-  "source_branch": "release/marina-shared-platform-rc1-20261103",
-  "pull_request": 284,
+  "candidate_commit": "62a2caec856e8fe32801c9156d90de655298ad33",
+  "source_branch": "release/marina-shared-platform-rc2-20261104",
+  "pull_request": 314,
   "migration_count": 39,
   "tenant_model": "Tenant/Property",
   "tenant_context_enabled": false,
-  "staging_gate": "manual_read_only",
+  "staging_gate": "isolated_synthetic_shared_pms",
   "external_staging_verified": false,
   "cross_tenant_e2e_verified": false,
   "backup_restore_target_verified": false,
@@ -16,14 +16,14 @@
   "payment_operations_enabled": false,
   "nfc_wallet_enabled": false,
   "notes": [
-    "Candidate commit pins the reviewed application source; the RC branch head is the exact version whose mandatory CI must be inspected. Metadata changes do not constitute deployment.",
-    "This branch prepares the shared MARINA platform. The authentication preview still closes operational routes; no shared PMS readiness is claimed.",
-    "39 migration files are pinned by SHA-256, including zz114. Source checksums do not attest the target migration ledger.",
-    "All required workflows must be present and successful for one candidate head. Missing, pending, failed, cancelled and skipped gates do not approve release.",
-    "Two-property CI currently uses property-pinned API processes; it is not the final shared-runtime acceptance.",
-    "External staging, target backup/restore, live WhatsApp, official OTA and acquiring remain unverified. No demo, Ubuntu or mobile changes are authorized by this manifest."
+    "RC2 source_commit is the reviewed *application source* revision from PR #312, not this RC2 metadata commit. The complete 19+1 required CI must PASS on the actual RC2 PR head SHA; no old SHA or isolated green job approves release.",
+    "RC2 stacks all reviewed shared-platform changes on the frozen RC1 branch, not on the diverged main branch. PR #314 is a staging integration candidate, still draft and not merged or deployed.",
+    "Exactly 39 migration.sql files stay pinned by SHA-256 (including zz114). Source hashes do not prove a target DB migration history, safe restore or rollback.",
+    "Two tenant/property sessions passed real Chromium -> Next -> ASGI -> disposable PostgreSQL PMS lifecycle on SHA 62a2caec856e8fe32801c9156d90de655298ad33. External staging, all staff-role/guest QR workspaces, third-hotel onboarding, real WhatsApp/AI, target backup/restore and production cutover are NOT verified.",
+    "tenant_context_enabled=false means no externally approved shared runtime is enabled. The isolated synthetic CI explicitly opts into tenant context. Shared PMS internal receipts are not online acquiring or validated money receipt.",
+    "NO GO: production_cutover_authorized=false, external_staging_verified=false and backup_restore_target_verified=false. No DEMO, mobile, Ubuntu or other-project changes are authorized."
   ],
-  "ci_baseline_commit": "59cdba4d098538c705998e32a924d9b5c62ed4b3",
+  "ci_baseline_commit": "62a2caec856e8fe32801c9156d90de655298ad33",
   "release_stage": "SOURCE_LOCKED_SHARED_RUNTIME_PENDING",
   "migration_sha256": {
     "0_init": "ae1fb9f1b223031ca39c2c5eb300670f830a09c9b6722bb62d6be80c0953b775",
@@ -86,5 +86,8 @@
     "marina-production-package-ci.yml",
     "marina-api-image-ci.yml",
     "marina-api-postgres-smoke-ci.yml"
+  ],
+  "additional_required_workflows": [
+    "marina-shared-live-browser-postgres-ci.yml"
   ]
 }
