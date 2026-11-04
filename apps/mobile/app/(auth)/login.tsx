@@ -37,6 +37,7 @@ export default function Login() {
     setAuthMode(null);
     if (!hotel || !api) return;
     if (hotel.demo) { setAuthMode('demo'); return; }
+    if (!api.authMode) { setErr(t('login.modeUnavailable')); return; }
     void api.authMode().then(mode => {
       if (active) setAuthMode(mode);
     }).catch(() => {
