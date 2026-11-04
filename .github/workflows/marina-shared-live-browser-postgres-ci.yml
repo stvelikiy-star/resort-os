@@ -9,6 +9,9 @@ on:
       - 'packages/database/**'
       - 'scripts/marina_shared_live_browser.mjs'
       - 'scripts/marina_shared_live_browser_db.py'
+      - 'scripts/marina_shared_release_restore_ci.py'
+      - 'scripts/prisma_migration_ledger.py'
+      - 'scripts/test_marina_shared_restore_guard.py'
       - 'scripts/marina_shared_role_auth_ci.py'
       - '.github/workflows/marina-shared-live-browser-postgres-ci.yml'
   workflow_dispatch:
@@ -103,6 +106,31 @@ jobs:
         run: python scripts/marina_shared_role_auth_ci.py
       - name: Verify both browser receipts against real PostgreSQL facts
         run: python scripts/marina_shared_live_browser_db.py verify
+      - name: Pin PostgreSQL 16 dump/restore clients to the synthetic PostgreSQL 16 server
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/lib/postgresql/16/bin/pg_dump; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\.'
+      - name: Prove shared restore target URLs fail closed before touching PostgreSQL
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_shared_restore_guard.py' -v
+      - name: Create a NEW empty database solely for full shared-runtime restore
+        env:
+          PGPASSWORD: synthetic-ci-database-only
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -p 5432 -U marina_ci -d postgres -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE marina_shared_browser_restore_ci;'
+      - name: pg_dump and pg_restore FULL two-hotel SHARED DB, compare all rows and schema, then call restored canonical ASGI
+        env:
+          RESTORE_DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_restore_ci?schema=public
+          MARINA_SHARED_RESTORE_CI_CONFIRM: ISOLATED_SHARED_TWO_HOTEL_RESTORE_ONLY
+        run: PYTHONDONTWRITEBYTECODE=1 python scripts/marina_shared_release_restore_ci.py
       - name: Print sanitized diagnostics only on failure
         if: failure()
         run: |
