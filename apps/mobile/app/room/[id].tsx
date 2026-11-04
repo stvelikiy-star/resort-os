@@ -61,8 +61,8 @@ export default function RoomCard() {
               const tc = toneColors(c, roomTone(s));
               const on = r.state === s;
               return (
-                <PressScale key={s} testID={`state-${s}`} onPress={() => set(s)} disabled={busy} style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: on ? tc.fg : tc.bg }}>
-                  <Text style={[font.small, { fontWeight: '800', color: on ? '#fff' : tc.fg }]}>{t(`rooms.state.${s}`)}</Text>
+                <PressScale key={s} testID={`state-${s}`} onPress={() => set(s)} disabled={busy} style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: on ? c.primary : tc.bg, borderWidth: on ? 2 : 1, borderColor: tc.fg }}>
+                  <Text style={[font.small, { fontWeight: '800', color: on ? c.primaryText : tc.fg }]}>{t(`rooms.state.${s}`)}</Text>
                 </PressScale>
               );
             })}
