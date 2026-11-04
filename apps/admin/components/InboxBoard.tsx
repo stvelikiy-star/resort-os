@@ -119,6 +119,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
   const [linkRequestId, setLinkRequestId] = useState("");
   const [capabilities, setCapabilities] = useState<OutboundCapabilities | null>(null);
   const [aiCapabilities, setAiCapabilities] = useState<AiCapabilities | null>(null);
+  const [myStaffId, setMyStaffId] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [sendBusy, setSendBusy] = useState(false);
   const [pendingSendKey, setPendingSendKey] = useState<string | null>(null);
@@ -146,12 +147,19 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
 
   const loadCapabilities = useCallback(async () => {
     try {
-      const [outboundResponse, aiResponse] = await Promise.all([
+      const [outboundResponse, aiResponse, identityResponse] = await Promise.all([
         fetch("/core/api/v1/admin/inbox/outbound-capabilities", { cache: "no-store" }),
         fetch("/core/api/v1/admin/inbox/ai-capabilities", { cache: "no-store" }),
+        fetch("/core/api/v1/auth/me", { cache: "no-store" }),
       ]);
-      if (outboundResponse.ok) setCapabilities(await outboundResponse.json());
-      if (aiResponse.ok) setAiCapabilities(await aiResponse.json());
+      setCapabilities(outboundResponse.ok ? await outboundResponse.json() : null);
+      setAiCapabilities(aiResponse.ok ? await aiResponse.json() : null);
+      if (identityResponse.ok) {
+        const identity = await identityResponse.json();
+        setMyStaffId(typeof identity.id === "string" ? identity.id : null);
+      } else {
+        setMyStaffId(null);
+      }
     } catch {
       // Missing capabilities keep optional actions safely disabled.
     }
@@ -184,7 +192,9 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
     detail
     && detail.conversation.channel_kind === "WHATSAPP"
     && capabilities?.whatsapp.configured
-    && (role !== "RECEPTION" || detail.conversation.assigned_to_id)
+    && (role !== "RECEPTION" || (
+      Boolean(myStaffId) && detail.conversation.assigned_to_id === myStaffId
+    ))
   );
   const replyEnabled = telegramReplyEnabled || whatsappReplyEnabled;
   const aiDraftEnabled = Boolean(detail && aiCapabilities?.draft_configured);
