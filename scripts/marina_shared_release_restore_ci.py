@@ -234,8 +234,8 @@ def restored_api_check() -> None:
             f = finance.json()
             assert f["scope"]["internal_only"] is True
             assert f["period_payments"]["received_kgs"] == own["manual_amount_kgs"]
-            assert any(row["id"] == own["reservation_id"] for row in f["reservation_ledger"])
-            assert not any(row["id"] == other["reservation_id"] for row in f["reservation_ledger"])
+            assert any(row["reservation_id"] == own["reservation_id"] for row in f["reservation_ledger"])
+            assert not any(row["reservation_id"] == other["reservation_id"] for row in f["reservation_ledger"])
             assert any(row["id"] == own["manual_payment_id"] for row in f["recent_payments"])
             assert not any(row["id"] == other["manual_payment_id"] for row in f["recent_payments"])
             own_history = client.get(
