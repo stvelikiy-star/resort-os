@@ -10,6 +10,7 @@ type RequestCode = "HOUSEKEEPING" | "TOWELS" | "LINEN" | "MAINTENANCE" | "TRANSF
 type RequestStatus = "OPEN" | "IN_PROGRESS" | "IN_INSPECTION" | "DONE" | "CANCELLED";
 
 type GuestContext = {
+  guest_capabilities?: { request_codes: RequestCode[]; ai_available: boolean } | null;
   property?: { name: string; check_out_time?: string | null; official_contact?: string; whatsapp?: string; checkout_instructions?: string } | null;
   qr_valid: boolean;
   authenticated: boolean;
@@ -500,7 +501,10 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     window.dispatchEvent(new Event("marina:guest-session-updated"));
   }
 
-  const services: Service[] = useMemo(() => SERVICE_ORDER.map((code) => ({ code, icon: SERVICE_ICONS[code], title: copy.services[code][0], note: copy.services[code][1] })), [copy]);
+  const reviewedCodes = context?.guest_capabilities?.request_codes;
+  const services: Service[] = useMemo(() => SERVICE_ORDER
+    .filter((code) => reviewedCodes === undefined || reviewedCodes === null || reviewedCodes.includes(code))
+    .map((code) => ({ code, icon: SERVICE_ICONS[code], title: copy.services[code][0], note: copy.services[code][1] })), [copy, reviewedCodes]);
 
   return <main className="concierge-page">
     <header className="concierge-topbar">
@@ -526,12 +530,12 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
         <div className="concierge-stay"><strong>{copy.stay}</strong><span>{dateLabel(context.stay.check_in, locale)} — {dateLabel(context.stay.check_out, locale)}</span>{context.property?.check_out_time && <small>{copy.checkout} {context.property.check_out_time}</small>}</div>
       </section>
 
-      <section className="concierge-section"><div className="concierge-heading"><div><h2>{copy.quick}</h2><p>{copy.quickNote}</p></div></div><div className="concierge-actions">{services.slice(0, 6).map((service) => <button key={service.code} onClick={() => { setSelected(service.code); setNotice(null); }}><span>{service.icon}</span><strong>{service.title}</strong><small>{service.note}</small></button>)}</div></section>
+      <section className="concierge-section"><div className="concierge-heading"><div><h2>{copy.quick}</h2><p>{copy.quickNote}</p></div></div><div className="concierge-actions">{services.slice(0, 6).map((service) => <button key={service.code} data-service-code={service.code} onClick={() => { setSelected(service.code); setNotice(null); }}><span>{service.icon}</span><strong>{service.title}</strong><small>{service.note}</small></button>)}</div></section>
 
       <section className="concierge-section concierge-requests"><div className="concierge-heading"><h2>{copy.myRequests}</h2><button onClick={() => void loadRequests()}>{copy.refresh}</button></div>{!requests.length ? <p className="concierge-empty">{copy.noRequests}</p> : <div className="concierge-request-list">{requests.map((item) => { const code = (SERVICE_ORDER.includes(item.request_code as RequestCode) || item.request_code === "PARKING" ? item.request_code : "ADMIN") as RequestCode; return <article key={item.id}><div><strong>{copy.services[code][0]}</strong><span data-status={item.status}>{copy.status[item.status]}</span></div>{item.description && <p>{item.description}</p>} {item.status === "OPEN" && <button onClick={() => void cancelRequest(item.id)}>{copy.cancel}</button>}</article>; })}</div>}</section>
 
       <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p>{context.property?.checkout_instructions && <p>{context.property.checkout_instructions}</p>}</article><article><h3>{copy.contacts}</h3>{officialContact && <p>{officialContact}</p>}{phone && <a href={`tel:${phone}`}>{copy.call}</a>}{whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer">{copy.message}</a>}</article></div></section>
-      <GuestAiAssistant key={token} token={token} locale={locale} onSessionExpired={() => { setContext(null); setRequests([]); void loadContext(); }} />
+      {context.guest_capabilities?.ai_available !== false && <GuestAiAssistant key={token} token={token} locale={locale} onSessionExpired={() => { setContext(null); setRequests([]); void loadContext(); }} />}
       <button className="concierge-signout" onClick={() => void logout()}>{copy.signOut}</button>
     </>}
 
