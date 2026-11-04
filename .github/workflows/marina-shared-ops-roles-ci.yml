@@ -3,6 +3,8 @@ name: MARINA Shared Operations RBAC CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-shared-rc3.json'
+      - 'services/api/app/auth.py'
       - 'services/api/app/operations.py'
       - 'services/api/app/section_permissions.py'
       - 'services/api/app/shared_auth_preview.py'

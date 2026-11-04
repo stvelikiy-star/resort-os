@@ -84,6 +84,11 @@ def make_app(db):
     @app.get('/api/v1/private-probe')
     async def private_probe(user=Depends(auth.current_user)):
         return user
+    # Minimal test-only version of an already admitted read route. This does
+    # NOT create or change an endpoint in the production ASGI application.
+    @app.get('/api/v1/admin/dashboard')
+    async def protected_dashboard(user=Depends(auth.current_user)):
+        return {'property_code': user['property_code']}
     return app
 
 
@@ -94,6 +99,7 @@ class SharedAuthTests(unittest.TestCase):
         self.patches = [patch.object(auth, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', True),
             patch.object(auth, 'MARINA_TENANT_CONTEXT_ENABLED', True),
             patch.object(auth, 'PROPERTY_CODE', 'UNUSED_GLOBAL'),
+            patch.object(auth, 'COOKIE_SECURE', True),
             patch.object(auth, 'password_hasher', self.hasher),
             patch.dict('os.environ', APP_ENV='staging')]
         for p in self.patches: p.start()
@@ -122,6 +128,43 @@ class SharedAuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['mode'], 'shared_auth_preview')
         self.assertNotIn('property', response.json())
+
+    def test_allowed_snapshot_401_and_unreviewed_503_are_distinct(self):
+        # Shared boundary admission is NOT equivalent to authorization.
+        # An expired/revoked session gets 401 on admitted management reads.
+        # Unreviewed shared inbox, kitchen, dining and assistant routes must
+        # remain hard 503 even when the owner has a valid session.
+        route = '/api/v1/admin/dashboard'
+        self.assertEqual(self.client.get(route).status_code, 401)
+        self.assertEqual(self.login('HOTEL_A').status_code, 200)
+        self.assertEqual(self.client.get(route).json(), {'property_code': 'HOTEL_A'})
+        forbidden_shared = (
+            ('GET', '/api/v1/admin/inbox/conversations'),
+            ('GET', '/api/v1/kitchen/orders'),
+            ('GET', '/api/v1/dining/floor'),
+            ('GET', '/api/v1/assistant/capabilities'),
+            ('PATCH', '/api/v1/ops/rooms/11111111-1111-4111-8111-111111111111/state'),
+        )
+        before = len(self.store.queries)
+        for method, path in forbidden_shared:
+            with self.subTest(path=path):
+                response = self.client.request(method, path)
+                self.assertEqual(response.status_code, 503)
+        self.assertEqual(len(self.store.queries), before,
+                         '503 middleware must reject requests before DB access')
+        self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
+        self.assertEqual(self.client.get(route).status_code, 401)
+
+    def test_shared_dashboard_never_falls_back_to_previous_hotel(self):
+        route = '/api/v1/admin/dashboard'
+        self.assertEqual(self.login('HOTEL_A').status_code, 200)
+        self.assertEqual(self.client.get(route).json()['property_code'], 'HOTEL_A')
+        self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
+        self.assertEqual(self.login('HOTEL_B').status_code, 200)
+        self.assertEqual(self.client.get(route).json()['property_code'], 'HOTEL_B')
+        self.store.active['HOTEL_B'] = False
+        self.assertEqual(self.client.get(route).status_code, 401)
+        self.assertNotEqual(self.client.get(route).status_code, 200)
 
     def test_other_hotel_password_cannot_authenticate(self):
         response = self.login('HOTEL_B', password='Password-HOTEL_A')
@@ -189,6 +232,32 @@ class SharedAuthTests(unittest.TestCase):
                      patch.object(auth, 'MARINA_TENANT_CONTEXT_ENABLED', change!='tenant_off'), \
                      patch.object(auth, 'PROPERTY_CODE', {'demo':'MARINA_DEMO','hotel01':'MARINA_HOTEL01'}.get(change,'UNUSED_GLOBAL')):
                     self.assertEqual(self.login().status_code, 503)
+
+    def test_shared_auth_fails_closed_when_secure_cookie_is_disabled(self):
+        # A staging operator must not accidentally deploy a shared tenant
+        # session in a cookie that could be transmitted over plain HTTP.
+        with patch.object(auth, 'COOKIE_SECURE', False):
+            before = len(self.store.queries)
+            for action in (
+                lambda: self.login(),
+                lambda: self.client.get('/health/ready'),
+                lambda: self.client.get('/api/v1/auth/mode'),
+            ):
+                response = action()
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()['detail'], 'Shared authentication requires Secure session cookies')
+            self.assertEqual(len(self.store.queries), before, 'Insecure shared auth must fail before database access')
+            self.assertFalse(self.store.sessions)
+
+        # Preserve single-property legacy behavior; the shared preview
+        # security prerequisite must not change historical login policy.
+        with patch.object(auth, 'COOKIE_SECURE', False), \
+             patch.object(auth, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', False), \
+             patch.object(auth, 'PROPERTY_CODE', 'HOTEL_A'):
+            response = self.client.post('/api/v1/auth/login', json={
+                'username': 'owner', 'password': 'Password-HOTEL_A'})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['property_code'], 'HOTEL_A')
 
     def test_unknown_workspace_attempts_are_limited_before_database(self):
         payload={'username':'owner','password':'long-password','tenant_code':'missing','property_code':'HOTEL_A'}

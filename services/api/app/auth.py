@@ -101,6 +101,10 @@ def shared_auth_preview_guard() -> None:
         raise HTTPException(503, detail="Shared authentication preview requires isolated staging and tenant context")
     if MARINA_SHARED_AUTH_PREVIEW_ENABLED and PROPERTY_CODE in {"MARINA_DEMO", "MARINA_HOTEL01"}:
         raise HTTPException(503, detail="Existing synthetic environments cannot host the shared authentication preview")
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED and not COOKIE_SECURE:
+        # The shared tenant session cookie must never be issued without Secure,
+        # even when this feature is enabled only for isolated staging.
+        raise HTTPException(503, detail="Shared authentication requires Secure session cookies")
 
 
 def _preview_login_limit(client_ip: str) -> None:
