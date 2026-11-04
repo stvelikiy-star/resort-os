@@ -60,7 +60,7 @@ export default function NewRequest() {
 
   return (
     <FutureScreen>
-      <PremiumHeader title={t('mt.title')} subtitle={hotel?.name} eyebrow="MARINA SMART"
+      <PremiumHeader title={t('mt.title')} subtitle={hotel?.name} eyebrow="MARINA SMART" inlineCompactRight
         right={<PressScale onPress={() => router.back()} accessibilityLabel={t('common.cancel')}
           style={{ minHeight: 48, minWidth: 48, borderRadius: radius.pill, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><X size={25} color={c.textMuted}/></PressScale>}/>
       <SectionLabel>{t('common.room')}</SectionLabel>
