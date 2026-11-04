@@ -1,6 +1,7 @@
 import { createHotelHttpClient, HttpMethod } from './http';
 import { authUserResponse, itemsEnvelope } from './contractValidation';
 import { safeRouteId } from './routeId';
+import { checkedHotelSelector } from './sharedHotelAuth';
 import { ApiError, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
@@ -64,7 +65,18 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
 
   return {
     mode: 'LIVE',
-    login: async (username, password) => authUserResponse(await call<unknown>('POST', '/api/v1/auth/login', { username, password })),
+    authMode: async () => {
+      const response = await call<unknown>('GET', '/api/v1/auth/mode');
+      const mode = (response as { mode?: unknown } | null)?.mode;
+      if (mode !== 'shared_auth_preview' && mode !== 'single_property') {
+        throw new ApiError('UNKNOWN', 'Unrecognized server authentication mode');
+      }
+      return mode;
+    },
+    login: async (username, password, selector) => {
+      const chosen = selector === undefined ? {} : checkedHotelSelector(selector);
+      return authUserResponse(await call<unknown>('POST', '/api/v1/auth/login', { username, password, ...chosen }));
+    },
     logout: () => call<void>('POST', '/api/v1/auth/logout'),
     me: async () => authUserResponse(await call<unknown>('GET', '/api/v1/auth/me')),
     async listTasks(filter?: { type?: TaskType; status?: TaskStatus }) {
