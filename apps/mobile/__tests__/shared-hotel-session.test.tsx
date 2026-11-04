@@ -73,6 +73,18 @@ function Panel() {
   </>;
 }
 const TRUST = process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS;
+// RN's test AppState stub does not always return an EventSubscription. Every
+// mounted provider must receive a real remove() across the entire suite.
+const appStateHandlers = new Set<(state: string) => void>();
+let appStateSpy: jest.SpyInstance;
+beforeAll(() => {
+  appStateSpy = jest.spyOn(AppState, 'addEventListener').mockImplementation(((
+    kind: string, handler: (state: string) => void,
+  ) => {
+    if (kind === 'change') appStateHandlers.add(handler);
+    return { remove: () => appStateHandlers.delete(handler) };
+  }) as typeof AppState.addEventListener);
+});
 beforeEach(() => {
   calls.length = 0;
   cookie = null;
@@ -83,6 +95,7 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 afterAll(() => {
+  appStateSpy.mockRestore();
   if (TRUST === undefined) delete process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS;
   else process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS = TRUST;
 });
@@ -125,22 +138,15 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
   });
 
   it('clears revoked hotel A session on foreground and permits verified fresh login', async () => {
-    const handlers = new Set<(state: string) => void>();
-    const spy = jest.spyOn(AppState, 'addEventListener').mockImplementation(((kind: string, handler: (state: string) => void) => {
-      if (kind === 'change') handlers.add(handler);
-      return { remove: () => handlers.delete(handler) };
-    }) as typeof AppState.addEventListener);
-    try {
-      const screen = await setup();
-      fireEvent.press(screen.getByTestId('login-a'));
-      await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_A'));
-      revoked = true;
-      await act(async () => { for (const handler of [...handlers]) handler('active'); });
-      await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('none'));
-      revoked = false;
-      fireEvent.press(screen.getByTestId('login-b'));
-      await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_B'));
-    } finally { spy.mockRestore(); }
+    const screen = await setup();
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_A'));
+    revoked = true;
+    await act(async () => { for (const handler of [...appStateHandlers]) handler('active'); });
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('none'));
+    revoked = false;
+    fireEvent.press(screen.getByTestId('login-b'));
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_B'));
   });
 
   it('does not expose an earlier hotel after leaving the shared connection', async () => {
