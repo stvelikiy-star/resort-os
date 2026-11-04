@@ -12,8 +12,10 @@ from release_contract import EXPECTED_MIGRATIONS
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "release" / "marina-smart-current-candidate.json"
 STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
-EXPECTED_BRANCH = "release/marina-shared-platform-rc1-20261103"
-EXPECTED_PR = 284
+EXPECTED_BRANCH = "release/marina-shared-platform-rc2-20261104"
+EXPECTED_PR = 314
+EXPECTED_REVIEWED_SOURCE = "62a2caec856e8fe32801c9156d90de655298ad33"
+ADDITIONAL_REQUIRED_WORKFLOWS = ("marina-shared-live-browser-postgres-ci.yml",)
 REQUIRED_WORKFLOWS = frozenset({
     "marina-staging-readiness-ci.yml", "marina-rc1-source-gate.yml",
     "marina-full-stack-smoke-ci.yml", "marina-two-property-restore-ci.yml",
@@ -40,7 +42,10 @@ def validate_source_lock(manifest: dict, root: Path) -> list[str]:
             or len(required) != len(REQUIRED_WORKFLOWS)
             or set(required) != REQUIRED_WORKFLOWS):
         errors.append("mandatory workflow set is incomplete or duplicated")
-    for name in sorted(REQUIRED_WORKFLOWS):
+    extra = manifest.get("additional_required_workflows")
+    if extra != list(ADDITIONAL_REQUIRED_WORKFLOWS):
+        errors.append("RC2 additional real-browser PostgreSQL workflow is missing or duplicated")
+    for name in sorted(REQUIRED_WORKFLOWS.union(ADDITIONAL_REQUIRED_WORKFLOWS)):
         path = root / ".github/workflows" / name
         if not path.is_file():
             errors.append(f"missing required workflow: {name}")
@@ -74,7 +79,7 @@ def main() -> int:
         "migration_count": len(EXPECTED_MIGRATIONS),
         "tenant_model": "Tenant/Property",
         "tenant_context_enabled": False,
-        "staging_gate": "manual_read_only",
+        "staging_gate": "isolated_synthetic_shared_pms",
         "external_staging_verified": False,
         "cross_tenant_e2e_verified": False,
         "backup_restore_target_verified": False,
@@ -91,6 +96,10 @@ def main() -> int:
     # CI status must be obtained from GitHub for the actual head, never inferred here.
     if not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("candidate_commit", ""))):
         errors.append("candidate_commit must be an exact 40-character Git SHA")
+    elif manifest["candidate_commit"] != EXPECTED_REVIEWED_SOURCE:
+        errors.append("RC2 candidate_commit must pin the reviewed application SHA")
+    if manifest.get("ci_baseline_commit") != EXPECTED_REVIEWED_SOURCE:
+        errors.append("RC2 CI baseline must match the reviewed application SHA")
 
     migrations = ROOT / "packages" / "database" / "prisma" / "migrations"
     actual_migrations = tuple(sorted(p.parent.name for p in migrations.glob("*/migration.sql")))
@@ -129,6 +138,7 @@ def main() -> int:
     print(f"FACT: product=MARINA SMART branch={EXPECTED_BRANCH} PR={EXPECTED_PR}")
     print(f"FACT: candidate_commit={manifest['candidate_commit']}")
     print(f"FACT: candidate_migrations={len(EXPECTED_MIGRATIONS)}")
+    print(f"FACT: mandatory_workflows={len(REQUIRED_WORKFLOWS)}+{len(ADDITIONAL_REQUIRED_WORKFLOWS)}; CI acceptance must be inspected separately")
     print("FACT: external staging, target restore and production authorization remain false")
     print("RESULT: MARINA CANDIDATE TRUTH GREEN; STAGING REQUIRED; CI STATUS NOT ASSERTED")
     return 0

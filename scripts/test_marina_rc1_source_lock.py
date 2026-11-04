@@ -6,7 +6,7 @@ import shutil
 import tempfile
 import unittest
 
-from marina_candidate_truth_guard import ROOT, REQUIRED_WORKFLOWS, validate_source_lock
+from marina_candidate_truth_guard import ROOT, REQUIRED_WORKFLOWS, ADDITIONAL_REQUIRED_WORKFLOWS, validate_source_lock
 
 
 class SourceLockTests(unittest.TestCase):
@@ -19,7 +19,7 @@ class SourceLockTests(unittest.TestCase):
                         self.root / 'packages/database/prisma/migrations')
         workflow_dir = self.root / '.github/workflows'
         workflow_dir.mkdir(parents=True)
-        for name in REQUIRED_WORKFLOWS:
+        for name in REQUIRED_WORKFLOWS.union(ADDITIONAL_REQUIRED_WORKFLOWS):
             shutil.copyfile(ROOT / '.github/workflows' / name, workflow_dir / name)
 
     def test_reviewed_source_is_accepted_without_asserting_rollout(self):
@@ -57,6 +57,16 @@ class SourceLockTests(unittest.TestCase):
         path.write_text("on:\n  push:\n    paths:\n      - 'release/marina-smart-current-candidate.json'\n"
                         "  pull_request:\n    paths:\n      - 'services/api/app/auth.py'\n  workflow_dispatch:\n")
         self.assertTrue(validate_source_lock(self.manifest, self.root))
+
+    def test_rc2_cannot_omit_live_browser_postgres_gate(self):
+        self.manifest['additional_required_workflows'] = []
+        self.assertIn('RC2 additional real-browser PostgreSQL workflow is missing or duplicated',
+                      validate_source_lock(self.manifest, self.root))
+
+    def test_rc2_live_browser_workflow_must_be_present(self):
+        (self.root / '.github/workflows/marina-shared-live-browser-postgres-ci.yml').unlink()
+        self.assertIn('missing required workflow: marina-shared-live-browser-postgres-ci.yml',
+                      validate_source_lock(self.manifest, self.root))
 
     def test_source_lock_cannot_claim_shared_runtime_acceptance(self):
         self.manifest['release_stage'] = 'PRODUCTION_READY'

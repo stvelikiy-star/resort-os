@@ -64,13 +64,28 @@ class HoldContractTests(unittest.TestCase):
         self.assertIn(
             "from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, PROPERTY_CODE", db
         )
-        self.assertIn("if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:", db)
+        self.assertIn("if MARINA_SHARED_AUTH_PREVIEW_ENABLED:", db)
+        self.assertIn("await expire_shared_holds_once(app.state.db)", db)
+        self.assertIn('JOIN tenants t ON t.id=p."tenantId"', db)
+        self.assertIn('await expire_holds(conn, row["id"])', db)
         self.assertIn(
             "'SELECT id FROM properties WHERE code=$1', PROPERTY_CODE", db
         )
         self.assertIn("await expire_holds(conn, property_id)", db)
         self.assertNotIn("await expire_holds(conn)", db)
         self.assertIn("await asyncio.sleep(30)", db)
+
+    def test_ordinary_booking_releases_expired_holds_before_quote(self):
+        booking = (ROOT / "services/api/app/pms_reservation_create.py").read_text()
+        quote = booking.split('async def preview_grid_reservation(', 1)[1].split(
+            '\n\n@router.post("/new/commit"', 1)[0]
+        commit = booking.split('async def commit_grid_reservation(', 1)[1]
+        self.assertIn('await expire_holds(conn, prop["id"])', quote)
+        self.assertIn('await expire_holds(conn, prop["id"])', commit)
+        self.assertLess(quote.index("await expire_holds("),
+                        quote.index("return await build_preview("))
+        self.assertLess(commit.index("await expire_holds("),
+                        commit.index("preview = await build_preview("))
 
     def test_frontend_exposes_hold_and_resume(self):
         modal = (ROOT / "apps/admin/components/PMSNewReservationModal.tsx").read_text()

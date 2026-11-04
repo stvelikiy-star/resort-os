@@ -1,5 +1,6 @@
 import os
 
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .agent_context import router as agent_context_router
 from .ai_sales import router as ai_sales_router
 from .analytics_reports import router as analytics_reports_router
@@ -186,7 +187,14 @@ app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reception_readiness_router)
 app.include_router(reservation_detail_router)
+# Shared staging composes the *internal manual* reservation-payment handlers
+# for explicit ASGI allowlisting below. It never enables acquiring, provider
+# callbacks or the legacy request-confirm-payment mutation.
 if PAYMENT_OPERATIONS_ENABLED:
+    app.include_router(reservation_payments_router)
+elif MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+    # No-payment legacy launch remains closed. Isolated shared staging
+    # only exposes explicitly reviewed manual routes via ASGI allowlist.
     app.include_router(reservation_payments_router)
 app.include_router(folio_router)
 app.include_router(room_detail_router)

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .payment_idempotency import (
     ensure_same_payment_payload,
     lock_payment_identity,
@@ -270,7 +271,7 @@ async def record_reservation_payment(
                     "message": "New payments cannot be recorded against cancelled or no-show reservations. Review historical payments separately.",
                 })
 
-            if os.environ.get('MARINA_ENFORCE_PAYMENT_BALANCE', '').lower() in {'1', 'true', 'yes'}:
+            if MARINA_SHARED_AUTH_PREVIEW_ENABLED or os.environ.get('MARINA_ENFORCE_PAYMENT_BALANCE', '').lower() in {'1', 'true', 'yes'}:
                 # Enforce the actual outstanding balance while the reservation row is locked.
                 # Charge totals and previously received payments are read in one transaction.
                 balance = await conn.fetchrow(
