@@ -6,6 +6,7 @@ import { Badge, Empty, Segmented } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { Conversation, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { chatStatusLabel, contactInitials } from '../../src/i18n/statusLabels';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -43,8 +44,8 @@ export default function Inbox() {
     {visible.map((x, i) => <StaggerItem key={x.id} index={i}>
       <GlassCard testID={'conversation-' + x.id} onPress={() => router.push({ pathname:'/conversation/[id]', params:{id:x.id} })}>
         <View style={{flexDirection:'row',alignItems:'center',gap:space.md}}>
-          <View style={{width:48,height:48,borderRadius:16,alignItems:'center',justifyContent:'center',backgroundColor:c.primarySoft}}>
-            <MessageCircle color={c.primary} size={24}/>
+          <View style={{width:48,height:48,borderRadius:24,alignItems:'center',justifyContent:'center',backgroundColor:c.primarySoft}}>
+            {contactInitials(x.contact_name) ? <Text style={[font.h2, { color: c.primary }]}>{contactInitials(x.contact_name)}</Text> : <MessageCircle color={c.primary} size={24}/>}
           </View>
           <View style={{flex:1,gap:6}}>
             <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:6}}>
@@ -54,6 +55,7 @@ export default function Inbox() {
             <Text style={[font.small,{color:c.textMuted}]} numberOfLines={2}>{x.last_message_text || copy.empty}</Text>
             <View style={{flexDirection:'row',alignItems:'center',gap:6,flexWrap:'wrap'}}>
               <Badge label={x.channel_kind} tone="info"/>
+              <Badge label={chatStatusLabel(x.status, copy)} tone={x.status === 'RESOLVED' ? 'success' : 'primary'}/>
               {x.needs_reply ? <Badge label={copy.needsReply} tone="warning"/> : null}
             </View>
           </View>
