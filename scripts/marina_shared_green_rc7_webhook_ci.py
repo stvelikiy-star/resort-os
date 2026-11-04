@@ -163,6 +163,13 @@ def main():
     from app.app_entry import app
     from app import auth
     from app.shared_green_rc7 import green_rc7_allowed
+    # Parallel #361 must not register a second RC7 implementation or route.
+    canonical_webhooks = [
+        route for route in app.routes
+        if getattr(route, "path", None) == ENDPOINT
+        and "POST" in (getattr(route, "methods", None) or set())
+    ]
+    assert len(canonical_webhooks) == 1, "Exactly one canonical RC7 webhook route required"
     assert green_rc7_allowed("POST", ENDPOINT)
     assert not green_rc7_allowed("GET", ENDPOINT)
     assert not green_rc7_allowed("POST", ENDPOINT + "/hotel_a")
