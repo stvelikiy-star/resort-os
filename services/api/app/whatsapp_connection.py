@@ -36,14 +36,21 @@ for _logger in ("httpx", "httpcore.connection", "httpcore.http11", "httpcore.htt
 def _configuration(user):
     if not env_flag("ENABLE_GREEN_API_CONNECTION", False):
         return None
-    bound = os.environ.get("GREEN_API_PROPERTY_CODE", "")
-    if (not bound or bound == "MARINA_DEMO" or bound != os.environ.get("PROPERTY_CODE")
-            or bound != user.get("property_code")
-            or env_flag("MARINA_TENANT_CONTEXT_ENABLED", False)):
-        raise HTTPException(503, detail="WhatsApp hotel binding is not configured")
-    origin = os.environ.get("GREEN_API_URL", "").rstrip("/")
-    instance = os.environ.get("GREEN_API_ID_INSTANCE", "")
-    token = os.environ.get("GREEN_API_TOKEN_INSTANCE", "")
+    if env_flag("MARINA_TENANT_CONTEXT_ENABLED", False):
+        # A shared service MUST NEVER fall back to single-hotel GREEN_API_*
+        # secrets. Bind one instance to authenticated DB tenant/property IDs.
+        from .shared_green_rc6_config import shared_green_rc6_config
+        origin, instance, token = shared_green_rc6_config(user)
+    else:
+        # Preserve the historical single-property deployment contract.
+        bound = os.environ.get("GREEN_API_PROPERTY_CODE", "")
+        if (not bound or bound == "MARINA_DEMO"
+                or bound != os.environ.get("PROPERTY_CODE")
+                or bound != user.get("property_code")):
+            raise HTTPException(503, detail="WhatsApp hotel binding is not configured")
+        origin = os.environ.get("GREEN_API_URL", "").rstrip("/")
+        instance = os.environ.get("GREEN_API_ID_INSTANCE", "")
+        token = os.environ.get("GREEN_API_TOKEN_INSTANCE", "")
     try:
         parsed = urlsplit(origin)
     except ValueError:
