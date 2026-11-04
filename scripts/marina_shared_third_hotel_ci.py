@@ -142,6 +142,7 @@ async def create_and_compare(dsn: str, hotel: NewHotel) -> dict:
 
 
 def login(client: TestClient, hotel: str, tenant: str, *, username: str="owner") -> dict:
+    client.cookies.clear()
     result = client.post("/api/v1/auth/login", json={
         "tenant_code": tenant, "property_code": hotel,
         "username": username, "password": PASSWORD,
@@ -219,40 +220,62 @@ def main() -> None:
     # the additive transaction; new login is not a substitute for this proof.
     sys.path.insert(0, str(ROOT / "services" / "api"))
     from app.app_entry import app
-    with (TestClient(app, base_url="https://localhost:18000") as a,
-          TestClient(app, base_url="https://localhost:18000") as b,
-          TestClient(app, base_url="https://localhost:18000") as c):
-        owner_a=login(a, "HOTEL_A", "tenant_a")
-        owner_b=login(b, "HOTEL_B", "tenant_b")
+    # A single ASGI lifespan owns one asyncpg pool/event loop. Isolate
+    # identities by replacing session cookies, not by nesting TestClients
+    # whose conflicting startup handlers replace app.state.db.
+    from app.auth import SESSION_COOKIE
+    with TestClient(app, base_url="https://localhost:18000") as client:
+        def use_session(token: str) -> None:
+            client.cookies.clear()
+            client.cookies.set(SESSION_COOKIE, token)
+
+        owner_a=login(client, "HOTEL_A", "tenant_a")
+        token_a=client.cookies.get(SESSION_COOKIE)
+        assert token_a
+        client.cookies.clear()
+        owner_b=login(client, "HOTEL_B", "tenant_b")
+        token_b=client.cookies.get(SESSION_COOKIE)
+        assert token_b and token_b!=token_a
         ids = asyncio.run(create_and_compare(dsn, hotel))
-        owner_c=login(c, "HOTEL_C", "tenant_c")
+        client.cookies.clear()
+        owner_c=login(client, "HOTEL_C", "tenant_c")
+        token_c=client.cookies.get(SESSION_COOKIE)
+        assert token_c and token_c not in (token_a,token_b)
         assert owner_c["property_id"] == ids["property"]
-        scope_check(a, "HOTEL_A", owner_a, [owner_b,owner_c],
+        use_session(token_a)
+        scope_check(client, "HOTEL_A", owner_a, [owner_b,owner_c],
                     old_reservations=receipts)
-        scope_check(b, "HOTEL_B", owner_b, [owner_a,owner_c],
+        use_session(token_b)
+        scope_check(client, "HOTEL_B", owner_b, [owner_a,owner_c],
                     old_reservations=receipts)
-        scope_check(c, "HOTEL_C", owner_c, [owner_a,owner_b],
+        use_session(token_c)
+        scope_check(client, "HOTEL_C", owner_c, [owner_a,owner_b],
                     old_reservations=receipts)
-        # Wrong organization/hotel pair cannot log in as an existing owner.
-        with TestClient(app, base_url="https://localhost:18000") as wrong:
-            for tenant, property_code in (
-                ("tenant_a", "HOTEL_C"), ("tenant_c", "HOTEL_A"),
-                ("tenant_b", "HOTEL_C"), ("tenant_c", "HOTEL_B"),
-            ):
-                response = wrong.post("/api/v1/auth/login", json={
-                    "tenant_code": tenant, "property_code": property_code,
-                    "username": "owner", "password": PASSWORD,
-                })
-                assert response.status_code == 401, (tenant, property_code, response.status_code)
-        # First two existing sessions survived; both remain independent.
-        assert a.get("/api/v1/auth/me").json()["property_code"] == "HOTEL_A"
-        assert b.get("/api/v1/auth/me").json()["property_code"] == "HOTEL_B"
-        assert c.get("/api/v1/auth/me").json()["property_code"] == "HOTEL_C"
-        logout = c.post("/api/v1/auth/logout")
+        # Wrong organization/hotel pairs cannot log in as an existing owner.
+        client.cookies.clear()
+        for tenant, property_code in (
+            ("tenant_a", "HOTEL_C"), ("tenant_c", "HOTEL_A"),
+            ("tenant_b", "HOTEL_C"), ("tenant_c", "HOTEL_B"),
+        ):
+            response = client.post("/api/v1/auth/login", json={
+                "tenant_code": tenant, "property_code": property_code,
+                "username": "owner", "password": PASSWORD,
+            })
+            assert response.status_code == 401, (tenant, property_code, response.status_code)
+            assert client.cookies.get(SESSION_COOKIE) is None
+        # Old sessions, issued *before* adding HOTEL_C, remain valid.
+        for token, property_code in ((token_a,"HOTEL_A"),(token_b,"HOTEL_B"),(token_c,"HOTEL_C")):
+            use_session(token)
+            response=client.get("/api/v1/auth/me")
+            assert response.status_code==200 and response.json()["property_code"]==property_code
+        use_session(token_c)
+        logout = client.post("/api/v1/auth/logout")
         assert logout.status_code == 204
-        assert c.get("/api/v1/auth/me").status_code == 401
-        assert a.get("/api/v1/auth/me").status_code == 200
-        assert b.get("/api/v1/auth/me").status_code == 200
+        assert client.get("/api/v1/auth/me").status_code == 401
+        use_session(token_a)
+        assert client.get("/api/v1/auth/me").status_code == 200
+        use_session(token_b)
+        assert client.get("/api/v1/auth/me").status_code == 200
     print("MARINA_SHARED_THREE_HOTEL_API_PASS: existing sessions remain valid; "
           "3 independent owners/grids/finance/staff/ops; 404 foreign data; "
           "selector mismatch 401 and independent logout", flush=True)
