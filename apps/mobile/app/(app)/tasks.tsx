@@ -16,8 +16,8 @@ import type { Task } from '../../src/api/types';
 export default function Tasks() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { api, user, hotel } = useSession();
-  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE');
+  const { api, user, hotel, serverAuthMode } = useSession();
+  const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => { if (hasFocused.current) void reload(); else hasFocused.current = true; }, [reload]));
@@ -31,7 +31,7 @@ export default function Tasks() {
   return <FutureScreen>
     <PremiumHeader title={t('tasks.title')} subtitle={hotel?.name} eyebrow={t(`roles.${user!.role}`)}/>
     {hotel?.demo ? <DemoBanner/> : null}
-    <StaggerItem index={0}>
+    {data && !error ? <StaggerItem index={0}>
       <Hero height={170}>
         <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
           <Text style={[font.label,{color:'#D6E9F7'}]}>{user!.display_name}</Text>
@@ -47,8 +47,8 @@ export default function Tasks() {
           <AnimatedProgressBar percent={pct}/>
         </View>
       </Hero>
-    </StaggerItem>
-    {ws.canCreateMaintenance ? <>
+    </StaggerItem> : null}
+    {ws.mobileReady && ws.canCreateMaintenance ? <>
       <SectionLabel>{t('tasks.quick')}</SectionLabel>
       <QuickAction icon={Plus} testID="quick-new-request" label={t('mt.newRequest')} onPress={() => router.push('/new-request')}/>
     </> : null}
