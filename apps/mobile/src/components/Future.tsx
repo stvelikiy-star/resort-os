@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, Easing, StyleProp, Text, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
@@ -16,7 +16,7 @@ export function FutureScreen({ children }: { children: React.ReactNode }) {
 export function PremiumHeader({ title, subtitle, eyebrow, right }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode }) {
   const { c } = useTheme();
   return <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm }}>
-    <Logo size={50}/><View style={{ flex: 1, gap: 2 }}>
+    <Logo size={50}/><View style={{ flex: 1, minWidth: 0, gap: 2 }}>
       {eyebrow ? <Text style={[font.label, { color: c.cyan }]}>{eyebrow.toUpperCase()}</Text> : null}
       <Title sub={subtitle}>{title}</Title>
     </View>{right}
@@ -38,6 +38,30 @@ export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon
     {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
   </GlassCard>;
 }
+/** Real, server-sourced numeric KPI. Motion is disabled until OS preference is known. */
+export function AnimatedKpi({ value, suffix = '', style, testID }: { value: number; suffix?: string; style?: StyleProp<TextStyle>; testID?: string }) {
+  const allowed = useMotionAllowed();
+  const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const [shown, setShown] = useState(safe);
+  const progress = useRef(new Animated.Value(safe)).current;
+  const previous = useRef(safe);
+  useEffect(() => {
+    const from = previous.current;
+    previous.current = safe;
+    if (!allowed || from === safe) {
+      progress.setValue(safe);
+      setShown(safe);
+      return;
+    }
+    progress.setValue(from);
+    const subscription = progress.addListener(({ value: next }) => setShown(Math.round(next)));
+    const anim = Animated.timing(progress, { toValue: safe, duration: motion.chart, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+    anim.start();
+    return () => { anim.stop(); progress.removeListener(subscription); };
+  }, [allowed, safe, progress]);
+  return <Text testID={testID} accessibilityLabel={String(Math.round(safe)) + suffix} style={style}>{Math.round(shown)}{suffix}</Text>;
+}
+
 /** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
 export function OccupancyRing({ percent, label }: { percent: number; label: string }) {
   const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
