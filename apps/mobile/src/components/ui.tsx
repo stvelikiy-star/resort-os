@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
@@ -82,13 +82,13 @@ export function Screen({ children, scroll = true, padded = true }: { children: R
   const insets = useSafeAreaInsets();
   const pad = padded ? space.lg : 0;
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {scroll ? (
-        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: pad, paddingTop: insets.top + space.md, paddingBottom: 112 + insets.bottom, gap: space.md }}>{children}</ScrollView>
+        <ScrollView style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: pad, paddingTop: insets.top + space.md, paddingBottom: 112 + insets.bottom, gap: space.md }}>{children}</ScrollView>
       ) : (
         <View style={{ flex: 1, padding: pad, paddingTop: insets.top + space.md, gap: space.md }}>{children}</View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
