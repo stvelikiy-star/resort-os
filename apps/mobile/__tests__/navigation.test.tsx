@@ -239,7 +239,8 @@ describe('navigation, guards and screens', () => {
 
   it('profile language and theme selectors respond to taps', async () => {
     const screen = await loginAs('manager');
-    await fireEvent.press(await screen.findByTestId('tab-profile', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('tab-more', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('more-profile', {}, { timeout: 4000 }));
     const en = await screen.findByTestId('segment-en', {}, { timeout: 4000 });
     await fireEvent.press(en);
     await waitFor(() => expect(screen.getByTestId('segment-en').props.accessibilityState.checked).toBe(true), { timeout: 4000 });
