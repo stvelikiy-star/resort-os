@@ -232,6 +232,55 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
     queueGate.release();
   });
 
+  it('revokes the shared-host cookie when leaving hotel A without signing into another', async () => {
+    const screen = await setup();
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_A'));
+    const { queueCookieLogout, flushPendingCookieLogouts } =
+      jest.requireMock('../src/lib/pendingLogout') as {
+        queueCookieLogout: jest.Mock;
+        flushPendingCookieLogouts: jest.Mock;
+      };
+    flushPendingCookieLogouts.mockImplementation(async (logout: (origin: string) => Promise<void>) =>
+      logout('https://platform.example'));
+    try {
+      fireEvent.press(screen.getByTestId('leave'));
+      await waitFor(() => expect(screen.getByTestId('hotel-host').props.children).toBe('none'));
+      expect(screen.getByTestId('selected-property').props.children).toBe('none');
+      await waitFor(() => expect(queueCookieLogout).toHaveBeenCalledWith('https://platform.example'));
+      await waitFor(() => expect(cookie).toBeNull());
+      expect(calls[calls.length - 1]).toBe('logout');
+    } finally {
+      flushPendingCookieLogouts.mockImplementation(async () => {});
+    }
+  });
+
+  it('waits for a late A login cookie before revoking it on hotel switch', async () => {
+    const screen = await setup();
+    holdHotelA = new Promise<void>(resolve => { releaseHotelA = resolve; });
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(calls).toContain('login:HOTEL_A'));
+    const priorLogouts = calls.filter(value => value === 'logout').length;
+    const { flushPendingCookieLogouts } =
+      jest.requireMock('../src/lib/pendingLogout') as { flushPendingCookieLogouts: jest.Mock };
+    flushPendingCookieLogouts.mockImplementation(async (logout: (origin: string) => Promise<void>) =>
+      logout('https://platform.example'));
+    try {
+      fireEvent.press(screen.getByTestId('leave'));
+      await waitFor(() => expect(screen.getByTestId('hotel-host').props.children).toBe('none'));
+      // No premature remote logout while Set-Cookie from A is unresolved.
+      expect(calls.filter(value => value === 'logout')).toHaveLength(priorLogouts);
+      expect(screen.getByTestId('selected-property').props.children).toBe('none');
+      releaseHotelA?.();
+      await waitFor(() => expect(calls.filter(value => value === 'logout').length).toBeGreaterThan(priorLogouts));
+      await waitFor(() => expect(cookie).toBeNull());
+      expect(calls[calls.length - 1]).toBe('logout');
+    } finally {
+      releaseHotelA?.();
+      flushPendingCookieLogouts.mockImplementation(async () => {});
+    }
+  });
+
   it('does not expose an earlier hotel after leaving the shared connection', async () => {
     const screen = await setup();
     fireEvent.press(screen.getByTestId('login-a'));
