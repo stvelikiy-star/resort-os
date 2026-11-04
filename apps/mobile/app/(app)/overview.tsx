@@ -1,5 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays, ClipboardCheck, Users, Wrench, Sparkles } from 'lucide-react-native';
@@ -22,6 +23,8 @@ export default function Overview() {
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
+  const { t: tr } = useTranslation();
+  const priorityLabel = (priority: string) => ['URGENT', 'HIGH', 'NORMAL', 'LOW'].includes(priority) ? tr('tasks.' + priority.toLowerCase()) : priority;
   const router = useRouter();
   const { data, loading, error, reload } = useAsync<Dashboard | null>(() => live ? live.dashboard() : Promise.resolve(null), [live, user?.id, user?.module_permissions?.join(',')]);
   const focused = useRef(false);
@@ -93,10 +96,10 @@ export default function Overview() {
         </GlassCard>
       </StaggerItem>)}
       <SectionLabel>{copy.urgent} · {data.tasks.urgent_active}</SectionLabel>
-      {data.attention_tasks.length === 0 ? <Empty text={copy.empty}/> : data.attention_tasks.slice(0,8).map((t, i) => <StaggerItem index={i+1} key={t.id}>
-        <GlassCard onPress={user?.module_permissions?.includes('OPS') ? () => router.push({pathname:'/task/[id]',params:{id:t.id}}) : undefined} style={{ flexDirection:'row',alignItems:'center',gap:12 }}>
+      {data.attention_tasks.length === 0 ? <Empty text={copy.empty}/> : data.attention_tasks.slice(0,8).map((task, i) => <StaggerItem index={i+1} key={task.id}>
+        <GlassCard onPress={user?.module_permissions?.includes('OPS') ? () => router.push({pathname:'/task/[id]',params:{id:task.id}}) : undefined} style={{ flexDirection:'row',alignItems:'center',gap:12 }}>
           <View style={{width:42,height:42,borderRadius:14,backgroundColor:c.warningSoft,alignItems:'center',justifyContent:'center'}}><ShieldAlert size={22} color={c.warning}/></View>
-          <View style={{flex:1}}><Text style={[font.h2,{color:c.text}]}>{t.title}</Text><Text style={[font.small,{color:c.textMuted}]}>{t.room_code||'—'} · {t.priority}</Text></View>
+          <View style={{flex:1}}><Text style={[font.h2,{color:c.text}]}>{task.title}</Text><Text style={[font.small,{color:c.textMuted}]}>{task.room_code||'—'} · {priorityLabel(task.priority)}</Text></View>
         </GlassCard>
       </StaggerItem>)}
     </> : null}
