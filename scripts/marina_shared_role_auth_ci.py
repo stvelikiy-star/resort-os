@@ -67,7 +67,7 @@ def main():
     receipts = json.loads(RECEIPTS.read_text())
     assert set(receipts) == {"HOTEL_A", "HOTEL_B"}
     token_cookie = auth.SESSION_COOKIE
-    with TestClient(app, base_url="http://127.0.0.1:18000") as client:
+    with TestClient(app, base_url="https://localhost:18000") as client:
         assert client.get("/api/v1/auth/me").status_code == 401
         mode = client.get("/api/v1/auth/mode")
         assert mode.status_code == 200 and mode.json()["mode"] == "shared_auth_preview"
