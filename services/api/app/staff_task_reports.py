@@ -5,10 +5,15 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import current_user, trusted_property_id
+from .auth import current_user, trusted_property_id, MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/ops", tags=["staff-task-reports"])
+
+# Shared contract matches five mobile checklist codes; legacy reports unchanged.
+SHARED_HOUSEKEEPING_CODES = frozenset({
+    "BED_LINEN", "BATHROOM", "SURFACES", "AMENITIES", "FINAL_CHECK",
+})
 
 
 class ChecklistItem(BaseModel):
@@ -57,6 +62,14 @@ async def complete_task_with_report(
 
     expected_type: Literal["HOUSEKEEPING", "MAINTENANCE"] = "HOUSEKEEPING" if role == "MAID" else "MAINTENANCE"
     actor_id = uuid.UUID(user["id"])
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        # Unverified arbitrary URLs are not proof of staff photos in shared mode.
+        if payload.evidence_urls:
+            raise HTTPException(status_code=422, detail="Shared photo uploads are not verified")
+        if expected_type == "HOUSEKEEPING":
+            codes = [item.code for item in payload.checklist]
+            if len(codes) != len(SHARED_HOUSEKEEPING_CODES) or set(codes) != SHARED_HOUSEKEEPING_CODES:
+                raise HTTPException(status_code=422, detail="Exact reviewed housekeeping checklist required")
 
     if expected_type == "HOUSEKEEPING":
         if not payload.checklist:
