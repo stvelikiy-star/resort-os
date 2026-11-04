@@ -5,6 +5,7 @@ import AuthLayout from '../app/(auth)/_layout';
 import Connect from '../app/(auth)/connect';
 import Login from '../app/(auth)/login';
 import AppTabs from '../app/(app)/_layout';
+import More from '../app/(app)/more';
 import Tasks from '../app/(app)/tasks';
 import Rooms from '../app/(app)/rooms';
 import Requests from '../app/(app)/requests';
@@ -29,6 +30,7 @@ const routes = {
   '(auth)/connect': Connect,
   '(auth)/login': Login,
   '(app)/_layout': AppTabs,
+  '(app)/more': More,
   '(app)/tasks': Tasks,
   '(app)/rooms': Rooms,
   '(app)/requests': Requests,
