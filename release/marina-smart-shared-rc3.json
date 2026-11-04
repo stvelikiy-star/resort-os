@@ -47,7 +47,7 @@
     "scripts/marina_shared_role_auth_ci.py": "63ad67d2fd784d9d666cb0e4e83fdd1d5ab8d335",
     "scripts/marina_shared_release_restore_ci.py": "6a9adb6f77c59a18412dd14eac01c45551c35d1d",
     "scripts/prisma_migration_ledger.py": "4478ccaf992edf2f98094d6fadedb0aa2423e3c6",
-    "scripts/test_marina_shared_auth.py": "1fd4c8284c005138bd9c36bb14fa48f4f1c08831",
+    "scripts/test_marina_shared_auth.py": "5ee0defbeb5b6dac0ab6aa04df97f413f03aef44",
     "scripts/test_marina_shared_restore_guard.py": "0f81d1143af18b4767b58124a4a81616afc66e31",
     "scripts/marina_rc3_source_gate.py": "1411fc41fb93534c5f1788f639d696b6f26626bf",
     "scripts/test_marina_rc3_source_gate.py": "f0d1eec904fa568d0d7fd812dfdf60f4dd911a61",
