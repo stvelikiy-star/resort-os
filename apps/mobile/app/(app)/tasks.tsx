@@ -56,7 +56,7 @@ export default function Tasks() {
       <QuickAction icon={Plus} testID="quick-new-request" label={t('mt.newRequest')} onPress={() => router.push('/new-request')}/>
     </> : null}
     <SectionLabel>{t(api?.mode === 'LIVE' ? 'tasks.visible' : 'tasks.today')}</SectionLabel>
-    {data && !error ? <Segmented value={filter} onChange={setFilter} options={[{key:'all',label:t('common.all')},{key:'active',label:t('tasks.inProgress')},{key:'urgent',label:t('tasks.urgent')}]} /> : null}
+    {data && !error ? <Segmented value={filter} onChange={setFilter} options={[{key:'all',label:t('common.all')},{key:'active',label:t('tasks.visible')},{key:'urgent',label:t('tasks.urgent')}]} /> : null}
     {loading && !data ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/> : null}
     {!loading && !error && !ws.mobileReady ? <Empty text={t('admin.forbidden')}/> : null}
