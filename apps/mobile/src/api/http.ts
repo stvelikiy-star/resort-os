@@ -1,5 +1,6 @@
 import { parseHotelAddress } from './hotels';
 import { ApiError } from './types';
+import { captureVerifiedHost, rejectVerifiedHost } from './unauthorizedSession';
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
 type Transport = typeof fetch;
@@ -40,6 +41,12 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       throw new ApiError('BAD_REQUEST', 'Unsupported hotel API path');
     }
     const expectedUrl = root + path;
+    // Capture the verified session at request START. Old hotel's delayed 401
+    // must not clear a newer employee session on the same HTTPS hostname.
+    // Auth endpoints are not protected-data requests: a wrong password must
+    // never act as a global log-out event.
+    const verifiedAtStart = pathname.startsWith('/api/v1/auth/')
+      ? null : captureVerifiedHost(root);
     const attempts = method === 'GET' ? 2 : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
       const controller = new AbortController();
@@ -67,6 +74,7 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
         throw new ApiError('FORBIDDEN', 'Unexpected hotel API redirect');
       }
       if (!response.ok) {
+        if (response.status === 401) rejectVerifiedHost(root, verifiedAtStart);
         if (method === 'GET' && attempt + 1 < attempts && [502, 503, 504].includes(response.status)) continue;
         if (response.status === 503) throw new ApiError('UNKNOWN', 'Hotel workspace is unavailable in this environment');
         const { code, message } = errorForStatus(response.status);
