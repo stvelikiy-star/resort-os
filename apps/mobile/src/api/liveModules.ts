@@ -4,7 +4,7 @@ import { isTrustedHotelOrigin } from './hotels';
 import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
-import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse } from './contractValidation';
+import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
@@ -90,19 +90,21 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     checkOut: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-out'), id, 'CHECKED_OUT'),
     bookingPreview: async (draft: BookingDraft) => bookingPreviewResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/preview', draft)),
     bookingCommit: async (draft: BookingCommit) => bookingCommitResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/commit', draft)),
-    holds: async () => {
-      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not implemented in pinned backend');
-      const value = await request<{ holds: Hold[] }>('GET', p + '/admin/pms/holds');
-      if (!Array.isArray(value?.holds)) throw new ApiError('UNKNOWN', 'Invalid holds list');
-      return value.holds;
+    holds: async (): Promise<Hold[]> => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not accepted for mobile LIVE');
+      // Actual SQL projection in pms_holds.py uses quoted camelCase columns,
+      // NOT the snake_case format stated in the older handoff matrix.
+      return holdListResponse(await request<unknown>('GET', p + '/admin/pms/holds'));
     },
-    createHold: (draft: {room_id: string;check_in: string;check_out: string;guest_name: string;guest_phone: string}) => {
-      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API missing');
-      return request<{id: string;expires_at: string;status: string}>('POST', p + '/admin/pms/holds', draft);
+    createHold: async (draft: {room_id: string;check_in: string;check_out: string;guest_name: string;guest_phone: string}) => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not accepted for mobile LIVE');
+      // Never return a claimed 60-minute hold without the server's 201 ACK.
+      return holdCreateResponse(await request<unknown>('POST', p + '/admin/pms/holds', draft));
     },
-    releaseHold: (id: string) => {
-      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API missing');
-      return request<unknown>('DELETE', p + '/admin/pms/holds/' + safeRouteId(id));
+    releaseHold: async (id: string) => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not accepted for mobile LIVE');
+      const key = safeRouteId(id);
+      return holdReleaseResponse(await request<unknown>('DELETE', p + '/admin/pms/holds/' + key), key);
     },
     pmsGrid: async (start: string, end: string) => {
       const value = await request<Grid>('GET', p + '/pms/grid?start=' + safeIsoDate(start) + '&end=' + safeIsoDate(end));
@@ -128,8 +130,17 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
   };
 }
 export function useLiveModules() {
-  const { hotel, api } = useSession();
-  return useMemo(() => hotel && api?.mode === 'LIVE' && isTrustedHotelOrigin(hotel.baseUrl) ? createLiveModules(hotel.baseUrl) : null, [hotel, api?.mode]);
+  const { hotel, api, user } = useSession();
+  // A connection URL is NOT an authenticated hotel identity. In the shared
+  // multi-owner PMS a leftover OS cookie may belong to a DIFFERENT property.
+  // Never issue a module request until /auth/me verified the selected session.
+  // Recreate the module client whenever identity or its API instance changes,
+  // so dependent screens invalidate old hotel data before issuing fresh reads.
+  return useMemo(() =>
+    hotel && user && api?.mode === 'LIVE' && isTrustedHotelOrigin(hotel.baseUrl)
+      ? createLiveModules(hotel.baseUrl) : null,
+    [hotel, api, user],
+  );
 }
 
 /** Hotel-local calendar dates for the occupancy grid; do not use UTC toISOString(). */
