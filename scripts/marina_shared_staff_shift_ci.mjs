@@ -24,7 +24,8 @@ try {
   for (const suffix of ["A", "B"]) {
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto(admin);
+    await page.goto(admin + "/shared-auth-preview");
+    await page.getByLabel("Код отеля").waitFor();
     const login = await api(page, "auth/login", "POST", {
       username: "owner", password, tenant_code: "tenant_" + suffix.toLowerCase(), property_code: "HOTEL_" + suffix,
     });
