@@ -39,10 +39,13 @@ try {
     await form.getByLabel("Имя гостя").fill("Synthetic HTTPS Guest " + suffix);
     await form.getByLabel("Телефон гостя").fill("+996555771122");
     await form.getByRole("button", { name: "Проверить доступность и цену" }).click();
+    const confirm = page.getByRole("button", { name: "Подтвердить бронь", exact: true });
+    await confirm.waitFor();
+    page.once("dialog", dialog => dialog.accept());
     const committed = page.waitForResponse(response =>
       response.url() === core + "/admin/pms/reservations/new/commit" &&
       response.request().method() === "POST");
-    await form.getByRole("button", { name: "Подтвердить бронь" }).click();
+    await confirm.click();
     const response = await committed;
     assert.equal(response.status(), 201, code + " booking commit");
     const booking = await response.json();
