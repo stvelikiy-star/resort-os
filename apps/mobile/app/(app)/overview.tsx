@@ -1,21 +1,23 @@
 import React, { useCallback, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays } from 'lucide-react-native';
+import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays, ClipboardCheck, Users, Wrench, Sparkles } from 'lucide-react-native';
 import { Hero } from '../../src/components/Brand';
 import { DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, OccupancyRing, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useLiveModules, Dashboard } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
 
 export default function Overview() {
-  const { user, hotel, serverAuthMode } = useSession();
+  const { user, hotel, api, serverAuthMode } = useSession();
   const shared = serverAuthMode === 'shared_auth_preview';
-  const canOpenInbox = !shared && (user?.module_permissions?.includes('WHATSAPP') || user?.module_permissions?.includes('INBOX'));
+  const canOpen = (tab: 'inbox' | 'pms' | 'tasks' | 'admin') => !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', tab, serverAuthMode);
+  const canOpenInbox = !shared && canOpen('inbox');
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
@@ -25,7 +27,7 @@ export default function Overview() {
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const money = (value: number) => Number(value).toLocaleString('ru-RU') + ' KGS';
   return <FutureScreen>
-    <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user?.display_name || 'MARINA SMART'}
+    <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user ? copy.welcome + ', ' + user.display_name : 'MARINA SMART'}
       right={!shared && live && user && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={46} onPress={() => router.push('/ai')}/> : null}/>
     {hotel?.demo ? <DemoBanner/> : null}
     {!live ? <Empty text={copy.unavailable}/> : null}
@@ -50,19 +52,40 @@ export default function Overview() {
           <View style={{ flex:1 }}><Text style={[font.h2,{color:'#FFFFFF'}]}>{data.stays.departures_today}</Text><Text style={[font.small,{color:'#D6E9F7'}]}>{copy.departures}</Text></View>
         </View>
       </Hero></StaggerItem>
-      <SectionLabel>{copy.today}</SectionLabel>
+      <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
       <View style={{ flexDirection:'row', flexWrap:'wrap', gap:space.md }}>
         <MetricCard icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
         <MetricCard icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
         <MetricCard icon={MessageCircle} label={copy.needsReply} value={String(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
-        <MetricCard icon={BedDouble} label={copy.dirty} value={String(data.rooms.dirty)} onPress={user?.module_permissions?.includes('PMS') ? () => router.push('/pms') : undefined}/>
+        <MetricCard icon={BedDouble} label={copy.dirty} value={String(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
       </View>
       <SectionLabel>{copy.available}</SectionLabel>
-      {user?.module_permissions?.includes('PMS') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
+      {canOpen('pms') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
       {canOpenInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
+      {canOpen('tasks') ? <QuickAction icon={ClipboardCheck} label={copy.tasks} onPress={() => router.push('/tasks')}/> : null}
+      {canOpen('admin') ? <QuickAction icon={Users} label={copy.staffOverview} onPress={() => router.push('/admin')}/> : null}
+      <SectionLabel>{copy.tasks}</SectionLabel>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+        <MetricCard icon={Sparkles} label={copy.housekeepingOverview} value={String(data.tasks.housekeeping_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
+        <MetricCard icon={Wrench} label={copy.maintenanceOverview} value={String(data.tasks.maintenance_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
+      </View>
+      {data.today.arrivals.length ? <SectionLabel>{copy.arrivalList} · {data.today.arrivals.length}</SectionLabel> : null}
+      {data.today.arrivals.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
+        <GlassCard onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}>
+          <Text style={[font.h2, { color: c.text }]}>{x.guest_name || x.booking_number}</Text>
+          <Text style={[font.small, { color: c.textMuted }]}>{x.booking_number} · {x.room_code || '—'}</Text>
+        </GlassCard>
+      </StaggerItem>)}
+      {data.today.departures.length ? <SectionLabel>{copy.departureList} · {data.today.departures.length}</SectionLabel> : null}
+      {data.today.departures.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
+        <GlassCard onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}>
+          <Text style={[font.h2, { color: c.text }]}>{x.guest_name || x.booking_number}</Text>
+          <Text style={[font.small, { color: c.textMuted }]}>{x.booking_number} · {x.room_code || '—'}</Text>
+        </GlassCard>
+      </StaggerItem>)}
       <SectionLabel>{copy.urgent} · {data.tasks.urgent_active}</SectionLabel>
       {data.attention_tasks.length === 0 ? <Empty text={copy.empty}/> : data.attention_tasks.slice(0,8).map((t, i) => <StaggerItem index={i+1} key={t.id}>
-        <GlassCard onPress={() => router.push({pathname:'/task/[id]',params:{id:t.id}})} style={{ flexDirection:'row',alignItems:'center',gap:12 }}>
+        <GlassCard onPress={user?.module_permissions?.includes('OPS') ? () => router.push({pathname:'/task/[id]',params:{id:t.id}}) : undefined} style={{ flexDirection:'row',alignItems:'center',gap:12 }}>
           <View style={{width:42,height:42,borderRadius:14,backgroundColor:c.warningSoft,alignItems:'center',justifyContent:'center'}}><ShieldAlert size={22} color={c.warning}/></View>
           <View style={{flex:1}}><Text style={[font.h2,{color:c.text}]}>{t.title}</Text><Text style={[font.small,{color:c.textMuted}]}>{t.room_code||'—'} · {t.priority}</Text></View>
         </GlassCard>
