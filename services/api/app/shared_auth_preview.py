@@ -18,6 +18,8 @@ class SharedAuthPreviewBoundary:
             ('GET', '/api/v1/auth/me'), ('GET', '/api/v1/auth/mode'),
             # Narrow, reviewed read-only management summary. Other workspaces remain closed.
             ('GET', '/api/v1/admin/dashboard'),
+            # Read-only hotel-local finance summary; no payment collection/refund.
+            ('GET', '/api/v1/admin/finance/summary'),
             ('GET', '/api/v1/pms/grid'),
             # Reviewed role-limited operations; no room-state override in shared mode.
             ('GET', '/api/v1/ops/tasks'), ('POST', '/api/v1/ops/tasks'),
@@ -84,9 +86,13 @@ class SharedAuthPreviewBoundary:
                                (method == 'OPTIONS' or
                                 (method == 'POST' and (path.endswith('/claim') or path.endswith('/complete-report'))) or
                                 (method == 'PATCH' and (path.endswith('/status') or path.endswith('/assignee')))))
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action
+            ops_history = (scope['type'] == 'http' and method in {'GET', 'OPTIONS'} and
+                           isinstance(path, str) and re.fullmatch(
+                               r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/history',
+                               path) is not None)
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
