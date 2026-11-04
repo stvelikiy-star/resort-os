@@ -58,6 +58,8 @@ def shared_inbox_rc5_allowed(method: str, path: str) -> bool:
 
 
 def rc5_guard() -> None:
+    if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") != "true":
+        raise HTTPException(503, detail="RC5 requires reviewed RC4 Guest QR stage")
     # RC5 depends on completed RC4 staging contract. No other environment
     # ever enables these routes, including legacy demo or live production.
     guest_qr_rc4_guard()
