@@ -161,6 +161,7 @@ def main():
         for h in "AB"
     ])
     from app.app_entry import app
+    from app import auth
     from app.shared_green_rc7 import green_rc7_allowed
     assert green_rc7_allowed("POST", ENDPOINT)
     assert not green_rc7_allowed("GET", ENDPOINT)
@@ -170,12 +171,26 @@ def main():
     fixtures = {h: {"property_id": accounts[h]["property_id"]} for h in "AB"}
 
     print("RC7 E2E: starting full Core TestClient", flush=True)
-    with TestClient(app, base_url=BASE) as svc, \
-            TestClient(app, base_url=BASE) as a, \
-            TestClient(app, base_url=BASE) as b:
-        login(a, "A", "owner", password)
-        login(b, "B", "owner", password)
-        owner = {"A": a, "B": b}
+    # One ASGI lifespan / one asyncpg pool / one event loop. Multiple
+    # simultaneous TestClient lifespan contexts share mutable app.state.db
+    # and can deadlock on transaction writes.
+    with TestClient(app, base_url=BASE) as svc:
+        login(svc, "A", "owner", password)
+        token_a = svc.cookies.get(auth.SESSION_COOKIE)
+        login(svc, "B", "owner", password)
+        token_b = svc.cookies.get(auth.SESSION_COOKIE)
+        assert token_a and token_b and token_a != token_b
+        svc.cookies.clear()
+
+        class HotelOwner:
+            def __init__(self, token):
+                self.token = token
+
+            def get(self, path):
+                return svc.get(path, cookies={auth.SESSION_COOKIE: self.token})
+
+        owner = {"A": HotelOwner(token_a), "B": HotelOwner(token_b)}
+        a, b = owner["A"], owner["B"]
 
         def deliver(h, event, *, token=None):
             secret = token if token is not None else accounts[h]["webhook_key"]
