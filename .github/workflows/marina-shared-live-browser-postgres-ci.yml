@@ -115,8 +115,8 @@ jobs:
             sudo apt-get install -y postgresql-client-16
           fi
           echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
-          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\\.'
-          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\\.'
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\.'
       - name: Prove shared restore target URLs fail closed before touching PostgreSQL
         run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_shared_restore_guard.py' -v
       - name: Create a NEW empty database solely for full shared-runtime restore
@@ -124,7 +124,7 @@ jobs:
           PGPASSWORD: synthetic-ci-database-only
         run: |
           set -euo pipefail
-          psql -h 127.0.0.1 -p 5432 -U marina_ci -d postgres -v ON_ERROR_STOP=1 \\
+          psql -h 127.0.0.1 -p 5432 -U marina_ci -d postgres -v ON_ERROR_STOP=1 \
             -c 'CREATE DATABASE marina_shared_browser_restore_ci;'
       - name: pg_dump and pg_restore FULL two-hotel SHARED DB, compare all rows and schema, then call restored canonical ASGI
         env:
