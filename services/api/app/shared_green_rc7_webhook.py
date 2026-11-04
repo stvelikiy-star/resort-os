@@ -63,6 +63,7 @@ def rc7_webhook_config() -> tuple[dict[str, str], ...]:
             ]
             if len(matches) != 1:
                 raise ValueError("Hotel provider and channel identity mismatch")
+            g = matches[0][1]
             for field in ("tenant_id", "property_id"):
                 try:
                     uuid.UUID(g.get(field, ""))
