@@ -348,9 +348,12 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
         : body.delivery_status === "SENT" ? "Telegram подтвердил отправку." : `Статус: ${body.delivery_status}`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка отправки");
+      const reason = e instanceof Error ? e.message : "Ошибка отправки";
       await openConversation(detail.conversation.id);
       await load();
+      // Refresh actions may clear transient errors; never hide the important
+      // queue reconciliation warning after an ambiguous provider result.
+      setError(reason);
     } finally {
       setSendBusy(false);
     }
