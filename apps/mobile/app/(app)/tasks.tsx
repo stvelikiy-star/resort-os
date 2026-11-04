@@ -63,6 +63,6 @@ export default function Tasks() {
     {!loading && !error && ws.mobileReady && visibleActive.length === 0 ? <Empty text={t('tasks.none')}/> : null}
     {visibleActive.map((task,i) => <StaggerItem key={task.id} index={i}><TaskCard task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/></StaggerItem>)}
     {filter === 'all' && finished.length ? <SectionLabel>{t('tasks.done')}</SectionLabel> : null}
-    {filter === 'all' ? finished.map(task => <TaskCard key={task.id} task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>)}
+    {filter === 'all' ? finished.map(task => <TaskCard key={task.id} task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>) : null}
   </FutureScreen>;
 }
