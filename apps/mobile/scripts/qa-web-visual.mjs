@@ -9,6 +9,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
+import { Buffer } from 'node:buffer';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const dist = path.resolve('dist');
