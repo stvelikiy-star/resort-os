@@ -174,6 +174,14 @@ async function main() {
     await screenshot('manager_team_en_dark_320_after_nav_fix');
     await viewport(430, 932);
     await screenshot('manager_team_en_dark_430');
+    // Real UI interaction, synthetic manager fixture only. No staff write is submitted.
+    // The visible "Assign" CTA used to be a decorative badge: enforce the
+    // selected-staff picker is now reachable from its own touch target.
+    await click('[data-testid="open-assign-t8"]', 'open actual assignment picker');
+    if (!await waitFor('[data-testid="assign-u-maid"]', 3000)) {
+      throw new Error('Manager assignment CTA did not open the eligible staff picker');
+    }
+    await screenshot('manager_assign_picker_en_dark_430');
     await viewport(375, 812);
     await click('[data-testid="tab-more"]', 'manager More menu');
     await click('[data-testid="more-profile"]', 'manager profile');
