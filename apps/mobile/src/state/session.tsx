@@ -6,6 +6,8 @@ import { createRealApi } from '../api/realApi';
 import { flushPendingCookieLogouts, hasUnrevokedCookieForHost, queueCookieLogout } from '../lib/pendingLogout';
 import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
+import { checkedHotelSelector, matchesSelectedHotel, sameSessionIdentity } from '../api/sharedHotelAuth';
+import type { SharedHotelSelector } from '../api/sharedHotelAuth';
 import type { AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
 import { getItem, setItem } from '../lib/storage';
@@ -19,7 +21,7 @@ interface SessionCtx {
   setLocale: (l: Locale) => void;
   addHotel: (h: HotelConnection) => void;
   selectHotel: (id: string) => void;
-  signIn: (username: string, password: string) => Promise<AuthUser>;
+  signIn: (username: string, password: string, selector?: SharedHotelSelector) => Promise<AuthUser>;
   /** Isolated synthetic preview: does not touch hotel APIs. */
   startDemo: (username?: string) => Promise<AuthUser>;
   signOut: () => Promise<void>;
@@ -84,7 +86,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       try {
         const verified = await api.me();
         if (sessionRevision.current !== revision) return;
-        if (!verified || verified.id !== user.id || verified.property_code !== user.property_code) {
+        if (!verified || !sameSessionIdentity(user, verified)) {
           sessionRevision.current++;
           dropApi(hotel.id);
           setSessions((current) => { const next = { ...current }; delete next[hotel.id]; return next; });
@@ -183,12 +185,28 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     }
   }, [hotelId]);
 
-  const signIn = useCallback(async (username: string, password: string) => {
+  const signIn = useCallback(async (username: string, password: string, selector?: SharedHotelSelector) => {
     if (!hotel || !api) throw new Error('no hotel');
     if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) throw new ApiError('FORBIDDEN', 'Untrusted hotel address');
-    const revision = sessionRevision.current;
+    // Clear any earlier hotel identity BEFORE a new login or cookie change.
+    // Also invalidate any in-flight foreground /me response for the old session.
+    const revision = ++sessionRevision.current;
     const attempt = ++loginAttempt.current;
+    setSessions({});
+    let selected: SharedHotelSelector | undefined;
     if (!hotel.demo) {
+      // This canonical endpoint distinguishes shared tenant login from legacy
+      // one-property login without guessing from a hostname or user input.
+      if (!api.authMode) throw new ApiError('UNKNOWN', 'Server authentication mode unavailable');
+      const mode = await api.authMode();
+      if (mode === 'shared_auth_preview') {
+        if (!selector) throw new ApiError('BAD_REQUEST', 'Organization and hotel codes are required');
+        selected = checkedHotelSelector(selector);
+      } else if (mode === 'single_property') {
+        if (selector) throw new ApiError('BAD_REQUEST', 'This hotel does not accept shared selectors');
+      } else {
+        throw new ApiError('UNKNOWN', 'Unverified authentication mode');
+      }
       // A cookie from a previous offline sign-out could still be active.
       // Revoke it before sending fresh credentials to the same host.
       await flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
@@ -208,19 +226,31 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // Switching hotel or signing out while a pending logout is reconciled
     // must invalidate this in-flight login BEFORE submitting credentials.
     if (sessionRevision.current !== revision || loginAttempt.current !== attempt) throw new ApiError('UNAUTHORIZED', 'Session context changed');
-    const signedIn = await api.login(username, password);
-    // A native cookie may not persist after a successful login response.
-    // Confirm that subsequent authenticated requests resolve to the SAME user.
-    const verified = api.mode === 'LIVE' ? await api.me() : signedIn;
-    if (!verified || typeof verified.id !== 'string' || !verified.id ||
-        typeof verified.property_code !== 'string' || !verified.property_code ||
-        typeof verified.role !== 'string' || !verified.role ||
-        verified.id !== signedIn.id || verified.property_code !== signedIn.property_code) {
-      throw new ApiError('UNAUTHORIZED', 'Session or hotel identity changed during login');
+    // A login response can set the OS cookie before /me fails. Treat every
+    // unverified LIVE result as potentially authenticated and queue revocation.
+    let loginStarted = false;
+    try {
+      loginStarted = true;
+      const signedIn = await api.login(username, password, selected);
+      const verified = api.mode === 'LIVE' ? await api.me() : signedIn;
+      if (!verified || !sameSessionIdentity(signedIn, verified) ||
+          (selected && !matchesSelectedHotel(signedIn, verified, selected))) {
+        throw new ApiError('UNAUTHORIZED', 'Session or selected hotel identity changed during login');
+      }
+      if (sessionRevision.current !== revision || loginAttempt.current !== attempt) {
+        throw new ApiError('UNAUTHORIZED', 'Session context changed during login');
+      }
+      setSessions({ [hotel.id]: verified });
+      return verified;
+    } catch (error) {
+      if (loginStarted && !hotel.demo && isTrustedHotelOrigin(hotel.baseUrl)) {
+        // The server may have issued a cookie even after a lost response.
+        // Do not reuse it on a later attempt without confirmed revocation.
+        await queueCookieLogout(hotel.baseUrl).catch(() => {});
+        void flushPendingCookieLogouts(async origin => createRealApi(origin).logout());
+      }
+      throw error;
     }
-    if (sessionRevision.current !== revision || loginAttempt.current !== attempt) throw new ApiError('UNAUTHORIZED', 'Session context changed during login');
-    setSessions((s) => ({ ...s, [hotel.id]: verified }));
-    return verified;
   }, [hotel, api]);
   const signOut = useCallback(async () => {
     if (!hotel || !api) return;

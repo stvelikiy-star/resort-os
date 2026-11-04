@@ -1,5 +1,9 @@
+import type { SharedHotelSelector } from './sharedHotelAuth';
+
 /** Types mirror the existing MARINA SMART contract (services/api/app/operations.py, auth.py). */
-export type Role = 'OWNER' | 'MANAGER' | 'RECEPTION' | 'AGENT' | 'MAID' | 'TECHNICIAN' | 'STORE_STAFF' | 'COOK' | 'WAITER' | 'CONTENT_MANAGER' | 'BEACH_PARTNER';
+export type AuthMode = 'demo' | 'single_property' | 'shared_auth_preview';
+
+export type Role = 'OWNER' | 'MANAGER' | 'RECEPTION' | 'AGENT' | 'MAID' | 'TECHNICIAN' | 'STORE_STAFF' | 'DINING_STAFF' | 'COOK' | 'WAITER' | 'CONTENT_MANAGER' | 'BEACH_PARTNER';
 export type TaskType = 'HOUSEKEEPING' | 'MAINTENANCE' | 'GUEST_REQUEST';
 export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'IN_INSPECTION' | 'DONE' | 'CANCELLED';
 export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
@@ -33,7 +37,9 @@ export class ApiError extends Error {
 /** One implementation per hotel connection. Screens depend only on this interface. */
 export interface StaffApi {
   readonly mode: 'DEMO' | 'LIVE';
-  login(username: string, password: string): Promise<AuthUser>;
+  /** LIVE-only discovery; the isolated demo never calls the server. */
+  authMode?(): Promise<AuthMode>;
+  login(username: string, password: string, selector?: SharedHotelSelector): Promise<AuthUser>;
   logout(): Promise<void>;
   me(): Promise<AuthUser>;
   listTasks(filter?: { type?: TaskType; status?: TaskStatus }): Promise<Task[]>;

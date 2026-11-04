@@ -17,7 +17,7 @@ export const WORKSPACES: Record<Role, Workspace> = {
   RECEPTION: FIELD,
   MAID: { tabs: ['tasks', 'rooms', 'profile'], taskTypes: ['HOUSEKEEPING'], canCreateMaintenance: false, canManage: false, canSetRoomState: false, mobileReady: true },
   TECHNICIAN: { tabs: ['tasks', 'requests', 'rooms', 'profile'], taskTypes: ['MAINTENANCE'], canCreateMaintenance: true, canManage: false, canSetRoomState: false, mobileReady: true },
-  AGENT: FIELD, STORE_STAFF: FIELD, COOK: FIELD, WAITER: FIELD, CONTENT_MANAGER: FIELD, BEACH_PARTNER: FIELD,
+  AGENT: FIELD, STORE_STAFF: FIELD, DINING_STAFF: FIELD, COOK: FIELD, WAITER: FIELD, CONTENT_MANAGER: FIELD, BEACH_PARTNER: FIELD,
 };
 export const workspaceFor = (role: Role): Workspace => WORKSPACES[role] ?? FIELD;
 export const hasTab = (role: Role, tab: TabKey) => workspaceFor(role).tabs.includes(tab);

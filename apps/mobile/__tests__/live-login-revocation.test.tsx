@@ -13,6 +13,7 @@ const account: AuthUser = {
 };
 const mockApi = {
   mode: 'LIVE' as const,
+  authMode: async () => 'single_property' as const,
   logout: async () => {
     events.push('logout');
     if (revokeFails) throw new ApiError('OFFLINE', 'No server acknowledgement');
