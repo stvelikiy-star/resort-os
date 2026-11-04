@@ -16,6 +16,8 @@ HUMAN_SEND = re.compile(rf"^/api/v1/admin/inbox/conversations/{UUID}/send-text$"
 
 
 def green_rc8_allowed(method: str, path: str) -> bool:
+    if method == "GET" and path == "/api/v1/admin/inbox/outbound-capabilities":
+        return True
     return method == "POST" and HUMAN_SEND.fullmatch(path) is not None
 
 
