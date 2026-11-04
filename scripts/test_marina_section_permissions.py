@@ -56,7 +56,8 @@ assert not role_or_section_allowed({"role": "MANAGER", "module_permissions": [],
 assert not role_or_section_allowed({"role": "COOK", "module_permissions": ["DINING"], "module_permissions_custom": False}, "/api/v1/kitchen/menu", ("OWNER", "MANAGER"))
 assert role_or_section_allowed({"role": "MANAGER", "module_permissions": [], "module_permissions_custom": True}, "/api/v1/unmapped/private", ("OWNER", "MANAGER"))
 assert not role_or_section_allowed({"role": "MAID", "module_permissions": ["STAFF"], "module_permissions_custom": True}, "/api/v1/admin/staff/9", ("OWNER",), module_grant=False)
-assert allowed_types_for_user({"role": "RECEPTION", "module_permissions": ["OPS"], "module_permissions_custom": True}) == {"HOUSEKEEPING", "MAINTENANCE", "GUEST_REQUEST"}
+# Module grants do not turn reception into the MAID/TECH or management roles.
+assert allowed_types_for_user({"role": "RECEPTION", "module_permissions": ["OPS"], "module_permissions_custom": True}) == set()
 assert allowed_types_for_user({"role": "MANAGER", "module_permissions": [], "module_permissions_custom": True}) == set()
 custom_service_staff = {"role": "WAITER", "module_permissions": ["SERVICES"], "module_permissions_custom": True}
 assert guest_request_access(custom_service_staff, "/api/v1/ops/guest-requests")
