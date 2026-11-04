@@ -3,6 +3,7 @@ import { AppState, Pressable, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SessionProvider, useSession } from '../src/state/session';
 import { ApiError } from '../src/api/types';
+import { createHotelHttpClient } from '../src/api/http';
 import type { AuthMode, AuthUser } from '../src/api/types';
 import type { SharedHotelSelector } from '../src/api/sharedHotelAuth';
 
@@ -279,6 +280,36 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
       releaseHotelA?.();
       flushPendingCookieLogouts.mockImplementation(async () => {});
     }
+  });
+
+  it('automatically clears current hotel UI after a protected LIVE HTTP 401', async () => {
+    const screen = await setup();
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_A'));
+    const transport = jest.fn(async () => ({
+      ok: false, status: 401, redirected: false, json: async () => ({ detail: 'private' }),
+    } as Response));
+    const http = createHotelHttpClient('https://platform.example', transport as unknown as typeof fetch);
+    await expect(http.request('GET', '/api/v1/ops/tasks')).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('none'));
+    expect(screen.getByTestId('selected-tenant').props.children).toBe('none');
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT sign out verified B when an old A read returns late 401 on same host', async () => {
+    const screen = await setup();
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_A'));
+    const gate = { finish: (_response: Response) => {} };
+    const transport = jest.fn(() => new Promise<Response>(resolve => { gate.finish = resolve; }));
+    const http = createHotelHttpClient('https://platform.example', transport as unknown as typeof fetch);
+    const pending = http.request('GET', '/api/v1/ops/tasks');
+    fireEvent.press(screen.getByTestId('login-b'));
+    await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_B'));
+    gate.finish({ status: 401, ok: false, redirected: false } as Response);
+    await expect(pending).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_B');
+    expect(screen.getByTestId('selected-tenant').props.children).toBe(TENANT_B);
   });
 
   it('does not expose an earlier hotel after leaving the shared connection', async () => {
