@@ -116,6 +116,10 @@ try {
   await page.locator(".concierge-modal textarea").fill("Synthetic browser maintenance request B");
   await page.locator(".concierge-modal .concierge-submit").click();
   await page.locator(".concierge-request-list").getByText("Synthetic browser maintenance request B").waitFor({ timeout: 20000 });
+  const safeTask = page.locator(".concierge-request-list article")
+    .filter({ hasText: "Synthetic browser maintenance request B" });
+  await safeTask.locator("button").click();
+  await safeTask.locator("button").waitFor({ state: "hidden", timeout: 20000 });
   // No charge to the guest folio or provider dispatch is allowed in RC4.
   const paid = await context.request.post(
     BASE + "/api/v1/guest-os/rooms/" + fixtures.B.url.split("/").at(-1) + "/requests",
