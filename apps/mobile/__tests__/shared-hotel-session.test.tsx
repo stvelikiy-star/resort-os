@@ -133,12 +133,13 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
     // Two hotels share ONE Android cookie jar. The second attempt must not
     // issue a logout or new login while A's first cookie write is unresolved.
     fireEvent.press(screen.getByTestId('login-b'));
-    await act(async () => { await Promise.resolve(); });
+    // No nested React act scope while a sign-in promise is deliberately held.
+    await Promise.resolve();
     expect(calls.filter(x => x === 'logout')).toHaveLength(1);
     expect(calls).not.toContain('login:HOTEL_B');
     expect(screen.getByTestId('selected-property').props.children).toBe('none');
 
-    await act(async () => { releaseHotelA?.(); });
+    releaseHotelA?.();
     await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('HOTEL_B'));
     expect(screen.getByTestId('selected-tenant').props.children).toBe(TENANT_B);
     expect(calls).toEqual([
