@@ -19,6 +19,7 @@ from .telegram_sales import (
 
 router = APIRouter(prefix="/api/v1/admin/inbox", tags=["admin-inbox-outbound"])
 manager_access = require_roles("OWNER", "MANAGER")
+send_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 
 
@@ -84,9 +85,25 @@ async def send_text_message(
     payload: OutboundTextCreate,
     request: Request,
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(send_access),
 ):
     idempotency_key = _validate_idempotency_key(idempotency_key_header)
+    if os.environ.get("MARINA_SHARED_GREEN_RC8_ENABLED") == "true":
+        # Keep ONE canonical send-text route. Stage RC8 accepts WhatsApp
+        # only, with separate hotel credentials and reviewed human action.
+        from .green_outbound import send_green_text
+        whatsapp = await send_green_text(
+            conversation_id, payload.text, request, user, idempotency_key,
+        )
+        if whatsapp is not None:
+            return whatsapp
+
+    # Telegram legacy sender stays manager-only. Shared staging cannot
+    # implicitly activate Telegram even when RC8 makes this path reachable.
+    if user["role"] == "RECEPTION":
+        raise HTTPException(403, detail="Reception may only send a claimed WhatsApp conversation")
+    if os.environ.get("MARINA_SHARED_AUTH_PREVIEW_ENABLED") == "true":
+        raise HTTPException(503, detail="Other shared outbound channels are not reviewed")
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
