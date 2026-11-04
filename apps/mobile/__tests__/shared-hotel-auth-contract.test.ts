@@ -47,7 +47,7 @@ describe('marina-shared-auth-v1 mobile transport (isolated mocked HTTP)', () => 
     const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response(user));
     await createRealApi('https://platform.example', transport as unknown as typeof fetch)
       .login('manager', 'synthetic-password');
-    expect(JSON.parse(transport.mock.calls[0][1].body)).toEqual({
+    expect(JSON.parse(String(transport.mock.calls[0][1]?.body))).toEqual({
       username: 'manager', password: 'synthetic-password',
     });
   });
@@ -73,7 +73,7 @@ describe('marina-shared-auth-v1 mobile transport (isolated mocked HTTP)', () => 
   it('does not assume that an unknown /auth/mode response is legacy auth', async () => {
     const transport = jest.fn(async (_url: RequestInfo | URL, _opts?: RequestInit) => response({ mode: 'unexpected' }));
     await expect(createRealApi('https://platform.example', transport as unknown as typeof fetch)
-      .authMode()).rejects.toMatchObject({ code: 'UNKNOWN' });
+      .authMode!()).rejects.toMatchObject({ code: 'UNKNOWN' });
   });
 });
 
