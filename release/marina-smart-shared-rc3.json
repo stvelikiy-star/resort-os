@@ -5,7 +5,7 @@
   "state": "DRAFT_SOURCE_ACCEPTANCE_PENDING",
   "source_branch": "release/marina-shared-platform-rc3-integration-20261104",
   "pull_request": 324,
-  "integration_source_sha": "1d2881ede0125f6de4ea08b955bdc016044d3849",
+  "integration_source_sha": "0bc58a555631ef4312fca8509f0e6fd45bc5f0bc",
   "legacy_rc2_manifest": "release/marina-smart-current-candidate.json",
   "migration_count": 39,
   "architecture": "one shared FastAPI/Next/PostgreSQL runtime, separate Tenant/Property per unrelated hotel owner",
@@ -53,7 +53,8 @@
     "scripts/test_marina_rc3_source_gate.py": "f0d1eec904fa568d0d7fd812dfdf60f4dd911a61",
     ".github/workflows/marina-shared-live-browser-postgres-ci.yml": "c6ccf2340a08c245982cf8b104f0f0e0deb3508c",
     ".github/workflows/marina-shared-rc3-source-ci.yml": "d4b8b7a068d36e28c1fa868deff8a15036be155e",
-    "release/marina-smart-current-candidate.json": "d108228473e87d726d6db2e5cfa67d5956d07729"
+    "release/marina-smart-current-candidate.json": "d108228473e87d726d6db2e5cfa67d5956d07729",
+    ".github/workflows/marina-shared-ops-roles-ci.yml": "46f64ce52f383a433220b9300bd28b0467acecaf"
   },
   "external_staging_verified": false,
   "ubuntu_restore_verified": false,
@@ -62,7 +63,7 @@
   "mobile_live_e2e_verified": false,
   "real_whatsapp_ai_verified": false,
   "notes": [
-    "Source lock verifies 21 critical Git blobs and 39 unchanged Prisma migration SQL hashes. CI conclusions require exact PR head SHA verification.",
+    "Source lock verifies 22 critical Git blobs and 39 unchanged Prisma migration SQL hashes. CI conclusions require exact PR head SHA verification.",
     "Two-hotel synthetic Chromium/Next/ASGI/PostgreSQL plus isolated backup/restore do not prove target Ubuntu or external production.",
     "Third-hotel onboarding, external staging, GREEN-API delivery, hotel-specific AI, guest QR and native mobile LIVE E2E remain pending.",
     "Historical RC2 manifest stays immutable; no merge to main and no production deployment."
