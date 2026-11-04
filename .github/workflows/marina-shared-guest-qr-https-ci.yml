@@ -30,6 +30,7 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 15
     env:
       DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      PYTHONPATH: services/api:scripts
       APP_ENV: staging
       PROPERTY_CODE: MARINA_BROWSER_CI
       RATE_PLAN_CODE: MARINA_BROWSER_CI
