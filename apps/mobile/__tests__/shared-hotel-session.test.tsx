@@ -145,7 +145,6 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
       'mode', 'logout', 'login:HOTEL_A', 'me',
       'mode', 'logout', 'login:HOTEL_B', 'me',
     ]);
-    await screen.unmount();
   });
 
   it('requires both shared selectors before sending any password or changing cookie', async () => {
