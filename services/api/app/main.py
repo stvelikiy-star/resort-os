@@ -49,14 +49,14 @@ app.add_middleware(
         SharedGreenQrRc6Boundary
         if os.environ.get("MARINA_SHARED_GREEN_RC6_ENABLED") == "true"
         else (
-        SharedInboxRc5Boundary
-        if os.environ.get("MARINA_SHARED_INBOX_RC5_ENABLED") == "true"
-        else (
-            SharedGuestQrRc4Boundary
-            if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
-            else SharedAuthPreviewBoundary
+            SharedInboxRc5Boundary
+            if os.environ.get("MARINA_SHARED_INBOX_RC5_ENABLED") == "true"
+            else (
+                SharedGuestQrRc4Boundary
+                if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+                else SharedAuthPreviewBoundary
+            )
         )
-    )
     )
 )
 app.include_router(auth_router)
