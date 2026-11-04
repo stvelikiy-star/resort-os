@@ -153,9 +153,15 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
 export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
   const { allowed, ready } = useMotionPreference();
   const [fade] = useState(() => new Animated.Value(0));
+  const appeared = useRef(false);
   useEffect(() => {
     if (!ready) return;
-    if (!allowed) { fade.setValue(1); return; }
+    if (appeared.current || !allowed) {
+      appeared.current = true;
+      fade.setValue(1);
+      return;
+    }
+    appeared.current = true;
     fade.setValue(0);
     const animation = Animated.timing(fade, { toValue: 1, duration: motion.card, delay: cappedStagger(index), useNativeDriver: true });
     animation.start(); return () => animation.stop();
