@@ -55,7 +55,7 @@ type OutboundCapabilities = {
     outbound_configured: boolean;
     max_text_length: number;
   };
-  whatsapp: { configured: boolean };
+  whatsapp: { configured: boolean; configured_in_core?: boolean; human_only?: boolean; queued_only?: boolean; max_text_length?: number };
   instagram: { configured: boolean };
   truth: string;
 };
@@ -119,8 +119,11 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
   const [linkRequestId, setLinkRequestId] = useState("");
   const [capabilities, setCapabilities] = useState<OutboundCapabilities | null>(null);
   const [aiCapabilities, setAiCapabilities] = useState<AiCapabilities | null>(null);
+  const [myStaffId, setMyStaffId] = useState<string | null>(null);
   const [reply, setReply] = useState("");
   const [sendBusy, setSendBusy] = useState(false);
+  const [pendingSendKey, setPendingSendKey] = useState<string | null>(null);
+  const [manualReconciliation, setManualReconciliation] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [sendInfo, setSendInfo] = useState<string | null>(null);
 
@@ -144,12 +147,19 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
 
   const loadCapabilities = useCallback(async () => {
     try {
-      const [outboundResponse, aiResponse] = await Promise.all([
+      const [outboundResponse, aiResponse, identityResponse] = await Promise.all([
         fetch("/core/api/v1/admin/inbox/outbound-capabilities", { cache: "no-store" }),
         fetch("/core/api/v1/admin/inbox/ai-capabilities", { cache: "no-store" }),
+        fetch("/core/api/v1/auth/me", { cache: "no-store" }),
       ]);
-      if (outboundResponse.ok) setCapabilities(await outboundResponse.json());
-      if (aiResponse.ok) setAiCapabilities(await aiResponse.json());
+      setCapabilities(outboundResponse.ok ? await outboundResponse.json() : null);
+      setAiCapabilities(aiResponse.ok ? await aiResponse.json() : null);
+      if (identityResponse.ok) {
+        const identity = await identityResponse.json();
+        setMyStaffId(typeof identity.id === "string" ? identity.id : null);
+      } else {
+        setMyStaffId(null);
+      }
     } catch {
       // Missing capabilities keep optional actions safely disabled.
     }
@@ -178,12 +188,25 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
     && capabilities?.telegram.outbound_configured
     && detail.conversation.channel_code === capabilities.telegram.channel_code
   );
+  const whatsappReplyEnabled = Boolean(
+    detail
+    && detail.conversation.channel_kind === "WHATSAPP"
+    && capabilities?.whatsapp.configured
+    && (role !== "RECEPTION" || (
+      Boolean(myStaffId) && detail.conversation.assigned_to_id === myStaffId
+    ))
+  );
+  const replyEnabled = telegramReplyEnabled || whatsappReplyEnabled;
   const aiDraftEnabled = Boolean(detail && aiCapabilities?.draft_configured);
 
   async function openConversation(id: string) {
     setDetailBusy(true);
     setError(null);
-    setSendInfo(null);
+    if (detail?.conversation.id !== id) {
+      setSendInfo(null);
+      setPendingSendKey(null);
+      setManualReconciliation(false);
+    }
     try {
       const [detailResponse, requestResponse] = await Promise.all([
         fetch(`/core/api/v1/admin/inbox/conversations/${id}`, { cache: "no-store" }),
@@ -303,11 +326,12 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
 
   async function sendReply(event: FormEvent) {
     event.preventDefault();
-    if (!detail || !telegramReplyEnabled || !reply.trim()) return;
+    if (!detail || !replyEnabled || !reply.trim() || manualReconciliation) return;
     setSendBusy(true);
     setError(null);
     setSendInfo(null);
-    const key = `pms-${crypto.randomUUID()}`;
+    const key = pendingSendKey || `pms-${crypto.randomUUID()}`;
+    setPendingSendKey(key);
     try {
       const response = await fetch(`/core/api/v1/admin/inbox/conversations/${detail.conversation.id}/send-text`, {
         method: "POST",
@@ -316,17 +340,30 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const statusText = body.delivery_status ? `Статус доставки: ${body.delivery_status}. ` : "";
-        throw new Error(`${statusText}${body.provider_description || body.detail || "Telegram не подтвердил отправку"}`);
+        const unsafeToRetry = body?.detail?.automatic_retry_safe === false || response.status === 502;
+        if (unsafeToRetry && whatsappReplyEnabled) {
+          setManualReconciliation(true);
+        }
+        const reason = typeof body.detail === "string" ? body.detail
+          : body?.detail?.code || body.provider_description || "Провайдер не подтвердил операцию";
+        throw new Error(unsafeToRetry && whatsappReplyEnabled
+          ? `${reason}. Возможна постановка в очередь; повтор запрещён до сверки с оператором.`
+          : reason);
       }
       setReply("");
-      setSendInfo(body.delivery_status === "SENT" ? "Telegram подтвердил отправку." : `Статус: ${body.delivery_status}`);
+      setPendingSendKey(null);
       await openConversation(detail.conversation.id);
+      setSendInfo(whatsappReplyEnabled
+        ? "WhatsApp принял сообщение в очередь. Доставку подтвердит отдельный webhook GREEN-API."
+        : body.delivery_status === "SENT" ? "Telegram подтвердил отправку." : `Статус: ${body.delivery_status}`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ошибка отправки");
+      const reason = e instanceof Error ? e.message : "Ошибка отправки";
       await openConversation(detail.conversation.id);
       await load();
+      // Refresh actions may clear transient errors; never hide the important
+      // queue reconciliation warning after an ambiguous provider result.
+      setError(reason);
     } finally {
       setSendBusy(false);
     }
@@ -378,13 +415,15 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
           </article>)}
         </div>
 
-        {(aiDraftEnabled || telegramReplyEnabled) ? <form className="outbound-reply-form" onSubmit={sendReply}>
-          <label><span>Черновик ответа менеджера</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={capabilities?.telegram.max_text_length || 4096} placeholder="Напишите ответ или создайте AI-черновик…" /></label>
+        {(aiDraftEnabled || replyEnabled) ? <form className="outbound-reply-form" onSubmit={sendReply}>
+          <label><span>{whatsappReplyEnabled ? "Ручной ответ гостиницы (без автоотправки ИИ)" : "Черновик ответа менеджера"}</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={whatsappReplyEnabled ? capabilities?.whatsapp.max_text_length || 4096 : capabilities?.telegram.max_text_length || 4096} placeholder="Напишите ответ или создайте AI-черновик…" /></label>
           <div className="reply-actions">
             {aiDraftEnabled && <button type="button" className="btn" onClick={generateAiDraft} disabled={aiBusy || sendBusy}>{aiBusy ? "Готовлю…" : "AI-черновик"}</button>}
-            {telegramReplyEnabled ? <button className="btn primary" disabled={sendBusy || aiBusy || !reply.trim()}>{sendBusy ? "Отправляю…" : "Отправить в Telegram"}</button> : <small>Отправка наружу выключена, пока реальный адаптер канала не настроен.</small>}
+            {replyEnabled ? <button className="btn primary" disabled={sendBusy || aiBusy || !reply.trim() || manualReconciliation}>{sendBusy ? "Обрабатываю…" : whatsappReplyEnabled ? "Передать в очередь WhatsApp" : "Отправить в Telegram"}</button> : <small>{role === "RECEPTION" && detail.conversation.channel_kind === "WHATSAPP" ? "Сначала возьмите диалог, затем отвечайте." : "Отправка наружу выключена, пока реальный адаптер канала не настроен."}</small>}
           </div>
           {sendInfo && <p className="send-info">{sendInfo}</p>}
+          {manualReconciliation && <p className="send-info" role="alert">Отправка требует сверки с оператором. Автоматический повтор выключен, чтобы не отправить дубликат.</p>}
+          {whatsappReplyEnabled && <p className="reply-truth">GREEN-API может принять сообщение в очередь без доставки. Только подтверждение webhook обновляет SENT / DELIVERED.</p>}
           <p className="reply-truth">AI только предлагает текст. Наличие, цена, оплата и статус брони берутся только из Core и требуют фактических данных.</p>
         </form> : <div className="inbox-send-disabled"><strong>AI и исходящая отправка не активированы</strong><span>Они включаются только после задания реальных ключей/модели и provider-адаптера. Система не имитирует отправку.</span></div>}
 

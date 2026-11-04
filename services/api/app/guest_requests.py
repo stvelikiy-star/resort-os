@@ -242,12 +242,24 @@ async def cancel_guest_request(token: str, task_id: uuid.UUID, request: Request,
         async with conn.transaction():
             qr, stay, _ = await authorized_context(conn, token, tc_guest_session)
             task = await conn.fetchrow(
-                '''SELECT id,status::text AS status,"chargeStatus" FROM operational_tasks
+                '''SELECT id,status::text AS status,"serviceCode","chargeKgs","chargeStatus" FROM operational_tasks
                    WHERE id=$1 AND "stayId"=$2 AND "createdByType"='GUEST' AND source LIKE 'GUEST_OS_%' FOR UPDATE''',
                 task_id, stay["stayId"],
             )
             if not task:
                 raise HTTPException(status_code=404, detail={"code": "GUEST_REQUEST_NOT_FOUND"})
+            # Even pre-existing guest tasks may contain a financial folio charge.
+            # RC4 permits cancellation only for its nonfinancial service codes;
+            # never let a guest stage session void a legacy paid charge.
+            if (MARINA_SHARED_AUTH_PREVIEW_ENABLED
+                    and os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+                    and (task["serviceCode"] not in {"ADMIN", "MAINTENANCE"}
+                         or task["chargeKgs"] is not None
+                         or task["chargeStatus"] not in {"NONE", None})):
+                raise HTTPException(
+                    status_code=503,
+                    detail={"code": "SHARED_GUEST_CHARGE_CANCELLATION_NOT_REVIEWED"},
+                )
             if task["status"] != "OPEN":
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_CANNOT_CANCEL", "status": task["status"]})
             if task["chargeStatus"] in {"PENDING", "POSTED"}:

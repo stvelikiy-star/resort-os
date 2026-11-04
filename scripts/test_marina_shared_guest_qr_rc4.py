@@ -3,14 +3,17 @@
 This unit gate uses no database and does not replace the separate real HTTPS,
 two-hotel PostgreSQL + Chromium acceptance.
 """
+import asyncio
 import os
+import uuid
+from types import SimpleNamespace
 from unittest import TestCase, main
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from app import auth, guest_os
+from app import auth, guest_os, guest_requests
 from app.guest_requests import router as guest_requests_router
 from app.shared_guest_qr_rc4 import (
     SharedGuestQrRc4Boundary, guest_qr_rc4_allowed, guest_qr_rc4_guard,
@@ -155,6 +158,52 @@ class GuestQrRc4AdmissionTests(TestCase):
         with self.staging(), patch.object(guest_os, "COOKIE_SECURE", False):
             with TestClient(fixture_app(), base_url="https://guest-rc4-ci.invalid") as client:
                 self.assertEqual(client.get(f"/api/v1/guest-os/rooms/{TOKEN}").status_code, 503)
+
+
+    def test_rc4_cannot_cancel_or_void_old_paid_guest_charges(self):
+        # The same hotel may contain pre-existing paid guest tasks from legacy
+        # operation. No RC4 guest cancellation may touch their folio charges.
+        class FakeDB:
+            def acquire(self):
+                return self
+
+            def transaction(self):
+                return self
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            async def fetchrow(self, *_args):
+                return {
+                    "id": uuid.uuid4(), "status": "OPEN",
+                    "serviceCode": "HOUSEKEEPING",
+                    "chargeKgs": 750, "chargeStatus": "POSTED",
+                }
+
+        from unittest.mock import AsyncMock
+        request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(db=FakeDB())))
+        with self.staging(), \
+                patch.object(guest_requests, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True), \
+                patch.object(
+                    guest_requests, "authorized_context",
+                    new=AsyncMock(return_value=(
+                        {"propertyId": uuid.uuid4()},
+                        {"stayId": uuid.uuid4()},
+                        {"id": uuid.uuid4()},
+                    )),
+                ):
+            with self.assertRaises(HTTPException) as result:
+                asyncio.run(guest_requests.cancel_guest_request(
+                    TOKEN, uuid.uuid4(), request, tc_guest_session="synthetic-opaque",
+                ))
+            self.assertEqual(result.exception.status_code, 503)
+            self.assertEqual(
+                result.exception.detail["code"],
+                "SHARED_GUEST_CHARGE_CANCELLATION_NOT_REVIEWED",
+            )
 
 
 if __name__ == "__main__":

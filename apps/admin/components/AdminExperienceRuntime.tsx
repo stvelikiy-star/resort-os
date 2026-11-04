@@ -19,6 +19,14 @@ const STORAGE_KEY = "three-crowns-admin-locale";
 
 
 const KZ_EXACT: Record<string, string> = {
+  "WhatsApp принял сообщение в очередь. Доставку подтвердит отдельный webhook GREEN-API.": "WhatsApp хабарламаны кезекке қабылдады. Жеткізуді GREEN-API webhook арқылы растау қажет.",
+  "Обрабатываю…": "Өңделуде…",
+  "Отправка наружу выключена, пока реальный адаптер канала не настроен.": "Нақты арна адаптері бапталмайынша сыртқа жіберу өшірулі.",
+  "Передать в очередь WhatsApp": "WhatsApp кезегіне жіберу",
+  "Провайдер не подтвердил операцию": "Провайдер операцияны растаған жоқ",
+  "Ручной ответ гостиницы (без автоотправки ИИ)": "Қонақүйдің қолмен жауабы (AI автоматты жібермейді)",
+  "Сначала возьмите диалог, затем отвечайте.": "Алдымен диалогты өзіңізге бекітіңіз, содан кейін жауап беріңіз.",
+  "Черновик ответа менеджера": "Менеджер жауабының жобасы",
   "Бронь поступила из внешнего канала. Отмените её через управление каналами.": "Брондау сыртқы арнадан келді. Оны арналарды басқару бөлімінен болдырмаңыз.",
   "Да, отменить бронь": "Иә, брондауды болдырмау",
   "Не удалось отменить бронь. Обновите данные и повторите.": "Брондауды болдырмау мүмкін болмады. Деректерді жаңартып, қайталаңыз.",
@@ -2222,6 +2230,19 @@ const KZ_AUDIT_V5: Record<string, string> = {
   "Помоги гостю выбрать вечерний сценарий отдыха на основе подтверждённых сервисов отеля.": "Қонаққа қонақүйдің расталған қызметтері негізінде кешкі демалыс жоспарын таңдауға көмектес."
 };
 
+// MARINA RC8 WhatsApp manual-send copy: all locales share the same runtime
+// translator as the rest of Admin; no locale-guard exceptions.
+common.push(
+  { ru: "WhatsApp принял сообщение в очередь. Доставку подтвердит отдельный webhook GREEN-API.", kg: "WhatsApp билдирүүнү кезекке алды. Жеткирилгенин GREEN-API webhook аркылуу ырастайт.", en: "WhatsApp queued the message. Delivery requires a separate GREEN-API webhook confirmation." },
+  { ru: "Обрабатываю…", kg: "Иштетилүүдө…", en: "Processing…" },
+  { ru: "Отправка наружу выключена, пока реальный адаптер канала не настроен.", kg: "Чыныгы канал адаптери орнотулмайынча тышка жөнөтүү өчүк.", en: "External sending remains disabled until a real channel adapter is configured." },
+  { ru: "Передать в очередь WhatsApp", kg: "WhatsApp кезегине жөнөтүү", en: "Queue in WhatsApp" },
+  { ru: "Провайдер не подтвердил операцию", kg: "Провайдер операцияны ырастаган жок", en: "Provider did not confirm the operation" },
+  { ru: "Ручной ответ гостиницы (без автоотправки ИИ)", kg: "Мейманкананын кол менен жообу (AI автоматтык жөнөтпөйт)", en: "Hotel manual reply (no AI auto-send)" },
+  { ru: "Сначала возьмите диалог, затем отвечайте.", kg: "Адегенде диалогду өзүңүзгө алыңыз, анан жооп бериңиз.", en: "Claim the conversation before replying." },
+  { ru: "Черновик ответа менеджера", kg: "Менеджердин жооп долбоору", en: "Manager's draft reply" },
+);
+
 const phraseIndex = new Map<string, Phrase>();
 for (const phrase of common) {
   phraseIndex.set(phrase.ru, phrase);
@@ -3098,7 +3119,13 @@ const DYNAMIC_FRAGMENTS: DynamicFragment[] = [
     "kg": " кирүү укугун ",
     "kz": " қолжетімділікті ",
     "en": " access for "
-  }
+  },
+  {
+    ru: ". Возможна постановка в очередь; повтор запрещён до сверки с оператором.",
+    kg: ". Билдирүү кезекке алынган болушу мүмкүн; оператор менен тактамайынча кайра жөнөтпөңүз.",
+    kz: ". Хабарлама кезекке қойылған болуы мүмкін; оператормен тексермейінше қайталамаңыз.",
+    en: ". The message may have been queued; do not retry before operator reconciliation.",
+  },
 ];
 
 function translateDynamicFragments(value: string, locale: Locale): string {

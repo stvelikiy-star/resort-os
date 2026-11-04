@@ -173,6 +173,30 @@ def main():
                 ]),
             }):
                 expect(owner_a.get(path), 503, "duplicate provider instance")
+            # Negative tests must also reject cross-hotel identity confusion,
+            # malformed credentials and unsafe provider origins without
+            # contacting the synthetic provider at all.
+            malformed = [
+                [accounts[0]],
+                [{**accounts[0], "property_id": accounts[1]["property_id"]}, accounts[1]],
+                [{**accounts[0], "tenant_id": accounts[1]["tenant_id"]}, accounts[1]],
+                [{**accounts[0], "property_code": "HOTEL_B"}, accounts[1]],
+                [{**accounts[0], "token": accounts[1]["token"]}, accounts[1]],
+                [{**accounts[0], "token": ""}, accounts[1]],
+                [{**accounts[0], "instance": "not-a-number"}, accounts[1]],
+                [{**accounts[0], "extra_secret": "unexpected"}, accounts[1]],
+                [{**accounts[0], "provider_origin": "https://evil.invalid"}, accounts[1]],
+                [{**accounts[0], "provider_origin": "http://7103.api.greenapi.com"}, accounts[1]],
+                [{**accounts[0], "provider_origin": "https://user@7103.api.greenapi.com"}, accounts[1]],
+            ]
+            for index, config in enumerate(malformed):
+                with patch.dict(os.environ, {
+                    "MARINA_SHARED_GREEN_RC6_CONFIG_JSON": json.dumps(config),
+                }):
+                    response = owner_a.get(path)
+                    expect(response, 503, "invalid config case " + str(index))
+                    assert A_TOKEN not in response.text and B_TOKEN not in response.text
+                    assert len(requested) == count
             with patch.dict(os.environ, {"MARINA_SHARED_GREEN_RC6_CONFIRM": "wrong"}):
                 expect(owner_a.get(path), 503, "missing explicit RC6 approval")
             with patch.dict(os.environ, {"MARINA_SHARED_GREEN_RC6_ENABLED": "false"}):
