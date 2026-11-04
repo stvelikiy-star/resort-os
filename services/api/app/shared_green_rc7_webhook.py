@@ -11,6 +11,7 @@ import hmac
 import json
 import os
 import re
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
@@ -62,13 +63,23 @@ def rc7_webhook_config() -> tuple[dict[str, str], ...]:
             ]
             if len(matches) != 1:
                 raise ValueError("Hotel provider and channel identity mismatch")
+            for field in ("tenant_id", "property_id"):
+                try:
+                    uuid.UUID(g.get(field, ""))
+                except (TypeError, ValueError, AttributeError):
+                    raise ValueError("Missing verified hotel UUID") from None
             service = {
                 "actor_type": "SERVICE",
                 "actor_id": "green-webhook:" + row["property_code"],
                 **matches[0][0],
             }
             service.pop("service_key")
-            bindings.append({**row, "service": service})
+            bindings.append({
+                **row,
+                "green_tenant_id": str(uuid.UUID(g["tenant_id"])),
+                "green_property_id": str(uuid.UUID(g["property_id"])),
+                "service": service,
+            })
         for field in ("tenant_code", "property_code", "instance", "webhook_token"):
             if len({b[field] for b in bindings}) != len(bindings):
                 raise ValueError("Ambiguous webhook bindings")
@@ -169,6 +180,19 @@ async def receive_green_webhook(request: Request):
         body = json.loads(raw)
     except (ValueError, UnicodeError):
         raise HTTPException(422, detail="Invalid GREEN-API JSON") from None
+    # Cross-check the provider's static owner configuration against the
+    # currently ACTIVE tenant/property relationship in PostgreSQL. The body
+    # is never allowed to choose this property.
+    async with request.app.state.db.acquire() as conn:
+        row = await conn.fetchrow(
+            '''SELECT p.id,p."tenantId" FROM properties p
+               JOIN tenants t ON t.id=p."tenantId"
+               WHERE p.code=$1 AND t.code=$2 AND t.status='ACTIVE' ''',
+            binding["property_code"], binding["tenant_code"],
+        )
+    if (not row or str(row["id"]) != binding["green_property_id"]
+            or str(row["tenantId"]) != binding["green_tenant_id"]):
+        raise HTTPException(503, detail="GREEN-API hotel binding is not active")
     message = normalize_green_text(body, binding)
     if message is None:
         return {"accepted": True, "stored": False, "reason": "UNSUPPORTED_EVENT"}
