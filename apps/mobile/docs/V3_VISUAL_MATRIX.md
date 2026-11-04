@@ -68,6 +68,8 @@ MANAGER: task queue RU/light and EN/dark, team EN/dark at 320/375/430, profile R
 
 | MANAGER assignment action | Genuine Expo Web screenshot [manager_team_en_dark_430](qa-evidence/manager_team_en_dark_430.jpg) showed a tiny `Assign` label beneath an unassigned task. Source audit verified the label was a passive `Badge`; only the task card itself opened staff selection. | Replaced passive badge with a labelled `PressScale` button, minimum 48 dp. Added a real Expo Web interaction assertion: tap `open-assign-t8`, require eligible `assign-u-maid`, then capture `manager_assign_picker_en_dark_430`. This does not submit a staff write. | WEB BEFORE + SOURCE CONFIRMED; AFTER awaits same-SHA CI screenshot |
 
+| Light-theme bottom navigation | Direct WCAG calculation found `navInactive #64798F` on `surface #FFFFFF` measured **4.49:1** (<4.5:1 AA text criterion); screenshots show these labels in normal use. | Adjusted only the existing light theme `navInactive` token to `#63788D`, yielding **4.56:1**. Added both-theme contrast assertion in `future-design.test.tsx`. | SOURCE VERIFIED; updated Expo Web screenshot and Android native QA pending |
+
 This polish does not expand permissions, seed fake platform metrics or modify any backend API. The previously captured 21 Expo Web screenshots predate these two changes and do not evidence their final appearance; their route statuses above remain unchanged.
 
 ## Explicitly unverified or blocked
