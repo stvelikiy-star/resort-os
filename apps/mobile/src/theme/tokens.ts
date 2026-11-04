@@ -30,7 +30,7 @@ export const colors: Record<ThemeName, Colors> = {
     info: '#14659A', infoSoft: '#E0F2FC', heroFrom: '#061B38', heroTo: '#155A87',
     shadow: '#0C3455', glass: '#FFFFFF', glassBorder: '#DFEBF4', gold: '#D5A64B',
     cyan: '#007E9B', iris: '#6743B4', glow: '#E2F7FF', navActive: '#073B70',
-    navInactive: '#64798F',
+    navInactive: '#63788D',
   },
   dark: {
     bg: '#061225', surface: '#10213D', surfaceAlt: '#172A49', border: '#2C4260',
