@@ -1,12 +1,13 @@
 import React, { useRef, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Text, View, useWindowDimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronLeft, MessageSquareText } from 'lucide-react-native';
+import { ChevronLeft, MessageSquareText, CheckCheck, AlertTriangle } from 'lucide-react-native';
 import { Badge, Button, Empty, Field, PressScale, SectionLabel } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { ConversationDetail, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { chatStatusLabel, deliveryStatusLabel, messageDirectionLabel } from '../../src/i18n/statusLabels';
+import { formatChatTimestamp } from '../../src/i18n/dateLabels';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
@@ -15,12 +16,13 @@ import { font, space } from '../../src/theme/tokens';
 
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, serverAuthMode } = useSession();
+  const { user, serverAuthMode, locale } = useSession();
   const modules = useLiveModules();
   const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
   const copy = useMobileCopy();
   const router = useRouter();
   const { c } = useTheme();
+  const { width } = useWindowDimensions();
   const [note, setNote] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
   const locked = useRef(false);
@@ -53,10 +55,21 @@ export default function ConversationScreen() {
       </View>
       <Text style={[font.small, { color: c.textMuted }]}>{copy.assigned}: {conversation.assigned_to_name || '—'}</Text>
       <SectionLabel>{copy.inboxTitle}</SectionLabel>
-      {(data?.messages ?? []).map(m => <GlassCard key={m.id} style={{ alignSelf: m.direction === 'OUTBOUND' ? 'flex-end' : m.direction === 'INBOUND' ? 'flex-start' : 'stretch', maxWidth: '95%', backgroundColor: m.direction === 'INTERNAL' ? c.warningSoft : m.direction === 'OUTBOUND' ? c.primarySoft : c.surface }}>
-        <Text style={[font.label, { color: c.textMuted }]}>{messageDirectionLabel(m.direction, copy)} · {m.created_at.slice(0, 16)}</Text>
-        <Text style={[font.body, { color: c.text, marginTop: 6 }]}>{m.text || '—'}</Text>
-        {m.delivery_status ? <Text style={[font.small, { color: c.textMuted }]}>{deliveryStatusLabel(m.delivery_status, copy)}</Text> : null}
+      {(data?.messages ?? []).map(m => <GlassCard key={m.id} style={{
+        alignSelf: m.direction === 'OUTBOUND' ? 'flex-end' : m.direction === 'INBOUND' ? 'flex-start' : 'stretch',
+        maxWidth: m.direction === 'INTERNAL' ? '100%' : width < 350 ? '96%' : '88%',
+        gap: space.sm,
+        borderBottomLeftRadius: m.direction === 'INBOUND' ? 8 : undefined,
+        borderBottomRightRadius: m.direction === 'OUTBOUND' ? 8 : undefined,
+        backgroundColor: m.direction === 'INTERNAL' ? c.warningSoft : m.direction === 'OUTBOUND' ? c.primarySoft : c.surface,
+      }}>
+        <Text style={[font.label, { color: c.textMuted }]}>{messageDirectionLabel(m.direction, copy)}</Text>
+        <Text style={[font.body, { color: c.text }]}>{m.text || '—'}</Text>
+        <View style={{flexDirection:'row',justifyContent:'flex-end',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+          {m.delivery_status === 'FAILED' ? <AlertTriangle size={14} color={c.danger}/> : m.delivery_status === 'READ' ? <CheckCheck size={14} color={c.success}/> : null}
+          {m.delivery_status ? <Text style={[font.small, { color: m.delivery_status === 'FAILED' ? c.danger : c.textMuted }]}>{deliveryStatusLabel(m.delivery_status, copy)}</Text> : null}
+          {formatChatTimestamp(m.created_at, locale) ? <Text style={[font.small, { color: c.textMuted }]}>{formatChatTimestamp(m.created_at, locale)}</Text> : null}
+        </View>
       </GlassCard>)}
       {data?.messages.length === 0 ? <Empty text={copy.empty}/> : null}
       {conversation.assigned_to_id === null ? <Button testID="claim-conversation" label={copy.claim} disabled={busy || unknownResult} onPress={() => void act(() => live!.claimConversation(id!))}/> : null}
