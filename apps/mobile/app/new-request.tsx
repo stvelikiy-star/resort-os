@@ -3,8 +3,9 @@ import { Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Droplets, Fan, Lamp, Package, Zap, X } from 'lucide-react-native';
-import { Button, Field, PressScale, Screen, SectionLabel, Segmented, Title } from '../src/components/ui';
+import { Button, Field, PressScale, SectionLabel, Segmented } from '../src/components/ui';
 import { useAsync } from '../src/lib/useAsync';
+import { FutureScreen, PremiumHeader, GlassCard, LoadingShimmer, ErrorState } from '../src/components/Future';
 import { useSession } from '../src/state/session';
 import { workspaceForSession } from '../src/roles/registry';
 import { useTheme } from '../src/theme/ThemeProvider';
@@ -18,7 +19,7 @@ export default function NewRequest() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api, user } = useSession();
+  const { api, user, hotel, serverAuthMode } = useSession();
   const rooms = useAsync<Room[]>(() => api ? api.listRooms() : Promise.resolve([]), [api]);
   const [cat, setCat] = useState<string>('PLUMBING');
   const [prio, setPrio] = useState<Priority>('NORMAL');
@@ -32,7 +33,7 @@ export default function NewRequest() {
   useEffect(() => () => { if (returnTimer.current) clearTimeout(returnTimer.current); }, []);
 
   const send = async () => {
-    if (sendLock.current || unknownResult || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return;
+    if (sendLock.current || unknownResult || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode, serverAuthMode).canCreateMaintenance) return;
     sendLock.current = true;
     setBusy(true); setMsg(null);
     let accepted = false;
@@ -58,12 +59,13 @@ export default function NewRequest() {
   if (!workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return <Redirect href="/profile" />;
 
   return (
-    <Screen>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Title>{t('mt.title')}</Title>
-        <PressScale onPress={() => router.back()} accessibilityLabel={t('common.cancel')}><X size={28} color={c.textMuted} /></PressScale>
-      </View>
+    <FutureScreen>
+      <PremiumHeader title={t('mt.title')} subtitle={hotel?.name} eyebrow="MARINA SMART"
+        right={<PressScale onPress={() => router.back()} accessibilityLabel={t('common.cancel')}
+          style={{ minHeight: 48, minWidth: 48, borderRadius: radius.pill, backgroundColor: c.surfaceAlt, alignItems: 'center', justifyContent: 'center' }}><X size={25} color={c.textMuted}/></PressScale>}/>
       <SectionLabel>{t('common.room')}</SectionLabel>
+      {rooms.loading && !rooms.data ? <LoadingShimmer count={1}/> : null}
+      {rooms.error ? <ErrorState text={rooms.error.message} retry={t('common.retry')} onRetry={rooms.reload}/> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {(rooms.data ?? []).map((r) => (
           <PressScale key={r.id} testID={`pick-room-${r.id}`} onPress={() => setRoomId(roomId === r.id ? null : r.id)} style={{ minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.pill, backgroundColor: roomId === r.id ? c.primary : c.surfaceAlt }}>
@@ -72,6 +74,7 @@ export default function NewRequest() {
         ))}
       </View>
       <SectionLabel>{t('mt.category')}</SectionLabel>
+      <GlassCard style={{ gap: space.sm }}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
         {CATS.map(({ k, I }) => (
           <PressScale key={k} testID={`cat-${k}`} onPress={() => setCat(k)} style={{ width: 104, height: 84, alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: radius.md, backgroundColor: cat === k ? c.primarySoft : c.surface, borderWidth: 1.5, borderColor: cat === k ? c.primary : c.border }}>
@@ -79,12 +82,13 @@ export default function NewRequest() {
           </PressScale>
         ))}
       </View>
+      </GlassCard>
       <SectionLabel>{t('mt.priority')}</SectionLabel>
       <Segmented<Priority> value={prio} onChange={setPrio} options={[{ key: 'LOW', label: t('tasks.low') }, { key: 'NORMAL', label: t('tasks.normal') }, { key: 'HIGH', label: t('tasks.high') }, { key: 'URGENT', label: t('tasks.urgent') }]} />
       <Field label={t('mt.describe')} placeholder={t('mt.describePh')} value={text} onChangeText={setText} multiline testID="mt-text" style={{ minHeight: 110, paddingTop: 14, textAlignVertical: 'top' }} />
       <Button testID="mt-send" label={t('mt.send')} onPress={send} disabled={busy || unknownResult || text.trim().length < 2} />
       {unknownResult ? <Button testID="mt-check-existing" variant="secondary" label={t('mt.checkExisting')} onPress={() => router.back()} /> : null}
-      {msg ? <Text testID={unknownResult ? 'mt-unknown-result' : 'mt-msg'} accessibilityRole="alert" style={[font.body, { color: unknownResult ? c.warning : c.primary, fontWeight: '700' }]}>{msg}</Text> : null}
-    </Screen>
+      {msg ? <GlassCard><Text testID={unknownResult ? 'mt-unknown-result' : 'mt-msg'} accessibilityRole="alert" style={[font.body, { color: unknownResult ? c.warning : c.primary, fontWeight: '700' }]}>{msg}</Text></GlassCard> : null}
+    </FutureScreen>
   );
 }
