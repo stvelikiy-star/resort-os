@@ -66,8 +66,8 @@ def validate(manifest: dict, root: Path) -> list[str]:
         errors.append("RC3 source branch mismatch")
     if manifest.get("pull_request") != EXPECTED_SOURCE_PR:
         errors.append("RC3 must stay in reviewed Draft PR #324")
-    if not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("reviewed_application_sha", ""))):
-        errors.append("RC3 reviewed application SHA must be full 40-character hash")
+    if not re.fullmatch(r"[0-9a-f]{40}", str(manifest.get("integration_source_sha", ""))):
+        errors.append("RC3 integrated source SHA must be full 40-character hash")
     if manifest.get("state") != "DRAFT_SOURCE_ACCEPTANCE_PENDING":
         errors.append("RC3 source cannot declare release GO")
     for name in REQUIRED_FLAGS_FALSE:
