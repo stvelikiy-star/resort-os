@@ -26,25 +26,28 @@ export default function Login() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const [modeResult, setModeResult] = useState<{ hotelId: string; attempt: number; value: AuthMode } | null>(null);
+  const [modeError, setModeError] = useState<{ hotelId: string; attempt: number } | null>(null);
   const [modeRetry, setModeRetry] = useState(0);
   const [tenantCode, setTenantCode] = useState('');
   const [propertyCode, setPropertyCode] = useState('');
+  const authMode: AuthMode | null = hotel?.demo ? 'demo' :
+    modeResult?.hotelId === hotel?.id && modeResult?.attempt === modeRetry ? modeResult.value : null;
+  const cannotDiscoverMode = modeError?.hotelId === hotel?.id && modeError?.attempt === modeRetry;
 
   useEffect(() => {
+    if (!hotel || !api || hotel.demo) return;
     let active = true;
-    setErr(null);
-    setAuthMode(null);
-    if (!hotel || !api) return;
-    if (hotel.demo) { setAuthMode('demo'); return; }
-    if (!api.authMode) { setErr(t('login.modeUnavailable')); return; }
-    void api.authMode().then(mode => {
-      if (active) setAuthMode(mode);
+    // Mode requests are public. Never send credentials when the mode is
+    // unknown, unsupported or unavailable. Async callbacks avoid render loops.
+    const check = api.authMode ? api.authMode() : Promise.reject(new Error('Auth mode unavailable'));
+    void check.then(value => {
+      if (active) setModeResult({ hotelId: hotel.id, attempt: modeRetry, value });
     }).catch(() => {
-      if (active) setErr(t('login.modeUnavailable'));
+      if (active) setModeError({ hotelId: hotel.id, attempt: modeRetry });
     });
     return () => { active = false; };
-  }, [hotel?.id, api, modeRetry]);
+  }, [hotel, api, modeRetry]);
 
   const go = async (user: string, pass: string) => {
     if (busyRef.current) return;
@@ -84,6 +87,7 @@ export default function Login() {
         <Field label={t('login.username')} value={u} onChangeText={setU} autoCapitalize="none" autoCorrect={false} testID="login-username" />
         <Field label={t('login.password')} value={p} onChangeText={setP} secureTextEntry testID="login-password" />
         {err ? <Text testID="login-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
+        {cannotDiscoverMode && authMode === null ? <Text testID="login-mode-error" style={[font.small, { color: c.danger }]}>{t('login.modeUnavailable')}</Text> : null}
         <Button testID="login-submit" label={t('login.signIn')} onPress={() => go(u, p)} disabled={busy || !authMode || !u || !p || (authMode === 'shared_auth_preview' && (!tenantCode.trim() || !propertyCode.trim()))} />
       </GlassCard>
       {hotel?.demo ? (
