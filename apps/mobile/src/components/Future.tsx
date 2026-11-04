@@ -4,7 +4,7 @@ import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles 
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
-import { cappedStagger, useMotionAllowed } from '../theme/motion';
+import { cappedStagger, useMotionAllowed, useMotionPreference } from '../theme/motion';
 import { elevation, font, iconography, motion, radius, space } from '../theme/tokens';
 import { Badge, Card, PressScale, Screen, Title } from './ui';
 import { Logo } from './Brand';
@@ -151,13 +151,14 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
   </PressScale>;
 }
 export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
-  const allowed = useMotionAllowed();
-  const [fade] = useState(() => new Animated.Value(1));
+  const { allowed, ready } = useMotionPreference();
+  const [fade] = useState(() => new Animated.Value(0));
   useEffect(() => {
+    if (!ready) return;
     if (!allowed) { fade.setValue(1); return; }
     fade.setValue(0);
     const animation = Animated.timing(fade, { toValue: 1, duration: motion.card, delay: cappedStagger(index), useNativeDriver: true });
     animation.start(); return () => animation.stop();
-  }, [allowed, fade, index]);
+  }, [allowed, ready, fade, index]);
   return <Animated.View style={{ opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>{children}</Animated.View>;
 }
