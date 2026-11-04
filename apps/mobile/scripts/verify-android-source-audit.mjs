@@ -20,6 +20,54 @@ export function sourceMatchesAffectedNode(source, node) {
     path === node || path.endsWith('/' + node);
 }
 
+/**
+ * Split npm audit packages into:
+ *  - directly vulnerable: the package itself has an advisory object in `via`
+ *    (this is the code that must not be shipped);
+ *  - propagated: every `via` entry is a string naming another vulnerable package.
+ * Propagated packages are only trusted as such when the chain resolves, through
+ * entries present in the same audit, to at least one directly vulnerable package.
+ * Anything unclassifiable (missing/empty `via`, unknown or cyclic chain, advisory
+ * object naming a different package) is treated as directly vulnerable: fail closed.
+ */
+export function classifyAuditPackages(vulnerabilities) {
+  const own = new Map();
+  for (const [name, report] of Object.entries(vulnerabilities)) {
+    const via = report?.via;
+    if (!Array.isArray(via) || via.length === 0) { own.set(name, 'unclassified'); continue; }
+    const advisories = via.filter(x => x && typeof x === 'object');
+    if (advisories.some(a => a.name !== name)) { own.set(name, 'unclassified'); continue; }
+    if (!via.every(x => typeof x === 'string' || (x && typeof x === 'object'))) { own.set(name, 'unclassified'); continue; }
+    own.set(name, advisories.length > 0 ? 'direct' : 'propagated');
+  }
+  const roots = new Map();
+  const resolve = (name, seen) => {
+    if (roots.has(name)) return roots.get(name);
+    if (seen.has(name)) return null;
+    const kind = own.get(name);
+    if (kind === 'direct') return [name];
+    if (kind !== 'propagated') return null;
+    seen.add(name);
+    const found = new Set();
+    for (const next of vulnerabilities[name].via) {
+      if (typeof next !== 'string' || !(next in vulnerabilities)) { seen.delete(name); return null; }
+      const r = resolve(next, seen);
+      if (!r) { seen.delete(name); return null; }
+      r.forEach(x => found.add(x));
+    }
+    seen.delete(name);
+    return [...found].sort();
+  };
+  const result = { direct: [], propagated: [] };
+  for (const name of Object.keys(vulnerabilities)) {
+    if (own.get(name) === 'direct') { result.direct.push({ name, kind: 'direct' }); continue; }
+    const r = own.get(name) === 'propagated' ? resolve(name, new Set()) : null;
+    if (r && r.length) result.propagated.push({ name, kind: 'propagated', roots: r });
+    else result.direct.push({ name, kind: 'unclassified' });
+  }
+  return result;
+}
+
 export function inspectAndroidMetroAudit(audit, sourceMaps, sourceCommit = 'unknown') {
   if (!audit || typeof audit !== 'object' || !audit.vulnerabilities ||
       typeof audit.vulnerabilities !== 'object' || Array.isArray(audit.vulnerabilities)) {
@@ -58,7 +106,10 @@ export function inspectAndroidMetroAudit(audit, sourceMaps, sourceCommit = 'unkn
     throw new Error('Source matcher positive and negative controls failed');
   }
 
+  const classes = classifyAuditPackages(audit.vulnerabilities);
+  const directNames = new Set(classes.direct.map(x => x.name));
   const affected = [];
+  const propagatedNodes = [];
   for (const [name, report] of Object.entries(audit.vulnerabilities)) {
     if (!report || typeof report !== 'object' ||
         !Array.isArray(report.nodes) || report.nodes.length === 0) {
@@ -68,7 +119,8 @@ export function inspectAndroidMetroAudit(audit, sourceMaps, sourceCommit = 'unkn
       if (!validAffectedNode(location)) {
         throw new Error('Unsafe npm advisory node path: ' + String(location));
       }
-      affected.push({ name, location });
+      if (directNames.has(name)) affected.push({ name, location });
+      else propagatedNodes.push({ name, location });
     }
   }
 
@@ -80,6 +132,13 @@ export function inspectAndroidMetroAudit(audit, sourceMaps, sourceCommit = 'unkn
       }
     }
   }
+  // Not hidden: dependents flagged by npm audit that ship in the bundle are
+  // reported as evidence, but only directly vulnerable modules fail the check.
+  const propagatedInBundle = classes.propagated.map(p => ({
+    name: p.name, roots: p.roots,
+    bundledSources: propagatedNodes.filter(n => n.name === p.name)
+      .reduce((count, n) => count + allSources.filter(src => sourceMatchesAffectedNode(src, n.location)).length, 0),
+  })).filter(p => p.bundledSources > 0);
   return {
     policy: 'METRO_SOURCE_MAP_DIAGNOSTIC_ONLY_NOT_NPM_AUDIT_OR_APK_RELEASE_WAIVER',
     sourceCommit,
@@ -88,6 +147,9 @@ export function inspectAndroidMetroAudit(audit, sourceMaps, sourceCommit = 'unkn
     nodeModulesSourceCount,
     expoRouterSourceCount,
     npmAdvisoryPackageNames: Object.keys(audit.vulnerabilities).length,
+    directlyVulnerable: classes.direct,
+    propagatedPackages: classes.propagated,
+    propagatedInBundle,
     affectedNodePaths: affected.length,
     matchedModulePaths: matches.length,
     matches,
@@ -120,6 +182,9 @@ if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).
       maps: evidence.mapDigests.length,
       sources: evidence.totalDistinctSources,
       expoRouterSources: evidence.expoRouterSourceCount,
+      directlyVulnerable: evidence.directlyVulnerable.length,
+      propagatedPackages: evidence.propagatedPackages.length,
+      propagatedDependentsInBundle: evidence.propagatedInBundle.length,
       affectedNodePaths: evidence.affectedNodePaths,
       matchingModules: evidence.matchedModulePaths,
       diagnosticOnly: true,
