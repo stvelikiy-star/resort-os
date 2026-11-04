@@ -106,9 +106,13 @@ try {
   await page.goto(fixtures.B.url, { waitUntil: "domcontentloaded" });
   await page.locator(".concierge-hero").waitFor({ timeout: 20000 });
 
+  // The real shared RC4 UI advertises only server-reviewed nonfinancial
+  // services. No unavailable AI or paid/provider action is clickable.
   const actions = page.locator(".concierge-actions button");
-  assert((await actions.count()) >= 4);
-  await actions.nth(3).click(); // MAINTENANCE, an informational guest request.
+  assert.deepEqual(await actions.evaluateAll((nodes) =>
+    nodes.map((n) => n.getAttribute("data-service-code"))), ["MAINTENANCE", "ADMIN"]);
+  assert.equal(await page.locator('section[aria-label*="MARINA AI"]').count(), 0);
+  await page.locator('.concierge-actions button[data-service-code="MAINTENANCE"]').click();
   await page.locator(".concierge-modal textarea").fill("Synthetic browser maintenance request B");
   await page.locator(".concierge-modal .concierge-submit").click();
   await page.locator(".concierge-request-list").getByText("Synthetic browser maintenance request B").waitFor({ timeout: 20000 });
@@ -123,6 +127,8 @@ try {
   const aContext = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 } });
   const aPage = await aContext.newPage();
   await verifyPage(aPage, "A");
+  assert.equal(await aPage.locator('section[aria-label*="MARINA AI"]').count(), 0);
+  assert.equal(await aPage.locator(".concierge-actions button").count(), 2);
   for (const locale of ["KG", "EN", "RU"]) {
     await aPage.locator(".concierge-langs button").filter({ hasText: locale }).click();
     assert.equal((await aPage.locator(".concierge-brand strong").textContent())?.trim(), "CI Hotel A");
