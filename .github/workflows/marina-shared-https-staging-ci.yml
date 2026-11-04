@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - compose.marina-shared-staging.yaml
+      - apps/staff/**
+      - scripts/marina_shared_staff_shift_ci.mjs
       - scripts/marina_shared_https_pms_ci.mjs
       - .github/workflows/marina-shared-https-staging-ci.yml
   workflow_dispatch:
@@ -51,6 +53,10 @@ jobs:
             tls /tls/cert.pem /tls/key.pem
             reverse_proxy 127.0.0.1:13201
           }
+          https://localhost:13444 {
+            tls /tls/cert.pem /tls/key.pem
+            reverse_proxy 127.0.0.1:13202
+          }
           CADDY
           docker run -d --name marina-https-ci-proxy --network host \
             -v "$PWD:/tls:ro" -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
@@ -82,6 +88,15 @@ jobs:
           npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
           ./scripts/node_modules/.bin/playwright install --with-deps chromium
           node scripts/marina_shared_https_pms_ci.mjs
+      - name: Build and verify shared Staff shifts through HTTPS
+        run: |
+          export CORE_API_URL=http://127.0.0.1:13201/core
+          npm --prefix apps/staff ci --no-audit --no-fund
+          npm --prefix apps/staff run typecheck
+          npm --prefix apps/staff run build
+          (cd apps/staff && exec ./node_modules/.bin/next start -H 127.0.0.1 -p 13202) > "$RUNNER_TEMP/marina-staff.log" 2>&1 &
+          curl -fsS --max-time 5 --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:13202/ >/dev/null
+          node scripts/marina_shared_staff_shift_ci.mjs
       - name: Remove isolated CI services and volumes
         if: always()
         run: |
