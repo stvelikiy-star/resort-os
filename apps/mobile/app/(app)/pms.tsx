@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble } from 'lucide-react-native';
-import { Badge, Button, Empty, PressScale, SectionLabel } from '../../src/components/ui';
+import { Badge, Button, Empty, PressScale, SectionLabel, Segmented } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
 import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
@@ -17,18 +17,26 @@ function dayAt(start: string, offset: number): string {
   const d = new Date(start + 'T12:00:00'); d.setDate(d.getDate() + offset);
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
-const DAYS = 7, CELL_WIDTH = 68, ROW_HEIGHT = 66, LABEL_WIDTH = 92;
+const DAYS = 7, CELL_WIDTH = 72, ROW_HEIGHT = 76, LABEL_WIDTH = 104;
+const DAY_NAMES = {
+  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
+  kg: ['Жек', 'Дүй', 'Шей', 'Шар', 'Бей', 'Жум', 'Ише'],
+  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+  kz: ['Жс', 'Дс', 'Сс', 'Ср', 'Бс', 'Жм', 'Сб'],
+} as const;
 export default function Pms() {
-  const { hotel, user } = useSession();
+  const { hotel, user, locale } = useSession();
   const live = useLiveModules();
   const copy = useMobileCopy();
   const router = useRouter();
   const { c } = useTheme();
   const [start, setStart] = useState(() => localDate());
+  const [filter, setFilter] = useState<'all' | 'attention'>('all');
   const { data, loading, error, reload } = useAsync<Grid | null>(() => live ? live.pmsGrid(start, dayAt(start, DAYS)) : Promise.resolve(null), [live, user?.id, start]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const dates = Array.from({ length: DAYS }, (_, i) => dayAt(start, i));
+  const shownRooms = (data?.rooms ?? []).filter(room => filter === 'all' || ['DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(room.operational_state));
   const occupancyFor = (room: GridRoom, day: string) => room.blocks.filter(b => b.start <= day && day < b.end);
   const cell = (room: GridRoom, day: string) => {
     const blocks = occupancyFor(room, day);
@@ -45,7 +53,7 @@ export default function Pms() {
     const canOpen = canOpenPmsReservation(blocks, day, user?.role);
     return <PressScale key={day} testID={'pms-' + room.id + '-' + day}
       accessibilityLabel={room.code + ' ' + day + ' · ' + semantic}
-      disabled={!canOpen} onPress={() => { if (canOpen) router.push({ pathname: '/reservation/[id]', params: { id: block.reservation_id! } }); }}
+      disabled={!canOpen} dimWhenDisabled={false} onPress={() => { if (canOpen) router.push({ pathname: '/reservation/[id]', params: { id: block.reservation_id! } }); }}
       style={{ width: CELL_WIDTH - 4, height: ROW_HEIGHT - 6, marginRight: 4, borderRadius: radius.sm, backgroundColor: tone, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: state === 'RESERVATION' ? tone : c.border }}>
       <Text style={[font.h2, { color: ink }]}>{label}</Text>
     </PressScale>;
@@ -73,7 +81,8 @@ export default function Pms() {
     {loading && live ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
-      <SectionLabel>{copy.available} · {data.rooms.length}</SectionLabel>
+      <SectionLabel>{copy.rooms} · {data.rooms.length}</SectionLabel>
+      <Segmented value={filter} options={[{ key: 'all', label: copy.all }, { key: 'attention', label: copy.needsAttention }]} onChange={setFilter}/>
       <Text style={[font.small, { color: c.textMuted }]}>{copy.gridHint}</Text>
       <GlassCard style={{ padding: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
@@ -81,25 +90,27 @@ export default function Pms() {
             <View style={{ height: 46, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <BedDouble size={18} color={c.primary}/><Text style={[font.label, { color: c.textMuted }]}>{copy.rooms}</Text>
             </View>
-            {data.rooms.map(room => <View key={room.id} style={{ height: ROW_HEIGHT, justifyContent: 'center', paddingRight: 6, borderBottomWidth: 1, borderColor: c.border }}>
+            {shownRooms.map(room => <View key={room.id} style={{ height: ROW_HEIGHT, justifyContent: 'center', paddingRight: 6, borderBottomWidth: 1, borderColor: c.border }}>
               <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{room.code}</Text>
-              <Text style={[font.small, { color: room.operational_state === 'TECH_BLOCK' ? c.danger : c.textMuted }]} numberOfLines={1}>{roomState(room)}</Text>
+              <Text style={[font.small, { color: room.operational_state === 'TECH_BLOCK' ? c.danger : c.textMuted }]} numberOfLines={2}>{roomState(room)}</Text>
             </View>)}
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator accessibilityLabel={copy.pms}>
             <View>
               <View style={{ flexDirection: 'row', height: 46, alignItems: 'center' }}>
                 {dates.map(date => <View key={date} style={{ width: CELL_WIDTH, alignItems: 'center', paddingVertical: 7, borderRadius: radius.sm, backgroundColor: date === localDate() ? c.primarySoft : 'transparent' }}>
-                  <Text style={[font.small, { color: c.text, fontWeight: '700' }]}>{date.slice(5)}</Text>
+                  <Text style={[font.small, { color: date === localDate() ? c.primary : c.text, fontWeight: '800' }]}>{date.slice(5)}</Text>
+                  <Text style={[font.label, { color: c.textMuted }]}>{DAY_NAMES[locale][new Date(date + 'T12:00:00').getDay()]}</Text>
                 </View>)}
               </View>
-              {data.rooms.map(room => <View key={room.id} style={{ flexDirection: 'row', height: ROW_HEIGHT, alignItems: 'center', borderBottomWidth: 1, borderColor: c.border }}>
+              {shownRooms.map(room => <View key={room.id} style={{ flexDirection: 'row', height: ROW_HEIGHT, alignItems: 'center', borderBottomWidth: 1, borderColor: c.border }}>
                 {dates.map(date => cell(room, date))}
               </View>)}
             </View>
           </ScrollView>
         </View>
       </GlassCard>
+      {shownRooms.length === 0 ? <Empty text={filter === 'attention' ? copy.empty : copy.noRooms}/> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         <Badge label={'● ' + copy.bookings} tone="primary"/>
         <Badge label={'H ' + copy.holds} tone="warning"/>
@@ -108,12 +119,12 @@ export default function Pms() {
         <Badge label={'! ' + copy.conflict} tone="danger"/>
       </View>
       <SectionLabel>{copy.bookings}</SectionLabel>
-      {data.rooms.flatMap(room => room.blocks.filter(b => b.reservation_id).map(b => ({room, b}))).slice(0,24).map(({room,b}) =>
+      {shownRooms.flatMap(room => room.blocks.filter(b => b.type === 'RESERVATION' && b.reservation_id).map(b => ({room, b}))).slice(0,24).map(({room,b}) =>
         <GlassCard key={b.id} onPress={b.reservation_id && user?.role !== 'AGENT' ? () => router.push({ pathname:'/reservation/[id]', params:{id:b.reservation_id!} }) : undefined}>
           <Text style={[font.h2, { color:c.text }]}>{room.code} · {b.booking_number || '—'}</Text>
           <Text style={[font.small, { color:c.textMuted }]}>{b.start} → {b.end} · {b.guest_name || copy.readOnly}</Text>
         </GlassCard>)}
-      {data.rooms.length === 0 ? <Empty text={copy.noRooms}/> : null}
+
     </> : null}
   </FutureScreen>;
 }
