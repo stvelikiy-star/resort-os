@@ -59,7 +59,7 @@ export default function Login() {
         tenant_code: tenantCode.trim(), property_code: propertyCode.trim(),
       }) : undefined;
       const me = await signIn(user, pass, selector);
-      router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE'));
+      router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE', authMode));
     } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'PENDING_LOGOUT' ? t('login.logoutPending') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { busyRef.current = false; setBusy(false); }
   };
 

@@ -3,6 +3,7 @@ import { useSession } from '../state/session';
 import { isTrustedHotelOrigin } from './hotels';
 import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
+import type { AuthMode } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
 import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
@@ -75,10 +76,16 @@ export interface DiningFloor {
   orders: { id: string; order_number: string; status: string; table_code: string | null;
     room_code: string | null; waiter_id: string | null; waiter_name: string | null }[];
 }
-export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch) {
+export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch, serverAuthMode: AuthMode | null = null) {
   const http = createHotelHttpClient(baseUrl, transport);
   const request = <T,>(method: HttpMethod, path: string, body?: unknown) => http.request<T>(method, path, body);
   const p = '/api/v1';
+  const reviewGate = () => {
+    if (serverAuthMode === 'shared_auth_preview') {
+      // The reviewed server boundary returns 503 for these modules.
+      throw new ApiError('UNKNOWN', 'Workspace is unavailable in shared PMS staging');
+    }
+  };
   return {
     dashboard: async () => dashboardResponse(await request<unknown>('GET', p + '/admin/dashboard')),
     reception: async () => {
@@ -110,27 +117,58 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const value = await request<Grid>('GET', p + '/pms/grid?start=' + safeIsoDate(start) + '&end=' + safeIsoDate(end));
       return gridResponse(value);
     },
-    conversations: async (needsReply?: boolean) => inboxListResponse(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : ''))),
+    conversations: async (needsReply?: boolean) => {
+      reviewGate();
+      return inboxListResponse(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : '')));
+    },
     conversation: async (id: string) => {
+      reviewGate();
       const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + safeRouteId(id));
       return conversationResponse(value);
     },
-    claimConversation: async (id: string) => conversationClaimAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'), id),
-    conversationStatus: async (id: string, status: ConversationStatus) => conversationStatusAck(await request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }), id, status),
-    internalNote: async (id: string, text: string) => noteAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }), id),
-    // WhatsApp sending is intentionally not exposed: the current backend send-text is Telegram-only.
-    kitchenOrders: async () => kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE')),
-    kitchenStatus: async (id: string, status: KitchenStatus) => kitchenStatusAck(await request<unknown>('PATCH', p + '/kitchen/orders/' + safeRouteId(id) + '/status', { status }), id, status),
-    diningFloor: async () => diningFloorResponse(await request<unknown>('GET', p + '/dining/floor')),
-    claimWaiterOrder: async (id: string, waiterId: string) => waiterClaimAck(await request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }), id, waiterId),
-    assistantCapabilities: async () => assistantCapabilitiesResponse(await request<unknown>('GET', p + '/assistant/capabilities')),
-    assistantChat: async (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => assistantAnswerResponse(await request<unknown>('POST', p + '/assistant/chat', {
-      messages: messages.slice(-10), locale, current_screen: currentScreen,
-    })),
+    claimConversation: async (id: string) => {
+      reviewGate();
+      return conversationClaimAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'), id);
+    },
+    conversationStatus: async (id: string, status: ConversationStatus) => {
+      reviewGate();
+      return conversationStatusAck(await request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }), id, status);
+    },
+    internalNote: async (id: string, text: string) => {
+      reviewGate();
+      return noteAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }), id);
+    },
+    // No WhatsApp sending: current server outbound is not multi-tenant accepted.
+    kitchenOrders: async () => {
+      reviewGate();
+      return kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE'));
+    },
+    kitchenStatus: async (id: string, status: KitchenStatus) => {
+      reviewGate();
+      return kitchenStatusAck(await request<unknown>('PATCH', p + '/kitchen/orders/' + safeRouteId(id) + '/status', { status }), id, status);
+    },
+    diningFloor: async () => {
+      reviewGate();
+      return diningFloorResponse(await request<unknown>('GET', p + '/dining/floor'));
+    },
+    claimWaiterOrder: async (id: string, waiterId: string) => {
+      reviewGate();
+      return waiterClaimAck(await request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }), id, waiterId);
+    },
+    assistantCapabilities: async () => {
+      reviewGate();
+      return assistantCapabilitiesResponse(await request<unknown>('GET', p + '/assistant/capabilities'));
+    },
+    assistantChat: async (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => {
+      reviewGate();
+      return assistantAnswerResponse(await request<unknown>('POST', p + '/assistant/chat', {
+        messages: messages.slice(-10), locale, current_screen: currentScreen,
+      }));
+    },
   };
 }
 export function useLiveModules() {
-  const { hotel, api, user } = useSession();
+  const { hotel, api, user, serverAuthMode } = useSession();
   // A connection URL is NOT an authenticated hotel identity. In the shared
   // multi-owner PMS a leftover OS cookie may belong to a DIFFERENT property.
   // Never issue a module request until /auth/me verified the selected session.
@@ -138,8 +176,8 @@ export function useLiveModules() {
   // so dependent screens invalidate old hotel data before issuing fresh reads.
   return useMemo(() =>
     hotel && user && api?.mode === 'LIVE' && isTrustedHotelOrigin(hotel.baseUrl)
-      ? createLiveModules(hotel.baseUrl) : null,
-    [hotel, api, user],
+      ? createLiveModules(hotel.baseUrl, fetch, serverAuthMode) : null,
+    [hotel, api, user, serverAuthMode],
   );
 }
 

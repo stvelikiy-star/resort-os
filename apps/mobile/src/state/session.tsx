@@ -6,9 +6,10 @@ import { createRealApi } from '../api/realApi';
 import { flushPendingCookieLogouts, hasUnrevokedCookieForHost, queueCookieLogout } from '../lib/pendingLogout';
 import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
 import { ApiError } from '../api/types';
+import { bindVerifiedHost } from '../api/unauthorizedSession';
 import { checkedHotelSelector, matchesSelectedHotel, sameSessionIdentity } from '../api/sharedHotelAuth';
 import type { SharedHotelSelector } from '../api/sharedHotelAuth';
-import type { AuthUser, StaffApi } from '../api/types';
+import type { AuthMode, AuthUser, StaffApi } from '../api/types';
 import { initI18n, Locale, localeFromDevice } from '../i18n';
 import { getItem, setItem } from '../lib/storage';
 
@@ -17,6 +18,8 @@ interface SessionCtx {
   hotel: HotelConnection | null;
   user: AuthUser | null;
   api: StaffApi | null;
+  /** Canonical /api/v1/auth/mode, verified during LIVE login. */
+  serverAuthMode: AuthMode | null;
   locale: Locale;
   setLocale: (l: Locale) => void;
   addHotel: (h: HotelConnection) => void;
@@ -39,6 +42,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const [hotelId, setHotelId] = useState<string | null>(initialHotelId ?? null);
   // Sessions are keyed by hotel id: signing in to hotel A never exposes data of hotel B.
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
+  const [serverAuthMode, setServerAuthMode] = useState<AuthMode | null>(null);
   const sessionRevision = useRef(0);
   const loginAttempt = useRef(0);
   // One native cookie jar per host: keep all LIVE sign-in cookie writes ordered.
@@ -145,6 +149,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // Switching hotel is a local security boundary even when remote logout
     // is offline. Do not expose the old staff identity during any network I/O.
     setSessions({});
+    setServerAuthMode(null);
     setHotelId(id);
     if (leaving && !leaving.demo && isTrustedHotelOrigin(leaving.baseUrl)) {
       const origin = leaving.baseUrl;
@@ -197,6 +202,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (hotelId) dropApi(hotelId);
     dropApi(demoHotel.id);
     setSessions({});
+    setServerAuthMode(null);
     setHotelId(demoHotel.id);
     try {
       const demoApi = apiFor(demoHotel);
@@ -223,6 +229,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     const revision = ++sessionRevision.current;
     const attempt = ++loginAttempt.current;
     setSessions({});
+    setServerAuthMode(null);
 
     const perform = async (): Promise<AuthUser> => {
       // A hotel switch or later login can supersede this queued request.
@@ -231,11 +238,13 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         throw new ApiError('UNAUTHORIZED', 'Session context changed before login');
       }
       let selected: SharedHotelSelector | undefined;
+      let chosenMode: AuthMode | null = null;
     if (!hotel.demo) {
       // This canonical endpoint distinguishes shared tenant login from legacy
       // one-property login without guessing from a hostname or user input.
       if (!api.authMode) throw new ApiError('UNKNOWN', 'Server authentication mode unavailable');
       const mode = await api.authMode();
+      chosenMode = mode;
       if (mode === 'shared_auth_preview') {
         if (!selector) throw new ApiError('BAD_REQUEST', 'Organization and hotel codes are required');
         selected = checkedHotelSelector(selector);
@@ -277,6 +286,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       if (sessionRevision.current !== revision || loginAttempt.current !== attempt) {
         throw new ApiError('UNAUTHORIZED', 'Session context changed during login');
       }
+      setServerAuthMode(chosenMode);
       setSessions({ [hotel.id]: verified });
       return verified;
     } catch (error) {
@@ -306,6 +316,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // A logout request invalidates visible identity synchronously. Never wait
     // for encrypted storage or a network call to remove the previous hotel.
     dropApi(hotel.id);
+    setServerAuthMode(null);
     setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
 
     if (hotel.demo) {
@@ -338,9 +349,20 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     await current;
   }, [hotel, api]);
 
+  // Protected-data 401 invalidates ONLY the verified session whose request
+  // began under this binding. Old A responses cannot sign out newly logged B.
+  useEffect(() => {
+    if (!hotel || !user || api?.mode !== 'LIVE' || !isTrustedHotelOrigin(hotel.baseUrl)) return;
+    const revision = sessionRevision.current;
+    return bindVerifiedHost(hotel.baseUrl, () => {
+      if (sessionRevision.current !== revision) return;
+      void signOut(); // clear locally now; serialize durable server revocation
+    });
+  }, [hotel, api, user, signOut]);
+
   const value = useMemo<SessionCtx>(() => ({
-    hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut, leaveHotel: () => selectHotel(null),
-  }), [hotels, hotel, user, api, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut]);
+    hotels, hotel, user, api, serverAuthMode, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut, leaveHotel: () => selectHotel(null),
+  }), [hotels, hotel, user, api, serverAuthMode, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
