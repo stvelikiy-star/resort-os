@@ -48,7 +48,7 @@ Effective shared role ceilings:
 - `OWNER`: hotel-local owner capabilities.
 - `MANAGER`: owner-granted modules, only within its manager role.
 - `RECEPTION`: `PMS`, `RESERVATIONS`, `SERVICES`, `DINING`, `ROOM_QR`, `GROUPS`, `WHATSAPP` (some sections still staging-closed).
-- `AGENT`: `PMS` only.
+- `AGENT`: `PMS` only, **and** the staff account must be linked to an ACTIVE, hotel-local `booking_agents` record. The CI fixture intentionally has no booking-agent membership, so a logged-in AGENT receives **403** for the grid until onboarding/linkage is explicitly accepted.
 - `MAID`: `OPS`/HOUSEKEEPING only. `TECHNICIAN`: `OPS`/MAINTENANCE only.
 - `COOK`, `WAITER`: `DINING` only (**shared cooking/dining endpoints currently closed**).
 - `STORE_STAFF`, `DINING_STAFF`, `CONTENT_MANAGER`, `BEACH_PARTNER`: the enum records still authenticate but have no accepted shared preview modules. Never show unimplemented features.
