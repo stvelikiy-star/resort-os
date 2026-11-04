@@ -111,6 +111,12 @@ def main():
                      role in ("OWNER", "MANAGER", "RECEPTION")),
                     ("/api/v1/ops/tasks", role in ("OWNER", "MANAGER", "MAID", "TECHNICIAN")),
                     ("/api/v1/admin/staff/overview", role in ("OWNER", "MANAGER")),
+                    ("/api/v1/admin/finance/summary?from_date=" +
+                     (date.today()-timedelta(days=3)).isoformat()+"&to_date="+
+                     (date.today()+timedelta(days=3)).isoformat(),
+                     role in ("OWNER","MANAGER")),
+                    ("/api/v1/ops/tasks/"+receipts[hotel]["maintenance_task_id"]+"/history",
+                     role in ("OWNER","MANAGER")),
                 )
                 for url, granted in choices:
                     response = client.get(url, headers=headers)
@@ -126,6 +132,16 @@ def main():
                         )
                     if granted and url == "/api/v1/admin/dashboard":
                         assert response.json()["property"]["code"] == hotel
+                    if granted and url.startswith("/api/v1/admin/finance/summary"):
+                        summary=response.json()
+                        assert summary["scope"]["internal_only"] is True
+                        assert summary["period_payments"]["received_kgs"] == (
+                            1000 if hotel=="HOTEL_A" else 1500
+                        )
+                        assert not any(row["reservation_id"]==receipts[foreign]["reservation_id"]
+                                       for row in summary["reservation_ledger"])
+                    if granted and url.endswith("/history"):
+                        assert response.json()["task"]["id"] == receipts[hotel]["maintenance_task_id"]
                     if granted and url == "/api/v1/admin/staff/overview":
                         staff = response.json()["staff"]
                         assert len(staff) == len(SERVER_ROLES), "Staff list crossed hotel boundary"
@@ -220,7 +236,35 @@ def main():
                 SELECT id FROM properties WHERE code='HOTEL_A')
         ''')
 
-    print("MARINA_SHARED_ROLE_AUTH_2_HOTEL_PASS: 24 role identities, role ceiling, grants/revocation, tenant selectors and foreign-data denial")
+        # Read-only finance and task history must be separately revocable
+        # from a manager, without deleting their unrelated STAFF permission.
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_A","OWNER")])
+        manager_row=next(s for s in client.get("/api/v1/admin/staff/overview").json()["staff"]
+                         if s["username"]=="manager")
+        narrowed=client.patch("/api/v1/admin/staff/"+manager_row["id"],
+                              json={"module_permissions":["STAFF"]})
+        assert narrowed.status_code==200,narrowed.text
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_A","MANAGER")])
+        assert client.get("/api/v1/auth/me").status_code==401
+        login(client,"HOTEL_A","MANAGER")
+        assert client.get("/api/v1/admin/staff/overview").status_code==200
+        assert client.get("/api/v1/admin/finance/summary?from_date="+
+                          date.today().isoformat()+"&to_date="+date.today().isoformat()).status_code==403
+        assert client.get("/api/v1/ops/tasks/"+
+                          receipts["HOTEL_A"]["maintenance_task_id"]+"/history").status_code==403
+        client.cookies.clear()
+        client.cookies.set(token_cookie, seen[("HOTEL_B","MANAGER")])
+        assert client.get("/api/v1/admin/finance/summary?from_date="+
+                          date.today().isoformat()+"&to_date="+date.today().isoformat()).status_code==200
+        mutate('''
+            UPDATE staff_users SET "modulePermissions"=NULL
+            WHERE username='manager' AND "propertyId"=(
+                SELECT id FROM properties WHERE code='HOTEL_A')
+        ''')
+
+    print("MARINA_SHARED_ROLE_AUTH_2_HOTEL_PASS: 24 roles, finance+audit role ceiling, grants/revocation, tenant selectors and denied foreign data")
 
 
 if __name__ == "__main__":
