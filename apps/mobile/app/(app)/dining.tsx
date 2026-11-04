@@ -6,6 +6,7 @@ import { Badge, Button, Empty, SectionLabel } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { DiningFloor, KitchenOrder, KitchenStatus, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { orderStatusLabel } from '../../src/i18n/statusLabels';
 import { useSession } from '../../src/state/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
@@ -52,12 +53,12 @@ export default function Dining() {
     {floor ? <><SectionLabel>{copy.tables}</SectionLabel><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>{floor.tables.map(t => <GlassCard key={t.id} style={{ width: '47%' }}><Text style={[font.h2, { color: c.text }]}>{t.code}</Text><Text style={[font.small, { color: c.textMuted }]}>{t.status} · {t.seats}</Text></GlassCard>)}</View></> : null}
     <SectionLabel>{copy.orders} · {orders.length}</SectionLabel>
     {orders.map((o,i) => <StaggerItem key={o.id} index={i}><GlassCard testID={'order-' + o.id} style={{ gap: 8 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={[font.h2, { color: c.text }]}>{o.order_number}</Text><Badge label={o.status} tone={o.status === 'READY' ? 'success' : 'info'}/></View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={[font.h2, { color: c.text }]}>{o.order_number}</Text><Badge label={orderStatusLabel(o.status, copy)} tone={o.status === 'READY' ? 'success' : 'info'}/></View>
       <Text style={[font.body, { color: c.textMuted }]}>{o.table_code || o.room_code || '—'}</Text>
       {'notes' in o && o.notes ? <Text style={[font.small, { color: c.text }]}>{o.notes}</Text> : null}
-      {cook && NEXT[o.status as KitchenStatus] ? <Button testID={'order-next-' + o.id} label={NEXT[o.status as KitchenStatus]!} disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, NEXT[o.status as KitchenStatus]!))}/> : null}
+      {cook && NEXT[o.status as KitchenStatus] ? <Button testID={'order-next-' + o.id} label={orderStatusLabel(NEXT[o.status as KitchenStatus]!, copy)} disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, NEXT[o.status as KitchenStatus]!))}/> : null}
       {waiter && !('waiter_id' in o && o.waiter_id) ? <Button testID={'waiter-claim-' + o.id} label={copy.take} disabled={busy || unknownResult} onPress={() => change(() => live!.claimWaiterOrder(o.id, user.id))}/> : null}
-      {waiter && o.status === 'READY' ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: READY · {copy.readOnly}</Text> : null}
+      {waiter && o.status === 'READY' ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: {orderStatusLabel('READY', copy)} · {copy.readOnly}</Text> : null}
     </GlassCard></StaggerItem>)}
     {!loading && !error && orders.length === 0 ? <Empty text={copy.empty}/> : null}
   </FutureScreen>;
