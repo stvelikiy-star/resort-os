@@ -2,16 +2,18 @@ import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .operations import has_full_operations_access
 
 router = APIRouter(prefix="/api/v1/ops", tags=["operations-assignment"])
-manager_access = require_roles("OWNER", "MANAGER")
+manager_access = require_roles("OWNER", "MANAGER", module_grant=False)
 
 
 class AssigneePatch(BaseModel):
-    assigned_to_id: uuid.UUID | None = None
+    # Explicit null removes assignment; omitted field must not do so accidentally.
+    assigned_to_id: uuid.UUID | None = Field(...)
 
 
 EXPECTED_ROLE = {
@@ -27,6 +29,9 @@ async def assign_task(
     request: Request,
     user: dict[str, Any] = Depends(manager_access),
 ):
+    # A custom OPS module grant can restrict management but never promote a line role.
+    if not has_full_operations_access(user):
+        raise HTTPException(status_code=403, detail="Management OPS permission required")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             property_id = await trusted_property_id(conn, user)
