@@ -28,7 +28,7 @@ describe('canonical shared-auth staging server 503 admission contract', () => {
   });
 
   it('refuses all blocked shared workspaces BEFORE network, without simulating a 200', async () => {
-    const transport = jest.fn(async () => ok({items: []}));
+    const transport = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ok({items: []}));
     const api = createLiveModules('https://platform.example/core',transport as unknown as typeof fetch,'shared_auth_preview');
     const attempts = [
       () => api.conversations(),
@@ -50,7 +50,7 @@ describe('canonical shared-auth staging server 503 admission contract', () => {
   });
 
   it('still allows reviewed shared PMS GET without extending server permissions', async () => {
-    const transport=jest.fn(async () => ok({property:'HOTEL_A',rooms:[]}));
+    const transport=jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ok({property:'HOTEL_A',rooms:[]}));
     const api=createLiveModules('https://platform.example/core',transport as unknown as typeof fetch,'shared_auth_preview');
     expect((await api.pmsGrid('2026-11-04','2026-11-11')).rooms).toEqual([]);
     expect(transport).toHaveBeenCalledTimes(1);
@@ -58,7 +58,7 @@ describe('canonical shared-auth staging server 503 admission contract', () => {
   });
 
   it('does not PATCH room state in shared preview; single-property contract remains separate', async () => {
-    const transport=jest.fn(async () => ok({mode:'shared_auth_preview'}));
+    const transport=jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ok({mode:'shared_auth_preview'}));
     const api=createRealApi('https://platform.example',transport as unknown as typeof fetch);
     expect(await api.authMode!()).toBe('shared_auth_preview');
     await expect(api.setRoomState('r1','CLEAN')).rejects.toMatchObject({code:'UNKNOWN'});
@@ -66,7 +66,7 @@ describe('canonical shared-auth staging server 503 admission contract', () => {
   });
 
   it('does not disable legacy Inbox by guessing the hostname', async () => {
-    const transport=jest.fn(async () => ok({items:[]}));
+    const transport=jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ok({items:[]}));
     const api=createLiveModules('https://platform.example',transport as unknown as typeof fetch,'single_property');
     expect(await api.conversations()).toEqual([]);
     expect(transport).toHaveBeenCalledTimes(1);
