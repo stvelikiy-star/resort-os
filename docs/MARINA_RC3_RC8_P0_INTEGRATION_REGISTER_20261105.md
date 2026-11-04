@@ -27,3 +27,7 @@
 RC4 #348 `6b5495245d7859b7dfbff7716ff1047cc13c5e86`; #351 `333db2c1a03aa3801e3f7e1f0ea9c21210011862`; RC5 #352 `51d93a058f9b947fec7558fef86160f5d6975479`; public AI #353 `eb1f77b5cf482a8eb6f18c67d0e4c2cc9afb829c`; RC6 #354 `aebde53b3af62624d299779875a4e3bb484a6a92`; RC7 #356 `654b5a85e2e52751bc632056ab91bad5a149333c`; RC8 #357 `6c210def1b30b8d3ddbb8dbb2d8e777b9bbc9e3d`; UI #358 `8a69e46897de1a7f0ba519629a6f5b3673110caa`.
 
 Parallel safety patches: #350 `27f1479043cb749e78d117687268e2fb8a0284a4`, #355 `9cca50880573cb5f1f0c7d4cd6809fa7fe919b80`, #360 `4827679c5031317d8866d5fcdca38e0e64dadfb9`, #361 `2431404348b7977683096a6ec8b8a87dafe4f41c`.
+
+## CI routing evidence (2026-11-05)
+
+The initial integration head used `integrate/marina-*`. This mistakenly selected Three Crowns public-site truth checks rather than the platform-specific isolated MARINA branch policy. The unrelated site truth assertions fail on pre-existing Three Crowns-only content (unchanged by this integration). The accepted final integration branch **must** use the established `marina-smart/*` prefix, so the existing GitHub workflow uses its dedicated MARINA guest-web isolation contract. This is a branch-routing correction, NOT a change to the website or a bypass of MARINA security tests. Every acceptance check needs a fresh run on this branch's **new unique SHA**.
