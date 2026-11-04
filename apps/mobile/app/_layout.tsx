@@ -37,7 +37,7 @@ function Shell() {
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
       {Platform.OS === 'web' ? (
         <View style={{ flex: 1, backgroundColor: framed ? c.surfaceAlt : c.bg, alignItems: 'center', justifyContent: 'center', paddingVertical: framed ? 20 : 0 }}>
-          <View testID="mobile-web-viewport" style={{ flex: 1, width: '100%', maxWidth: framed ? WEB_MOBILE_PREVIEW_WIDTH : undefined, maxHeight: framed ? 920 : undefined, borderRadius: framed ? 26 : 0, borderWidth: framed ? 1 : 0, borderColor: c.border, overflow: 'hidden', backgroundColor: c.bg }}>
+          <View testID="mobile-web-viewport" style={{ flex: 1, width: '100%', maxWidth: WEB_MOBILE_PREVIEW_WIDTH, maxHeight: framed ? 920 : undefined, borderRadius: framed ? 26 : 0, borderWidth: framed ? 1 : 0, borderColor: c.border, overflow: 'hidden', backgroundColor: c.bg }}>
             {navigation}
           </View>
         </View>
