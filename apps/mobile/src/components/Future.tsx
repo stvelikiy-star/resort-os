@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle } from 'react-native';
+import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
@@ -15,11 +15,17 @@ export function FutureScreen({ children }: { children: React.ReactNode }) {
 }
 export function PremiumHeader({ title, subtitle, eyebrow, right }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode }) {
   const { c } = useTheme();
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm }}>
-    <Logo size={50}/><View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-      {eyebrow ? <Text style={[font.label, { color: c.cyan }]}>{eyebrow.toUpperCase()}</Text> : null}
-      <Title sub={subtitle}>{title}</Title>
-    </View>{right}
+  const { width, fontScale } = useWindowDimensions();
+  const compact = !!right && (width < 375 || fontScale > 1.25);
+  return <View style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'stretch' : 'center', gap: space.md, paddingVertical: space.sm }}>
+    <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center', flex: compact ? undefined : 1, minWidth: 0 }}>
+      <Logo size={width < 350 ? 42 : 50}/>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        {eyebrow ? <Text style={[font.label, { color: c.cyan }]} numberOfLines={2}>{eyebrow.toUpperCase()}</Text> : null}
+        <Title sub={subtitle}>{title}</Title>
+      </View>
+    </View>
+    {right ? <View style={{ alignSelf: compact ? 'flex-end' : 'center' }}>{right}</View> : null}
   </View>;
 }
 export function GlassCard({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
@@ -28,12 +34,14 @@ export function GlassCard({ children, style, onPress, testID }: { children: Reac
 }
 export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void }) {
   const { c } = useTheme();
-  return <GlassCard onPress={onPress} style={{ flexGrow: 1, flexBasis: '46%', minWidth: 136, gap: 10, padding: 16 }}>
+  const { width, fontScale } = useWindowDimensions();
+  const oneColumn = width < 350 || fontScale > 1.5;
+  return <GlassCard onPress={onPress} style={{ flexGrow: 1, flexBasis: oneColumn ? '100%' : '46%', minWidth: 0, gap: 10, padding: 16 }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon color={c.primary} size={iconography.metric}/></View>
       {onPress ? <ArrowUpRight size={18} color={c.textMuted}/> : null}
     </View>
-    <Text style={[font.metric, { color: c.text }]} adjustsFontSizeToFit numberOfLines={1}>{value}</Text>
+    <Text style={[font.metric, { color: c.text }]} adjustsFontSizeToFit minimumFontScale={0.55} numberOfLines={1}>{value}</Text>
     <Text style={[font.small, { color: c.textMuted }]}>{label}</Text>
     {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
   </GlassCard>;
@@ -63,14 +71,14 @@ export function AnimatedKpi({ value, suffix = '', style, testID }: { value: numb
 }
 
 /** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
-export function OccupancyRing({ percent, label }: { percent: number; label: string }) {
+export function OccupancyRing({ percent, label, size = 112 }: { percent: number; label: string; size?: number }) {
   const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
   const circumference = 2 * Math.PI * 42;
   const length = circumference * safe / 100;
   return <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
     accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
-    style={{ width: 112, height: 112, justifyContent: 'center', alignItems: 'center' }}>
-    <Svg pointerEvents="none" width={112} height={112} viewBox="0 0 112 112">
+    style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg pointerEvents="none" width={size} height={size} viewBox="0 0 112 112">
       <Circle cx="56" cy="56" r="42" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="8"/>
       <Circle cx="56" cy="56" r="42" fill="none" stroke="#00D8FF" strokeWidth="8"
         strokeLinecap="round" strokeDasharray={`${length} ${circumference}`} transform="rotate(-90 56 56)"/>
