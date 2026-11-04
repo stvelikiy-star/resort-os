@@ -4,7 +4,7 @@ import { isTrustedHotelOrigin } from './hotels';
 import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
-import { objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse } from './contractValidation';
+import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
@@ -86,8 +86,8 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       return receptionResponse(value);
     },
     reservation: async (id: string) => objectResponse(await request<unknown>('GET', p + '/admin/reception/reservations/' + safeRouteId(id)), 'reservation'),
-    checkIn: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-in'),
-    checkOut: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-out'),
+    checkIn: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-in'), id, 'CHECKED_IN'),
+    checkOut: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-out'), id, 'CHECKED_OUT'),
     bookingPreview: async (draft: BookingDraft) => bookingPreviewResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/preview', draft)),
     bookingCommit: async (draft: BookingCommit) => bookingCommitResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/commit', draft)),
     holds: async () => {
@@ -113,14 +113,14 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + safeRouteId(id));
       return conversationResponse(value);
     },
-    claimConversation: (id: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'),
-    conversationStatus: (id: string, status: ConversationStatus) => request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }),
-    internalNote: (id: string, text: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }),
+    claimConversation: async (id: string) => conversationClaimAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'), id),
+    conversationStatus: async (id: string, status: ConversationStatus) => conversationStatusAck(await request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }), id, status),
+    internalNote: async (id: string, text: string) => noteAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }), id),
     // WhatsApp sending is intentionally not exposed: the current backend send-text is Telegram-only.
     kitchenOrders: async () => kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE')),
-    kitchenStatus: (id: string, status: KitchenStatus) => request<unknown>('PATCH', p + '/kitchen/orders/' + safeRouteId(id) + '/status', { status }),
+    kitchenStatus: async (id: string, status: KitchenStatus) => kitchenStatusAck(await request<unknown>('PATCH', p + '/kitchen/orders/' + safeRouteId(id) + '/status', { status }), id, status),
     diningFloor: async () => diningFloorResponse(await request<unknown>('GET', p + '/dining/floor')),
-    claimWaiterOrder: (id: string, waiterId: string) => request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }),
+    claimWaiterOrder: async (id: string, waiterId: string) => waiterClaimAck(await request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }), id, waiterId),
     assistantCapabilities: async () => assistantCapabilitiesResponse(await request<unknown>('GET', p + '/assistant/capabilities')),
     assistantChat: async (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => assistantAnswerResponse(await request<unknown>('POST', p + '/assistant/chat', {
       messages: messages.slice(-10), locale, current_screen: currentScreen,

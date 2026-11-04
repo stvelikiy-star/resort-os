@@ -9,6 +9,7 @@ import {
 const ok = (data: unknown) => ({ status: 200, ok: true, redirected: false, json: async () => data } as Response);
 const transportOf = (data: unknown) => jest.fn(async (_u: RequestInfo | URL, _i?: RequestInit) => ok(data));
 const user = { id: 'u1', username: 'maid', display_name: 'A', role: 'MAID', property_code: 'P1', module_permissions: ['OPS'] };
+type Live = ReturnType<typeof createLiveModules>;
 const live = (data: unknown) => { const t = transportOf(data); return { t, api: createLiveModules('https://hotel.example', t as unknown as typeof fetch) }; };
 
 describe('shared route guards', () => {
@@ -25,15 +26,15 @@ describe('shared route guards', () => {
 
 describe('LIVE modules use the shared guards before any network call', () => {
   it.each([
-    ['reservation', (a: ReturnType<typeof createLiveModules>) => a.reservation('../x')],
-    ['checkIn', (a: ReturnType<typeof createLiveModules>) => a.checkIn('a/b')],
-    ['claimConversation', (a: ReturnType<typeof createLiveModules>) => Promise.resolve().then(() => a.claimConversation('a%2fb'))],
-    ['kitchenStatus', (a: ReturnType<typeof createLiveModules>) => Promise.resolve().then(() => a.kitchenStatus('a?b', 'READY'))],
-    ['claimWaiterOrder waiter', (a: ReturnType<typeof createLiveModules>) => Promise.resolve().then(() => a.claimWaiterOrder('o1', '../u'))],
-    ['pmsGrid', (a: ReturnType<typeof createLiveModules>) => a.pmsGrid('2026-11-04&x=1', '2026-11-05')],
+    ['reservation', (a: Live) => a.reservation('../x')],
+    ['checkIn', (a: Live) => a.checkIn('a/b')],
+    ['claimConversation', (a: Live) => Promise.resolve().then(() => a.claimConversation('a%2fb'))],
+    ['kitchenStatus', (a: Live) => Promise.resolve().then(() => a.kitchenStatus('a?b', 'READY'))],
+    ['claimWaiterOrder waiter', (a: Live) => Promise.resolve().then(() => a.claimWaiterOrder('o1', '../u'))],
+    ['pmsGrid', (a: Live) => a.pmsGrid('2026-11-04&x=1', '2026-11-05')],
   ])('%s rejects a malformed reference', async (_n, run) => {
     const { t, api } = live({});
-    await expect(Promise.resolve().then(() => run(api))).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(Promise.resolve().then(() => run(api) as Promise<unknown>)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(t).not.toHaveBeenCalled();
   });
   it('still builds the exact pinned route for a valid id', async () => {

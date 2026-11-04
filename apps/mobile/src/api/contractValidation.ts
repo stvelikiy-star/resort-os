@@ -86,3 +86,25 @@ export function assistantAnswerResponse(v:unknown):AssistantAnswer {
 }
 /** Detail payloads whose fields are rendered defensively: only the envelope shape is enforced. */
 export function objectResponse(v:unknown,k:string):Record<string,unknown>{return obj(v,k);}
+
+/**
+ * Mutation acknowledgments must echo the record the app addressed (and, where the
+ * server returns it, the resulting state). A mismatch is a contract violation, and
+ * because the write may already be committed it surfaces as UNKNOWN (fail closed).
+ */
+function ack(v:unknown,k:string,idKey:string,id:string,state?:{key:string;value:string}):Record<string,unknown>{
+  const x=obj(v,k);
+  if(str(x[idKey],k+'.'+idKey)!==id)invalid(k+'.'+idKey+' mismatch');
+  if(state&&x[state.key]!==state.value)invalid(k+'.'+state.key);
+  return x;
+}
+export const stayAck=(v:unknown,reservationId:string,status:'CHECKED_IN'|'CHECKED_OUT')=>ack(v,'stay','reservation_id',reservationId,{key:'status',value:status});
+export const kitchenStatusAck=(v:unknown,orderId:string,status:string)=>ack(v,'kitchen.status','id',orderId,{key:'status',value:status});
+export const conversationStatusAck=(v:unknown,id:string,status:string)=>ack(v,'conversation.status','id',id,{key:'status',value:status});
+export const conversationClaimAck=(v:unknown,id:string)=>ack(v,'conversation.claim','id',id);
+export const noteAck=(v:unknown,id:string)=>{const x=ack(v,'note','conversation_id',id);str(x.id,'note.id');return x;};
+export function waiterClaimAck(v:unknown,orderId:string,waiterId:string){
+  const x=ack(v,'waiter.claim','id',orderId);
+  if(x.waiter_id!==waiterId)invalid('waiter.claim.waiter_id');
+  return x;
+}
