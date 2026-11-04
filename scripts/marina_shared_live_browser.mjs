@@ -607,6 +607,46 @@ try {
   await ownerApprovesHousekeeping(pageA,"HOTEL_A");
   await ownerApprovesHousekeeping(pageB,"HOTEL_B");
 
+  // P0: genuine internal finance summary and task audit history, not banking.
+  for (const [hotel, ctx, foreign] of [
+    ["HOTEL_A", contextA, "HOTEL_B"],
+    ["HOTEL_B", contextB, "HOTEL_A"],
+  ]) {
+    const data=receipts[hotel];
+    const other=receipts[foreign];
+    const period=await ctx.request.get(BASE+
+      "/core/api/v1/admin/finance/summary?from_date="+day(-3)+"&to_date="+day(3));
+    assert.equal(period.status(),200,await period.text());
+    const summary=await period.json();
+    assert.equal(summary.scope.internal_only,true,"Internal report cannot claim bank settlement");
+    assert.equal(summary.range.currency,"KGS");
+    assert.equal(Number(summary.period_payments.received_kgs),data.manual_amount_kgs,
+      "Finance report summed foreign hotel payments or missed own record");
+    assert.equal(Number(summary.period_payments.received_count),1);
+    assert(summary.reservation_ledger.some(row=>row.id===data.reservation_id));
+    assert(!summary.reservation_ledger.some(row=>row.id===other.reservation_id),
+      "Foreign reservation in scoped financial ledger");
+    assert(summary.recent_payments.some(p=>p.id===data.manual_payment_id));
+    assert(!summary.recent_payments.some(p=>p.id===other.manual_payment_id),
+      "Foreign payment exposed in hotel summary");
+    const ownHistory=await ctx.request.get(BASE+
+      "/core/api/v1/ops/tasks/"+data.maintenance_task_id+"/history");
+    assert.equal(ownHistory.status(),200,await ownHistory.text());
+    const history=await ownHistory.json();
+    assert.equal(history.task.id,data.maintenance_task_id);
+    assert.equal(history.task.status,"DONE");
+    assert(history.history.some(row=>row.action==="ASSIGN"));
+    assert(history.history.some(row=>row.action==="CLAIM"));
+    assert(history.history.some(row=>row.action==="STATUS_CHANGE"));
+    const foreignHistory=await ctx.request.get(BASE+
+      "/core/api/v1/ops/tasks/"+other.maintenance_task_id+"/history");
+    assert.equal(foreignHistory.status(),404,"Foreign hotel audit must be hidden");
+    const blockedFinanceWrite=await ctx.request.post(BASE+
+      "/core/api/v1/admin/finance/requests/"+data.maintenance_task_id+
+      "/payment-requirement",{data:{amount_kgs:1}});
+    assert.equal(blockedFinanceWrite.status(),503,"Finance mutations remain disabled");
+  }
+
   const aDetail = await contextA.request.get(
     BASE + "/core/api/v1/admin/reception/reservations/" + receipts.HOTEL_B.reservation_id);
   assert.equal(aDetail.status(),404,"Reverse direction foreign reservation leak");
@@ -618,7 +658,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two hotels PMS + OPS, server-side assignee RBAC, mobile-shaped housekeeping report, audit and cross-tenant denial");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: two hotels PMS+OPS, real scoped finance summary, task audit history and cross-tenant denial");
 } finally {
   await browser.close();
 }
