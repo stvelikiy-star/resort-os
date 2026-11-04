@@ -54,7 +54,8 @@ async def force_expire(hold_id):
     try:
         updated = await conn.execute(
             '''UPDATE marina_reservation_holds
-               SET "expiresAt"=now()-interval '1 minute'
+               SET "createdAt"=now()-interval '2 hours',
+                   "expiresAt"=now()-interval '1 hour'
                WHERE id=$1 AND "releasedAt" IS NULL
                      AND "confirmedReservationId" IS NULL''',
             uuid.UUID(hold_id),
