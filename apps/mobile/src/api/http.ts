@@ -25,7 +25,7 @@ export function errorForStatus(status: number): { code: ErrorCode; message: stri
   return { code, message: SAFE_MESSAGE[code] ?? SAFE_MESSAGE.UNKNOWN! };
 }
 
-export function createHotelHttpClient(baseUrl: string, transport: Transport = fetch) {
+export function createHotelHttpClient(baseUrl: string, transport: Transport = fetch, sessionIsActive?: () => boolean) {
   const parsed = parseHotelAddress(baseUrl);
   if (!parsed.ok) throw new Error('Invalid hotel API address');
   const root = parsed.baseUrl;
@@ -45,15 +45,17 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
     // must not clear a newer employee session on the same HTTPS hostname.
     // Auth endpoints are not protected-data requests: a wrong password must
     // never act as a global log-out event.
-    const verifiedAtStart = pathname.startsWith('/api/v1/auth/')
-      ? null : captureVerifiedHost(root);
+    const protectedRequest = !pathname.startsWith('/api/v1/auth/');
+    const verifiedAtStart = protectedRequest ? captureVerifiedHost(root) : null;
     const requireSameSession = () => {
-      if (verifiedAtStart && captureVerifiedHost(root) !== verifiedAtStart) {
+      if ((protectedRequest && sessionIsActive && !sessionIsActive()) ||
+          (verifiedAtStart && captureVerifiedHost(root) !== verifiedAtStart)) {
         throw new ApiError('STALE_SESSION', 'The active hotel session changed');
       }
     };
     const attempts = method === 'GET' ? 2 : 1;
     for (let attempt = 0; attempt < attempts; attempt++) {
+      requireSameSession();
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), method === 'GET' ? 15000 : 25000);
       let response: Response;
@@ -81,7 +83,7 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       }
       if (!response.ok) {
         if (response.status === 401) {
-          rejectVerifiedHost(root, verifiedAtStart);
+          if (!sessionIsActive || sessionIsActive()) rejectVerifiedHost(root, verifiedAtStart);
           const { code, message } = errorForStatus(401);
           throw new ApiError(code, message);
         }
