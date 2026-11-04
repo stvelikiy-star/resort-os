@@ -90,8 +90,8 @@ async def resolve_room_qr(conn, raw_token: str, *, lock: bool = False):
                room."buildingOrZone",room."floorLabel",room."bedConfiguration",
                rt.code AS room_type_code,rt.name AS room_type_name
         FROM room_qrs qr
-        JOIN rooms room ON room.id=qr."roomId"
-        JOIN room_types rt ON rt.id=room."roomTypeId"
+        JOIN rooms room ON room.id=qr."roomId" AND room."propertyId"=qr."propertyId"
+        JOIN room_types rt ON rt.id=room."roomTypeId" AND rt."propertyId"=room."propertyId"
         WHERE qr."tokenHash"=$1 AND qr.status='ACTIVE'{suffix}
         ''',
         hash_secret(raw_token),
@@ -107,9 +107,10 @@ async def current_stay_for_room(conn, room_id: uuid.UUID, *, lock: bool = False)
                r.id AS reservation_id,r."bookingNumber",r."checkIn",r."checkOut",
                g."firstName",g."lastName",p.timezone
         FROM room_assignments ra
-        JOIN stays s ON s.id=ra."stayId"
-        JOIN reservations r ON r.id=s."reservationId"
-        JOIN guests g ON g.id=s."guestId"
+        JOIN stays s ON s.id=ra."stayId" AND s."propertyId"=ra."propertyId"
+        JOIN rooms active_room ON active_room.id=ra."roomId" AND active_room."propertyId"=ra."propertyId"
+        JOIN reservations r ON r.id=s."reservationId" AND r."propertyId"=s."propertyId"
+        JOIN guests g ON g.id=s."guestId" AND g."propertyId"=s."propertyId"
         JOIN properties p ON p.id=s."propertyId"
         WHERE ra."roomId"=$1 AND ra."endedAt" IS NULL AND s.status='ACTIVE'
         LIMIT 1{suffix}
@@ -132,10 +133,11 @@ async def valid_guest_session(conn, raw_session: str | None):
     )
     row = await conn.fetchrow(
         '''
-        SELECT gs.id,gs."stayId",gs."guestId",gs."roomQrId",gs."expiresAt",
+        SELECT gs.id,gs."stayId",gs."guestId",gs."propertyId",gs."roomQrId",gs."expiresAt",
                s.status::text AS stay_status
         FROM guest_sessions gs
         JOIN stays s ON s.id=gs."stayId"
+          AND s."propertyId"=gs."propertyId" AND s."guestId"=gs."guestId"
         WHERE gs."tokenHash"=$1 AND gs.status='ACTIVE' AND gs."expiresAt" > now()
           AND s.status='ACTIVE'
         ''',
@@ -394,7 +396,8 @@ async def room_context(token: str, request: Request, tc_guest_session: str | Non
         if not stay:
             return generic_room_context(qr, active_stay=False, property_info=property_info)
         session = await valid_guest_session(conn, tc_guest_session)
-        if not session or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]:
+        if (not session or session["propertyId"] != qr["propertyId"]
+                or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]):
             return generic_room_context(qr, active_stay=True, property_info=property_info)
         return {
             "qr_valid": True,

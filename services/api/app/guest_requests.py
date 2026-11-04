@@ -53,7 +53,8 @@ async def authorized_context(conn, token: str, raw_session: str | None):
     if not stay:
         raise HTTPException(status_code=401, detail={"code": "GUEST_SESSION_REQUIRED"})
     session = await valid_guest_session(conn, raw_session)
-    if not session or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]:
+    if (not session or session["propertyId"] != qr["propertyId"]
+            or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]):
         raise HTTPException(status_code=401, detail={"code": "GUEST_SESSION_REQUIRED"})
     return qr, stay, session
 
