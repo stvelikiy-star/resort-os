@@ -220,6 +220,12 @@ def main():
             expect(send(api, token_a, a_msg), 503, "missing staging approval")
         with patch.dict(os.environ, {"MARINA_SHARED_GREEN_WEBHOOK_RC7_JSON": json.dumps(webhook[:1])}):
             expect(send(api, token_a, a_msg), 503, "misconfigured hotel set")
+        # Even a server-side mapping that lists the right instance but the
+        # wrong property's UUID must not mutate the inbox.
+        mismatched = [{**accounts[0], "property_id": accounts[1]["property_id"]}, accounts[1]]
+        with patch.dict(os.environ, {"MARINA_SHARED_GREEN_RC6_CONFIG_JSON": json.dumps(mismatched)}):
+            expect(send(api, token_a, a_msg), 503, "stale provider/property UUID boundary")
+
     print(
         "PASS: RC7 authenticated GreenAPI webhook -> canonical Inbox -> "
         "PostgreSQL two hotel isolation, replay dedupe and mutation 409, "
