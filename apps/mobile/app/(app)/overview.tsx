@@ -1,6 +1,6 @@
 import React, { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text, View } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays, ClipboardCheck, Users, Wrench, Sparkles } from 'lucide-react-native';
 import { Hero } from '../../src/components/Brand';
@@ -11,8 +11,9 @@ import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useLiveModules, Dashboard } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { contactInitials } from '../../src/i18n/statusLabels';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { font, space } from '../../src/theme/tokens';
+import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Overview() {
   const { user, hotel, api, serverAuthMode } = useSession();
@@ -22,6 +23,7 @@ export default function Overview() {
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
+  const { width } = useWindowDimensions();
   const { t: tr } = useTranslation();
   const priorityLabel = (priority: string) => ['URGENT', 'HIGH', 'NORMAL', 'LOW'].includes(priority) ? tr('tasks.' + priority.toLowerCase()) : priority;
   const router = useRouter();
@@ -32,7 +34,13 @@ export default function Overview() {
   const count = (value: number) => Number.isFinite(value) && value >= 0 ? String(value) : '—';
   return <FutureScreen>
     <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user ? copy.welcome + ', ' + user.display_name : 'MARINA SMART'}
-      right={!shared && live && user && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={46} onPress={() => router.push('/ai')}/> : null}/>
+      right={user ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View accessibilityLabel={copy.profile + ': ' + user.display_name}
+          style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border, backgroundColor: c.primarySoft, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={[font.h2, { color: c.primary }]}>{contactInitials(user.display_name) || '•'}</Text>
+        </View>
+        {!shared && live && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={38} onPress={() => router.push('/ai')}/> : null}
+      </View> : null}/>
     {hotel?.demo ? <DemoBanner/> : null}
     {!live ? <Empty text={copy.unavailable}/> : null}
     {loading && live ? <LoadingShimmer count={3}/> : null}
@@ -40,15 +48,15 @@ export default function Overview() {
     {data ? <>
       <StaggerItem index={0}><Hero>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-          <Text style={[font.label, { color:'#C8E8F5' }]}>{data.property.name.toUpperCase()} · {data.property.local_date}</Text>
-          <Text style={[font.label, { color:'#E7C480' }]}>LIVE PMS</Text>
+          <Text numberOfLines={2} style={[font.label, { color:'#C8E8F5', flex: 1, minWidth: 0 }]}>{data.property.name.toUpperCase()} · {data.property.local_date}</Text>
+          <Text style={[font.label, { color:'#E7C480' }]}>{hotel?.demo ? copy.demoLabel : 'LIVE PMS'}</Text>
         </View>
-        <View style={{ flexDirection:'row', alignItems:'center', gap:12, marginTop:8 }}>
+        <View style={{ flexDirection:'row', alignItems:'center', gap:width < 350 ? 6 : 12, marginTop:8 }}>
           <View style={{ flex:1 }}>
-            <AnimatedKpi value={data.stays.occupancy_percent} suffix="%" style={[font.display, { color:'#FFFFFF', fontSize:43 }]}/>
+            <AnimatedKpi value={data.stays.occupancy_percent} suffix="%" style={[font.display, { color:'#FFFFFF', fontSize:width < 350 ? 34 : 43 }]}/>
             <Text style={[font.body, { color:'#D6E9F7' }]}>{copy.occupancy} · {data.stays.occupied_rooms}/{data.rooms.total}</Text>
           </View>
-          <OccupancyRing percent={data.stays.occupancy_percent} label={copy.occupancy}/>
+          <OccupancyRing percent={data.stays.occupancy_percent} label={copy.occupancy} size={width < 350 ? 82 : 112}/>
         </View>
         <View style={{ height:1, backgroundColor:'rgba(255,255,255,0.16)', marginTop:20, marginBottom:14 }}/>
         <View style={{ flexDirection:'row', gap:space.lg }}>
@@ -75,6 +83,21 @@ export default function Overview() {
       {canOpenInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
       {canOpen('tasks') ? <QuickAction icon={ClipboardCheck} label={copy.tasks} onPress={() => router.push('/tasks')}/> : null}
       {canOpen('admin') ? <QuickAction icon={Users} label={copy.staffOverview} onPress={() => router.push('/admin')}/> : null}
+      <SectionLabel>{copy.roomCondition}</SectionLabel>
+      <GlassCard style={{ gap: space.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+          {([
+            { label: copy.clean, value: data.rooms.clean, color: c.success },
+            { label: copy.dirty, value: data.rooms.dirty, color: c.warning },
+            { label: copy.checking, value: data.rooms.in_inspection, color: c.info },
+            { label: copy.tech, value: data.rooms.tech_block, color: c.danger },
+          ]).map(item => <View key={item.label} style={{ width: width < 350 ? '100%' : '46%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ width: 8, height: 8, borderRadius: radius.pill, backgroundColor: item.color }}/>
+            <Text style={[font.small, { color: c.textMuted, flex: 1 }]}>{item.label}</Text>
+            <Text style={[font.h2, { color: c.text }]}>{count(item.value)}</Text>
+          </View>)}
+        </View>
+      </GlassCard>
       <SectionLabel>{copy.tasks}</SectionLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
         <MetricCard icon={Sparkles} label={copy.housekeepingOverview} value={count(data.tasks.housekeeping_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
