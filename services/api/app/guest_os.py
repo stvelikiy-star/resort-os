@@ -68,9 +68,10 @@ def client_key_hash(request: Request) -> str:
     # Share authentication's trusted-proxy policy: a caller-supplied
     # X-Forwarded-For header must never reset the guest PIN failure counter.
     # Only an explicitly trusted deployment reverse proxy may supply the IP.
+    # User-Agent is attacker-controlled too; varying it must not reset the
+    # PIN failure budget. The counter is per QR and validated client IP.
     client_ip = _client_ip(request)
-    agent = request.headers.get("user-agent", "unknown")[:300]
-    return hashlib.sha256(f"{client_ip}|{agent}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
 
 
 async def property_context(conn, user):
