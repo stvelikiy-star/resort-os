@@ -964,7 +964,11 @@ def main():
     qr_app = FastAPI(lifespan=lifespan)
     qr_app.include_router(auth.router)
     qr_app.include_router(guest_os.admin_router)
-    with TestClient(qr_app, base_url='https://shared-auth.test') as qr_client:
+    # Shared Guest QR creation now requires an explicitly configured TLS
+    # front door. Use a reserved non-routable .invalid fixture origin, never
+    # a legacy hotel's default public domain or production environment.
+    with patch.dict(os.environ, {'GUEST_OS_PUBLIC_BASE_URL': 'https://shared-auth-qr.invalid'}), \
+            TestClient(qr_app, base_url='https://shared-auth.test') as qr_client:
         for suffix, foreign in (('a','b'), ('b','a')):
             result = qr_client.post('/api/v1/auth/login', json=dict(
                 username='owner', password=passwords[suffix], tenant_code='tenant_'+suffix,
