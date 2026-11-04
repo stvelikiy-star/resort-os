@@ -8,6 +8,7 @@ import json
 import os
 import secrets
 import uuid
+from unittest.mock import patch
 from datetime import datetime, timezone
 
 import asyncpg
@@ -283,13 +284,13 @@ def main():
         outbound = [m for m in detail["messages"] if m["direction"] == "OUTBOUND"]
         assert len(outbound) == 1 and outbound[0]["delivery_status"] == "DELIVERED"
 
-        with __import__("unittest").mock.patch.dict(os.environ, {
+        with patch.dict(os.environ, {
             "MARINA_SHARED_GREEN_RC7_ENABLED": "false",
         }):
             expect(deliver("B", callback(
                 "B", "inbound-msg-002", "disabled",
             )), 503, "RC7 disabled fail closed")
-        with __import__("unittest").mock.patch.dict(os.environ, {
+        with patch.dict(os.environ, {
             "MARINA_SHARED_GREEN_RC7_CONFIRM": "invalid",
         }):
             expect(deliver("B", callback(
