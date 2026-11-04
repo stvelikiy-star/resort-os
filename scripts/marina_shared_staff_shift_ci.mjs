@@ -42,6 +42,8 @@ try {
 
   for (const [suffix, foreign, username, type, role] of [
     ["A", "B", "maid", "HOUSEKEEPING", "MAID"],
+    ["A", "B", "technician", "MAINTENANCE", "TECHNICIAN"],
+    ["B", "A", "maid", "HOUSEKEEPING", "MAID"],
     ["B", "A", "technician", "MAINTENANCE", "TECHNICIAN"],
   ]) {
     const context = await browser.newContext();
@@ -70,9 +72,32 @@ try {
     await page.getByRole("button", { name: "Выйти" }).click();
     await page.getByLabel("Код отеля").waitFor();
     assert.equal((await api(page, "auth/me")).status, 401);
+
+    // Reuse the SAME browser cookie jar for the other hotel. The previous
+    // hotel's session and task list must never survive the transition.
+    await page.getByLabel("Код организации").fill("tenant_" + foreign.toLowerCase());
+    await page.getByLabel("Код отеля").fill("HOTEL_" + foreign);
+    await page.getByLabel("Логин").fill(username);
+    await page.getByLabel("Пароль").fill(password);
+    await page.getByRole("button", { name: "Войти" }).click();
+    await page.getByRole("button", { name: "Выйти" }).waitFor();
+    const swapped = await api(page, "auth/me");
+    assert.equal(swapped.status, 200);
+    assert.equal(swapped.data.role, role);
+    assert.equal(swapped.data.property_code, "HOTEL_" + foreign);
+    assert.notEqual(swapped.data.property_id, me.data.property_id);
+    assert.notEqual(swapped.data.tenant_id, me.data.tenant_id);
+    const swappedTasks = await api(page, "ops/tasks?limit=250&type=" + type);
+    assert.equal(swappedTasks.status, 200);
+    assert(swappedTasks.data.items.some((task) => task.id === other.id), "Switched hotel task missing");
+    assert(!swappedTasks.data.items.some((task) => task.id === own.id), "Stale task leaked after hotel switch");
+    assert.equal((await api(page, "ops/tasks/" + own.id + "/claim", "POST")).status, 404);
+    await page.getByRole("button", { name: "Выйти" }).click();
+    await page.getByLabel("Код отеля").waitFor();
+    assert.equal((await api(page, "auth/me")).status, 401);
     await context.close();
   }
-  console.log("PASS: Staff HTTPS sign-in, local task claims, foreign 404 and logout");
+  console.log("PASS: Staff HTTPS four-role/property combinations, foreign 404, logout and same-browser hotel switch");
 } finally {
   await browser.close();
 }
