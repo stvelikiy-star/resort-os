@@ -6,7 +6,7 @@ import { Badge, Button, Empty, SectionLabel } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { DiningFloor, KitchenOrder, KitchenStatus, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
-import { orderStatusLabel } from '../../src/i18n/statusLabels';
+import { orderStatusLabel, diningTableStatusLabel } from '../../src/i18n/statusLabels';
 import { useSession } from '../../src/state/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
@@ -55,7 +55,8 @@ export default function Dining() {
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {floor ? <><SectionLabel>{copy.tables}</SectionLabel><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>{floor.tables.map(t => <GlassCard key={t.id} style={{ width: singleColumn ? '100%' : '47%', gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><UtensilsCrossed size={21} color={c.primary}/><Text style={[font.h2, { color: c.text, flex: 1 }]}>{t.code}</Text></View>
-      <Text style={[font.small, { color: c.textMuted }]}>{t.status} · {t.seats}</Text>
+      <Badge label={diningTableStatusLabel(t.status, copy)} tone={t.status === 'AVAILABLE' || t.status === 'FREE' ? 'success' : t.status === 'OCCUPIED' ? 'warning' : t.status === 'RESERVED' ? 'info' : 'neutral'}/>
+      <Text style={[font.small, { color: c.textMuted }]}>{t.seats}</Text>
     </GlassCard>)}</View></> : null}
     <SectionLabel>{copy.orders} · {orders.length}</SectionLabel>
     {orders.map((o,i) => <StaggerItem key={o.id} index={i}><GlassCard testID={'order-' + o.id} style={{ gap: 10, borderLeftWidth: 4, borderLeftColor: o.status === 'NEW' ? c.warning : o.status === 'READY' ? c.success : o.status === 'CANCELLED' ? c.danger : c.primary }}>
