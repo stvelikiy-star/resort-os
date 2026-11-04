@@ -185,6 +185,7 @@ def restore() -> None:
     # Only the separate empty target is modified by this process. Invoke a
     # separate read/write acceptance process with the restored DB as DATABASE_URL.
     child_env = dict(os.environ)
+    child_env["MARINA_SHARED_ORIGINAL_DATABASE_URL"] = os.environ[SOURCE_ENV]
     child_env[SOURCE_ENV] = dst
     run_command([sys.executable, str(Path(__file__)), "api-check"], env=child_env)
     print("MARINA_SHARED_TWO_HOTEL_RESTORE_E2E_PASS: shared runtime, no external DB")
@@ -199,6 +200,7 @@ def restored_api_check() -> None:
     receipts = receipt_rows()
 
     from fastapi.testclient import TestClient
+    sys.path.insert(0, str(ROOT / "services" / "api"))
     from app.app_entry import app
     with TestClient(app, base_url="http://localhost:18000") as client:
         for hotel in ("HOTEL_A", "HOTEL_B"):
