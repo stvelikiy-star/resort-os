@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import { useLiveModules } from '../src/api/liveModules';
 import type { HotelConnection } from '../src/api/hotels';
 import type { AuthUser } from '../src/api/types';
@@ -45,7 +45,7 @@ it('blocks operations even on a trusted shared host until /auth/me verifies the 
   const screen = await render(<GateProbe />);
   expect(screen.getByTestId('live-modules').props.children).toBe('BLOCKED');
   mockSession.user = userA;
-  screen.rerender(<GateProbe />);
+  await act(async () => { screen.rerender(<GateProbe />); });
   expect(screen.getByTestId('live-modules').props.children).toBe('VERIFIED');
 });
 
@@ -58,14 +58,14 @@ it('drops module access immediately during a switch from hotel A to B on the sam
 
   // The OS cookie might still belong to A. Selection alone is not authority.
   mockSession.user = null;
-  screen.rerender(<GateProbe />);
+  await act(async () => { screen.rerender(<GateProbe />); });
   expect(screen.getByTestId('live-modules').props.children).toBe('BLOCKED');
 
   mockSession.user = userB; // only after verified B login + /me
-  screen.rerender(<GateProbe />);
+  await act(async () => { screen.rerender(<GateProbe />); });
   expect(screen.getByTestId('live-modules').props.children).toBe('VERIFIED');
   mockSession.api = null; // explicit sign-out / disconnect
-  screen.rerender(<GateProbe />);
+  await act(async () => { screen.rerender(<GateProbe />); });
   expect(screen.getByTestId('live-modules').props.children).toBe('BLOCKED');
 });
 
