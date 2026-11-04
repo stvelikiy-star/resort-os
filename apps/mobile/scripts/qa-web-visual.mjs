@@ -46,16 +46,25 @@ function chromeExe() {
   }
   return null;
 }
-async function waitChrome(port) {
-  for (let n = 0; n < 75; n++) {
+async function waitChrome(profile, child, readStderr) {
+  // The ephemeral CDP port is written by Chrome inside its own isolated profile.
+  // A fixed port occasionally collides with another process on CI runners.
+  for (let n = 0; n < 120; n++) {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error('Chrome exited during startup: ' + readStderr().slice(-1500));
+    }
     try {
-      const tabs = await (await fetch('http://127.0.0.1:' + port + '/json')).json();
-      const target = tabs.find(x => x.type === 'page' && x.webSocketDebuggerUrl);
-      if (target) return target;
-    } catch { /* startup */ }
+      const [port] = (await readFile(path.join(profile, 'DevToolsActivePort'), 'utf8')).split(/\r?\n/);
+      if (/^\d+$/.test(port)) {
+        const response = await fetch('http://127.0.0.1:' + port + '/json', { signal: AbortSignal.timeout(1500) });
+        const tabs = await response.json();
+        const target = tabs.find(x => x.type === 'page' && x.webSocketDebuggerUrl);
+        if (target) return target;
+      }
+    } catch { /* Chrome may still be initializing the isolated profile */ }
     await sleep(200);
   }
-  throw new Error('Chrome DevTools connection unavailable');
+  throw new Error('Chrome DevTools did not become available: ' + readStderr().slice(-2000));
 }
 async function openSocket(url) {
   socket = new WebSocket(url);
@@ -126,16 +135,22 @@ async function diagnose(name) {
 async function main() {
   if (!existsSync(path.join(dist, 'index.html'))) throw new Error('Expo export missing dist/index.html');
   const exe = chromeExe();
-  if (!exe) { console.log('WEB_VISUAL_BLOCKER no Chrome binary on this runner; screenshots NOT TESTED'); return; }
+  if (!exe) {
+    const message = 'WEB_VISUAL_BLOCKER no Chrome binary on this runner; screenshots NOT TESTED';
+    if (process.env.GITHUB_ACTIONS === 'true') throw new Error(message);
+    console.log(message);
+    return;
+  }
   await mkdir(evidenceDir, { recursive: true });
   server = createServer((req, res) => { void serve(req,res); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   profileDir = await mkdtemp(path.join(tmpdir(), 'marina-web-qa-'));
-  const debugPort = 19914;
+  let browserLog = '';
   browser = spawn(exe, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
-    '--remote-allow-origins=*', '--remote-debugging-port=' + debugPort, '--user-data-dir=' + profileDir, 'about:blank'],
-    { stdio: 'ignore' });
-  const target = await waitChrome(debugPort);
+    '--remote-allow-origins=*', '--remote-debugging-port=0', '--user-data-dir=' + profileDir, 'about:blank'],
+    { stdio: ['ignore', 'ignore', 'pipe'] });
+  browser.stderr?.on('data', chunk => { browserLog = (browserLog + String(chunk)).slice(-6000); });
+  const target = await waitChrome(profileDir, browser, () => browserLog);
   await openSocket(target.webSocketDebuggerUrl);
   await cdp('Page.enable'); await cdp('Runtime.enable');
   await viewport(375, 812);
@@ -214,10 +229,15 @@ async function main() {
   } catch (e) {
     console.log('WEB_VISUAL_PARTIAL ' + String(e.message || e));
     await diagnose('partial');
+    if (process.env.GITHUB_ACTIONS === 'true') throw e;
   }
   console.log('WEB_VISUAL_QA_END captured=' + emitted + ' actual=ExpoWeb not=Android');
 }
-main().catch(e => { console.log('WEB_VISUAL_BLOCKER ' + String(e.stack || e)); process.exitCode = 0; })
+main().catch(e => {
+  console.log('WEB_VISUAL_BLOCKER ' + String(e.stack || e));
+  // A failed screenshot run is NOT a visual QA pass. Never hide this in CI.
+  process.exitCode = process.env.GITHUB_ACTIONS === 'true' ? 1 : 0;
+})
   .finally(async () => {
     try { socket?.close(); } catch { /* cleanup */ }
     try { browser?.kill('SIGKILL'); } catch { /* cleanup */ }
