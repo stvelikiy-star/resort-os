@@ -1,9 +1,9 @@
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Plus, ShieldCheck } from 'lucide-react-native';
-import { AnimatedProgressBar, DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
+import { AnimatedProgressBar, DemoBanner, Empty, SectionLabel, Segmented } from '../../src/components/ui';
 import { FutureScreen, ErrorState, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { TaskCard } from '../../src/components/domain';
 import { Hero } from '../../src/components/Brand';
@@ -16,6 +16,7 @@ import type { Task } from '../../src/api/types';
 export default function Tasks() {
   const { t } = useTranslation();
   const router = useRouter();
+  const [filter, setFilter] = useState<'all' | 'active' | 'urgent'>('all');
   const { api, user, hotel, serverAuthMode } = useSession();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
@@ -24,10 +25,12 @@ export default function Tasks() {
   const { active, finished, pct } = useMemo(() => {
     const list = data ?? [];
     const finished = list.filter(x => x.status === 'DONE');
+    const priorityOrder = { URGENT: 0, HIGH: 1, NORMAL: 2, LOW: 3 };
     const active = list.filter(x => x.status !== 'DONE' && x.status !== 'CANCELLED').sort((a,b) =>
-      (a.priority === 'URGENT' ? -1 : 0) - (b.priority === 'URGENT' ? -1 : 0));
+      priorityOrder[a.priority] - priorityOrder[b.priority]);
     return { active, finished, pct: list.length ? Math.round((finished.length / list.length) * 100) : 0 };
   }, [data]);
+  const visibleActive = filter === 'urgent' ? active.filter(task => task.priority === 'URGENT') : active;
   return <FutureScreen>
     <PremiumHeader title={t('tasks.title')} subtitle={hotel?.name} eyebrow={t(`roles.${user!.role}`)}/>
     {hotel?.demo ? <DemoBanner/> : null}
@@ -53,12 +56,13 @@ export default function Tasks() {
       <QuickAction icon={Plus} testID="quick-new-request" label={t('mt.newRequest')} onPress={() => router.push('/new-request')}/>
     </> : null}
     <SectionLabel>{t(api?.mode === 'LIVE' ? 'tasks.visible' : 'tasks.today')}</SectionLabel>
+    {data && !error ? <Segmented value={filter} onChange={setFilter} options={[{key:'all',label:t('common.all')},{key:'active',label:t('tasks.inProgress')},{key:'urgent',label:t('tasks.urgent')}]} /> : null}
     {loading && !data ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/> : null}
     {!loading && !error && !ws.mobileReady ? <Empty text={t('admin.forbidden')}/> : null}
-    {!loading && !error && ws.mobileReady && active.length === 0 ? <Empty text={t('tasks.none')}/> : null}
-    {active.map((task,i) => <StaggerItem key={task.id} index={i}><TaskCard task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/></StaggerItem>)}
-    {finished.length ? <SectionLabel>{t('tasks.done')}</SectionLabel> : null}
-    {finished.map(task => <TaskCard key={task.id} task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>)}
+    {!loading && !error && ws.mobileReady && visibleActive.length === 0 ? <Empty text={t('tasks.none')}/> : null}
+    {visibleActive.map((task,i) => <StaggerItem key={task.id} index={i}><TaskCard task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/></StaggerItem>)}
+    {filter === 'all' && finished.length ? <SectionLabel>{t('tasks.done')}</SectionLabel> : null}
+    {filter === 'all' ? finished.map(task => <TaskCard key={task.id} task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>)}
   </FutureScreen>;
 }
