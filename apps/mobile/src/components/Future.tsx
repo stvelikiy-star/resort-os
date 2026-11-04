@@ -14,19 +14,20 @@ export function FutureScreen({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
   return <Screen><View style={{ position: 'absolute', top: -100, right: -140, width: 320, height: 320, borderRadius: 160, backgroundColor: c.glow, opacity: 0.5 }} pointerEvents="none" />{children}</Screen>;
 }
-export function PremiumHeader({ title, subtitle, eyebrow, right }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode }) {
+export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRight = false }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode; inlineCompactRight?: boolean }) {
   const { c } = useTheme();
   const { width, fontScale } = useWindowDimensions();
   const compact = !!right && (width < 375 || fontScale > 1.25);
-  return <View style={{ flexDirection: compact ? 'column' : 'row', alignItems: compact ? 'stretch' : 'center', gap: space.md, paddingVertical: space.sm }}>
-    <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center', flex: compact ? undefined : 1, minWidth: 0 }}>
+  const stackRight = compact && !inlineCompactRight;
+  return <View style={{ flexDirection: stackRight ? 'column' : 'row', alignItems: stackRight ? 'stretch' : 'center', gap: space.md, paddingVertical: space.sm }}>
+    <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center', flex: stackRight ? undefined : 1, minWidth: 0 }}>
       <Logo size={width < 350 ? 42 : 50}/>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         {eyebrow ? <Text style={[font.label, { color: c.cyan }]} numberOfLines={2}>{eyebrow.toUpperCase()}</Text> : null}
         <Title sub={subtitle}>{title}</Title>
       </View>
     </View>
-    {right ? <View style={{ alignSelf: compact ? 'flex-end' : 'center' }}>{right}</View> : null}
+    {right ? <View style={{ alignSelf: stackRight ? 'flex-end' : 'center', flexShrink: 0 }}>{right}</View> : null}
   </View>;
 }
 export function GlassCard({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
