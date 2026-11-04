@@ -1,4 +1,5 @@
 """Guest QR administration and review links must follow authenticated hotel IDs."""
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 import sys
@@ -10,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
-from app import auth, guest_os, guest_stay_reviews as reviews
+from app import auth, guest_os, guest_requests, guest_stay_reviews as reviews
 
 
 class Store:
@@ -67,6 +68,7 @@ class GuestTenantTests(unittest.TestCase):
         self.app = FastAPI()
         self.app.state.db = self.store
         self.app.include_router(guest_os.admin_router)
+        self.app.include_router(guest_os.public_router)
         self.app.include_router(reviews.router)
         self.app.dependency_overrides[guest_os.admin_access] = lambda: self.user
         self.flag = patch.object(auth, 'MARINA_TENANT_CONTEXT_ENABLED', True)
@@ -131,6 +133,83 @@ class GuestTenantTests(unittest.TestCase):
             response = self.client.get('/api/v1/guest-os/rooms/test-token/review-links')
         self.assertEqual(response.status_code, 404)
         rules.assert_not_awaited()
+
+
+    def test_foreign_hotel_cookie_cannot_unlock_room_context(self):
+        # Same stay/guest identifiers are deliberately replayed with a
+        # different property ID to verify the hotel boundary explicitly.
+        room_id, stay_id, guest_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        qr = {
+            'propertyId': self.store.ids[0], 'roomId': room_id, 'room_code': 'A101',
+            'room_name': 'Room A101', 'room_type_name': 'Standard',
+            'buildingOrZone': None, 'floorLabel': None,
+        }
+        stay = {
+            'stayId': stay_id, 'guestId': guest_id, 'firstName': 'Private Name',
+            'checkIn': '2026-11-04', 'checkOut': '2026-11-06',
+        }
+        session = {'stayId': stay_id, 'guestId': guest_id, 'propertyId': self.store.ids[1]}
+        with patch.object(guest_os, 'resolve_room_qr', AsyncMock(return_value=qr)), \
+                patch.object(guest_os, 'current_stay_for_room', AsyncMock(return_value=stay)), \
+                patch.object(guest_os, 'valid_guest_session', AsyncMock(return_value=session)), \
+                patch.object(guest_os, 'guest_property_info', AsyncMock(return_value={'name': 'Hotel A'})):
+            response = self.client.get('/api/v1/guest-os/rooms/' + 'x' * 32)
+            self.assertEqual(response.status_code, 200)
+            body = response.json()
+            self.assertFalse(body['authenticated'])
+            self.assertTrue(body['verification_required'])
+            self.assertEqual(body['property'], {'name': 'Hotel A'})
+            self.assertIsNone(body['guest'])
+            self.assertIsNone(body['stay'])
+            # A hotel-local active cookie still works (no regression).
+            session['propertyId'] = self.store.ids[0]
+            response = self.client.get('/api/v1/guest-os/rooms/' + 'x' * 32)
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.json()['authenticated'])
+            self.assertEqual(response.json()['guest']['first_name'], 'Private Name')
+
+    def test_foreign_hotel_cookie_cannot_submit_private_guest_request(self):
+        room_id, stay_id, guest_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        qr = {'propertyId': self.store.ids[0], 'roomId': room_id}
+        stay = {'stayId': stay_id, 'guestId': guest_id}
+        session = {'propertyId': self.store.ids[1], 'stayId': stay_id, 'guestId': guest_id}
+        with patch.object(guest_requests, 'resolve_room_qr', AsyncMock(return_value=qr)), \
+                patch.object(guest_requests, 'current_stay_for_room', AsyncMock(return_value=stay)), \
+                patch.object(guest_requests, 'valid_guest_session', AsyncMock(return_value=session)):
+            with self.assertRaises(HTTPException) as error:
+                asyncio.run(guest_requests.authorized_context(self.store, 'x' * 32, 'y' * 32))
+            self.assertEqual(error.exception.status_code, 401)
+            session['propertyId'] = self.store.ids[0]
+            returned = asyncio.run(guest_requests.authorized_context(self.store, 'x' * 32, 'y' * 32))
+            self.assertIs(returned[0], qr)
+            self.assertIs(returned[1], stay)
+
+    def test_guest_qr_stay_and_session_queries_join_same_property(self):
+        # Inspect exact SQL predicates without modifying or seeding user data.
+        class QueryRecorder:
+            def __init__(self):
+                self.queries = []
+
+            async def fetchrow(self, sql, *args):
+                self.queries.append(sql)
+                return None
+
+            async def execute(self, sql, *args):
+                self.queries.append(sql)
+
+        conn = QueryRecorder()
+        asyncio.run(guest_os.resolve_room_qr(conn, 'q' * 32))
+        asyncio.run(guest_os.current_stay_for_room(conn, uuid.uuid4()))
+        asyncio.run(guest_os.valid_guest_session(conn, 's' * 32))
+        sql = '\n'.join(conn.queries)
+        self.assertIn('room."propertyId"=qr."propertyId"', sql)
+        self.assertIn('rt."propertyId"=room."propertyId"', sql)
+        self.assertIn('s."propertyId"=ra."propertyId"', sql)
+        self.assertIn('active_room."propertyId"=ra."propertyId"', sql)
+        self.assertIn('r."propertyId"=s."propertyId"', sql)
+        self.assertIn('g."propertyId"=s."propertyId"', sql)
+        self.assertIn('s."propertyId"=gs."propertyId"', sql)
+        self.assertIn('s."guestId"=gs."guestId"', sql)
 
 
 if __name__ == '__main__':
