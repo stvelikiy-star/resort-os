@@ -62,6 +62,13 @@ async def seed(conn):
                 (id,"propertyId",username,"displayName","passwordHash",role,"isActive","updatedAt")
                 VALUES($1,$2,'owner',$3,$4,'OWNER',true,now())
             ''', uuid.uuid4(), property_id, "Synthetic Owner " + hotel.upper(), hashed_password)
+            for role, username in (("MAID", "maid"), ("TECHNICIAN", "technician")):
+                await conn.execute('''
+                    INSERT INTO staff_users
+                    (id,"propertyId",username,"displayName","passwordHash",role,"isActive","updatedAt")
+                    VALUES($1,$2,$3,$4,$5,$6::"StaffRole",true,now())
+                ''', uuid.uuid4(), property_id, username,
+                    "Synthetic " + role + " " + hotel.upper(), hashed_password, role)
             await conn.execute('''
                 INSERT INTO room_types(id,"propertyId",code,name,"capacityAdults","updatedAt")
                 VALUES($1,$2,'STANDARD','CI Standard',2,now())
