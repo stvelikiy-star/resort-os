@@ -41,6 +41,41 @@ describe('central 401 revocation for verified hotel data requests', () => {
     } finally { clearA(); clearB(); }
   });
 
+  it.each([200, 503])('discards a delayed A response (%i) without retrying under B', async status => {
+    const clearA = bindVerifiedHost(origin, jest.fn());
+    let finish!: (response: Response) => void;
+    const transport = jest.fn(() => new Promise<Response>(resolve => { finish = resolve; }));
+    const http = createHotelHttpClient(origin, transport as unknown as typeof fetch);
+    const pending = http.request('GET', '/api/v1/ops/tasks');
+    const clearB = bindVerifiedHost(origin, jest.fn());
+    try {
+      const response = resp(status);
+      const readBody = jest.spyOn(response, 'json');
+      finish(response);
+      await expect(pending).rejects.toMatchObject({ code: 'STALE_SESSION' });
+      expect(readBody).not.toHaveBeenCalled();
+      expect(transport).toHaveBeenCalledTimes(1);
+    } finally { clearA(); clearB(); }
+  });
+
+  it('discards an A body if the session changes while reading it', async () => {
+    const clearA = bindVerifiedHost(origin, jest.fn());
+    let finish!: (value: unknown) => void;
+    let reading!: () => void;
+    const bodyStarted = new Promise<void>(resolve => { reading = resolve; });
+    const json = () => new Promise<unknown>(resolve => { finish = resolve; reading(); });
+    const transport = jest.fn(async () => ({ ...resp(200), json }) as Response);
+    const http = createHotelHttpClient(origin, transport as unknown as typeof fetch);
+    const pending = http.request('GET', '/api/v1/ops/tasks');
+    await bodyStarted;
+    const clearB = bindVerifiedHost(origin, jest.fn());
+    try {
+      finish({ hotel: 'A' });
+      await expect(pending).rejects.toMatchObject({ code: 'STALE_SESSION' });
+      expect(transport).toHaveBeenCalledTimes(1);
+    } finally { clearA(); clearB(); }
+  });
+
   it('does not sign out an existing employee after a rejected login, mode probe or 403', async () => {
     const revoked = jest.fn(), clear = bindVerifiedHost(origin, revoked);
     try {
