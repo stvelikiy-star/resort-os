@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - compose.marina-shared-staging.yaml
+      - scripts/marina_shared_https_pms_ci.mjs
       - .github/workflows/marina-shared-https-staging-ci.yml
   workflow_dispatch:
 
@@ -18,6 +19,9 @@ jobs:
       COMPOSE_FILE: compose.marina-shared-staging.yaml
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Generate isolated credentials
         run: |
           db=$(openssl rand -hex 24)
@@ -71,6 +75,13 @@ jobs:
           test "$(curl_tls -o /dev/null -w '%{http_code}' -b a.cookies "$base/api/v1/auth/me")" = 401
           curl_tls --fail -b b.cookies "$base/api/v1/auth/me" |
             jq -e '.property_code == "HOTEL_B"' >/dev/null
+          pin=$(openssl x509 -in cert.pem -pubkey -noout | openssl pkey -pubin -outform DER | openssl dgst -sha256 -binary | openssl base64 -A)
+          echo "MARINA_STAGING_CERT_SPKI=$pin" >> "$GITHUB_ENV"
+      - name: Verify Chromium PMS bookings and isolation over HTTPS
+        run: |
+          npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+          node scripts/marina_shared_https_pms_ci.mjs
       - name: Remove isolated CI services and volumes
         if: always()
         run: |
