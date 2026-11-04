@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .auth import current_user, require_roles, trusted_property_id
+from .auth import current_user, require_roles, trusted_property_id, MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/ops", tags=["operations"])
@@ -193,6 +193,11 @@ async def list_tasks(
     user: dict[str, Any] = Depends(current_user),
 ):
     allowed = allowed_types_for_user(user)
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED and not allowed:
+        # Legacy single-property clients historically received an empty list.
+        # In shared mode an unreviewed role or revoked OPS grant must fail
+        # explicitly, never appear to have an operational workspace.
+        raise HTTPException(status_code=403, detail="Operations role and OPS permission required")
     if task_type and task_type not in allowed:
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if task_status and task_status not in TASK_STATUSES:
