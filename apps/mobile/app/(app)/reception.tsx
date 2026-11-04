@@ -1,53 +1,111 @@
-import React, { useCallback, useRef } from 'react';
-import { Text, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronRight } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Search, Users } from 'lucide-react-native';
 import { Badge, Empty, SectionLabel } from '../../src/components/ui';
-import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
-import { useLiveModules, ReceptionList } from '../../src/api/liveModules';
+import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
+import { useLiveModules, ReceptionList, ReceptionReservation } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useSession } from '../../src/state/session';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { font, space } from '../../src/theme/tokens';
+import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Reception() {
-  const { user, hotel } = useSession();
+  const { user, hotel, api, serverAuthMode } = useSession();
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
+  const [search, setSearch] = useState('');
   const { data, loading, error, reload } = useAsync<ReceptionList | null>(() => live ? live.reception() : Promise.resolve(null), [live, user?.id]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
-  const arrivals = (data?.items ?? []).filter(x => x.checkIn === data?.local_date && x.status === 'GUARANTEED');
-  const departures = (data?.items ?? []).filter(x => x.checkOut === data?.local_date && x.status === 'CHECKED_IN');
-  const item = (x: ReceptionList['items'][number]) => <GlassCard key={x.id} testID={'reservation-' + x.id}
-    onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text style={[font.h2, { color: c.text }]}>{x.firstName || x.bookingNumber}</Text>
-        <Text style={[font.small, { color: c.textMuted }]}>{x.bookingNumber} · {x.room_code || '—'}</Text>
-        <Text style={[font.small, { color: c.textMuted }]}>{x.checkIn} → {x.checkOut}</Text>
-        <Badge label={x.status} tone={x.room_state === 'TECH_BLOCK' || x.room_state === 'DIRTY' ? 'danger' : 'primary'} />
+  const canInbox = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'inbox', serverAuthMode);
+  const visible = useMemo(() => (data?.items ?? []).filter(x => {
+    const q = search.trim().toLocaleLowerCase();
+    return !q || [x.firstName, x.bookingNumber, x.room_code, x.phone].some(v => (v ?? '').toLocaleLowerCase().includes(q));
+  }), [data, search]);
+  const arrivals = visible.filter(x => x.checkIn === data?.local_date && x.status === 'GUARANTEED');
+  const departures = visible.filter(x => x.checkOut === data?.local_date && x.status === 'CHECKED_IN');
+  const pending = visible.filter(x => ['PENDING', 'REQUESTED'].includes(x.status));
+  const staying = visible.filter(x => x.status === 'CHECKED_IN' && !departures.includes(x));
+  const rest = visible.filter(x => !arrivals.includes(x) && !departures.includes(x) && !pending.includes(x) && !staying.includes(x));
+
+  const bookingState = (x: ReceptionReservation) => {
+    if (x.status === 'CHECKED_OUT') return { label: copy.checkedOut, tone: 'neutral' as const };
+    if (x.status === 'CANCELLED') return { label: copy.cancelled, tone: 'danger' as const };
+    if (x.status === 'CHECKED_IN') return { label: x.checkOut <= (data?.local_date ?? '') ? copy.awaitingDeparture : copy.checkedIn, tone: 'success' as const };
+    if (x.status === 'GUARANTEED') return { label: copy.awaitingArrival, tone: 'info' as const };
+    if (['PENDING', 'REQUESTED'].includes(x.status)) return { label: copy.pendingConfirmation, tone: 'warning' as const };
+    return { label: x.status, tone: 'neutral' as const };
+  };
+  const card = (x: ReceptionReservation, index: number) => {
+    const state = bookingState(x);
+    return <StaggerItem index={index} key={x.id}><GlassCard testID={'reservation-' + x.id}
+      onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}
+      style={{ gap: space.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+        <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Users size={22} color={c.primary}/>
+        </View>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{x.firstName || x.bookingNumber}</Text>
+          <Text style={[font.small, { color: c.textMuted }]}>{x.bookingNumber} · {x.room_code || '—'}</Text>
+        </View>
+        <ChevronRight color={c.primary} size={22}/>
       </View>
-      <ChevronRight color={c.primary} size={24}/>
-    </View>
-  </GlassCard>;
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <Badge label={state.label} tone={state.tone}/>
+        {x.room_state === 'DIRTY' ? <Badge label={copy.dirty} tone="warning"/> : null}
+        {x.room_state === 'TECH_BLOCK' ? <Badge label={copy.tech} tone="danger"/> : null}
+        <Text style={[font.small, { color: c.textMuted }]}>{x.checkIn} → {x.checkOut}</Text>
+      </View>
+    </GlassCard></StaggerItem>;
+  };
   return <FutureScreen>
-    <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART" right={live ? <AIOrb label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
-    {!live ? <Empty text={copy.unavailable} /> : null}
+    <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART"
+      right={live && serverAuthMode !== 'shared_auth_preview' ? <AIOrb label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
+    {canInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
+    {!live ? <Empty text={copy.unavailable}/> : null}
     {loading && live ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
-      <GlassCard style={{ gap: 8 }}><CalendarDays size={28} color={c.primary}/><Text style={[font.h2, { color: c.text }]}>{data.local_date}</Text>
-        <Text style={[font.body, { color: c.textMuted }]}>{copy.arrivals}: {arrivals.length} · {copy.departures}: {departures.length}</Text></GlassCard>
-      <SectionLabel>{copy.arrivals}</SectionLabel>
-      {arrivals.length ? arrivals.map(item) : <Empty text={copy.empty}/>}
-      <SectionLabel>{copy.departures}</SectionLabel>
-      {departures.length ? departures.map(item) : <Empty text={copy.empty}/>}
-      <SectionLabel>{copy.bookings} · {data.items.length}</SectionLabel>
-      {data.items.filter(x => !arrivals.includes(x) && !departures.includes(x)).map(item)}
+      <GlassCard style={{ gap: space.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          <CalendarDays size={22} color={c.primary}/>
+          <Text style={[font.h2, { color: c.text }]}>{data.local_date}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <View style={{ flex: 1, gap: 4 }}>
+            <LogIn color={c.success} size={21}/>
+            <Text style={[font.metric, { color: c.text }]}>{(data.items ?? []).filter(x => x.checkIn === data.local_date && x.status === 'GUARANTEED').length}</Text>
+            <Text style={[font.small, { color: c.textMuted }]}>{copy.arrivals}</Text>
+          </View>
+          <View style={{ flex: 1, gap: 4 }}>
+            <LogOut color={c.warning} size={21}/>
+            <Text style={[font.metric, { color: c.text }]}>{(data.items ?? []).filter(x => x.checkOut === data.local_date && x.status === 'CHECKED_IN').length}</Text>
+            <Text style={[font.small, { color: c.textMuted }]}>{copy.departures}</Text>
+          </View>
+        </View>
+      </GlassCard>
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 56, gap: 8, paddingHorizontal: 14, backgroundColor: c.surface, borderWidth: 1, borderRadius: radius.md, borderColor: c.border }}>
+        <Search size={20} color={c.textMuted}/>
+        <TextInput testID="reception-search" accessibilityLabel={copy.searchReservation} placeholder={copy.searchReservation}
+          placeholderTextColor={c.textMuted} autoCorrect={false} value={search} onChangeText={setSearch}
+          style={[font.body, { color: c.text, flex: 1, paddingVertical: 10 }]}/>
+      </View>
+      <SectionLabel>{copy.arrivalList} · {arrivals.length}</SectionLabel>
+      {arrivals.length ? arrivals.map(card) : <Empty text={copy.empty}/>}
+      <SectionLabel>{copy.departureList} · {departures.length}</SectionLabel>
+      {departures.length ? departures.map(card) : <Empty text={copy.empty}/>}
+      {pending.length ? <SectionLabel>{copy.pendingConfirmation} · {pending.length}</SectionLabel> : null}
+      {pending.map(card)}
+      {staying.length ? <SectionLabel>{copy.checkedIn} · {staying.length}</SectionLabel> : null}
+      {staying.map(card)}
+      {rest.length ? <SectionLabel>{copy.bookings} · {rest.length}</SectionLabel> : null}
+      {rest.map(card)}
+      {!visible.length ? <Empty text={copy.empty}/> : null}
     </> : null}
   </FutureScreen>;
-}
