@@ -20,6 +20,11 @@ RECEIPTS = Path("/tmp/marina_shared_browser_receipts.json")
 PASSWORD = os.environ.get("MARINA_SHARED_BROWSER_CI_PASSWORD", "")
 ROOM_CODES = {"a": "A101", "b": "B202"}
 PRICES = {"a": 3000, "b": 4500}
+SERVER_ROLES = (
+    "OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN",
+    "STORE_STAFF", "DINING_STAFF", "COOK", "WAITER",
+    "CONTENT_MANAGER", "BEACH_PARTNER",
+)
 
 
 def dsn():
@@ -62,12 +67,18 @@ async def seed(conn):
                 (id,"propertyId",username,"displayName","passwordHash",role,"isActive","updatedAt")
                 VALUES($1,$2,'owner',$3,$4,'OWNER',true,now())
             ''', uuid.uuid4(), property_id, "Synthetic Owner " + hotel.upper(), hashed_password)
-            for role, username in (("MAID", "maid"), ("TECHNICIAN", "technician")):
+            # Same role usernames in both hotels prove that neither username
+            # nor a caller-selected property header can select an identity.
+            # Retain all legacy enum roles for authentication/RBAC acceptance,
+            # even where a shared operational screen has not been enabled.
+            for role in SERVER_ROLES:
+                if role == "OWNER":
+                    continue
                 await conn.execute('''
                     INSERT INTO staff_users
                     (id,"propertyId",username,"displayName","passwordHash",role,"isActive","updatedAt")
                     VALUES($1,$2,$3,$4,$5,$6::"StaffRole",true,now())
-                ''', uuid.uuid4(), property_id, username,
+                ''', uuid.uuid4(), property_id, role.lower(),
                     "Synthetic " + role + " " + hotel.upper(), hashed_password, role)
             await conn.execute('''
                 INSERT INTO room_types(id,"propertyId",code,name,"capacityAdults","updatedAt")
@@ -87,7 +98,7 @@ async def seed(conn):
                                          "mealIncluded","saleStatus","updatedAt")
                 VALUES($1,$2,$3,'CI period',$4,$5,$6,'NONE','OPEN',now())
             ''', uuid.uuid4(), rate_plan_id, room_type_id, start, end, PRICES[hotel])
-    print("PASS: two independent hotel-owner accounts, rooms, and distinct live Core rates seeded")
+    print("PASS: two independent hotels, 12 role identities each, separate rooms and rates seeded")
 
 
 async def verify(conn):
