@@ -16,7 +16,7 @@ export default function Profile() {
   const { t } = useTranslation();
   const { c, pref, setPref } = useTheme();
   const router = useRouter();
-  const { user, hotel, api, locale, setLocale, signOut, leaveHotel } = useSession();
+  const { user, hotel, api, serverAuthMode, locale, setLocale, signOut, leaveHotel } = useSession();
   if (!user || !hotel || !api) return <Redirect href="/connect" />;
   const row = (k: string, v: string) => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
@@ -33,7 +33,7 @@ export default function Profile() {
         {row(t('profile.mode'), hotel?.demo ? t('profile.modeDemo') : t('profile.modeLive'))}
         {row(t('profile.version'), String(Constants.expoConfig?.version ?? '0.2.0'))}
       </GlassCard>
-      {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE').mobileReady ? <GlassCard testID="role-soon"><Text style={[font.body, { color: c.textMuted }]}>{t('profile.roleSoon')}</Text></GlassCard> : null}
+      {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).mobileReady ? <GlassCard testID="role-soon"><Text style={[font.body, { color: c.textMuted }]}>{t('profile.roleSoon')}</Text></GlassCard> : null}
       <SectionLabel>{t('profile.language')}</SectionLabel>
       <Segmented<Locale> value={locale} onChange={setLocale} options={LOCALES.map((l) => ({ key: l, label: LOCALE_LABEL[l] }))} />
       <SectionLabel>{t('profile.theme')}</SectionLabel>
