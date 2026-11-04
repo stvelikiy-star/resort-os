@@ -64,7 +64,8 @@ async function verifyHotel(hotel, role) {
   }
   const status = await page.locator('section[aria-label="WhatsApp своей гостиницы"] p[role="status"]').innerText();
   assert.match(status, new RegExp("HOTEL_" + hotel), "Hotel header: " + status);
-  assert.match(status, new RegExp(role), "Role header: " + status);
+  const verified = await assertStatus(await context.request.get(BASE + "/core/api/v1/auth/me"), 200, "server-role verification");
+  assert.equal(verified.role, role, "Server authority must provide the expected role");
   await page.locator(".inbox-row").getByText("CI WhatsApp Guest " + hotel).waitFor({ timeout: 20000 });
   const foreign = hotel === "A" ? "B" : "A";
   assert.equal(await page.getByText("CI WhatsApp Guest " + foreign).count(), 0,
