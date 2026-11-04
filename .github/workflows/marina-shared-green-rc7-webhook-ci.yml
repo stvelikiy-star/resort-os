@@ -92,4 +92,4 @@ jobs:
       - name: Seed unrelated hotels, authenticated owners and distinct rates
         run: python scripts/marina_shared_live_browser_db.py seed
       - name: Verify two-hotel authenticated GREEN-API callbacks and delivery reconciliation
-        run: python scripts/marina_shared_green_rc7_webhook_ci.py
+        run: timeout --signal=SIGTERM --kill-after=15s 180s python -u scripts/marina_shared_green_rc7_webhook_ci.py
