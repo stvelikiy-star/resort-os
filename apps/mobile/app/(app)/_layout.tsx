@@ -44,7 +44,7 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], href: workspace.tabs.includes(key) ? undefined : null,
+        title: copy[key], tabBarLabel: key === 'admin' ? copy.teamShort : copy[key], href: workspace.tabs.includes(key) ? undefined : null,
         // Overflow routes remain registered in the navigator; only their tab buttons are hidden.
         // A null href here would make the screen unreachable from the More hub.
         tabBarButton: plan.overflow.includes(key) ? () => null : undefined,
