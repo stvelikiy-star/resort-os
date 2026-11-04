@@ -252,7 +252,7 @@ async def verify(conn):
                 SELECT count(*) FROM audit_logs
                 WHERE "propertyId"=$1 AND "resourceId"=$2
                   AND action='CLAIM' AND "actorId"=$3
-            ''',pid,task_id,actor_id)==1,"Missing role-verified claim audit"
+            ''',pid,task_id,str(actor_id))==1,"Missing role-verified claim audit"
             assert await conn.fetchval('''
                 SELECT count(*) FROM audit_logs
                 WHERE "propertyId"=$1 AND "resourceId"=$2
