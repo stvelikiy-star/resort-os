@@ -1,6 +1,5 @@
 import React, { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays, ClipboardCheck, Users, Wrench, Sparkles } from 'lucide-react-native';
