@@ -44,7 +44,10 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], href: plan.primary.includes(key) ? undefined : null,
+        title: copy[key], href: workspace.tabs.includes(key) ? undefined : null,
+        // Overflow routes remain registered in the navigator; only their tab buttons are hidden.
+        // A null href here would make the screen unreachable from the More hub.
+        tabBarButton: plan.overflow.includes(key) ? () => null : undefined,
         tabBarIcon: ({ color, focused }) =>
           <View style={{ minWidth: 50, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}>
             <Icon size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/>
