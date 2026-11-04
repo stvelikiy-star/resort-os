@@ -623,8 +623,8 @@ try {
     assert.equal(Number(summary.period_payments.received_kgs),data.manual_amount_kgs,
       "Finance report summed foreign hotel payments or missed own record");
     assert.equal(Number(summary.period_payments.received_count),1);
-    assert(summary.reservation_ledger.some(row=>row.id===data.reservation_id));
-    assert(!summary.reservation_ledger.some(row=>row.id===other.reservation_id),
+    assert(summary.reservation_ledger.some(row=>row.reservation_id===data.reservation_id));
+    assert(!summary.reservation_ledger.some(row=>row.reservation_id===other.reservation_id),
       "Foreign reservation in scoped financial ledger");
     assert(summary.recent_payments.some(p=>p.id===data.manual_payment_id));
     assert(!summary.recent_payments.some(p=>p.id===other.manual_payment_id),
