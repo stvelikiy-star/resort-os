@@ -4,6 +4,7 @@
 All callbacks synthetic. Provider send APIs and external AI are NEVER called.
 """
 import asyncio
+import faulthandler
 import json
 import os
 import secrets
@@ -122,6 +123,8 @@ def login(client, h, role, password):
 
 
 def main():
+    faulthandler.dump_traceback_later(90, repeat=True)
+    print("RC7 E2E: initializing two hotel bindings", flush=True)
     assert os.environ.get("MARINA_SHARED_GREEN_RC7_CI_CONFIRM") == (
         "ISOLATED_TWO_HOTEL_GREEN_WEBHOOK_CI_ONLY"
     )
@@ -166,6 +169,7 @@ def main():
     password = os.environ["MARINA_SHARED_BROWSER_CI_PASSWORD"]
     fixtures = {h: {"property_id": accounts[h]["property_id"]} for h in "AB"}
 
+    print("RC7 E2E: starting full Core TestClient", flush=True)
     with TestClient(app, base_url=BASE) as svc, \
             TestClient(app, base_url=BASE) as a, \
             TestClient(app, base_url=BASE) as b:
@@ -181,6 +185,7 @@ def main():
                 json=event,
             )
 
+        print("RC7 E2E: authenticating and exercising webhook guards", flush=True)
         # HTTPS staging admission does NOT authorize unknown or missing
         # callback credentials, cross-hotel instance IDs or chat group events.
         expect(svc.post(ENDPOINT, json=callback("A", "inbound-msg-001", "hello")), 401, "anonymous webhook")
@@ -198,6 +203,7 @@ def main():
 
         # Identical WhatsApp chat ID and Green ID across two independent
         # provider instances MUST produce separate hotel-scoped conversations.
+        print("RC7 E2E: guest message callback and idempotency", flush=True)
         for h in "AB":
             marker = h + "-GREEN7-MESSAGE-MARKER"
             event = callback(h, "inbound-msg-001", marker)
@@ -225,6 +231,7 @@ def main():
                 h, "outbound-msg-001", "delivered",
             )), 409, h + " untracked delivery cannot fabricate response")
 
+        print("RC7 E2E: outbound status reconciliation", flush=True)
         # Create one synthetic queued outgoing record through the existing
         # normalized adapter contract. Never call GREEN API sendMessage.
         queue = {
