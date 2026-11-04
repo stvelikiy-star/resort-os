@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Search, Users } from 'lucide-react-native';
-import { Badge, Empty, SectionLabel } from '../../src/components/ui';
+import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Search, Users, X } from 'lucide-react-native';
+import { Badge, Empty, SectionLabel, Segmented, PressScale } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useLiveModules, ReceptionList, ReceptionReservation } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { contactInitials } from '../../src/i18n/statusLabels';
 import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
@@ -19,6 +20,7 @@ export default function Reception() {
   const { c } = useTheme();
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [view, setView] = useState<'all' | 'arrivals' | 'departures' | 'staying'>('all');
   const { data, loading, error, reload } = useAsync<ReceptionList | null>(() => live ? live.reception() : Promise.resolve(null), [live, user?.id]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
@@ -48,7 +50,7 @@ export default function Reception() {
       style={{ gap: space.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
         <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          <Users size={22} color={c.primary}/>
+          {x.firstName ? <Text style={[font.h2, { color: c.primary }]}>{contactInitials(x.firstName)}</Text> : <Users size={22} color={c.primary}/>} 
         </View>
         <View style={{ flex: 1, gap: 4 }}>
           <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{x.firstName || x.bookingNumber}</Text>
@@ -93,20 +95,26 @@ export default function Reception() {
       <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 56, gap: 8, paddingHorizontal: 14, backgroundColor: c.surface, borderWidth: 1, borderRadius: radius.md, borderColor: c.border }}>
         <Search size={20} color={c.textMuted}/>
         <TextInput testID="reception-search" accessibilityLabel={copy.searchReservation} placeholder={copy.searchReservation}
-          placeholderTextColor={c.textMuted} autoCorrect={false} value={search} onChangeText={setSearch}
+          placeholderTextColor={c.textMuted} autoCorrect={false} returnKeyType="search" value={search} onChangeText={setSearch}
           style={[font.body, { color: c.text, flex: 1, paddingVertical: 10 }]}/>
+        {search ? <PressScale accessibilityLabel={copy.clearSearch} onPress={() => setSearch('')} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}><X size={20} color={c.textMuted}/></PressScale> : null}
       </View>
-      <SectionLabel>{copy.arrivalList} · {arrivals.length}</SectionLabel>
-      {arrivals.length ? arrivals.map(card) : <Empty text={copy.empty}/>}
-      <SectionLabel>{copy.departureList} · {departures.length}</SectionLabel>
-      {departures.length ? departures.map(card) : <Empty text={copy.empty}/>}
-      {pending.length ? <SectionLabel>{copy.pendingConfirmation} · {pending.length}</SectionLabel> : null}
-      {pending.map(card)}
-      {staying.length ? <SectionLabel>{copy.checkedIn} · {staying.length}</SectionLabel> : null}
-      {staying.map(card)}
-      {rest.length ? <SectionLabel>{copy.bookings} · {rest.length}</SectionLabel> : null}
-      {rest.map(card)}
-      {!visible.length ? <Empty text={copy.empty}/> : null}
+      <Segmented value={view} onChange={setView} options={[{key:'all',label:copy.all},{key:'arrivals',label:copy.arrivals},{key:'departures',label:copy.departures},{key:'staying',label:copy.checkedIn}]}/>
+      {(view === 'all' || view === 'arrivals') ? <>
+        <SectionLabel>{copy.arrivalList} · {arrivals.length}</SectionLabel>
+        {arrivals.length ? arrivals.map(card) : <Empty text={copy.empty}/>}
+      </> : null}
+      {(view === 'all' || view === 'departures') ? <>
+        <SectionLabel>{copy.departureList} · {departures.length}</SectionLabel>
+        {departures.length ? departures.map(card) : <Empty text={copy.empty}/>}
+      </> : null}
+      {view === 'all' && pending.length ? <SectionLabel>{copy.pendingConfirmation} · {pending.length}</SectionLabel> : null}
+      {view === 'all' ? pending.map(card) : null}
+      {(view === 'all' || view === 'staying') && staying.length ? <SectionLabel>{copy.checkedIn} · {staying.length}</SectionLabel> : null}
+      {(view === 'all' || view === 'staying') ? staying.map(card) : null}
+      {view === 'all' && rest.length ? <SectionLabel>{copy.bookings} · {rest.length}</SectionLabel> : null}
+      {view === 'all' ? rest.map(card) : null}
+      {visible.length === 0 || (view === 'staying' && staying.length === 0) ? <Empty text={copy.empty}/> : null}
     </> : null}
   </FutureScreen>;
 }
