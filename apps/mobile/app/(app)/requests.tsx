@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Plus, AlertTriangle, Wrench } from 'lucide-react-native';
-import { Button, Empty } from '../../src/components/ui';
+import { Button, Empty, SectionLabel } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { TaskCard } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
@@ -22,6 +22,7 @@ export default function Requests() {
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks({ type: 'MAINTENANCE' }) : Promise.resolve([])), [api, user?.id, ws.mobileReady]);
   const active = useMemo(() => (data ?? []).filter(x => x.status !== 'DONE' && x.status !== 'CANCELLED'), [data]);
   const urgent = active.filter(x => x.priority === 'URGENT').length;
+  const finished = useMemo(() => (data ?? []).filter(x => x.status === 'DONE' || x.status === 'CANCELLED'), [data]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   return <FutureScreen>
@@ -37,8 +38,13 @@ export default function Requests() {
     {loading && !data ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/> : null}
     {!error && data && data.length === 0 ? <Empty text={t('common.empty')}/> : null}
+    {active.length ? <SectionLabel>{t('tasks.visible')}</SectionLabel> : null}
     {active.map((task, i) => <StaggerItem key={task.id} index={i}>
       <TaskCard task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>
+    </StaggerItem>)}
+    {finished.length ? <SectionLabel>{t('tasks.done')}</SectionLabel> : null}
+    {finished.map((task, i) => <StaggerItem key={task.id} index={i}>
+      <TaskCard task={task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })}/>
     </StaggerItem>)}
   </FutureScreen>;
 }
