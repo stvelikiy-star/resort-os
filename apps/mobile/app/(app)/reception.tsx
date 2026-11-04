@@ -109,3 +109,4 @@ export default function Reception() {
       {!visible.length ? <Empty text={copy.empty}/> : null}
     </> : null}
   </FutureScreen>;
+}
