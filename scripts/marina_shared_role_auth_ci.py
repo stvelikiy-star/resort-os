@@ -111,6 +111,12 @@ def main():
                      role in ("OWNER", "MANAGER", "RECEPTION")),
                     ("/api/v1/ops/tasks", role in ("OWNER", "MANAGER", "MAID", "TECHNICIAN")),
                     ("/api/v1/admin/staff/overview", role in ("OWNER", "MANAGER")),
+                    ("/api/v1/admin/finance/summary?from_date=" +
+                     (date.today()-timedelta(days=3)).isoformat()+"&to_date="+
+                     (date.today()+timedelta(days=3)).isoformat(),
+                     role in ("OWNER","MANAGER")),
+                    ("/api/v1/ops/tasks/"+receipts[hotel]["maintenance_task_id"]+"/history",
+                     role in ("OWNER","MANAGER")),
                 )
                 for url, granted in choices:
                     response = client.get(url, headers=headers)
@@ -126,6 +132,16 @@ def main():
                         )
                     if granted and url == "/api/v1/admin/dashboard":
                         assert response.json()["property"]["code"] == hotel
+                    if granted and url.startswith("/api/v1/admin/finance/summary"):
+                        summary=response.json()
+                        assert summary["scope"]["internal_only"] is True
+                        assert summary["period_payments"]["received_kgs"] == (
+                            1000 if hotel=="HOTEL_A" else 1500
+                        )
+                        assert not any(row["id"]==receipts[foreign]["reservation_id"]
+                                       for row in summary["reservation_ledger"])
+                    if granted and url.endswith("/history"):
+                        assert response.json()["task"]["id"] == receipts[hotel]["maintenance_task_id"]
                     if granted and url == "/api/v1/admin/staff/overview":
                         staff = response.json()["staff"]
                         assert len(staff) == len(SERVER_ROLES), "Staff list crossed hotel boundary"
