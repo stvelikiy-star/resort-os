@@ -8,6 +8,7 @@ import { cappedStagger, useMotionAllowed, useMotionPreference } from '../theme/m
 import { elevation, font, iconography, motion, radius, space } from '../theme/tokens';
 import { Badge, Card, PressScale, Screen, Title } from './ui';
 import { Logo } from './Brand';
+import { metricNeedsFullWidth } from '../theme/layout';
 
 export function FutureScreen({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
@@ -35,13 +36,13 @@ export function GlassCard({ children, style, onPress, testID }: { children: Reac
 export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void }) {
   const { c } = useTheme();
   const { width, fontScale } = useWindowDimensions();
-  const oneColumn = width < 350 || fontScale > 1.5;
+  const oneColumn = metricNeedsFullWidth(width, fontScale, value);
   return <GlassCard onPress={onPress} style={{ flexGrow: 1, flexBasis: oneColumn ? '100%' : '46%', minWidth: 0, gap: 10, padding: 16 }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
       <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon color={c.primary} size={iconography.metric}/></View>
       {onPress ? <ArrowUpRight size={18} color={c.textMuted}/> : null}
     </View>
-    <Text style={[font.metric, { color: c.text }]} adjustsFontSizeToFit minimumFontScale={0.55} numberOfLines={1}>{value}</Text>
+    <Text style={[font.metric, { color: c.text, flexShrink: 1 }]} adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={oneColumn ? 2 : 1}>{value}</Text>
     <Text style={[font.small, { color: c.textMuted }]}>{label}</Text>
     {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
   </GlassCard>;
@@ -146,7 +147,7 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
     loop.start(); return () => loop.stop();
   }, [allowed, progress, state]);
   const ring = state === 'error' ? c.danger : state === 'offline' ? c.textMuted : c.cyan;
-  return <PressScale disabled={!onPress} onPress={onPress} accessibilityLabel={label} style={{ width: size + 16, height: size + 16, justifyContent: 'center', alignItems: 'center' }}>
+  return <PressScale disabled={!onPress} dimWhenDisabled={false} onPress={onPress} accessibilityLabel={label} style={{ width: size + 16, height: size + 16, justifyContent: 'center', alignItems: 'center' }}>
     <Animated.View style={{ position: 'absolute', transform: [{ rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
       <Svg width={size + 16} height={size + 16} viewBox="0 0 100 100">
         <Defs><LinearGradient id="orbRing" x1="0" x2="1" y1="0" y2="1"><Stop offset="0" stopColor={ring}/><Stop offset="1" stopColor={c.iris}/></LinearGradient></Defs>
