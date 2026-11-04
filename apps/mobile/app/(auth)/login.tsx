@@ -10,7 +10,7 @@ import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
 import { useSession } from '../../src/state/session';
 import { homeForSession } from '../../src/roles/registry';
 import { ApiError } from '../../src/api/types';
-import type { AuthMode } from '../../src/api/types';
+import type { AuthMode, StaffApi } from '../../src/api/types';
 import { checkedHotelSelector } from '../../src/api/sharedHotelAuth';
 import { isTrustedHotelOrigin } from '../../src/api/hotels';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -26,14 +26,14 @@ export default function Login() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  const [modeResult, setModeResult] = useState<{ hotelId: string; attempt: number; value: AuthMode } | null>(null);
-  const [modeError, setModeError] = useState<{ hotelId: string; attempt: number } | null>(null);
+  const [modeResult, setModeResult] = useState<{ api: StaffApi; attempt: number; value: AuthMode } | null>(null);
+  const [modeError, setModeError] = useState<{ api: StaffApi; attempt: number } | null>(null);
   const [modeRetry, setModeRetry] = useState(0);
   const [tenantCode, setTenantCode] = useState('');
   const [propertyCode, setPropertyCode] = useState('');
   const authMode: AuthMode | null = hotel?.demo ? 'demo' :
-    modeResult?.hotelId === hotel?.id && modeResult?.attempt === modeRetry ? modeResult.value : null;
-  const cannotDiscoverMode = modeError?.hotelId === hotel?.id && modeError?.attempt === modeRetry;
+    modeResult?.api === api && modeResult?.attempt === modeRetry ? modeResult.value : null;
+  const cannotDiscoverMode = modeError?.api === api && modeError?.attempt === modeRetry;
 
   useEffect(() => {
     if (!hotel || !api || hotel.demo) return;
@@ -42,9 +42,9 @@ export default function Login() {
     // unknown, unsupported or unavailable. Async callbacks avoid render loops.
     const check = api.authMode ? api.authMode() : Promise.reject(new Error('Auth mode unavailable'));
     void check.then(value => {
-      if (active) setModeResult({ hotelId: hotel.id, attempt: modeRetry, value });
+      if (active) setModeResult({ api, attempt: modeRetry, value });
     }).catch(() => {
-      if (active) setModeError({ hotelId: hotel.id, attempt: modeRetry });
+      if (active) setModeError({ api, attempt: modeRetry });
     });
     return () => { active = false; };
   }, [hotel, api, modeRetry]);
