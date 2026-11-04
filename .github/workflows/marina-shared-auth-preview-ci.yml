@@ -5,6 +5,8 @@ on:
     branches: [prep/marina-shared-platform-20261103]
     paths:
       - 'services/api/app/auth.py'
+      - 'services/api/app/section_permissions.py'
+      - 'scripts/test_marina_shared_auth_role_ceiling.py'
       - 'services/api/app/realtime.py'
       - 'services/api/app/dining_realtime.py'
       - 'services/api/app/websocket_security.py'
@@ -21,6 +23,8 @@ on:
     paths:
       - 'release/marina-smart-current-candidate.json'
       - 'services/api/app/auth.py'
+      - 'services/api/app/section_permissions.py'
+      - 'scripts/test_marina_shared_auth_role_ceiling.py'
       - 'services/api/app/realtime.py'
       - 'services/api/app/dining_realtime.py'
       - 'services/api/app/websocket_security.py'
@@ -78,6 +82,7 @@ jobs:
       - name: Run isolated authentication preview tests
         run: |
           python scripts/test_marina_shared_auth.py -v
+          python -m unittest discover -s scripts -p 'test_marina_shared_auth_role_ceiling.py' -v
           python scripts/test_marina_guest_tenant_boundary.py -v
           python scripts/test_marina_realtime_tenant_boundary.py -v
       - name: Verify real PostgreSQL and HTTP session isolation
