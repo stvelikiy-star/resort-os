@@ -1,0 +1,78 @@
+name: MARINA Shared HTTPS Staging Compose CI
+
+on:
+  pull_request:
+    paths:
+      - compose.marina-shared-staging.yaml
+      - .github/workflows/marina-shared-https-staging-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  https-first-boot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      COMPOSE_FILE: compose.marina-shared-staging.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate isolated credentials
+        run: |
+          db=$(openssl rand -hex 24)
+          fixture=synthetic-ci-only-$(openssl rand -hex 24)
+          echo "::add-mask::$db"
+          echo "::add-mask::$fixture"
+          {
+            echo "MARINA_STAGING_SHA=$(git rev-parse HEAD)"
+            echo "MARINA_STAGING_DB_PASSWORD=$db"
+            echo "MARINA_STAGING_FIXTURE_PASSWORD=$fixture"
+          } >> "$GITHUB_ENV"
+      - name: Validate and boot Compose
+        run: |
+          docker compose config --quiet
+          docker compose up -d --wait postgres
+          docker compose run --rm --build seed
+          docker compose up -d --build --wait admin
+      - name: Verify HTTPS session isolation through the Admin proxy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$(mktemp -d)"
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost' -keyout key.pem -out cert.pem 2>/dev/null
+          cat > Caddyfile <<'CADDY'
+          https://localhost:13443 {
+            tls /tls/cert.pem /tls/key.pem
+            reverse_proxy 127.0.0.1:13201
+          }
+          CADDY
+          docker run -d --name marina-https-ci-proxy --network host \
+            -v "$PWD:/tls:ro" -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine
+          base=https://localhost:13443/core
+          curl_tls() { curl --silent --show-error --cacert cert.pem --max-time 10 "$@"; }
+          curl_tls --fail --retry 15 --retry-connrefused --retry-delay 2 "$base/health/ready" >/dev/null
+          curl_tls --fail "$base/api/v1/auth/mode" | jq -e '.mode == "shared_auth_preview"' >/dev/null
+          for tenant in a b; do
+            property=HOTEL_${tenant^^}
+            jq -n --arg tenant "tenant_$tenant" --arg property "$property" \
+              '{tenant_code:$tenant,property_code:$property,username:"owner",password:env.MARINA_STAGING_FIXTURE_PASSWORD}' |
+              curl_tls --fail -H 'Content-Type: application/json' --data-binary @- \
+                -D "$tenant.headers" -c "$tenant.cookies" "$base/api/v1/auth/login" |
+              jq -e --arg property "$property" '.property_code == $property' >/dev/null
+            grep -i '^set-cookie: resort_session=' "$tenant.headers" |
+              grep -i 'secure' | grep -i 'httponly' | grep -iq 'samesite=lax'
+            curl_tls --fail -b "$tenant.cookies" "$base/api/v1/auth/me" > "$tenant.me"
+            jq -e --arg property "$property" '.property_code == $property' "$tenant.me" >/dev/null
+          done
+          jq -e -s '.[0].tenant_id != .[1].tenant_id and .[0].property_id != .[1].property_id' a.me b.me >/dev/null
+          curl_tls --fail -X POST -b a.cookies "$base/api/v1/auth/logout" >/dev/null
+          test "$(curl_tls -o /dev/null -w '%{http_code}' -b a.cookies "$base/api/v1/auth/me")" = 401
+          curl_tls --fail -b b.cookies "$base/api/v1/auth/me" |
+            jq -e '.property_code == "HOTEL_B"' >/dev/null
+      - name: Remove isolated CI services and volumes
+        if: always()
+        run: |
+          docker rm -f marina-https-ci-proxy || true
+          docker compose down --volumes --remove-orphans
