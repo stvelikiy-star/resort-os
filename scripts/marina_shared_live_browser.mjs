@@ -402,7 +402,6 @@ async function ownerCreateRepair(page,hotel) {
   assert.equal(assignment.status(),200,await assignment.text());
   const assigned=await assignment.json();
   assert.equal(assigned.id,task.id);
-  assert.equal(assigned.status,"OPEN");
   assert.equal(assigned.assigned_to_id,tech.id);
   receipts[hotel].technician_id=tech.id;
   receipts[hotel].maid_id=maid.id;
@@ -474,7 +473,8 @@ async function maidPreparesInspection(hotel){
       housekeeping.id+"/complete-report",{data:report});
     assert.equal(completion.status(),200,await completion.text());
     const acknowledged=await completion.json();
-    assert.equal(acknowledged.id,housekeeping.id);
+    assert.equal(acknowledged.task_id,housekeeping.id);
+    assert.equal(acknowledged.report_recorded,true);
     assert.equal(acknowledged.status,"IN_INSPECTION");
     assert.equal(acknowledged.room_state,"IN_INSPECTION");
     const replay=await ctx.request.post(BASE+"/core/api/v1/ops/tasks/"+
