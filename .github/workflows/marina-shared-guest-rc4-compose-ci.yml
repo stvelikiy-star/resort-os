@@ -29,6 +29,9 @@ jobs:
       MARINA_GUEST_RC4_ROLLBACK_EVIDENCE: ISOLATED_COMPOSE_ROLLBACK
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Test exactly the reviewed PR head, never GitHub's synthetic merge SHA.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -36,6 +39,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
           db="$(openssl rand -hex 24)"
           fixture="synthetic-ci-only-$(openssl rand -hex 24)"
           echo "::add-mask::$db"
@@ -142,8 +147,10 @@ jobs:
             jq -e '.property_code == "HOTEL_A"'
           curl_tls -fsS -b /tmp/marina-shared-rc4-compose-ci/a.cookies \
             "$base/auth/me" | jq -e '.property_code == "HOTEL_A"'
+          start="$(TZ=Asia/Bishkek date +%F)"
+          end="$(TZ=Asia/Bishkek date -d '+2 days' +%F)"
           curl_tls -fsS -b /tmp/marina-shared-rc4-compose-ci/a.cookies \
-            "$base/pms/grid" | jq -e 'type == "object"'
+            "$base/pms/grid?start=$start&end=$end" | jq -e 'type == "object"'
           qr_properties="$(docker compose exec -T postgres psql -U marina_ci \
             -d marina_shared_browser_ci -Atc \
             "SELECT COUNT(DISTINCT \"propertyId\") FROM room_qrs WHERE status='ACTIVE'")"
