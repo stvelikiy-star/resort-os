@@ -1,4 +1,4 @@
-import type { Role } from '../api/types';
+import type { AuthMode, Role } from '../api/types';
 
 export type TabKey = 'overview' | 'reception' | 'pms' | 'inbox' | 'dining' | 'tasks' | 'rooms' | 'requests' | 'admin' | 'profile';
 export interface Workspace {
@@ -38,11 +38,18 @@ const MODULE: Record<TabKey, string | null> = {
   dining: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'STAFF', profile: null,
 };
 /** UI visibility is only a convenience. Every endpoint still enforces hard role, property and custom module grants. */
-export function workspaceForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): Workspace {
+export function workspaceForSession(
+  role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO',
+  serverAuthMode: AuthMode | null = null,
+): Workspace {
   if (mode === 'DEMO') return workspaceFor(role);
   const candidates = LIVE_TABS[role];
   if (!candidates || !Array.isArray(permissions)) return FIELD;
+  const sharedPreview = serverAuthMode === 'shared_auth_preview';
+  // SharedAuthPreviewBoundary returns 503 for inbox and dining irrespective
+  // of grants. The UI must never suggest these routes are LIVE-ready.
   const tabs = candidates.filter((tab) => {
+    if (sharedPreview && (tab === 'inbox' || tab === 'dining')) return false;
     if (tab === 'inbox') return permissions.includes('WHATSAPP') || (role !== 'RECEPTION' && permissions.includes('INBOX'));
     if (tab === 'admin') return permissions.includes('OPS') && permissions.includes('STAFF');
     return !MODULE[tab] || permissions.includes(MODULE[tab]!);
@@ -54,13 +61,19 @@ export function workspaceForSession(role: Role, permissions: string[] | undefine
     taskTypes: ops ? workspaceFor(role).taskTypes : [],
     canCreateMaintenance: ops && workspaceFor(role).canCreateMaintenance,
     canManage: ops && permissions.includes('STAFF') && manager,
-    canSetRoomState: ops && manager,
+    canSetRoomState: ops && manager && !sharedPreview,
     mobileReady: tabs.some((tab) => tab !== 'profile'),
   };
 }
-export function hasTabForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO', tab: TabKey) {
-  return workspaceForSession(role, permissions, mode).tabs.includes(tab);
+export function hasTabForSession(
+  role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO',
+  tab: TabKey, serverAuthMode: AuthMode | null = null,
+) {
+  return workspaceForSession(role, permissions, mode, serverAuthMode).tabs.includes(tab);
 }
-export function homeForSession(role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO'): `/${TabKey}` {
-  return ('/' + workspaceForSession(role, permissions, mode).tabs[0]) as `/${TabKey}`;
+export function homeForSession(
+  role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO',
+  serverAuthMode: AuthMode | null = null,
+): `/${TabKey}` {
+  return ('/' + workspaceForSession(role, permissions, mode, serverAuthMode).tabs[0]) as `/${TabKey}`;
 }
