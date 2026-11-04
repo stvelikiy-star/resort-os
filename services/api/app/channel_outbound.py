@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, require_roles
 from .communication_ingest import NormalizedChannelMessage, ingest_normalized_channel_message
 from .telegram_sales import (
     TELEGRAM_SALES_CHANNEL_CODE,
@@ -54,8 +54,38 @@ async def _property_id(conn, property_code: str) -> uuid.UUID:
 
 @router.get("/outbound-capabilities")
 async def outbound_capabilities(
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(send_access),
 ):
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        # The per-hotel provider configuration is derived from the DB-signed
+        # staff session, not from request headers or another hotel's number.
+        from .whatsapp_connection import _configuration
+        configured = False
+        try:
+            from .shared_green_rc8 import rc8_guard
+            rc8_guard()
+            configured = _configuration(user) is not None
+        except HTTPException:
+            configured = False
+        return {
+            "telegram": {
+                "channel_code": TELEGRAM_SALES_CHANNEL_CODE,
+                "inbound_configured": False,
+                "outbound_configured": False,
+                "max_text_length": 4096,
+            },
+            "whatsapp": {
+                "configured": configured,
+                "configured_in_core": configured,
+                "human_only": True,
+                "queued_only": True,
+                "max_text_length": 4096,
+            },
+            "instagram": {"configured": False},
+            "truth": "Human WhatsApp sends are QUEUED until a verified provider callback confirms SENT or DELIVERED; AI auto-send stays disabled.",
+        }
+    if user.get("role") == "RECEPTION":
+        raise HTTPException(403, detail="Outbound capabilities are not available to this role")
     return {
         "telegram": {
             "channel_code": TELEGRAM_SALES_CHANNEL_CODE,
