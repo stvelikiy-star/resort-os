@@ -76,6 +76,18 @@ try {
   await prepare("B");
   assert.notEqual(fixtures.A.property_id, fixtures.B.property_id);
   assert.notEqual(fixtures.A.url, fixtures.B.url);
+  // This IS the full shared Resort Core app: unrelated capabilities must
+  // remain closed by the frozen RC3 boundary while Guest QR is admitted.
+  for (const path of [
+    "/api/v1/assistant/capabilities",
+    "/api/v1/admin/inbox/conversations",
+    "/api/v1/guest-os/rooms/" + fixtures.A.url.split("/").at(-1) + "/service-policy",
+  ]) {
+    expectStatus(await api(owners.A, "GET", path), 503, "unreviewed shared route");
+  }
+  expectStatus(await api(owners.A, "POST",
+    "/api/v1/admin/guest-os/room-qrs/issue-missing", {}), 503,
+    "unreviewed batch room QR issuance");
   // ONE cookie jar: Hotel A session must not unlock Hotel B.
   const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
@@ -100,6 +112,12 @@ try {
   await page.locator(".concierge-modal textarea").fill("Synthetic browser maintenance request B");
   await page.locator(".concierge-modal .concierge-submit").click();
   await page.locator(".concierge-request-list").getByText("Synthetic browser maintenance request B").waitFor({ timeout: 20000 });
+  // No charge to the guest folio or provider dispatch is allowed in RC4.
+  const paid = await context.request.post(
+    BASE + "/api/v1/guest-os/rooms/" + fixtures.B.url.split("/").at(-1) + "/requests",
+    { data: { request_code: "HOUSEKEEPING" } });
+  assert.equal(paid.status(), 503, "paid housekeeping must remain blocked in RC4");
+  assert.equal((await paid.json()).detail.code, "SHARED_GUEST_SERVICE_NOT_REVIEWED");
 
   // Fresh guest context for A; locale switches must not change hotel identity.
   const aContext = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 } });
@@ -125,8 +143,8 @@ try {
   await page.locator(".concierge-state").waitFor({ timeout: 20000 });
   assert.equal(await page.locator(".concierge-hero").count(), 0);
   await context.close();
-  console.log("PASS: actual Guest OS Next page /g/token on one HTTPS origin, two hotels, "
-    + "cookie isolation, PIN, hotel labels, live service request, RU/KG/EN, mobile and checkout");
+  console.log("PASS: full shared Resort Core RC4 + real Next guest page over one HTTPS origin; "
+    + "2 hotels, exact route 503s, secure PIN and cookies, no paid actions, RU/KG/EN, mobile, checkout");
 } finally {
   await browser.close();
   for (const ctx of Object.values(owners)) await ctx.dispose();
