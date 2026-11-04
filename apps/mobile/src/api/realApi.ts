@@ -17,6 +17,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
   // Never synthesize an unseen task or claim that a missing write succeeded.
   const lastKnownTasks = new Map<string, Task>();
   const lastKnownRooms = new Map<string, Room>();
+  let verifiedServerMode: 'shared_auth_preview' | 'single_property' | null = null;
 
   const call = <T,>(method: string, path: string, body?: unknown) => http.request<T>(method as HttpMethod, path, body);
 
@@ -71,6 +72,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       if (mode !== 'shared_auth_preview' && mode !== 'single_property') {
         throw new ApiError('UNKNOWN', 'Unrecognized server authentication mode');
       }
+      verifiedServerMode = mode;
       return mode;
     },
     login: async (username, password, selector) => {
@@ -135,6 +137,11 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
       return [...seen.values()];
     },
     async setRoomState(roomId, state: RoomState) {
+      if (verifiedServerMode === 'shared_auth_preview') {
+        // SharedAuthPreviewBoundary never admits room-state PATCH (503).
+        // No optimistic writes or status simulation.
+        throw new ApiError('UNKNOWN', 'Room-state override is unavailable in shared PMS staging');
+      }
       const key = safeRouteId(roomId);
       // Never invent the code/floor after changing state. The current server
       // acknowledges only {room_id,state}; preserve an already observed room.
