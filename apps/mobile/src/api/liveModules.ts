@@ -3,7 +3,8 @@ import { useSession } from '../state/session';
 import { isTrustedHotelOrigin } from './hotels';
 import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
-import { receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse } from './contractValidation';
+import { safeRouteId, safeIsoDate } from './routeId';
+import { objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
@@ -74,13 +75,6 @@ export interface DiningFloor {
   orders: { id: string; order_number: string; status: string; table_code: string | null;
     room_code: string | null; waiter_id: string | null; waiter_name: string | null }[];
 }
-function encoded(id: string) { return encodeURIComponent(id); }
-function list<T>(payload: unknown): T[] {
-  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { items?: unknown }).items)) {
-    throw new ApiError('UNKNOWN', 'Invalid list response');
-  }
-  return (payload as { items: T[] }).items;
-}
 export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch) {
   const http = createHotelHttpClient(baseUrl, transport);
   const request = <T,>(method: HttpMethod, path: string, body?: unknown) => http.request<T>(method, path, body);
@@ -91,9 +85,9 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
       return receptionResponse(value);
     },
-    reservation: (id: string) => request<Record<string, unknown>>('GET', p + '/admin/reception/reservations/' + encoded(id)),
-    checkIn: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + encoded(id) + '/check-in'),
-    checkOut: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + encoded(id) + '/check-out'),
+    reservation: async (id: string) => objectResponse(await request<unknown>('GET', p + '/admin/reception/reservations/' + safeRouteId(id)), 'reservation'),
+    checkIn: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-in'),
+    checkOut: (id: string) => request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-out'),
     bookingPreview: async (draft: BookingDraft) => bookingPreviewResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/preview', draft)),
     bookingCommit: async (draft: BookingCommit) => bookingCommitResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/commit', draft)),
     holds: async () => {
@@ -108,29 +102,29 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     },
     releaseHold: (id: string) => {
       if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API missing');
-      return request<unknown>('DELETE', p + '/admin/pms/holds/' + encoded(id));
+      return request<unknown>('DELETE', p + '/admin/pms/holds/' + safeRouteId(id));
     },
     pmsGrid: async (start: string, end: string) => {
-      const value = await request<Grid>('GET', p + '/pms/grid?start=' + encoded(start) + '&end=' + encoded(end));
+      const value = await request<Grid>('GET', p + '/pms/grid?start=' + safeIsoDate(start) + '&end=' + safeIsoDate(end));
       return gridResponse(value);
     },
     conversations: async (needsReply?: boolean) => inboxListResponse(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : ''))),
     conversation: async (id: string) => {
-      const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + encoded(id));
+      const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + safeRouteId(id));
       return conversationResponse(value);
     },
-    claimConversation: (id: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + encoded(id) + '/claim'),
-    conversationStatus: (id: string, status: ConversationStatus) => request<unknown>('PATCH', p + '/admin/inbox/conversations/' + encoded(id) + '/status', { status }),
-    internalNote: (id: string, text: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + encoded(id) + '/notes', { text }),
+    claimConversation: (id: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'),
+    conversationStatus: (id: string, status: ConversationStatus) => request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }),
+    internalNote: (id: string, text: string) => request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }),
     // WhatsApp sending is intentionally not exposed: the current backend send-text is Telegram-only.
-    kitchenOrders: async () => list<KitchenOrder>(await request('GET', p + '/kitchen/orders?status=ACTIVE')),
-    kitchenStatus: (id: string, status: KitchenStatus) => request<unknown>('PATCH', p + '/kitchen/orders/' + encoded(id) + '/status', { status }),
-    diningFloor: () => request<DiningFloor>('GET', p + '/dining/floor'),
-    claimWaiterOrder: (id: string, waiterId: string) => request<unknown>('PATCH', p + '/dining/orders/' + encoded(id) + '/waiter', { waiter_id: waiterId }),
-    assistantCapabilities: () => request<AssistantCapabilities>('GET', p + '/assistant/capabilities'),
-    assistantChat: (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => request<AssistantAnswer>('POST', p + '/assistant/chat', {
+    kitchenOrders: async () => kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE')),
+    kitchenStatus: (id: string, status: KitchenStatus) => request<unknown>('PATCH', p + '/kitchen/orders/' + safeRouteId(id) + '/status', { status }),
+    diningFloor: async () => diningFloorResponse(await request<unknown>('GET', p + '/dining/floor')),
+    claimWaiterOrder: (id: string, waiterId: string) => request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }),
+    assistantCapabilities: async () => assistantCapabilitiesResponse(await request<unknown>('GET', p + '/assistant/capabilities')),
+    assistantChat: async (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => assistantAnswerResponse(await request<unknown>('POST', p + '/assistant/chat', {
       messages: messages.slice(-10), locale, current_screen: currentScreen,
-    }),
+    })),
   };
 }
 export function useLiveModules() {

@@ -1,19 +1,9 @@
 import { createHotelHttpClient, HttpMethod } from './http';
-import { ApiError, AuthUser, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
+import { authUserResponse, itemsEnvelope } from './contractValidation';
+import { safeRouteId } from './routeId';
+import { ApiError, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
-
-/**
- * PMS identifiers are opaque server references, never user-provided URL syntax.
- * Reject reserved/encoded separators before building any authenticated route.
- * The backend uses UUID/CUID-style IDs; do not normalize a malformed ID.
- */
-function safeRouteId(value: string): string {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(value)) {
-    throw new ApiError('BAD_REQUEST', 'Invalid hotel record reference');
-  }
-  return value;
-}
 
 /**
  * Real implementation against the EXISTING MARINA SMART API of ONE hotel (property-pinned host).
@@ -74,17 +64,15 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
 
   return {
     mode: 'LIVE',
-    login: (username, password) => call<AuthUser>('POST', '/api/v1/auth/login', { username, password }),
+    login: async (username, password) => authUserResponse(await call<unknown>('POST', '/api/v1/auth/login', { username, password })),
     logout: () => call<void>('POST', '/api/v1/auth/logout'),
-    me: () => call<AuthUser>('GET', '/api/v1/auth/me'),
+    me: async () => authUserResponse(await call<unknown>('GET', '/api/v1/auth/me')),
     async listTasks(filter?: { type?: TaskType; status?: TaskStatus }) {
       const q = new URLSearchParams();
       if (filter?.type) q.set('type', filter.type);
       if (filter?.status) q.set('status', filter.status);
-      const raw = await call<any>('GET', `/api/v1/ops/tasks${q.size ? `?${q}` : ''}`);
-      const items = Array.isArray(raw) ? raw : raw?.items;
-      if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
-      return items.map(mapTask);
+      const raw = await call<unknown>('GET', `/api/v1/ops/tasks${q.size ? `?${q}` : ''}`);
+      return itemsEnvelope(raw, 'tasks', true).map(mapTask);
     },
     async claimTask(id) { const key = safeRouteId(id); const ack = await call('POST', `/api/v1/ops/tasks/${key}/claim`); return committedTask(key, ack); },
     async setTaskStatus(id, status) { const key = safeRouteId(id); const ack = await call('PATCH', `/api/v1/ops/tasks/${key}/status`, { status }); return committedTask(key, ack); },
@@ -165,10 +153,8 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffA
   };
 
   async function findTask(id: string): Promise<Task> {
-    const list = await call<any>('GET', '/api/v1/ops/tasks?limit=300');
-    const items = Array.isArray(list) ? list : list?.items;
-    if (!Array.isArray(items)) throw new ApiError('UNKNOWN', 'Invalid tasks list response');
-    const t = items.find((x: any) => String(x.id) === id);
+    const items = itemsEnvelope(await call<unknown>('GET', '/api/v1/ops/tasks?limit=300'), 'tasks', true);
+    const t = items.find((x: any) => String(x?.id) === id);
     if (!t) throw new ApiError('NOT_FOUND');
     return mapTask(t);
   }
