@@ -271,7 +271,8 @@ def main():
     personal_raw = str(personal_body).lower()
     assert "phone" not in personal_raw and "email" not in personal_raw and "passport" not in personal_raw
 
-    # Authenticate legitimate guest before exhausting the same room/IP PIN budget.
+    # Authenticate the legitimate guest before intentionally exhausting this
+    # room/IP PIN budget: a later UA change must NOT bypass the rate limit.
     # A photographed room QR is insufficient; brute-force attempts are durably rate-limited.
     brute = httpx.Client(base_url=BASE_URL, timeout=30.0, headers={"user-agent": "guest-os-ci-bruteforce"})
     wrong = "000000" if pin != "000000" else "111111"
