@@ -14,8 +14,9 @@ import { font, space } from '../../src/theme/tokens';
 
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useSession();
-  const live = useLiveModules();
+  const { user, serverAuthMode } = useSession();
+  const modules = useLiveModules();
+  const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
   const copy = useMobileCopy();
   const router = useRouter();
   const { c } = useTheme();
@@ -36,6 +37,7 @@ export default function ConversationScreen() {
     }
     finally { locked.current = false; setBusy(false); }
   };
+  if (serverAuthMode === 'shared_auth_preview') return <FutureScreen><Empty text={copy.unavailable}/></FutureScreen>;
   if (!user || !(user.module_permissions?.includes('WHATSAPP') || (user.role !== 'RECEPTION' && user.module_permissions?.includes('INBOX'))) || !['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const conversation = data?.conversation;
   return <FutureScreen>
