@@ -57,6 +57,15 @@ MANAGER: task queue RU/light and EN/dark, team EN/dark at 320/375/430, profile R
 
 [Authentic screenshot provenance](qa-evidence/PROVENANCE.json) includes the exact source SHA, GitHub Actions run, DEMO fixture and files.
 
+## Follow-up polish — source-verified, awaiting fresh real visual evidence
+
+| Surface | Proven code-level issue | Minimal correction | Evidence status |
+| --- | --- | --- | --- |
+| MARINA AI Orb (offline / read-only) | `AIOrb` passed `disabled={!onPress}` into `PressScale`, which automatically reduced its opacity to 0.5. This muted a visual status indicator that should not signify an inaccessible button. | `dimWhenDisabled={false}` on `AIOrb`; no new action or API capability. | SOURCE FIX; Android visual NOT TESTED, LIVE AI route Web NOT TESTED |
+| OWNER/MANAGER financial KPI | At 375 dp the previous `MetricCard` forced even long values into a 46%-width column, one line, as low as 55% font scaling. Risk of unreadable KGS figures on narrow devices was confirmed by source inspection, **not** an OWNER screenshot. | Full-width card for formatted values >10 characters, <350 dp phones or >150% system font. Two-line value allowed, minimum scale now 70%. Pure layout regression tests added. | SOURCE FIX; OWNER Web/Android visual NOT TESTED |
+
+This polish does not expand permissions, seed fake platform metrics or modify any backend API. The previously captured 21 Expo Web screenshots predate these two changes and do not evidence their final appearance; their route statuses above remain unchanged.
+
 ## Explicitly unverified or blocked
 
 - **Android visual QA remains NOT TESTED for all 22 routes.** This review container has no Android SDK, ADB or emulator; the available GitHub workflow only builds and signs the APK. An APK build PASS is **not** a native UI PASS.
