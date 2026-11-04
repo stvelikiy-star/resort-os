@@ -38,15 +38,15 @@ def guest_qr_rc4_allowed(method: str, path: str) -> bool:
     """Exact reviewed method+path contract, not a prefix allowlist."""
     if (method, path) in EXACT:
         return True
-    if method == "POST" and ADMIN_QR.fullmatch(path):
+    if method == "POST" and ADMIN_QR.fullmatch(path) is not None:
         return True
-    if method == "GET" and GUEST_ROOM.fullmatch(path):
+    if method == "GET" and GUEST_ROOM.fullmatch(path) is not None:
         return True
-    if method == "POST" and GUEST_PIN.fullmatch(path):
+    if method == "POST" and GUEST_PIN.fullmatch(path) is not None:
         return True
-    if method in {"GET", "POST"} and GUEST_TASKS.fullmatch(path):
+    if method in {"GET", "POST"} and GUEST_TASKS.fullmatch(path) is not None:
         return True
-    if method == "POST" and GUEST_TASK_CANCEL.fullmatch(path):
+    if method == "POST" and GUEST_TASK_CANCEL.fullmatch(path) is not None:
         return True
     # Preflight is valid only where an admitted real method exists. No broad
     # wildcard guest API or implicit AI/finance/provider endpoint exposure.
