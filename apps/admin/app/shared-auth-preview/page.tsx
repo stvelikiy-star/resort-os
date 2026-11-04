@@ -4,13 +4,14 @@ import { FormEvent, useEffect, useState } from "react";
 import SharedBookingForm from "./SharedBookingForm";
 import SharedHoldPanel from "./SharedHoldPanel";
 import SharedReservationActions from "./SharedReservationActions";
+import SharedOperationsPanel from "./SharedOperationsPanel";
 
 type Identity = {
   id: string; display_name: string; role: string;
   property_code: string; property_id: string; tenant_id: string;
   module_permissions: string[];
 };
-type Section = "dashboard" | "grid" | "reservations" | "staff";
+type Section = "dashboard" | "grid" | "reservations" | "staff" | "operations";
 type Dashboard = {
   property: { code: string; name: string };
   rooms: { total: number; clean: number; dirty: number };
@@ -47,6 +48,7 @@ function availableSections(user: Identity): Section[] {
   if (["OWNER", "MANAGER", "RECEPTION", "AGENT"].includes(user.role) && can("PMS")) sections.push("grid");
   if (["OWNER", "MANAGER", "RECEPTION"].includes(user.role) && can("RESERVATIONS")) sections.push("reservations");
   if (["OWNER", "MANAGER"].includes(user.role) && can("STAFF")) sections.push("staff");
+  if (["OWNER", "MANAGER", "MAID", "TECHNICIAN"].includes(user.role) && can("OPS")) sections.push("operations");
   return sections;
 }
 function dateText(date: Date): string {
@@ -118,6 +120,7 @@ export default function SharedAuthPreview() {
 
   useEffect(() => {
     if (!identity || !section) return;
+    if (section === "operations") { setLoadingSection(false); setSectionError(""); return; }
     const controller = new AbortController();
     setLoadingSection(true);
     setSectionError("");
@@ -329,7 +332,7 @@ export default function SharedAuthPreview() {
         <nav aria-label="Проверяемые разделы" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
           {sections.map(item => <button className="btn" type="button" key={item} aria-current={section === item ? "page" : undefined}
             onClick={() => { setIssuedPin(null); setActionInfo(""); setSection(item); }}>
-            {item === "dashboard" ? "Дашборд" : item === "grid" ? "Шахматка" : item === "reservations" ? "Бронирования" : "Персонал"}</button>)}
+            {item === "dashboard" ? "Дашборд" : item === "grid" ? "Шахматка" : item === "reservations" ? "Бронирования" : item === "operations" ? "Задачи" : "Персонал"}</button>)}
         </nav>
         {!sections.length && <p>Для этой роли рабочие разделы ещё не приняты. Доступ к данным других гостиниц закрыт.</p>}
         {loadingSection && <p role="status">Загружаю данные своей гостиницы…</p>}
@@ -411,6 +414,10 @@ export default function SharedAuthPreview() {
               <button className="btn primary" disabled={pending} type="submit">Создать сотрудника</button>
             </form>}
           </section>}
+        {section === "operations" && !loadingSection && identity &&
+          <SharedOperationsPanel key={identity.tenant_id+":"+identity.property_id+":"+identity.id}
+            role={identity.role} userId={identity.id} propertyCode={identity.property_code}
+            onExpired={()=>setIdentity(null)} />}
         <button className="btn" onClick={() => void logout()} disabled={pending}>Выйти</button>
       </>}
       {error && <p role="alert" className="login-error">{error}</p>}

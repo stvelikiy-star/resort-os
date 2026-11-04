@@ -346,6 +346,126 @@ async function cancelFixture(page,hotel){
   await row.getByRole("cell",{name:/^(?:ОТМЕНЕНО|CANCELLED)$/}).waitFor();
 }
 
+async function signInOps(page,hotel,username) {
+  await page.goto(BASE,{waitUntil:"domcontentloaded"});
+  await page.waitForURL("**/shared-auth-preview",{timeout:25000});
+  await page.getByLabel("Код организации").fill("tenant_"+hotel.at(-1).toLowerCase());
+  await page.getByLabel("Код отеля").fill(hotel);
+  await page.getByLabel("Логин").fill(username);
+  await page.getByLabel("Пароль").fill(password);
+  const responsePromise=page.waitForResponse(res=>
+    res.url().endsWith("/core/api/v1/auth/login") && res.request().method()==="POST");
+  await page.getByRole("button",{name:"Войти"}).click();
+  const login=await responsePromise;
+  assert.equal(login.status(),200,await login.text());
+  await page.getByRole("button",{name:"Задачи",exact:true}).waitFor();
+  await page.getByRole("region",{name:"Операционные задачи гостиницы"}).waitFor();
+  const me=await page.context().request.get(BASE+"/core/api/v1/auth/me");
+  assert.equal(me.status(),200);
+  const data=await me.json();
+  assert.equal(data.property_code,hotel);
+  assert.equal(data.role,username==="maid"?"MAID":"TECHNICIAN");
+}
+async function ownerCreateRepair(page,hotel) {
+  await page.getByRole("button",{name:"Задачи",exact:true}).click();
+  const panel=page.getByRole("region",{name:"Операционные задачи гостиницы"});
+  const form=panel.getByRole("form",{name:"Создать операционную задачу"});
+  await form.waitFor();
+  await form.getByLabel("Вид задачи").selectOption("MAINTENANCE");
+  await form.getByLabel("Название").fill("Synthetic Repair "+hotel);
+  await form.getByLabel("Приоритет").selectOption("HIGH");
+  await form.getByLabel("Номер").selectOption(receipts[hotel].room_id);
+  const response=page.waitForResponse(res=>res.url().endsWith("/core/api/v1/ops/tasks") &&
+    res.request().method()==="POST");
+  await form.getByRole("button",{name:"Создать задачу"}).click();
+  const created=await response;
+  assert.equal(created.status(),201,await created.text());
+  const task=await created.json();
+  assert.equal(task.status,"OPEN");
+  assert.match(task.id,/^[0-9a-f-]{36}$/i);
+  receipts[hotel].maintenance_task_id=task.id;
+  await panel.getByRole("article",{name:"Задача Synthetic Repair "+hotel}).waitFor();
+}
+async function technicianCompletesRepair(hotel) {
+  const ctx=await browser.newContext({viewport:{width:390,height:844}});
+  const page=await ctx.newPage();
+  page.on("dialog",dialog=>void dialog.accept());
+  await signInOps(page,hotel,"technician");
+  const panel=page.getByRole("region",{name:"Операционные задачи гостиницы"});
+  const tasks=await ctx.request.get(BASE+"/core/api/v1/ops/tasks");
+  assert.equal(tasks.status(),200);
+  const data=await tasks.json();
+  assert(data.items.every(task=>task.type==="MAINTENANCE"),"TECH role leakage");
+  const item=panel.getByRole("article",{name:"Задача Synthetic Repair "+hotel});
+  await item.waitFor();
+  const claim=page.waitForResponse(res=>res.url().endsWith(
+    "/core/api/v1/ops/tasks/"+receipts[hotel].maintenance_task_id+"/claim"));
+  await item.getByRole("button",{name:"Взять задачу"}).click();
+  assert.equal((await claim).status(),200);
+  const done=page.waitForResponse(res=>res.url().endsWith(
+    "/core/api/v1/ops/tasks/"+receipts[hotel].maintenance_task_id+"/status") &&
+    res.request().method()==="PATCH");
+  await item.getByRole("button",{name:"Ремонт выполнен"}).click();
+  const finished=await done;
+  assert.equal(finished.status(),200,await finished.text());
+  const result=await finished.json();
+  assert.equal(result.status,"DONE");
+  assert.equal(result.room_state,"DIRTY","Repair must not sell a room before housekeeping");
+  assert.match(result.housekeeping_task_id,/^[0-9a-f-]{36}$/i);
+  const deny=await ctx.request.patch(BASE+"/core/api/v1/ops/tasks/"+
+    receipts[hotel].stay_fixture.housekeeping_task_id+"/status",{
+      data:{status:"DONE"}});
+  assert.equal(deny.status(),403,"TECH must not approve housekeeping");
+  await ctx.close();
+}
+async function maidPreparesInspection(hotel){
+  const ctx=await browser.newContext({viewport:{width:390,height:844}});
+  const page=await ctx.newPage();
+  page.on("dialog",dialog=>void dialog.accept());
+  await signInOps(page,hotel,"maid");
+  const panel=page.getByRole("region",{name:"Операционные задачи гостиницы"});
+  const tasks=await ctx.request.get(BASE+"/core/api/v1/ops/tasks");
+  assert.equal(tasks.status(),200);
+  const data=await tasks.json();
+  assert(data.items.every(task=>task.type==="HOUSEKEEPING"),"MAID task type leakage");
+  const housekeeping=data.items.find(task=>
+    task.id===receipts[hotel].stay_fixture.housekeeping_task_id);
+  assert(housekeeping,"Hotel checkout housekeeping task missing");
+  const item=panel.getByRole("article",{name:"Задача "+housekeeping.title});
+  await item.waitFor();
+  const claim=page.waitForResponse(res=>res.url().endsWith(
+    "/core/api/v1/ops/tasks/"+housekeeping.id+"/claim"));
+  await item.getByRole("button",{name:"Взять задачу"}).click();
+  assert.equal((await claim).status(),200);
+  const inspect=page.waitForResponse(res=>res.url().endsWith(
+    "/core/api/v1/ops/tasks/"+housekeeping.id+"/status") &&
+    res.request().method()==="PATCH");
+  await item.getByRole("button",{name:"На проверку"}).click();
+  const result=await inspect;
+  assert.equal(result.status(),200,await result.text());
+  assert.equal((await result.json()).status,"IN_INSPECTION");
+  const deny=await ctx.request.patch(BASE+"/core/api/v1/ops/tasks/"+
+    receipts[hotel].maintenance_task_id+"/status",{data:{status:"DONE"}});
+  assert.equal(deny.status(),403,"MAID must not complete maintenance");
+  await ctx.close();
+}
+async function ownerApprovesHousekeeping(page,hotel){
+  const panel=page.getByRole("region",{name:"Операционные задачи гостиницы"});
+  await panel.getByRole("button",{name:"Обновить задачи"}).click();
+  const id=receipts[hotel].stay_fixture.housekeeping_task_id;
+  const list=await page.context().request.get(BASE+"/core/api/v1/ops/tasks");
+  assert.equal(list.status(),200);
+  const task=(await list.json()).items.find(x=>x.id===id);
+  assert(task && task.status==="IN_INSPECTION","Inspection task missing");
+  const item=panel.getByRole("article",{name:"Задача "+task.title});
+  const response=page.waitForResponse(res=>res.url().endsWith(
+    "/core/api/v1/ops/tasks/"+id+"/status") && res.request().method()==="PATCH");
+  await item.getByRole("button",{name:"Принять уборку"}).click();
+  const approved=await response;
+  assert.equal(approved.status(),200,await approved.text());
+  assert.equal((await approved.json()).status,"DONE");
+}
+
 try {
   const contextA = await browser.newContext({ viewport:{width:390,height:844} });
   const pageA = await contextA.newPage();
@@ -415,6 +535,28 @@ try {
   await createStayFixture(contextB,"HOTEL_B");
   await completeStayViaBrowser(pageA,"HOTEL_A");
   await completeStayViaBrowser(pageB,"HOTEL_B");
+
+  await ownerCreateRepair(pageA,"HOTEL_A");
+  await ownerCreateRepair(pageB,"HOTEL_B");
+  const foreignTask=await contextB.request.post(
+    BASE+"/core/api/v1/ops/tasks/"+receipts.HOTEL_A.maintenance_task_id+"/claim",{
+      headers:{"X-Property-Id":ownerA.property_id,"X-Tenant-Id":ownerA.tenant_id,"X-Role":"OWNER"}});
+  assert.equal(foreignTask.status(),404,"Foreign hotel task claim");
+  const reverseTask=await contextA.request.patch(
+    BASE+"/core/api/v1/ops/tasks/"+receipts.HOTEL_B.maintenance_task_id+"/status",{
+      data:{status:"DONE"}});
+  assert.equal(reverseTask.status(),404,"Foreign hotel task status mutation");
+  const unrelatedRoute=await contextA.request.patch(
+    BASE+"/core/api/v1/ops/rooms/"+roomA+"/state",{data:{state:"CLEAN"}});
+  assert.equal(unrelatedRoute.status(),503,"Unreviewed room override must remain closed");
+
+  await technicianCompletesRepair("HOTEL_A");
+  await technicianCompletesRepair("HOTEL_B");
+  await maidPreparesInspection("HOTEL_A");
+  await maidPreparesInspection("HOTEL_B");
+  await ownerApprovesHousekeeping(pageA,"HOTEL_A");
+  await ownerApprovesHousekeeping(pageB,"HOTEL_B");
+
   const aDetail = await contextA.request.get(
     BASE + "/core/api/v1/admin/reception/reservations/" + receipts.HOTEL_B.reservation_id);
   assert.equal(aDetail.status(),404,"Reverse direction foreign reservation leak");
@@ -426,7 +568,7 @@ try {
   assert.equal(sameHotelB.status(),200,"Own reservation detail must be readable");
 
   writeFileSync("/tmp/marina_shared_browser_receipts.json", JSON.stringify(receipts));
-  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: 2 hotels booking, schedule, HOLD, cancellation, manual receipt, check-in+one-time PIN, check-out+housekeeping, tenant isolation");
+  console.log("MARINA_SHARED_LIVE_BROWSER_HTTP_PASS: 2 hotels: full PMS + OPS repair by TECH, housekeeping by MAID, owner inspection; denied cross-tenant tasks and privilege escalation");
 } finally {
   await browser.close();
 }
