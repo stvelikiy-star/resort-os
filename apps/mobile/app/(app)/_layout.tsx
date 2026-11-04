@@ -2,10 +2,11 @@ import React from 'react';
 import { View } from 'react-native';
 import { Redirect, Tabs, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ClipboardCheck, BedDouble, ChartNoAxesCombined, CircleUserRound, Wrench, MessageCircle, CalendarDays, ConciergeBell, UtensilsCrossed } from 'lucide-react-native';
+import { Grid2X2, ClipboardCheck, BedDouble, ChartNoAxesCombined, CircleUserRound, Wrench, MessageCircle, CalendarDays, ConciergeBell, UtensilsCrossed } from 'lucide-react-native';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { hasTabForSession, homeForSession, TabKey } from '../../src/roles/registry';
+import { hasTabForSession, homeForSession, workspaceForSession, TabKey } from '../../src/roles/registry';
+import { mobileTabPlan } from '../../src/roles/navigation';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { iconography, radius } from '../../src/theme/tokens';
 
@@ -23,8 +24,11 @@ export default function AppTabs() {
   const insets = useSafeAreaInsets();
   if (!user) return <Redirect href="/connect" />;
   const mode = api?.mode ?? 'LIVE';
-  const selected = pathname.split('/')[1] as TabKey;
-  if (ORDER.includes(selected) && !hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)) {
+  const selected = pathname.split('/')[1] as TabKey | 'more';
+  const workspace = workspaceForSession(user.role, user.module_permissions, mode, serverAuthMode);
+  const plan = mobileTabPlan(workspace.tabs);
+  if (selected === 'more' && !plan.showMore) return <Redirect href={homeForSession(user.role, user.module_permissions, mode, serverAuthMode)} />;
+  if (selected !== 'more' && ORDER.includes(selected) && !hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)) {
     return <Redirect href={homeForSession(user.role, user.module_permissions, mode, serverAuthMode)} />;
   }
   return <Tabs screenOptions={{
@@ -40,7 +44,7 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], href: hasTabForSession(user.role, user.module_permissions, mode, key, serverAuthMode) ? undefined : null,
+        title: copy[key], href: plan.primary.includes(key) ? undefined : null,
         tabBarIcon: ({ color, focused }) =>
           <View style={{ minWidth: 50, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}>
             <Icon size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/>
@@ -48,5 +52,10 @@ export default function AppTabs() {
         tabBarButtonTestID: 'tab-' + key,
       }} />;
     })}
+    <Tabs.Screen name="more" options={{
+      title: copy.moreMenu, href: plan.showMore ? undefined : null,
+      tabBarButtonTestID: 'tab-more',
+      tabBarIcon: ({ color, focused }) => <View style={{ minWidth: 50, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}><Grid2X2 size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/></View>,
+    }}/>
   </Tabs>;
 }
