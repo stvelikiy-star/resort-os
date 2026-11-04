@@ -36,7 +36,8 @@ export class ApiError extends Error {
 /** One implementation per hotel connection. Screens depend only on this interface. */
 export interface StaffApi {
   readonly mode: 'DEMO' | 'LIVE';
-  authMode(): Promise<AuthMode>;
+  /** LIVE-only discovery; the isolated demo never calls the server. */
+  authMode?(): Promise<AuthMode>;
   login(username: string, password: string, selector?: SharedHotelSelector): Promise<AuthUser>;
   logout(): Promise<void>;
   me(): Promise<AuthUser>;
