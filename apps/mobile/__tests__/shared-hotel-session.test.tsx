@@ -148,6 +148,40 @@ describe('shared multi-hotel sign-in; one trusted host, unrelated owners', () =>
     ]);
   });
 
+  it('defers native sign-out until the in-flight login can no longer install a late cookie', async () => {
+    const screen = await setup();
+    const { flushPendingCookieLogouts, queueCookieLogout } =
+      jest.requireMock('../src/lib/pendingLogout') as {
+        flushPendingCookieLogouts: jest.Mock;
+        queueCookieLogout: jest.Mock;
+      };
+    holdHotelA = new Promise<void>(resolve => { releaseHotelA = resolve; });
+    fireEvent.press(screen.getByTestId('login-a'));
+    await waitFor(() => expect(calls).toContain('login:HOTEL_A'));
+    const logoutsBefore = calls.filter(x => x === 'logout').length;
+    queueCookieLogout.mockClear();
+    // Simulate a confirmed 204 for every requested host revocation.
+    flushPendingCookieLogouts.mockImplementation(async (callback: (origin: string) => Promise<void>) =>
+      callback('https://platform.example'));
+    try {
+      fireEvent.press(screen.getByTestId('logout'));
+      await waitFor(() => expect(screen.getByTestId('selected-property').props.children).toBe('none'));
+      // The first network login is still in flight: no second logout or
+      // destructive journal cleanup is allowed to race its Set-Cookie.
+      expect(calls.filter(x => x === 'logout')).toHaveLength(logoutsBefore);
+      expect(queueCookieLogout).not.toHaveBeenCalled();
+
+      releaseHotelA?.();
+      await waitFor(() => expect(calls.filter(x => x === 'logout').length).toBeGreaterThan(logoutsBefore));
+      await waitFor(() => expect(cookie).toBeNull());
+      expect(calls[calls.length - 1]).toBe('logout');
+      expect(screen.getByTestId('selected-tenant').props.children).toBe('none');
+    } finally {
+      flushPendingCookieLogouts.mockImplementation(async () => {});
+      releaseHotelA?.();
+    }
+  });
+
   it('requires both shared selectors before sending any password or changing cookie', async () => {
     const screen = await setup();
     fireEvent.press(screen.getByTestId('login-missing'));
