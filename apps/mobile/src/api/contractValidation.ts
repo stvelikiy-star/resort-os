@@ -1,5 +1,5 @@
 import { ApiError } from './types';
-import type { Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, AssistantCapabilities, AssistantAnswer } from './liveModules';
+import type { Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, AssistantCapabilities, AssistantAnswer, Hold } from './liveModules';
 import type { AuthUser } from './types';
 const invalid=(where:string):never=>{ throw new ApiError('UNKNOWN','Hotel response contract mismatch: '+where); };
 const obj=(v:unknown,k:string):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:invalid(k);
@@ -84,6 +84,56 @@ export function assistantAnswerResponse(v:unknown):AssistantAnswer {
   if(x.read_only!==true)invalid('assistant.read_only');
   return v as AssistantAnswer;
 }
+/** Matches the actual pms_holds.py quoted SQL projection: camelCase list keys.
+ * This is a SOURCE-only adapter; the mobile HOLD feature gate remains CLOSED.
+ */
+const uuid=(v:unknown,k:string):string=>{
+  const value=str(v,k);
+  return /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(value)?value:invalid(k);
+};
+const dateOnly=(v:unknown,k:string):string=>{
+  const value=str(v,k);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value)) invalid(k);
+  const candidate=new Date(value+'T12:00:00Z');
+  return !Number.isNaN(candidate.getTime())&&candidate.toISOString().slice(0,10)===value?value:invalid(k);
+};
+const timestamp=(v:unknown,k:string):string=>{
+  const value=str(v,k);
+  // Server returns Python datetime.isoformat() with explicit timezone offset.
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)&&
+    !Number.isNaN(Date.parse(value))?value:invalid(k);
+};
+export function holdListResponse(v:unknown):Hold[] {
+  const rows=arr(obj(v,'hold.list').holds,'hold.list.holds');
+  return rows.map((row,i)=>{
+    const h=obj(row,'hold.list.'+i);
+    const id=uuid(h.id,'hold.id');
+    const roomId=uuid(h.roomId,'hold.roomId');
+    const checkIn=dateOnly(h.checkIn,'hold.checkIn');
+    const checkOut=dateOnly(h.checkOut,'hold.checkOut');
+    if(checkOut<=checkIn) invalid('hold.dates');
+    const guestName=str(h.guestName,'hold.guestName');
+    const expiresAt=timestamp(h.expiresAt,'hold.expiresAt');
+    return {id,roomId,checkIn,checkOut,guestName,expiresAt};
+  });
+}
+export interface HoldCreatedAck {
+  id:string; status:'HELD'; expires_at:string; duration_minutes:60;
+}
+export function holdCreateResponse(v:unknown):HoldCreatedAck {
+  const result=obj(v,'hold.create');
+  const id=uuid(result.id,'hold.create.id');
+  if(result.status!=='HELD'||result.duration_minutes!==60) invalid('hold.create.ack');
+  const expires_at=timestamp(result.expires_at,'hold.create.expires_at');
+  return {id,status:'HELD',expires_at,duration_minutes:60};
+}
+export function holdReleaseResponse(v:unknown,expectedId:string):{id:string;status:'RELEASED'} {
+  const result=obj(v,'hold.release');
+  const id=uuid(result.id,'hold.release.id');
+  if(id!==expectedId||result.status!=='RELEASED') invalid('hold.release.ack');
+  return {id,status:'RELEASED'};
+}
+
 /** Detail payloads whose fields are rendered defensively: only the envelope shape is enforced. */
 export function objectResponse(v:unknown,k:string):Record<string,unknown>{return obj(v,k);}
 

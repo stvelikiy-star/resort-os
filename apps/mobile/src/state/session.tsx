@@ -278,14 +278,16 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     if (!hotel || !api) return;
     sessionRevision.current++;
     loginAttempt.current++;
+    // Logout is a local security boundary BEFORE durable storage or network.
+    // A slow encrypted-storage write must not leave staff data or LIVE modules
+    // visible while a logout is already requested.
+    dropApi(hotel.id);
+    setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
     let queued = hotel.demo;
     if (!hotel.demo) {
       try { await queueCookieLogout(hotel.baseUrl); queued = true; }
       catch { /* local clearance still takes priority */ }
     }
-    // Clear on-device identity immediately; never await network to sign out.
-    dropApi(hotel.id);
-    setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
     if (hotel.demo) {
       try { await api.logout(); } catch { /* isolated demo only */ }
     } else if (queued) {
