@@ -138,6 +138,18 @@ def run():
             reception_b = Staff("B", "reception")
             manager_b = Staff("B", "manager")
 
+            # The operator UI must be driven by truthful per-property
+            # capabilities, including RECEPTION. No Telegram in shared mode.
+            for hotel, member in (("A", owners["A"]), ("B", owners["B"]),
+                                  ("B", reception_b), ("B", manager_b)):
+                cap = expect(member.get(
+                    "/api/v1/admin/inbox/outbound-capabilities",
+                ), 200, hotel + " human outbound capability")
+                assert cap["whatsapp"]["configured"] is True
+                assert cap["whatsapp"]["human_only"] is True
+                assert cap["whatsapp"]["queued_only"] is True
+                assert cap["telegram"]["outbound_configured"] is False
+
             def deliver(hotel, data):
                 return client.post(
                     ENDPOINT,
@@ -243,6 +255,9 @@ def run():
                 expect(owners["A"].post(
                     paths["A"], {"text": "No operation"}, key="rc8-ci-disabled-key-001",
                 ), 503, "RC8 disabled must close send")
+                expect(owners["A"].get(
+                    "/api/v1/admin/inbox/outbound-capabilities",
+                ), 503, "RC8 disabled must close operator capability")
             assert len(calls) == first_failure_calls
 
             asyncio.run(database_evidence(fixtures))
