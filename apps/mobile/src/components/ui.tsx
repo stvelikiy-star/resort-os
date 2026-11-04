@@ -134,7 +134,7 @@ export function Badge({ label, tone = 'neutral', icon: Icon }: { label: string; 
 export function Button({ label, onPress, icon: Icon, variant = 'primary', disabled, testID }: { label: string; onPress: () => void; icon?: LucideIcon; variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; disabled?: boolean; testID?: string }) {
   const { c } = useTheme();
   const bg = variant === 'primary' ? c.primary : variant === 'danger' ? c.danger : variant === 'secondary' ? c.primarySoft : 'transparent';
-  const fg = variant === 'primary' ? c.primaryText : variant === 'danger' ? '#fff' : c.primary;
+  const fg = variant === 'primary' || variant === 'danger' ? c.primaryText : c.primary;
   return (
     <PressScale testID={testID} disabled={disabled} onPress={onPress} accessibilityLabel={label}
       style={{ minHeight: TOUCH, borderRadius: radius.lg, backgroundColor: bg, paddingHorizontal: space.xl, borderWidth: variant === 'secondary' ? 1 : 0, borderColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm }}>
