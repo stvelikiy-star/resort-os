@@ -48,7 +48,7 @@ export default function Pms() {
   };
   const roomState = (room: GridRoom) =>
     room.operational_state === 'CLEAN' ? copy.clean : room.operational_state === 'DIRTY' ? copy.dirty
-      : room.operational_state === 'TECH_BLOCK' ? copy.tech : room.operational_state;
+      : room.operational_state === 'TECH_BLOCK' ? copy.tech : room.operational_state === 'IN_INSPECTION' ? copy.checking : room.operational_state;
   return <FutureScreen>
     <PremiumHeader title={copy.pms} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
     {live && user && ['OWNER','MANAGER','AGENT'].includes(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
@@ -103,7 +103,7 @@ export default function Pms() {
       </View>
       <SectionLabel>{copy.bookings}</SectionLabel>
       {data.rooms.flatMap(room => room.blocks.filter(b => b.reservation_id).map(b => ({room, b}))).slice(0,24).map(({room,b}) =>
-        <GlassCard key={b.id} onPress={() => { if (b.reservation_id && user?.role !== 'AGENT') router.push({ pathname:'/reservation/[id]', params:{id:b.reservation_id} }); }}>
+        <GlassCard key={b.id} onPress={b.reservation_id && user?.role !== 'AGENT' ? () => router.push({ pathname:'/reservation/[id]', params:{id:b.reservation_id!} }) : undefined}>
           <Text style={[font.h2, { color:c.text }]}>{room.code} · {b.booking_number || '—'}</Text>
           <Text style={[font.small, { color:c.textMuted }]}>{b.start} → {b.end} · {b.guest_name || copy.readOnly}</Text>
         </GlassCard>)}
