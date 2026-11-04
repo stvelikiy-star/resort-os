@@ -2,7 +2,7 @@
 export type AuthMode = 'demo' | 'single_property' | 'shared_auth_preview';
 import type { SharedHotelSelector } from './sharedHotelAuth';
 
-export type Role = 'OWNER' | 'MANAGER' | 'RECEPTION' | 'AGENT' | 'MAID' | 'TECHNICIAN' | 'STORE_STAFF' | 'COOK' | 'WAITER' | 'CONTENT_MANAGER' | 'BEACH_PARTNER';
+export type Role = 'OWNER' | 'MANAGER' | 'RECEPTION' | 'AGENT' | 'MAID' | 'TECHNICIAN' | 'STORE_STAFF' | 'DINING_STAFF' | 'COOK' | 'WAITER' | 'CONTENT_MANAGER' | 'BEACH_PARTNER';
 export type TaskType = 'HOUSEKEEPING' | 'MAINTENANCE' | 'GUEST_REQUEST';
 export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'IN_INSPECTION' | 'DONE' | 'CANCELLED';
 export type Priority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
