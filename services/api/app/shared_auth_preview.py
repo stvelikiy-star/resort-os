@@ -79,11 +79,11 @@ class SharedAuthPreviewBoundary:
                                     path) is not None)
             ops_task_action = (scope['type'] == 'http' and isinstance(path, str) and
                                re.fullmatch(
-                                   r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/(?:claim|status)',
+                                   r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/(?:claim|status|assignee|complete-report)',
                                    path) is not None and
                                (method == 'OPTIONS' or
-                                (method == 'POST' and path.endswith('/claim')) or
-                                (method == 'PATCH' and path.endswith('/status'))))
+                                (method == 'POST' and (path.endswith('/claim') or path.endswith('/complete-report'))) or
+                                (method == 'PATCH' and (path.endswith('/status') or path.endswith('/assignee')))))
             valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action
             if method == 'OPTIONS':
                 valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action
