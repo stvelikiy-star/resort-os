@@ -202,7 +202,7 @@ def restored_api_check() -> None:
     from fastapi.testclient import TestClient
     sys.path.insert(0, str(ROOT / "services" / "api"))
     from app.app_entry import app
-    with TestClient(app, base_url="http://localhost:18000") as client:
+    with TestClient(app, base_url="https://localhost:18000") as client:
         for hotel in ("HOTEL_A", "HOTEL_B"):
             foreign = "HOTEL_B" if hotel == "HOTEL_A" else "HOTEL_A"
             client.cookies.clear()
