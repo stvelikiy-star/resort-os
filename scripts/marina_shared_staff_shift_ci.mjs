@@ -69,6 +69,44 @@ try {
     await card.getByRole("button", { name: "Взять в работу" }).click();
     await card.getByText("В работе", { exact: true }).waitFor();
 
+    // Submit the report through the real Staff form, not a direct API shortcut.
+    await card.getByRole("button", { name: type === "HOUSEKEEPING" ? "Сдать уборку" : "Сдать ремонт" }).click();
+    const report = page.locator(".shift-modal");
+    const submitLabel = type === "HOUSEKEEPING" ? "Отправить на проверку" : "Завершить ремонт";
+    await report.getByRole("textbox", { name: "Что сделано" }).fill("Synthetic browser verified work report");
+    const checklist = [
+      { code: "BED_LINEN", label: "Кровать и бельё", done: true },
+      { code: "BATHROOM", label: "Санузел", done: true },
+      { code: "SURFACES", label: "Пол и поверхности", done: true },
+      { code: "AMENITIES", label: "Комплектация номера", done: true },
+      { code: "FINAL_CHECK", label: "Финальная проверка", done: true },
+    ];
+    if (type === "HOUSEKEEPING") {
+      // Incomplete housekeeping must be refused by Core, not auto-approved.
+      await report.getByRole("button", { name: submitLabel }).click();
+      await page.getByText("Отметьте все пункты чек-листа перед сдачей номера.").waitFor();
+      const boxes = report.locator('input[type="checkbox"]');
+      assert.equal(await boxes.count(), 5);
+      for (let i = 0; i < 5; i += 1) await boxes.nth(i).check();
+    } else {
+      assert.equal(await report.locator('input[type="checkbox"]').count(), 0);
+    }
+    await report.getByRole("button", { name: submitLabel }).click();
+    await report.waitFor({ state: "hidden" });
+    const expectedStatus = type === "HOUSEKEEPING" ? "IN_INSPECTION" : "DONE";
+    const taskList = await api(page, "ops/tasks?limit=250&type=" + type);
+    assert.equal(taskList.status, 200);
+    assert.equal(taskList.data.items.find((task) => task.id === own.id)?.status, expectedStatus);
+    const completion = { summary: "Must not replay completed report", checklist: type === "HOUSEKEEPING" ? checklist : [], evidence_urls: [] };
+    assert.equal((await api(page, "ops/tasks/" + own.id + "/complete-report", "POST", completion)).status, 409);
+    if (type === "HOUSEKEEPING") {
+      // A maid cannot approve an inspection, even for her own assigned task.
+      assert.equal((await api(page, "ops/tasks/" + own.id + "/status", "PATCH", { status: "DONE" })).status, 403);
+    } else {
+      await page.getByRole("button", { name: /завершено/i }).click();
+      await page.getByRole("article").filter({ hasText: own.title }).getByText("Готово", { exact: true }).waitFor();
+    }
+
     await page.getByRole("button", { name: "Выйти" }).click();
     await page.getByLabel("Код отеля").waitFor();
     assert.equal((await api(page, "auth/me")).status, 401);
@@ -92,12 +130,36 @@ try {
     assert(swappedTasks.data.items.some((task) => task.id === other.id), "Switched hotel task missing");
     assert(!swappedTasks.data.items.some((task) => task.id === own.id), "Stale task leaked after hotel switch");
     assert.equal((await api(page, "ops/tasks/" + own.id + "/claim", "POST")).status, 404);
+    const foreignReport = { summary: "Cross-tenant report must fail", checklist: type === "HOUSEKEEPING" ? [
+      { code: "BED_LINEN", label: "Кровать и бельё", done: true },
+      { code: "BATHROOM", label: "Санузел", done: true },
+      { code: "SURFACES", label: "Пол и поверхности", done: true },
+      { code: "AMENITIES", label: "Комплектация номера", done: true },
+      { code: "FINAL_CHECK", label: "Финальная проверка", done: true },
+    ] : [], evidence_urls: [] };
+    assert.equal((await api(page, "ops/tasks/" + own.id + "/complete-report", "POST", foreignReport)).status, 404);
     await page.getByRole("button", { name: "Выйти" }).click();
     await page.getByLabel("Код отеля").waitFor();
     assert.equal((await api(page, "auth/me")).status, 401);
     await context.close();
   }
-  console.log("PASS: Staff HTTPS four-role/property combinations, foreign 404, logout and same-browser hotel switch");
+  // Only management may accept an inspected housekeeping task.
+  for (const suffix of ["A", "B"]) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(admin + "/shared-auth-preview");
+    await page.getByLabel("Код отеля").waitFor();
+    const login = await api(page, "auth/login", "POST", {
+      username: "owner", password, tenant_code: "tenant_" + suffix.toLowerCase(), property_code: "HOTEL_" + suffix,
+    });
+    assert.equal(login.status, 200);
+    const taskId = tasks[suffix].HOUSEKEEPING.id;
+    const approved = await api(page, "ops/tasks/" + taskId + "/status", "PATCH", { status: "DONE" });
+    assert.equal(approved.status, 200);
+    assert.equal(approved.data.status, "DONE");
+    await context.close();
+  }
+  console.log("PASS: Staff HTTPS four-role/property report lifecycles, inspection RBAC, replay denials, foreign 404 and hotel switch");
 } finally {
   await browser.close();
 }
