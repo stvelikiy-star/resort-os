@@ -93,11 +93,35 @@ def main():
     pwd = os.environ["MARINA_SHARED_BROWSER_CI_PASSWORD"]
     wa._windows.clear()
     with patch.object(wa, "_provider", side_effect=synthetic_green):
-        with TestClient(app, base_url="https://green-rc6-ci.invalid") as anonymous, \
-                TestClient(app, base_url="https://green-rc6-ci.invalid") as owner_a, \
-                TestClient(app, base_url="https://green-rc6-ci.invalid") as owner_b, \
-                TestClient(app, base_url="https://green-rc6-ci.invalid") as manager, \
-                TestClient(app, base_url="https://green-rc6-ci.invalid") as reception:
+        # One FastAPI lifespan/asyncpg pool, several isolated HTTP cookie jars.
+        # Multiple TestClient context managers on one app open distinct event
+        # loops and would incorrectly reuse the same asyncpg pool.
+        with TestClient(app, base_url="https://green-rc6-ci.invalid") as api:
+            from app import auth
+
+            class ScopedSession:
+                def __init__(self):
+                    self.token = None
+
+                def call(self, method, path, **kwargs):
+                    api.cookies.clear()
+                    if self.token is not None:
+                        api.cookies.set(auth.SESSION_COOKIE, self.token)
+                    response = api.request(method, path, **kwargs)
+                    if path == "/api/v1/auth/login" and response.status_code == 200:
+                        self.token = api.cookies.get(auth.SESSION_COOKIE)
+                        assert self.token
+                    return response
+
+                def get(self, path, **kwargs):
+                    return self.call("GET", path, **kwargs)
+
+                def post(self, path, **kwargs):
+                    return self.call("POST", path, **kwargs)
+
+            anonymous, owner_a, owner_b, manager, reception = (
+                ScopedSession() for _ in range(5)
+            )
             login(owner_a, "A", "owner", pwd)
             login(owner_b, "B", "owner", pwd)
             login(manager, "A", "manager", pwd)
