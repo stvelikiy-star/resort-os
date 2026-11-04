@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/inbox", tags=["admin-inbox-ai"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -233,7 +233,7 @@ async def create_ai_draft(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        property_id = await conn.fetchval("SELECT id FROM properties WHERE code=$1", user["property_code"])
+        property_id = await trusted_property_id(conn, user)
         if not property_id:
             raise HTTPException(status_code=503, detail="Property not loaded")
         context = await _load_context(conn, property_id, conversation_id)
