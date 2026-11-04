@@ -59,6 +59,7 @@ export function createDemoApi(hotelId: string, latency = 120): StaffApi {
 
   return {
     mode: 'DEMO',
+    async authMode() { return 'demo' as const; },
     async login(username, password) {
       await delay(latency);
       const d = DEMO_USERS[username.trim().toLowerCase()];
