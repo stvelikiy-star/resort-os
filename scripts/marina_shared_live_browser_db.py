@@ -271,13 +271,13 @@ async def verify(conn):
     assert await conn.fetchval('''
         SELECT count(*) FROM audit_logs
         WHERE "propertyId"=$1 AND "resourceId"=$2
-          AND action='HOUSEKEEPING_REPORT'
+          AND action='COMPLETE_WITH_REPORT'
           AND "afterJson"->>'status'='IN_INSPECTION'
-          AND jsonb_array_length("afterJson"->'checklist')=5
+          AND jsonb_array_length("afterJson"->'report'->'checklist')=5
     ''',property_ids["HOTEL_B"],hotel_b["stay_fixture"]["housekeeping_task_id"])==1, \
         "Mobile-format inspection report missing"
     assert await conn.fetchval('''
-        SELECT count(*) FROM audit_logs WHERE action='HOUSEKEEPING_REPORT'
+        SELECT count(*) FROM audit_logs WHERE action='COMPLETE_WITH_REPORT'
     ''')==1,"Duplicate or foreign housekeeping report persisted"
 
     assert await conn.fetchval('''
