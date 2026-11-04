@@ -35,6 +35,9 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
         if not isinstance(values, list) or not 2 <= len(values) <= 100:
             raise ValueError("Missing per-property webhook bindings")
         adapters = configured_channel_adapters()
+        provider_bindings = json.loads(os.environ.get("MARINA_SHARED_GREEN_RC6_CONFIG_JSON", ""))
+        if not isinstance(provider_bindings, list) or len(provider_bindings) != len(adapters):
+            raise ValueError("Missing paired provider identities")
         result = []
         for item in values:
             if not isinstance(item, dict) or set(item) != {
@@ -55,6 +58,13 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
                 and r["service_key"] != item["webhook_token"]
             )]) != 1:
                 raise ValueError("Webhook binding does not match an independent inbox adapter")
+            # The owner-paired GREEN API instance must match as well. Token
+            # authentication may never silently retarget a different account.
+            if len([p for p in provider_bindings if isinstance(p, dict)
+                    and p.get("property_code") == item["property_code"]
+                    and p.get("instance") == item["instance"]
+                    and p.get("token") != item["webhook_token"]]) != 1:
+                raise ValueError("Webhook instance does not match owner pairing")
             result.append(item)
         for field in ("instance", "property_code", "webhook_token"):
             if len({r[field] for r in result}) != len(result):
