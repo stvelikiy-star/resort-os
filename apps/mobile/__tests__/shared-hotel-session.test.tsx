@@ -27,7 +27,7 @@ const identity = (property: 'HOTEL_A' | 'HOTEL_B'): AuthUser => ({
   module_permissions: ['PMS', 'OPS'],
 });
 
-const fakeApi = {
+const mockApi = {
   mode: 'LIVE' as const,
   authMode: async (): Promise<AuthMode> => { calls.push('mode'); return mode; },
   logout: async () => { calls.push('logout'); cookie = null; },
@@ -43,8 +43,8 @@ const fakeApi = {
     return meOverride ?? cookie;
   },
 };
-jest.mock('../src/api/factory', () => ({ apiFor: () => fakeApi, dropApi: jest.fn() }));
-jest.mock('../src/api/realApi', () => ({ createRealApi: () => fakeApi }));
+jest.mock('../src/api/factory', () => ({ apiFor: () => mockApi, dropApi: jest.fn() }));
+jest.mock('../src/api/realApi', () => ({ createRealApi: () => mockApi }));
 jest.mock('../src/lib/pendingLogout', () => ({
   flushPendingCookieLogouts: jest.fn(async () => {}),
   hasUnrevokedCookieForHost: jest.fn(async () => false),
