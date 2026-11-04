@@ -46,7 +46,7 @@ class TaskCreate(BaseModel):
     priority: str = "NORMAL"
     title: str = Field(min_length=2, max_length=180)
     description: str | None = Field(default=None, max_length=4000)
-    assigned_to_id: uuid.UUID | None = None
+    assigned_to_id: uuid.UUID | None = Field(...)
     source: str = Field(default="PMS", max_length=60)
 
 
