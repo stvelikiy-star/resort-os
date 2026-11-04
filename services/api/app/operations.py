@@ -1,3 +1,4 @@
+import json
 import uuid
 from typing import Any
 
@@ -427,3 +428,147 @@ async def change_room_state(
         if result.endswith("0"):
             raise HTTPException(status_code=404, detail="Room not found")
     return {"room_id": str(room_id), "state": payload.state}
+
+
+class TaskAssigneePatch(BaseModel):
+    assigned_to_id: uuid.UUID | None = None
+
+
+class HousekeepingChecklistItem(BaseModel):
+    code: str = Field(min_length=2, max_length=40)
+    label: str = Field(min_length=2, max_length=80)
+    done: bool
+
+
+class HousekeepingCompletionReport(BaseModel):
+    summary: str = Field(min_length=2, max_length=4000)
+    checklist: list[HousekeepingChecklistItem] = Field(min_length=5, max_length=5)
+    # Photos require a reviewed authenticated uploads API; URLs are not evidence.
+    evidence_urls: list[str] = Field(default_factory=list, max_length=0)
+
+
+HOUSEKEEPING_REQUIRED_CODES = frozenset({
+    "BED_LINEN", "BATHROOM", "SURFACES", "AMENITIES", "FINAL_CHECK",
+})
+
+
+@router.patch("/tasks/{task_id}/assignee")
+async def assign_operational_task(
+    task_id: uuid.UUID,
+    payload: TaskAssigneePatch,
+    request: Request,
+    user: dict[str, Any] = Depends(current_user),
+):
+    """Hotel-local management-only assignment; never steal active work."""
+    if not has_full_operations_access(user):
+        raise HTTPException(status_code=403, detail="Management OPS permission required")
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn, user)
+            task = await conn.fetchrow(
+                '''SELECT id,type::text AS type,status::text AS status,"assignedToId"
+                   FROM operational_tasks WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                task_id, pid,
+            )
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if task["type"] not in allowed_types_for_user(user):
+                raise HTTPException(status_code=403, detail="Task type not permitted")
+            if task["status"] != "OPEN":
+                raise HTTPException(status_code=409, detail="Only open tasks can be assigned")
+            if task["type"] not in {"HOUSEKEEPING", "MAINTENANCE"}:
+                raise HTTPException(status_code=422, detail="Unsupported task assignment type")
+            next_id = payload.assigned_to_id
+            if next_id is not None:
+                assignee = await conn.fetchrow(
+                    '''SELECT id,role::text AS role FROM staff_users
+                       WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true''',
+                    next_id, pid,
+                )
+                expected_role = "MAID" if task["type"] == "HOUSEKEEPING" else "TECHNICIAN"
+                if not assignee or assignee["role"] != expected_role:
+                    raise HTTPException(status_code=422, detail="Assignee must be active hotel staff with matching task role")
+            if task["assignedToId"] != next_id:
+                await conn.execute(
+                    '''UPDATE operational_tasks SET "assignedToId"=$1,"updatedAt"=now()
+                       WHERE id=$2 AND "propertyId"=$3''',
+                    next_id, task_id, pid,
+                )
+                await conn.execute(
+                    '''INSERT INTO audit_logs
+                       (id,"propertyId","actorType","actorId",action,resource,
+                        "resourceId",source,result,"afterJson","createdAt")
+                       VALUES($1,$2,'STAFF',$3,'ASSIGN','OperationalTask',$4,
+                              'OPS','SUCCESS',$5::jsonb,now())''',
+                    uuid.uuid4(), pid, user["id"], str(task_id),
+                    json.dumps({"previous_assignee_id": str(task["assignedToId"]) if task["assignedToId"] else None,
+                                "assigned_to_id": str(next_id) if next_id else None}),
+                )
+    return {"id": str(task_id), "status": "OPEN", "assigned_to_id": str(next_id) if next_id else None}
+
+
+@router.post("/tasks/{task_id}/complete-report")
+async def submit_housekeeping_report(
+    task_id: uuid.UUID,
+    payload: HousekeepingCompletionReport,
+    request: Request,
+    user: dict[str, Any] = Depends(current_user),
+):
+    """Staff submits evidence for management inspection, never self-approves CLEAN."""
+    if user.get("role") != "MAID" or "HOUSEKEEPING" not in allowed_types_for_user(user):
+        raise HTTPException(status_code=403, detail="Housekeeping role and OPS permission required")
+    submitted = [row.code for row in payload.checklist]
+    if set(submitted) != HOUSEKEEPING_REQUIRED_CODES or len(set(submitted)) != len(submitted):
+        raise HTTPException(status_code=422, detail="Exact housekeeping checklist required")
+    if not all(row.done for row in payload.checklist):
+        raise HTTPException(status_code=422, detail="Incomplete housekeeping checklist")
+
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await property_id(conn, user)
+            task = await conn.fetchrow(
+                '''SELECT id,type::text AS type,status::text AS status,
+                          "roomId","assignedToId"
+                   FROM operational_tasks WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                task_id, pid,
+            )
+            if not task:
+                raise HTTPException(status_code=404, detail="Task not found")
+            if task["type"] != "HOUSEKEEPING":
+                raise HTTPException(status_code=403, detail="Not a housekeeping task")
+            if task["assignedToId"] != uuid.UUID(user["id"]):
+                raise HTTPException(status_code=403, detail="Claim task before submitting report")
+            if task["status"] != "IN_PROGRESS":
+                raise HTTPException(status_code=409, detail="Report requires task in progress")
+            if task["roomId"]:
+                room_state = await conn.fetchval(
+                    '''SELECT "operationalState"::text FROM rooms
+                       WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                    task["roomId"], pid,
+                )
+                if room_state != "DIRTY":
+                    raise HTTPException(status_code=409, detail="Room must be dirty before inspection")
+                await conn.execute(
+                    '''UPDATE rooms SET "operationalState"='IN_INSPECTION',"updatedAt"=now()
+                       WHERE id=$1 AND "propertyId"=$2''',
+                    task["roomId"], pid,
+                )
+            await conn.execute(
+                '''UPDATE operational_tasks SET status='IN_INSPECTION',"updatedAt"=now()
+                   WHERE id=$1 AND "propertyId"=$2''',
+                task_id, pid,
+            )
+            await conn.execute(
+                '''INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,
+                    "resourceId",source,result,"afterJson","createdAt")
+                   VALUES($1,$2,'STAFF',$3,'HOUSEKEEPING_REPORT','OperationalTask',$4,
+                          'OPS','SUCCESS',$5::jsonb,now())''',
+                uuid.uuid4(), pid, user["id"], str(task_id),
+                json.dumps({"summary": payload.summary,
+                            "checklist": [{"code": row.code, "done": row.done}
+                                          for row in payload.checklist],
+                            "status": "IN_INSPECTION"}),
+            )
+    return {"id": str(task_id), "status": "IN_INSPECTION",
+            "room_state": "IN_INSPECTION" if task["roomId"] else None}
