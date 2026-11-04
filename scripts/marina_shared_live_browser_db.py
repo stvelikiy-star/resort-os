@@ -201,7 +201,9 @@ async def verify(conn):
         assert row["guestAccessPinHash"] is None
         assert row["guestAccessPinIssuedAt"] is None
         assert row["guestAccessPinExpiresAt"] is None
-        assert row["room_state"]=="DIRTY","Room not sent to cleaning"
+        # E2E first checked the check-out DIRTY response, then TECH repaired
+        # and MAID finished manager-reviewed cleaning. Final room must be CLEAN.
+        assert row["room_state"]=="CLEAN","Manager-reviewed cleaning did not restore room"
         assert await conn.fetchval('''
             SELECT count(*) FROM guest_sessions WHERE "stayId"=$1 AND status='ACTIVE'
         ''',row["stay_id"])==0,"Checkout left a live guest session"
@@ -222,9 +224,48 @@ async def verify(conn):
             WHERE "reservationId"=$1 AND active=true
               AND "endDate"=$2::date AND "blockType"='RESERVATION'
         ''',row["id"],date.fromisoformat(fixture["checkout_local_date"]))==1,"Early checkout did not trim nights"
+    # Shared operations are hotel-local all the way into PostgreSQL:
+    # repair claimed/closed by TECH, checkout cleaning claimed by MAID,
+    # and final housekeeping inspection accepted by management.
+    for hotel,receipt in receipts.items():
+        pid=property_ids[hotel]
+        for role,username,task_id,kind in (
+            ("TECHNICIAN","technician",receipt["maintenance_task_id"],"MAINTENANCE"),
+            ("MAID","maid",receipt["stay_fixture"]["housekeeping_task_id"],"HOUSEKEEPING"),
+        ):
+            actor_id=await conn.fetchval('''
+                SELECT id FROM staff_users
+                WHERE "propertyId"=$1 AND username=$2 AND role::text=$3
+            ''',pid,username,role)
+            assert actor_id is not None,"Missing hotel-local operations staff"
+            task=await conn.fetchrow('''
+                SELECT id,"propertyId","roomId",type::text AS type,
+                       status::text AS status,"assignedToId","completedAt"
+                FROM operational_tasks WHERE id=$1
+            ''',uuid.UUID(task_id))
+            assert task and task["propertyId"]==pid,"Cross-hotel operation task ownership"
+            assert task["type"]==kind and task["status"]=="DONE"
+            assert task["roomId"]==uuid.UUID(receipt["room_id"])
+            assert task["assignedToId"]==actor_id,"Wrong hotel or role claimed task"
+            assert task["completedAt"] is not None,"Terminal task lacks completion timestamp"
+            assert await conn.fetchval('''
+                SELECT count(*) FROM audit_logs
+                WHERE "propertyId"=$1 AND "resourceId"=$2
+                  AND action='CLAIM' AND "actorId"=$3
+            ''',pid,task_id,actor_id)==1,"Missing role-verified claim audit"
+            assert await conn.fetchval('''
+                SELECT count(*) FROM audit_logs
+                WHERE "propertyId"=$1 AND "resourceId"=$2
+                  AND action='STATUS_CHANGE'
+            ''',pid,task_id)>=1,"Missing operation transition audit"
+    assert await conn.fetchval('''
+        SELECT count(*) FROM operational_tasks
+        WHERE type='MAINTENANCE' AND status='DONE'
+    ''')==2,"Two repairs not complete"
+
     assert await conn.fetchval('SELECT count(*) FROM inventory_blocks WHERE active=true') == 4
     assert await conn.fetchval('SELECT count(*) FROM payments') == 2, "Unexpected extra manual payment"
-    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, booked and rescheduled, 2 unpaid cancellations, 2 manual payments, 2 HOLD releases, 2 check-in/PIN/out/housekeeping lifecycles; no cross-tenant access")
+    print("MARINA_SHARED_LIVE_BROWSER_DB_PASS: 2 hotels, complete PMS + MAID/TECH task claims, repair completion, manager-inspected housekeeping, per-hotel audit, no foreign access")
 
 
 async def main():
