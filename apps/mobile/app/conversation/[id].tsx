@@ -6,6 +6,7 @@ import { Badge, Button, Empty, Field, PressScale, SectionLabel } from '../../src
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { ConversationDetail, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { chatStatusLabel, deliveryStatusLabel, messageDirectionLabel } from '../../src/i18n/statusLabels';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
@@ -47,15 +48,15 @@ export default function ConversationScreen() {
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {conversation ? <>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-        <Badge label={conversation.status} tone="primary"/>
+        <Badge label={chatStatusLabel(conversation.status, copy)} tone="primary"/>
         {conversation.needs_reply ? <Badge label={copy.needsReply} tone="warning"/> : null}
       </View>
       <Text style={[font.small, { color: c.textMuted }]}>{copy.assigned}: {conversation.assigned_to_name || '—'}</Text>
       <SectionLabel>{copy.inboxTitle}</SectionLabel>
-      {(data?.messages ?? []).map(m => <GlassCard key={m.id} style={{ backgroundColor: m.direction === 'INTERNAL' ? c.warningSoft : m.direction === 'OUTBOUND' ? c.primarySoft : c.surface }}>
-        <Text style={[font.label, { color: c.textMuted }]}>{m.direction === 'INTERNAL' ? copy.note : m.direction} · {m.created_at.slice(0, 16)}</Text>
+      {(data?.messages ?? []).map(m => <GlassCard key={m.id} style={{ alignSelf: m.direction === 'OUTBOUND' ? 'flex-end' : m.direction === 'INBOUND' ? 'flex-start' : 'stretch', maxWidth: '95%', backgroundColor: m.direction === 'INTERNAL' ? c.warningSoft : m.direction === 'OUTBOUND' ? c.primarySoft : c.surface }}>
+        <Text style={[font.label, { color: c.textMuted }]}>{messageDirectionLabel(m.direction, copy)} · {m.created_at.slice(0, 16)}</Text>
         <Text style={[font.body, { color: c.text, marginTop: 6 }]}>{m.text || '—'}</Text>
-        {m.delivery_status ? <Text style={[font.small, { color: c.textMuted }]}>{m.delivery_status}</Text> : null}
+        {m.delivery_status ? <Text style={[font.small, { color: c.textMuted }]}>{deliveryStatusLabel(m.delivery_status, copy)}</Text> : null}
       </GlassCard>)}
       {data?.messages.length === 0 ? <Empty text={copy.empty}/> : null}
       {conversation.assigned_to_id === null ? <Button testID="claim-conversation" label={copy.claim} disabled={busy || unknownResult} onPress={() => void act(() => live!.claimConversation(id!))}/> : null}
