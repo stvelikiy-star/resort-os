@@ -41,6 +41,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
   const sessionRevision = useRef(0);
   const loginAttempt = useRef(0);
+  // One native cookie jar per host: keep all LIVE sign-in cookie writes ordered.
+  // Promise tail intentionally remains successful after a rejected attempt.
+  const liveSignInTail = useRef<Promise<void>>(Promise.resolve());
   useEffect(() => {
     if (initialLocale) return;
     void getItem('marina.locale').then((v) => { if (v && ['ru', 'kg', 'en', 'kz'].includes(v)) { initI18n(v as Locale); setLocaleState(v as Locale); } });
@@ -185,15 +188,24 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     }
   }, [hotelId]);
 
-  const signIn = useCallback(async (username: string, password: string, selector?: SharedHotelSelector) => {
-    if (!hotel || !api) throw new Error('no hotel');
-    if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) throw new ApiError('FORBIDDEN', 'Untrusted hotel address');
-    // Clear any earlier hotel identity BEFORE a new login or cookie change.
-    // Also invalidate any in-flight foreground /me response for the old session.
+  const signIn = useCallback((username: string, password: string, selector?: SharedHotelSelector): Promise<AuthUser> => {
+    if (!hotel || !api) return Promise.reject(new Error('no hotel'));
+    if (!hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) {
+      return Promise.reject(new ApiError('FORBIDDEN', 'Untrusted hotel address'));
+    }
+    // Invalidate the prior identity as soon as the user requests a new login,
+    // not after waiting for an earlier native-cookie mutation to finish.
     const revision = ++sessionRevision.current;
     const attempt = ++loginAttempt.current;
     setSessions({});
-    let selected: SharedHotelSelector | undefined;
+
+    const perform = async (): Promise<AuthUser> => {
+      // A hotel switch or later login can supersede this queued request.
+      // Never send stale credentials or mutate cookies for that request.
+      if (sessionRevision.current !== revision || loginAttempt.current !== attempt) {
+        throw new ApiError('UNAUTHORIZED', 'Session context changed before login');
+      }
+      let selected: SharedHotelSelector | undefined;
     if (!hotel.demo) {
       // This canonical endpoint distinguishes shared tenant login from legacy
       // one-property login without guessing from a hostname or user input.
@@ -251,6 +263,16 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       }
       throw error;
     }
+    };
+    // A single native cookie jar is shared by unrelated properties on one
+    // API host. Complete logout/login/me/failed-login cleanup for one attempt
+    // before permitting the next LIVE attempt to touch the same cookie.
+    // Keep DEMO concurrent behavior unchanged (in-memory, no OS cookie).
+    if (hotel.demo) return perform();
+    const previous = liveSignInTail.current;
+    const current = previous.then(perform, perform);
+    liveSignInTail.current = current.then(() => undefined, () => undefined);
+    return current;
   }, [hotel, api]);
   const signOut = useCallback(async () => {
     if (!hotel || !api) return;
