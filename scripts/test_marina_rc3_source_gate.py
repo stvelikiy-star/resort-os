@@ -41,8 +41,9 @@ class RC3SourceLockTests(unittest.TestCase):
         self.assertIn("reviewed critical source changed: " + first, check_files(manifest, ROOT))
 
     def test_git_blob_sha_tracks_real_bytes(self):
-        self.assertEqual(git_blob_sha(b"test\\n"),
-                         __import__("hashlib").sha1(b"blob 5\\0test\\n").hexdigest())
+        payload = bytes([116, 101, 115, 116, 10])  # test + newline
+        expected = __import__("hashlib").sha1(b"blob 5" + bytes([0]) + payload).hexdigest()
+        self.assertEqual(git_blob_sha(payload), expected)
 
 
 if __name__ == "__main__":
