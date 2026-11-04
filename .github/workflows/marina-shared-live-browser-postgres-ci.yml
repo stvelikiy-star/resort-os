@@ -40,7 +40,9 @@ jobs:
       MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
       MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
       MARINA_SHARED_BROWSER_CI_PASSWORD: synthetic-ci-only-browser-two-hotels-2026
-      MARINA_SHARED_BROWSER_URL: http://127.0.0.1:13001
+      # Chromium permits Secure cookies on the special localhost loopback host.
+      # Keep Secure=true rather than weakening shared multi-hotel auth.
+      MARINA_SHARED_BROWSER_URL: http://localhost:13001
       # Exercise Secure session cookies even on disposable loopback Chromium.
       # Shared hotel auth must never be exercised with COOKIE_SECURE=false.
       COOKIE_SECURE: 'true'
