@@ -28,7 +28,7 @@ export default function AppTabs() {
   const workspace = workspaceForSession(user.role, user.module_permissions, mode, serverAuthMode);
   const plan = mobileTabPlan(workspace.tabs);
   if (selected === 'more' && !plan.showMore) return <Redirect href={homeForSession(user.role, user.module_permissions, mode, serverAuthMode)} />;
-  if (selected !== 'more' && ORDER.includes(selected) && !hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)) {
+  if (selected !== 'more' && ORDER.includes(selected as TabKey) && !hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)) {
     return <Redirect href={homeForSession(user.role, user.module_permissions, mode, serverAuthMode)} />;
   }
   return <Tabs screenOptions={{
