@@ -1,65 +1,82 @@
-# MARINA SMART — shared platform RC1 source candidate
+# MARINA SMART — unified shared-platform RC2 source candidate
 
-Date: 2026-11-03, Asia/Bishkek.
+Date: 2026-11-04, Asia/Bishkek.
 
-## Candidate identity
+## Candidate identity — source review, NOT production
 
 - Repository: stvelikiy-star/resort-os
-- PR: #284
-- Branch: release/marina-shared-platform-rc1-20261103
-- Application baseline: 59cdba4d098538c705998e32a924d9b5c62ed4b3
+- PR: #314
+- Branch: release/marina-shared-platform-rc2-20261104
+- Application baseline: 62a2caec856e8fe32801c9156d90de655298ad33
+- Previous reviewed RC1: draft PR #284, head 488fec8b9823c6f98d690333dcc7c9b28fa86bc8
 - Candidate manifest: release/marina-smart-current-candidate.json
 - Migration ledger: 39 migrations
 - Critical constraints: 106 (scripts/release_contract.py)
 - Source stage: SOURCE_LOCKED_SHARED_RUNTIME_PENDING
+- Scope: shared Tenant/Property platform; tenant_id and property_id must come from authenticated database-backed context
 
-The application baseline is the previously inspected source revision, not the
-RC metadata commit. All 19 mandatory workflows must pass at the actual RC head.
-Older runs and a successful source-lock check do not establish those results.
-All 39 migration.sql files have exact SHA-256 checksums in the manifest.
+The baseline is the already-reviewed *application code* SHA, not the metadata head.
+The RC2 branch is 92 commits ahead of RC1 and changes only 29 paths relative
+to the frozen RC1. The main branch has independently diverged; a direct
+main merge/force-push is forbidden until separately reconciled.
+Existing draft PRs #303–#312 form a reviewed stacked source history.
+Do NOT independently deploy or cherry-pick them into production.
 
-## Previously verified baseline evidence
+## Observed synthetic CI evidence for application baseline
 
-The baseline audit observed 29 successful PR workflow runs. Full-stack and
-two-property jobs checked out merge aace18af2a6d6056c7e065a0eb8069d5d21d0ec1;
-its tree equals baseline tree da1dd4d715da134dd7cd41ca94fd10c920177213.
+- Actual Chromium -> Next.js -> canonical FastAPI -> disposable PostgreSQL 16,
+  two different hotels: booking and rates, HOLD/release, schedule mutation,
+  unpaid cancellation, **manual staff-recorded** payment, guest check-in/one-time
+  PIN, early check-out, revoked access and housekeeping:
+  https://github.com/stvelikiy-star/resort-os/actions/runs/41711228040
+- Resort OS Release Gate:
+  https://github.com/stvelikiy-star/resort-os/actions/runs/41711228001
+- On baseline PR #312 SHA, 20 of 21 reported runs were successful.
+  The failure was 'Three Crowns Full Staging Gate' (public-content truth drift).
+  This does not constitute success for all **19 required MARINA workflows**.
+- RC2 requires those same 19 mandatory named workflows PLUS
+  marina-shared-live-browser-postgres-ci.yml as an additional acceptance gate,
+  all PASS at the **exact final RC2 metadata head SHA**. Older runs are not evidence.
+- The SHA-256 manifest fingerprints exactly 39 migration.sql files including
+  zz114. They do not prove migration or restore on any target server.
 
-- Full-stack booking, staff lifecycle, manual ledger, guest check-in/out and browser:
-  https://github.com/stvelikiy-star/resort-os/actions/runs/41610201813
-- Two-property HOLD, finance denial and restore of 68 public tables:
-  https://github.com/stvelikiy-star/resort-os/actions/runs/41610201768
+## Tenant isolation and role boundary
 
-These are baseline results, not RC1 or Ubuntu approval. Manual payments are not
-acquiring; provider-free assistant browser errors are not model answers.
-
-## Customer isolation boundary
-
-Tenant/Property remains the customer isolation model. Trusted tenant_id and
-property_id come from database-derived authentication context. Two-property
-checks currently use PROPERTY_PINNED_RUNTIMES, not the final shared backend.
-The shared-auth preview still closes operational HTTP and WebSocket routes.
+Tenant/Property is the customer boundary. The RC2 synthetic two-hotel run
+uses one shared API/backend and verifies two distinct authenticated hotel
+contexts for the tested PMS operations. This is stronger than the historical
+PROPERTY_PINNED_RUNTIMES baseline but is NOT an accepted external shared service.
 
 The existing roles, navigation and approved compact chessboard remain unchanged.
+This sentence applies to the **legacy single-property UI**; RC2 adds a separate
+shared-auth-preview staging cabinet containing a subset of dashboard, grid,
+reservations, booking/HOLD and staff-management functionality.
+It has NO complete operational workspaces for MAID/TECHNICIAN/COOK/WAITER, no
+activated shared guest QR/service flow, and no accepted hotel onboarding.
 
-## Unverified rollout boundary
+Internal manual receipts are not connected acquiring or proof of money received.
+The historical GREEN-API setup is property-pinned and deliberately rejects
+tenant-context mode; production per-hotel WhatsApp and AI handoff remain unverified.
+
+## Explicit unverified rollout boundary
 
 - external_staging_verified=false
-- cross_tenant_e2e_verified=false
+- cross_tenant_e2e_verified=false (target/external; synthetic E2E is evidenced above)
 - backup_restore_target_verified=false
 - production_cutover_authorized=false
 
-MARINA_DEMO is the public synthetic demo. MARINA_HOTEL01 is the older separate
-test stack, not the primary production platform. Existing data and deployment
-settings are preserved. No Ubuntu commands, seed, migrations, DNS, real WhatsApp,
-OTA or acquiring are executed by this source change.
+MARINA_DEMO is an independent public synthetic demo. MARINA_HOTEL01 is an
+older isolated hotel01 test stack, not the primary MARINA production runtime.
+No changes to DEMO, hotel01 data, mobile, KÖL, AK BERMET, Ubuntu, deployment,
+DNS, provider secrets or working databases are authorized by this candidate.
 
-## Next stages
+## Next ordered stages (NO-GO remains)
 
-1. Accept all mandatory RC1 source gates at one head.
-2. Complete shared operational tenancy, onboarding and scoped background work.
-3. Accept PMS, supported roles and restore/rollback on the unified source.
-4. Inspect Ubuntu and prove restoration of a real backup into a separate DB.
-5. Deploy the separate primary environment with permanent HTTPS; verify restart.
-6. Accept real hotel-specific WhatsApp/AI delivery and handoff.
-7. Accept a controlled real-property pilot.
-8. Accept official OTA/acquiring integrations before advertising them.
+1. Get exactly 19 core + 1 real-browser RC2 checks green on one final SHA.
+2. Accept unified PMS externally; complete all role cabinets/tasks and guest QR.
+3. Validate new property/owner onboarding and tenant isolation.
+4. Accept per-hotel real WhatsApp/AI/human handoff.
+5. Run full release safety and migration/restore/rollback gates.
+6. Inspect Ubuntu and deploy separately only after acceptance and recovery proof.
+
+This document and manifest record a source review, NOT a deployment.
