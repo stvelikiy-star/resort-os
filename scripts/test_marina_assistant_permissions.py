@@ -156,10 +156,11 @@ class RouterPermissions(unittest.TestCase):
         sid, gid, qid, pid, room = [uuid.uuid4() for _ in range(5)]
         qr = {"qr_id": qid, "propertyId": pid, "roomId": room, "room_code": "101"}
         stay = {"stayId": sid, "guestId": gid, "checkIn": "2026-10-25", "checkOut": "2026-10-28"}
-        valid = {"id": uuid.uuid4(), "stayId": sid, "guestId": gid, "roomQrId": qid}
+        valid = {"id": uuid.uuid4(), "propertyId": pid, "stayId": sid, "guestId": gid, "roomQrId": qid}
         cases = [(qr, stay, None, 401), (qr, None, valid, 401), (None, stay, valid, 404),
                  (qr, stay, {**valid, "stayId": uuid.uuid4()}, 401),
                  (qr, stay, {**valid, "guestId": uuid.uuid4()}, 401),
+                 (qr, stay, {**valid, "propertyId": uuid.uuid4()}, 401),
                  (qr, stay, {**valid, "roomQrId": uuid.uuid4()}, 401),
                  (qr, stay, valid, 200)]
         for qr_value, stay_value, session_value, expected in cases:
