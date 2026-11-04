@@ -66,3 +66,34 @@ assignment/report routes. Independently verify 2-hotel real-browser/PostgreSQL
 E2E, role ceilings, explicit assignment, checklist report audit and rollback.
 Retain reviewed RC2 #314 and its 64/64 gates immutable. No DEMO, APK, Ubuntu or
 production data modification in this handoff.
+
+
+## P0 source-contract delta — verified server #319 / mobile #315
+
+This is an **addendum** to the historical #317 baseline above, not a claim of
+production deployment. Reviewed server: PR #319
+`8f1d7a2ef6c371a44be62f1c94e930d61d7ce8e9` (stacked on
+#318 `cb04266ab5d67e5358f0e78c3635b02fb3d47837`); independent mobile:
+PR #315 `bd75fdb5b2dcec17d3aa8458b34d31a58b765254`.
+No mobile/server code was merged with the other branch.
+
+| Canonical boundary | #319 server state | #315 mobile state | Required acceptance |
+| --- | --- | --- | --- |
+| `POST /auth/login` | Shared staging requires `tenant_code`, `property_code`, username/password; 12 roles × 2 properties checked with actual disposable PostgreSQL | **INCOMPATIBLE**: sends username/password only and identifies LIVE hotel by host | Choose tenant/property explicitly; compare login + `/me` identity; 2-owner negative tests; never trust caller property headers |
+| `GET /auth/me`, `POST /auth/logout` | Cookie bound to DB tenant/property/employee, session revocation and role ceiling tested in shared PostgreSQL CI | Checks current user; no signed/device token or shared-origin property switching | Actual device cookie/logout/revoke and origin trust **NOT TESTED** |
+| Role grants | Shared `require_roles` requires allowed role; custom grants intersect with reviewed role ceiling | Client role/module UI gating only; server must authorize | All 12 role login does **not** mean all workspaces accepted |
+| Staff tasks/assignment/cleaning report | #318 admits canonical task assignment/report; report transitions to `IN_INSPECTION`; #319 tests scope/role and preserves legacy | API adapters exist, not a deployed shared-device result | Confirm MAID/TECH and owner/manager with two-hotel sessions on device |
+| PMS / HOLD / finance | Server code and disposable integration checks exist | Mobile HOLD feature gate remains `false`, response shape mismatch; no live finance write | Do **not** enable blocked functions without explicit reviewed client/server contract |
+| Inbox / WhatsApp, MARINA AI, Kitchen/Waiter, guest QR | **SHARED PREVIEW 503** until separate tenant-safe provider and role verification | UI/legacy adapters present; presence is not availability | E2E with hotel-local providers, AI context and hardware; **NOT TESTED** |
+| Session cookie policy | Shared staged session cookie is `HttpOnly`, `SameSite=Lax`; production HTTPS + `Secure` is required | Uses `credentials:include`; actual native cookie behavior **NOT TESTED** | New isolated server hardening draft requires `COOKIE_SECURE=true` before shared sessions; final CI must pass |
+
+**Current isolated security change:** a server-only draft stacked on #319 rejects
+shared-auth staging with `COOKIE_SECURE=false` *before* any DB queries or
+session issuance, and adds negative tests. This must be validated on its own
+SHA; do not report it as passed or part of #319.
+
+**Not accepted:** actual external deployment, HTTPS reverse proxy,
+independent native two-property device sessions, GREEN-API send/receipts,
+mobile HOLD, property guest QR, iOS, real client data, restore on target Ubuntu.
+The shared staging CI is a **synthetic disposable Postgres/HTTP/browser**
+environment, not a production hotel.
