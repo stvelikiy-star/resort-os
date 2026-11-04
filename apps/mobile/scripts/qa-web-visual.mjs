@@ -147,19 +147,37 @@ async function main() {
   try {
     await click('[data-testid="segment-ru"]', 'Russian language');
     await screenshot('connect_ru_light_375');
-    await click('[data-testid="web-demo-start"]', 'demo staff launcher');
-    if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('Demo staff tasks navigation absent');
-    await diagnose('maid_tasks');
-    await screenshot('maid_tasks_ru_light_375');
-    await click('[data-testid="tab-profile"]', 'maid profile');
+    // The built-in quick DEMO launcher starts as MANAGER, not MAID.
+    await click('[data-testid="web-demo-start"]', 'demo manager launcher');
+    if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('Demo manager tasks navigation absent');
+    await diagnose('manager_tasks');
+    await screenshot('manager_tasks_ru_light_375_before_tab_fix');
+    await click('[data-testid="tab-more"]', 'manager More menu');
+    await click('[data-testid="more-profile"]', 'manager profile in More');
     if (!await waitFor('[data-testid="segment-dark"]')) throw new Error('Theme selector not visible');
-    await screenshot('maid_profile_ru_light_375');
+    await screenshot('manager_profile_ru_light_375');
     await click('[data-testid="segment-dark"]', 'dark theme');
-    await screenshot('maid_profile_ru_dark_375');
+    await screenshot('manager_profile_ru_dark_375');
     await click('[data-testid="segment-en"]', 'English language');
-    await screenshot('maid_profile_en_dark_375');
-    await click('[data-testid="tab-tasks"]', 'back to tasks');
+    await screenshot('manager_profile_en_dark_375');
+    await click('[data-testid="tab-tasks"]', 'manager tasks in dark mode');
+    await screenshot('manager_tasks_en_dark_375');
+    await click('[data-testid="tab-admin"]', 'manager team tab');
+    await screenshot('manager_team_en_dark_375');
+    await viewport(320, 640);
+    await diagnose('manager_team_320');
+    await screenshot('manager_team_en_dark_320');
+    await viewport(430, 932);
+    await screenshot('manager_team_en_dark_430');
+    await viewport(375, 812);
+    await click('[data-testid="tab-more"]', 'manager More menu');
+    await click('[data-testid="more-profile"]', 'manager profile');
+    await click('[data-testid="sign-out"]', 'manager signout for isolated MAID fixture');
+    await click('[data-testid="demo-maid"]', 'built-in MAID fixture');
+    if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('DEMO MAID tasks navigation absent');
     await screenshot('maid_tasks_en_dark_375');
+    await click('[data-testid="tab-rooms"]', 'MAID rooms');
+    await screenshot('maid_rooms_en_dark_375');
   } catch (e) {
     console.log('WEB_VISUAL_PARTIAL ' + String(e.message || e));
     await diagnose('partial');
