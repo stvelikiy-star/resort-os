@@ -11,8 +11,8 @@ type Fetch = typeof fetch;
  * Interim auth = the server's httpOnly cookie session (`resort_session`). No secrets live in the app.
  * Bearer/refresh tokens + device registry are backend work item B1/B2 (see docs) and are NOT assumed here.
  */
-export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch): StaffApi {
-  const http = createHotelHttpClient(baseUrl, fetchImpl);
+export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch, sessionIsActive?: () => boolean): StaffApi {
+  const http = createHotelHttpClient(baseUrl, fetchImpl, sessionIsActive);
   // Most recent server-provided records for safe post-commit readback fallback.
   // Never synthesize an unseen task or claim that a missing write succeeded.
   const lastKnownTasks = new Map<string, Task>();
