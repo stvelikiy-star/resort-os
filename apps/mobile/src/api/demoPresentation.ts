@@ -78,16 +78,15 @@ export function demoConversationDetail(id: string, locale: Locale): Conversation
   ] };
 }
 export function demoDiningFloor(locale: Locale): DiningFloor {
-  const tr = text[locale];
   return {
-    tables: [{id:'d-table-1',code:'T-01',status:'OCCUPIED',seats:4},{id:'d-table-2',code:'T-02',status:'AVAILABLE',seats:2},{id:'d-table-3',code:'T-03',status:'RESERVED',seats:6}],
-    orders: demoKitchenOrders(locale),
+    tables: [{id:'d-table-1',code:'T-01',name:'DEMO T-01',status:'OCCUPIED',seats:4},{id:'d-table-2',code:'T-02',name:'DEMO T-02',status:'AVAILABLE',seats:2},{id:'d-table-3',code:'T-03',name:'DEMO T-03',status:'RESERVED',seats:6}],
+    orders: demoKitchenOrders(locale).map(o=>({id:o.id,order_number:o.order_number,status:o.status,table_code:o.table_code,room_code:o.room_code,waiter_id:null,waiter_name:null})),
   };
 }
 export function demoKitchenOrders(locale: Locale): KitchenOrder[] {
   const tr=text[locale];
   return [
-    {id:'d-order-01',order_number:'DEMO-021',status:'COOKING',table_code:'T-01',room_code:null,notes:null,waiter_id:null,items:[{id:'d-item-01',name:tr.soup,quantity:2},{id:'d-item-02',name:tr.fish,quantity:1}]},
-    {id:'d-order-02',order_number:'DEMO-022',status:'NEW',table_code:'T-03',room_code:null,notes:null,waiter_id:null,items:[{id:'d-item-03',name:tr.salad,quantity:2},{id:'d-item-04',name:tr.cake,quantity:1}]},
+    {id:'d-order-01',order_number:'DEMO-021',status:'COOKING',table_code:'T-01',room_code:null,total_kgs:1850,notes:null,items:[{id:'d-item-01',name:tr.soup,quantity:2},{id:'d-item-02',name:tr.fish,quantity:1}]},
+    {id:'d-order-02',order_number:'DEMO-022',status:'NEW',table_code:'T-03',room_code:null,total_kgs:1460,notes:null,items:[{id:'d-item-03',name:tr.salad,quantity:2},{id:'d-item-04',name:tr.cake,quantity:1}]},
   ];
 }
