@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api")
 from app.operations import (
     HOUSEKEEPING_REQUIRED_CODES,
     HousekeepingChecklistItem, HousekeepingCompletionReport,
-    TaskAssigneePatch, allowed_types_for_user,
+    TaskAssigneePatch, TaskCreate, allowed_types_for_user,
     has_full_operations_access, router,
 )
 
@@ -27,6 +27,12 @@ class ServerMobileTaskContractTests(unittest.TestCase):
         for path in ("/api/v1/ops/tasks/{task_id}/assignee",
                      "/api/v1/ops/tasks/{task_id}/complete-report"):
             self.assertEqual(paths.count(path), 1)
+
+    def test_existing_task_create_remains_backward_compatible(self):
+        payload = TaskCreate(type="HOUSEKEEPING", title="Test daily cleaning")
+        self.assertIsNone(payload.assigned_to_id)
+        self.assertEqual(payload.status if hasattr(payload, "status") else payload.type,
+                         "HOUSEKEEPING")
 
     def test_assignment_requires_explicit_intent(self):
         with self.assertRaises(ValidationError):
