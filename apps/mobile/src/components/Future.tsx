@@ -168,7 +168,11 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
         <Path d="M 28 45 Q 50 12 72 45 Q 82 75 50 82 Q 18 72 28 45 Z" fill={c.primarySoft} stroke={ring} strokeWidth="2"/>
       </Svg>
     </Animated.View>
-    {state === 'error' || state === 'offline' ? <CircleHelp size={size / 3} color={ring}/> : <Sparkles size={size / 3} color={ring}/>}
+    <View style={{ width: size * 0.56, height: size * 0.56, borderRadius: size * 0.28, backgroundColor: c.primarySoft,
+      alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.glassBorder }}>
+      {state === 'error' ? <CircleHelp size={Math.max(20, size * 0.30)} color={c.danger}/>
+        : <Sparkles size={Math.max(20, size * 0.34)} color={state === 'offline' ? c.textMuted : c.cyan} strokeWidth={2.1}/>}
+    </View>
   </PressScale>;
 }
 export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
