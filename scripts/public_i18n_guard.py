@@ -32,7 +32,53 @@ FILES = {
 }
 
 
+def separated_guest_route_guard() -> int:
+    """Check the intentional public-root /guest /g separation, not the
+    superseded AK BERMET public sales website contract.
+    """
+    paths = {
+        "public": ROOT / "apps/web/app/page.tsx",
+        "guest": ROOT / "apps/web/app/guest/page.tsx",
+        "landing": ROOT / "apps/web/components/GuestLanding.tsx",
+        "route": ROOT / "apps/web/app/g/[token]/page.tsx",
+        "runtime": ROOT / "apps/web/components/GuestConciergeRuntime.tsx",
+        "locale": ROOT / "apps/web/lib/marinaGuestLocale.ts",
+        "boundary": ROOT / "apps/web/components/PublicSiteRuntime.tsx",
+    }
+    texts = {key: path.read_text(encoding="utf-8") for key, path in paths.items()}
+    requirements = {
+        "public": ("Три Короны", "3korony.com"),
+        "guest": ("GuestLanding", "AK BERMET", "MARINA SMART", "index: false"),
+        "landing": ("AK BERMET", "MARINA SMART", 'type Locale = "ru" | "kg" | "kz" | "en"', "ru: {", "kg: {", "kz: {", "en: {"),
+        "route": ("GuestConciergeRuntime",),
+        "runtime": ("useMarinaGuestLocale", "MARINA_GUEST_LOCALES", "COPY", "ru: {", "kg: {", "kz: {", "en: {"),
+        "locale": ("MARINA_GUEST_LOCALES", "marina-smart-guest-locale", "marina-smart-site-language", "window.localStorage.setItem(MARINA_GUEST_LOCALE_KEY, locale)"),
+        "boundary": ('pathname === "/guest"', 'pathname.startsWith("/g/")', 'pathname.startsWith("/p/")'),
+    }
+    errors = [
+        f"{name}: missing {needle!r}"
+        for name, needles in requirements.items()
+        for needle in needles if needle not in texts[name]
+    ]
+    for forbidden in ("Три Короны", "Three Crowns", "3korony.com"):
+        if forbidden in texts["landing"] + texts["guest"]:
+            errors.append(f"MARINA guest landing contains public-site brand: {forbidden}")
+    if errors:
+        for error in errors:
+            print(f"FAIL: {error}")
+        print("RESULT: SEPARATED MARINA GUEST ROUTE DRIFT")
+        return 1
+    print("PASS: public root is isolated from four-language MARINA guest and QR routes")
+    return 0
+
+
 def main() -> int:
+    # The shared platform serves the approved Three Crowns public pages at /,
+    # while MARINA guest/QR pages have distinct route ownership and languages.
+    home = (ROOT / "apps/web/app/page.tsx").read_text(encoding="utf-8")
+    if "Три Короны" in home and "3korony.com" in home:
+        return separated_guest_route_guard()
+
     errors: list[str] = []
     texts: dict[str, str] = {}
     for key, path in FILES.items():

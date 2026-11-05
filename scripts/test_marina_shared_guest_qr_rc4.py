@@ -66,6 +66,7 @@ class GuestQrRc4AdmissionTests(TestCase):
         stack.enter_context(patch.object(auth, "COOKIE_SECURE", True))
         stack.enter_context(patch.object(auth, "PROPERTY_CODE", "MARINA_BROWSER_CI"))
         stack.enter_context(patch.object(guest_os, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True))
+        stack.enter_context(patch.object(guest_requests, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True))
         stack.enter_context(patch.object(guest_os, "COOKIE_SECURE", True))
         return stack
 

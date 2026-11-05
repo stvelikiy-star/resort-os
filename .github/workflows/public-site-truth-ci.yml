@@ -69,14 +69,21 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          page = Path("apps/web/app/page.tsx").read_text(encoding="utf-8")
+          public_page = Path("apps/web/app/page.tsx").read_text(encoding="utf-8")
           layout = Path("apps/web/app/layout.tsx").read_text(encoding="utf-8")
-          joined = page + "\n" + layout
-          assert "AK BERMET" in joined
-          assert "MARINA SMART" in joined
+          guest_page = Path("apps/web/app/guest/page.tsx").read_text(encoding="utf-8")
+          guest_landing = Path("apps/web/components/GuestLanding.tsx").read_text(encoding="utf-8")
+          public_runtime = Path("apps/web/components/PublicSiteRuntime.tsx").read_text(encoding="utf-8")
+          assert "Три Короны" in public_page and "3korony.com" in public_page
+          assert "3korony.com" in layout
+          joined_guest = guest_page + "\n" + guest_landing
+          assert "AK BERMET" in joined_guest and "MARINA SMART" in joined_guest
           for forbidden in ("Три Короны", "Three Crowns", "3korony.com"):
-              assert forbidden not in joined, forbidden
-          print("PASS: dedicated MARINA SMART guest web is isolated from legacy Three Crowns public-site branding")
+              assert forbidden not in joined_guest, forbidden
+          assert 'pathname === "/guest"' in public_runtime
+          assert 'pathname.startsWith("/g/")' in public_runtime
+          assert 'pathname.startsWith("/p/")' in public_runtime
+          print("PASS: Three Crowns public root and isolated MARINA guest/QR route ownership")
           PY
       - name: Enforce public media integrity
         if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-')) }}

@@ -80,6 +80,7 @@ class RealtimeTenantTests(unittest.TestCase):
         self.app.include_router(dining_realtime.router)
         self.patches = [
             patch.object(auth, 'MARINA_SHARED_AUTH_PREVIEW_ENABLED', True),
+            patch.object(auth, 'COOKIE_SECURE', True),
             patch.object(auth, 'MARINA_TENANT_CONTEXT_ENABLED', True),
             patch.object(auth, 'PROPERTY_CODE', 'HOTEL_A'),
             patch.object(realtime, 'PROPERTY_CODE', 'HOTEL_A'),

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 
 const runtime = fs.readFileSync('apps/web/components/GuestConciergeRuntime.tsx', 'utf8');
+const guestLocale = fs.readFileSync('apps/web/lib/marinaGuestLocale.ts', 'utf8');
 const page = fs.readFileSync('apps/web/app/g/[token]/page.tsx', 'utf8');
 const css = fs.readFileSync('apps/web/app/guest-concierge.css', 'utf8');
 
@@ -11,8 +12,11 @@ function require(condition, message) {
 require(page.includes('GuestConciergeRuntime'), 'Guest concierge route not mounted');
 require(!page.includes('GuestRequestsPanel'), 'Duplicate legacy request panel is still mounted');
 require(!page.includes('GuestOsRuntime'), 'Legacy Guest OS runtime is still mounted');
-require(runtime.includes('marina-smart-guest-locale'), 'Guest locale persistence missing');
-require(runtime.includes('marina-smart-site-language'), 'Public-site locale continuity missing');
+require(runtime.includes('useMarinaGuestLocale()'), 'Shared guest locale hook not mounted');
+require(guestLocale.includes('marina-smart-guest-locale'), 'Guest locale persistence missing');
+require(guestLocale.includes('marina-smart-site-language'), 'Guest locale continuity missing');
+require(guestLocale.includes('window.localStorage.setItem(MARINA_GUEST_LOCALE_KEY, locale)'), 'Guest locale is not persisted');
+require(guestLocale.includes('window.localStorage.setItem(MARINA_SITE_LOCALE_KEY, locale)'), 'Guest locale continuity is not persisted');
 require(runtime.includes('setInterval(() => void loadRequests(), 15000)'), 'Request status polling missing');
 require(runtime.includes('credentials: "include"'), 'Guest session cookie boundary missing');
 require(runtime.includes('request_code: selected'), 'OperationalTask request code missing');

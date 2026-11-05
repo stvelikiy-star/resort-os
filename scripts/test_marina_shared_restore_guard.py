@@ -1,7 +1,10 @@
 """Guard invariants for the destructive-risk shared PostgreSQL restore rehearsal."""
 import os
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 import unittest
+import marina_shared_release_restore_ci as restore_guard
 
 from marina_shared_release_restore_ci import validate_restore_urls, SOURCE_NAME, TARGET_NAME
 
@@ -18,6 +21,19 @@ ENV = {
 
 
 class RestoreSafety(unittest.TestCase):
+    def setUp(self):
+        # Real synthetic fixtures keep negative URL assertions meaningful.
+        fixture = TemporaryDirectory(prefix="marina-shared-restore-guard-")
+        self.addCleanup(fixture.cleanup)
+        receipts = Path(fixture.name) / "browser-receipts.json"
+        receipts.write_text("{}", encoding="utf-8")
+        for guard in (
+            patch.object(restore_guard, "PASSWORD", "synthetic-ci-only-restore-guard"),
+            patch.object(restore_guard, "RECEIPTS", receipts),
+        ):
+            guard.start()
+            self.addCleanup(guard.stop)
+
     def test_only_explicit_ci_localhost_urls_accepted(self):
         with patch.dict(os.environ, ENV, clear=False):
             self.assertEqual(validate_restore_urls(SOURCE, TARGET),
