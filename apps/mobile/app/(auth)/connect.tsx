@@ -48,7 +48,7 @@ export default function Connect() {
         <Segmented<Locale> value={locale} onChange={setLocale} options={LOCALES.map((l) => ({ key: l, label: LOCALE_LABEL[l].slice(0, 3).toUpperCase() }))} />
       </FadeIn>
 
-      {
+      {!installed ? (
         <GlassCard testID="web-demo-launcher" style={{ gap: space.md, backgroundColor: c.primarySoft }}>
           <Text style={[font.h2, { color: c.text }]}>{t('connect.tryDemoTitle')}</Text>
           <Text style={[font.body, { color: c.textMuted }]}>{t('connect.tryDemoHint')}</Text>
@@ -64,7 +64,7 @@ export default function Connect() {
               } finally { setDemoBusy(false); }
             }} />
         </GlassCard>
-      }
+      ) : null}
       {!installed ? (
         <GlassCard testID="demo-role-entry" style={{ gap: space.sm }}>
           <DemoBanner />
