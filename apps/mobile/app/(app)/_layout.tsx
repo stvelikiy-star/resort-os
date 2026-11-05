@@ -53,7 +53,7 @@ export default function AppTabs() {
     {ORDER.map((key) => {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
-        title: copy[key], tabBarLabel: tabTitle(key), href: workspace.tabs.includes(key) ? undefined : null,
+        title: copy[key], tabBarLabel: tabTitle(key),
         // Keep overflow routes registered and navigable from More, but remove
         // their tab-bar slots entirely. A null button alone left empty flex
         // slots and compressed visible labels to "Об..." on 375 px phones.
