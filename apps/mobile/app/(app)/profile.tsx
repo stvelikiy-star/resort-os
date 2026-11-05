@@ -4,7 +4,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { LogOut, Repeat, Languages, Palette, ArrowLeftRight } from 'lucide-react-native';
 import Constants from 'expo-constants';
-import { Button, DemoBanner, SectionLabel, Segmented } from '../../src/components/ui';
+import { Button, DemoBanner, Segmented } from '../../src/components/ui';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
 import { Hero } from '../../src/components/Brand';
