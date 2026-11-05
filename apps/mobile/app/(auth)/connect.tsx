@@ -9,10 +9,9 @@ import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
 import { homeForSession } from '../../src/roles/registry';
 import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
-import { DEMO_HOTELS } from '../../src/api/hotels';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
-import { hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../../src/api/hotels';
+import { DEMO_HOTELS, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../../src/api/hotels';
 import { LOCALE_LABEL, LOCALES, Locale } from '../../src/i18n';
 
 export default function Connect() {
