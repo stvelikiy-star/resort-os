@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, UsersRound, ClipboardCheck } from 'lucide-react-native';
 import { Badge, Button, Card, Empty, PressScale, SectionLabel } from '../../src/components/ui';
 import { TaskCard } from '../../src/components/domain';
+import { demoTaskTitle } from '../../src/i18n/demoLabels';
 import { FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
@@ -19,7 +20,7 @@ export default function Admin() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api, user, hotel, serverAuthMode } = useSession();
+  const { api, user, hotel, serverAuthMode, locale } = useSession();
   const allowed = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).canManage;
   const [pick, setPick] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -85,7 +86,7 @@ export default function Admin() {
       {!tasks.loading && !tasks.error && queue.length === 0 ? <Empty text={t('common.empty')} /> : null}
       {queue.map((task) => (
         <View key={task.id} style={{ gap: space.sm }}>
-          <TaskCard task={task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })} />
+          <TaskCard task={api?.mode === 'DEMO' ? { ...task, title: demoTaskTitle(task.id, locale, task.title) } : task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })} />
           <View style={{ flexDirection: 'row', gap: space.sm }}>
             <View style={{ flex: 1 }}><Button testID={`approve-${task.id}`} label={t('tasks.approve')} icon={CheckCircle2} onPress={() => approve(task.id)} disabled={actionBusy || unknownResult} /></View>
             <View style={{ flex: 1 }}><Button label={t('tasks.reject')} variant="secondary" onPress={() => back(task.id)} disabled={actionBusy || unknownResult} /></View>
@@ -97,7 +98,7 @@ export default function Admin() {
       {!tasks.loading && !tasks.error && unassigned.length === 0 ? <Empty text={t('common.empty')} /> : null}
       {unassigned.map((task) => (
         <View key={task.id} style={{ gap: space.sm }}>
-          <TaskCard task={task} onPress={() => setPick(pick === task.id ? null : task.id)} />
+          <TaskCard task={api?.mode === 'DEMO' ? { ...task, title: demoTaskTitle(task.id, locale, task.title) } : task} onPress={() => setPick(pick === task.id ? null : task.id)} />
           {pick === task.id ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
               {eligibleStaff(task).map((m) => (
