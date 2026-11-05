@@ -27,7 +27,7 @@ export const workspaceFor = (role: Role): Workspace => WORKSPACES[role] ?? FIELD
  */
 const DEMO_SHOWCASE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
   OWNER: ['overview', 'pms', 'reception', 'inbox', 'admin', 'tasks', 'rooms', 'profile'],
-  MANAGER: ['overview', 'reception', 'pms', 'inbox', 'admin', 'tasks', 'requests', 'rooms', 'profile'],
+  MANAGER: ['overview', 'tasks', 'admin', 'inbox', 'pms', 'reception', 'requests', 'rooms', 'profile'],
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
