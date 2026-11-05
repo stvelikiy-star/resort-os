@@ -10,6 +10,7 @@ from verify_marina_customer_isolation import parse_env, path_overlap, validate_o
 def hotel(n):
     return {
         "PROPERTY_CODE": f"HOTEL_{n}", "COMPOSE_PROJECT_NAME": f"marina_hotel_{n}",
+        "MARINA_DEPLOYMENT_HOST_ID": f"synthetic-vm-{n}",
         "POSTGRES_DB": f"marina_hotel_{n}", "POSTGRES_USER": f"marina_{n}",
         "POSTGRES_PASSWORD": f"private-db-secret-{n}",
         "N8N_ENCRYPTION_KEY": f"private-encryption-secret-{n}",
@@ -45,6 +46,12 @@ class CustomerIsolationContract(unittest.TestCase):
         findings = " ".join(validate_pair(a, b))
         for marker in ("COMPOSE_PROJECT_NAME", "HOST_DATA_DIR", "AUTOMATION_SERVICE_KEY", "hostnames"):
             self.assertIn(marker, findings)
+
+    def test_two_customer_stacks_on_same_host_are_blocked_for_port_collision(self):
+        a, b = hotel(1), hotel(2)
+        b["MARINA_DEPLOYMENT_HOST_ID"] = a["MARINA_DEPLOYMENT_HOST_ID"]
+        findings = " ".join(validate_pair(a, b))
+        self.assertIn("80/443 collision", findings)
 
     def test_single_property_and_secure_cookie_required(self):
         a = hotel(1)
