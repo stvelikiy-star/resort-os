@@ -112,6 +112,9 @@ it('provisioned customer rejects direct DEMO selection and showroom launch witho
   await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id));
   fireEvent.press(screen.getByTestId('login'));
   await waitFor(()=>expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A'));
+  // LIVE sign-in deliberately revokes a stale host cookie once before login.
+  // Only additional revocations caused by forbidden DEMO entry would be a defect.
+  const logoutCountAtLogin = mockEvents.filter(x=>x==='logout-A').length;
   fireEvent.press(screen.getByTestId('select-demo'));
   await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('selected-demo-attempt'));
   expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
@@ -124,5 +127,5 @@ it('provisioned customer rejects direct DEMO selection and showroom launch witho
   await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('switch-demo-denied'));
   expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
   expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
-  expect(mockEvents).not.toContain('logout-A');
+  expect(mockEvents.filter(x=>x==='logout-A')).toHaveLength(logoutCountAtLogin);
 });
