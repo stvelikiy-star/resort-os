@@ -45,8 +45,8 @@ export const hasTab = (role: Role, tab: TabKey) => workspaceFor(role).tabs.inclu
 export const homeFor = (role: Role): `/${TabKey}` => ('/' + workspaceFor(role).tabs[0]) as `/${TabKey}`;
 
 const LIVE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
-  OWNER: ['overview', 'pms', 'inbox', 'admin', 'profile'],
-  MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'admin', 'profile'],
+  OWNER: ['overview', 'pms', 'inbox', 'admin', 'tasks', 'rooms', 'requests', 'profile'],
+  MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'rooms', 'requests', 'admin', 'profile'],
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
