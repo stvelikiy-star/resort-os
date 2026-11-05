@@ -1,13 +1,13 @@
 # MARINA SMART MOBILE · FUTURE LUXURY V3 — visual QA acceptance matrix
 
-**Scope:** `apps/mobile` only · Draft PR #342. The matrix contains **22 named routes**, rather than 21.
+**Scope:** `apps/mobile` only · Draft PR #342 and follow-up Draft PR #368. The matrix now tracks **23 named routes** including `/finance`.
 
 ## Evidence basis and strict distinctions
 
 The genuine screenshots below were captured from the **running Expo Web export** in headless Google Chrome, with a built-in **DEMO-only fixture** at localhost. They are **NOT Android**, not generated illustrations and not substituted for native visual evidence. The screen source was `1b55a5a48a4ca5c616d4b0d8aa179591882d82ef`, GitHub Actions [run 41875555127](https://github.com/stvelikiy-star/resort-os/actions/runs/41875555127), mobile-check job 126734622122. The screenshot assets and this report only add documentation, not executable UI changes.
 
-**Expo Web route QA:** 0 PASS / 0 FAIL / **11 PARTIAL** / **11 NOT TESTED**.
-**Android native visual QA:** 0 PASS / 0 FAIL / 0 PARTIAL / **22 NOT TESTED**.
+**Expo Web route QA (historical screenshot evidence across verified source SHAs):** 0 PASS / 0 FAIL / **18 PARTIAL** / **5 NOT TESTED**. New PR #368 matrix captures are not credited until its CI finishes.
+**Android native visual QA:** 0 PASS / 0 FAIL / 0 PARTIAL / **23 NOT TESTED**.
 **Screenshots:** 21 authentic Expo Web JPEGs, at 320 / 375 / 430 viewport widths, RU / KG / EN / KZ and light / dark where noted.
 
 **PARTIAL** means a screen was really rendered and captured in the safe DEMO context but the complete cross-product of viewport/font scale/locale/theme/data states/accessibility was not checked. **NOT TESTED** means the route was not actually rendered; source analysis and Jest never count as a visual PASS.
@@ -19,15 +19,16 @@ The genuine screenshots below were captured from the **running Expo Web export**
 | `/connect` | Select demo/trusted hotel | PARTIAL | NOT TESTED | [Web 1](qa-evidence/connect_ru_light_375.jpg) |
 | `/login` | All server-supported roles | PARTIAL | NOT TESTED | [Web 1](qa-evidence/login_en_dark_375.jpg) |
 | `/scan` | Hotel QR connection | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/overview` | OWNER/MANAGER | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/reception` | RECEPTION | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/pms` | OWNER/MANAGER/AGENT | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/overview` | OWNER/MANAGER | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web owner overview artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_overview_ru_light_375.jpg` |
+| `/reception` | RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web reception artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `reception_en_dark_375.jpg` |
+| `/pms` | OWNER/MANAGER/AGENT | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web PMS artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_pms_ru_light_375.jpg` |
 | `/new-booking` | Permitted booking creator | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
 | `/reservation/[id]` | Permitted booking detail | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
 | `/holds` | OWNER/MANAGER where server supported | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/inbox` | Permitted OWNER/MANAGER/RECEPTION | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/conversation/[id]` | Permitted inbox users | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/ai` | Permitted OWNER/MANAGER/RECEPTION | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/finance` | OWNER/MANAGER with FINANCE grant, LIVE only | NOT TESTED | NOT TESTED | New route in PR #368; no physical Android or LIVE screenshots |
+| `/inbox` | Permitted OWNER/MANAGER/RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web Inbox artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_inbox_ru_light_375.jpg` |
+| `/conversation/[id]` | Permitted inbox users | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web chat artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_conversation_ru_light_375.jpg` |
+| `/ai` | Permitted OWNER/MANAGER/RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web unavailable AI artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_ai_unavailable_ru_light_375.jpg` (offline, not LIVE) |
 | `/tasks` | MAID/TECHNICIAN and other permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_tasks_ru_light_375_after_tab_fix.jpg) · [Web 2](qa-evidence/maid_tasks_en_dark_375.jpg) · [Web 3](qa-evidence/tech_tasks_en_dark_375.jpg) |
 | `/task/[id]` | Permitted task detail | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_housekeeping_detail_en_dark_375.jpg) |
 | `/rooms` | Permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_rooms_en_dark_375_after_wrap_fix.jpg) |
@@ -35,9 +36,19 @@ The genuine screenshots below were captured from the **running Expo Web export**
 | `/requests` | TECHNICIAN and permitted maintenance staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/tech_repairs_en_dark_375.jpg) |
 | `/new-request` | Maintenance creator | PARTIAL | NOT TESTED | [Web 1](qa-evidence/tech_new_request_en_dark_320.jpg) · [Web 2](qa-evidence/tech_new_request_en_dark_375.jpg) · [After 320](qa-evidence/tech_new_request_en_dark_320_verified.jpg) |
 | `/admin` | OWNER/MANAGER if authorized | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_team_en_dark_320_after_nav_fix.jpg) · [Web 2](qa-evidence/manager_team_en_dark_375.jpg) · [Web 3](qa-evidence/manager_team_en_dark_430.jpg) · [Assign picker](qa-evidence/manager_assign_picker_en_dark_430_verified.jpg) |
-| `/dining` | COOK/WAITER/authorized management | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
+| `/dining` | COOK/WAITER/authorized management | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web kitchen artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `cook_orders_en_dark_375.jpg` |
 | `/profile` | All authenticated staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_profile_ru_light_375.jpg) · [Web 2](qa-evidence/manager_profile_ru_dark_375.jpg) · [Web 3](qa-evidence/manager_profile_kg_dark_375.jpg) · [Web 4](qa-evidence/manager_profile_kz_dark_375.jpg) · [Web 5](qa-evidence/manager_profile_en_dark_375.jpg) · [After sign-out](qa-evidence/manager_profile_ru_dark_375_verified.jpg) |
 | `/more` | Roles with >4 allowed navigation tabs | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_more_ru_light_375.jpg) |
+
+## PR #368 — P1 matrix provenance and acceptance (5 November 2026)
+
+**Verified prior-commit evidence:** 35 genuine Expo Web screenshot interactions from source SHA `b01bbcf6e14208dfd9aba0ad428fd89ed1063aec`, [workflow 41975002638](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914), synthetic local DEMO only. These images justify **PARTIAL**, not PASS, for seven formerly untested routes (overview/reception/pms/inbox/conversation/ai/dining). Exact filenames are named above; no LIVE/PMS data was accessed.
+
+**New matrix runner added:** `apps/mobile/scripts/qa-web-visual.mjs` records an exact-source `matrix-manifest.json` and individual JPEGs for reachable routes. Target combinations: 320/375/430 dp × light/dark × RU/KG/EN for overview, reception, pms, inbox, conversation, AI and dining; QR scan is attempted at 320/375/430 in RU/KG/EN with **dark only**. A successful Expo Web screenshot is never evidence of a native camera scan.
+
+**Remaining NOT TESTED:** `/new-booking`, `/reservation/[id]`, `/holds` have no safe authenticated DEMO flow that would prove operation; `/finance` requires a real FINANCE-authorized server session. The QR scan screenshots are **PENDING** until actual CI logs confirm captures. Do not assume those screenshots exist from configured test code alone.
+
+**Acceptance rule:** only mark new matrix items PARTIAL after a CI log confirms `WEB_VISUAL_CAPTURE` with exact route+locale+theme+width and the corresponding nonempty JPEG artifact. Historical and current artifacts must not be conflated. **All Android routes remain NOT TESTED** until actual-device screenshots and E2E checks.
 
 ## Confirmed UI fixes — same-condition before / after
 
