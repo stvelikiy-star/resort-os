@@ -1,0 +1,78 @@
+name: MARINA Shared Staff P0 Two-Hotel Lifecycle CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/marina_shared_staff_lifecycle_ci.py'
+      - 'services/api/app/staff_control.py'
+      - 'services/api/app/auth.py'
+      - 'services/api/app/shared_auth_preview.py'
+      - 'services/api/app/section_permissions.py'
+      - '.github/workflows/marina-shared-staff-lifecycle-p0-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-hotel-staff-lifecycle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      COOKIE_SECURE: 'true'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      PYTHONPATH: services/api:scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pin exact PR HEAD and create local-only synthetic owner password
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          pwd="synthetic-ci-only-$(openssl rand -hex 24)"
+          echo "::add-mask::$pwd"
+          echo "MARINA_SHARED_BROWSER_CI_PASSWORD=$pwd" >> "$GITHUB_ENV"
+      - name: Verify immutable RC3 source and historical migrations
+        run: python scripts/marina_rc3_source_gate.py
+      - name: Apply existing Prisma migrations to disposable empty PostgreSQL
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - name: Install canonical FastAPI dependencies
+        run: python -m pip install -r services/api/requirements.txt
+      - name: Verify role ceilings including all 12 server enum identities
+        run: python -m unittest discover -s scripts -p 'test_marina_shared_auth_role_ceiling.py' -v
+      - name: Seed TWO unrelated synthetic hotel owners and 12 server roles each
+        run: python scripts/marina_shared_live_browser_db.py seed
+      - name: Verify full real two-hotel staff creation and revocation contract
+        run: python scripts/marina_shared_staff_lifecycle_ci.py

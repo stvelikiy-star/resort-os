@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import uuid
@@ -8,8 +9,14 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles, router as auth_router
+from .auth import require_roles, router as auth_router, trusted_property_id
 from .db import lifespan
+from .shared_auth_preview import SharedAuthPreviewBoundary
+from .shared_guest_qr_rc4 import SharedGuestQrRc4Boundary
+from .shared_inbox_rc5 import SharedInboxRc5Boundary
+from .shared_green_rc6 import SharedGreenQrRc6Boundary
+from .shared_green_rc7 import SharedGreenWebhookRc7Boundary
+from .shared_green_rc8 import SharedGreenHumanOutboundRc8Boundary
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
@@ -17,7 +24,7 @@ MARKETING_POLICY_VERSION = os.environ.get("MARKETING_POLICY_VERSION", "2026-09-1
 MARKETING_CHANNELS = {"WHATSAPP", "EMAIL", "SMS", "TELEGRAM", "PHONE"}
 
 app = FastAPI(
-    title="Three Crowns Resort Core API",
+    title="MARINA SMART Core API",
     version="0.2.0",
     lifespan=lifespan,
 )
@@ -33,6 +40,29 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
+)
+# RC3 remains the exact default; RC4 only when explicitly requested in
+# reviewed, isolated shared staging. Every non-Guest request still uses RC3.
+app.add_middleware(
+    SharedGreenHumanOutboundRc8Boundary
+    if os.environ.get("MARINA_SHARED_GREEN_RC8_ENABLED") == "true"
+    else (
+        SharedGreenWebhookRc7Boundary
+        if os.environ.get("MARINA_SHARED_GREEN_RC7_ENABLED") == "true"
+        else (
+            SharedGreenQrRc6Boundary
+            if os.environ.get("MARINA_SHARED_GREEN_RC6_ENABLED") == "true"
+            else (
+                SharedInboxRc5Boundary
+                if os.environ.get("MARINA_SHARED_INBOX_RC5_ENABLED") == "true"
+                else (
+                    SharedGuestQrRc4Boundary
+                    if os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+                    else SharedAuthPreviewBoundary
+                )
+            )
+        )
+    )
 )
 app.include_router(auth_router)
 
@@ -125,7 +155,13 @@ async def price_room_type(conn, room_type_id, check_in: date, check_out: date) -
     reason = None
 
     for night in nights:
-        matched = next((r for r in rows if r["validFrom"] <= night <= r["validTo"]), None)
+        matches = [r for r in rows if r["validFrom"] <= night <= r["validTo"]]
+        if len(matches) > 1:
+            sellable = False
+            reason = "RATE_OVERLAP"
+            nightly.append({"date": night, "price_kgs": None, "status": "AMBIGUOUS"})
+            continue
+        matched = matches[0] if matches else None
         if not matched:
             sellable = False
             reason = "RATE_MISSING"
@@ -163,7 +199,7 @@ async def price_room_type(conn, room_type_id, check_in: date, check_out: date) -
 async def health(request: Request):
     async with request.app.state.db.acquire() as conn:
         await conn.fetchval("SELECT 1")
-    return {"status": "ok", "service": "three-crowns-core"}
+    return {"status": "ok", "service": "marina-smart-core"}
 
 
 @app.get("/api/v1/booking/check-availability")
@@ -186,14 +222,19 @@ async def check_availability(
             '''
             SELECT rt.id, rt.code, rt.name, rt."capacityAdults", rt."capacityChildren", rt."areaLabel",
                    r.id AS room_id, r.code AS room_code, r."buildingOrZone", r."floorLabel",
-                   r."bedConfiguration", r."operationalState"
+                   r."bedConfiguration", r."operationalState", r.notes AS room_notes
             FROM room_types rt
             JOIN rooms r ON r."roomTypeId" = rt.id
             WHERE rt."propertyId" = $1
-              AND rt."capacityAdults" >= $2
               AND (
-                  $3::int = 0
-                  OR (rt."capacityChildren" IS NOT NULL AND rt."capacityChildren" >= $3)
+                  $7::boolean = true
+                  OR (
+                      rt."capacityAdults" >= $2
+                      AND (
+                          $3::int = 0
+                          OR (rt."capacityChildren" IS NOT NULL AND rt."capacityChildren" >= $3)
+                      )
+                  )
               )
               AND ($4::text IS NULL OR rt.code = $4)
               AND r."operationalState" <> 'TECH_BLOCK'
@@ -213,10 +254,21 @@ async def check_availability(
             room_type_code,
             check_in,
             check_out,
+            PROPERTY_CODE == "AK_BERMET_TEST",
         )
 
         grouped: dict[str, dict[str, Any]] = {}
         for row in rows:
+            room_max_capacity = None
+            if PROPERTY_CODE == "AK_BERMET_TEST":
+                try:
+                    metadata = json.loads(row["room_notes"] or "{}")
+                    room_max_capacity = int(metadata["max_capacity"])
+                except (TypeError, ValueError, KeyError, json.JSONDecodeError):
+                    continue
+                if adults + children > room_max_capacity:
+                    continue
+
             key = str(row["id"])
             if key not in grouped:
                 grouped[key] = {
@@ -237,6 +289,7 @@ async def check_availability(
                     "floor": row["floorLabel"],
                     "beds_raw": row["bedConfiguration"],
                     "operational_state": str(row["operationalState"]),
+                    "max_capacity": room_max_capacity,
                 }
             )
 
@@ -244,6 +297,15 @@ async def check_availability(
         for item in grouped.values():
             pricing = await price_room_type(conn, item["room_type_id"], check_in, check_out)
             item["available_count"] = len(item["available_rooms"])
+            manager_confirmation_required = (
+                PROPERTY_CODE == "AK_BERMET_TEST"
+                and (children > 0 or adults + children > int(item["capacity_adults"]))
+            )
+            pricing["manager_confirmation_required"] = manager_confirmation_required
+            if manager_confirmation_required:
+                pricing["confirmation_reason"] = (
+                    "AK_BERMET_CHILD_OR_EXTRA_PLACE_PRICING_REQUIRES_MANAGER_CONFIRMATION"
+                )
             item["pricing"] = pricing
             item["children_requested"] = children
             result.append(item)
@@ -255,7 +317,11 @@ async def check_availability(
         "nights": (check_out - check_in).days,
         "adults": adults,
         "children": children,
-        "children_capacity_policy": "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED",
+        "children_capacity_policy": (
+            "AK_BERMET_CONFIRMED_ROOM_MAX_CAPACITY"
+            if PROPERTY_CODE == "AK_BERMET_TEST"
+            else "CONFIRMED_CAPACITY_REQUIRED_WHEN_CHILDREN_REQUESTED"
+        ),
         "results": result,
         "rule": "Availability is informational until a paid reservation is created. An unpaid request is not a reservation.",
     }
@@ -364,15 +430,24 @@ async def pms_grid(
     end: date,
     room_type_code: str | None = None,
     operational_state: str | None = None,
-    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER")),
+    _user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", "RECEPTION", "AGENT")),
 ):
     if end <= start:
         raise HTTPException(status_code=422, detail="end must be after start")
     if (end - start).days > 62:
         raise HTTPException(status_code=422, detail="grid window is limited to 62 days")
 
+    linked_agent_id = None
     async with request.app.state.db.acquire() as conn:
-        property_id = await get_property_id(conn)
+        property_id = await trusted_property_id(conn, _user)
+        if _user["role"] == "AGENT":
+            linked_agent_id = await conn.fetchval(
+                'SELECT "bookingAgentId" FROM staff_users WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
+                _user["id"],
+                property_id,
+            )
+            if not linked_agent_id:
+                raise HTTPException(status_code=403, detail="Agent account is not linked to an active booking agent")
         rooms = await conn.fetch(
             '''
             SELECT r.id, r.code, r.name, r."buildingOrZone", r."floorLabel",
@@ -394,10 +469,13 @@ async def pms_grid(
             '''
             SELECT ib.id, ib."roomId", ib."blockType", ib."startDate", ib."endDate", ib.reason,
                    res.id AS reservation_id, res."bookingNumber", res.status AS reservation_status,
+                   res."agentId" AS reservation_agent_id,
+                   rr.source AS channel_source,
                    g."firstName", g."lastName", g.phone
             FROM inventory_blocks ib
             JOIN rooms r ON r.id = ib."roomId"
             LEFT JOIN reservations res ON res.id = ib."reservationId"
+            LEFT JOIN reservation_requests rr ON rr.id = res."requestId"
             LEFT JOIN guests g ON g.id = res."primaryGuestId"
             WHERE r."propertyId" = $1
               AND ib.active = true
@@ -412,24 +490,31 @@ async def pms_grid(
     blocks_by_room: dict[str, list[dict[str, Any]]] = {}
     for block in blocks:
         room_id = str(block["roomId"])
-        guest_name = " ".join(filter(None, [block["firstName"], block["lastName"]])) or None
+        own_agent_booking = (
+            _user["role"] != "AGENT"
+            or (linked_agent_id is not None and block["reservation_agent_id"] == linked_agent_id)
+        )
+        guest_name = (
+            " ".join(filter(None, [block["firstName"], block["lastName"]])) or None
+        ) if own_agent_booking else None
         blocks_by_room.setdefault(room_id, []).append(
             {
                 "id": str(block["id"]),
                 "type": str(block["blockType"]),
                 "start": block["startDate"],
                 "end": block["endDate"],
-                "reason": block["reason"],
-                "reservation_id": str(block["reservation_id"]) if block["reservation_id"] else None,
-                "booking_number": block["bookingNumber"],
+                "reason": block["reason"] if _user["role"] != "AGENT" else None,
+                "reservation_id": str(block["reservation_id"]) if block["reservation_id"] and own_agent_booking else None,
+                "booking_number": block["bookingNumber"] if own_agent_booking else None,
                 "reservation_status": str(block["reservation_status"]) if block["reservation_status"] else None,
                 "guest_name": guest_name,
-                "guest_phone": block["phone"],
+                "guest_phone": block["phone"] if own_agent_booking else None,
+                "channel_source": block["channel_source"] if own_agent_booking else None,
             }
         )
 
     return {
-        "property": PROPERTY_CODE,
+        "property": _user["property_code"],
         "start": start,
         "end": end,
         "rooms": [

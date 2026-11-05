@@ -37,7 +37,7 @@ async def _hotel_local_date(conn, property_id: uuid.UUID):
 
 async def _published_menu_rows(conn, property_id: uuid.UUID, service_date):
     return await conn.fetch(
-        '''SELECT m.id,m.code,m.category,m."nameRu",m."nameKg",m."nameEn",m."priceKgs",m."isActive",m."isDraft",m."sortOrder",
+        '''SELECT m.id,m.code,m.category,m."nameRu",m."nameKg",m."nameKz",m."nameEn",m."priceKgs",m."isActive",m."isDraft",m."sortOrder",
                   array_agg(DISTINCT a."mealType" ORDER BY a."mealType") AS meal_types
            FROM kitchen_menu_items m
            JOIN kitchen_menu_availability a ON a."menuItemId"=m.id AND a."propertyId"=m."propertyId"
@@ -56,6 +56,7 @@ def _menu_item(row) -> dict[str, Any]:
         "category": row["category"],
         "name_ru": row["nameRu"],
         "name_kg": row["nameKg"],
+        "name_kz": row["nameKz"],
         "name_en": row["nameEn"],
         "price_kgs": row["priceKgs"],
         "is_active": row["isActive"],

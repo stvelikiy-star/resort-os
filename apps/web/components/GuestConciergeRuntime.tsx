@@ -1,12 +1,17 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import GuestAiAssistant from "./GuestAiAssistant";
 
-type Locale = "ru" | "kg" | "en";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { MARINA_GUEST_LOCALES, MarinaGuestLocale, marinaGuestIntlLocale, useMarinaGuestLocale } from "../lib/marinaGuestLocale";
+
+type Locale = MarinaGuestLocale;
 type RequestCode = "HOUSEKEEPING" | "TOWELS" | "LINEN" | "MAINTENANCE" | "TRANSFER" | "MEALS" | "PARKING" | "SAUNA" | "BILLIARDS" | "EXCURSIONS" | "ADMIN";
 type RequestStatus = "OPEN" | "IN_PROGRESS" | "IN_INSPECTION" | "DONE" | "CANCELLED";
 
 type GuestContext = {
+  guest_capabilities?: { request_codes: RequestCode[]; ai_available: boolean } | null;
+  property?: { name: string; check_out_time?: string | null; official_contact?: string; whatsapp?: string; checkout_instructions?: string } | null;
   qr_valid: boolean;
   authenticated: boolean;
   verification_required: boolean;
@@ -28,15 +33,10 @@ type GuestRequest = {
 
 type Service = { code: RequestCode; icon: string; title: string; note: string };
 
-const STORAGE_KEY = "three-crowns-guest-language";
-const SITE_STORAGE_KEY = "three-crowns-site-language";
-const HOTEL_PHONE_E164 = "+996558085002";
-const HOTEL_WHATSAPP_URL = "https://wa.me/996558085002";
-
 const COPY = {
   ru: {
-    property: "Три Короны",
-    product: "Цифровой консьерж",
+    property: "MARINA SMART",
+    product: "MARINA SMART · гостевой кабинет",
     language: "Язык",
     loading: "Открываем цифровой консьерж…",
     invalidTitle: "Код номера недоступен",
@@ -58,7 +58,7 @@ const COPY = {
     stay: "Ваше проживание",
     from: "с",
     to: "по",
-    checkout: "Выезд до 12:00",
+    checkout: "Выезд до",
     quick: "Что нужно сейчас?",
     quickNote: "Большинство услуг можно запросить за несколько нажатий.",
     myRequests: "Мои заявки",
@@ -76,15 +76,15 @@ const COPY = {
     cancel: "Отменить",
     close: "Закрыть",
     mealsTitle: "Питание",
-    mealsNote: "Выберите приём пищи и количество гостей. Конкретное меню подтверждает столовая.",
+    mealsNote: "Выберите приём пищи и количество гостей. Меню, доступность и стоимость подтверждает столовая.",
     meal: "Приём пищи",
     breakfast: "Завтрак",
     lunch: "Обед",
     dinner: "Ужин",
     adults: "Взрослые",
     children: "Дети",
-    estimated: "Расчёт по действующему прайсу",
-    mealWarning: "Включённое в проживание питание определяется вашей бронью. Здесь показана стоимость дополнительного питания.",
+    estimated: "Стоимость",
+    mealWarning: "Включённое в проживание питание определяется вашей бронью. Стоимость дополнительного питания подтверждает столовая.",
     transferTitle: "Трансфер",
     origin: "Откуда",
     destination: "Куда",
@@ -94,12 +94,12 @@ const COPY = {
     manas: "Аэропорт Манас",
     tamchy: "Аэропорт Тамчы",
     bishkek: "Бишкек",
-    hotel: "Три Короны",
+    hotel: "MARINA SMART",
     other: "Другое место",
     luggage: "Багаж / особые пожелания",
     serviceInfo: "После отправки сотрудник подтвердит доступность, время и окончательные условия.",
     rules: "Правила и информация",
-    rulesText: "Заезд с 14:00. Выезд до 12:00. По вопросам проживания, услуг и безопасности обращайтесь на ресепшен.",
+    rulesText: "По вопросам проживания, услуг и безопасности обращайтесь на ресепшен.",
     contacts: "Связаться с отелем",
     call: "Позвонить на ресепшен",
     message: "Написать менеджеру",
@@ -120,30 +120,30 @@ const COPY = {
     },
   },
   kg: {
-    property: "Үч Таажы",
-    product: "Санарип жардамчы",
+    property: "MARINA SMART",
+    product: "MARINA SMART · конок кабинети",
     language: "Тил",
     loading: "Санарип жардамчы ачылууда…",
     invalidTitle: "Бөлмө коду жеткиликсиз",
-    invalidText: "Код табылган жок же алмаштырылган. Ресепшенге кайрылыңыз.",
+    invalidText: "Код табылган жок же алмаштырылган. Кабыл алуу кызматына кайрылыңыз.",
     noStayTitle: "Бөлмө кийинки конокко даяр",
     noStayText: "Азыр бул бөлмөдө активдүү жашоо жок.",
     room: "Бөлмө",
     verifyTitle: "Жашооңузду ырастаңыз",
-    verifyText: "Катталууда ресепшенден алган алты орундуу кодду киргизиңиз.",
+    verifyText: "Катталууда кабыл алуу кызматынан алган алты орундуу кодду киргизиңиз.",
     pin: "Конок коду",
     open: "Кабинетти ачуу",
     checking: "Текшерилүүдө…",
-    wrong: "Код туура эмес. Сандарды текшериңиз же ресепшенге кайрылыңыз.",
-    expired: "Коддун мөөнөтү бүттү. Ресепшенден жаңы код сураңыз.",
-    limited: "Аракеттер өтө көп болду. Кийин аракет кылыңыз же ресепшенге кайрылыңыз.",
+    wrong: "Код туура эмес. Сандарды текшериңиз же кабыл алуу кызматына кайрылыңыз.",
+    expired: "Коддун мөөнөтү бүттү. Кабыл алуу кызматынан жаңы код сураңыз.",
+    limited: "Аракеттер өтө көп болду. Кийин кайра аракет кылыңыз же кабыл алуу кызматына кайрылыңыз.",
     error: "Кабинет ачылган жок. Байланышты текшерип, кайра аракет кылыңыз.",
     retry: "Кайра аракет кылуу",
     hello: "Кош келиңиз",
     stay: "Сиздин жашооңуз",
     from: "баштап",
     to: "чейин",
-    checkout: "Чыгуу саат 12:00гө чейин",
+    checkout: "Чыгуу убактысы:",
     quick: "Азыр эмне керек?",
     quickNote: "Көпчүлүк кызматтарды бир нече басуу менен сураса болот.",
     myRequests: "Менин өтүнмөлөрүм",
@@ -153,23 +153,23 @@ const COPY = {
     service: "Кызмат",
     date: "Күн",
     time: "Убакыт",
-    comment: "Комментарий",
+    comment: "Түшүндүрмө",
     commentPlaceholder: "Керек болсо маалымат кошуңуз",
     send: "Жөнөтүү",
     sending: "Жөнөтүлүүдө…",
-    sent: "Өтүнмө жөнөтүлдү. Абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
+    sent: "Өтүнмө жөнөтүлдү. Анын абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
     cancel: "Жокко чыгаруу",
     close: "Жабуу",
     mealsTitle: "Тамактануу",
-    mealsNote: "Тамактануу убактысын жана коноктордун санын тандаңыз. Так менюну ашкана ырастайт.",
+    mealsNote: "Тамактануу түрүн жана коноктордун санын тандаңыз. Менюну, жеткиликтүүлүктү жана бааны ашкана ырастайт.",
     meal: "Тамактануу",
     breakfast: "Эртең мененки тамак",
     lunch: "Түшкү тамак",
     dinner: "Кечки тамак",
     adults: "Чоңдор",
     children: "Балдар",
-    estimated: "Учурдагы баа боюнча эсеп",
-    mealWarning: "Жашоого кирген тамактануу сиздин бронуңуз боюнча аныкталат. Бул жерде кошумча тамактануунун баасы көрсөтүлөт.",
+    estimated: "Баасы",
+    mealWarning: "Жашоого кирген тамактануу сиздин бронуңуз боюнча аныкталат. Кошумча тамактануунун баасын ашкана ырастайт.",
     transferTitle: "Трансфер",
     origin: "Кайдан",
     destination: "Кайда",
@@ -179,14 +179,14 @@ const COPY = {
     manas: "Манас аэропорту",
     tamchy: "Тамчы аэропорту",
     bishkek: "Бишкек",
-    hotel: "Үч Таажы",
+    hotel: "MARINA SMART",
     other: "Башка жер",
     luggage: "Жүк / өзгөчө каалоо",
     serviceInfo: "Жөнөткөндөн кийин кызматкер жеткиликтүүлүктү, убакытты жана акыркы шарттарды ырастайт.",
     rules: "Эрежелер жана маалымат",
-    rulesText: "Кирүү саат 14:00дөн. Чыгуу саат 12:00гө чейин. Жашоо, кызматтар жана коопсуздук боюнча ресепшенге кайрылыңыз.",
+    rulesText: "Жашоо, кызматтар жана коопсуздук боюнча кабыл алуу кызматына кайрылыңыз.",
     contacts: "Мейманкана менен байланыш",
-    call: "Ресепшенге чалуу",
+    call: "Кабыл алуу кызматына чалуу",
     message: "Менеджерге жазуу",
     signOut: "Конок кирүүсүн жабуу",
     status: { OPEN: "Кабыл алынды", IN_PROGRESS: "Аткарылууда", IN_INSPECTION: "Текшерүүдө", DONE: "Аткарылды", CANCELLED: "Жокко чыгарылды" },
@@ -204,9 +204,94 @@ const COPY = {
       ADMIN: ["Жардам", "Администратор менен байланышуу"],
     },
   },
+  kz: {
+    property: "MARINA SMART",
+    product: "MARINA SMART · қонақ кабинеті",
+    language: "Тіл",
+    loading: "Цифрлық консьерж ашылуда…",
+    invalidTitle: "Бөлме коды қолжетімсіз",
+    invalidText: "Код табылмады немесе ауыстырылды. Қабылдау бөліміне хабарласыңыз.",
+    noStayTitle: "Бөлме келесі қонаққа дайын",
+    noStayText: "Қазір бұл бөлмеге белсенді тұру тіркелмеген.",
+    room: "Бөлме",
+    verifyTitle: "Тұруыңызды растаңыз",
+    verifyText: "Орналасу кезінде қабылдау бөлімінен алған алты таңбалы кодты енгізіңіз.",
+    pin: "Қонақ коды",
+    open: "Кабинетті ашу",
+    checking: "Тексерілуде…",
+    wrong: "Код сәйкес келмеді. Сандарды тексеріңіз немесе қабылдау бөліміне хабарласыңыз.",
+    expired: "Кодтың мерзімі аяқталды. Қабылдау бөлімінен жаңа код сұраңыз.",
+    limited: "Әрекет саны тым көп. Кейінірек қайталаңыз немесе қабылдау бөліміне хабарласыңыз.",
+    error: "Кабинетті жүктеу мүмкін болмады. Байланысты тексеріп, қайта көріңіз.",
+    retry: "Қайталау",
+    hello: "Қош келдіңіз",
+    stay: "Сіздің тұруыңыз",
+    from: "бастап",
+    to: "дейін",
+    checkout: "Шығу уақыты:",
+    quick: "Қазір не қажет?",
+    quickNote: "Қызметтердің көбін бірнеше рет басу арқылы сұратуға болады.",
+    myRequests: "Менің өтінімдерім",
+    noRequests: "Әзірге өтінімдер жоқ.",
+    refresh: "Жаңарту",
+    newRequest: "Жаңа өтінім",
+    service: "Қызмет",
+    date: "Күн",
+    time: "Уақыт",
+    comment: "Түсініктеме",
+    commentPlaceholder: "Қажет болса, қосымша мәлімет жазыңыз",
+    send: "Жіберу",
+    sending: "Жіберілуде…",
+    sent: "Өтінім жіберілді. Күйі «Менің өтінімдерім» бөлімінде көрінеді.",
+    cancel: "Бас тарту",
+    close: "Жабу",
+    mealsTitle: "Тамақтану",
+    mealsNote: "Тамақтану түрін және қонақтар санын таңдаңыз. Мәзірді, қолжетімділікті және құнын асүй қызметі растайды.",
+    meal: "Тамақтану",
+    breakfast: "Таңғы ас",
+    lunch: "Түскі ас",
+    dinner: "Кешкі ас",
+    adults: "Ересектер",
+    children: "Балалар",
+    estimated: "Құны",
+    mealWarning: "Тұруға кіретін тамақтану сіздің броніңізге байланысты. Қосымша тамақтану құнын асхана растайды.",
+    transferTitle: "Трансфер",
+    origin: "Қайдан",
+    destination: "Қайда",
+    vehicle: "Көлік",
+    sedan: "Седан",
+    minivan: "Минивэн",
+    manas: "Манас әуежайы",
+    tamchy: "Тамчы әуежайы",
+    bishkek: "Бішкек",
+    hotel: "MARINA SMART",
+    other: "Басқа орын",
+    luggage: "Жүк / ерекше тілек",
+    serviceInfo: "Жіберілгеннен кейін қызметкер қолжетімділікті, уақытты және соңғы шарттарды растайды.",
+    rules: "Ережелер мен ақпарат",
+    rulesText: "Тұру, қызметтер және қауіпсіздік мәселелері бойынша қабылдау бөліміне хабарласыңыз.",
+    contacts: "Қонақүймен байланысу",
+    call: "Қабылдау бөліміне қоңырау шалу",
+    message: "Менеджерге жазу",
+    signOut: "Қонақ қолжетімділігін жабу",
+    status: { OPEN: "Қабылданды", IN_PROGRESS: "Жұмыста", IN_INSPECTION: "Тексеруде", DONE: "Орындалды", CANCELLED: "Бас тартылды" },
+    services: {
+      HOUSEKEEPING: ["Тазалау", "Бөлмені ыңғайлы уақытта тазалау"],
+      TOWELS: ["Сүлгілер", "Таза сүлгі әкелу"],
+      LINEN: ["Төсек-орын", "Төсек-орынды ауыстыру"],
+      MAINTENANCE: ["Жөндеу", "Бөлмедегі мәселе туралы хабарлау"],
+      MEALS: ["Тамақтану", "Таңғы, түскі немесе кешкі ас"],
+      TRANSFER: ["Трансфер", "Әуежайға немесе қалаға бару"],
+      SAUNA: ["Сауна", "Ыңғайлы уақытты сұрату"],
+      BILLIARDS: ["Бильярд", "Келу уақытын сұрату"],
+      EXCURSIONS: ["Экскурсиялар", "Сапарды таңдау және сұрату"],
+      PARKING: ["Тұрақ", "Тұраққа көмектесу"],
+      ADMIN: ["Көмек", "Әкімшімен байланысу"],
+    },
+  },
   en: {
-    property: "Three Crowns",
-    product: "Digital concierge",
+    property: "MARINA SMART",
+    product: "MARINA SMART · Guest area",
     language: "Language",
     loading: "Opening your digital concierge…",
     invalidTitle: "Room code unavailable",
@@ -228,7 +313,7 @@ const COPY = {
     stay: "Your stay",
     from: "from",
     to: "to",
-    checkout: "Check-out by 12:00",
+    checkout: "Check-out by",
     quick: "What do you need now?",
     quickNote: "Most hotel services can be requested in just a few taps.",
     myRequests: "My requests",
@@ -246,15 +331,15 @@ const COPY = {
     cancel: "Cancel",
     close: "Close",
     mealsTitle: "Dining",
-    mealsNote: "Choose a meal and number of guests. The dining team confirms the actual menu.",
+    mealsNote: "Choose a meal and number of guests. The dining team confirms the menu, availability and price.",
     meal: "Meal",
     breakfast: "Breakfast",
     lunch: "Lunch",
     dinner: "Dinner",
     adults: "Adults",
     children: "Children",
-    estimated: "Estimate from the current price list",
-    mealWarning: "Meal inclusion depends on your reservation. The prices shown here are for additional meals.",
+    estimated: "Price",
+    mealWarning: "Meal inclusion depends on your reservation. The dining team confirms the price of additional meals.",
     transferTitle: "Transfer",
     origin: "From",
     destination: "To",
@@ -264,12 +349,12 @@ const COPY = {
     manas: "Manas Airport",
     tamchy: "Tamchy Airport",
     bishkek: "Bishkek",
-    hotel: "Three Crowns",
+    hotel: "MARINA SMART",
     other: "Other location",
     luggage: "Luggage / special request",
     serviceInfo: "After submission, staff will confirm availability, timing and final conditions.",
     rules: "Rules and information",
-    rulesText: "Check-in is from 14:00. Check-out is by 12:00. Contact reception for stay, service or safety questions.",
+    rulesText: "Contact reception for stay, service or safety questions.",
     contacts: "Contact the hotel",
     call: "Call reception",
     message: "Message manager",
@@ -294,21 +379,12 @@ const COPY = {
 const SERVICE_ORDER: RequestCode[] = ["MEALS", "HOUSEKEEPING", "TRANSFER", "MAINTENANCE", "SAUNA", "EXCURSIONS", "TOWELS", "LINEN", "BILLIARDS", "ADMIN"];
 const SERVICE_ICONS: Record<RequestCode, string> = { MEALS: "🍽", HOUSEKEEPING: "✦", TRANSFER: "↗", MAINTENANCE: "⌁", SAUNA: "♨", EXCURSIONS: "⌖", TOWELS: "▤", LINEN: "▧", BILLIARDS: "●", PARKING: "P", ADMIN: "?" };
 
-function initialLocale(): Locale {
-  if (typeof window === "undefined") return "ru";
-  const query = new URLSearchParams(window.location.search).get("lang");
-  if (query === "ru" || query === "kg" || query === "en") return query;
-  const local = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(SITE_STORAGE_KEY);
-  return local === "kg" || local === "en" ? local : "ru";
-}
-
 function dateLabel(value: string, locale: Locale) {
-  const lang = locale === "kg" ? "ky-KG" : locale === "en" ? "en-GB" : "ru-RU";
-  return new Date(`${value}T00:00:00`).toLocaleDateString(lang, { day: "numeric", month: "short" });
+  return new Date(`${value}T00:00:00`).toLocaleDateString(marinaGuestIntlLocale(locale), { day: "numeric", month: "short" });
 }
 
 export default function GuestConciergeRuntime({ token }: { token: string }) {
-  const [locale, setLocale] = useState<Locale>("ru");
+  const [locale, chooseLocale] = useMarinaGuestLocale();
   const [context, setContext] = useState<GuestContext | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "invalid" | "error">("loading");
   const [pin, setPin] = useState("");
@@ -328,15 +404,16 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   const [destination, setDestination] = useState("tamchy");
   const [vehicle, setVehicle] = useState("sedan");
 
-  useEffect(() => setLocale(initialLocale()), []);
   const copy = COPY[locale];
-
-  function chooseLocale(next: Locale) {
-    setLocale(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
-    window.localStorage.setItem(SITE_STORAGE_KEY, next);
-    document.documentElement.lang = next === "kg" ? "ky" : next;
-  }
+  const propertyName = context?.property?.name || copy.property;
+  const officialContact = context?.property?.official_contact?.trim() || "";
+  const phoneCandidate = officialContact.replace(/[\s().-]/g, "");
+  const phone = /^\+?[0-9]{7,15}$/.test(phoneCandidate) ? phoneCandidate : null;
+  const whatsappCandidate = (context?.property?.whatsapp || "").trim();
+  const whatsappDigits = whatsappCandidate.replace(/[\s()+.-]/g, "");
+  const whatsapp = /^[0-9]{7,15}$/.test(whatsappDigits)
+    ? `https://wa.me/${whatsappDigits}`
+    : /^https:\/\/wa\.me\/[0-9]{7,15}$/.test(whatsappCandidate) ? whatsappCandidate : null;
 
   const loadContext = useCallback(async () => {
     try {
@@ -378,14 +455,9 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
         return;
       }
       setPin(""); await loadContext();
+      window.dispatchEvent(new Event("marina:guest-session-updated"));
     } catch { setPinMessage(copy.error); }
     finally { setChecking(false); }
-  }
-
-  function mealPrice() {
-    const adult = meal === "breakfast" ? 500 : meal === "lunch" ? 750 : 650;
-    const child = meal === "breakfast" ? 400 : meal === "lunch" ? 550 : 450;
-    return adult * adults + child * children;
   }
 
   function descriptionFor(code: RequestCode) {
@@ -394,8 +466,8 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
       return `${mealName}; ${copy.adults}: ${adults}; ${copy.children}: ${children}${comment.trim() ? `; ${copy.comment}: ${comment.trim()}` : ""}`;
     }
     if (code === "TRANSFER") {
-      const from = copy[origin as "hotel" | "manas" | "tamchy" | "bishkek" | "other"];
-      const to = copy[destination as "hotel" | "manas" | "tamchy" | "bishkek" | "other"];
+      const from = origin === "hotel" ? propertyName : copy[origin as "manas" | "tamchy" | "bishkek" | "other"];
+      const to = destination === "hotel" ? propertyName : copy[destination as "manas" | "tamchy" | "bishkek" | "other"];
       const car = vehicle === "minivan" ? copy.minivan : copy.sedan;
       return `${copy.origin}: ${from}; ${copy.destination}: ${to}; ${copy.vehicle}: ${car}${comment.trim() ? `; ${copy.luggage}: ${comment.trim()}` : ""}`;
     }
@@ -426,14 +498,18 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
   async function logout() {
     await fetch("/core/api/v1/guest-os/logout", { method: "POST", credentials: "include" }).catch(() => null);
     setContext(null); setRequests([]); await loadContext();
+    window.dispatchEvent(new Event("marina:guest-session-updated"));
   }
 
-  const services: Service[] = useMemo(() => SERVICE_ORDER.map((code) => ({ code, icon: SERVICE_ICONS[code], title: copy.services[code][0], note: copy.services[code][1] })), [copy]);
+  const reviewedCodes = context?.guest_capabilities?.request_codes;
+  const services: Service[] = useMemo(() => SERVICE_ORDER
+    .filter((code) => reviewedCodes === undefined || reviewedCodes === null || reviewedCodes.includes(code))
+    .map((code) => ({ code, icon: SERVICE_ICONS[code], title: copy.services[code][0], note: copy.services[code][1] })), [copy, reviewedCodes]);
 
   return <main className="concierge-page">
     <header className="concierge-topbar">
-      <div className="concierge-brand"><span>III</span><div><strong>{copy.property}</strong><small>{copy.product}</small></div></div>
-      <div className="concierge-langs" aria-label={copy.language}>{(["ru", "kg", "en"] as Locale[]).map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
+      <div className="concierge-brand"><span>III</span><div><strong>{propertyName}</strong><small>{copy.product}</small></div></div>
+      <div className="concierge-langs" aria-label={copy.language}>{MARINA_GUEST_LOCALES.map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
     </header>
 
     {state === "loading" && <section className="concierge-state">{copy.loading}</section>}
@@ -451,20 +527,21 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
     {state === "ready" && context?.authenticated && context.stay && <>
       <section className="concierge-hero">
         <div><p>{copy.hello}{context.guest?.first_name ? `, ${context.guest.first_name}` : ""}</p><h1>{copy.room} {context.room.code}</h1></div>
-        <div className="concierge-stay"><strong>{copy.stay}</strong><span>{dateLabel(context.stay.check_in, locale)} — {dateLabel(context.stay.check_out, locale)}</span><small>{copy.checkout}</small></div>
+        <div className="concierge-stay"><strong>{copy.stay}</strong><span>{dateLabel(context.stay.check_in, locale)} — {dateLabel(context.stay.check_out, locale)}</span>{context.property?.check_out_time && <small>{copy.checkout} {context.property.check_out_time}</small>}</div>
       </section>
 
-      <section className="concierge-section"><div className="concierge-heading"><div><h2>{copy.quick}</h2><p>{copy.quickNote}</p></div></div><div className="concierge-actions">{services.slice(0, 6).map((service) => <button key={service.code} onClick={() => { setSelected(service.code); setNotice(null); }}><span>{service.icon}</span><strong>{service.title}</strong><small>{service.note}</small></button>)}</div></section>
+      <section className="concierge-section"><div className="concierge-heading"><div><h2>{copy.quick}</h2><p>{copy.quickNote}</p></div></div><div className="concierge-actions">{services.slice(0, 6).map((service) => <button key={service.code} data-service-code={service.code} onClick={() => { setSelected(service.code); setNotice(null); }}><span>{service.icon}</span><strong>{service.title}</strong><small>{service.note}</small></button>)}</div></section>
 
       <section className="concierge-section concierge-requests"><div className="concierge-heading"><h2>{copy.myRequests}</h2><button onClick={() => void loadRequests()}>{copy.refresh}</button></div>{!requests.length ? <p className="concierge-empty">{copy.noRequests}</p> : <div className="concierge-request-list">{requests.map((item) => { const code = (SERVICE_ORDER.includes(item.request_code as RequestCode) || item.request_code === "PARKING" ? item.request_code : "ADMIN") as RequestCode; return <article key={item.id}><div><strong>{copy.services[code][0]}</strong><span data-status={item.status}>{copy.status[item.status]}</span></div>{item.description && <p>{item.description}</p>} {item.status === "OPEN" && <button onClick={() => void cancelRequest(item.id)}>{copy.cancel}</button>}</article>; })}</div>}</section>
 
-      <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p></article><article><h3>{copy.contacts}</h3><a href={`tel:${HOTEL_PHONE_E164}`}>{copy.call}</a><a href={HOTEL_WHATSAPP_URL} target="_blank" rel="noreferrer">{copy.message}</a></article></div></section>
+      <section className="concierge-section"><div className="concierge-heading"><h2>{copy.rules}</h2></div><div className="concierge-info-grid"><article><p>{copy.rulesText}</p>{context.property?.checkout_instructions && <p>{context.property.checkout_instructions}</p>}</article><article><h3>{copy.contacts}</h3>{officialContact && <p>{officialContact}</p>}{phone && <a href={`tel:${phone}`}>{copy.call}</a>}{whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer">{copy.message}</a>}</article></div></section>
+      {context.guest_capabilities?.ai_available !== false && <GuestAiAssistant key={token} token={token} locale={locale} onSessionExpired={() => { setContext(null); setRequests([]); void loadContext(); }} />}
       <button className="concierge-signout" onClick={() => void logout()}>{copy.signOut}</button>
     </>}
 
     {selected && <div className="concierge-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) setSelected(null); }}><section className="concierge-modal" role="dialog" aria-modal="true"><div className="concierge-modal-head"><div><small>{copy.newRequest}</small><h2>{selected === "MEALS" ? copy.mealsTitle : selected === "TRANSFER" ? copy.transferTitle : copy.services[selected][0]}</h2></div><button onClick={() => setSelected(null)} aria-label={copy.close}>×</button></div><p>{selected === "MEALS" ? copy.mealsNote : selected === "TRANSFER" ? copy.serviceInfo : copy.services[selected][1]}</p><form onSubmit={sendRequest}>
-      {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{mealPrice().toLocaleString()} сом</strong><small>{copy.mealWarning}</small></div></>}
-      {selected === "TRANSFER" && <><div className="concierge-two"><label>{copy.origin}<select value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label><label>{copy.destination}<select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="hotel">{copy.hotel}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label></div><label>{copy.vehicle}<select value={vehicle} onChange={(e) => setVehicle(e.target.value)}><option value="sedan">{copy.sedan}</option><option value="minivan">{copy.minivan}</option></select></label></>}
+      {selected === "MEALS" && <><label>{copy.meal}<select value={meal} onChange={(e) => setMeal(e.target.value as typeof meal)}><option value="breakfast">{copy.breakfast}</option><option value="lunch">{copy.lunch}</option><option value="dinner">{copy.dinner}</option></select></label><div className="concierge-two"><label>{copy.adults}<input type="number" min="0" max="10" value={adults} onChange={(e) => setAdults(Number(e.target.value))} /></label><label>{copy.children}<input type="number" min="0" max="10" value={children} onChange={(e) => setChildren(Number(e.target.value))} /></label></div><div className="concierge-estimate"><span>{copy.estimated}</span><strong>{copy.mealWarning}</strong></div></>}
+      {selected === "TRANSFER" && <><div className="concierge-two"><label>{copy.origin}<select value={origin} onChange={(e) => setOrigin(e.target.value)}><option value="hotel">{propertyName}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label><label>{copy.destination}<select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="hotel">{propertyName}</option><option value="manas">{copy.manas}</option><option value="tamchy">{copy.tamchy}</option><option value="bishkek">{copy.bishkek}</option><option value="other">{copy.other}</option></select></label></div><label>{copy.vehicle}<select value={vehicle} onChange={(e) => setVehicle(e.target.value)}><option value="sedan">{copy.sedan}</option><option value="minivan">{copy.minivan}</option></select></label></>}
       <div className="concierge-two"><label>{copy.date}<input type="date" value={serviceDate} onChange={(e) => setServiceDate(e.target.value)} /></label><label>{copy.time}<input type="time" value={serviceTime} onChange={(e) => setServiceTime(e.target.value)} /></label></div><label>{selected === "TRANSFER" ? copy.luggage : copy.comment}<textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder={copy.commentPlaceholder} maxLength={1200} /></label>{notice && <div className="concierge-notice">{notice}</div>}<button className="concierge-submit" disabled={sending}>{sending ? copy.sending : copy.send}</button></form></section></div>}
   </main>;
 }

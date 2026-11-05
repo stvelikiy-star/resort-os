@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const trustedPackageBlobs = new Map([
-  ["apps/admin/package.json", "28c751e9c0a5315afa79ba24d8077c275cdf852c"],
-  ["apps/web/package.json", "694adbfe80badba25bc664579888b3e55b18ee49"],
-  ["apps/staff/package.json", "c7a730cd7a7561cf8a68562eab953d35384590cf"],
+  ["apps/admin/package.json", "750dd4a5486bcbac0ba6452d35909a4ce81d927f"],
+  ["apps/web/package.json", "82a9815d3fcdca8df08ae31436c831f1dc3eac04"],
+  ["apps/staff/package.json", "45235005c65ad9ae231b7d8b772eb694d36647a0"],
 ]);
 
 function gitBlobSha(path) {

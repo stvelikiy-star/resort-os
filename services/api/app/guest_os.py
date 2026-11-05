@@ -2,18 +2,20 @@ import base64
 import hashlib
 import hmac
 import io
+import json
 import os
 import secrets
 import uuid
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
+from urllib.parse import urlsplit
 
 import qrcode
 import qrcode.image.svg
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, _client_ip, require_roles, trusted_property_id
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 PUBLIC_BASE_URL = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "https://3korony.com").rstrip("/")
@@ -64,14 +66,18 @@ def verify_pin_hash(pin: str, stored: str | None) -> bool:
 
 
 def client_key_hash(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    host = forwarded or (request.client.host if request.client else "unknown")
-    agent = request.headers.get("user-agent", "unknown")[:300]
-    return hashlib.sha256(f"{host}|{agent}".encode("utf-8")).hexdigest()
+    # Share authentication's trusted-proxy policy: a caller-supplied
+    # X-Forwarded-For header must never reset the guest PIN failure counter.
+    # Only an explicitly trusted deployment reverse proxy may supply the IP.
+    # User-Agent is attacker-controlled too; varying it must not reset the
+    # PIN failure budget. The counter is per QR and validated client IP.
+    client_ip = _client_ip(request)
+    return hashlib.sha256(client_ip.encode("utf-8")).hexdigest()
 
 
-async def property_context(conn):
-    prop = await conn.fetchrow('SELECT id,code,name,timezone FROM properties WHERE code=$1', PROPERTY_CODE)
+async def property_context(conn, user):
+    property_id = await trusted_property_id(conn, user)
+    prop = await conn.fetchrow('SELECT id,code,name,timezone FROM properties WHERE id=$1', property_id)
     if not prop:
         raise HTTPException(status_code=503, detail="Property not loaded")
     return prop
@@ -88,8 +94,8 @@ async def resolve_room_qr(conn, raw_token: str, *, lock: bool = False):
                room."buildingOrZone",room."floorLabel",room."bedConfiguration",
                rt.code AS room_type_code,rt.name AS room_type_name
         FROM room_qrs qr
-        JOIN rooms room ON room.id=qr."roomId"
-        JOIN room_types rt ON rt.id=room."roomTypeId"
+        JOIN rooms room ON room.id=qr."roomId" AND room."propertyId"=qr."propertyId"
+        JOIN room_types rt ON rt.id=room."roomTypeId" AND rt."propertyId"=room."propertyId"
         WHERE qr."tokenHash"=$1 AND qr.status='ACTIVE'{suffix}
         ''',
         hash_secret(raw_token),
@@ -105,9 +111,10 @@ async def current_stay_for_room(conn, room_id: uuid.UUID, *, lock: bool = False)
                r.id AS reservation_id,r."bookingNumber",r."checkIn",r."checkOut",
                g."firstName",g."lastName",p.timezone
         FROM room_assignments ra
-        JOIN stays s ON s.id=ra."stayId"
-        JOIN reservations r ON r.id=s."reservationId"
-        JOIN guests g ON g.id=s."guestId"
+        JOIN stays s ON s.id=ra."stayId" AND s."propertyId"=ra."propertyId"
+        JOIN rooms active_room ON active_room.id=ra."roomId" AND active_room."propertyId"=ra."propertyId"
+        JOIN reservations r ON r.id=s."reservationId" AND r."propertyId"=s."propertyId"
+        JOIN guests g ON g.id=s."guestId" AND g."propertyId"=s."propertyId"
         JOIN properties p ON p.id=s."propertyId"
         WHERE ra."roomId"=$1 AND ra."endedAt" IS NULL AND s.status='ACTIVE'
         LIMIT 1{suffix}
@@ -130,10 +137,11 @@ async def valid_guest_session(conn, raw_session: str | None):
     )
     row = await conn.fetchrow(
         '''
-        SELECT gs.id,gs."stayId",gs."guestId",gs."roomQrId",gs."expiresAt",
+        SELECT gs.id,gs."stayId",gs."guestId",gs."propertyId",gs."roomQrId",gs."expiresAt",
                s.status::text AS stay_status
         FROM guest_sessions gs
         JOIN stays s ON s.id=gs."stayId"
+          AND s."propertyId"=gs."propertyId" AND s."guestId"=gs."guestId"
         WHERE gs."tokenHash"=$1 AND gs.status='ACTIVE' AND gs."expiresAt" > now()
           AND s.status='ACTIVE'
         ''',
@@ -144,12 +152,43 @@ async def valid_guest_session(conn, raw_session: str | None):
     return row
 
 
-def generic_room_context(qr, active_stay: bool):
+async def guest_property_info(conn, property_id):
+    """Expose only guest-facing hotel settings belonging to the resolved QR."""
+    row = await conn.fetchrow(
+        '''SELECT p.name, to_char(s."checkOutTime", 'HH24:MI') AS check_out_time,
+                  r.policy, c."publishedJson" AS site_content
+           FROM properties p
+           LEFT JOIN property_product_settings s ON s."propertyId"=p.id
+           LEFT JOIN property_hotel_rules r ON r."propertyId"=p.id
+           LEFT JOIN site_content_documents c ON c."propertyId"=p.id
+                AND c.locale='ru' AND c.scope='PUBLIC_SITE'
+           WHERE p.id=$1''', property_id,
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail={"code": "PROPERTY_NOT_FOUND"})
+    policy = row["policy"] or {}
+    if isinstance(policy, str):
+        policy = json.loads(policy)
+    site_content = row["site_content"] or {}
+    if isinstance(site_content, str):
+        site_content = json.loads(site_content)
+    contacts = site_content.get("contacts") or {}
+    return {
+        "name": row["name"],
+        "check_out_time": row["check_out_time"],
+        "official_contact": str(contacts.get("phone") or policy.get("official_contact") or ""),
+        "whatsapp": str(contacts.get("whatsapp") or ""),
+        "checkout_instructions": str(policy.get("checkout_instructions") or ""),
+    }
+
+
+def generic_room_context(qr, active_stay: bool, property_info=None):
     return {
         "qr_valid": True,
         "authenticated": False,
         "verification_required": active_stay,
         "active_stay": active_stay,
+        "property": {"name": property_info["name"]} if property_info else None,
         "room": {
             "code": qr["room_code"],
             "name": qr["room_name"],
@@ -200,7 +239,40 @@ async def write_verify_audit(
     )
 
 
+
+def guest_qr_public_origin() -> str:
+    """An unrelated hotel's permanent QR must never default to a legacy domain.
+
+    Legacy single-property deployments retain their configured historical
+    default. Shared staging requires an explicitly configured HTTPS origin
+    serving all tenants; no tenant or request header may select its hostname.
+    """
+    if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        return PUBLIC_BASE_URL
+    value = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "").strip()
+    try:
+        parsed = urlsplit(value)
+        valid = (parsed.scheme == "https" and bool(parsed.hostname)
+                 and not parsed.username and not parsed.password
+                 and parsed.path in {"", "/"} and not parsed.query and not parsed.fragment)
+        # A private loopback QR is valid only for the disposable acceptance
+        # harness, never for an externally accessible shared deployment.
+        if parsed.hostname in {"localhost", "127.0.0.1", "::1"}:
+            valid = valid and os.environ.get("MARINA_GUEST_QR_CI_CONFIRM") == (
+                "ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY"
+            )
+    except ValueError:
+        valid = False
+    if not valid:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "SHARED_GUEST_QR_ORIGIN_NOT_CONFIGURED"},
+        )
+    return value.rstrip("/")
+
+
 async def issue_room_qr(conn, *, property_id: uuid.UUID, room_id: uuid.UUID, room_code: str, label: str | None = None):
+    public_origin = guest_qr_public_origin()
     existing = await conn.fetchrow('SELECT id FROM room_qrs WHERE "roomId"=$1 AND status=\'ACTIVE\' FOR UPDATE', room_id)
     if existing:
         raise HTTPException(
@@ -209,7 +281,7 @@ async def issue_room_qr(conn, *, property_id: uuid.UUID, room_id: uuid.UUID, roo
         )
     raw_token = secrets.token_urlsafe(32)
     qr_id = uuid.uuid4()
-    public_url = f"{PUBLIC_BASE_URL}/g/{raw_token}"
+    public_url = f"{public_origin}/g/{raw_token}"
     await conn.execute(
         '''
         INSERT INTO room_qrs (
@@ -233,7 +305,7 @@ async def issue_room_qr(conn, *, property_id: uuid.UUID, room_id: uuid.UUID, roo
 @admin_router.get("/room-qrs")
 async def list_room_qrs(request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn)
+        prop = await property_context(conn, user)
         rows = await conn.fetch(
             '''
             SELECT room.id AS room_id,room.code AS room_code,room."bedConfiguration",
@@ -268,7 +340,7 @@ async def list_room_qrs(request: Request, user: dict[str, object] = Depends(admi
 async def issue_qr(room_id: uuid.UUID, request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn)
+            prop = await property_context(conn, user)
             room = await conn.fetchrow('SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', room_id, prop["id"])
             if not room:
                 raise HTTPException(status_code=404, detail="Room not found")
@@ -289,7 +361,7 @@ async def issue_qr(room_id: uuid.UUID, request: Request, user: dict[str, object]
 async def rotate_qr(room_id: uuid.UUID, request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn)
+            prop = await property_context(conn, user)
             room = await conn.fetchrow('SELECT id,code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', room_id, prop["id"])
             if not room:
                 raise HTTPException(status_code=404, detail="Room not found")
@@ -315,7 +387,7 @@ async def rotate_qr(room_id: uuid.UUID, request: Request, user: dict[str, object
 async def issue_missing_qrs(payload: BatchIssuePayload, request: Request, user: dict[str, object] = Depends(admin_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn)
+            prop = await property_context(conn, user)
             rooms = await conn.fetch(
                 '''
                 SELECT room.id,room.code,
@@ -356,17 +428,20 @@ async def room_context(token: str, request: Request, tc_guest_session: str | Non
         qr = await resolve_room_qr(conn, token)
         if not qr:
             raise HTTPException(status_code=404, detail={"code": "ROOM_QR_NOT_FOUND"})
+        property_info = await guest_property_info(conn, qr["propertyId"])
         stay = await current_stay_for_room(conn, qr["roomId"])
         if not stay:
-            return generic_room_context(qr, active_stay=False)
+            return generic_room_context(qr, active_stay=False, property_info=property_info)
         session = await valid_guest_session(conn, tc_guest_session)
-        if not session or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]:
-            return generic_room_context(qr, active_stay=True)
+        if (not session or session["propertyId"] != qr["propertyId"]
+                or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]):
+            return generic_room_context(qr, active_stay=True, property_info=property_info)
         return {
             "qr_valid": True,
             "authenticated": True,
             "verification_required": False,
             "active_stay": True,
+            "property": property_info,
             "room": {
                 "code": qr["room_code"],
                 "name": qr["room_name"],
@@ -377,6 +452,14 @@ async def room_context(token: str, request: Request, tc_guest_session: str | Non
             "guest": {"first_name": stay["firstName"] or "Гость"},
             "stay": {"check_in": stay["checkIn"], "check_out": stay["checkOut"]},
             "privacy": "MINIMAL_GUEST_CONTEXT",
+            # Capabilities are server-authoritative. In shared RC4 the guest
+            # UI must not advertise financial/provider actions or unavailable AI.
+            "guest_capabilities": (
+                {"request_codes": ["MAINTENANCE", "ADMIN"], "ai_available": False}
+                if (MARINA_SHARED_AUTH_PREVIEW_ENABLED
+                    and os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true")
+                else None
+            ),
         }
 
 

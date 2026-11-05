@@ -1,0 +1,236 @@
+name: MARINA Two-Hotel Guest QR HTTPS CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/marina_shared_guest_qr_ci_app.py'
+      - 'scripts/marina_shared_guest_qr_https_ci.py'
+      - 'services/api/app/guest_os.py'
+      - 'services/api/app/guest_requests.py'
+      - '.github/workflows/marina-shared-guest-qr-https-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guest-qr-two-hotels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      PYTHONPATH: services/api:scripts
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_GUEST_QR_CI_CONFIRM: ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY
+      COOKIE_SECURE: 'true'
+      COOKIE_DOMAIN: ''
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      GUEST_OS_PUBLIC_BASE_URL: https://localhost:18443
+      MARINA_GUEST_QR_CI_CERT: /tmp/marina-guest-qr-ci/cert.pem
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate isolated two-hotel fixture credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret="synthetic-ci-only-$(openssl rand -hex 24)"
+          echo "::add-mask::$secret"
+          echo "MARINA_SHARED_BROWSER_CI_PASSWORD=$secret" >> "$GITHUB_ENV"
+      - name: Apply existing immutable Prisma migrations to empty CI DB
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - name: Install canonical Resort Core test dependencies
+        run: python -m pip install -r services/api/requirements.txt
+      - name: Seed two independent owners, rooms and rates in disposable PostgreSQL
+        run: python scripts/marina_shared_live_browser_db.py seed
+      - name: Produce localhost-only TLS certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/marina-guest-qr-ci
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost' \
+            -keyout /tmp/marina-guest-qr-ci/key.pem \
+            -out /tmp/marina-guest-qr-ci/cert.pem 2>/dev/null
+      - name: Start limited-router canonical Guest OS on localhost HTTPS
+        shell: bash
+        run: |
+          set -euo pipefail
+          (python -m uvicorn marina_shared_guest_qr_ci_app:app \
+            --app-dir scripts --host 127.0.0.1 --port 18443 \
+            --no-proxy-headers \
+            --ssl-keyfile /tmp/marina-guest-qr-ci/key.pem \
+            --ssl-certfile /tmp/marina-guest-qr-ci/cert.pem \
+            > /tmp/marina-guest-qr-ci/api.log 2>&1 &
+           echo $! > /tmp/marina-guest-qr-ci/api.pid)
+          curl --fail --silent --show-error --cacert /tmp/marina-guest-qr-ci/cert.pem \
+            --retry 20 --retry-connrefused --retry-delay 1 \
+            https://localhost:18443/api/v1/auth/mode > /dev/null
+      - name: Verify two-hotel QR, real PIN, cross-cookie denial and checkout over HTTPS
+        run: python scripts/marina_shared_guest_qr_https_ci.py
+      - name: Print server logs on failure
+        if: failure()
+        run: tail -n 150 /tmp/marina-guest-qr-ci/api.log || true
+      - name: Stop local acceptance server
+        if: always()
+        run: |
+          if [ -f /tmp/marina-guest-qr-ci/api.pid ]; then
+            kill "$(cat /tmp/marina-guest-qr-ci/api.pid)" 2>/dev/null || true
+          fi
+
+  guest-browser-two-hotels:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      PYTHONPATH: services/api:scripts
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_GUEST_QR_CI_CONFIRM: ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY
+      MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'true'
+      MARINA_SHARED_GUEST_QR_RC4_CONFIRM: REVIEWED_SHARED_GUEST_QR_STAGING_ONLY
+      MARINA_SHARED_GUEST_QR_RC4_ORIGIN: https://localhost:18443
+      COOKIE_SECURE: 'true'
+      COOKIE_DOMAIN: ''
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      GUEST_OS_PUBLIC_BASE_URL: https://localhost:18443
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      CORE_API_URL: http://127.0.0.1:18444
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate private synthetic fixture password
+        run: |
+          secret="synthetic-ci-only-$(openssl rand -hex 24)"
+          echo "::add-mask::$secret"
+          echo "MARINA_SHARED_BROWSER_CI_PASSWORD=$secret" >> "$GITHUB_ENV"
+      - name: Apply immutable migrations to empty isolated database
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - name: Install canonical API and create two disposable hotels
+        run: |
+          python -m pip install -r services/api/requirements.txt
+          python scripts/marina_shared_live_browser_db.py seed
+      - name: Verify RC4 exact-route admission and fail-closed guard
+        run: python -m unittest scripts.test_marina_shared_guest_qr_rc4 -v
+      - name: Build actual public Next guest application
+        run: |
+          npm --prefix apps/web ci --no-audit --no-fund
+          npm --prefix apps/web run typecheck
+          npm --prefix apps/web run build
+      - name: Install real Chromium for browser acceptance
+        run: |
+          npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Start full shared Resort Core RC4 and public Next on loopback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/marina-guest-browser-ci
+          python -m uvicorn app.app_entry:app --app-dir services/api \
+            --host 127.0.0.1 --port 18444 --no-proxy-headers \
+            > /tmp/marina-guest-browser-ci/api.log 2>&1 &
+          echo $! > /tmp/marina-guest-browser-ci/api.pid
+          (cd apps/web && ./node_modules/.bin/next start -H 127.0.0.1 -p 13000) \
+            > /tmp/marina-guest-browser-ci/web.log 2>&1 &
+          echo $! > /tmp/marina-guest-browser-ci/web.pid
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:13000/ > /dev/null
+      - name: Serve both public QR pages and Core from one HTTPS hostname
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=/tmp/marina-guest-browser-ci
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost' \
+            -keyout "$dir/key.pem" -out "$dir/cert.pem" 2>/dev/null
+          cat > "$dir/Caddyfile" <<'CADDY'
+          https://localhost:18443 {
+            tls /tls/cert.pem /tls/key.pem
+            @api path /api/v1/* /core/api/v1/*
+            handle @api {
+              uri strip_prefix /core
+              reverse_proxy 127.0.0.1:18444
+            }
+            handle {
+              reverse_proxy 127.0.0.1:13000
+            }
+          }
+          CADDY
+          docker run -d --name marina-guest-browser-ci-proxy --network host \
+            -v "$dir/cert.pem:/tls/cert.pem:ro" \
+            -v "$dir/key.pem:/tls/key.pem:ro" \
+            -v "$dir/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine
+          curl --fail --silent --show-error --cacert "$dir/cert.pem" \
+            --retry 20 --retry-connrefused --retry-delay 1 \
+            https://localhost:18443/api/v1/auth/mode > /dev/null
+          curl --fail --silent --show-error --cacert "$dir/cert.pem" \
+            https://localhost:18443/g/synthetic-check-route > /dev/null
+      - name: Verify real guest UI in two hotels, same-origin PIN and cookie isolation
+        run: node scripts/marina_shared_guest_qr_browser_ci.mjs
+      - name: Print scoped logs on browser failure
+        if: failure()
+        run: |
+          tail -n 100 /tmp/marina-guest-browser-ci/api.log || true
+          tail -n 100 /tmp/marina-guest-browser-ci/web.log || true
+          docker logs --tail 100 marina-guest-browser-ci-proxy || true
+      - name: Stop all disposable HTTP services
+        if: always()
+        run: |
+          docker rm -f marina-guest-browser-ci-proxy || true
+          for file in /tmp/marina-guest-browser-ci/api.pid /tmp/marina-guest-browser-ci/web.pid; do
+            if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi
+          done

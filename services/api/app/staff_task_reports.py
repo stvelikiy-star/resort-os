@@ -5,9 +5,15 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import current_user
+from .auth import current_user, trusted_property_id, MARINA_SHARED_AUTH_PREVIEW_ENABLED
+from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/ops", tags=["staff-task-reports"])
+
+# Shared contract matches five mobile checklist codes; legacy reports unchanged.
+SHARED_HOUSEKEEPING_CODES = frozenset({
+    "BED_LINEN", "BATHROOM", "SURFACES", "AMENITIES", "FINAL_CHECK",
+})
 
 
 class ChecklistItem(BaseModel):
@@ -37,11 +43,8 @@ class TaskCompletionReport(BaseModel):
         return self
 
 
-async def _property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 @router.post("/tasks/{task_id}/complete-report")
@@ -52,11 +55,21 @@ async def complete_task_with_report(
     user: dict[str, Any] = Depends(current_user),
 ):
     role = user["role"]
-    if role not in {"MAID", "TECHNICIAN"}:
+    if role not in {"MAID", "TECHNICIAN"} or (
+        user.get("module_permissions_custom") and not user_has_section(user, "OPS")
+    ):
         raise HTTPException(status_code=403, detail="Completion reports are for line staff")
 
     expected_type: Literal["HOUSEKEEPING", "MAINTENANCE"] = "HOUSEKEEPING" if role == "MAID" else "MAINTENANCE"
     actor_id = uuid.UUID(user["id"])
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        # Unverified arbitrary URLs are not proof of staff photos in shared mode.
+        if payload.evidence_urls:
+            raise HTTPException(status_code=422, detail="Shared photo uploads are not verified")
+        if expected_type == "HOUSEKEEPING":
+            codes = [item.code for item in payload.checklist]
+            if len(codes) != len(SHARED_HOUSEKEEPING_CODES) or set(codes) != SHARED_HOUSEKEEPING_CODES:
+                raise HTTPException(status_code=422, detail="Exact reviewed housekeeping checklist required")
 
     if expected_type == "HOUSEKEEPING":
         if not payload.checklist:
@@ -67,7 +80,7 @@ async def complete_task_with_report(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await _property_id(conn, user["property_code"])
+            pid = await _property_id(conn, user)
             task = await conn.fetchrow(
                 '''
                 SELECT t.id,t.type::text AS type,t.status::text AS status,t."roomId",t."assignedToId",

@@ -20,7 +20,7 @@ type ReadyMessage =
   | { type: "dining.order.ready"; order: ReadyOrder }
   | { type: "heartbeat" };
 
-const ALLOWED = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
+const ALLOWED = new Set(["OWNER", "MANAGER", "WAITER"]);
 
 function websocketBase() {
   const configured = process.env.NEXT_PUBLIC_CORE_WS_URL?.replace(/\/$/, "");

@@ -70,7 +70,7 @@ def main() -> None:
         fail("owner guest-service defaults drifted from cutoff=60, delivery=200, housekeeping=3, linen=true")
 
     defaults = json.loads(SITE_DEFAULTS.read_text(encoding="utf-8"))
-    for locale in ("ru", "kg", "en"):
+    for locale in ("ru", "kg", "kz", "en"):
         conference = defaults[locale]["conference"]
         if "20" not in conference["capacity"] or "120" not in conference["capacity"]:
             fail(f"{locale} conference capacity drifted")
@@ -81,8 +81,13 @@ def main() -> None:
         text = path.read_text(encoding="utf-8")
         if STALE_CONTACT_DIGITS in text:
             fail(f"stale manager contact remains in {path.relative_to(ROOT)}")
-        if CURRENT_CONTACT_DIGITS not in text:
-            fail(f"corrected manager contact missing from {path.relative_to(ROOT)}")
+
+    # The owner-approved manager contact belongs to canonical public guest facts.
+    # Property-specific concierge surfaces may correctly expose a different hotel
+    # reception number and must not be forced to copy the manager contact.
+    canonical_contact = ROOT / "apps" / "web" / "lib" / "ownerApprovedGuestFacts.ts"
+    if CURRENT_CONTACT_DIGITS not in canonical_contact.read_text(encoding="utf-8"):
+        fail("corrected manager contact missing from canonical owner-approved guest facts")
 
     print(
         "PASS: owner corrections are consistent across canonical room intake, checksum evidence, "

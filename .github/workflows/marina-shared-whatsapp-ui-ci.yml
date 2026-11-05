@@ -1,0 +1,161 @@
+name: MARINA Shared WhatsApp Workspace Browser CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/app/shared-whatsapp/**'
+      - 'scripts/marina_shared_whatsapp_browser_ci.mjs'
+      - '.github/workflows/marina-shared-whatsapp-ui-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  two-hotel-whatsapp-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16.15-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      PYTHONPATH: services/api:scripts
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_WHATSAPP_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_WHATSAPP_BROWSER_ONLY
+      MARINA_SHARED_GUEST_QR_RC4_ENABLED: 'true'
+      MARINA_SHARED_GUEST_QR_RC4_CONFIRM: REVIEWED_SHARED_GUEST_QR_STAGING_ONLY
+      GUEST_OS_PUBLIC_BASE_URL: https://localhost:18447
+      MARINA_SHARED_GUEST_QR_RC4_ORIGIN: https://localhost:18447
+      MARINA_GUEST_QR_CI_CONFIRM: ISOLATED_TWO_HOTEL_GUEST_QR_CI_ONLY
+      MARINA_SHARED_INBOX_RC5_ENABLED: 'true'
+      MARINA_SHARED_INBOX_RC5_CONFIRM: REVIEWED_SHARED_INBOX_STAGING_ONLY
+      MARINA_SHARED_INBOX_RC5_AI_MOCK_ENABLED: 'false'
+      MARINA_SHARED_GREEN_RC6_ENABLED: 'true'
+      MARINA_SHARED_GREEN_RC6_CONFIRM: REVIEWED_SHARED_GREEN_QR_STAGING_ONLY
+      ENABLE_GREEN_API_CONNECTION: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      COOKIE_SECURE: 'true'
+      COOKIE_DOMAIN: ''
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      CORE_API_URL: http://127.0.0.1:18448
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Create two distinct disposable WhatsApp adapter credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          python - <<'PY'
+          import json, os, secrets
+          password = "synthetic-ci-only-" + secrets.token_hex(24)
+          adapters = []
+          print("::add-mask::" + password)
+          for hotel, account in (("A", "10000001"), ("B", "20000002")):
+              secret = secrets.token_urlsafe(48)
+              print("::add-mask::" + secret)
+              adapters.append({
+                  "tenant_code": "tenant_" + hotel.lower(),
+                  "property_code": "HOTEL_" + hotel,
+                  "channel_code": "WA_MAIN",
+                  "external_account_id": account,
+                  "service_key": secret,
+              })
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write("MARINA_SHARED_BROWSER_CI_PASSWORD=" + password + "\n")
+              env.write("MARINA_SHARED_INBOX_RC5_ADAPTERS_JSON=" +
+                        json.dumps(adapters, separators=(",", ":")) + "\n")
+          PY
+      - name: Apply unchanged Prisma migrations to empty PostgreSQL
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - name: Install Core and seed two independent hotels with owners and reception
+        run: |
+          python -m pip install -r services/api/requirements.txt
+          python scripts/marina_shared_live_browser_db.py seed
+      - name: Build real shared Admin Next website with canonical API proxy
+        run: |
+          npm --prefix apps/admin ci --no-audit --no-fund
+          npm --prefix apps/admin run typecheck
+          npm --prefix apps/admin run build
+      - name: Install real Chromium
+        run: |
+          npm install --prefix scripts --no-save --no-package-lock playwright@1.56.1
+          ./scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Start full shared API and Admin on loopback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/marina-shared-whatsapp-ui-ci
+          python -m uvicorn app.app_entry:app --app-dir services/api \
+            --host 127.0.0.1 --port 18448 --no-proxy-headers \
+            > /tmp/marina-shared-whatsapp-ui-ci/api.log 2>&1 &
+          echo $! > /tmp/marina-shared-whatsapp-ui-ci/api.pid
+          (cd apps/admin && exec ./node_modules/.bin/next start -H 127.0.0.1 -p 13201) \
+            > /tmp/marina-shared-whatsapp-ui-ci/admin.log 2>&1 &
+          echo $! > /tmp/marina-shared-whatsapp-ui-ci/admin.pid
+          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:18448/api/v1/auth/mode > /dev/null
+          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:13201/shared-whatsapp > /dev/null
+      - name: Serve exact shared Admin and API from one loopback HTTPS origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/marina-shared-whatsapp-ui-ci
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+            -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost' \
+            -keyout key.pem -out cert.pem 2>/dev/null
+          cat > Caddyfile <<'CADDY'
+          https://localhost:18447 {
+            tls /tls/cert.pem /tls/key.pem
+            reverse_proxy 127.0.0.1:13201
+          }
+          CADDY
+          docker run -d --name marina-shared-whatsapp-ui-proxy --network host \
+            -v "$PWD/cert.pem:/tls/cert.pem:ro" \
+            -v "$PWD/key.pem:/tls/key.pem:ro" \
+            -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine
+          curl -fsS --cacert cert.pem --retry 20 --retry-connrefused --retry-delay 1 \
+            https://localhost:18447/core/api/v1/auth/mode | jq -e '.mode == "shared_auth_preview"'
+      - name: Chromium two hotels, WhatsApp room inbox, reception and logout
+        run: node scripts/marina_shared_whatsapp_browser_ci.mjs
+      - name: Print application diagnostics on failure
+        if: failure()
+        run: |
+          tail -n 120 /tmp/marina-shared-whatsapp-ui-ci/api.log || true
+          tail -n 120 /tmp/marina-shared-whatsapp-ui-ci/admin.log || true
+          docker logs --tail 80 marina-shared-whatsapp-ui-proxy || true
+      - name: Stop and remove disposable services
+        if: always()
+        run: |
+          docker rm -f marina-shared-whatsapp-ui-proxy || true
+          for file in /tmp/marina-shared-whatsapp-ui-ci/api.pid /tmp/marina-shared-whatsapp-ui-ci/admin.pid; do
+            if [ -f "$file" ]; then kill "$(cat "$file")" 2>/dev/null || true; fi
+          done

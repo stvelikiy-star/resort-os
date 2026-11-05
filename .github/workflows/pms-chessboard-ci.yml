@@ -11,6 +11,7 @@ on:
       - '.github/workflows/pms-chessboard-ci.yml'
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'services/api/**'
       - 'packages/database/**'
       - 'scripts/**'
@@ -115,7 +116,10 @@ jobs:
       - name: Start Core and login
         run: |
           python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 8000 > /tmp/chessboard-api.log 2>&1 &
-          sleep 3
+          # Startup varies as the canonical Core imports more opt-in modules.
+          # Never mistake a fixed three-second delay for readiness.
+          curl --fail --silent --show-error --retry 30 --retry-connrefused \
+            --retry-delay 1 --max-time 5 http://127.0.0.1:8000/ready > /tmp/chessboard-ready.json
           curl --fail -sS -c /tmp/cookies.txt -X POST http://127.0.0.1:8000/api/v1/auth/login \
             -H 'Content-Type: application/json' \
             -d '{"username":"ci-owner","password":"CI-Only-Strong-Password-2026"}' > /tmp/login.json

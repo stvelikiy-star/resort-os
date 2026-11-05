@@ -15,8 +15,8 @@ async function login(page) {
     await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);
     await page.locator("button.login-button").click();
   }
-  await page.getByRole("button", { name: "Супершахматка" }).waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "Супершахматка" }).click();
+  await page.getByRole("button", { name: "Шахматка" }).waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "Шахматка" }).click();
   await page.locator(".owner-grid-shell").waitFor({ state: "visible" });
   await page.locator(".owner-grid-loading").waitFor({ state: "detached" }).catch(() => {});
 }
@@ -165,11 +165,11 @@ try {
   await page.getByRole("button", { name: "Скрыть операционный центр" }).click();
   assert(await page.locator(".owner-pms-tools-panel").count() === 0, "operational center must collapse again");
 
-  await page.getByRole("button", { name: "Перенос / разрез / расширенная V9" }).click();
+  await page.getByRole("button", { name: /Перенос \/ (?:Split Stay|разрез \/ расширенная V9)/ }).click();
   await page.locator(".owner-pms-advanced-panel").waitFor({ state: "visible" });
-  assert(await page.locator(".v8-board").count() > 0 || await page.locator(".v8-shell").count() > 0, "existing advanced V9 chessboard is not preserved");
+  assert(await page.locator(".v8-board").count() > 0 || await page.locator(".v8-shell").count() > 0, "advanced split-stay chessboard is not preserved");
 
-  console.log("PASS: owner PMS browser acceptance (84 rooms, exact legacy shorthand, 14/31 windows, full desktop 31-day viewport, compact cells, 1-night click, 4-night drag, Core preview, 5000 payment fact vs remaining balance, collapsed tools, advanced V9 preserved)");
+  console.log("PASS: owner PMS browser acceptance (84 rooms, exact legacy shorthand, 14/31 windows, full desktop 31-day viewport, compact cells, 1-night click, 4-night drag, Core preview, 5000 payment fact vs remaining balance, collapsed tools, advanced split-stay preserved)");
 } finally {
   await browser.close();
 }

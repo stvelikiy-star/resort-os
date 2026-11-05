@@ -9,13 +9,16 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .automation_read import _guest_facts
 from .main import check_availability, get_property_id
 
 router = APIRouter(prefix="/api/v1/public/ai-admin", tags=["public-ai-admin"])
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-OPENAI_PUBLIC_ASSISTANT_MODEL = os.environ.get("OPENAI_PUBLIC_ASSISTANT_MODEL") or os.environ.get("OPENAI_SALES_MODEL")
+OPENAI_PUBLIC_ASSISTANT_MODEL = (
+    os.environ.get("OPENAI_PUBLIC_ASSISTANT_MODEL")
+    or os.environ.get("OPENAI_SALES_MODEL")
+    or os.environ.get("OPENAI_MARINA_ASSISTANT_MODEL")
+)
 OPENAI_API_BASE_URL = os.environ.get("OPENAI_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_TIMEOUT_SECONDS = float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "30"))
 AI_ADMIN_MAX_MESSAGES = int(os.environ.get("AI_ADMIN_MAX_MESSAGES", "12"))
@@ -47,7 +50,7 @@ class AvailabilitySearch(BaseModel):
 
 class PublicAiAdminRequest(BaseModel):
     messages: list[AssistantMessage] = Field(min_length=1, max_length=20)
-    locale: Literal["ru", "kg", "en"] = "ru"
+    locale: Literal["ru", "kg", "kz", "en"] = "ru"
     search: AvailabilitySearch | None = None
 
     @model_validator(mode="after")
@@ -149,7 +152,7 @@ async def _public_context(request: Request) -> dict[str, Any]:
             property_id,
         )
     return {
-        "property": dict(property_row) if property_row else {"code": "THREE_CROWNS", "name": "Три Короны"},
+        "property": dict(property_row) if property_row else {"code": "MARINA_TEST", "name": "MARINA SMART TEST HOTEL"},
         "inventory": [
             {
                 "code": row["code"],
@@ -161,13 +164,13 @@ async def _public_context(request: Request) -> dict[str, Any]:
             }
             for row in room_types
         ],
-        "guest_facts": _guest_facts(),
     }
 
 
 def _prompt(payload: PublicAiAdminRequest, context: dict[str, Any], availability: dict[str, Any] | None) -> str:
-    language = {"ru": "Russian", "kg": "Kyrgyz", "en": "English"}[payload.locale]
-    rules = f"""You are the public AI administrator of Three Crowns Resort & SPA in Cholpon-Ata, Issyk-Kul.
+    language = {"ru": "Russian", "kg": "Kyrgyz", "kz": "Kazakh", "en": "English"}[payload.locale]
+    property_name = str((context.get("property") or {}).get("name") or "MARINA SMART Hotel")
+    rules = f"""You are the public AI administrator for {property_name}, powered by MARINA SMART Hotel OS.
 Answer in {language}. Keep replies concise, warm and practical.
 
 NON-NEGOTIABLE RULES:
@@ -195,7 +198,7 @@ async def _ask_openai(prompt: str) -> str:
             response = await client.post(
                 f"{OPENAI_API_BASE_URL}/responses",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"},
-                json={"model": OPENAI_PUBLIC_ASSISTANT_MODEL, "input": prompt},
+                json={"model": OPENAI_PUBLIC_ASSISTANT_MODEL, "input": prompt, "store": False},
             )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="AI administrator provider transport error") from exc

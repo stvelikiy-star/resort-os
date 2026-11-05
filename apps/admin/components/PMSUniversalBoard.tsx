@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
+import { pmsRoomDisplayNumber, pmsStaffBuildingLabel } from "./PMSRoomDisplayLabel";
 import RoomDetailModal from "./RoomDetailModal";
 
 type Block = {
@@ -25,6 +26,7 @@ type Room = {
   room_type_name: string;
   building_or_zone: string | null;
   floor: string | null;
+  beds_raw?: string | null;
   operational_state: "UNKNOWN" | "CLEAN" | "DIRTY" | "IN_INSPECTION" | "TECH_BLOCK";
   blocks: Block[];
 };
@@ -177,11 +179,27 @@ function paymentClass(item?: ReceptionItem) {
   return "unpaid";
 }
 
-function groupValue(room: Room, mode: GroupMode) {
-  if (mode === "BUILDING") return room.building_or_zone || "Без корпуса";
+function groupValue(room: Room, mode: GroupMode, propertyCode?: string | null) {
+  if (mode === "BUILDING") return pmsStaffBuildingLabel(room.building_or_zone, propertyCode);
   if (mode === "FLOOR") return room.floor ? `${room.floor} этаж` : "Этаж не указан";
   if (mode === "CATEGORY") return room.room_type_name;
   return "";
+}
+
+const AK_BERMET_STAFF_GROUP_ORDER = [
+  "Корпус №1",
+  "Корпус №2",
+  "Корпус №3",
+  "GARDEN",
+  "Кирпичные",
+  "Деревянные",
+  "Сруб",
+];
+
+function staffGroupRank(label: string, propertyCode?: string | null) {
+  if (propertyCode !== "AK_BERMET_TEST") return Number.MAX_SAFE_INTEGER;
+  const index = AK_BERMET_STAFF_GROUP_ORDER.indexOf(label);
+  return index === -1 ? AK_BERMET_STAFF_GROUP_ORDER.length : index;
 }
 
 export default function PMSUniversalBoard() {
@@ -338,7 +356,10 @@ export default function PMSUniversalBoard() {
     () =>
       Array.from(
         new Set((data?.rooms || []).map((room) => room.building_or_zone).filter((value): value is string => Boolean(value))),
-      ).sort(),
+      ).sort((a, b) => {
+        const rank = staffGroupRank(a, data?.property) - staffGroupRank(b, data?.property);
+        return rank || a.localeCompare(b, "ru", { numeric: true });
+      }),
     [data],
   );
 
@@ -439,9 +460,17 @@ export default function PMSUniversalBoard() {
     });
 
     return list.sort((a, b) => {
-      const aGroup = groupValue(a, groupMode);
-      const bGroup = groupValue(b, groupMode);
-      return aGroup.localeCompare(bGroup, "ru") || a.code.localeCompare(b.code, "ru", { numeric: true });
+      const aGroup = groupValue(a, groupMode, data?.property);
+      const bGroup = groupValue(b, groupMode, data?.property);
+      const groupOrder =
+        groupMode === "BUILDING"
+          ? staffGroupRank(aGroup, data?.property) - staffGroupRank(bGroup, data?.property)
+          : 0;
+      return (
+        groupOrder ||
+        aGroup.localeCompare(bGroup, "ru", { numeric: true }) ||
+        pmsRoomDisplayNumber(a, data?.property).localeCompare(pmsRoomDisplayNumber(b, data?.property), "ru", { numeric: true })
+      );
     });
   }, [data, filters, financeState, groupMode, quickMatch, roomHasToday, roomReservations, today]);
 
@@ -450,12 +479,12 @@ export default function PMSUniversalBoard() {
     let lastGroup = "";
     const counts = new Map<string, number>();
     filteredRooms.forEach((room) => {
-      const group = groupValue(room, groupMode);
+      const group = groupValue(room, groupMode, data?.property);
       counts.set(group, (counts.get(group) || 0) + 1);
     });
 
     filteredRooms.forEach((room) => {
-      const group = groupValue(room, groupMode);
+      const group = groupValue(room, groupMode, data?.property);
       if (groupMode !== "NONE" && group !== lastGroup) {
         result.push({ kind: "group", key: `group-${group}`, label: group, count: counts.get(group) || 0 });
         lastGroup = group;
@@ -924,8 +953,8 @@ export default function PMSUniversalBoard() {
                   onDrop={(event) => drop(room, event)}
                 >
                   <button className="v8-room-cell" onClick={() => setRoomId(room.id)}>
-                    <strong>№ {room.code}</strong>
-                    <span>{room.room_type_name}</span>
+                    <strong>№ {pmsRoomDisplayNumber(room, data?.property)}</strong>
+                    <span>{data?.property === "AK_BERMET_TEST" ? (room.beds_raw || room.room_type_name) : room.room_type_name}</span>
                     <small>{[room.building_or_zone, room.floor].filter(Boolean).join(" · ") || "—"}</small>
                   </button>
                   <div className="v8-state-cell">

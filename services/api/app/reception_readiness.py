@@ -3,31 +3,25 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from .auth import current_user
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/reception", tags=["reception-readiness"])
-ALLOWED_ROLES = {"OWNER", "MANAGER", "RECEPTION"}
+reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 
 
-async def _property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 @router.post("/reservations/{reservation_id}/housekeeping-request", status_code=status.HTTP_201_CREATED)
 async def request_housekeeping_for_arrival(
     reservation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(current_user),
+    user: dict[str, Any] = Depends(reception_access),
 ):
-    if user["role"] not in ALLOWED_ROLES:
-        raise HTTPException(status_code=403, detail="Insufficient permission")
-
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await _property_id(conn, user["property_code"])
+            pid = await _property_id(conn, user)
             arrival = await conn.fetchrow(
                 '''
                 SELECT r.id AS reservation_id, r."bookingNumber" AS booking_number,

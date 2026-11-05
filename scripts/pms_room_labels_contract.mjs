@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { pmsOwnerRoomDisplayLabel } from "../apps/admin/components/PMSRoomDisplayLabel.ts";
+import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber, pmsStaffBuildingLabel } from "../apps/admin/components/PMSRoomDisplayLabel.ts";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -24,6 +24,23 @@ const cases = [
   [{ code: "1", room_type_name: "Квартиры / апартаменты с кухней", beds_raw: "2сп+1сп+1сп+д+кр" }, "1 (2сп+1сп+1сп+д+кр)"],
 ];
 
+assert(
+  pmsRoomDisplayNumber({ code: "C1-101", name: "101", room_type_name: "Корпус №1 · 4-местный люкс" }, "AK_BERMET_TEST") === "101",
+  "AK BERMET must show the staff-facing room number instead of the internal unique code",
+);
+assert(
+  pmsRoomDisplayNumber({ code: "C2-101", name: "101", room_type_name: "Корпус №2 · 2-местный стандарт" }, "AK_BERMET_TEST") === "101",
+  "AK BERMET duplicate room numbers across buildings must remain familiar in the UI",
+);
+assert(
+  pmsRoomDisplayNumber({ code: "112", name: "Номер 112", room_type_name: "Двухместный улучшенный" }, "THREE_CROWNS") === "112",
+  "Other hotels must keep their existing room code semantics",
+);
+assert(pmsStaffBuildingLabel("Garden 1", "AK_BERMET_TEST") === "GARDEN", "AK BERMET Garden 1 must use staff GARDEN group");
+assert(pmsStaffBuildingLabel("Garden 2", "AK_BERMET_TEST") === "GARDEN", "AK BERMET Garden 2 must use staff GARDEN group");
+assert(pmsStaffBuildingLabel("Коттеджи кирпичные", "AK_BERMET_TEST") === "Кирпичные", "AK BERMET brick cottages staff label");
+assert(pmsStaffBuildingLabel("Коттеджи деревянные / срубы", "AK_BERMET_TEST") === "Деревянные", "AK BERMET wooden cottages staff label");
+
 for (const [room, expected] of cases) {
   const actual = pmsOwnerRoomDisplayLabel(room);
   assert(actual === expected, `${room.code}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
@@ -35,4 +52,4 @@ assert(css.includes('repeat(31,26px)!important'), "31-day cells must remain 26px
 assert(css.includes('repeat(14,34px)!important'), "14-day cells must remain 34px wide");
 assert(css.includes('height:32px'), "owner room/night rows must remain compact at 32px");
 
-console.log(`PASS: ${cases.length} owner room-label cases + compact grid contract`);
+console.log(`PASS: ${cases.length} owner room-label cases + AK BERMET room-number contract + compact grid contract`);

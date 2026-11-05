@@ -2,54 +2,33 @@ from __future__ import annotations
 
 import asyncio
 import os
-from datetime import datetime
+import uuid
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from .auth import SESSION_COOKIE, hash_session_token
-from .websocket_security import require_websocket_same_origin
+from .auth import SESSION_COOKIE, resolve_session_user
+from .section_permissions import role_or_section_allowed
+from .websocket_security import require_websocket_same_origin, websocket_authority
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 POLL_SECONDS = max(0.25, float(os.environ.get("DINING_WS_POLL_SECONDS", "1")))
 router = APIRouter(tags=["dining-realtime"])
-ALLOWED_ROLES = {"OWNER", "MANAGER", "DINING_STAFF"}
+ALLOWED_ROLES = {"OWNER", "MANAGER", "WAITER"}
 
 
 async def authenticate(websocket: WebSocket, conn) -> dict[str, Any] | None:
-    raw_token = websocket.cookies.get(SESSION_COOKIE)
-    if not raw_token:
-        await websocket.close(code=4401, reason="Authentication required")
-        return None
-    row = await conn.fetchrow(
-        '''SELECT s."expiresAt",s."revokedAt",u.id AS user_id,u.username,u."displayName",
-                  u.role::text AS role,u."isActive",p.id AS property_id,p.code AS property_code
-           FROM auth_sessions s
-           JOIN staff_users u ON u.id=s."userId"
-           JOIN properties p ON p.id=u."propertyId"
-           WHERE s."tokenHash"=$1''',
-        hash_session_token(raw_token),
-    )
-    if (
-        not row
-        or row["revokedAt"] is not None
-        or row["expiresAt"] <= datetime.utcnow()
-        or not row["isActive"]
-        or row["property_code"] != PROPERTY_CODE
-    ):
+    try:
+        user = await resolve_session_user(conn, websocket.cookies.get(SESSION_COOKIE), touch=False)
+    except HTTPException:
         await websocket.close(code=4401, reason="Session expired or invalid")
         return None
-    if row["role"] not in ALLOWED_ROLES:
+    if user["role"] not in ALLOWED_ROLES or not role_or_section_allowed(
+        user, "/api/v1/dining/floor", tuple(ALLOWED_ROLES)
+    ):
         await websocket.close(code=4403, reason="Dining realtime requires dining or management role")
         return None
-    return {
-        "id": str(row["user_id"]),
-        "user_id": row["user_id"],
-        "display_name": row["displayName"],
-        "role": row["role"],
-        "property_id": row["property_id"],
-        "property_code": row["property_code"],
-    }
+    return {**user, "user_id": uuid.UUID(user["id"]), "property_id": uuid.UUID(user["property_id"])}
 
 
 async def ready_orders(conn, user: dict[str, Any]) -> list[dict[str, Any]]:
@@ -90,30 +69,39 @@ async def dining_ready_websocket(websocket: WebSocket):
 
     async with websocket.app.state.db.acquire() as conn:
         user = await authenticate(websocket, conn)
-        if not user:
-            return
-        await websocket.accept()
-        try:
+        if user:
             initial = await ready_orders(conn, user)
-            seen = {item["id"] for item in initial}
-            await websocket.send_json(
-                {
-                    "type": "dining.ready.snapshot",
-                    "orders": initial,
-                    "scope": "ALL" if user["role"] in {"OWNER", "MANAGER"} else "ASSIGNED_TO_ME",
-                }
-            )
-            heartbeat = 0
-            while True:
+    if not user:
+        return
+    await websocket.accept()
+    authority = websocket_authority(user)
+    try:
+        seen = {item["id"] for item in initial}
+        await websocket.send_json(
+            {
+                "type": "dining.ready.snapshot",
+                "orders": initial,
+                "scope": "ALL" if user["role"] in {"OWNER", "MANAGER"} else "ASSIGNED_TO_ME",
+            }
+        )
+        heartbeat = 0
+        while True:
+            await asyncio.sleep(POLL_SECONDS)
+            async with websocket.app.state.db.acquire() as conn:
+                user = await authenticate(websocket, conn)
+                if not user:
+                    return
+                if websocket_authority(user) != authority:
+                    await websocket.close(code=4403, reason="Session authority changed; reconnect required")
+                    return
                 items = await ready_orders(conn, user)
-                for item in items:
-                    if item["id"] not in seen:
-                        await websocket.send_json({"type": "dining.order.ready", "order": item})
-                        seen.add(item["id"])
-                heartbeat += 1
-                if heartbeat >= max(1, int(20 / POLL_SECONDS)):
-                    await websocket.send_json({"type": "heartbeat"})
-                    heartbeat = 0
-                await asyncio.sleep(POLL_SECONDS)
-        except WebSocketDisconnect:
-            return
+            for item in items:
+                if item["id"] not in seen:
+                    await websocket.send_json({"type": "dining.order.ready", "order": item})
+                    seen.add(item["id"])
+            heartbeat += 1
+            if heartbeat >= max(1, int(20 / POLL_SECONDS)):
+                await websocket.send_json({"type": "heartbeat"})
+                heartbeat = 0
+    except WebSocketDisconnect:
+        return

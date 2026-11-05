@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-control"])
-manager_access = require_roles("OWNER", "MANAGER")
+manager_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 
 
 @router.get("/control-snapshot")
