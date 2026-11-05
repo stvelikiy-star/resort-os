@@ -48,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: marina-mobile-expo-web-role-screenshots
-          path: apps/mobile/visual-evidence/*.jpg
+          path: apps/mobile/visual-evidence/*
           retention-days: 14
           if-no-files-found: error
       - name: Validate Expo configuration

@@ -271,6 +271,64 @@ async function main() {
     await click('[data-testid="switch-demo-role"]','agent selector');
     await click('[data-testid="demo-agent"]','agent role');
     await screenshot('agent_pms_en_dark_375');
+    // P1 visual matrix: visit only real, reachable Expo Web DEMO routes.
+    // No test route bypass, fake LIVE API, Android emulator or camera simulation.
+    // Names encode exact route, locale, theme and viewport for factual evidence.
+    await click('[data-testid="tab-profile"]', 'agent profile');
+    await click('[data-testid="switch-demo-role"]', 'choose owner for visual matrix');
+    await click('[data-testid="demo-owner"]', 'owner matrix role');
+    const requestedMatrixRoutes = ['overview', 'reception', 'pms', 'new-booking', 'reservation', 'holds', 'inbox', 'conversation', 'ai', 'dining', 'scan'];
+    const reachableRoutes = ['overview', 'reception', 'pms', 'inbox', 'conversation', 'ai'];
+    const matrixFiles = [];
+    const localeBack = { ru: 'Закрыть', kg: 'Жабуу', en: 'Close' };
+    const aiBack = { ru: 'Назад', kg: 'Артка', en: 'Back' };
+    async function matrixCapture(route, lang, theme) {
+      for (const width of [320, 375, 430]) {
+        await viewport(width, width === 320 ? 690 : width === 375 ? 812 : 932);
+        const url = await evaluate('location.pathname');
+        const expected = route === 'conversation' ? '/conversation/demo-chat-01' : route === 'ai' ? '/ai' : '/' + route;
+        if (url !== expected) throw new Error('Visual matrix wrong route: expected ' + expected + ', got ' + url);
+        const name = 'matrix_' + route + '_' + lang + '_' + theme + '_' + width;
+        await screenshot(name);
+        matrixFiles.push(name + '.jpg');
+      }
+      await viewport(375, 812);
+    }
+    for (const lang of ['ru', 'kg', 'en']) {
+      for (const theme of ['light', 'dark']) {
+        await click('[data-testid="tab-more"]', 'owner more');
+        await click('[data-testid="more-profile"]', 'owner profile');
+        await click('[data-testid="segment-' + lang + '"]', 'matrix language ' + lang);
+        await click('[data-testid="segment-' + theme + '"]', 'matrix theme ' + theme);
+        await click('[data-testid="tab-overview"]', 'owner overview');
+        await matrixCapture('overview', lang, theme);
+        await click('[data-testid="tab-reception"]', 'owner reception');
+        await matrixCapture('reception', lang, theme);
+        await click('[data-testid="tab-pms"]', 'owner pms');
+        await matrixCapture('pms', lang, theme);
+        await click('[data-testid="tab-inbox"]', 'owner inbox');
+        await matrixCapture('inbox', lang, theme);
+        await click('[data-testid="conversation-demo-chat-01"]', 'demo chat detail');
+        await matrixCapture('conversation', lang, theme);
+        await click('[aria-label="' + localeBack[lang] + '"]', 'back to inbox');
+        await click('[data-testid="tab-overview"]', 'return to overview');
+        await click('[aria-label="MARINA AI"]', 'real unavailable AI state');
+        await matrixCapture('ai', lang, theme);
+        await click('[aria-label="' + aiBack[lang] + '"]', 'back to overview');
+      }
+    }
+    const matrixManifest = {
+      source: 'Actual Expo Web, offline DEMO only, NOT Android',
+      sha: process.env.GITHUB_SHA || 'from checked-out source',
+      verified_routes: reachableRoutes,
+      not_tested_routes: requestedMatrixRoutes.filter(route => !reachableRoutes.includes(route)),
+      image_files: matrixFiles,
+      dimensions: [320, 375, 430], languages: ['ru', 'kg', 'en'], themes: ['light', 'dark'],
+    };
+    await writeFile(path.join(evidenceDir, 'matrix-manifest.json'), JSON.stringify(matrixManifest, null, 2));
+    console.log('WEB_VISUAL_MATRIX captured=' + matrixFiles.length + ' routes=' + reachableRoutes.join(',') +
+      ' not_tested=' + matrixManifest.not_tested_routes.join(','));
+
   } catch (e) {
     console.log('WEB_VISUAL_PARTIAL ' + String(e.message || e));
     await diagnose('partial');
