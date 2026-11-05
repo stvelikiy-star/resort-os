@@ -209,8 +209,7 @@ async function main() {
     await click('[data-testid="demo-manager"]','synthetic manager role');
     if (!await waitFor('[data-testid="tab-overview"]')) throw new Error('Manager overview missing');
     await screenshot('manager_overview_en_dark_375');
-    await click('[data-testid="tab-more"]','manager More');
-    await click('[data-testid="more-admin"]','manager team');
+    await click('[data-testid="tab-admin"]','manager team');
     if (!await waitFor('[data-testid="open-assign-t8"]')) throw new Error('Manager task allocation missing');
     await screenshot('manager_team_en_dark_375');
     await viewport(320,640);
@@ -220,8 +219,7 @@ async function main() {
     if (!await waitFor('[data-testid="assign-u-maid"]')) throw new Error('Staff picker did not appear');
     await screenshot('manager_assign_en_dark_430');
     await viewport(375,812);
-    await click('[data-testid="tab-more"]','manager More');
-    await click('[data-testid="more-tasks"]','manager tasks');
+    await click('[data-testid="tab-tasks"]','manager tasks');
     await screenshot('manager_tasks_en_dark_375');
     await click('[data-testid="tab-more"]','manager More');
     await click('[data-testid="more-profile"]','manager profile');
