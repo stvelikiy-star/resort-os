@@ -6,6 +6,7 @@ import { Plus, ShieldCheck } from 'lucide-react-native';
 import { AnimatedProgressBar, DemoBanner, Empty, SectionLabel, Segmented } from '../../src/components/ui';
 import { FutureScreen, ErrorState, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { TaskCard } from '../../src/components/domain';
+import { demoTaskTitle } from '../../src/i18n/demoLabels';
 import { Hero } from '../../src/components/Brand';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
@@ -17,7 +18,7 @@ export default function Tasks() {
   const { t } = useTranslation();
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'active' | 'urgent'>('all');
-  const { api, user, hotel, serverAuthMode } = useSession();
+  const { api, user, hotel, serverAuthMode, locale } = useSession();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
   const hasFocused = useRef(false);
@@ -61,7 +62,7 @@ export default function Tasks() {
     {error ? <ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/> : null}
     {!loading && !error && !ws.mobileReady ? <Empty text={t('admin.forbidden')}/> : null}
     {!loading && !error && ws.mobileReady && visibleActive.length === 0 ? <Empty text={t('tasks.none')}/> : null}
-    {visibleActive.map((task,i) => <StaggerItem key={task.id} index={i}><TaskCard task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/></StaggerItem>)}
+    {visibleActive.map((task,i) => <StaggerItem key={task.id} index={i}><TaskCard task={api?.mode === 'DEMO' ? { ...task, title: demoTaskTitle(task.id, locale, task.title) } : task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/></StaggerItem>)}
     {filter === 'all' && finished.length ? <SectionLabel>{t('tasks.done')}</SectionLabel> : null}
     {filter === 'all' ? finished.map(task => <TaskCard key={task.id} task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>) : null}
   </FutureScreen>;
