@@ -9,6 +9,7 @@ import { useAsync } from '../../src/lib/useAsync';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
+import { demoTaskTitle } from '../../src/i18n/demoLabels';
 import { workspaceForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space, TOUCH } from '../../src/theme/tokens';
@@ -19,7 +20,7 @@ export default function TaskDetail() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { api, user, hotel, serverAuthMode } = useSession();
+  const { api, user, hotel, serverAuthMode, locale } = useSession();
   const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => user && api && ws.mobileReady ? (await api.listTasks()).find((x) => x.id === id) ?? null : null, [api, id, user?.id]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
@@ -67,7 +68,7 @@ export default function TaskDetail() {
       </PressScale>
       <PremiumHeader title={task.room_code ?? t('common.room')} subtitle={hotel?.name} eyebrow={t(`tasks.types.${task.type}`)}/>
       <GlassCard style={{ gap: space.sm, borderLeftWidth: 4, borderLeftColor: priorityTone(task.priority) === 'danger' ? c.danger : priorityTone(task.priority) === 'warning' ? c.warning : c.primary }}>
-        <Text style={[font.h2, { color: c.text }]}>{task.title}</Text>
+        <Text style={[font.h2, { color: c.text }]}>{api.mode === 'DEMO' ? demoTaskTitle(task.id, locale, task.title) : task.title}</Text>
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           <Badge label={t(statusKey(task.status))} tone={task.status === 'DONE' ? 'success' : task.status === 'IN_INSPECTION' ? 'info' : task.status === 'IN_PROGRESS' ? 'primary' : 'neutral'} />
           <Badge label={t(prioKey(task.priority))} tone={priorityTone(task.priority)} />
