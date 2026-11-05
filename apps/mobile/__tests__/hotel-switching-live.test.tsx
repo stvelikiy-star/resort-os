@@ -3,6 +3,7 @@ import { AppState, Pressable, Text } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SessionProvider, useSession } from '../src/state/session';
 import { ApiError, AuthUser, StaffApi } from '../src/api/types';
+import { DEMO_HOTELS } from '../src/api/hotels';
 import type { HotelConnection } from '../src/api/hotels';
 
 const hotelA: HotelConnection = {id:'live-hotel-a.example',name:'Hotel A',city:'',baseUrl:'https://hotel-a.example',demo:false,accent:'#245E9A'};
@@ -64,7 +65,7 @@ beforeEach(()=>{
   mockClients[hotelA.id]=fakeApi('A');mockClients[hotelB.id]=fakeApi('B');mockEvents.length=0;
 });
 function ViewPanel(){
-  const {hotel,user,addHotel,signIn,switchHotel,api}=useSession();
+  const {hotel,user,addHotel,signIn,switchHotel,selectHotel,startDemo,api}=useSession();
   const [result,setResult]=React.useState('none');
   const [room,setRoom]=React.useState('none');
   return <>
@@ -82,6 +83,8 @@ function ViewPanel(){
       void switchHotel(hotelB.id).then(()=>setResult('unexpected-switch'),()=>setResult('switch-denied'));
     }}><Text>Switch B</Text></Pressable>
     <Pressable testID="read" onPress={()=>{void api?.listRooms().then(v=>setRoom(v[0]?.code??'none'));}}><Text>Read</Text></Pressable>
+    <Pressable testID="select-demo" onPress={()=>{selectHotel(DEMO_HOTELS[0].id);setResult("selected-demo-attempt");}}><Text>Select demo</Text></Pressable>
+    <Pressable testID="start-demo" onPress={()=>{void startDemo("owner").then(()=>setResult("unexpected-demo"),()=>setResult("demo-denied"));}}><Text>Start demo</Text></Pressable>
   </>;
 }
 it('LIVE device binds one origin and refuses a second hotel without losing session A',async()=>{
@@ -99,4 +102,22 @@ it('LIVE device binds one origin and refuses a second hotel without losing sessi
   fireEvent.press(screen.getByTestId('read'));
   await waitFor(()=>expect(screen.getByTestId('room').props.children).toBe('A-101'));
   expect(mockEvents).not.toContain('login-B');
+});
+
+
+it('provisioned customer rejects direct DEMO selection and showroom launch without revoking LIVE user',async()=>{
+  const screen=await render(<SessionProvider initialLocale="ru"><ViewPanel/></SessionProvider>);
+  fireEvent.press(screen.getByTestId('add-a'));
+  await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id));
+  fireEvent.press(screen.getByTestId('login'));
+  await waitFor(()=>expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A'));
+  fireEvent.press(screen.getByTestId('select-demo'));
+  await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('selected-demo-attempt'));
+  expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
+  expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
+  fireEvent.press(screen.getByTestId('start-demo'));
+  await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('demo-denied'));
+  expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
+  expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
+  expect(mockEvents).not.toContain('logout-A');
 });
