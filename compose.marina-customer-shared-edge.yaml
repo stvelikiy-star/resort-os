@@ -1,0 +1,37 @@
+# Overlay for a customer deployment BEHIND the one MARINA HTTPS edge.
+# Usage: docker compose -f compose.production.yaml -f compose.marina-customer-shared-edge.yaml ...
+# The existing standalone Caddy is excluded by its profile; no customer
+# container publishes 80/443 (or any other host port).
+services:
+  caddy:
+    profiles: ["standalone-only"]
+  customer_gateway:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST}
+      ADMIN_HOST: ${ADMIN_HOST}
+      STAFF_HOST: ${STAFF_HOST}
+      API_HOST: ${API_HOST}
+      AUTOMATION_HOST: ${AUTOMATION_HOST}
+    volumes:
+      - ./deploy/Caddyfile.customer-gateway:/etc/caddy/Caddyfile:ro
+      - ${HOST_DATA_DIR}/media/public:/srv/media/public:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      admin:
+        condition: service_healthy
+      staff:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    networks:
+      resort: {}
+      marina_ingress:
+        aliases:
+          - marina_${COMPOSE_PROJECT_NAME}_gateway
+networks:
+  marina_ingress:
+    name: marina_ingress_${COMPOSE_PROJECT_NAME}
+    driver: bridge
