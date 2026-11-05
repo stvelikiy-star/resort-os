@@ -236,8 +236,22 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       void setItem('marina.hotels', JSON.stringify(next.filter((x) => !x.demo)));
       return next;
     });
-    selectHotel(h.id);
-  }, [selectHotel]);
+    const previous = hotelId ? hotels.find(current => current.id === hotelId) : null;
+    const sameHost = previous && !previous.demo &&
+      new URL(previous.baseUrl).hostname === new URL(h.baseUrl).hostname;
+    if (sameHost) {
+      // Replacing /api/v1 with /core on one host must still revoke the
+      // old cookie and invalidate its cached user: this is NOT a second hotel.
+      selectHotel(h.id);
+    } else {
+      // New trusted host: its OS cookie is isolated by host, so other
+      // previously verified hotel sessions can remain in memory.
+      sessionRevision.current++;
+      loginAttempt.current++;
+      setServerAuthMode(null);
+      setHotelId(h.id);
+    }
+  }, [hotelId, hotels, selectHotel]);
   const startDemo = useCallback(async (username = 'manager'): Promise<AuthUser> => {
     const demoHotel = DEMO_HOTELS[0];
     // Never bypass production auth. This method explicitly uses the isolated
