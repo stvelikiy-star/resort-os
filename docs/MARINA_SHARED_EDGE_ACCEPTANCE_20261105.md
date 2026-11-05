@@ -27,6 +27,7 @@ Keep real `.env` outside Git. Each customer config needs the same true
 `MARINA_DEPLOYMENT_HOST_ID` when installed on one Ubuntu, and unique
 `COMPOSE_PROJECT_NAME`, `PROPERTY_CODE`, data/backup roots, secrets and hostnames.
 `COOKIE_SECURE=true`; `MARINA_TENANT_CONTEXT_ENABLED=false`.
+Set `COOKIE_DOMAIN=` (empty, host-only sessions) and `CORS_ORIGINS` to the **exact three HTTPS origins of that customer's `PUBLIC_HOST`, `ADMIN_HOST`, and `STAFF_HOST`**. Do not copy an earlier hotel's origins, even when both run on the same Ubuntu.
 
 ```bash
 python3 scripts/marina_shared_edge_config.py \
