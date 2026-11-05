@@ -38,10 +38,11 @@ export function demoDashboard(name: string, rooms: readonly Room[], tasks: reado
   const arrival = reception.items.filter(x => x.checkIn === reception.local_date && x.status === 'GUARANTEED');
   const departing = reception.items.filter(x => x.checkOut === reception.local_date && x.status === 'CHECKED_IN');
   const counts = (state: string) => rooms.filter(x => x.state === state).length;
+  const occupied = reception.items.filter(x => x.status === 'CHECKED_IN').length;
   return {
     property: { name, local_date: reception.local_date, currency: 'KGS' },
     rooms: { total: rooms.length, clean: counts('CLEAN'), dirty: counts('DIRTY'), in_inspection: counts('IN_INSPECTION'), tech_block: counts('TECH_BLOCK') },
-    stays: { occupancy_percent: 72, occupied_rooms: 4, arrivals_today: arrival.length, departures_today: departing.length },
+    stays: { occupancy_percent: rooms.length ? Math.round(occupied / rooms.length * 100) : 0, occupied_rooms: occupied, arrivals_today: arrival.length, departures_today: departing.length },
     communications: { active: 2, needs_reply: 1 },
     finance: { confirmed_payments_today_kgs: 142500, active_reservations_remaining_kgs: 38000 },
     tasks: { urgent_active: active.filter(t => t.priority === 'URGENT' || t.priority === 'HIGH').length, housekeeping_active: active.filter(t => t.type === 'HOUSEKEEPING').length, maintenance_active: active.filter(t => t.type === 'MAINTENANCE').length },
