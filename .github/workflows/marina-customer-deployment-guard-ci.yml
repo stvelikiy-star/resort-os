@@ -6,6 +6,10 @@ on:
       - 'scripts/verify_marina_customer_isolation.py'
       - 'scripts/test_verify_marina_customer_isolation.py'
       - 'scripts/verify_marina_customer_compose_render.py'
+      - 'scripts/marina_shared_edge_config.py'
+      - 'scripts/test_marina_shared_edge_config.py'
+      - 'compose.marina-customer-shared-edge.yaml'
+      - 'deploy/Caddyfile.customer-gateway'
       - 'docs/MARINA_SINGLE_CUSTOMER_DEPLOYMENT_CONTRACT_20261105.md'
       - '.github/workflows/marina-customer-deployment-guard-ci.yml'
   workflow_dispatch:
@@ -23,10 +27,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile guard and tests
-        run: python3 -m py_compile scripts/verify_marina_customer_isolation.py scripts/test_verify_marina_customer_isolation.py scripts/verify_marina_customer_compose_render.py
+        run: python3 -m py_compile scripts/verify_marina_customer_isolation.py scripts/test_verify_marina_customer_isolation.py scripts/verify_marina_customer_compose_render.py scripts/marina_shared_edge_config.py scripts/test_marina_shared_edge_config.py
       - name: Validate fail-closed deployment configuration rules
-        run: python3 scripts/test_verify_marina_customer_isolation.py
-      - name: Render two separate customer Compose configurations (no containers)
+        run: |
+          python3 scripts/test_verify_marina_customer_isolation.py
+          python3 scripts/test_marina_shared_edge_config.py
+      - name: Render standalone and shared edge customer Compose configurations (no containers)
         run: python3 scripts/verify_marina_customer_compose_render.py
       - name: Record non-deployment acceptance boundary
         run: |
