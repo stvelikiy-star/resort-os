@@ -51,7 +51,10 @@ export default function Overview() {
     {data ? <>
       <StaggerItem index={0}><Hero>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-          <Text numberOfLines={2} style={[font.label, { color:'#C8E8F5', flex: 1, minWidth: 0 }]}>{data.property.name.toUpperCase()} · {data.property.local_date}</Text>
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <Text numberOfLines={1} style={[font.label, { color: '#C8E8F5' }]}>{data.property.name.toUpperCase()}</Text>
+            <Text numberOfLines={1} style={[font.label, { color: '#C8E8F5' }]}>{data.property.local_date}</Text>
+          </View>
           <Text style={[font.label, { color:'#E7C480' }]}>{hotel?.demo ? copy.demoLabel : 'LIVE PMS'}</Text>
         </View>
         <View style={{ flexDirection:'row', alignItems:'center', gap:width < 350 ? 6 : 12, marginTop:8 }}>

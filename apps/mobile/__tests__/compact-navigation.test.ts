@@ -1,7 +1,17 @@
 import { mobileTabPlan } from '../src/roles/navigation';
 import { workspaceForSession } from '../src/roles/registry';
+import { mobileCopyStrings } from '../src/i18n/mobileCopy';
 
 describe('role-aware compact bottom navigation', () => {
+  it('uses concise, localized navigation labels rather than truncating PMS and Home at 320–375dp', () => {
+    for (const locale of ['ru', 'kg', 'en', 'kz'] as const) {
+      const copy = mobileCopyStrings[locale];
+      expect(copy.pmsTabShort.length).toBeLessThan(copy.pms.length);
+      expect(copy.pmsTabShort.length).toBeLessThanOrEqual(7);
+      expect(copy.homeShort.trim()).not.toBe('');
+    }
+  });
+
   it('keeps permission-filtered routes and caps bottom tabs at five including More', () => {
     const ws = workspaceForSession('OWNER', ['DASHBOARD', 'PMS', 'WHATSAPP', 'OPS', 'STAFF'], 'LIVE');
     const plan = mobileTabPlan(ws.tabs);

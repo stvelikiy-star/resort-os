@@ -1,7 +1,7 @@
 import { useSession } from '../state/session';
 const strings = {
   ru: {
-    overview: 'Обзор', reception: 'Сегодня', pms: 'Шахматка', inbox: 'Чаты', dining: 'Питание',
+    overview: 'Обзор', homeShort: 'Главная', pmsTabShort: 'Брони', reception: 'Сегодня', pms: 'Шахматка', inbox: 'Чаты', dining: 'Питание',
     tasks: 'Задачи', rooms: 'Номера', requests: 'Ремонт', admin: 'Команда', profile: 'Профиль',
     unavailable: 'В этой среде нет подтверждённых рабочих данных. Подключите защищённый адрес отеля.',
     denied: 'Раздел недоступен по правам текущей роли.', empty: 'Нет данных', retry: 'Повторить', loading: 'Загрузка…',
@@ -21,7 +21,7 @@ const strings = {
     more: 'Детали', moreMenu: 'Ещё', welcome: 'Здравствуйте', demoLabel: 'ДЕМО', roomCondition: 'Состояние номерного фонда', shiftBriefing: 'Оперативная сводка', awaitingArrival: 'Ожидает заезда', checkedIn: 'Заселён', awaitingDeparture: 'Ожидает выселения', checkedOut: 'Выселен', cancelled: 'Отменён', pendingConfirmation: 'Ждёт подтверждения', searchReservation: 'Найти гостя, номер или бронь', clearSearch: 'Очистить поиск', staffOverview: 'Команда', teamShort: 'Штат', repairShort: 'Рем.', tasksTabShort: 'Задачи', roomsTabShort: 'Номера', maintenanceOverview: 'Активный ремонт', housekeepingOverview: 'В уборке', arrivalList: 'Ожидаемые заезды', departureList: 'Ожидаемые выезды', noTrendData: 'Динамика недоступна: сервер не предоставляет подтверждённый ряд данных', close: 'Закрыть', chatOpen: 'Открыт', chatWaitingGuest: 'Ожидаем гостя', chatWaitingStaff: 'Нужен сотрудник', chatResolved: 'Решён', chatArchived: 'В архиве', messageIncoming: 'Гость', messageOutgoing: 'Сотрудник', messageInternal: 'Внутреннее', messageSent: 'Отправлено', messageDelivered: 'Доставлено', messageRead: 'Прочитано', messageFailed: 'Ошибка доставки', orderNew: 'Новый', orderAccepted: 'Принят', orderCooking: 'Готовится', orderReady: 'Готово', orderServed: 'Подано', orderCancelled: 'Отменён', senderBlocked: 'Нет серверной отправки WhatsApp',
   },
   en: {
-    overview: 'Overview', reception: 'Today', pms: 'PMS grid', inbox: 'Chats', dining: 'Dining',
+    overview: 'Overview', homeShort: 'Home', pmsTabShort: 'PMS', reception: 'Today', pms: 'PMS grid', inbox: 'Chats', dining: 'Dining',
     tasks: 'Tasks', rooms: 'Rooms', requests: 'Repairs', admin: 'Team', profile: 'Profile',
     unavailable: 'No verified live hotel data in this environment. Connect a secure hotel address.',
     denied: 'You do not have permission for this section.', empty: 'No records', retry: 'Retry', loading: 'Loading…',
@@ -41,7 +41,7 @@ const strings = {
     more: 'Details', moreMenu: 'More', welcome: 'Welcome', demoLabel: 'DEMO', roomCondition: 'Room condition', shiftBriefing: 'Shift briefing', awaitingArrival: 'Awaiting arrival', checkedIn: 'Checked in', awaitingDeparture: 'Awaiting checkout', checkedOut: 'Checked out', cancelled: 'Cancelled', pendingConfirmation: 'Awaiting confirmation', searchReservation: 'Find guest, room or booking', clearSearch: 'Clear search', staffOverview: 'Team', teamShort: 'Staff', repairShort: 'Fix', tasksTabShort: 'Tasks', roomsTabShort: 'Rooms', maintenanceOverview: 'Active repairs', housekeepingOverview: 'Cleaning', arrivalList: 'Expected arrivals', departureList: 'Expected departures', noTrendData: 'Trends unavailable: the server has no verified time series', close: 'Close', chatOpen: 'Open', chatWaitingGuest: 'Waiting for guest', chatWaitingStaff: 'Waiting for staff', chatResolved: 'Resolved', chatArchived: 'Archived', messageIncoming: 'Guest', messageOutgoing: 'Staff', messageInternal: 'Internal', messageSent: 'Sent', messageDelivered: 'Delivered', messageRead: 'Read', messageFailed: 'Delivery failed', orderNew: 'New', orderAccepted: 'Accepted', orderCooking: 'Cooking', orderReady: 'Ready', orderServed: 'Served', orderCancelled: 'Cancelled', senderBlocked: 'WhatsApp outbound not configured on server',
   },
   kg: {
-    overview: 'Сереп', reception: 'Бүгүн', pms: 'Брондоо тору', inbox: 'Чаттар', dining: 'Тамактануу',
+    overview: 'Сереп', homeShort: 'Башкы', pmsTabShort: 'Брондор', reception: 'Бүгүн', pms: 'Брондоо тору', inbox: 'Чаттар', dining: 'Тамактануу',
     tasks: 'Тапшырмалар', rooms: 'Бөлмөлөр', requests: 'Оңдоо', admin: 'Команда', profile: 'Профиль',
     unavailable: 'Бул чөйрөдө ырасталган маалымат жок. Мейманкананын коопсуз дарегине туташыңыз.',
     denied: 'Бул бөлүмгө укугуңуз жок.', empty: 'Маалымат жок', retry: 'Кайталоо', loading: 'Жүктөлүүдө…',
@@ -61,7 +61,7 @@ const strings = {
     more: 'Маалымат', moreMenu: 'Дагы', welcome: 'Саламатсызбы', demoLabel: 'ДЕМО', roomCondition: 'Бөлмөлөрдүн абалы', shiftBriefing: 'Нөөмөт боюнча маалымат', awaitingArrival: 'Келүүнү күтүүдө', checkedIn: 'Жайгашты', awaitingDeparture: 'Чыгууну күтүүдө', checkedOut: 'Чыгып кетти', cancelled: 'Жокко чыгарылды', pendingConfirmation: 'Ырастоо күтүлүүдө', searchReservation: 'Конокту, бөлмөнү же бронду издөө', clearSearch: 'Издөөнү тазалоо', staffOverview: 'Команда', teamShort: 'Кызмат', repairShort: 'Оңд.', tasksTabShort: 'Тапш.', roomsTabShort: 'Бөлм.', maintenanceOverview: 'Оңдоодогу иштер', housekeepingOverview: 'Тазалоодо', arrivalList: 'Күтүлгөн келүүлөр', departureList: 'Күтүлгөн кетүүлөр', noTrendData: 'Серверде ырасталган убакыттык катар жок', close: 'Жабуу', chatOpen: 'Ачык', chatWaitingGuest: 'Конокту күтүүдө', chatWaitingStaff: 'Кызматкерди күтүүдө', chatResolved: 'Чечилди', chatArchived: 'Архивде', messageIncoming: 'Конок', messageOutgoing: 'Кызматкер', messageInternal: 'Ички', messageSent: 'Жөнөтүлдү', messageDelivered: 'Жеткирилди', messageRead: 'Окулду', messageFailed: 'Жеткирүү катасы', orderNew: 'Жаңы', orderAccepted: 'Кабыл алынды', orderCooking: 'Даярдалууда', orderReady: 'Даяр', orderServed: 'Берилди', orderCancelled: 'Жокко чыгарылды', senderBlocked: 'Серверде WhatsApp жөнөтүү жок',
   },
   kz: {
-    overview: 'Шолу',
+    overview: 'Шолу', homeShort: 'Басты', pmsTabShort: 'Брондау',
     reception: 'Бүгін',
     pms: 'Брондау торы',
     inbox: 'Чаттар',

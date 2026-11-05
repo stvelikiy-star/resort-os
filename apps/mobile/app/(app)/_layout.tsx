@@ -25,6 +25,8 @@ export default function AppTabs() {
   const { width, fontScale } = useWindowDimensions();
   const compact = width < 355 || fontScale > 1.35;
   const tabTitle = (key: TabKey) => {
+    if (key === 'overview' && compact) return copy.homeShort;
+    if (key === 'pms') return copy.pmsTabShort;
     if (key === 'admin') return copy.teamShort;
     if (key === 'tasks' && (locale === 'kg' || locale === 'kz')) return copy.tasksTabShort;
     if (key === 'rooms' && (locale === 'kg' || locale === 'kz')) return copy.roomsTabShort;
