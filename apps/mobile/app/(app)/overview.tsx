@@ -76,10 +76,10 @@ export default function Overview() {
       </GlassCard> : null}
       <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
       <View style={{ flexDirection:'row', flexWrap:'wrap', gap:space.md }}>
-        <MetricCard icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
-        <MetricCard icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
-        <MetricCard icon={MessageCircle} label={copy.needsReply} value={count(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
-        <MetricCard icon={BedDouble} label={copy.dirty} value={count(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
+        <MetricCard tone="gold" icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
+        <MetricCard tone="warning" icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
+        <MetricCard tone="cyan" icon={MessageCircle} label={copy.needsReply} value={count(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
+        <MetricCard tone="warning" icon={BedDouble} label={copy.dirty} value={count(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
       </View>
       <SectionLabel>{copy.available}</SectionLabel>
       {canOpen('pms') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
@@ -104,8 +104,8 @@ export default function Overview() {
       </GlassCard>
       <SectionLabel>{copy.tasks}</SectionLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-        <MetricCard icon={Sparkles} label={copy.housekeepingOverview} value={count(data.tasks.housekeeping_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
-        <MetricCard icon={Wrench} label={copy.maintenanceOverview} value={count(data.tasks.maintenance_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
+        <MetricCard tone="success" icon={Sparkles} label={copy.housekeepingOverview} value={count(data.tasks.housekeeping_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
+        <MetricCard tone="warning" icon={Wrench} label={copy.maintenanceOverview} value={count(data.tasks.maintenance_active)} onPress={canOpen('tasks') ? () => router.push('/tasks') : undefined}/>
       </View>
       {data.today.arrivals.length ? <SectionLabel>{copy.arrivalList} · {data.today.arrivals.length}</SectionLabel> : null}
       {data.today.arrivals.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
