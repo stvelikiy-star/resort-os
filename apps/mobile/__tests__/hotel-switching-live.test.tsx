@@ -84,7 +84,7 @@ function ViewPanel(){
   </>;
 }
 it('retains independent verified LIVE sessions A→B→A on two signed, different HTTPS hosts',async()=>{
-  const screen=render(<SessionProvider initialLocale="ru"><ViewPanel/></SessionProvider>);
+  const screen=await render(<SessionProvider initialLocale="ru"><ViewPanel/></SessionProvider>);
   fireEvent.press(screen.getByTestId('add-a'));
   await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id));
   fireEvent.press(screen.getByTestId('login'));

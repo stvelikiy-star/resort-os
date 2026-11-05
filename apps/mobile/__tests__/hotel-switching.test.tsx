@@ -33,7 +33,7 @@ function HotelPanel() {
   </>;
 }
 it('A → B → A retains A in-memory identity without re-login and never mixes hotel data', async () => {
-  const screen = render(<SessionProvider initialLocale="ru" initialHotelId="demo-marina-issykkul"><HotelPanel/></SessionProvider>);
+  const screen = await render(<SessionProvider initialLocale="ru" initialHotelId="demo-marina-issykkul"><HotelPanel/></SessionProvider>);
   fireEvent.press(screen.getByTestId('login-owner'));
   await waitFor(() => expect(screen.getByTestId('role').props.children).toBe('OWNER'));
   fireEvent.press(screen.getByTestId('read'));

@@ -193,7 +193,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     }
     const revision = ++sessionRevision.current;
     loginAttempt.current++;
-    let remembered = sessions[id] ?? null;
+    let remembered: AuthUser | null = sessions[id] ?? null;
     if (remembered && !target.demo) {
       try {
         // Revalidate before revealing any cached LIVE identity or hotel data.
