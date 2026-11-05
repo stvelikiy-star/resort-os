@@ -38,6 +38,11 @@ class SharedEdgeContract(unittest.TestCase):
         a, b = hotel(1), hotel(2)
         self.assertIn("SAME actual Ubuntu host", " ".join(validate_shared_edge([a, b])))
 
+    def test_www_redirect_cannot_shadow_other_customer_admin_route(self):
+        a, b = self.config()
+        b["ADMIN_HOST"] = "www." + a["PUBLIC_HOST"]
+        self.assertIn("www aliases collide", " ".join(validate_shared_edge([a, b])))
+
     def test_bad_hostname_cannot_inject_caddy_config(self):
         a, b = self.config()
         b["PUBLIC_HOST"] = "bad.example.kg {\n reverse_proxy evil"
