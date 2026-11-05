@@ -65,3 +65,12 @@ describe('direct Inbox route authorization', () => {
     expect(hasTabForSession('OWNER', ['WHATSAPP'], 'LIVE', 'inbox', 'shared_auth_preview')).toBe(false);
   });
 });
+
+describe('direct PMS route authorization', () => {
+  it('requires a real PMS grant and a PMS-supported role', () => {
+    expect(hasTabForSession('MAID', ['PMS'], 'LIVE', 'pms')).toBe(false);
+    expect(hasTabForSession('MANAGER', ['DASHBOARD'], 'LIVE', 'pms')).toBe(false);
+    expect(hasTabForSession('RECEPTION', ['PMS'], 'LIVE', 'pms')).toBe(true);
+    expect(hasTabForSession('AGENT', ['PMS'], 'LIVE', 'pms')).toBe(true);
+  });
+});
