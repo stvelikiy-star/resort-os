@@ -2,11 +2,12 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Alert, Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ChefHat, UtensilsCrossed, Clock3, CheckCircle2 } from 'lucide-react-native';
-import { Badge, Button, Empty, SectionLabel } from '../../src/components/ui';
+import { Badge, Button, Empty, SectionLabel, DemoBanner } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { DiningFloor, KitchenOrder, KitchenStatus, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { orderStatusLabel, diningTableStatusLabel } from '../../src/i18n/statusLabels';
+import { demoDiningFloor, demoKitchenOrders } from '../../src/api/demoPresentation';
 import { useSession } from '../../src/state/session';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
@@ -15,7 +16,8 @@ import { font, space } from '../../src/theme/tokens';
 
 const NEXT: Partial<Record<KitchenStatus, KitchenStatus>> = { NEW: 'ACCEPTED', ACCEPTED: 'COOKING', COOKING: 'READY' };
 export default function Dining() {
-  const { user, hotel } = useSession();
+  const { user, hotel, api, locale } = useSession();
+  const showroom = api?.mode === 'DEMO';
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
@@ -23,7 +25,7 @@ export default function Dining() {
   const singleColumn = width < 365 || fontScale > 1.35;
   const cook = user?.role === 'COOK';
   const waiter = user?.role === 'WAITER';
-  const { data, loading, error, reload } = useAsync<KitchenOrder[] | DiningFloor | null>(() => live ? cook ? live.kitchenOrders() : live.diningFloor() : Promise.resolve(null), [live, cook, user?.id]);
+  const { data, loading, error, reload } = useAsync<KitchenOrder[] | DiningFloor | null>(() => showroom ? Promise.resolve(cook ? demoKitchenOrders(locale) : demoDiningFloor(locale)) : live ? cook ? live.kitchenOrders() : live.diningFloor() : Promise.resolve(null), [live, showroom, cook, user?.id, locale]);
   const focused = useRef(false);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -45,13 +47,14 @@ export default function Dining() {
       Alert.alert(rejected ? copy.conflict : copy.resultUnknown);
     } finally { locked.current = false; setBusy(false); }
   }}]);
-  if (!user || !user.module_permissions?.includes('DINING') || !['COOK','WAITER','OWNER','MANAGER'].includes(user.role))
+  if (!user || (!showroom && !user.module_permissions?.includes('DINING')) || !['COOK','WAITER','OWNER','MANAGER'].includes(user.role))
     return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.dining} subtitle={hotel?.name} eyebrow="MARINA SMART" right={cook ? <ChefHat size={27} color={c.primary}/> : <UtensilsCrossed size={27} color={c.primary}/>}/>
-    {!live ? <Empty text={copy.unavailable}/> : null}
+    {showroom ? <DemoBanner/> : null}
+    {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
     {unknownResult ? <GlassCard testID="dining-unknown-result"><Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.resultUnknown}</Text></GlassCard> : null}
-    {loading && live ? <LoadingShimmer count={3}/> : null}
+    {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {floor ? <><SectionLabel>{copy.tables}</SectionLabel><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>{floor.tables.map(t => <GlassCard key={t.id} style={{ width: singleColumn ? '100%' : '47%', gap: 6 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><UtensilsCrossed size={21} color={c.primary}/><Text style={[font.h2, { color: c.text, flex: 1 }]}>{t.code}</Text></View>
@@ -69,8 +72,8 @@ export default function Dining() {
         </View>)}
       </View> : null}
       {'notes' in o && o.notes ? <Text style={[font.small, { color: c.text }]}>{o.notes}</Text> : null}
-      {cook && NEXT[o.status as KitchenStatus] ? <Button testID={'order-next-' + o.id} label={orderStatusLabel(NEXT[o.status as KitchenStatus]!, copy)} disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, NEXT[o.status as KitchenStatus]!))}/> : null}
-      {waiter && !('waiter_id' in o && o.waiter_id) ? <Button testID={'waiter-claim-' + o.id} label={copy.take} disabled={busy || unknownResult} onPress={() => change(() => live!.claimWaiterOrder(o.id, user.id))}/> : null}
+      {!showroom && cook && NEXT[o.status as KitchenStatus] ? <Button testID={'order-next-' + o.id} label={orderStatusLabel(NEXT[o.status as KitchenStatus]!, copy)} disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, NEXT[o.status as KitchenStatus]!))}/> : null}
+      {!showroom && waiter && !('waiter_id' in o && o.waiter_id) ? <Button testID={'waiter-claim-' + o.id} label={copy.take} disabled={busy || unknownResult} onPress={() => change(() => live!.claimWaiterOrder(o.id, user.id))}/> : null}
       {waiter && o.status === 'READY' ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: {orderStatusLabel('READY', copy)} · {copy.readOnly}</Text> : null}
     </GlassCard></StaggerItem>)}
     {!loading && !error && orders.length === 0 ? <Empty text={copy.empty}/> : null}
