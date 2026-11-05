@@ -6,7 +6,7 @@
 
 The genuine screenshots below were captured from the **running Expo Web export** in headless Google Chrome, with a built-in **DEMO-only fixture** at localhost. They are **NOT Android**, not generated illustrations and not substituted for native visual evidence. The screen source was `1b55a5a48a4ca5c616d4b0d8aa179591882d82ef`, GitHub Actions [run 41875555127](https://github.com/stvelikiy-star/resort-os/actions/runs/41875555127), mobile-check job 126734622122. The screenshot assets and this report only add documentation, not executable UI changes.
 
-**Expo Web route QA (historical screenshot evidence across verified source SHAs):** 0 PASS / 0 FAIL / **18 PARTIAL** / **5 NOT TESTED**. New PR #368 matrix captures are not credited until its CI finishes.
+**Expo Web route QA (actual screenshot evidence):** 0 PASS / 0 FAIL / **19 PARTIAL** / **4 NOT TESTED** (23 routes). Extended run: 170 authentic Expo Web JPEGs, including 135 named route/locale/theme/viewport matrix shots.
 **Android native visual QA:** 0 PASS / 0 FAIL / 0 PARTIAL / **23 NOT TESTED**.
 **Screenshots:** 21 authentic Expo Web JPEGs, at 320 / 375 / 430 viewport widths, RU / KG / EN / KZ and light / dark where noted.
 
@@ -18,17 +18,17 @@ The genuine screenshots below were captured from the **running Expo Web export**
 | --- | --- | --- | --- | --- |
 | `/connect` | Select demo/trusted hotel | PARTIAL | NOT TESTED | [Web 1](qa-evidence/connect_ru_light_375.jpg) |
 | `/login` | All server-supported roles | PARTIAL | NOT TESTED | [Web 1](qa-evidence/login_en_dark_375.jpg) |
-| `/scan` | Hotel QR connection | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
-| `/overview` | OWNER/MANAGER | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web owner overview artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_overview_ru_light_375.jpg` |
-| `/reception` | RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web reception artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `reception_en_dark_375.jpg` |
-| `/pms` | OWNER/MANAGER/AGENT | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web PMS artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_pms_ru_light_375.jpg` |
+| `/scan` | Hotel QR connection | PARTIAL (Web permission-state only, no camera E2E) | NOT TESTED | [9 actual `matrix_scan_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709); RU/KG/EN dark, 320/375/430 |
+| `/overview` | OWNER/MANAGER | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web owner overview artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_overview_ru_light_375.jpg` · [18 actual `matrix_overview_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
+| `/reception` | RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web reception artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `reception_en_dark_375.jpg` · [18 actual `matrix_reception_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
+| `/pms` | OWNER/MANAGER/AGENT | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web PMS artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_pms_ru_light_375.jpg` · [18 actual `matrix_pms_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
 | `/new-booking` | Permitted booking creator | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
 | `/reservation/[id]` | Permitted booking detail | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
 | `/holds` | OWNER/MANAGER where server supported | NOT TESTED | NOT TESTED | No safely accessible built-in DEMO screen |
 | `/finance` | OWNER/MANAGER with FINANCE grant, LIVE only | NOT TESTED | NOT TESTED | New route in PR #368; no physical Android or LIVE screenshots |
-| `/inbox` | Permitted OWNER/MANAGER/RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web Inbox artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_inbox_ru_light_375.jpg` |
-| `/conversation/[id]` | Permitted inbox users | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web chat artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_conversation_ru_light_375.jpg` |
-| `/ai` | Permitted OWNER/MANAGER/RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web unavailable AI artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_ai_unavailable_ru_light_375.jpg` (offline, not LIVE) |
+| `/inbox` | Permitted OWNER/MANAGER/RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web Inbox artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_inbox_ru_light_375.jpg` · [18 actual `matrix_inbox_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
+| `/conversation/[id]` | Permitted inbox users | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web chat artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_conversation_ru_light_375.jpg` · [18 actual `matrix_conversation_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
+| `/ai` | Permitted OWNER/MANAGER/RECEPTION | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web unavailable AI artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `owner_ai_unavailable_ru_light_375.jpg` (offline, not LIVE) · [18 actual `matrix_ai_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
 | `/tasks` | MAID/TECHNICIAN and other permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_tasks_ru_light_375_after_tab_fix.jpg) · [Web 2](qa-evidence/maid_tasks_en_dark_375.jpg) · [Web 3](qa-evidence/tech_tasks_en_dark_375.jpg) |
 | `/task/[id]` | Permitted task detail | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_housekeeping_detail_en_dark_375.jpg) |
 | `/rooms` | Permitted staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/maid_rooms_en_dark_375_after_wrap_fix.jpg) |
@@ -36,7 +36,7 @@ The genuine screenshots below were captured from the **running Expo Web export**
 | `/requests` | TECHNICIAN and permitted maintenance staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/tech_repairs_en_dark_375.jpg) |
 | `/new-request` | Maintenance creator | PARTIAL | NOT TESTED | [Web 1](qa-evidence/tech_new_request_en_dark_320.jpg) · [Web 2](qa-evidence/tech_new_request_en_dark_375.jpg) · [After 320](qa-evidence/tech_new_request_en_dark_320_verified.jpg) |
 | `/admin` | OWNER/MANAGER if authorized | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_team_en_dark_320_after_nav_fix.jpg) · [Web 2](qa-evidence/manager_team_en_dark_375.jpg) · [Web 3](qa-evidence/manager_team_en_dark_430.jpg) · [Assign picker](qa-evidence/manager_assign_picker_en_dark_430_verified.jpg) |
-| `/dining` | COOK/WAITER/authorized management | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web kitchen artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `cook_orders_en_dark_375.jpg` |
+| `/dining` | COOK/WAITER/authorized management | PARTIAL (prior SHA) | NOT TESTED | [Real Expo Web kitchen artifact](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914) · `cook_orders_en_dark_375.jpg` · [18 actual `matrix_dining_*` captures](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709) |
 | `/profile` | All authenticated staff | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_profile_ru_light_375.jpg) · [Web 2](qa-evidence/manager_profile_ru_dark_375.jpg) · [Web 3](qa-evidence/manager_profile_kg_dark_375.jpg) · [Web 4](qa-evidence/manager_profile_kz_dark_375.jpg) · [Web 5](qa-evidence/manager_profile_en_dark_375.jpg) · [After sign-out](qa-evidence/manager_profile_ru_dark_375_verified.jpg) |
 | `/more` | Roles with >4 allowed navigation tabs | PARTIAL | NOT TESTED | [Web 1](qa-evidence/manager_more_ru_light_375.jpg) |
 
@@ -44,11 +44,34 @@ The genuine screenshots below were captured from the **running Expo Web export**
 
 **Verified prior-commit evidence:** 35 genuine Expo Web screenshot interactions from source SHA `b01bbcf6e14208dfd9aba0ad428fd89ed1063aec`, [workflow 41975002638](https://github.com/stvelikiy-star/resort-os/actions/runs/41975002638/artifacts/13391511914), synthetic local DEMO only. These images justify **PARTIAL**, not PASS, for seven formerly untested routes (overview/reception/pms/inbox/conversation/ai/dining). Exact filenames are named above; no LIVE/PMS data was accessed.
 
-**New matrix runner added:** `apps/mobile/scripts/qa-web-visual.mjs` records an exact-source `matrix-manifest.json` and individual JPEGs for reachable routes. Target combinations: 320/375/430 dp × light/dark × RU/KG/EN for overview, reception, pms, inbox, conversation, AI and dining; QR scan is attempted at 320/375/430 in RU/KG/EN with **dark only**. A successful Expo Web screenshot is never evidence of a native camera scan.
+**New matrix runner executed successfully on SHA `8edaaf9`:** `apps/mobile/scripts/qa-web-visual.mjs` records an exact-source `matrix-manifest.json` and individual JPEGs for reachable routes. Target combinations: 320/375/430 dp × light/dark × RU/KG/EN for overview, reception, pms, inbox, conversation, AI and dining; QR scan is attempted at 320/375/430 in RU/KG/EN with **dark only**. A successful Expo Web screenshot is never evidence of a native camera scan.
 
-**Remaining NOT TESTED:** `/new-booking`, `/reservation/[id]`, `/holds` have no safe authenticated DEMO flow that would prove operation; `/finance` requires a real FINANCE-authorized server session. The QR scan screenshots are **PENDING** until actual CI logs confirm captures. Do not assume those screenshots exist from configured test code alone.
+**Remaining NOT TESTED:** `/new-booking`, `/reservation/[id]`, `/holds` have no safe authenticated DEMO flow that would prove operation; `/finance` requires a real FINANCE-authorized server session. QR permission-state screenshots are **CONFIRMED (9 files)**; no real camera scan is claimed. Do not assume those screenshots exist from configured test code alone.
 
 **Acceptance rule:** only mark new matrix items PARTIAL after a CI log confirms `WEB_VISUAL_CAPTURE` with exact route+locale+theme+width and the corresponding nonempty JPEG artifact. Historical and current artifacts must not be conflated. **All Android routes remain NOT TESTED** until actual-device screenshots and E2E checks.
+
+## PR #368 — CONFIRMED EXTENDED WEB MATRIX
+
+**Exact executable SHA:** `8edaaf9ed810370350b41005d68a0fa5a2bb5b9b`. [GitHub Actions run 41982562743](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743): `mobile-check` **SUCCESS**, Jest **34 suites / 228 tests PASS**, `WEB_VISUAL_QA_END captured=170 actual=ExpoWeb not=Android`.
+
+[Verified screenshots and machine-readable matrix-manifest.json](https://github.com/stvelikiy-star/resort-os/actions/runs/41982562743/artifacts/13394124709). All 170 images were captured from the actual running Expo Web app on isolated local DEMO data (35 standard screen shots + 135 matrix captures). No real hotel, native device or simulated proof was used.
+
+| Route | Captures | Actual locale/theme/width | Expo Web |
+| --- | ---: | --- | --- |
+| `/overview` | 18 | RU/KG/EN × light/dark × 320/375/430 | PARTIAL |
+| `/reception` | 18 | RU/KG/EN × light/dark × 320/375/430 | PARTIAL |
+| `/pms` | 18 | RU/KG/EN × light/dark × 320/375/430 | PARTIAL |
+| `/inbox` | 18 | RU/KG/EN × light/dark × 320/375/430 | PARTIAL |
+| `/conversation/[id]` | 18 | RU/KG/EN × light/dark × 320/375/430 | PARTIAL |
+| `/ai` | 18 | RU/KG/EN × light/dark × 320/375/430; offline/unavailable state only | PARTIAL |
+| `/dining` | 18 | RU/KG/EN × light/dark × 320/375/430 | PARTIAL |
+| `/scan` | 9 | RU/KG/EN × dark only × 320/375/430; camera permission state, **not camera scan** | PARTIAL |
+| `/new-booking` | 0 | No safe DEMO booking-write scenario | NOT TESTED |
+| `/reservation/[id]` | 0 | No safe DEMO reservation-detail auth context | NOT TESTED |
+| `/holds` | 0 | Server-backed feature gate remains false | NOT TESTED |
+| `/finance` | 0 | LIVE FINANCE-permitted account required | NOT TESTED |
+
+**No native Android screenshots or LIVE E2E were taken:** all 23 Android routes remain **NOT TESTED**. Screenshot PARTIAL describes only browser-rendered UI at specified conditions, not production-ready functionality or human translation certification. The follow-up documentation commit changes no executable UI but still requires CI acceptance on the final SHA.
 
 ## Confirmed UI fixes — same-condition before / after
 
