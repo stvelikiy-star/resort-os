@@ -239,7 +239,13 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // requires a dedicated administrator-controlled reset, not another login.
     const existing = hotels.find(item => !item.demo);
     if (existing && existing.id !== h.id) {
-      throw new ApiError('FORBIDDEN', 'Device is already bound to a hotel');
+      const sameHost = new URL(existing.baseUrl).hostname === new URL(h.baseUrl).hostname;
+      // /api/v1 -> /core on the SAME approved host is a technical URL
+      // migration, not onboarding a second customer. Never swap an active user.
+      if (!sameHost || sessions[existing.id]) {
+        throw new ApiError('FORBIDDEN', 'Device is already bound to a hotel');
+      }
+      dropApi(existing.id);
     }
     setHotels([...DEMO_HOTELS, h]);
     void setItem('marina.hotels', JSON.stringify([h]));
