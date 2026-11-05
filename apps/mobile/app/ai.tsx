@@ -101,7 +101,7 @@ function AssistantForSession() {
  * A late response can only address its old, unmounted React instance.
  */
 export default function Assistant() {
-  const { hotel, user, api, serverAuthMode } = useSession();
+  const { hotel, user, api } = useSession();
   if (!hotel || !user || !api) return <Redirect href="/connect"/>;
   return <AssistantForSession key={assistantSessionKey(hotel.id, user, api.mode)}/>;
 }
