@@ -11,12 +11,15 @@ import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useLiveModules, Dashboard } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { demoDashboard } from '../../src/api/demoPresentation';
+import { InventorySpectrum } from '../../src/components/InventorySpectrum';
 import { contactInitials } from '../../src/i18n/statusLabels';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Overview() {
-  const { user, hotel, api, serverAuthMode } = useSession();
+  const { user, hotel, api, serverAuthMode, locale } = useSession();
+  const showroom = api?.mode === 'DEMO';
   const shared = serverAuthMode === 'shared_auth_preview';
   const canOpen = (tab: 'inbox' | 'pms' | 'tasks' | 'admin') => !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', tab, serverAuthMode);
   const canOpenInbox = !shared && canOpen('inbox');
@@ -27,7 +30,7 @@ export default function Overview() {
   const { t: tr } = useTranslation();
   const priorityLabel = (priority: string) => ['URGENT', 'HIGH', 'NORMAL', 'LOW'].includes(priority) ? tr('tasks.' + priority.toLowerCase()) : priority;
   const router = useRouter();
-  const { data, loading, error, reload } = useAsync<Dashboard | null>(() => live ? live.dashboard() : Promise.resolve(null), [live, user?.id, user?.module_permissions?.join(',')]);
+  const { data, loading, error, reload } = useAsync<Dashboard | null>(async () => showroom && api ? demoDashboard(hotel?.name ?? 'DEMO', await api.listRooms(), await api.listTasks(), locale) : live ? live.dashboard() : null, [live, api, showroom, hotel?.id, user?.id, locale, user?.module_permissions?.join(',')]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const money = (value: number) => Number.isFinite(value) ? Number(value).toLocaleString('ru-RU') + ' KGS' : '—';
@@ -42,8 +45,8 @@ export default function Overview() {
         {!shared && live && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={38} onPress={() => router.push('/ai')}/> : null}
       </View> : null}/>
     {hotel?.demo ? <DemoBanner/> : null}
-    {!live ? <Empty text={copy.unavailable}/> : null}
-    {loading && live ? <LoadingShimmer count={3}/> : null}
+    {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
+    {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <StaggerItem index={0}><Hero>
@@ -84,6 +87,7 @@ export default function Overview() {
       {canOpen('tasks') ? <QuickAction icon={ClipboardCheck} label={copy.tasks} onPress={() => router.push('/tasks')}/> : null}
       {canOpen('admin') ? <QuickAction icon={Users} label={copy.staffOverview} onPress={() => router.push('/admin')}/> : null}
       <SectionLabel>{copy.roomCondition}</SectionLabel>
+      <InventorySpectrum totals={data.rooms} total={data.rooms.total} labels={{clean:copy.clean,dirty:copy.dirty,inspection:copy.checking,blocked:copy.tech}}/>
       <GlassCard style={{ gap: space.md }}>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
           {([
@@ -105,14 +109,14 @@ export default function Overview() {
       </View>
       {data.today.arrivals.length ? <SectionLabel>{copy.arrivalList} · {data.today.arrivals.length}</SectionLabel> : null}
       {data.today.arrivals.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
-        <GlassCard onPress={canOpen('pms') ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}>
+        <GlassCard onPress={!showroom && canOpen('pms') ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}>
           <Text style={[font.h2, { color: c.text }]}>{x.guest_name || x.booking_number}</Text>
           <Text style={[font.small, { color: c.textMuted }]}>{x.booking_number} · {x.room_code || '—'}</Text>
         </GlassCard>
       </StaggerItem>)}
       {data.today.departures.length ? <SectionLabel>{copy.departureList} · {data.today.departures.length}</SectionLabel> : null}
       {data.today.departures.slice(0, 3).map((x, i) => <StaggerItem key={x.id} index={i}>
-        <GlassCard onPress={canOpen('pms') ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}>
+        <GlassCard onPress={!showroom && canOpen('pms') ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}>
           <Text style={[font.h2, { color: c.text }]}>{x.guest_name || x.booking_number}</Text>
           <Text style={[font.small, { color: c.textMuted }]}>{x.booking_number} · {x.room_code || '—'}</Text>
         </GlassCard>
