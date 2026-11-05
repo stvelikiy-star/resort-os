@@ -1,5 +1,5 @@
 import { mobileTabPlan } from '../src/roles/navigation';
-import { workspaceForSession } from '../src/roles/registry';
+import { hasTabForSession, workspaceForSession } from '../src/roles/registry';
 import { mobileCopyStrings } from '../src/i18n/mobileCopy';
 
 describe('role-aware compact bottom navigation', () => {
@@ -52,5 +52,25 @@ describe('role-aware compact bottom navigation', () => {
   it('does not duplicate or invent privileges', () => {
     const p = mobileTabPlan(['tasks', 'rooms', 'requests', 'admin', 'profile', 'profile']);
     expect([...p.primary, ...p.overflow]).toEqual(['tasks', 'rooms', 'requests', 'admin', 'profile']);
+  });
+});
+
+describe('direct Inbox route authorization', () => {
+  it('requires WhatsApp/Inbox grant in LIVE and blocks server-disabled shared preview', () => {
+    expect(hasTabForSession('MANAGER', ['DASHBOARD'], 'LIVE', 'inbox')).toBe(false);
+    expect(hasTabForSession('MAID', ['WHATSAPP'], 'LIVE', 'inbox')).toBe(false);
+    expect(hasTabForSession('RECEPTION', ['INBOX'], 'LIVE', 'inbox')).toBe(false);
+    expect(hasTabForSession('RECEPTION', ['WHATSAPP'], 'LIVE', 'inbox')).toBe(true);
+    expect(hasTabForSession('MANAGER', ['INBOX'], 'LIVE', 'inbox')).toBe(true);
+    expect(hasTabForSession('OWNER', ['WHATSAPP'], 'LIVE', 'inbox', 'shared_auth_preview')).toBe(false);
+  });
+});
+
+describe('direct PMS route authorization', () => {
+  it('requires a real PMS grant and a PMS-supported role', () => {
+    expect(hasTabForSession('MAID', ['PMS'], 'LIVE', 'pms')).toBe(false);
+    expect(hasTabForSession('MANAGER', ['DASHBOARD'], 'LIVE', 'pms')).toBe(false);
+    expect(hasTabForSession('RECEPTION', ['PMS'], 'LIVE', 'pms')).toBe(true);
+    expect(hasTabForSession('AGENT', ['PMS'], 'LIVE', 'pms')).toBe(true);
   });
 });

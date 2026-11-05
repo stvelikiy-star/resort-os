@@ -1,5 +1,5 @@
 import { createLiveModules } from '../src/api/liveModules';
-import { canReadFinance } from '../src/api/financeAccess';
+import { canReadFinance, dashboardFinanceForUser } from '../src/api/financeAccess';
 import { financeSummaryResponse } from '../src/api/contractValidation';
 import type { AuthUser } from '../src/api/types';
 
@@ -41,4 +41,14 @@ it('propagates HTTP 503 rather than substituting DEMO or zero finance totals',as
 });
 it('rejects malformed or missing financial measurements',()=>{
   expect(()=>financeSummaryResponse({ ...summary, period_payments:{received_count:2} })).toThrow();
+});
+
+it('hides dashboard financial KPI values from DASHBOARD-only roles and grants', () => {
+  const finance = { confirmed_payments_today_kgs: 4700, active_reservations_remaining_kgs: 1200 };
+  expect(dashboardFinanceForUser(user('OWNER', ['DASHBOARD']), finance)).toBeNull();
+  expect(dashboardFinanceForUser(user('MANAGER', ['DASHBOARD', 'OPS']), finance)).toBeNull();
+  expect(dashboardFinanceForUser(user('RECEPTION', ['DASHBOARD', 'FINANCE']), finance)).toBeNull();
+  expect(dashboardFinanceForUser(null, finance)).toBeNull();
+  expect(dashboardFinanceForUser(user('OWNER', ['DASHBOARD', 'FINANCE']), finance)).toEqual(finance);
+  expect(dashboardFinanceForUser(user('MANAGER', ['DASHBOARD', 'FINANCE']), finance)).toEqual(finance);
 });

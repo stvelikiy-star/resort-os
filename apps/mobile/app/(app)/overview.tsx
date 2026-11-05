@@ -15,7 +15,7 @@ import { demoDashboard } from '../../src/api/demoPresentation';
 import { InventorySpectrum } from '../../src/components/InventorySpectrum';
 import { contactInitials } from '../../src/i18n/statusLabels';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { canReadFinance } from '../../src/api/financeAccess';
+import { canReadFinance, dashboardFinanceForUser } from '../../src/api/financeAccess';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Overview() {
@@ -80,8 +80,10 @@ export default function Overview() {
       </GlassCard> : null}
       <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
       <View style={{ flexDirection:'row', flexWrap:'wrap', gap:space.md }}>
-        <MetricCard tone="gold" icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
-        <MetricCard tone="warning" icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
+        {dashboardFinanceForUser(user, data.finance) ? <>
+          <MetricCard tone="gold" icon={Wallet} label={copy.revenue} detail={copy.paymentsNotProfit} value={money(data.finance.confirmed_payments_today_kgs)}/>
+          <MetricCard tone="warning" icon={ShieldAlert} label={copy.debt} value={money(data.finance.active_reservations_remaining_kgs)}/>
+        </> : null}
         <MetricCard tone="cyan" icon={MessageCircle} label={copy.needsReply} value={count(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
         <MetricCard tone="warning" icon={BedDouble} label={copy.dirty} value={count(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
       </View>

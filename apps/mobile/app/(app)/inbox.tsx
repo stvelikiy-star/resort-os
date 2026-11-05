@@ -11,19 +11,21 @@ import { formatChatTimestamp } from '../../src/i18n/dateLabels';
 import { demoConversations } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Inbox() {
-  const { hotel, user, locale, api } = useSession();
+  const { hotel, user, locale, api, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
+  const allowed = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'inbox', serverAuthMode);
   const live = useLiveModules();
   const router = useRouter();
   const copy = useMobileCopy();
   const { c } = useTheme();
   const [filter, setFilter] = useState<'needs' | 'all'>('needs');
   const [search, setSearch] = useState('');
-  const { data, loading, error, reload } = useAsync<Conversation[] | null>(() => showroom ? Promise.resolve(demoConversations(locale).filter(x => filter !== 'needs' || x.needs_reply)) : live ? live.conversations(filter === 'needs') : Promise.resolve(null), [live, showroom, filter, user?.id, locale]);
+  const { data, loading, error, reload } = useAsync<Conversation[] | null>(() => !allowed ? Promise.resolve(null) : showroom ? Promise.resolve(demoConversations(locale).filter(x => filter !== 'needs' || x.needs_reply)) : live ? live.conversations(filter === 'needs') : Promise.resolve(null), [live, showroom, filter, user?.id, locale, allowed]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const visible = useMemo(() => (user?.role === 'RECEPTION' ? (data ?? []).filter(x => x.channel_kind === 'WHATSAPP') : data ?? []).filter(x => {
@@ -31,6 +33,7 @@ export default function Inbox() {
     if (!query) return true;
     return [x.contact_name, x.contact_phone, x.last_message_text].some(value => (value ?? '').toLocaleLowerCase().includes(query));
   }), [data, user?.role, search]);
+  if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.inboxTitle} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={<View style={{ width:44,height:44,borderRadius:14,backgroundColor:c.primarySoft,alignItems:'center',justifyContent:'center' }}><MessageCircle color={c.primary} size={24}/></View>}/>

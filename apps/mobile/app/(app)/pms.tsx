@@ -11,6 +11,7 @@ import { useMobileCopy, pmsWeekdayLabels } from '../../src/i18n/mobileCopy';
 import { demoGrid } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius } from '../../src/theme/tokens';
 
@@ -21,15 +22,16 @@ function dayAt(start: string, offset: number): string {
 const DAYS = 7, CELL_WIDTH = 72, ROW_HEIGHT = 76, LABEL_WIDTH = 104;
 
 export default function Pms() {
-  const { hotel, user, locale, api } = useSession();
+  const { hotel, user, locale, api, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
+  const allowed = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'pms', serverAuthMode);
   const live = useLiveModules();
   const copy = useMobileCopy();
   const router = useRouter();
   const { c } = useTheme();
   const [start, setStart] = useState(() => localDate());
   const [filter, setFilter] = useState<'all' | 'attention'>('all');
-  const { data, loading, error, reload } = useAsync<Grid | null>(async () => showroom && api ? demoGrid(locale, await api.listRooms(), hotel?.name ?? 'DEMO') : live ? live.pmsGrid(start, dayAt(start, DAYS)) : null, [live, api, showroom, user?.id, start, locale, hotel?.id]);
+  const { data, loading, error, reload } = useAsync<Grid | null>(async () => !allowed ? null : showroom && api ? demoGrid(locale, await api.listRooms(), hotel?.name ?? 'DEMO') : live ? live.pmsGrid(start, dayAt(start, DAYS)) : null, [live, api, showroom, user?.id, start, locale, hotel?.id, allowed]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const dates = Array.from({ length: DAYS }, (_, i) => dayAt(start, i));
@@ -58,6 +60,7 @@ export default function Pms() {
   const roomState = (room: GridRoom) =>
     room.operational_state === 'CLEAN' ? copy.clean : room.operational_state === 'DIRTY' ? copy.dirty
       : room.operational_state === 'TECH_BLOCK' ? copy.tech : room.operational_state === 'IN_INSPECTION' ? copy.checking : room.operational_state;
+  if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.pms} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
     {live && user && ['OWNER','MANAGER','AGENT'].includes(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
