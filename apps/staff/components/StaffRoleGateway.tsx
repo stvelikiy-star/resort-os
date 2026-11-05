@@ -214,7 +214,7 @@ export default function StaffRoleGateway() {
         <label><span>Код отеля</span><input value={propertyCode} onChange={(event) => setPropertyCode(event.target.value)} required /></label>
       </>}
       <label><span>Логин</span><input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required /></label>
-      <label><span>Пароль</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={6} required /></label>
+      <label><span>Пароль</span><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" minLength={mode === "shared_auth_preview" ? 8 : 6} required /></label>
       {error && <div className="shift-error">{error}</div>}
       <button className="shift-primary" disabled={!mode || busy}>Войти</button>
     </form></main>;

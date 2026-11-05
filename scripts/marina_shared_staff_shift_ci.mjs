@@ -52,7 +52,12 @@ try {
     await page.getByLabel("Код организации").fill("tenant_" + suffix.toLowerCase());
     await page.getByLabel("Код отеля").fill("HOTEL_" + suffix);
     await page.getByLabel("Логин").fill(username);
-    await page.getByLabel("Пароль").fill(password);
+    // Shared-mode server password policy is eight characters minimum.
+    const passwordInput = page.getByLabel("Пароль");
+    assert.equal(await passwordInput.getAttribute("minlength"), "8");
+    await passwordInput.fill("1234567");
+    assert.equal(await passwordInput.evaluate(input => input.checkValidity()), false);
+    await passwordInput.fill(password);
     await page.getByRole("button", { name: "Войти" }).click();
     await page.getByRole("button", { name: "Выйти" }).waitFor();
     const me = await api(page, "auth/me");

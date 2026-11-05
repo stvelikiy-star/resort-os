@@ -41,6 +41,15 @@ try {
     await form.getByRole("button", { name: "Проверить доступность и цену" }).click();
     const confirm = page.getByRole("button", { name: "Подтвердить бронь", exact: true });
     await confirm.waitFor();
+    // Guest/phone changes invalidate the server quote before booking commit.
+    await form.getByLabel("Телефон гостя").fill("+996555771123");
+    await confirm.waitFor({ state: "hidden" });
+    await form.getByRole("button", { name: "Проверить доступность и цену" }).click();
+    await confirm.waitFor();
+    await form.getByLabel("Имя гостя").fill("Synthetic HTTPS Guest " + suffix + " Updated");
+    await confirm.waitFor({ state: "hidden" });
+    await form.getByRole("button", { name: "Проверить доступность и цену" }).click();
+    await confirm.waitFor();
     page.once("dialog", dialog => dialog.accept());
     const committed = page.waitForResponse(response =>
       response.url() === core + "/admin/pms/reservations/new/commit" &&
