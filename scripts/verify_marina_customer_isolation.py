@@ -101,9 +101,12 @@ def validate_pair(a: dict[str, str], b: dict[str, str]) -> list[str]:
         va, vb = a.get(key, "").strip(), b.get(key, "").strip()
         if va and vb and va == vb:
             errors.append(f"hotels share {key}")
-    for key in PATH_KEYS:
-        if a.get(key) and b.get(key) and path_overlap(a[key], b[key]):
-            errors.append(f"hotels share/overlap {key}")
+    # Cross-key overlaps matter too: hotel A's data cannot be inside
+    # hotel B's backup directory (or vice versa).
+    for a_key in PATH_KEYS:
+        for b_key in PATH_KEYS:
+            if a.get(a_key) and b.get(b_key) and path_overlap(a[a_key], b[b_key]):
+                errors.append(f"hotels share/overlap {a_key} and {b_key}")
     a_hosts = {a.get(key, "").lower().strip(".") for key in HOST_KEYS}
     b_hosts = {b.get(key, "").lower().strip(".") for key in HOST_KEYS}
     if (a_hosts - {""}) & (b_hosts - {""}):
