@@ -8,7 +8,7 @@ import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { AssistantCapabilities, AssistantMessage, useLiveModules } from '../src/api/liveModules';
 import { useAsync } from '../src/lib/useAsync';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StatusPill } from '../src/components/Future';
-import { Button, Empty, PressScale, SectionLabel } from '../src/components/ui';
+import { Button, DemoBanner, Empty, PressScale, SectionLabel } from '../src/components/ui';
 import { font, radius, space } from '../src/theme/tokens';
 
 const labels = {
@@ -26,7 +26,7 @@ const labels = {
     source: 'Платформа контексі', yes: 'Бар', no: 'Расталмаған', empty: 'Серверден жауап алу үшін сұрақ қойыңыз.', back: 'Артқа', ready: 'AI қосылды', offline: 'AI қолжетімсіз', processing: 'Сұрау өңделуде…' },
 };
 export default function Assistant() {
-  const { user, locale, serverAuthMode } = useSession();
+  const { user, locale, serverAuthMode, api } = useSession();
   const modules = useLiveModules();
   const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
   const copy = useMobileCopy();
@@ -66,6 +66,7 @@ export default function Assistant() {
       <ChevronLeft size={22} color={c.primary}/><Text style={[font.body, { color: c.primary }]}>{t.back}</Text>
     </PressScale>
     <PremiumHeader title={t.title} subtitle={t.sub} eyebrow="MARINA SMART"/>
+    {api?.mode === 'DEMO' ? <DemoBanner/> : null}
     <View style={{ alignItems: 'center', gap: 8 }}>
       <AIOrb state={!live ? 'offline' : error || capsError ? 'error' : busy ? 'processing' : 'idle'} size={110} label={t.title}/>
       <StatusPill label={busy ? t.processing : capabilities?.configured ? t.ready : t.offline} tone={capabilities?.configured ? 'success' : 'warning'}/>
