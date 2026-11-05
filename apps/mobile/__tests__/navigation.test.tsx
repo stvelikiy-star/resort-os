@@ -53,10 +53,7 @@ const routes = {
 
 async function loginAs(role: string) {
   const screen = await renderRouter(routes, { initialUrl: '/connect' });
-  await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 });
-  await fireEvent.press(screen.getByTestId('hotel-demo-marina-issykkul'));
-  await screen.findByTestId('login-submit');
-  await fireEvent.press(screen.getByTestId(`demo-${role}`));
+  await fireEvent.press(await screen.findByTestId(`connect-demo-${role}`, {}, { timeout: 4000 }));
   if (role === 'manager') {
     // Manager's first screen is now the premium overview, with operations one tap away.
     await fireEvent.press(await screen.findByTestId('tab-tasks', {}, { timeout: 4000 }));
@@ -81,29 +78,29 @@ describe('navigation, guards and screens', () => {
 
   it('unauthenticated direct profile link goes to hotel selection, not empty settings', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/profile' });
-    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('unauthenticated users land on hotel connection with demo banner', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/tasks' });
-    await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 });
+    await screen.findByTestId('web-demo-start', {}, { timeout: 4000 });
     expect(screen.getByTestId('demo-banner')).toBeTruthy();
-    expect(screen.getByTestId('hotel-demo-sunrise-bishkek')).toBeTruthy();
+    expect(screen.queryByTestId('profile-add-hotel')).toBeNull();
   });
 
   it('protects a direct task detail deep link without login', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/task/t1' });
-    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('protects a direct room detail deep link without login', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/room/r1' });
-    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('protects a direct maintenance creation deep link without login', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/new-request' });
-    expect(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('rejects insecure hotel address', async () => {
@@ -281,7 +278,7 @@ describe('navigation, guards and screens', () => {
 
   it('wrong password shows error', async () => {
     const screen = await renderRouter(routes, { initialUrl: '/connect' });
-    await fireEvent.press(await screen.findByTestId('hotel-demo-marina-issykkul', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('connect-demo-login', {}, { timeout: 4000 }));
     await fireEvent.changeText(await screen.findByTestId('login-username'), 'maid');
     await fireEvent.changeText(screen.getByTestId('login-password'), 'nope');
     await fireEvent.press(screen.getByTestId('login-submit'));
