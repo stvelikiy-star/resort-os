@@ -1,0 +1,27 @@
+:3000 {
+  header {
+    Cache-Control "private, no-store"
+    X-Robots-Tag "noindex, nofollow"
+    X-Content-Type-Options "nosniff"
+    Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  }
+
+  @health path /healthz
+  handle @health {
+    respond "OK" 200
+  }
+
+  @unpublished {
+    method GET
+    header Accept *text/html*
+  }
+  handle @unpublished {
+    root * /srv
+    rewrite * /index.html
+    file_server
+  }
+
+  handle {
+    respond "Not published" 503
+  }
+}
