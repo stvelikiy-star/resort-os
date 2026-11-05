@@ -12,6 +12,7 @@ import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { Hero } from '../../src/components/Brand';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Reception() {
@@ -77,24 +78,33 @@ export default function Reception() {
     {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
-      <GlassCard style={{ gap: space.md }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <CalendarDays size={22} color={c.primary}/>
-          <Text style={[font.h2, { color: c.text }]}>{data.local_date}</Text>
+      <Hero height={178}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+          <CalendarDays color="#E6BD70" size={21}/>
+          <Text style={[font.small, { color: '#C8E8F5', letterSpacing: 0.8 }]}>{copy.today} · {data.local_date}</Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <View style={{ flex: 1, gap: 4 }}>
-            <LogIn color={c.success} size={21}/>
-            <Text style={[font.metric, { color: c.text }]}>{(data.items ?? []).filter(x => x.checkIn === data.local_date && x.status === 'GUARANTEED').length}</Text>
-            <Text style={[font.small, { color: c.textMuted }]}>{copy.arrivals}</Text>
+        <View style={{ flexDirection: 'row', gap: space.lg, marginTop: space.lg }}>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(73,220,183,0.18)', alignItems: 'center', justifyContent: 'center' }}>
+              <LogIn size={24} color="#73EBC9"/>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[font.metric, { color: '#FFFFFF' }]}>{arrivals.length}</Text>
+              <Text numberOfLines={2} style={[font.small, { color: '#D9EAF6' }]}>{copy.arrivals}</Text>
+            </View>
           </View>
-          <View style={{ flex: 1, gap: 4 }}>
-            <LogOut color={c.warning} size={21}/>
-            <Text style={[font.metric, { color: c.text }]}>{(data.items ?? []).filter(x => x.checkOut === data.local_date && x.status === 'CHECKED_IN').length}</Text>
-            <Text style={[font.small, { color: c.textMuted }]}>{copy.departures}</Text>
+          <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.2)' }}/>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(230,189,112,0.17)', alignItems: 'center', justifyContent: 'center' }}>
+              <LogOut size={24} color="#E6BD70"/>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[font.metric, { color: '#FFFFFF' }]}>{departures.length}</Text>
+              <Text numberOfLines={2} style={[font.small, { color: '#D9EAF6' }]}>{copy.departures}</Text>
+            </View>
           </View>
         </View>
-      </GlassCard>
+      </Hero>
       <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 56, gap: 8, paddingHorizontal: 14, backgroundColor: c.surface, borderWidth: 1, borderRadius: radius.md, borderColor: c.border }}>
         <Search size={20} color={c.textMuted}/>
         <TextInput testID="reception-search" accessibilityLabel={copy.searchReservation} placeholder={copy.searchReservation}
