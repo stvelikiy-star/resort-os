@@ -6,6 +6,10 @@ import Connect from '../app/(auth)/connect';
 import Login from '../app/(auth)/login';
 import AppTabs from '../app/(app)/_layout';
 import More from '../app/(app)/more';
+import Overview from '../app/(app)/overview';
+import Pms from '../app/(app)/pms';
+import Reception from '../app/(app)/reception';
+import Inbox from '../app/(app)/inbox';
 import Tasks from '../app/(app)/tasks';
 import Rooms from '../app/(app)/rooms';
 import Requests from '../app/(app)/requests';
@@ -55,10 +59,10 @@ describe('navigation, guards and screens', () => {
   it('browser demo opens synthetic OWNER showroom without a real hotel or credentials', async () => {
     const screen = await renderRouter({
       ...routes,
-      '(app)/overview': require('../app/(app)/overview').default,
-      '(app)/pms': require('../app/(app)/pms').default,
-      '(app)/reception': require('../app/(app)/reception').default,
-      '(app)/inbox': require('../app/(app)/inbox').default,
+      '(app)/overview': Overview,
+      '(app)/pms': Pms,
+      '(app)/reception': Reception,
+      '(app)/inbox': Inbox,
     }, { initialUrl: '/connect' });
     await fireEvent.press(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 }));
     expect(await screen.findByTestId('tab-overview', {}, { timeout: 4000 })).toBeTruthy();
