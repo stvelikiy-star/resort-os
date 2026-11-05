@@ -128,8 +128,8 @@ def main() -> None:
     assert "80" in edge_ports and "443" in edge_ports
     assert len(edge["services"]["marina_edge"]["networks"]) == 2
     assert len(edge["networks"]) == 2
-    for hotel in (a, b):
-        assert "marina_ingress_" + hotel["COMPOSE_PROJECT_NAME"] in [v["name"] for v in edge["networks"].values()]
+    for customer in (a, b):
+        assert "marina_ingress_" + customer["COMPOSE_PROJECT_NAME"] in [v["name"] for v in edge["networks"].values()]
     print("PASS: two synthetic same-host customer gateways + ONE shared HTTPS edge render without leaked DB ports")
     print("PASS: two synthetic customer Compose configs render distinct DB, network, volume, project and provider bindings")
     print("BOUNDARY: customer stacks require separate hosts with this Compose; same-Ubuntu shared HTTPS edge not yet accepted")
