@@ -121,7 +121,7 @@ def main() -> None:
     for cfg, customer in zip(shared, (a, b)):
         gateway = cfg["services"]["customer_gateway"]
         assert not gateway.get("ports"), "Private gateway exposes host ports"
-        assert cfg["services"]["caddy"].get("profiles") == ["standalone-only"]
+        assert "caddy" not in cfg["services"], "Standalone public Caddy must be disabled in customer shared-edge mode"
         assert cfg["networks"]["marina_ingress"]["name"] == "marina_ingress_" + customer["COMPOSE_PROJECT_NAME"]
         assert cfg["services"]["postgres"].get("ports") in (None, []), "PostgreSQL exposed"
     edge_ports = {str(p["published"]) for p in edge["services"]["marina_edge"]["ports"]}
