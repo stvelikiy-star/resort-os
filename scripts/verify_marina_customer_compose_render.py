@@ -118,11 +118,11 @@ def main() -> None:
         if checked.returncode:
             raise AssertionError("Generated edge Compose graph invalid")
         edge = json.loads(checked.stdout)
-    for cfg, hotel in zip(shared, (a, b)):
+    for cfg, customer in zip(shared, (a, b)):
         gateway = cfg["services"]["customer_gateway"]
         assert not gateway.get("ports"), "Private gateway exposes host ports"
         assert cfg["services"]["caddy"].get("profiles") == ["standalone-only"]
-        assert cfg["networks"]["marina_ingress"]["name"] == "marina_ingress_" + hotel["COMPOSE_PROJECT_NAME"]
+        assert cfg["networks"]["marina_ingress"]["name"] == "marina_ingress_" + customer["COMPOSE_PROJECT_NAME"]
         assert cfg["services"]["postgres"].get("ports") in (None, []), "PostgreSQL exposed"
     edge_ports = {str(p["published"]) for p in edge["services"]["marina_edge"]["ports"]}
     assert "80" in edge_ports and "443" in edge_ports
