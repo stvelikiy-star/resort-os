@@ -3,7 +3,7 @@ import { Platform, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Building2, Link2, QrCode, ShieldCheck } from 'lucide-react-native';
-import { Button, Card, FadeIn, Field, SectionLabel, Segmented } from '../../src/components/ui';
+import { Button, Card, DemoBanner, FadeIn, Field, SectionLabel, Segmented } from '../../src/components/ui';
 import { Hero, Logo, Wordmark } from '../../src/components/Brand';
 import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
@@ -67,6 +67,7 @@ export default function Connect() {
       }
       {!installed ? (
         <GlassCard testID="demo-role-entry" style={{ gap: space.sm }}>
+          <DemoBanner />
           <Text style={[font.small, { color: c.textMuted }]}>{t('login.demoRole')}</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
             {DEMO_ROLE_LOGINS.map(entry => (
