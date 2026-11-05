@@ -38,7 +38,7 @@ it('never applies an old PMS/Inbox read after the hotel identity changes', async
 it('discards a pending response after its screen unmounts', async () => {
   const a = deferred<string>();
   const request = jest.fn(() => a.promise);
-  const screen = render(<Panel hotel="A" request={request} />);
+  const screen = await render(<Panel hotel="A" request={request} />);
   await screen.unmount();
   await act(async () => { a.resolve('old content'); await a.promise; });
   expect(request).toHaveBeenCalledTimes(1);
