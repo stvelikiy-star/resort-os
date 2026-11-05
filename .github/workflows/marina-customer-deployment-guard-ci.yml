@@ -11,6 +11,7 @@ on:
       - 'compose.marina-customer-shared-edge.yaml'
       - 'deploy/Caddyfile.customer-gateway'
       - 'docs/MARINA_SINGLE_CUSTOMER_DEPLOYMENT_CONTRACT_20261105.md'
+      - 'docs/MARINA_SHARED_EDGE_ACCEPTANCE_20261105.md'
       - '.github/workflows/marina-customer-deployment-guard-ci.yml'
   workflow_dispatch:
 
