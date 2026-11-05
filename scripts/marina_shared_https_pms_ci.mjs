@@ -141,12 +141,31 @@ try {
     assert.equal(quote.pricing.source, "CORE_RATE");
     assert.equal(quote.pricing.discount_percent, 0);
     assert.equal(quote.pricing.total_kgs, suffix === "A" ? 6000 : 9000);
-    page.once("dialog", dialog => dialog.accept());
+    let receptionDialog = "not-fired";
+    let commitRequests = 0;
+    page.on("request", request => {
+      if (request.url().includes("/admin/pms/reservations/new/commit")) commitRequests++;
+    });
+    page.once("dialog", async dialog => {
+      receptionDialog = dialog.type();
+      await dialog.accept();
+    });
     const committedResponse = page.waitForResponse(response =>
       response.url() === core + "/admin/pms/reservations/new/commit" &&
-      response.request().method() === "POST");
+      response.request().method() === "POST", { timeout: 12000 });
     await bookingForm.getByRole("button", { name: "Подтвердить бронь", exact: true }).click();
-    const committed = await committedResponse;
+    let committed;
+    try {
+      committed = await committedResponse;
+    } catch (error) {
+      console.error("Reception commit diagnostics:", JSON.stringify({
+        hotel, dialog: receptionDialog, request_count: commitRequests,
+        alerts: await page.getByRole("alert").allTextContents(),
+        statuses: await page.getByRole("status").allTextContents(),
+        location: page.url(),
+      }));
+      throw error;
+    }
     assert.equal(committed.status(), 201, "Reception booked own room");
     const result = await committed.json();
     assert.equal(result.room_id, ownRoom);
