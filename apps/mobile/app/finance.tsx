@@ -52,3 +52,4 @@ export default function Finance() {
       <Text style={[font.small, { color: c.textMuted }]}>{copy.financeDisclaimer}</Text>
     </> : null}
   </FutureScreen>;
+}
