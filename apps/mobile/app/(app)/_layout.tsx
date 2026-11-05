@@ -54,9 +54,13 @@ export default function AppTabs() {
       const Icon = ICONS[key];
       return <Tabs.Screen key={key} name={key} options={{
         title: copy[key], tabBarLabel: tabTitle(key), href: workspace.tabs.includes(key) ? undefined : null,
-        // Overflow routes remain registered in the navigator; only their tab buttons are hidden.
-        // A null href here would make the screen unreachable from the More hub.
-        tabBarButton: plan.overflow.includes(key) ? () => null : undefined,
+        // Keep overflow routes registered and navigable from More, but remove
+        // their tab-bar slots entirely. A null button alone left empty flex
+        // slots and compressed visible labels to "Об..." on 375 px phones.
+        tabBarButton: !plan.primary.includes(key) ? () => null : undefined,
+        tabBarItemStyle: plan.primary.includes(key)
+          ? { flex: 1, minWidth: 0 }
+          : { display: 'none', width: 0, flex: 0 },
         tabBarIcon: ({ color, focused }) =>
           <View style={{ minWidth: 50, height: 34, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}>
             <Icon size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/>
