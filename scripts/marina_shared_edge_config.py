@@ -35,6 +35,17 @@ def validate_shared_edge(hotels: list[dict[str, str]]) -> list[str]:
         for key in HOST_KEYS:
             if not FQDN.fullmatch(hotel.get(key, "").lower()):
                 problems.append(f"hotel_{i+1}: {key} must be a valid public DNS name")
+        expected_origins = {"https://" + hotel.get(key, "").lower() for key in
+                            ("PUBLIC_HOST", "ADMIN_HOST", "STAFF_HOST")}
+        supplied_origins = {value.strip().lower() for value in
+                            hotel.get("CORS_ORIGINS", "").split(",") if value.strip()}
+        if supplied_origins != expected_origins:
+            problems.append(f"hotel_{i+1}: CORS_ORIGINS must contain exactly this hotel's public/admin/staff HTTPS origins")
+        # Host-only session cookies are required for customer privacy; a parent
+        # domain cookie could be shared with unrelated client subdomains.
+        if hotel.get("COOKIE_DOMAIN", "").strip():
+            problems.append(f"hotel_{i+1}: COOKIE_DOMAIN must be empty (host-only cookies)")
+
     # The public www redirect is a real additional edge hostname.
     # Do not allow it to overlap another customer's API/Admin/Staff host.
     all_hosts: list[str] = []
