@@ -1,6 +1,9 @@
 import { ApiError, AuthUser, canTransition, DaySummary, HousekeepingReport, NewMaintenance, Role, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 export const DEMO_USERS: Record<string, { user: AuthUser; password: string }> = {
+  owner: { password: 'demo', user: { id: 'u-owner', username: 'owner', display_name: 'MARINA DEMO', role: 'OWNER', property_code: 'DEMO', module_permissions: ['*'] } },
+  cook: { password: 'demo', user: { id: 'u-cook', username: 'cook', display_name: 'DEMO Kitchen', role: 'COOK', property_code: 'DEMO', module_permissions: ['dining'] } },
+  agent: { password: 'demo', user: { id: 'u-agent', username: 'agent', display_name: 'DEMO Agent', role: 'AGENT', property_code: 'DEMO', module_permissions: ['pms'] } },
   maid: { password: 'demo', user: { id: 'u-maid', username: 'maid', display_name: 'Айгерим Т.', role: 'MAID', property_code: 'DEMO', module_permissions: ['housekeeping'] } },
   tech: { password: 'demo', user: { id: 'u-tech', username: 'tech', display_name: 'Бакыт Э.', role: 'TECHNICIAN', property_code: 'DEMO', module_permissions: ['maintenance'] } },
   reception: { password: 'demo', user: { id: 'u-rec', username: 'reception', display_name: 'Нурзат К.', role: 'RECEPTION', property_code: 'DEMO', module_permissions: ['reception', 'housekeeping'] } },
