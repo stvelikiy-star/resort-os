@@ -1,6 +1,9 @@
 import { ApiError, AuthUser, canTransition, DaySummary, HousekeepingReport, NewMaintenance, Role, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 export const DEMO_USERS: Record<string, { user: AuthUser; password: string }> = {
+  owner: { password: 'demo', user: { id: 'u-owner', username: 'owner', display_name: 'MARINA DEMO', role: 'OWNER', property_code: 'DEMO', module_permissions: ['*'] } },
+  cook: { password: 'demo', user: { id: 'u-cook', username: 'cook', display_name: 'DEMO Kitchen', role: 'COOK', property_code: 'DEMO', module_permissions: ['dining'] } },
+  agent: { password: 'demo', user: { id: 'u-agent', username: 'agent', display_name: 'DEMO Agent', role: 'AGENT', property_code: 'DEMO', module_permissions: ['pms'] } },
   maid: { password: 'demo', user: { id: 'u-maid', username: 'maid', display_name: 'Айгерим Т.', role: 'MAID', property_code: 'DEMO', module_permissions: ['housekeeping'] } },
   tech: { password: 'demo', user: { id: 'u-tech', username: 'tech', display_name: 'Бакыт Э.', role: 'TECHNICIAN', property_code: 'DEMO', module_permissions: ['maintenance'] } },
   reception: { password: 'demo', user: { id: 'u-rec', username: 'reception', display_name: 'Нурзат К.', role: 'RECEPTION', property_code: 'DEMO', module_permissions: ['reception', 'housekeeping'] } },
@@ -20,12 +23,12 @@ function seed(hotelId: string): { rooms: Room[]; tasks: Task[] } {
   const second = hotelId.includes('sunrise');
   const prefix = second ? 'S' : 'M';
   const rooms: Room[] = [
-    { id: 'r1', code: `${prefix}-101`, floor: 1, state: 'DIRTY', guest: null, checkout: 'сегодня 12:00' },
-    { id: 'r2', code: `${prefix}-102`, floor: 1, state: 'CLEAN', guest: 'A. Ivanov', arrival: null },
+    { id: 'r1', code: `${prefix}-101`, floor: 1, state: 'DIRTY', guest: null, checkout: '12:00' },
+    { id: 'r2', code: `${prefix}-102`, floor: 1, state: 'CLEAN', guest: 'DEMO Guest', arrival: null },
     { id: 'r3', code: `${prefix}-205`, floor: 2, state: 'IN_INSPECTION', guest: null },
-    { id: 'r4', code: `${prefix}-206`, floor: 2, state: 'DIRTY', guest: null, checkout: 'сегодня 11:00' },
+    { id: 'r4', code: `${prefix}-206`, floor: 2, state: 'DIRTY', guest: null, checkout: '11:00' },
     { id: 'r5', code: `${prefix}-310`, floor: 3, state: 'TECH_BLOCK', note: 'AC' },
-    { id: 'r6', code: `${prefix}-311`, floor: 3, state: 'CLEAN', arrival: 'сегодня 14:00' },
+    { id: 'r6', code: `${prefix}-311`, floor: 3, state: 'CLEAN', arrival: '14:00' },
   ];
   const tasks: Task[] = [
     { id: 't1', type: 'HOUSEKEEPING', status: 'OPEN', priority: 'URGENT', title: 'Уборка после выезда', room_code: rooms[0].code, room_id: 'r1', assigned_to_id: 'u-maid', due_label: '12:30' },

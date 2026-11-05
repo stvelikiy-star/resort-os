@@ -7,6 +7,7 @@ import { Badge, Button, Card, DemoBanner, FadeIn, Field, SectionLabel, Segmented
 import { Hero, Logo, Wordmark } from '../../src/components/Brand';
 import { FutureScreen, GlassCard, StaggerItem } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
+import { homeForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
 import { hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../../src/api/hotels';
@@ -56,8 +57,8 @@ export default function Connect() {
               if (demoBusy) return;
               setDemoBusy(true); setErr(null);
               try {
-                await startDemo();
-                router.replace('/tasks');
+                const visitor = await startDemo('owner');
+                router.replace(homeForSession(visitor.role, visitor.module_permissions, 'DEMO'));
               } catch {
                 setErr(t('errors.generic'));
               } finally { setDemoBusy(false); }

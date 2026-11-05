@@ -5,6 +5,12 @@ import AuthLayout from '../app/(auth)/_layout';
 import Connect from '../app/(auth)/connect';
 import Login from '../app/(auth)/login';
 import AppTabs from '../app/(app)/_layout';
+import More from '../app/(app)/more';
+import Overview from '../app/(app)/overview';
+import Pms from '../app/(app)/pms';
+import Reception from '../app/(app)/reception';
+import Inbox from '../app/(app)/inbox';
+import Dining from '../app/(app)/dining';
 import Tasks from '../app/(app)/tasks';
 import Rooms from '../app/(app)/rooms';
 import Requests from '../app/(app)/requests';
@@ -29,6 +35,12 @@ const routes = {
   '(auth)/connect': Connect,
   '(auth)/login': Login,
   '(app)/_layout': AppTabs,
+  '(app)/overview': Overview,
+  '(app)/reception': Reception,
+  '(app)/pms': Pms,
+  '(app)/inbox': Inbox,
+  '(app)/dining': Dining,
+  '(app)/more': More,
   '(app)/tasks': Tasks,
   '(app)/rooms': Rooms,
   '(app)/requests': Requests,
@@ -45,16 +57,26 @@ async function loginAs(role: string) {
   await fireEvent.press(screen.getByTestId('hotel-demo-marina-issykkul'));
   await screen.findByTestId('login-submit');
   await fireEvent.press(screen.getByTestId(`demo-${role}`));
-  await screen.findByTestId('progress-pct', {}, { timeout: 4000 }).catch(() => null);
+  if (role === 'manager') {
+    // Manager's first screen is now the premium overview, with operations one tap away.
+    await fireEvent.press(await screen.findByTestId('tab-tasks', {}, { timeout: 4000 }));
+    await screen.findByTestId('progress-pct', {}, { timeout: 4000 });
+  }
   return screen;
 }
 
 describe('navigation, guards and screens', () => {
-  it('browser demo can open manager workspace without username or password', async () => {
-    const screen = await renderRouter(routes, { initialUrl: '/connect' });
+  it('browser demo opens synthetic OWNER showroom without a real hotel or credentials', async () => {
+    const screen = await renderRouter({
+      ...routes,
+      '(app)/overview': Overview,
+      '(app)/pms': Pms,
+      '(app)/reception': Reception,
+      '(app)/inbox': Inbox,
+    }, { initialUrl: '/connect' });
     await fireEvent.press(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 }));
-    expect(await screen.findByTestId('tab-admin', {}, { timeout: 4000 })).toBeTruthy();
-    expect(await screen.findByTestId('task-t1', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('tab-overview', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('demo-banner', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('unauthenticated direct profile link goes to hotel selection, not empty settings', async () => {
@@ -112,14 +134,16 @@ describe('navigation, guards and screens', () => {
     const screen = await loginAs('manager');
     await screen.findByTestId('task-t1', {}, { timeout: 4000 });
     expect(screen.getByTestId('tab-admin')).toBeTruthy();
-    expect(screen.getByTestId('tab-requests')).toBeTruthy();
+    expect(screen.getByTestId('tab-inbox')).toBeTruthy();
+    expect(screen.getByTestId('tab-more')).toBeTruthy();
   });
 
   it('manager can assign an unassigned cleaning task from the admin screen', async () => {
     const screen = await loginAs('manager');
     await fireEvent.press(await screen.findByTestId('tab-admin', {}, { timeout: 4000 }));
-    const task = await screen.findByTestId('task-t8', {}, { timeout: 4000 });
-    await fireEvent.press(task);
+    const assignButton = await screen.findByTestId('open-assign-t8', {}, { timeout: 4000 });
+    expect(assignButton.props.accessibilityRole).toBe('button');
+    await fireEvent.press(assignButton);
     await fireEvent.press(await screen.findByTestId('assign-u-maid2', {}, { timeout: 4000 }));
     await waitFor(() => expect(screen.queryByTestId('assign-u-maid2')).toBeNull(), { timeout: 4000 });
   });
@@ -237,7 +261,8 @@ describe('navigation, guards and screens', () => {
 
   it('profile language and theme selectors respond to taps', async () => {
     const screen = await loginAs('manager');
-    await fireEvent.press(await screen.findByTestId('tab-profile', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('tab-more', {}, { timeout: 4000 }));
+    await fireEvent.press(await screen.findByTestId('more-profile', {}, { timeout: 4000 }));
     const en = await screen.findByTestId('segment-en', {}, { timeout: 4000 });
     await fireEvent.press(en);
     await waitFor(() => expect(screen.getByTestId('segment-en').props.accessibilityState.checked).toBe(true), { timeout: 4000 });
@@ -247,9 +272,9 @@ describe('navigation, guards and screens', () => {
     await fireEvent.press(screen.getByTestId('segment-system'));
   });
 
-  it('waiter has no operational workspace (profile only)', async () => {
+  it('waiter can view isolated restaurant DEMO without task or admin permissions', async () => {
     const screen = await loginAs('waiter');
-    await screen.findByTestId('tab-profile', {}, { timeout: 4000 });
+    await screen.findByTestId('tab-dining', {}, { timeout: 4000 });
     expect(screen.queryByTestId('tab-tasks')).toBeNull();
     expect(screen.queryByTestId('tab-admin')).toBeNull();
   });

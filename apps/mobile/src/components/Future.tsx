@@ -1,52 +1,97 @@
-import React, { useEffect, useState } from 'react';
-import { Animated, Easing, StyleProp, Text, View, ViewStyle } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
-import { cappedStagger, useMotionAllowed } from '../theme/motion';
+import { cappedStagger, useMotionAllowed, useMotionPreference } from '../theme/motion';
 import { elevation, font, iconography, motion, radius, space } from '../theme/tokens';
 import { Badge, Card, PressScale, Screen, Title } from './ui';
 import { Logo } from './Brand';
+import { metricNeedsFullWidth } from '../theme/layout';
 
 export function FutureScreen({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
   return <Screen><View style={{ position: 'absolute', top: -100, right: -140, width: 320, height: 320, borderRadius: 160, backgroundColor: c.glow, opacity: 0.5 }} pointerEvents="none" />{children}</Screen>;
 }
-export function PremiumHeader({ title, subtitle, eyebrow, right }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode }) {
+export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRight = false }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode; inlineCompactRight?: boolean }) {
   const { c } = useTheme();
-  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm }}>
-    <Logo size={50}/><View style={{ flex: 1, gap: 2 }}>
-      {eyebrow ? <Text style={[font.label, { color: c.cyan }]}>{eyebrow.toUpperCase()}</Text> : null}
-      <Title sub={subtitle}>{title}</Title>
-    </View>{right}
+  const { width, fontScale } = useWindowDimensions();
+  const compact = !!right && (width < 375 || fontScale > 1.25);
+  const stackRight = compact && !inlineCompactRight;
+  return <View style={{ flexDirection: stackRight ? 'column' : 'row', alignItems: stackRight ? 'stretch' : 'center', gap: space.md, paddingVertical: space.sm }}>
+    <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center', flex: stackRight ? undefined : 1, minWidth: 0 }}>
+      <Logo size={width < 350 ? 42 : 50}/>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        {eyebrow ? <Text style={[font.label, { color: c.cyan }]} numberOfLines={2}>{eyebrow.toUpperCase()}</Text> : null}
+        <Title sub={subtitle}>{title}</Title>
+      </View>
+    </View>
+    {right ? <View style={{ alignSelf: stackRight ? 'flex-end' : 'center', flexShrink: 0 }}>{right}</View> : null}
   </View>;
 }
 export function GlassCard({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
   const { c } = useTheme();
   return <Card testID={testID} onPress={onPress} style={[{ backgroundColor: c.glass, borderColor: c.glassBorder, borderWidth: 1, ...elevation.card }, style]}>{children}</Card>;
 }
-export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void }) {
+export type MetricTone = 'primary' | 'gold' | 'cyan' | 'success' | 'warning';
+export function MetricCard({ icon: Icon, label, value, detail, onPress, tone = 'primary' }: {
+  icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void; tone?: MetricTone;
+}) {
   const { c } = useTheme();
-  return <GlassCard onPress={onPress} style={{ flexGrow: 1, flexBasis: '46%', minWidth: 136, gap: 10, padding: 16 }}>
+  const { width, fontScale } = useWindowDimensions();
+  const oneColumn = metricNeedsFullWidth(width, fontScale, value);
+  const accent = tone === 'gold' ? c.gold : tone === 'cyan' ? c.cyan : tone === 'success' ? c.success : tone === 'warning' ? c.warning : c.primary;
+  const soft = tone === 'gold' || tone === 'warning' ? c.warningSoft : tone === 'success' ? c.successSoft : tone === 'cyan' ? c.infoSoft : c.primarySoft;
+  return <GlassCard onPress={onPress} style={{
+    flexGrow: 1, flexBasis: oneColumn ? '100%' : '46%', minWidth: 0,
+    gap: 9, minHeight: 174, padding: 17, borderTopWidth: 3, borderTopColor: accent,
+  }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-      <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon color={c.primary} size={iconography.metric}/></View>
-      {onPress ? <ArrowUpRight size={18} color={c.textMuted}/> : null}
+      <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: soft, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon color={accent} size={iconography.metric + 2} strokeWidth={1.9}/>
+      </View>
+      {onPress ? <ArrowUpRight size={21} color={accent}/> : null}
     </View>
-    <Text style={[font.metric, { color: c.text }]} adjustsFontSizeToFit numberOfLines={1}>{value}</Text>
-    <Text style={[font.small, { color: c.textMuted }]}>{label}</Text>
-    {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
+    <Text style={[font.metric, { color: c.text, flexShrink: 1, fontSize: oneColumn ? 32 : 29 }]}
+      adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={oneColumn ? 2 : 1}>{value}</Text>
+    <Text style={[font.small, { color: c.textMuted, flexShrink: 1, fontWeight: '600' }]}>{label}</Text>
+    {detail ? <Text style={[font.small, { color: c.info }]}>{detail}</Text> : null}
   </GlassCard>;
 }
+/** Real, server-sourced numeric KPI. Motion is disabled until OS preference is known. */
+export function AnimatedKpi({ value, suffix = '', style, testID }: { value: number; suffix?: string; style?: StyleProp<TextStyle>; testID?: string }) {
+  const allowed = useMotionAllowed();
+  const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const [shown, setShown] = useState(safe);
+  const [progress] = useState(() => new Animated.Value(safe));
+  const previous = useRef(safe);
+  useEffect(() => {
+    const from = previous.current;
+    previous.current = safe;
+    if (!allowed || from === safe) {
+      progress.setValue(safe);
+      setShown(safe);
+      return;
+    }
+    progress.setValue(from);
+    const subscription = progress.addListener(({ value: next }) => setShown(Math.round(next)));
+    const anim = Animated.timing(progress, { toValue: safe, duration: motion.chart, easing: Easing.out(Easing.cubic), useNativeDriver: false });
+    anim.start();
+    return () => { anim.stop(); progress.removeListener(subscription); };
+  }, [allowed, safe, progress]);
+  return <Text testID={testID} accessibilityLabel={String(Math.round(safe)) + suffix} style={style}>{Math.round(shown)}{suffix}</Text>;
+}
+
 /** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
-export function OccupancyRing({ percent, label }: { percent: number; label: string }) {
+export function OccupancyRing({ percent, label, size = 112 }: { percent: number; label: string; size?: number }) {
   const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
   const circumference = 2 * Math.PI * 42;
   const length = circumference * safe / 100;
   return <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
     accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
-    style={{ width: 112, height: 112, justifyContent: 'center', alignItems: 'center' }}>
-    <Svg pointerEvents="none" width={112} height={112} viewBox="0 0 112 112">
+    style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+    <Svg pointerEvents="none" width={size} height={size} viewBox="0 0 112 112">
       <Circle cx="56" cy="56" r="42" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="8"/>
       <Circle cx="56" cy="56" r="42" fill="none" stroke="#00D8FF" strokeWidth="8"
         strokeLinecap="round" strokeDasharray={`${length} ${circumference}`} transform="rotate(-90 56 56)"/>
@@ -114,7 +159,7 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
     loop.start(); return () => loop.stop();
   }, [allowed, progress, state]);
   const ring = state === 'error' ? c.danger : state === 'offline' ? c.textMuted : c.cyan;
-  return <PressScale disabled={!onPress} onPress={onPress} accessibilityLabel={label} style={{ width: size + 16, height: size + 16, justifyContent: 'center', alignItems: 'center' }}>
+  return <PressScale disabled={!onPress} dimWhenDisabled={false} onPress={onPress} accessibilityLabel={label} style={{ width: size + 16, height: size + 16, justifyContent: 'center', alignItems: 'center' }}>
     <Animated.View style={{ position: 'absolute', transform: [{ rotate: progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
       <Svg width={size + 16} height={size + 16} viewBox="0 0 100 100">
         <Defs><LinearGradient id="orbRing" x1="0" x2="1" y1="0" y2="1"><Stop offset="0" stopColor={ring}/><Stop offset="1" stopColor={c.iris}/></LinearGradient></Defs>
@@ -123,17 +168,28 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
         <Path d="M 28 45 Q 50 12 72 45 Q 82 75 50 82 Q 18 72 28 45 Z" fill={c.primarySoft} stroke={ring} strokeWidth="2"/>
       </Svg>
     </Animated.View>
-    {state === 'error' || state === 'offline' ? <CircleHelp size={size / 3} color={ring}/> : <Sparkles size={size / 3} color={ring}/>}
+    <View style={{ width: size * 0.56, height: size * 0.56, borderRadius: size * 0.28, backgroundColor: c.primarySoft,
+      alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: c.glassBorder }}>
+      {state === 'error' ? <CircleHelp size={Math.max(20, size * 0.30)} color={c.danger}/>
+        : <Sparkles size={Math.max(20, size * 0.34)} color={state === 'offline' ? c.textMuted : c.cyan} strokeWidth={2.1}/>}
+    </View>
   </PressScale>;
 }
 export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
-  const allowed = useMotionAllowed();
-  const [fade] = useState(() => new Animated.Value(1));
+  const { allowed, ready } = useMotionPreference();
+  const [fade] = useState(() => new Animated.Value(0));
+  const appeared = useRef(false);
   useEffect(() => {
-    if (!allowed) { fade.setValue(1); return; }
+    if (!ready) return;
+    if (appeared.current || !allowed) {
+      appeared.current = true;
+      fade.setValue(1);
+      return;
+    }
+    appeared.current = true;
     fade.setValue(0);
     const animation = Animated.timing(fade, { toValue: 1, duration: motion.card, delay: cappedStagger(index), useNativeDriver: true });
     animation.start(); return () => animation.stop();
-  }, [allowed, fade, index]);
+  }, [allowed, ready, fade, index]);
   return <Animated.View style={{ opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>{children}</Animated.View>;
 }

@@ -20,6 +20,27 @@ export const WORKSPACES: Record<Role, Workspace> = {
   AGENT: FIELD, STORE_STAFF: FIELD, DINING_STAFF: FIELD, COOK: FIELD, WAITER: FIELD, CONTENT_MANAGER: FIELD, BEACH_PARTNER: FIELD,
 };
 export const workspaceFor = (role: Role): Workspace => WORKSPACES[role] ?? FIELD;
+
+/** Isolated DEMO showroom. Navigation is richer than legacy synthetic operations,
+ * but never implies a LIVE server permission or enables unsupported writes.
+ * Existing WORKSPACES remain unchanged for the legacy task workflows.
+ */
+const DEMO_SHOWCASE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
+  OWNER: ['overview', 'pms', 'reception', 'inbox', 'admin', 'tasks', 'rooms', 'profile'],
+  MANAGER: ['overview', 'tasks', 'admin', 'inbox', 'pms', 'reception', 'requests', 'rooms', 'profile'],
+  RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
+  MAID: ['tasks', 'rooms', 'profile'],
+  TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
+  COOK: ['dining', 'profile'],
+  WAITER: ['dining', 'profile'],
+  AGENT: ['pms', 'profile'],
+};
+export function demoShowcaseWorkspace(role: Role): Workspace {
+  const tabs = DEMO_SHOWCASE_TABS[role];
+  if (!tabs) return workspaceFor(role);
+  return { ...workspaceFor(role), tabs: [...tabs], mobileReady: tabs.some(tab => tab !== 'profile') };
+}
+
 export const hasTab = (role: Role, tab: TabKey) => workspaceFor(role).tabs.includes(tab);
 export const homeFor = (role: Role): `/${TabKey}` => ('/' + workspaceFor(role).tabs[0]) as `/${TabKey}`;
 
@@ -42,7 +63,7 @@ export function workspaceForSession(
   role: Role, permissions: string[] | undefined, mode: 'LIVE' | 'DEMO',
   serverAuthMode: AuthMode | null = null,
 ): Workspace {
-  if (mode === 'DEMO') return workspaceFor(role);
+  if (mode === 'DEMO') return demoShowcaseWorkspace(role);
   const candidates = LIVE_TABS[role];
   if (!candidates || !Array.isArray(permissions)) return FIELD;
   const sharedPreview = serverAuthMode === 'shared_auth_preview';

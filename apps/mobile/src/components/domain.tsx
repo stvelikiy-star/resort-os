@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, BedDouble, Check, ClipboardCheck, Hammer, HelpCircle, Sparkles, Wrench } from 'lucide-react-native';
+import { AlertTriangle, ArrowUpRight, BedDouble, Check, ClipboardCheck, Hammer, HelpCircle, Sparkles, Wrench } from 'lucide-react-native';
 import type { Priority, RoomState, Task, TaskStatus, TaskType } from '../api/types';
 import { useTheme } from '../theme/ThemeProvider';
 import { font, radius, space } from '../theme/tokens';
@@ -24,18 +24,23 @@ export function TaskCard({ task, onPress }: { task: Task; onPress: () => void })
   const tone = task.status === 'DONE' ? 'success' : task.status === 'IN_INSPECTION' ? 'info' : task.status === 'IN_PROGRESS' ? 'primary' : 'neutral';
   const tc = toneColors(c, priorityTone(task.priority));
   return (
-    <Card testID={`task-${task.id}`} onPress={onPress} style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
-      <View style={{ width: 52, height: 52, borderRadius: radius.md, backgroundColor: tc.bg, alignItems: 'center', justifyContent: 'center' }}>
-        {task.priority === 'URGENT' ? <AlertTriangle size={26} color={tc.fg} /> : React.createElement(typeIcon(task.type), { size: 26, color: tc.fg })}
+    <Card testID={`task-${task.id}`} onPress={onPress} style={{
+      flexDirection: 'row', gap: space.md, alignItems: 'center',
+      borderLeftWidth: 4, borderLeftColor: tc.fg, minHeight: 118, paddingVertical: 17,
+    }}>
+      <View style={{ width: 54, height: 54, borderRadius: radius.md, backgroundColor: tc.bg, alignItems: 'center', justifyContent: 'center' }}>
+        {task.priority === 'URGENT' ? <AlertTriangle size={27} color={tc.fg} strokeWidth={1.9}/> : React.createElement(typeIcon(task.type), { size: 27, color: tc.fg, strokeWidth: 1.9 })}
       </View>
-      <View style={{ flex: 1, gap: 4 }}>
-        <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{task.room_code ?? t('common.room')} · {t(`tasks.types.${task.type}`)}</Text>
-        <Text style={[font.small, { color: c.textMuted }]} numberOfLines={1}>{task.title}</Text>
-        <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
-          <Badge label={t(statusKey(task.status))} tone={tone} />
-          {task.due_label ? <Badge label={task.due_label} /> : null}
+      <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+        <Text style={[font.h2, { color: c.text }]} numberOfLines={2}>{task.room_code ?? t('common.room')} · {t(`tasks.types.${task.type}`)}</Text>
+        <Text style={[font.small, { color: c.textMuted }]} numberOfLines={2}>{task.title}</Text>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: 3 }}>
+          <Badge label={t(statusKey(task.status))} tone={tone}/>
+          {['URGENT', 'HIGH'].includes(task.priority) ? <Badge label={t(prioKey(task.priority))} tone={priorityTone(task.priority)}/> : null}
+          {task.due_label ? <Badge label={task.due_label}/> : null}
         </View>
       </View>
+      <ArrowUpRight size={20} color={c.textMuted}/>
     </Card>
   );
 }

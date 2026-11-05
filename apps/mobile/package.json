@@ -11,6 +11,7 @@
     "lint": "eslint . --max-warnings=0",
     "test": "jest",
     "web:export": "expo export --platform web",
+    "postweb:export": "node scripts/qa-web-visual.mjs",
     "check": "npm run typecheck && npm run lint && npm test"
   },
   "dependencies": {

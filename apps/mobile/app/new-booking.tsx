@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
-import { Badge, Button, Card, Empty, Field, PressScale, Screen, SectionLabel, Title } from '../src/components/ui';
+import { Badge, Button, Empty, Field, PressScale, SectionLabel } from '../src/components/ui';
 import { BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
 import { ApiError } from '../src/api/types';
 import { acknowledgePendingBooking, clearPendingBooking, finishPendingBooking, readPendingBooking, recordPendingBooking } from '../src/lib/pendingBooking';
@@ -11,6 +11,7 @@ import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { useAsync } from '../src/lib/useAsync';
 import { useTheme } from '../src/theme/ThemeProvider';
+import { FutureScreen, GlassCard, PremiumHeader, LoadingShimmer, ErrorState } from '../src/components/Future';
 import { font, space } from '../src/theme/tokens';
 
 const reviewCopy = {
@@ -31,7 +32,7 @@ export default function NewBooking() {
 
 function BookingForm({ journalKey }: { journalKey: string | null }) {
   const live = useLiveModules();
-  const { user, locale } = useSession();
+  const { user, locale, hotel } = useSession();
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
@@ -137,23 +138,23 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       finally { await journal.reload(); busyLock.current = false; setBusy(false); }
     }},
   ]);
-  if (!user || !['OWNER','MANAGER','AGENT'].includes(user.role) || !user.module_permissions?.includes('PMS')) return <Screen><Empty text={copy.denied}/></Screen>;
-  return <Screen>
+  if (!user || !['OWNER','MANAGER','AGENT'].includes(user.role) || !user.module_permissions?.includes('PMS')) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
+  return <FutureScreen>
     <PressScale onPress={() => router.back()} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center' }}><ChevronLeft color={c.primary} size={24}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
-    <Title>{copy.newBooking}</Title>
+    <PremiumHeader title={copy.newBooking} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
     {!live ? <Empty text={copy.unavailable}/> : null}
     <Field label={copy.start + ' · ' + copy.dateFormat} value={start} onChangeText={v => {setStart(v);setRoomId('');resetPreview();}} autoCapitalize="none"/>
     <Field label={copy.end + ' · ' + copy.dateFormat} value={end} onChangeText={v => {setEnd(v);setRoomId('');resetPreview();}} autoCapitalize="none"/>
     <SectionLabel>{copy.rooms}</SectionLabel>
-    {loading ? <Empty text={copy.loading}/> : null}
-    {gridError ? <Card onPress={reload}><Text style={[font.body, { color: c.danger }]}>{gridError.message} · {copy.retry}</Text></Card> : null}
+    {loading ? <LoadingShimmer count={2}/> : null}
+    {gridError ? <ErrorState text={gridError.message} retry={copy.retry} onRetry={reload}/> : null}
     <View style={{ flexDirection:'row',flexWrap:'wrap',gap:space.sm }}>
       {(grid?.rooms ?? []).map(room => {
         const available = !room.blocks.length && room.operational_state !== 'TECH_BLOCK';
         return <PressScale key={room.id} testID={'booking-room-' + room.id} disabled={!available || lockedForReview || completed}
           onPress={() => {setRoomId(room.id);resetPreview();}}
           style={{ minWidth: 90,minHeight:48,borderRadius:12,padding:12,backgroundColor: roomId === room.id ? c.primary : c.surfaceAlt,opacity:available?1:0.45,alignItems:'center',justifyContent:'center' }}>
-          <Text style={[font.h2,{color:roomId === room.id?'#fff':c.text}]}>{room.code}</Text>
+          <Text style={[font.h2,{color:roomId === room.id?c.primaryText:c.text}]}>{room.code}</Text>
         </PressScale>;
       })}
     </View>
@@ -164,24 +165,24 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       <View style={{flex:1}}><Field label={copy.children} value={children} onChangeText={v=>{setChildren(v);resetPreview();}} keyboardType="number-pad"/></View>
     </View>
     <Button testID="booking-preview" label={copy.preview} disabled={!validate() || busy || lockedForReview || completed} onPress={() => void doPreview()}/>
-    {preview ? <Card style={{gap:8}}>
+    {preview ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:preview.can_commit?c.success:c.danger}}>
       <Text style={[font.h2,{color:c.text}]}>{preview.room.code} · {preview.nights} {copy.nights}</Text>
       <Badge label={preview.pricing.source} tone="primary"/>
-      <Text style={[font.title,{color:c.text}]}>{preview.pricing.total_kgs === null ? '—' : preview.pricing.total_kgs.toLocaleString('ru-RU')} KGS</Text>
+      <Text style={[font.title,{color:c.text}]}>{preview.pricing.total_kgs === null ? '—' : preview.pricing.total_kgs.toLocaleString('ru-RU') + ' KGS'}</Text>
       {preview.pricing.discount_percent ? <Text style={[font.small,{color:c.textMuted}]} >{copy.discount}: {preview.pricing.discount_percent}%</Text> : null}
       {!preview.can_commit ? <Text style={[font.body,{color:c.danger}]}>{copy.conflict} · {preview.pricing.reason || ''}</Text> : null}
       <Button testID="booking-commit" label={copy.commit} disabled={!preview.can_commit || busy || lockedForReview || completed} onPress={doCommit}/>
-    </Card> : null}
-    {result ? <Card style={{gap:8}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
+    </GlassCard> : null}
+    {result ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:c.success}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
       <Button testID="booking-create-another" label={copy.anotherBooking} variant="secondary" onPress={resetForm}/>
-    </Card> : null}
-    {error ? <Card><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{error}</Text></Card> : null}
+    </GlassCard> : null}
+    {error ? <GlassCard><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{error}</Text></GlassCard> : null}
     {journal.error ? <Button label={reviewCopy[locale].storage} onPress={journal.reload}/> : null}
-    {journal.data ? <Card style={{ gap: 8 }}>
+    {journal.data ? <GlassCard style={{ gap: 8, borderLeftWidth:4,borderLeftColor:c.warning }}>
       <Text style={[font.small,{color:c.warning}]}>{copy.resultUnknown}</Text>
       <Button testID="booking-reconcile" label={reviewCopy[locale].review} disabled={busy} onPress={() => void reconcile()}/>
       {readback ? <><Text style={[font.body,{color:c.text}]}>{readback}</Text>
         <Button label={reviewCopy[locale].ack} disabled={busy} onPress={acknowledge}/></> : null}
-    </Card> : null}
-  </Screen>;
+    </GlassCard> : null}
+  </FutureScreen>;
 }

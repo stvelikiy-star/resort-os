@@ -9,21 +9,30 @@ export const motionPresets = {
   tab: { duration: motion.tab, easing: Easing.out(Easing.cubic) },
   chart: { duration: motion.chart, easing: Easing.out(Easing.cubic) },
 } as const;
-/** False = no animation work in screen readers' Reduced Motion state. */
-export function useMotionAllowed(): boolean {
-  const [allowed, setAllowed] = useState(false); // safe first render avoids a flash
+/** Resolves the OS preference before an entrance animation makes content visible.
+ * Never run motion while backgrounded; Reduced Motion always takes priority.
+ */
+export function useMotionPreference(): { allowed: boolean; ready: boolean } {
+  const [state, setState] = useState({ allowed: false, ready: false });
   useEffect(() => {
     let live = true;
     const read = async () => {
-      try { const reduce = await AccessibilityInfo.isReduceMotionEnabled(); if (live) setAllowed(!reduce && AppState.currentState === 'active'); }
-      catch { if (live) setAllowed(false); }
+      try {
+        const reduce = await AccessibilityInfo.isReduceMotionEnabled();
+        if (live) setState({ allowed: !reduce && AppState.currentState === 'active', ready: true });
+      } catch {
+        if (live) setState({ allowed: false, ready: true });
+      }
     };
     void read();
     const motionSub = AccessibilityInfo.addEventListener('reduceMotionChanged', () => { void read(); });
     const stateSub = AppState.addEventListener('change', () => { void read(); });
     return () => { live = false; motionSub.remove(); stateSub.remove(); };
   }, []);
-  return allowed;
+  return state;
+}
+export function useMotionAllowed(): boolean {
+  return useMotionPreference().allowed;
 }
 export function cappedStagger(index: number): number {
   return Math.min(Math.max(index, 0), motion.maxStaggerCards) * motion.cardStagger;

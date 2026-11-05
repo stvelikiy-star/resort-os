@@ -31,6 +31,9 @@ it('future luxury palette maintains WCAG AA text and primary action contrast in 
     expect(contrast(c.textMuted, c.surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(c.primary, c.primarySoft)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(c.primaryText, c.primary)).toBeGreaterThanOrEqual(4.5);
+    // Danger buttons use the same theme-aware foreground, not hardcoded white.
+    expect(contrast(c.primaryText, c.danger)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(c.navInactive, c.surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(c.warning, c.warningSoft)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(c.danger, c.dangerSoft)).toBeGreaterThanOrEqual(4.5);
   }

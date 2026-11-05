@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
@@ -50,7 +50,7 @@ export function AnimatedProgressBar({ percent }: { percent: number }) {
   );
 }
 
-export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string }) {
+export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel, dimWhenDisabled = true }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string; dimWhenDisabled?: boolean }) {
   const [s] = useState(() => new Animated.Value(1));
   const to = (x: number) => {
     if (disabled) return;
@@ -69,10 +69,10 @@ export function PressScale({ children, onPress, style, disabled, testID, accessi
   }
   const fill = outer.flex !== undefined || outer.flexGrow !== undefined;
   return (
-    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={accessibilityLabel} disabled={disabled} style={outer as ViewStyle}
+    <Pressable testID={testID} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} accessibilityLabel={accessibilityLabel} disabled={disabled} style={outer as ViewStyle}
       onPressIn={() => to(0.97)} onPressOut={() => to(1)}
       onPress={() => { void Haptics.selectionAsync().catch(() => {}); onPress?.(); }}>
-      <Animated.View style={[inner as ViewStyle, fill ? { flex: 1 } : null, { transform: [{ scale: s }], opacity: disabled ? 0.5 : 1 }]}>{children}</Animated.View>
+      <Animated.View style={[inner as ViewStyle, fill ? { flex: 1 } : null, { transform: [{ scale: s }], opacity: disabled && dimWhenDisabled ? 0.5 : 1 }]}>{children}</Animated.View>
     </Pressable>
   );
 }
@@ -82,13 +82,13 @@ export function Screen({ children, scroll = true, padded = true }: { children: R
   const insets = useSafeAreaInsets();
   const pad = padded ? space.lg : 0;
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {scroll ? (
-        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: pad, paddingTop: insets.top + space.md, paddingBottom: 112 + insets.bottom, gap: space.md }}>{children}</ScrollView>
+        <ScrollView style={{ flex: 1 }} keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: pad, paddingTop: insets.top + space.md, paddingBottom: 112 + insets.bottom, gap: space.md }}>{children}</ScrollView>
       ) : (
         <View style={{ flex: 1, padding: pad, paddingTop: insets.top + space.md, gap: space.md }}>{children}</View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -124,9 +124,9 @@ export function Badge({ label, tone = 'neutral', icon: Icon }: { label: string; 
   const { c } = useTheme();
   const t = toneColors(c, tone);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.bg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, alignSelf: 'flex-start' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.bg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, alignSelf: 'flex-start', maxWidth: '100%' }}>
       {Icon ? <Icon size={13} color={t.fg} /> : null}
-      <Text style={[font.label, { color: t.fg }]}>{label}</Text>
+      <Text style={[font.label, { color: t.fg, flexShrink: 1 }]}>{label}</Text>
     </View>
   );
 }
@@ -134,12 +134,12 @@ export function Badge({ label, tone = 'neutral', icon: Icon }: { label: string; 
 export function Button({ label, onPress, icon: Icon, variant = 'primary', disabled, testID }: { label: string; onPress: () => void; icon?: LucideIcon; variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; disabled?: boolean; testID?: string }) {
   const { c } = useTheme();
   const bg = variant === 'primary' ? c.primary : variant === 'danger' ? c.danger : variant === 'secondary' ? c.primarySoft : 'transparent';
-  const fg = variant === 'primary' ? c.primaryText : variant === 'danger' ? '#fff' : c.primary;
+  const fg = variant === 'primary' || variant === 'danger' ? c.primaryText : c.primary;
   return (
     <PressScale testID={testID} disabled={disabled} onPress={onPress} accessibilityLabel={label}
       style={{ minHeight: TOUCH, borderRadius: radius.lg, backgroundColor: bg, paddingHorizontal: space.xl, borderWidth: variant === 'secondary' ? 1 : 0, borderColor: c.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm }}>
       {Icon ? <Icon size={22} color={fg} /> : null}
-      <Text style={[font.h2, { color: fg, fontSize: 17 }]}>{label}</Text>
+      <Text style={[font.h2, { color: fg, fontSize: 17, flexShrink: 1, textAlign: 'center' }]}>{label}</Text>
     </PressScale>
   );
 }
@@ -177,15 +177,17 @@ export function Empty({ text }: { text: string }) {
 
 export function Segmented<T extends string>({ value, options, onChange }: { value: T; options: { key: T; label: string }[]; onChange: (k: T) => void }) {
   const { c } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const wrap = options.length >= 4 && (width < 430 || fontScale > 1.25);
   return (
-    <View style={{ flexDirection: 'row', backgroundColor: c.surfaceAlt, borderRadius: radius.pill, padding: 4, gap: 4 }}>
+    <View style={{ flexDirection: 'row', flexWrap: wrap ? 'wrap' : 'nowrap', backgroundColor: c.surfaceAlt, borderRadius: wrap ? radius.md : radius.pill, padding: 4, gap: 4 }}>
       {options.map((o) => {
         const on = o.key === value;
         return (
           <Pressable key={o.key} testID={`segment-${o.key}`} onPress={() => onChange(o.key)}
             accessibilityRole="radio" accessibilityState={{ checked: on }} accessibilityLabel={o.label}
-            style={{ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: on ? c.surface : 'transparent', borderWidth: on ? 1 : 0, borderColor: c.border }}>
-            <Text style={[font.small, { fontWeight: '700', color: on ? c.primary : c.textMuted, textAlign: 'center' }]}>{o.label}</Text>
+            style={{ flex: wrap ? undefined : 1, width: wrap ? '48%' : undefined, minWidth: 0, minHeight: 48, paddingHorizontal: 3, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: on ? c.surface : 'transparent', borderWidth: on ? 1 : 0, borderColor: c.border }}>
+            <Text numberOfLines={2} style={[font.small, { fontWeight: '700', color: on ? c.primary : c.textMuted, textAlign: 'center', flexShrink: 1 }]}>{o.label}</Text>
           </Pressable>
         );
       })}
