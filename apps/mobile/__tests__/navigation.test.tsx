@@ -10,6 +10,7 @@ import Overview from '../app/(app)/overview';
 import Pms from '../app/(app)/pms';
 import Reception from '../app/(app)/reception';
 import Inbox from '../app/(app)/inbox';
+import Dining from '../app/(app)/dining';
 import Tasks from '../app/(app)/tasks';
 import Rooms from '../app/(app)/rooms';
 import Requests from '../app/(app)/requests';
@@ -34,6 +35,11 @@ const routes = {
   '(auth)/connect': Connect,
   '(auth)/login': Login,
   '(app)/_layout': AppTabs,
+  '(app)/overview': Overview,
+  '(app)/reception': Reception,
+  '(app)/pms': Pms,
+  '(app)/inbox': Inbox,
+  '(app)/dining': Dining,
   '(app)/more': More,
   '(app)/tasks': Tasks,
   '(app)/rooms': Rooms,
@@ -51,7 +57,11 @@ async function loginAs(role: string) {
   await fireEvent.press(screen.getByTestId('hotel-demo-marina-issykkul'));
   await screen.findByTestId('login-submit');
   await fireEvent.press(screen.getByTestId(`demo-${role}`));
-  await screen.findByTestId('progress-pct', {}, { timeout: 4000 }).catch(() => null);
+  if (role === 'manager') {
+    // Manager's first screen is now the premium overview, with operations one tap away.
+    await fireEvent.press(await screen.findByTestId('tab-tasks', {}, { timeout: 4000 }));
+    await screen.findByTestId('progress-pct', {}, { timeout: 4000 });
+  }
   return screen;
 }
 
@@ -124,7 +134,8 @@ describe('navigation, guards and screens', () => {
     const screen = await loginAs('manager');
     await screen.findByTestId('task-t1', {}, { timeout: 4000 });
     expect(screen.getByTestId('tab-admin')).toBeTruthy();
-    expect(screen.getByTestId('tab-requests')).toBeTruthy();
+    expect(screen.getByTestId('tab-inbox')).toBeTruthy();
+    expect(screen.getByTestId('tab-more')).toBeTruthy();
   });
 
   it('manager can assign an unassigned cleaning task from the admin screen', async () => {
@@ -261,9 +272,9 @@ describe('navigation, guards and screens', () => {
     await fireEvent.press(screen.getByTestId('segment-system'));
   });
 
-  it('waiter has no operational workspace (profile only)', async () => {
+  it('waiter can view isolated restaurant DEMO without task or admin permissions', async () => {
     const screen = await loginAs('waiter');
-    await screen.findByTestId('tab-profile', {}, { timeout: 4000 });
+    await screen.findByTestId('tab-dining', {}, { timeout: 4000 });
     expect(screen.queryByTestId('tab-tasks')).toBeNull();
     expect(screen.queryByTestId('tab-admin')).toBeNull();
   });
