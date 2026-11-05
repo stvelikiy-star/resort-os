@@ -77,8 +77,15 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
           known.add(id);
           extra.push({ id, baseUrl: parsed.baseUrl, name: id.slice(5), city: '', demo: false, accent: '#245E9A' });
         }
-        // Existing devices can contain historical multi-hotel preferences; bind only one.
-        setHotels([...DEMO_HOTELS, ...extra.slice(0, 1)]);
+        // Legacy devices could have saved multiple unrelated hotel origins.
+        // Never silently pick one: clear ambiguous preferences and require
+        // an explicit, trusted single-property setup again.
+        if (extra.length > 1) {
+          setHotels(DEMO_HOTELS);
+          void setItem('marina.hotels', '[]');
+          return;
+        }
+        setHotels([...DEMO_HOTELS, ...extra]);
       } catch { /* ignore corrupt preferences */ }
     });
   }, [initialLocale]);
