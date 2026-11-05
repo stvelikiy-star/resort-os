@@ -164,6 +164,76 @@ try {
     assert.equal(approved.data.status, "DONE");
     await context.close();
   }
+  // Accepted P0 shared dining: REAL COOK/WAITER browsers, canonical API,
+  // synthetic PostgreSQL, two independent hotels, and cross-property denials.
+  const diningOrderIds = {
+    A: "11111111-2222-4333-8444-5555555555a1",
+    B: "11111111-2222-4333-8444-5555555555b2",
+  };
+  for (const suffix of ["A", "B"]) {
+    const other = suffix === "A" ? "B" : "A";
+    for (const [username, role, heading] of [
+      ["cook", "COOK", "Кухня · заказы"],
+      ["waiter", "WAITER", "Официант · зал"],
+    ]) {
+      const context = await browser.newContext();
+      const page = await context.newPage();
+      await page.goto(staff);
+      await page.getByLabel("Код организации").fill("tenant_" + suffix.toLowerCase());
+      await page.getByLabel("Код отеля").fill("HOTEL_" + suffix);
+      await page.getByLabel("Логин").fill(username);
+      await page.getByLabel("Пароль").fill(password);
+      await page.getByRole("button", { name: "Войти" }).click();
+      await page.getByRole("heading", { name: heading }).waitFor();
+      const me = await api(page, "auth/me");
+      assert.equal(me.status, 200);
+      assert.equal(me.data.role, role);
+      assert.equal(me.data.property_code, "HOTEL_" + suffix);
+      assert(me.data.module_permissions.includes("DINING"));
+
+      const own = diningOrderIds[suffix];
+      const foreign = diningOrderIds[other];
+      const listPath = role === "COOK" ? "kitchen/orders?status=ACTIVE" : "dining/floor";
+      const list = await api(page, listPath);
+      assert.equal(list.status, 200);
+      const orders = role === "COOK" ? list.data.items : list.data.orders;
+      assert.deepEqual(orders.map(row => row.id), [own], "Shared dining data crossed hotel");
+      if (role === "WAITER") assert.equal(list.data.current_user_id, me.data.id);
+      const ownCard = page.getByRole("article").filter({ hasText: "CI-DINING-" + suffix });
+      await ownCard.waitFor();
+      assert.equal(await page.getByText("CI-DINING-" + other, { exact: true }).count(), 0);
+      if (role === "COOK") {
+        assert.equal((await api(page, "dining/floor")).status, 403,
+          "Cook must not gain waiter floor");
+        assert.equal((await api(page, "kitchen/orders/" + foreign + "/status",
+          "PATCH", { status: "ACCEPTED" })).status, 404,
+          "Cook may not patch foreign hotel order");
+        await ownCard.getByRole("button", { name: "Принять в работу" }).click();
+        await ownCard.getByText("ACCEPTED", { exact: false }).waitFor();
+        const updated = await api(page, "kitchen/orders?status=ACTIVE");
+        assert.equal(updated.data.items.find(item => item.id === own)?.status, "ACCEPTED");
+      } else {
+        assert.equal((await api(page, "kitchen/orders")).status, 403,
+          "Waiter must not change kitchen production");
+        assert.equal((await api(page, "dining/orders/" + foreign + "/waiter",
+          "PATCH", { waiter_id: me.data.id })).status, 404,
+          "Waiter may not assign foreign order");
+        assert.equal((await api(page, "dining/orders/" + own + "/waiter",
+          "PATCH", { waiter_id: foreign })).status, 403,
+          "Waiter may assign only self");
+        await ownCard.getByRole("button", { name: "Назначить заказ себе" }).click();
+        await page.getByText("Операция по заказу CI-DINING-" + suffix +
+          " подтверждена.", { exact: true }).waitFor();
+        const updated = await api(page, "dining/floor");
+        assert.equal(updated.data.orders.find(item => item.id === own)?.waiter_id, me.data.id);
+      }
+      await page.getByRole("button", { name: "Выйти" }).click();
+      await page.getByLabel("Код организации").waitFor();
+      assert.equal((await api(page, "auth/me")).status, 401);
+      await context.close();
+    }
+  }
+  console.log("PASS: two-hotel COOK/WAITER HTTPS sessions, scoped orders, status/assignment and 403/404 denials");
   console.log("PASS: Staff HTTPS four-role/property report lifecycles, inspection RBAC, replay denials, foreign 404 and hotel switch");
 } finally {
   await browser.close();

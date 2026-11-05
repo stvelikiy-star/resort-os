@@ -38,3 +38,30 @@ This new candidate introduces **RECEPTION core-rate-only booking** through the e
 Coverage added: a Python scope regression and a two-hotel, real Chromium HTTPS browser test that attempts manager overrides (403), foreign room pricing (404), repeated booking (409), and accepts only core-rate 201 with no payment. **These are test requirements, not PASS claims until the final SHA CI has completed.**
 
 Kitchen/waiter shared workspaces, external provider delivery, target restore and production authorisation remain blocking.
+
+## Stage 2 COOK / WAITER shared staging slice — CI acceptance pending
+
+The existing canonical handlers remain authoritative: `GET /api/v1/kitchen/orders`,
+`PATCH /api/v1/kitchen/orders/{id}/status` (COOK); `GET /api/v1/dining/floor`,
+`PATCH /api/v1/dining/orders/{id}/waiter` (WAITER). Additional exact dining
+routes are admitted via an **explicit** stage-only boundary. No menu management,
+provider, payments, AI, guest or unreviewed mutations are opened.
+
+- `MARINA_SHARED_DINING_P0_ENABLED` defaults false; activation requires
+  `MARINA_SHARED_DINING_P0_CONFIRM=REVIEWED_SHARED_DINING_STAGING_ONLY`,
+  secure shared cookies, `APP_ENV=staging` and validated tenant context.
+- The default RC3–RC8 ASGI boundary remains unchanged when the feature is off.
+  Role and module permissions are still resolved by `require_roles` and the
+  active hotel by `trusted_property_id` in the existing canonical endpoints.
+- Shared Staff shows a role-specific `SharedDiningShift` only after verifying
+  that COOK/WAITER identity has DINING and the server-issued hotel IDs.
+- The disposable staging CI creates two synthetic table/order records using
+  frozen RC3 database safety guards; browser tests verify COOK transition,
+  WAITER self-assignment, property isolation, 403 role denials, foreign 404
+  and revoked session on logout.
+- Never execute the dining seed against a customer or populated database.
+  Do not turn on the stage flag in production or DEMO.
+
+**Evidence requirement:** successful exact-head CI for new kitchen/restaurant
+unit gate, Compose HTTPS Chrome staff end-to-end, full source integrity and
+relevant regressions. This document is not an acceptance receipt.

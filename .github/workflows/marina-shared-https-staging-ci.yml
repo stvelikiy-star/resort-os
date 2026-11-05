@@ -6,6 +6,10 @@ on:
       - compose.marina-shared-staging.yaml
       - apps/staff/**
       - scripts/marina_shared_staff_shift_ci.mjs
+      - scripts/marina_shared_dining_p0_seed.py
+      - scripts/test_marina_shared_dining_p0.py
+      - services/api/app/shared_dining_p0.py
+      - services/api/app/main.py
       - scripts/marina_shared_https_pms_ci.mjs
       - .github/workflows/marina-shared-https-staging-ci.yml
   workflow_dispatch:
@@ -19,6 +23,8 @@ jobs:
     timeout-minutes: 25
     env:
       COMPOSE_FILE: compose.marina-shared-staging.yaml
+      MARINA_SHARED_DINING_P0_ENABLED: 'true'
+      MARINA_SHARED_DINING_P0_CONFIRM: REVIEWED_SHARED_DINING_STAGING_ONLY
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,7 +46,13 @@ jobs:
           docker compose config --quiet
           docker compose up -d --wait postgres
           docker compose run --rm --build seed
+          # Only add synthetic dining facts to this disposable PostgreSQL volume.
+          docker compose run --rm dining-seed
           docker compose up -d --build --wait admin
+      - name: Check exact shared dining path gate and opt-in controls
+        run: |
+          python -m pip install -r services/api/requirements.txt
+          PYTHONPATH=services/api python -m unittest discover -s scripts -p 'test_marina_shared_dining_p0.py' -v
       - name: Verify HTTPS session isolation through the Admin proxy
         shell: bash
         run: |

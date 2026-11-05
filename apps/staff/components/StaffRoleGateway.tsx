@@ -4,10 +4,11 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import GuestRequestShiftPanel from "./GuestRequestShiftPanel";
 import StaffShiftV2 from "./StaffShiftV2";
+import SharedDiningShift from "./SharedDiningShift";
 import MarinaAiAssistant from "./MarinaAiAssistant";
 
 type Role = "OWNER" | "MANAGER" | "RECEPTION" | "MAID" | "TECHNICIAN" | "DINING_STAFF" | "COOK" | "WAITER" | "STORE_STAFF";
-type User = { id: string; username: string; display_name: string; role: Role; property_code: string; property_id?: string; tenant_id?: string };
+type User = { id: string; username: string; display_name: string; role: Role; property_code: string; property_id?: string; tenant_id?: string; module_permissions?: string[] };
 
 declare global {
   interface Window {
@@ -46,6 +47,13 @@ function isSharedShiftUser(value: unknown): value is User & { role: "MAID" | "TE
   return isOperationalUser(value) && (value.role === "MAID" || value.role === "TECHNICIAN");
 }
 
+function isSharedDiningUser(value: unknown): value is User & { role: "COOK" | "WAITER"; property_id: string; tenant_id: string } {
+  if (!isOperationalUser(value)) return false;
+  return (value.role === "COOK" || value.role === "WAITER") &&
+    typeof value.property_id === "string" && typeof value.tenant_id === "string" &&
+    Array.isArray(value.module_permissions) && value.module_permissions.includes("DINING");
+}
+
 export default function StaffRoleGateway() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
@@ -79,7 +87,7 @@ export default function StaffRoleGateway() {
         if (detected === "shared_auth_preview") {
           const me = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
           const identity = me.ok ? await me.json() : null;
-          if (!cancelled && isSharedShiftUser(identity)) setUser(identity);
+          if (!cancelled && (isSharedShiftUser(identity) || isSharedDiningUser(identity))) setUser(identity);
           if (!cancelled) setChecking(false);
           return;
         }
@@ -159,7 +167,8 @@ export default function StaffRoleGateway() {
         try {
           const me = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
           const identity = me.ok ? await me.json() : null;
-          if (!isSharedShiftUser(body) || !isSharedShiftUser(identity) ||
+          if (!(isSharedShiftUser(body) || isSharedDiningUser(body)) ||
+              !(isSharedShiftUser(identity) || isSharedDiningUser(identity)) ||
               !identity.tenant_id || !identity.property_id ||
               identity.tenant_id !== body.tenant_id || identity.property_id !== body.property_id ||
               identity.property_code !== selectors.property_code ||
@@ -220,6 +229,9 @@ export default function StaffRoleGateway() {
     </form></main>;
   }
 
+  if (mode === "shared_auth_preview" && isSharedDiningUser(user)) {
+    return <SharedDiningShift key={user.property_id + ":" + user.id} user={user} onEnd={expireSharedSession} />;
+  }
   if (mode === "shared_auth_preview" && isSharedShiftUser(user)) {
     return <StaffShiftV2 key={user.id} sharedSession={{ user, onEnd: expireSharedSession }} />;
   }

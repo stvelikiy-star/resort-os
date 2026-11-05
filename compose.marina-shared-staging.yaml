@@ -12,6 +12,8 @@ x-shared-env: &shared-env
   RATE_PLAN_CODE: MARINA_BROWSER_CI
   MARINA_TENANT_CONTEXT_ENABLED: "true"
   MARINA_SHARED_AUTH_PREVIEW_ENABLED: "true"
+  MARINA_SHARED_DINING_P0_ENABLED: ${MARINA_SHARED_DINING_P0_ENABLED:-false}
+  MARINA_SHARED_DINING_P0_CONFIRM: ${MARINA_SHARED_DINING_P0_CONFIRM:-}
   COOKIE_SECURE: "true"
   COOKIE_DOMAIN: ""
   AUTH_TRUST_PROXY_HEADERS: "false"
@@ -56,6 +58,21 @@ services:
         npx --no-install prisma migrate deploy
         cd /app
         python scripts/marina_shared_live_browser_db.py seed
+
+  dining-seed:
+    <<: *api-image
+    profiles: [dining-ci]
+    network_mode: service:postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://marina_ci:${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_BROWSER_CI_PASSWORD: ${MARINA_STAGING_FIXTURE_PASSWORD:?Set a dedicated synthetic fixture password}
+      MARINA_SHARED_DINING_P0_SEED_CONFIRM: ISOLATED_DINING_CI_ONLY
+    command: [python, scripts/marina_shared_dining_p0_seed.py]
 
   api:
     <<: *api-image
