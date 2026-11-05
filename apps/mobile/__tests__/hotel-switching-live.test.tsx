@@ -64,51 +64,39 @@ beforeEach(()=>{
   mockClients[hotelA.id]=fakeApi('A');mockClients[hotelB.id]=fakeApi('B');mockEvents.length=0;
 });
 function ViewPanel(){
-  const {hotel,user,addHotel,switchHotel,signIn,api}=useSession();
+  const {hotel,user,addHotel,signIn,switchHotel,api}=useSession();
+  const [result,setResult]=React.useState('none');
   const [room,setRoom]=React.useState('none');
-  const [restored,setRestored]=React.useState('none');
-  const swap=async(id:string)=>{
-    setRoom('none');const r=await switchHotel(id);setRestored(r?'yes':'no');
-  };
   return <>
     <Text testID="hotel">{hotel?.id??'none'}</Text>
     <Text testID="owner">{user?.property_code??'none'}</Text>
+    <Text testID="result">{result}</Text>
     <Text testID="room">{room}</Text>
-    <Text testID="restored">{restored}</Text>
-    <Pressable testID="add-a" onPress={()=>addHotel(hotelA)}><Text>Add A</Text></Pressable>
-    <Pressable testID="add-b" onPress={()=>addHotel(hotelB)}><Text>Add B</Text></Pressable>
+    <Pressable testID="add-a" onPress={()=>addHotel(hotelA)}><Text>Bind A</Text></Pressable>
     <Pressable testID="login" onPress={()=>{void signIn('owner','testpass');}}><Text>Sign in</Text></Pressable>
-    <Pressable testID="back-a" onPress={()=>{void swap(hotelA.id);}}><Text>Switch A</Text></Pressable>
-    <Pressable testID="back-b" onPress={()=>{void swap(hotelB.id);}}><Text>Switch B</Text></Pressable>
+    <Pressable testID="add-b" onPress={()=>{
+      try { addHotel(hotelB); setResult('unexpected-add'); }
+      catch { setResult('add-denied'); }
+    }}><Text>Bind B</Text></Pressable>
+    <Pressable testID="switch-b" onPress={()=>{
+      void switchHotel(hotelB.id).then(()=>setResult('unexpected-switch'),()=>setResult('switch-denied'));
+    }}><Text>Switch B</Text></Pressable>
     <Pressable testID="read" onPress={()=>{void api?.listRooms().then(v=>setRoom(v[0]?.code??'none'));}}><Text>Read</Text></Pressable>
   </>;
 }
-it('retains independent verified LIVE sessions A→B→A on two signed, different HTTPS hosts',async()=>{
+it('LIVE device binds one origin and refuses a second hotel without losing session A',async()=>{
   const screen=await render(<SessionProvider initialLocale="ru"><ViewPanel/></SessionProvider>);
   fireEvent.press(screen.getByTestId('add-a'));
   await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id));
   fireEvent.press(screen.getByTestId('login'));
   await waitFor(()=>expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A'));
-  fireEvent.press(screen.getByTestId('read'));
-  await waitFor(()=>expect(screen.getByTestId('room').props.children).toBe('A-101'));
-
   fireEvent.press(screen.getByTestId('add-b'));
-  await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelB.id));
-  expect(screen.getByTestId('owner').props.children).toBe('none');
-  fireEvent.press(screen.getByTestId('login'));
-  await waitFor(()=>expect(screen.getByTestId('owner').props.children).toBe('HOTEL_B'));
-  fireEvent.press(screen.getByTestId('read'));
-  await waitFor(()=>expect(screen.getByTestId('room').props.children).toBe('B-101'));
-
-  fireEvent.press(screen.getByTestId('back-a'));
-  await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id));
-  await waitFor(()=>expect(screen.getByTestId('restored').props.children).toBe('yes'));
+  await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('add-denied'));
+  fireEvent.press(screen.getByTestId('switch-b'));
+  await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('switch-denied'));
+  expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
   expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
-  expect(mockEvents.filter(x=>x==='login-A')).toHaveLength(1);
-  expect(mockEvents).toContain('me-A');
   fireEvent.press(screen.getByTestId('read'));
   await waitFor(()=>expect(screen.getByTestId('room').props.children).toBe('A-101'));
-  // The *first sign-in* deliberately clears any stale A cookie. Switching
-  // to B and returning to A must not add a SECOND A logout.
-  expect(mockEvents.filter(x=>x==='logout-A')).toHaveLength(1);
+  expect(mockEvents).not.toContain('login-B');
 });

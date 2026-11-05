@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Repeat, Languages, Palette, ArrowLeftRight, Wallet } from 'lucide-react-native';
+import { LogOut, Languages, Palette, ArrowLeftRight, Wallet } from 'lucide-react-native';
 import Constants from 'expo-constants';
-import { Button, DemoBanner, Segmented, PressScale, Badge } from '../../src/components/ui';
+import { Button, DemoBanner, Segmented } from '../../src/components/ui';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
 import { Hero } from '../../src/components/Brand';
@@ -21,9 +21,7 @@ export default function Profile() {
   const mobile = useMobileCopy();
   const { c, pref, setPref } = useTheme();
   const router = useRouter();
-  const { user, hotel, hotels, api, serverAuthMode, locale, setLocale, signOut, switchHotel } = useSession();
-  const [changing, setChanging] = useState(false);
-  const [switchError, setSwitchError] = useState(false);
+  const { user, hotel, api, serverAuthMode, locale, setLocale, signOut } = useSession();
   if (!user || !hotel || !api) return <Redirect href="/connect" />;
   const row = (k: string, v: string) => (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.md, paddingVertical: 8 }}>
@@ -68,31 +66,9 @@ export default function Profile() {
         </View>
         <Segmented<ThemePref> value={pref} onChange={setPref} options={[{ key: 'system', label: t('profile.system') }, { key: 'light', label: t('profile.light') }, { key: 'dark', label: t('profile.dark') }]} />
       </GlassCard>
-      <GlassCard style={{ gap: space.sm }}>
-        <Text style={[font.h2, { color: c.text }]}>{t('profile.switchHotel')}</Text>
-        {hotels.map(connection => <PressScale key={connection.id} testID={'profile-hotel-' + connection.id}
-          disabled={changing || connection.id === hotel.id}
-          onPress={async () => {
-            if (changing) return;
-            setChanging(true);
-            setSwitchError(false);
-            try {
-              const restored = await switchHotel(connection.id);
-              router.replace(restored ? '/profile' : '/login');
-            } catch { setSwitchError(true); }
-            finally { setChanging(false); }
-          }}
-          style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md }}>
-          <Text numberOfLines={2} style={[font.body, { color: c.text, flex: 1 }]}>{connection.name}</Text>
-          <Badge label={connection.id === hotel.id ? t('profile.hotel') : connection.demo ? t('profile.modeDemo') : t('profile.modeLive')}
-            tone={connection.id === hotel.id ? 'success' : connection.demo ? 'warning' : 'info'} />
-        </PressScale>)}
-        {switchError ? <Text accessibilityRole="alert" style={[font.small, { color: c.danger }]}>{t('errors.generic')}</Text> : null}
-      </GlassCard>
       {api.mode === 'LIVE' && canReadFinance(user) ? <Button testID="profile-finance" label={mobile.financeTitle} icon={Wallet} variant="secondary" onPress={() => router.push('/finance')}/> : null}
       <View style={{ gap: space.sm, marginTop: space.md }}>
         {api.mode === 'DEMO' ? <Button testID="switch-demo-role" label={t('profile.switchDemoRole')} icon={ArrowLeftRight} variant="secondary" onPress={async () => { await signOut(); router.replace('/login'); }}/> : null}
-        <Button testID="profile-add-hotel" label={t('connect.addHotel')} icon={Repeat} variant="secondary" onPress={() => router.push('/connect')} />
         <Button testID="sign-out" label={t('profile.signOut')} icon={LogOut} variant="danger" onPress={async () => { await signOut(); router.replace('/login'); }} />
       </View>
     </FutureScreen>

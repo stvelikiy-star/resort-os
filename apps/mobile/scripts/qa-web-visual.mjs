@@ -341,7 +341,8 @@ async function main() {
     const scanMatrixFiles = [];
     await click('[data-testid="tab-more"]','owner more after matrix');
     await click('[data-testid="more-profile"]','owner profile before scan');
-    await click('[data-testid="profile-add-hotel"]','connect page for QR check');
+    // Customer profile no longer exposes cross-hotel provisioning controls.
+    await nav('/connect');
     for (const lang of ['ru','kg','en']) {
       await click('[data-testid="segment-' + lang + '"]','connect scan language');
       await click('[data-testid="connect-scan"]','open QR camera permission view');

@@ -77,6 +77,14 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
           known.add(id);
           extra.push({ id, baseUrl: parsed.baseUrl, name: id.slice(5), city: '', demo: false, accent: '#245E9A' });
         }
+        // Legacy devices could have saved multiple unrelated hotel origins.
+        // Never silently pick one: clear ambiguous preferences and require
+        // an explicit, trusted single-property setup again.
+        if (extra.length > 1) {
+          setHotels(DEMO_HOTELS);
+          void setItem('marina.hotels', '[]');
+          return;
+        }
         setHotels([...DEMO_HOTELS, ...extra]);
       } catch { /* ignore corrupt preferences */ }
     });
@@ -178,6 +186,10 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     }
   }, [hotelId, hotels]);
   const switchHotel = useCallback(async (id: string): Promise<boolean> => {
+    // Customer builds are single-property: never restore another hotel's login.
+    if (hotelId && id !== hotelId) {
+      throw new ApiError('FORBIDDEN', 'Hotel switching is not available in a customer session');
+    }
     const target = hotels.find(h => h.id === id);
     if (!target || (!target.demo && !isTrustedHotelOrigin(target.baseUrl))) {
       throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
@@ -220,38 +232,25 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   }, [hotelId, hotels, sessions, selectHotel]);
 
   const addHotel = useCallback((h: HotelConnection) => {
-    if (h.demo || !isTrustedHotelOrigin(h.baseUrl)) throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
-    setHotels((cur) => {
-      // Cookies are held in the native OS cookie jar, which is shared by
-      // /api/v1 and /core/api/v1 on the same host. Avoid presenting both
-      // connections as independently authenticated hotels.
-      const host = new URL(h.baseUrl).hostname;
-      for (const previous of cur) {
-        if (!previous.demo && new URL(previous.baseUrl).hostname === host && previous.id !== h.id) {
-          dropApi(previous.id);
-        }
-      }
-      const remaining = cur.filter((x) => x.demo || new URL(x.baseUrl).hostname !== host);
-      const next = [...remaining, h];
-      void setItem('marina.hotels', JSON.stringify(next.filter((x) => !x.demo)));
-      return next;
-    });
-    const previous = hotelId ? hotels.find(current => current.id === hotelId) : null;
-    const sameHost = previous && !previous.demo &&
-      new URL(previous.baseUrl).hostname === new URL(h.baseUrl).hostname;
-    if (sameHost) {
-      // Replacing /api/v1 with /core on one host must still revoke the
-      // old cookie and invalidate its cached user: this is NOT a second hotel.
-      selectHotel(h.id);
-    } else {
-      // New trusted host: its OS cookie is isolated by host, so other
-      // previously verified hotel sessions can remain in memory.
-      sessionRevision.current++;
-      loginAttempt.current++;
-      setServerAuthMode(null);
-      setHotelId(h.id);
+    if (h.demo || !isTrustedHotelOrigin(h.baseUrl)) {
+      throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
     }
-  }, [hotelId, hotels, selectHotel]);
+    // A customer device may be provisioned for ONE trusted hotel. Changing it
+    // requires a dedicated administrator-controlled reset, not another login.
+    const existing = hotels.find(item => !item.demo);
+    if (existing && existing.id !== h.id) {
+      const sameHost = new URL(existing.baseUrl).hostname === new URL(h.baseUrl).hostname;
+      // /api/v1 -> /core on the SAME approved host is a technical URL
+      // migration, not onboarding a second customer. Never swap an active user.
+      if (!sameHost || sessions[existing.id]) {
+        throw new ApiError('FORBIDDEN', 'Device is already bound to a hotel');
+      }
+      dropApi(existing.id);
+    }
+    setHotels([...DEMO_HOTELS, h]);
+    void setItem('marina.hotels', JSON.stringify([h]));
+    if (hotelId !== h.id) selectHotel(h.id);
+  }, [hotels, hotelId, selectHotel, sessions]);
   const startDemo = useCallback(async (username = 'manager'): Promise<AuthUser> => {
     const demoHotel = DEMO_HOTELS[0];
     // Never bypass production auth. This method explicitly uses the isolated
