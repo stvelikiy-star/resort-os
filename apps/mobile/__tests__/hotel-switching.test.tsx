@@ -21,7 +21,7 @@ function BoundHotelPanel() {
 }
 
 it('one bound hotel: cross-hotel switch is denied without dropping current employee', async () => {
-  const screen = render(<SessionProvider initialLocale="ru" initialHotelId="demo-marina-issykkul"><BoundHotelPanel/></SessionProvider>);
+  const screen = await render(<SessionProvider initialLocale="ru" initialHotelId="demo-marina-issykkul"><BoundHotelPanel/></SessionProvider>);
   fireEvent.press(screen.getByTestId('login'));
   await waitFor(() => expect(screen.getByTestId('role').props.children).toBe('OWNER'));
   fireEvent.press(screen.getByTestId('switch'));
