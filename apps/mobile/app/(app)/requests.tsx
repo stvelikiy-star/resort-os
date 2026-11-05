@@ -6,6 +6,7 @@ import { Plus, AlertTriangle, Wrench } from 'lucide-react-native';
 import { Button, Empty, SectionLabel } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { TaskCard } from '../../src/components/domain';
+import { demoTaskTitle } from '../../src/i18n/demoLabels';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -17,7 +18,7 @@ export default function Requests() {
   const { t } = useTranslation();
   const router = useRouter();
   const { c } = useTheme();
-  const { api, user, hotel, serverAuthMode } = useSession();
+  const { api, user, hotel, serverAuthMode, locale } = useSession();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks({ type: 'MAINTENANCE' }) : Promise.resolve([])), [api, user?.id, ws.mobileReady]);
   const active = useMemo(() => (data ?? []).filter(x => x.status !== 'DONE' && x.status !== 'CANCELLED'), [data]);
@@ -40,11 +41,11 @@ export default function Requests() {
     {!error && data && data.length === 0 ? <Empty text={t('common.empty')}/> : null}
     {active.length ? <SectionLabel>{t('tasks.visible')}</SectionLabel> : null}
     {active.map((task, i) => <StaggerItem key={task.id} index={i}>
-      <TaskCard task={task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>
+      <TaskCard task={api?.mode === 'DEMO' ? { ...task, title: demoTaskTitle(task.id, locale, task.title) } : task} onPress={() => router.push({ pathname:'/task/[id]', params:{id:task.id} })}/>
     </StaggerItem>)}
     {finished.length ? <SectionLabel>{t('tasks.done')}</SectionLabel> : null}
     {finished.map((task, i) => <StaggerItem key={task.id} index={i}>
-      <TaskCard task={task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })}/>
+      <TaskCard task={api?.mode === 'DEMO' ? { ...task, title: demoTaskTitle(task.id, locale, task.title) } : task} onPress={() => router.push({ pathname: '/task/[id]', params: { id: task.id } })}/>
     </StaggerItem>)}
   </FutureScreen>;
 }
