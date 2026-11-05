@@ -151,14 +151,14 @@ export function demoConversations(locale: Locale): Conversation[] {
   const timestamp = new Date().toISOString();
   return [
     {
-      id: 'demo-chat-1', channel_kind: 'WHATSAPP', channel_name: l.channelA,
+      id: 'demo-chat-01', channel_kind: 'WHATSAPP', channel_name: l.channelA,
       status: 'OPEN', contact_name: l.guestA, contact_phone: null,
       assigned_to_id: null, assigned_to_name: null,
       last_message_text: l.inboundA, last_message_at: timestamp,
       needs_reply: true, waiting_seconds: 120,
     },
     {
-      id: 'demo-chat-2', channel_kind: 'WEBCHAT', channel_name: l.channelB,
+      id: 'demo-chat-02', channel_kind: 'WEBCHAT', channel_name: l.channelB,
       status: 'WAITING_GUEST', contact_name: l.guestB, contact_phone: null,
       assigned_to_id: 'demo-staff', assigned_to_name: 'DEMO',
       last_message_text: l.inboundB, last_message_at: timestamp,
@@ -175,7 +175,7 @@ export function demoConversationDetail(id: string, locale: Locale): Conversation
   return {
     conversation,
     messages: [
-      { id: id + '-1', direction: 'INBOUND', text: id === 'demo-chat-1' ? l.inboundA : l.inboundB,
+      { id: id + '-1', direction: 'INBOUND', text: id === 'demo-chat-01' ? l.inboundA : l.inboundB,
         created_at: timestamp, delivery_status: 'DELIVERED' },
       { id: id + '-2', direction: 'OUTBOUND', text: l.outboundA,
         created_at: timestamp, delivery_status: 'READ' },
@@ -187,12 +187,12 @@ export function demoKitchenOrders(locale: Locale): KitchenOrder[] {
   const l = labels[locale];
   return [
     {
-      id: 'demo-order-1', order_number: 'DEMO-0001', status: 'NEW',
+      id: 'd-order-01', order_number: 'DEMO-0001', status: 'NEW',
       table_code: 'T-01', room_code: null, total_kgs: 0, notes: l.note,
       items: [{ id: 'demo-item-1', name: l.dishA, quantity: 1 }],
     },
     {
-      id: 'demo-order-2', order_number: 'DEMO-0002', status: 'READY',
+      id: 'd-order-02', order_number: 'DEMO-0002', status: 'READY',
       table_code: 'T-03', room_code: null, total_kgs: 0, notes: l.note,
       items: [{ id: 'demo-item-2', name: l.dishB, quantity: 2 }],
     },
