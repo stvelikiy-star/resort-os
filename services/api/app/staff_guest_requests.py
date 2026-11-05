@@ -151,9 +151,11 @@ async def load_routed_task_for_update(conn, pid, task_id: uuid.UUID, user: dict[
     )
     if not task:
         raise HTTPException(status_code=404, detail="Guest request not found")
-    if not guest_request_access(user, "/api/v1/ops/guest-requests") or not (
-        user.get("module_permissions_custom") and user_has_granted_requests(user)
-    ) and not can_handle(user["role"], task["serviceCode"]):
+    # Claim/complete/cancel must enforce the same role ceiling as queue reads.
+    # A custom section grant is not a service-code wildcard.
+    if (not guest_request_access(user, "/api/v1/ops/guest-requests")
+            or not can_handle(user["role"], task["serviceCode"])
+            or not guest_request_codes(user)):
         raise HTTPException(status_code=403, detail="Request type not allowed for role")
     return task
 
