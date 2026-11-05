@@ -66,7 +66,7 @@ export default function DiningDayPlanner() {
   useEffect(() => {
     api("/core/api/v1/auth/me")
       .then((body) => {
-        if (!["OWNER", "MANAGER", "DINING_STAFF"].includes(body.role)) throw new Error("Нет доступа к меню кухни");
+        if (!["OWNER", "MANAGER"].includes(body.role)) throw new Error("Нет доступа к меню кухни");
         setUser(body);
       })
       .catch(() => setUser(null))
@@ -149,7 +149,7 @@ export default function DiningDayPlanner() {
 
   return <main className={styles.shell}>
     <header className={styles.header}>
-      <div><p>Три Короны · Dining Control</p><h1>Меню на сегодня</h1><span>{user.display_name} · меню гостя публикуется только после явного подтверждения.</span></div>
+      <div><p>MARINA SMART · Dining Control</p><h1>Меню на сегодня</h1><span>{user.display_name} · меню гостя публикуется только после явного подтверждения.</span></div>
       <nav><a href="/kitchen">Кухня</a><a href="/waiter">Официант / зал</a></nav>
     </header>
 

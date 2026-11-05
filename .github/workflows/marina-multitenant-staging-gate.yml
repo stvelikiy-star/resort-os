@@ -1,0 +1,46 @@
+name: MARINA SMART Multi-Tenant Staging Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_tenants:
+        description: "Expected active tenant count in staging"
+        required: true
+        default: "2"
+      expected_properties:
+        description: "Expected property count in staging"
+        required: true
+        default: "2"
+      expected_property_codes:
+        description: "Optional comma-separated property codes"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  foundation-gate:
+    name: Read-only staging foundation gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout selected ref
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install gate dependencies
+        run: python -m pip install --disable-pip-version-check asyncpg==0.30.0 httpx==0.28.1
+
+      - name: Run read-only foundation gate
+        env:
+          MARINA_STAGING_BASE_URL: ${{ secrets.MARINA_STAGING_BASE_URL }}
+          MARINA_STAGING_DATABASE_URL: ${{ secrets.MARINA_STAGING_DATABASE_URL }}
+          MARINA_STAGING_EXPECTED_TENANTS: ${{ inputs.expected_tenants }}
+          MARINA_STAGING_EXPECTED_PROPERTIES: ${{ inputs.expected_properties }}
+          MARINA_STAGING_EXPECTED_PROPERTY_CODES: ${{ inputs.expected_property_codes }}
+        run: python scripts/verify_marina_multitenant_staging.py

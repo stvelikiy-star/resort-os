@@ -100,7 +100,7 @@ jobs:
           )"
           echo "KITCHEN_MENU_DINING_USERNAME=$DINING_USERNAME" >> "$GITHUB_ENV"
           echo "KITCHEN_MENU_DINING_PASSWORD=$DINING_PASSWORD" >> "$GITHUB_ENV"
-          STAFF_USERNAME="$DINING_USERNAME" STAFF_PASSWORD="$DINING_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Menu Dining CI" STAFF_ROLE="DINING_STAFF" python scripts/upsert_staff_user.py
+          STAFF_USERNAME="$DINING_USERNAME" STAFF_PASSWORD="$DINING_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Menu Cook CI" STAFF_ROLE="COOK" python scripts/upsert_staff_user.py
 
       - name: Typecheck and build Kitchen Admin host app
         working-directory: apps/staff

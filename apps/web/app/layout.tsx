@@ -1,10 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import AiAdministratorWidget from "../components/AiAdministratorWidget";
-import GuestServicesRuntime from "../components/GuestServicesRuntime";
-import PremiumMotion from "../components/PremiumMotion";
-import PublicUiI18nRuntime from "../components/PublicUiI18nRuntime";
-import SiteContentRuntime from "../components/SiteContentRuntime";
-import SiteMediaRuntime from "../components/SiteMediaRuntime";
+import PublicSiteRuntime from "../components/PublicSiteRuntime";
 import { getPublishedSiteContent } from "../lib/siteContent";
 import "./globals.css";
 import "./premium-expansion.css";
@@ -48,5 +43,5 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = { themeColor: "#0A1128", colorScheme: "dark light" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body><PremiumMotion /><SiteContentRuntime /><SiteMediaRuntime /><PublicUiI18nRuntime /><GuestServicesRuntime />{children}<AiAdministratorWidget /></body></html>;
+  return <html lang="ru"><body>{children}<PublicSiteRuntime /></body></html>;
 }

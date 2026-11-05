@@ -56,9 +56,12 @@ function typeForRole(role: Role) {
   return null;
 }
 
-export default function StaffShiftV2() {
-  const [user, setUser] = useState<User | null>(null);
-  const [checking, setChecking] = useState(true);
+export default function StaffShiftV2({ sharedSession }: {
+  sharedSession?: { user: User; onEnd: () => void };
+}) {
+  const [user, setUser] = useState<User | null>(sharedSession?.user ?? null);
+  const [checking, setChecking] = useState(!sharedSession);
+  const endSharedSession = sharedSession?.onEnd;
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -76,6 +79,7 @@ export default function StaffShiftV2() {
   const [checks, setChecks] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    if (endSharedSession) return;
     window.Telegram?.WebApp?.ready();
     window.Telegram?.WebApp?.expand();
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
@@ -124,7 +128,7 @@ export default function StaffShiftV2() {
     }
     void bootstrap();
     return () => { cancelled = true; };
-  }, []);
+  }, [endSharedSession]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -136,6 +140,7 @@ export default function StaffShiftV2() {
       const response = await fetch(`/core/api/v1/ops/tasks?limit=250${suffix}`, { cache: "no-store" });
       if (response.status === 401) {
         setUser(null);
+        endSharedSession?.();
         return;
       }
       const body = await response.json().catch(() => ({}));
@@ -146,7 +151,7 @@ export default function StaffShiftV2() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, endSharedSession]);
 
   useEffect(() => { if (user) void load(); }, [user, load]);
 
@@ -182,14 +187,19 @@ export default function StaffShiftV2() {
         if (link?.ok) setTelegramNotice("Telegram привязан. Следующий вход — автоматически.");
       }
     } catch {
-      setLoginError("Resort Core недоступен");
+      setLoginError("MARINA SMART недоступен");
     }
   }
 
   async function logout() {
-    await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+    const response = await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
+    if (endSharedSession && response?.status !== 204 && response?.status !== 401) {
+      setError("Не удалось завершить сессию. Повторите выход.");
+      return;
+    }
     setUser(null);
     setTasks([]);
+    endSharedSession?.();
   }
 
   async function claim(task: Task) {
@@ -198,6 +208,10 @@ export default function StaffShiftV2() {
     try {
       const response = await fetch(`/core/api/v1/ops/tasks/${task.id}/claim`, { method: "POST" });
       const body = await response.json().catch(() => ({}));
+      if (response.status === 401 && endSharedSession) {
+        endSharedSession();
+        return;
+      }
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Задачу уже забрал другой сотрудник");
       setFilter("MINE");
       await load();
@@ -234,6 +248,10 @@ export default function StaffShiftV2() {
         }),
       });
       const body = await response.json().catch(() => ({}));
+      if (response.status === 401 && endSharedSession) {
+        endSharedSession();
+        return;
+      }
       if (!response.ok) {
         if (body.detail?.code === "CHECKLIST_INCOMPLETE") throw new Error("Отметьте все пункты чек-листа перед сдачей номера.");
         throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось сдать работу");
@@ -251,12 +269,12 @@ export default function StaffShiftV2() {
 
   if (!user) return <main className="shift-center"><form className="shift-login" onSubmit={login}>
     <div className="shift-crown">III</div>
-    <p className="shift-eyebrow">Три Короны · Resort OS</p>
+    <p className="shift-eyebrow">MARINA SMART · Hotel OS</p>
     <h1>Моя смена</h1>
     <p>{telegramDetected ? "Первый вход: рабочий логин и пароль. После привязки Telegram вход будет автоматическим." : "Войдите под рабочей учётной записью."}</p>
     {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
     <label><span>Логин</span><input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required /></label>
-    <label><span>Пароль</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={8} required /></label>
+    <label><span>Пароль</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={6} required /></label>
     {loginError && <div className="shift-error">{loginError}</div>}
     <button className="shift-primary">Войти</button>
   </form></main>;
@@ -268,7 +286,7 @@ export default function StaffShiftV2() {
 
   return <main className="shift-shell">
     <header className="shift-head">
-      <div><p className="shift-eyebrow">Три Короны · Моя смена</p><h1>{user.display_name}</h1><span>{roleLabel[user.role]}{telegramDetected ? " · Telegram" : ""}</span></div>
+      <div><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>{user.display_name}</h1><span>{roleLabel[user.role]}{telegramDetected ? " · Telegram" : ""}</span></div>
       <button className="shift-ghost" onClick={logout}>Выйти</button>
     </header>
 
@@ -307,7 +325,7 @@ export default function StaffShiftV2() {
         <div className="shift-modal-head"><div><p className="shift-eyebrow">Отчёт о работе</p><h2>{reportTask.room_code ? `Номер ${reportTask.room_code}` : reportTask.title}</h2></div><button type="button" className="shift-ghost" onClick={() => setReportTask(null)}>×</button></div>
         {reportTask.type === "HOUSEKEEPING" && <section className="shift-checklist"><h3>Чек-лист уборки</h3>{housekeepingChecklist.map(([code, label]) => <label key={code}><input type="checkbox" checked={Boolean(checks[code])} onChange={(e) => setChecks((current) => ({ ...current, [code]: e.target.checked }))} /><span>{label}</span></label>)}</section>}
         <label className="shift-field"><span>Что сделано</span><textarea value={summary} onChange={(e) => setSummary(e.target.value)} minLength={2} maxLength={2000} required /></label>
-        <label className="shift-field"><span>Фото / ссылка на подтверждение</span><input type="url" value={evidenceUrl} onChange={(e) => setEvidenceUrl(e.target.value)} placeholder="https://…" /><small>На staging подключим прямую загрузку фото в защищённое хранилище; сейчас Core уже умеет сохранять ссылку в audit trail.</small></label>
+        {!sharedSession && <label className="shift-field"><span>Фото / ссылка на подтверждение</span><input type="url" value={evidenceUrl} onChange={(e) => setEvidenceUrl(e.target.value)} placeholder="https://…" /><small>На staging подключим прямую загрузку фото в защищённое хранилище; сейчас Core уже умеет сохранять ссылку в audit trail.</small></label>}
         <button className="shift-primary shift-submit" disabled={busy === reportTask.id}>{busy === reportTask.id ? "Сохраняю…" : reportTask.type === "HOUSEKEEPING" ? "Отправить на проверку" : "Завершить ремонт"}</button>
       </form>
     </div>}

@@ -20,12 +20,12 @@ type KitchenPulse = {
   arrivals: ArrivalItem[];
 };
 
-const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
+const KITCHEN_ROLES = new Set(["OWNER", "MANAGER", "COOK"]);
 
 async function json(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка MARINA SMART");
   return body;
 }
 
@@ -40,10 +40,12 @@ export default function KitchenEntry() {
   const [pulseError, setPulseError] = useState<string | null>(null);
 
   const loadPulse = useCallback(async () => {
+    if (!user) return;
     try {
+      const cookOnly = user.role === "COOK";
       const [menuBody, tablesBody, ordersBody, arrivalsBody] = await Promise.all([
-        json("/core/api/v1/kitchen/menu"),
-        json("/core/api/v1/kitchen/tables"),
+        cookOnly ? Promise.resolve({ items: [] }) : json("/core/api/v1/kitchen/menu"),
+        cookOnly ? Promise.resolve({ items: [] }) : json("/core/api/v1/kitchen/tables"),
         json("/core/api/v1/kitchen/orders?status=ACTIVE"),
         json("/core/api/v1/ops/kitchen/arrivals"),
       ]);
@@ -58,7 +60,7 @@ export default function KitchenEntry() {
       setPulse(null);
       setPulseError(e instanceof Error ? e.message : "Не удалось загрузить сводку кухни");
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +97,7 @@ export default function KitchenEntry() {
       }) as User;
       if (!KITCHEN_ROLES.has(body.role)) {
         await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
-        throw new Error("Для этого входа нужна роль DINING_STAFF, MANAGER или OWNER.");
+        throw new Error("Для этого входа нужна роль COOK, MANAGER или OWNER.");
       }
       setUser(body);
       setPassword("");
@@ -130,13 +132,13 @@ export default function KitchenEntry() {
     };
   }, [pulse]);
 
-  if (checking) return <main className={styles.loginPage}><div className={styles.loginCard}><p>Три Короны · Resort OS</p><h1>Открываю кухню…</h1><span>Проверяю рабочую сессию.</span></div></main>;
+  if (checking) return <main className={styles.loginPage}><div className={styles.loginCard}><p>MARINA SMART · Hotel OS</p><h1>Открываю кухню…</h1><span>Проверяю рабочую сессию.</span></div></main>;
 
   if (!user) {
     return <main className={styles.loginPage}>
       <form className={styles.loginCard} onSubmit={login}>
         <div className={styles.mark}>III</div>
-        <p>Три Короны · отдельный вход</p>
+        <p>MARINA SMART · отдельный вход</p>
         <h1>Кухня</h1>
         <span>План порций, заказы кухни, меню, стоп-лист и новые заезды — в одном рабочем контуре.</span>
         <label>Логин<input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required autoFocus /></label>
@@ -164,11 +166,11 @@ export default function KitchenEntry() {
         <article><strong>{facts.arrivals}</strong><span>карточек заезда</span><small>для команды питания</small></article>
       </div>
       <div className={styles.guide}>
-        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; DINING_STAFF работает с заказами и столами без права менять цены.</span>
+        <b>Логика работы:</b><span>Chef OS показывает подтверждённые порции проживания. Kitchen Admin ведёт NEW → ACCEPTED → COOKING → READY. OWNER/MANAGER управляют каталогом и публикацией меню; COOK работает только с заказами и статусами приготовления.</span>
       </div>
     </section>
     <ChefProduction userRole={user.role} />
-    <KitchenAdminV2 />
-    <MarinaAiAssistant screen="KITCHEN" role={user.role} />
+    {user.role !== "COOK" && <KitchenAdminV2 />}
+    {user.role !== "COOK" && <MarinaAiAssistant screen="KITCHEN" role={user.role} />}
   </>;
 }

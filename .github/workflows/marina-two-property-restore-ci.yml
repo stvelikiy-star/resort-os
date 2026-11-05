@@ -1,0 +1,94 @@
+name: MARINA Two-Property Isolation and Restore CI
+
+on:
+  pull_request:
+    paths:
+      - 'release/marina-smart-current-candidate.json'
+      - 'services/api/**'
+      - 'packages/database/**'
+      - 'scripts/marina_two_property_restore_e2e.py'
+      - 'scripts/verify_channel_reservations.py'
+      - 'scripts/test_channel_reservation_contract.py'
+      - 'scripts/test_marina_restore_safety.py'
+      - 'scripts/test_marina_isolation_gate.py'
+      - 'scripts/verify_marina_multitenant_isolation.py'
+      - 'scripts/verify_marina_multitenant_staging.py'
+      - 'scripts/bootstrap_marina_test.py'
+      - 'scripts/bootstrap_owner.py'
+      - '.github/workflows/marina-two-property-restore-ci.yml'
+      - '.github/workflows/marina-full-stack-smoke-ci.yml'
+      - 'scripts/test_marina_grid_property.py'
+      - 'scripts/test_marina_booking_property_context.py'
+      - 'scripts/test_marina_finance_tenant_boundary.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-two-property-restore-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolation-restore:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_isolation_source
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: marina_ci_synthetic_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_isolation_source"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_ci:marina_ci_synthetic_only@127.0.0.1:5432/marina_isolation_source
+      RESTORE_DATABASE_URL: postgresql://marina_ci:marina_ci_synthetic_only@127.0.0.1:5432/marina_isolation_restore
+      MARINA_CI_ISOLATION_CONFIRM: CREATE_SYNTHETIC_LOCAL_ONLY
+      MARINA_CI_CHANNEL_IMPORT: 'true'
+      PGPASSWORD: marina_ci_synthetic_only
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select PostgreSQL 16 clients for the PostgreSQL 16 restore target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/lib/postgresql/16/bin/pg_dump; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\.'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply candidate migrations to disposable source
+        working-directory: packages/database
+        run: |
+          npm ci --no-audit --no-fund
+          npx prisma migrate deploy
+      - name: Install API and gate dependencies
+        run: python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+      - name: Create fresh disposable restore target
+        run: psql -h 127.0.0.1 -U marina_ci -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE marina_isolation_restore;'
+      - name: Reject unsafe test targets and false isolation evidence
+        run: |
+          python scripts/test_marina_isolation_gate.py
+          python scripts/test_marina_restore_safety.py
+          python scripts/test_channel_reservation_contract.py
+          python scripts/test_marina_grid_property.py
+          python scripts/test_marina_booking_property_context.py
+          python -m unittest discover -s scripts -p 'test_marina_finance_tenant_boundary.py' -v
+      - name: Verify two-property API isolation before and after full restoration
+        run: python scripts/marina_two_property_restore_e2e.py

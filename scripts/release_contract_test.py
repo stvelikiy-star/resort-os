@@ -15,17 +15,29 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 24
-    assert EXPECTED_MIGRATIONS[-7:] == (
-        "z17_dining_floor_layout_20260905",
-        "z18_site_media_slots_20260905",
+    assert len(EXPECTED_MIGRATIONS) == 39
+    assert EXPECTED_MIGRATIONS[-19:] == (
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
         "z99_marketing_consent_attribution_20260912",
         "zz100_owner_ops_corrections_20260914",
+        "zz101_marina_product_settings_20260926",
+        "zz102_marina_full_modules_20260927",
+        "zz103_agent_access_20260927",
+        "zz104_public_kz_20260929",
+        "zz105_guest_dynamic_kz_20260929",
+        "zz106_marina_split_cook_waiter_20261007",
+        "zz107_marina_tenants_20261008",
+        "zz108_marina_channel_mappings_20261016",
+        "zz109_marina_review_stars_20261022",
+        "zz110_marina_guest_stay_reviews_20261022",
+        "zz111_marina_room_wayfinding_20261022",
+        "zz112_marina_staff_module_permissions_20261022",
+        "zz113_marina_housekeeping_schedule_date_20261027",
+        "zz114_marina_60minute_holds_20261029",
     )
-    assert len(CRITICAL_CONSTRAINTS) == 93
+    assert len(CRITICAL_CONSTRAINTS) == 106
     assert {
         "service_points_category_check",
         "service_point_qrs_revocation_check",
@@ -75,9 +87,9 @@ def main() -> int:
     }.issubset(CRITICAL_CONSTRAINTS)
 
     print("PASS: DBaaS query parameters survive Prisma schema cleanup")
-    print("PASS: exact 24-migration current candidate ledger is fail-closed")
+    print("PASS: exact 39-migration current candidate ledger is fail-closed")
     print("PASS: current Dining, Guest, CMS, Group Booking, Service Point, Marketing and Owner Operations boundaries are canonical")
-    print("PASS: current critical constraint fingerprint contains 93 constraints")
+    print("PASS: current critical constraint fingerprint contains 105 constraints")
     return 0
 
 

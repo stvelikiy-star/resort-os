@@ -96,17 +96,17 @@ def queue_codes(client: httpx.Client) -> set[str]:
 def main():
     suffix = uuid.uuid4().hex[:8]
     reception_name = f"staff-ci-reception-{suffix}"
-    dining_name = f"staff-ci-dining-{suffix}"
+    cook_name = f"staff-ci-cook-{suffix}"
     store_name = f"staff-ci-store-{suffix}"
     maid_name = f"staff-ci-maid-{suffix}"
     asyncio.run(ensure_user(reception_name, 'RECEPTION'))
-    asyncio.run(ensure_user(dining_name, 'DINING_STAFF'))
+    asyncio.run(ensure_user(cook_name, 'COOK'))
     asyncio.run(ensure_user(store_name, 'STORE_STAFF'))
     asyncio.run(ensure_user(maid_name, 'MAID'))
     requests = asyncio.run(seed_requests())
 
     reception = login(reception_name)
-    dining = login(dining_name)
+    cook = login(cook_name)
     store = login(store_name)
     maid = login(maid_name)
 
@@ -115,10 +115,10 @@ def main():
     assert 'MEALS' not in reception_codes
     assert 'TOWELS' not in reception_codes
 
-    dining_codes = queue_codes(dining)
-    assert 'MEALS' in dining_codes
-    assert 'TRANSFER' not in dining_codes
-    assert 'TOWELS' not in dining_codes
+    cook_codes = queue_codes(cook)
+    assert 'MEALS' in cook_codes
+    assert 'TRANSFER' not in cook_codes
+    assert 'TOWELS' not in cook_codes
 
     maid_codes = queue_codes(maid)
     assert 'TOWELS' in maid_codes
@@ -128,7 +128,7 @@ def main():
     store_queue = store.get('/api/v1/ops/guest-requests')
     assert store_queue.status_code == 403, store_queue.text
 
-    wrong = dining.post(f"/api/v1/ops/guest-requests/{requests['TRANSFER']}/claim")
+    wrong = cook.post(f"/api/v1/ops/guest-requests/{requests['TRANSFER']}/claim")
     assert wrong.status_code == 403, wrong.text
 
     claim = reception.post(f"/api/v1/ops/guest-requests/{requests['TRANSFER']}/claim")
@@ -140,12 +140,12 @@ def main():
     assert asyncio.run(audit_count('CLAIM_GUEST_REQUEST', requests['TRANSFER'])) == 1
     assert asyncio.run(audit_count('COMPLETE_GUEST_REQUEST', requests['TRANSFER'])) == 1
 
-    claim_meal = dining.post(f"/api/v1/ops/guest-requests/{requests['MEALS']}/claim")
+    claim_meal = cook.post(f"/api/v1/ops/guest-requests/{requests['MEALS']}/claim")
     claim_meal.raise_for_status()
-    done_meal = dining.post(f"/api/v1/ops/guest-requests/{requests['MEALS']}/complete")
+    done_meal = cook.post(f"/api/v1/ops/guest-requests/{requests['MEALS']}/complete")
     done_meal.raise_for_status()
 
-    for client in (reception, dining, store, maid):
+    for client in (reception, cook, store, maid):
         logout = client.post('/api/v1/auth/logout')
         assert logout.status_code == 204
         client.close()

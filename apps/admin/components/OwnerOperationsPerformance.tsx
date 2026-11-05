@@ -113,7 +113,7 @@ export default function OwnerOperationsPerformance() {
         <div>
           <p className="eyebrow">OWNER OPERATIONS · MTD</p>
           <h2>Сервис, уборка и ремонты</h2>
-          <p>{data.range.from} → {data.range.to} · {data.property.timezone} · только факты Resort Core</p>
+          <p>{data.range.from} → {data.range.to} · {data.property.timezone} · только факты MARINA SMART</p>
         </div>
         <button className="btn" onClick={load} disabled={loading}>{loading ? "Обновляю…" : "Обновить"}</button>
       </div>
@@ -172,7 +172,7 @@ export default function OwnerOperationsPerformance() {
           <p className="eyebrow">TRUTH BOUNDARY</p>
           <h3>Как читать показатели</h3>
           <p>Время закрытия считается от фактического OperationalTask.createdAt до completedAt только для DONE.</p>
-          <p>SLA breach не считается, пока в Resort Core нет утверждённого SLA-порога. Просрочка по дате — отдельный факт.</p>
+          <p>SLA breach не считается, пока в MARINA SMART нет утверждённого SLA-порога. Просрочка по дате — отдельный факт.</p>
           <p>«Проблемный номер» означает минимум две MAINTENANCE-задачи в периоде.</p>
           <p>«Повторяющаяся поломка» — одинаковый нормализованный текст title в том же физическом номере. Семантическое сходство ИИ не применяется.</p>
         </article>

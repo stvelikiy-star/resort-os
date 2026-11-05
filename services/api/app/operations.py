@@ -4,7 +4,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .auth import current_user, require_roles
+from .auth import current_user, require_roles, trusted_property_id, MARINA_SHARED_AUTH_PREVIEW_ENABLED
+from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/ops", tags=["operations"])
 
@@ -56,11 +57,8 @@ class RoomStatePatch(BaseModel):
     state: str
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code=$1", property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def allowed_types_for_role(role: str) -> set[str]:
@@ -71,6 +69,27 @@ def allowed_types_for_role(role: str) -> set[str]:
     if role == "TECHNICIAN":
         return {"MAINTENANCE"}
     return set()
+
+
+def allowed_types_for_user(user: dict[str, Any]) -> set[str]:
+    """A module grant can restrict access, never promote a staff role.
+
+    An MAID with custom OPS access must not suddenly see MAINTENANCE or
+    GUEST_REQUEST, and a COOK with OPS selected must not gain task powers.
+    """
+    role_types = allowed_types_for_role(user.get("role", ""))
+    if not role_types:
+        return set()
+    if user.get("module_permissions_custom") and not user_has_section(user, "OPS"):
+        return set()
+    return role_types
+
+
+def has_full_operations_access(user: dict[str, Any]) -> bool:
+    """Manager authority is role-bound even with custom section grants."""
+    if user.get("role") not in {"OWNER", "MANAGER"}:
+        return False
+    return not user.get("module_permissions_custom") or user_has_section(user, "OPS")
 
 
 def task_to_dict(row) -> dict[str, Any]:
@@ -173,14 +192,19 @@ async def list_tasks(
     limit: int = Query(default=150, ge=1, le=300),
     user: dict[str, Any] = Depends(current_user),
 ):
-    allowed = allowed_types_for_role(user["role"])
+    allowed = allowed_types_for_user(user)
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED and not allowed:
+        # Legacy single-property clients historically received an empty list.
+        # In shared mode an unreviewed role or revoked OPS grant must fail
+        # explicitly, never appear to have an operational workspace.
+        raise HTTPException(status_code=403, detail="Operations role and OPS permission required")
     if task_type and task_type not in allowed:
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if task_status and task_status not in TASK_STATUSES:
         raise HTTPException(status_code=422, detail="Unknown task status")
     line_staff_id = uuid.UUID(user["id"]) if user["role"] in {"MAID", "TECHNICIAN"} else None
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''
             SELECT t.id, t.type::text AS type, t.status::text AS status, t.priority::text AS priority,
@@ -211,14 +235,14 @@ async def create_task(
     request: Request,
     user: dict[str, Any] = Depends(current_user),
 ):
-    if payload.type not in TASK_TYPES or payload.type not in allowed_types_for_role(user["role"]):
+    if payload.type not in TASK_TYPES or payload.type not in allowed_types_for_user(user):
         raise HTTPException(status_code=403, detail="Task type not allowed for role")
     if payload.priority not in TASK_PRIORITIES:
         raise HTTPException(status_code=422, detail="Unknown priority")
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             if payload.room_id:
                 room = await conn.fetchrow(
                     '''SELECT id, code FROM rooms WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -265,11 +289,11 @@ async def claim_task(
     request: Request,
     user: dict[str, Any] = Depends(current_user),
 ):
-    if user["role"] not in {"MAID", "TECHNICIAN"}:
+    if user["role"] not in {"MAID", "TECHNICIAN"} and not has_full_operations_access(user):
         raise HTTPException(status_code=403, detail="Only line staff claims tasks through this endpoint")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             task = await conn.fetchrow(
                 '''SELECT id,type::text AS type,status::text AS status,"assignedToId" FROM operational_tasks
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -277,7 +301,7 @@ async def claim_task(
             )
             if not task:
                 raise HTTPException(status_code=404, detail="Task not found")
-            if task["type"] not in allowed_types_for_role(user["role"]):
+            if task["type"] not in allowed_types_for_user(user):
                 raise HTTPException(status_code=403, detail="Task type not allowed for role")
             current_user_id = uuid.UUID(user["id"])
             if task["assignedToId"] and task["assignedToId"] != current_user_id:
@@ -309,7 +333,7 @@ async def change_task_status(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             task = await conn.fetchrow(
                 '''SELECT id,type::text AS type,status::text AS status,"roomId","assignedToId" FROM operational_tasks
                    WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
@@ -317,9 +341,9 @@ async def change_task_status(
             )
             if not task:
                 raise HTTPException(status_code=404, detail="Task not found")
-            if task["type"] not in allowed_types_for_role(user["role"]):
+            if task["type"] not in allowed_types_for_user(user):
                 raise HTTPException(status_code=403, detail="Task type not allowed for role")
-            if user["role"] in {"MAID", "TECHNICIAN"} and task["assignedToId"] != uuid.UUID(user["id"]):
+            if user["role"] in {"MAID", "TECHNICIAN"} and not has_full_operations_access(user) and task["assignedToId"] != uuid.UUID(user["id"]):
                 raise HTTPException(status_code=403, detail="Claim the task before changing its status")
 
             current_status = task["status"]
@@ -335,7 +359,7 @@ async def change_task_status(
                     },
                 )
 
-            is_manager = user["role"] in {"OWNER", "MANAGER"}
+            is_manager = has_full_operations_access(user)
             if payload.status == "CANCELLED" and not is_manager:
                 raise HTTPException(status_code=403, detail="Only management can cancel an operational task")
             if task["type"] == "HOUSEKEEPING" and current_status == "IN_INSPECTION" and payload.status in {"IN_PROGRESS", "DONE"} and not is_manager:
@@ -399,7 +423,7 @@ async def change_room_state(
     if payload.state not in ROOM_STATES:
         raise HTTPException(status_code=422, detail="Unknown room state")
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         result = await conn.execute(
             '''UPDATE rooms SET "operationalState"=$1::"RoomOperationalState", "updatedAt"=now()
                WHERE id=$2 AND "propertyId"=$3''',

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED, require_roles
 from .communication_ingest import NormalizedChannelMessage, ingest_normalized_channel_message
 from .telegram_sales import (
     TELEGRAM_SALES_CHANNEL_CODE,
@@ -19,6 +19,7 @@ from .telegram_sales import (
 
 router = APIRouter(prefix="/api/v1/admin/inbox", tags=["admin-inbox-outbound"])
 manager_access = require_roles("OWNER", "MANAGER")
+send_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 
 
@@ -53,8 +54,38 @@ async def _property_id(conn, property_code: str) -> uuid.UUID:
 
 @router.get("/outbound-capabilities")
 async def outbound_capabilities(
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(send_access),
 ):
+    if MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        # The per-hotel provider configuration is derived from the DB-signed
+        # staff session, not from request headers or another hotel's number.
+        from .whatsapp_connection import _configuration
+        configured = False
+        try:
+            from .shared_green_rc8 import rc8_guard
+            rc8_guard()
+            configured = _configuration(user) is not None
+        except HTTPException:
+            configured = False
+        return {
+            "telegram": {
+                "channel_code": TELEGRAM_SALES_CHANNEL_CODE,
+                "inbound_configured": False,
+                "outbound_configured": False,
+                "max_text_length": 4096,
+            },
+            "whatsapp": {
+                "configured": configured,
+                "configured_in_core": configured,
+                "human_only": True,
+                "queued_only": True,
+                "max_text_length": 4096,
+            },
+            "instagram": {"configured": False},
+            "truth": "Human WhatsApp sends are QUEUED until a verified provider callback confirms SENT or DELIVERED; AI auto-send stays disabled.",
+        }
+    if user.get("role") == "RECEPTION":
+        raise HTTPException(403, detail="Outbound capabilities are not available to this role")
     return {
         "telegram": {
             "channel_code": TELEGRAM_SALES_CHANNEL_CODE,
@@ -84,9 +115,25 @@ async def send_text_message(
     payload: OutboundTextCreate,
     request: Request,
     idempotency_key_header: str | None = Header(default=None, alias="Idempotency-Key"),
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(send_access),
 ):
     idempotency_key = _validate_idempotency_key(idempotency_key_header)
+    if os.environ.get("MARINA_SHARED_GREEN_RC8_ENABLED") == "true":
+        # Keep ONE canonical send-text route. Stage RC8 accepts WhatsApp
+        # only, with separate hotel credentials and reviewed human action.
+        from .green_outbound import send_green_text
+        whatsapp = await send_green_text(
+            conversation_id, payload.text, request, user, idempotency_key,
+        )
+        if whatsapp is not None:
+            return whatsapp
+
+    # Telegram legacy sender stays manager-only. Shared staging cannot
+    # implicitly activate Telegram even when RC8 makes this path reachable.
+    if user["role"] == "RECEPTION":
+        raise HTTPException(403, detail="Reception may only send a claimed WhatsApp conversation")
+    if os.environ.get("MARINA_SHARED_AUTH_PREVIEW_ENABLED") == "true":
+        raise HTTPException(503, detail="Other shared outbound channels are not reviewed")
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():

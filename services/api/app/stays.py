@@ -1,12 +1,13 @@
 import base64
 import hashlib
+import os
 import secrets
 import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .kitchen_arrivals import create_arrival_notification
 
 router = APIRouter(prefix="/api/v1/admin/stays", tags=["stays"])
@@ -16,8 +17,17 @@ PIN_ITERATIONS = 200_000
 
 
 def issue_guest_pin() -> tuple[str, str]:
-    """Return the one-time visible PIN and a salted PBKDF2 representation for storage."""
-    pin = f"{secrets.randbelow(1_000_000):06d}"
+    """Return the visible PIN and a salted PBKDF2 representation for storage.
+
+    A fixed PIN is allowed only outside production for controlled demo/test
+    environments. Production always receives a cryptographically random PIN.
+    """
+    app_env = os.environ.get("APP_ENV", "production").strip().lower()
+    fixed_pin = os.environ.get("TEST_GUEST_FIXED_PIN", "").strip()
+    if app_env != "production" and len(fixed_pin) == 6 and fixed_pin.isdigit():
+        pin = fixed_pin
+    else:
+        pin = f"{secrets.randbelow(1_000_000):06d}"
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac(
         "sha256",
@@ -36,9 +46,10 @@ def issue_guest_pin() -> tuple[str, str]:
     return pin, stored
 
 
-async def property_context(conn, property_code: str):
+async def property_context(conn, user: dict[str, Any]):
+    property_id = await trusted_property_id(conn, user)
     row = await conn.fetchrow(
-        'SELECT id,timezone FROM properties WHERE code=$1', property_code
+        'SELECT id,timezone FROM properties WHERE id=$1', property_id
     )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -314,7 +325,7 @@ async def check_in(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn, user["property_code"])
+            prop = await property_context(conn, user)
             pid = prop["id"]
             local_today = await conn.fetchval(
                 "SELECT (now() AT TIME ZONE $1)::date", prop["timezone"]
@@ -434,7 +445,7 @@ async def check_out(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await property_context(conn, user["property_code"])
+            prop = await property_context(conn, user)
             pid = prop["id"]
             local_today = await conn.fetchval(
                 "SELECT (now() AT TIME ZONE $1)::date", prop["timezone"]

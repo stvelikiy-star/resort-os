@@ -17,8 +17,8 @@ from .dining_coordination import (
 )
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-seating"])
-read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
-write_access = require_roles("OWNER", "MANAGER", "RECEPTION", "DINING_STAFF")
+read_access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
+write_access = require_roles("OWNER", "MANAGER", "RECEPTION", "WAITER")
 SESSION_TRANSITIONS: dict[str, set[str]] = {
     "WAITING": {"SEATED", "CANCELLED"},
     "SEATED": {"RELEASED", "CANCELLED"},
@@ -67,7 +67,7 @@ async def audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, resourc
 
 async def validate_waiter(conn, pid: uuid.UUID, user: dict[str, Any], waiter_id: uuid.UUID | None) -> uuid.UUID | None:
     current_id = uuid.UUID(user["id"])
-    if user["role"] == "DINING_STAFF":
+    if user["role"] == "WAITER":
         if waiter_id is None:
             return current_id
         if waiter_id != current_id:
@@ -78,7 +78,7 @@ async def validate_waiter(conn, pid: uuid.UUID, user: dict[str, Any], waiter_id:
         '''SELECT id,role::text AS role FROM staff_users
            WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true''', waiter_id, pid,
     )
-    if not waiter or waiter["role"] != "DINING_STAFF":
+    if not waiter or waiter["role"] != "WAITER":
         raise HTTPException(status_code=422, detail={"code": "DINING_WAITER_INVALID"})
     return waiter_id
 
@@ -309,7 +309,7 @@ async def patch_session_status(
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Dining table session not found")
-            if user["role"] == "DINING_STAFF" and row["waiterId"] not in {None, uuid.UUID(user["id"])}:
+            if user["role"] == "WAITER" and row["waiterId"] not in {None, uuid.UUID(user["id"])}:
                 raise HTTPException(status_code=403, detail="This table belongs to another waiter")
 
             current_status = row["status"]
@@ -413,7 +413,7 @@ async def move_session(
                 raise HTTPException(status_code=409, detail={"code": "DINING_SESSION_NOT_MOVABLE", "status": session["status"]})
             if payload.target_table_id == session["tableId"]:
                 raise HTTPException(status_code=409, detail={"code": "DINING_MOVE_SAME_TABLE"})
-            if user["role"] == "DINING_STAFF" and session["waiterId"] not in {None, uuid.UUID(user["id"])}:
+            if user["role"] == "WAITER" and session["waiterId"] not in {None, uuid.UUID(user["id"])}:
                 raise HTTPException(status_code=403, detail="This table belongs to another waiter")
 
             target = await conn.fetchrow(
@@ -482,7 +482,7 @@ async def move_session(
             if payload.waiter_mode == "KEEP":
                 waiter_id = session["waiterId"]
             elif payload.waiter_mode == "CLEAR":
-                if user["role"] == "DINING_STAFF":
+                if user["role"] == "WAITER":
                     raise HTTPException(status_code=403, detail="Dining staff cannot clear assignment")
                 waiter_id = None
             else:

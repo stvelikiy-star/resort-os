@@ -3,7 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import SiteMediaBoard from "./SiteMediaBoard";
 
-type Locale = "ru" | "kg" | "en";
+type Locale = "ru" | "kg" | "kz" | "en";
 type Content = Record<string, Record<string, string>>;
 type ContentItem = {
   locale: Locale;
@@ -19,6 +19,7 @@ type ContentItem = {
 const LOCALES: { code: Locale; label: string }[] = [
   { code: "ru", label: "Русский" },
   { code: "kg", label: "Кыргызча" },
+  { code: "kz", label: "Қазақша" },
   { code: "en", label: "English" },
 ];
 
@@ -113,7 +114,7 @@ export default function SiteContentBoard() {
       for (const entry of payload.items) next[entry.locale] = cloneContent(entry.draft);
       setDrafts(next);
     } catch {
-      setError("Контент API недоступен. Проверьте Resort Core и Prisma-миграцию site_content.");
+      setError("Контент API недоступен. Проверьте MARINA SMART и Prisma-миграцию site_content.");
     } finally {
       setLoading(false);
     }
@@ -177,7 +178,7 @@ export default function SiteContentBoard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `three-crowns-site-content-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `marina-smart-site-content-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -186,8 +187,8 @@ export default function SiteContentBoard() {
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text()) as Record<Locale, Content>;
-      if (!parsed.ru || !parsed.kg || !parsed.en) throw new Error("LOCALES");
-      setDrafts({ ru: parsed.ru, kg: parsed.kg, en: parsed.en });
+      if (!parsed.ru || !parsed.kg || !parsed.kz || !parsed.en) throw new Error("LOCALES");
+      setDrafts({ ru: parsed.ru, kg: parsed.kg, kz: parsed.kz, en: parsed.en });
       setMessage("JSON загружен в редактор. Нажмите «Сохранить» или «Опубликовать» для каждого языка.");
     } catch {
       setError("Неверный JSON контента.");
@@ -203,7 +204,7 @@ export default function SiteContentBoard() {
         <div>
           <p className="eyebrow">Сайт / Контент</p>
           <h1>Редактор публичного сайта</h1>
-          <p>Маркетинговые тексты, фотографии, конференц-блок, контакты и SEO управляются через Resort Core. Номерной фонд, цены, брони и утверждённые правила услуг остаются отдельной доменной правдой PMS.</p>
+          <p>Маркетинговые тексты, фотографии, конференц-блок, контакты и SEO управляются через MARINA SMART. Номерной фонд, цены, брони и утверждённые правила услуг остаются отдельной доменной правдой PMS.</p>
         </div>
         <div className="content-head-actions">
           <button className="btn" onClick={exportJson}>Экспорт JSON</button>

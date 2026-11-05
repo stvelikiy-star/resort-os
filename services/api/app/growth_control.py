@@ -41,6 +41,11 @@ class FeedbackRecord(BaseModel):
     feedback_text: str | None = Field(default=None, max_length=12000)
 
 
+class StarReviewRecord(BaseModel):
+    rating: int = Field(ge=1, le=5)
+    feedback_text: str | None = Field(default=None, max_length=12000)
+
+
 async def property_context(conn, property_code: str):
     row = await conn.fetchrow('SELECT id,code,name,timezone FROM properties WHERE code=$1', property_code)
     if not row:
@@ -86,6 +91,8 @@ def serialize_engagement(row) -> dict[str, Any]:
         "title": row["title"],
         "notes": row["notes"],
         "score": score,
+        "star_rating": row["starRating"],
+        "recovery_urgent": row["starRating"] is not None and row["starRating"] <= 3 and row["status"] in {"OPEN", "IN_PROGRESS"},
         "nps_class": nps_class(score),
         "feedback_text": row["feedbackText"],
         "completed_at": row["completedAt"],
@@ -99,7 +106,7 @@ async def fetch_engagement(conn, engagement_id: uuid.UUID, property_id):
     return await conn.fetchrow(
         '''
         SELECT e.id,e."propertyId",e."guestId",e."reservationId",e.kind,e.status,e."dueDate",e."channelHint",
-               e.title,e.notes,e.score,e."feedbackText",e."completedAt",e."createdAt",e."updatedAt",
+               e.title,e.notes,e.score,e."starRating",e."feedbackText",e."completedAt",e."createdAt",e."updatedAt",
                g."firstName",g."lastName",g.phone,g.email,
                r."bookingNumber",r.status::text AS reservation_status,r."checkIn",r."checkOut"
         FROM guest_engagements e
@@ -131,7 +138,7 @@ async def list_engagements(
         rows = await conn.fetch(
             '''
             SELECT e.id,e."propertyId",e."guestId",e."reservationId",e.kind,e.status,e."dueDate",e."channelHint",
-                   e.title,e.notes,e.score,e."feedbackText",e."completedAt",e."createdAt",e."updatedAt",
+                   e.title,e.notes,e.score,e."starRating",e."feedbackText",e."completedAt",e."createdAt",e."updatedAt",
                    g."firstName",g."lastName",g.phone,g.email,
                    r."bookingNumber",r.status::text AS reservation_status,r."checkIn",r."checkOut"
             FROM guest_engagements e
@@ -142,6 +149,7 @@ async def list_engagements(
               AND ($3::text IS NULL OR e.status=$3)
               AND ($4::uuid IS NULL OR e."guestId"=$4)
             ORDER BY
+              CASE WHEN e."starRating" BETWEEN 1 AND 3 AND e.status IN ('OPEN','IN_PROGRESS') THEN -1 ELSE 0 END,
               CASE e.status WHEN 'OPEN' THEN 0 WHEN 'IN_PROGRESS' THEN 1 ELSE 2 END,
               e."dueDate" NULLS LAST,e."updatedAt" DESC
             LIMIT $5
@@ -302,6 +310,8 @@ async def record_feedback(
                 raise HTTPException(status_code=409, detail={"code": "FEEDBACK_WRONG_ENGAGEMENT_KIND"})
             if row["status"] == "CANCELLED":
                 raise HTTPException(status_code=409, detail={"code": "FEEDBACK_ENGAGEMENT_CANCELLED"})
+            if row["starRating"] is not None and row["starRating"] <= 3:
+                next_status = "IN_PROGRESS"
             await conn.execute(
                 '''
                 UPDATE guest_engagements
@@ -319,6 +329,58 @@ async def record_feedback(
             )
             updated = await fetch_engagement(conn, engagement_id, prop["id"])
     return serialize_engagement(updated) | {"recovery_required": classification == "DETRACTOR"}
+
+
+@router.post("/engagements/{engagement_id}/stars")
+async def record_star_review(
+    engagement_id: uuid.UUID,
+    payload: StarReviewRecord,
+    request: Request,
+    user: dict[str, Any] = Depends(manager_access),
+):
+    """Independent 1–5 private feedback. No review gating and NO external send."""
+    urgent = payload.rating <= 3
+    new_status = "IN_PROGRESS" if urgent else "DONE"
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            prop = await property_context(conn, user["property_code"])
+            pid = prop["id"]
+            row = await fetch_engagement(conn, engagement_id, pid)
+            if not row:
+                raise HTTPException(status_code=404, detail="Feedback task not found")
+            if row["kind"] != "POST_STAY_FEEDBACK":
+                raise HTTPException(status_code=409, detail="Only post-stay tasks accept star ratings")
+            if row["status"] == "CANCELLED":
+                raise HTTPException(status_code=409, detail="Cancelled feedback task")
+            if row["score"] is not None and row["score"] <= 6:
+                new_status = "IN_PROGRESS"
+            # A low score creates urgent manager work without any attempt to
+            # discourage the guest from leaving their independent public review.
+            await conn.execute(
+                """UPDATE guest_engagements
+                   SET "starRating"=$1,"feedbackText"=$2,status=$3,
+                       "completedAt"=CASE WHEN $3='DONE' THEN now() ELSE NULL END,
+                       "dueDate"=CASE WHEN $3='IN_PROGRESS' THEN
+                         LEAST(COALESCE("dueDate", $4::date), $4::date)
+                         ELSE "dueDate" END,
+                       "updatedAt"=now()
+                   WHERE id=$5 AND "propertyId"=$6""",
+                payload.rating, payload.feedback_text, new_status,
+                await conn.fetchval('SELECT (now() AT TIME ZONE $1)::date', prop["timezone"]),
+                engagement_id, pid,
+            )
+            await conn.execute(
+                """INSERT INTO audit_logs (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'RECORD_GUEST_STAR_REVIEW','GuestEngagement',$4,'PMS_GROWTH','SUCCESS',
+                     jsonb_build_object('stars',$5::int,'urgent',$6::boolean,'status',$7::text,'outbound_authority','NONE_AUTOMATIC'),now())""",
+                uuid.uuid4(),pid,user["id"],str(engagement_id),payload.rating,urgent,new_status,
+            )
+            updated = await fetch_engagement(conn, engagement_id, pid)
+    return serialize_engagement(updated) | {
+        "manager_attention_required": new_status == "IN_PROGRESS",
+        "public_review_links_available_to_all_guests": True,
+        "outbound_authority": "NONE_AUTOMATIC",
+    }
 
 
 @router.get("/candidates/post-stay")
@@ -425,6 +487,41 @@ async def reactivation_candidates(
     }
 
 
+@router.get("/guest-stay-reviews")
+async def list_guest_qr_reviews(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=200),
+    user: dict[str, Any] = Depends(manager_access),
+):
+    """Private reviews from live QR/PIN guest cabinet. No automatic guest messaging."""
+    async with request.app.state.db.acquire() as conn:
+        prop = await property_context(conn, user["property_code"])
+        rows = await conn.fetch(
+            """SELECT rev.id,rev.rating,rev.comment,rev."createdAt",
+                      rev."guestId",rev."stayId",
+                      g."firstName",g."lastName",r."bookingNumber"
+               FROM guest_stay_reviews rev
+               JOIN guests g ON g.id=rev."guestId" AND g."propertyId"=rev."propertyId"
+               JOIN stays s ON s.id=rev."stayId" AND s."propertyId"=rev."propertyId"
+               JOIN reservations r ON r.id=s."reservationId" AND r."propertyId"=rev."propertyId"
+               WHERE rev."propertyId"=$1
+               ORDER BY CASE WHEN rev.rating<=3 THEN 0 ELSE 1 END,rev."createdAt" DESC
+               LIMIT $2""",
+            prop["id"], limit,
+        )
+    return {"items": [{
+        "id": str(row["id"]),
+        "guest_id": str(row["guestId"]),
+        "stay_id": str(row["stayId"]),
+        "guest_name": guest_name(row),
+        "booking_number": row["bookingNumber"],
+        "rating": row["rating"],
+        "comment": row["comment"],
+        "created_at": row["createdAt"],
+        "manager_attention_required": row["rating"] <= 3,
+    } for row in rows], "outbound_authority": "NONE_AUTOMATIC"}
+
+
 @router.get("/summary")
 async def growth_summary(
     request: Request,
@@ -453,7 +550,11 @@ async def growth_summary(
                    count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 9 AND 10)::int AS promoters,
                    count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 7 AND 8)::int AS passives,
                    count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 0 AND 6)::int AS detractors,
-                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 0 AND 6 AND status='IN_PROGRESS')::int AS recovery_open
+                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND score BETWEEN 0 AND 6 AND status='IN_PROGRESS')::int AS recovery_open,
+                   count("starRating") FILTER (WHERE kind='POST_STAY_FEEDBACK')::int AS star_scored,
+                   round(avg("starRating") FILTER (WHERE kind='POST_STAY_FEEDBACK' AND "starRating" IS NOT NULL),2) AS average_stars,
+                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND "starRating" BETWEEN 1 AND 3)::int AS low_star_count,
+                   count(*) FILTER (WHERE kind='POST_STAY_FEEDBACK' AND "starRating" BETWEEN 1 AND 3 AND status='IN_PROGRESS')::int AS low_star_open
             FROM guest_engagements WHERE "propertyId"=$1
             ''',
             pid,
@@ -502,6 +603,10 @@ async def growth_summary(
             "recovery_open": int(feedback["recovery_open"] or 0),
             "nps": nps,
             "nps_sample_size": scored,
+            "star_scored": int(feedback["star_scored"] or 0),
+            "average_stars": float(feedback["average_stars"]) if feedback["average_stars"] is not None else None,
+            "low_star_count": int(feedback["low_star_count"] or 0),
+            "low_star_open": int(feedback["low_star_open"] or 0),
         },
         "candidates": {
             "post_stay_14d": post_stay_candidates,

@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/guest-services", tags=["guest-services"])
 center_access = require_roles("OWNER", "MANAGER", "RECEPTION")
@@ -48,11 +48,8 @@ def service_code(value: str) -> str:
     return normalized
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def row_to_item(row) -> dict[str, Any]:
@@ -155,7 +152,7 @@ async def list_guest_services(
     assignee_needle = (assignee or "").strip()
 
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             BASE_SELECT
             + '''
@@ -214,7 +211,7 @@ async def create_guest_service(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             reservation = await conn.fetchrow(
                 '''
                 SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",

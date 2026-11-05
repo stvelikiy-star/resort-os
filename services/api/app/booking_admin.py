@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .guest_identity import resolve_or_create_guest
 from .payment_idempotency import (
     ensure_same_payment_payload,
@@ -19,6 +19,11 @@ from .payment_idempotency import (
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 RATE_PLAN_CODE = os.environ.get("RATE_PLAN_CODE", "DIRECT_2026_27")
 MANUAL_PAYMENT_PROVIDER = "MANAGER_MANUAL"
+PREPAYMENT_POLICY = os.environ.get(
+    "PREPAYMENT_POLICY",
+    "FIRST_NIGHT" if PROPERTY_CODE == "AK_BERMET_TEST" else "MANAGER_DECIDES",
+).strip().upper()
+SUPPORTED_PREPAYMENT_POLICIES = {"MANAGER_DECIDES", "FIRST_NIGHT"}
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-booking"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -35,11 +40,8 @@ class ConfirmPaymentPayload(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=180)
 
 
-async def property_id(conn) -> uuid.UUID:
-    value = await conn.fetchval("SELECT id FROM properties WHERE code = $1", PROPERTY_CODE)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property seed is not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def nights_between(check_in: date, check_out: date) -> list[date]:
@@ -65,14 +67,18 @@ async def price_room_type(conn, room_type_id: uuid.UUID, check_in: date, check_o
         check_out - timedelta(days=1),
     )
     total = 0
+    first_night_kgs: int | None = None
     for night in nights:
         matched = next((row for row in rows if row["validFrom"] <= night <= row["validTo"]), None)
         if not matched:
             return {"sellable": False, "reason": "RATE_MISSING", "total_kgs": None}
         if str(matched["saleStatus"]) != "OPEN" or matched["priceKgs"] <= 0:
             return {"sellable": False, "reason": "RATE_REQUIRES_CONFIRMATION", "total_kgs": None}
-        total += matched["priceKgs"]
-    return {"sellable": True, "reason": None, "total_kgs": total}
+        price_kgs = int(matched["priceKgs"])
+        if first_night_kgs is None:
+            first_night_kgs = price_kgs
+        total += price_kgs
+    return {"sellable": True, "reason": None, "total_kgs": total, "first_night_kgs": first_night_kgs}
 
 
 async def serialize_request(conn, request_id: uuid.UUID) -> dict[str, Any] | None:
@@ -107,7 +113,8 @@ async def serialize_request(conn, request_id: uuid.UUID) -> dict[str, Any] | Non
         "room_type_name": row["room_type_name"],
         "quoted_total_kgs": row["quotedTotalKgs"],
         "required_prepayment_kgs": row["requiredPrepaymentKgs"],
-        "prepayment_decided_by_manager": True,
+        "prepayment_policy": PREPAYMENT_POLICY,
+        "prepayment_decided_by_manager": PREPAYMENT_POLICY == "MANAGER_DECIDES",
         "notes": row["notes"],
         "created_at": row["createdAt"],
         "updated_at": row["updatedAt"],
@@ -127,7 +134,7 @@ async def list_requests(
     _user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn)
+        pid = await property_id(conn, _user)
         rows = await conn.fetch(
             '''
             SELECT rr.id
@@ -154,7 +161,7 @@ async def quote_request(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn)
+            pid = await property_id(conn, user)
             rr = await conn.fetchrow(
                 '''SELECT * FROM reservation_requests WHERE id = $1 AND "propertyId" = $2 FOR UPDATE''',
                 request_id,
@@ -201,16 +208,29 @@ async def quote_request(
             if available_count < 1:
                 raise HTTPException(status_code=409, detail="No room available for requested dates")
 
-            total = pricing["total_kgs"]
+            if PREPAYMENT_POLICY not in SUPPORTED_PREPAYMENT_POLICIES:
+                raise HTTPException(status_code=503, detail=f"Unsupported PREPAYMENT_POLICY: {PREPAYMENT_POLICY}")
+
+            total = int(pricing["total_kgs"])
+            required_prepayment_kgs = None
+            next_status = "QUOTED"
+            if PREPAYMENT_POLICY == "FIRST_NIGHT":
+                required_prepayment_kgs = int(pricing.get("first_night_kgs") or 0)
+                if required_prepayment_kgs <= 0:
+                    raise HTTPException(status_code=409, detail="FIRST_NIGHT prepayment cannot be calculated")
+                next_status = "AWAITING_PREPAYMENT"
+
             await conn.execute(
                 '''
                 UPDATE reservation_requests
-                SET status = 'QUOTED', "desiredRoomTypeId" = $1,
-                    "quotedTotalKgs" = $2, "requiredPrepaymentKgs" = NULL, "updatedAt" = now()
-                WHERE id = $3
+                SET status = $1::"ReservationRequestStatus", "desiredRoomTypeId" = $2,
+                    "quotedTotalKgs" = $3, "requiredPrepaymentKgs" = $4, "updatedAt" = now()
+                WHERE id = $5
                 ''',
+                next_status,
                 room_type["id"],
                 total,
+                required_prepayment_kgs,
                 request_id,
             )
             await conn.execute(
@@ -218,9 +238,15 @@ async def quote_request(
                 INSERT INTO audit_logs (id, "propertyId", "actorType", "actorId", action, resource,
                   "resourceId", source, result, "afterJson", "createdAt")
                 VALUES ($1,$2,'STAFF',$3,'QUOTE','ReservationRequest',$4,'PMS','SUCCESS',
-                  jsonb_build_object('room_type_code',$5::text,'total_kgs',$6::integer,'prepayment_rule','MANAGER_DECIDES'),now())
+                  jsonb_build_object(
+                    'room_type_code',$5::text,
+                    'total_kgs',$6::integer,
+                    'prepayment_rule',$7::text,
+                    'required_prepayment_kgs',$8::integer
+                  ),now())
                 ''',
                 uuid.uuid4(), pid, user["id"], str(request_id), payload.room_type_code, total,
+                PREPAYMENT_POLICY, required_prepayment_kgs,
             )
         item = await serialize_request(conn, request_id)
     return item
@@ -298,7 +324,7 @@ async def confirm_payment_and_reserve(
                         },
                     )
 
-            pid = await property_id(conn)
+            pid = await property_id(conn, user)
             rr = await conn.fetchrow(
                 '''
                 SELECT rr.*,rt.code AS room_type_code
@@ -463,7 +489,7 @@ async def list_reservations(
     _user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn)
+        pid = await property_id(conn, _user)
         rows = await conn.fetch(
             '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",

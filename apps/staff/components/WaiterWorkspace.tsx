@@ -7,7 +7,7 @@ import DiningGuestSeatingPanel from "./DiningGuestSeatingPanel";
 import DiningReadyRealtime from "./DiningReadyRealtime";
 import WaiterEntry from "./WaiterEntry";
 
-const ALLOWED = new Set(["OWNER", "MANAGER", "DINING_STAFF"]);
+const ALLOWED = new Set(["OWNER", "MANAGER", "WAITER"]);
 
 export default function WaiterWorkspace() {
   const [authorized, setAuthorized] = useState(false);

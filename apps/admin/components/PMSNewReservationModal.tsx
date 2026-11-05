@@ -13,6 +13,8 @@ type Preview = {
     beds_raw?: string | null;
     operational_state: string;
     capacity_adults: number;
+    max_capacity_adults?: number | null;
+    max_extra_bed_count?: number | null;
     effective_capacity_adults: number;
     extra_bed_allowed: boolean;
   };
@@ -58,6 +60,12 @@ function errorText(body: any, fallback: string) {
   if (detail?.code === "EXTRA_BED_NOT_ALLOWED") return `В категории «${detail.room_type_name || "этот номер"}» дополнительные места запрещены.`;
   if (detail?.code === "AGENT_NOT_FOUND") return "Карточка агента не найдена. Обновите список агентов.";
   if (detail?.code === "AGENT_INACTIVE") return `Агент «${detail.agent_name || ""}» неактивен.`;
+  if (detail?.code === "AGENT_ACCOUNT_NOT_LINKED") return "Аккаунт агентства не привязан к активной карточке агента.";
+  if (detail?.code === "AGENT_MANAGER_PRICE_FORBIDDEN") return "Агент не может задавать ручную цену.";
+  if (detail?.code === "AGENT_EXTRA_BED_FORBIDDEN") return "Дополнительное место должен подтвердить отель.";
+  if (detail?.code === "AGENT_DISCOUNT_FORBIDDEN") return "Агент не может назначать скидку.";
+  if (detail?.code === "AGENT_ID_OVERRIDE_FORBIDDEN") return "Нельзя создать бронь от имени другого агентства.";
+  if (detail?.code === "AGENT_PRICING_SOURCE_FORBIDDEN") return "Для агентства доступен только штатный тариф MARINA SMART.";
   if (detail?.code === "PRICE_CHANGED") return `Цена изменилась в Core: ${money(detail.current_total_kgs)}. Выполните preview ещё раз.`;
   if (detail?.code === "PRICING_SOURCE_CHANGED") return "Источник цены изменился. Выполните preview ещё раз.";
   if (detail?.code === "RATE_REQUIRES_CONFIRMATION") return "На эти даты нет открытого тарифа. Введите базовую цену менеджера и подтвердите её явно.";
@@ -73,6 +81,8 @@ export default function PMSNewReservationModal({
   checkOut,
   onClose,
   onCreated,
+  agentMode = false,
+  initialHoldId,
 }: {
   roomId: string;
   roomCode: string;
@@ -81,6 +91,8 @@ export default function PMSNewReservationModal({
   checkOut: string;
   onClose: () => void;
   onCreated: () => void;
+  agentMode?: boolean;
+  initialHoldId?: string;
 }) {
   const [adults, setAdults] = useState(2);
   const [children, setChildren] = useState(0);
@@ -98,15 +110,40 @@ export default function PMSNewReservationModal({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [hold, setHold] = useState<{ id: string; expires_at: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ booking_number: string; total_kgs: number } | null>(null);
 
   useEffect(() => {
+    if (agentMode) {
+      setAgents([]);
+      setAgentId("");
+      return;
+    }
     fetch("/core/api/v1/admin/owner-corrections/agents?include_inactive=false", { cache: "no-store" })
       .then(async (response) => response.ok ? response.json() : { items: [] })
       .then((body) => setAgents((body.items || []).filter((item: Agent) => item.status === "ACTIVE")))
       .catch(() => setAgents([]));
-  }, []);
+  }, [agentMode]);
+
+  useEffect(() => {
+    if (!initialHoldId) return;
+    let active = true;
+    fetch(`/core/api/v1/admin/pms/holds/${initialHoldId}`, { cache: "no-store" })
+      .then(async (response) => {
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error("Удержание уже истекло или снято");
+        return body;
+      })
+      .then((item) => {
+        if (!active) return;
+        setGuestName(item.guestName);
+        setPhone(item.guestPhone);
+        setHold({ id: item.id, expires_at: item.expiresAt });
+      })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : "HOLD недоступен"); });
+    return () => { active = false; };
+  }, [initialHoldId]);
 
   const normalizedDiscount = useMemo(() => {
     if (!discountPercent.trim()) return null;
@@ -137,15 +174,16 @@ export default function PMSNewReservationModal({
           room_id: roomId,
           check_in: checkIn,
           check_out: checkOut,
+          hold_id: hold?.id ?? null,
           adults,
           children,
-          manager_total_kgs: override || null,
-          guest_phone: phone.trim() || null,
-          extra_bed_count: extraBedCount,
-          extra_bed_unit_kgs: extraBedCount > 0 ? normalizedExtraUnit : null,
-          discount_percent: discountPercent.trim() ? normalizedDiscount : null,
-          discount_reason: discountReason.trim() || null,
-          agent_id: agentId || null,
+          manager_total_kgs: agentMode ? null : (override || null),
+          guest_phone: agentMode ? null : (phone.trim() || null),
+          extra_bed_count: agentMode ? 0 : extraBedCount,
+          extra_bed_unit_kgs: agentMode ? null : (extraBedCount > 0 ? normalizedExtraUnit : null),
+          discount_percent: agentMode ? 0 : (discountPercent.trim() ? normalizedDiscount : null),
+          discount_reason: agentMode ? null : (discountReason.trim() || null),
+          agent_id: agentMode ? null : (agentId || null),
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -156,7 +194,7 @@ export default function PMSNewReservationModal({
     } finally {
       setLoading(false);
     }
-  }, [roomId, checkIn, checkOut, adults, children, phone, extraBedCount, normalizedExtraUnit, discountPercent, normalizedDiscount, discountReason, agentId]);
+  }, [roomId, checkIn, checkOut, adults, children, phone, extraBedCount, normalizedExtraUnit, discountPercent, normalizedDiscount, discountReason, agentId, agentMode, hold?.id]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadPreview(null), phone.trim() ? 350 : 0);
@@ -172,9 +210,50 @@ export default function PMSNewReservationModal({
     await loadPreview(value);
   }
 
+  async function createHold() {
+    if (agentMode || busy || !guestName.trim() || !phone.trim() || !preview?.can_commit) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/core/api/v1/admin/pms/holds", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room_id: roomId, check_in: checkIn, check_out: checkOut,
+          guest_name: guestName.trim(), guest_phone: phone.trim(),
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(errorText(body, "Не удалось удержать номер"));
+      setHold({ id: body.id, expires_at: body.expires_at });
+      onCreated();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ошибка создания HOLD");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function releaseHold() {
+    if (!hold || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(`/core/api/v1/admin/pms/holds/${hold.id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Не удалось освободить номер");
+      setHold(null);
+      await loadPreview();
+      onCreated();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Ошибка снятия HOLD");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!preview?.can_commit || !preview.pricing.total_kgs) {
+    if ((!hold && !preview?.can_commit) || !preview?.pricing.total_kgs) {
       setError("Сначала получите корректный preview цены и доступности.");
       return;
     }
@@ -192,18 +271,19 @@ export default function PMSNewReservationModal({
           adults,
           children,
           manager_total_kgs: managerOverride,
-          guest_phone: phone.trim(),
-          extra_bed_count: extraBedCount,
-          extra_bed_unit_kgs: extraBedCount > 0 ? normalizedExtraUnit : null,
-          discount_percent: discountPercent.trim() ? normalizedDiscount : null,
-          discount_reason: discountReason.trim() || null,
-          agent_id: agentId || null,
+          guest_phone: agentMode ? null : phone.trim(),
+          extra_bed_count: agentMode ? 0 : extraBedCount,
+          extra_bed_unit_kgs: agentMode ? null : (extraBedCount > 0 ? normalizedExtraUnit : null),
+          discount_percent: agentMode ? 0 : (discountPercent.trim() ? normalizedDiscount : null),
+          discount_reason: agentMode ? null : (discountReason.trim() || null),
+          agent_id: agentMode ? null : (agentId || null),
           guest_name: guestName.trim(),
           phone: phone.trim(),
           email: email.trim() || null,
           notes: notes.trim() || null,
           expected_total_kgs: preview.pricing.total_kgs,
-          expected_pricing_source: preview.pricing.source,
+          expected_pricing_source: agentMode ? "CORE_RATE" : preview.pricing.source,
+          hold_id: hold?.id ?? null,
         }),
       });
       const body = await response.json().catch(() => ({}));
@@ -218,6 +298,7 @@ export default function PMSNewReservationModal({
   }
 
   const deniedExtraBeds = preview?.room.extra_bed_allowed === false;
+  const maxExtraBedCount = preview?.room.max_extra_bed_count ?? 10;
 
   return (
     <div className="owner-booking-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -253,24 +334,24 @@ export default function PMSNewReservationModal({
               <label><span>Взрослые</span><input type="number" min={1} max={20} value={adults} onChange={(event) => setAdults(Number(event.target.value))} /></label>
               <label><span>Дети</span><input type="number" min={0} max={20} value={children} onChange={(event) => setChildren(Number(event.target.value))} /></label>
               <label><span>Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="необязательно" /></label>
-              <label><span>Агент</span><select value={agentId} onChange={(event) => setAgentId(event.target.value)}><option value="">Прямая бронь / без агента</option>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+              {!agentMode && <label><span>Агент</span><select value={agentId} onChange={(event) => setAgentId(event.target.value)}><option value="">Прямая бронь / без агента</option>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>}
               <label className="owner-notes"><span>Комментарий</span><input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="пожелания / условия" /></label>
             </div>
 
-            <section className="owner-price-card ready">
+            {!agentMode && <section className="owner-price-card ready">
               <div>
                 <span>Дополнительные места</span>
                 {deniedExtraBeds ? <strong>Запрещены для этой категории</strong> : <strong>Разрешены</strong>}
-                {!deniedExtraBeds && <small>При добавлении места Core автоматически пересчитает весь период.</small>}
+                {!deniedExtraBeds && <small>При добавлении места Core автоматически пересчитает весь период.{preview?.room.max_extra_bed_count != null ? ` Максимум допмест: ${preview.room.max_extra_bed_count}.` : ""}</small>}
               </div>
               {!deniedExtraBeds && <div className="owner-manager-price">
-                <input type="number" min={0} max={10} value={extraBedCount} onChange={(event) => setExtraBedCount(Number(event.target.value))} aria-label="Количество дополнительных мест" />
+                <input type="number" min={0} max={maxExtraBedCount} value={extraBedCount} onChange={(event) => setExtraBedCount(Number(event.target.value))} aria-label="Количество дополнительных мест" />
                 <input inputMode="numeric" value={extraBedUnit} disabled={extraBedCount === 0} onChange={(event) => setExtraBedUnit(event.target.value)} placeholder="Цена 1 допместа / ночь" />
               </div>}
               {preview && <div className="owner-commercial-prices"><span>Допместа: {money(preview.pricing.extra_beds_total_kgs)}</span><span>Вместимость: {preview.room.effective_capacity_adults}</span></div>}
-            </section>
+            </section>}
 
-            <section className="owner-price-card ready">
+            {!agentMode && <section className="owner-price-card ready">
               <div>
                 <span>Скидка на проживание</span>
                 {preview?.pricing.returning_guest ? <strong>Постоянный гость · автоматически 10%</strong> : <strong>Новый гость / скидка по решению менеджера</strong>}
@@ -280,25 +361,26 @@ export default function PMSNewReservationModal({
                 <input type="number" min={0} max={100} value={discountPercent} onChange={(event) => setDiscountPercent(event.target.value)} placeholder="% — пусто = авто" />
                 <input value={discountReason} onChange={(event) => setDiscountReason(event.target.value)} placeholder="Причина другой скидки" />
               </div>
-            </section>
+            </section>}
 
             <section className={`owner-price-card ${preview?.pricing.sellable ? "ready" : "needs-manager"}`}>
               <div>
-                <span>Расчёт Resort Core</span>
+                <span>Расчёт MARINA SMART</span>
                 {loading ? <strong>Проверяем…</strong> : preview?.pricing.core_sellable ? <strong>{money(preview.pricing.core_total_kgs)}</strong> : <strong>Требует подтверждения менеджера</strong>}
                 {preview?.pricing.core_reason && <small>{preview.pricing.core_reason}</small>}
               </div>
               {preview?.pricing.nights?.length ? (
                 <div className="owner-nightly-prices">
-                  {preview.pricing.nights.map((night) => <span key={night.date}>{night.date.slice(5)} · {money(night.price_kgs)}</span>)}
+                  {preview.pricing.nights.map((night) => <span key={night.date}>{night.date.slice(0, 10)} · {money(night.price_kgs)}{night.period ? ` · ${night.period}` : ""}</span>)}
                 </div>
               ) : null}
-              {!preview?.pricing.core_sellable && !loading && (
+              {!preview?.pricing.core_sellable && !loading && !agentMode && (
                 <div className="owner-manager-price">
                   <input inputMode="numeric" value={managerTotal} onChange={(event) => setManagerTotal(event.target.value)} placeholder="Базовая цена проживания, сом" />
                   <button type="button" onClick={applyManagerTotal}>Подтвердить цену</button>
                 </div>
               )}
+              {!preview?.pricing.core_sellable && !loading && agentMode && <div className="owner-booking-error">Тариф на выбранные даты закрыт. Свяжитесь с отелем для подтверждения цены.</div>}
               {preview?.pricing.source === "MANAGER_OVERRIDE" && <b className="owner-override-badge">Базовая цена подтверждена менеджером</b>}
               {preview && <div className="owner-commercial-prices">
                 <span>База: {money(preview.pricing.base_total_kgs)}</span>
@@ -312,9 +394,12 @@ export default function PMSNewReservationModal({
             {error && <div className="owner-booking-error">{error}</div>}
 
             <footer className="owner-booking-actions">
-              <span>Клетки — ночи. Допместа и скидки подтверждаются Core и сохраняются в аудите.</span>
-              <button type="submit" disabled={busy || loading || !preview?.can_commit || !guestName.trim() || !phone.trim()}>
-                {busy ? "Создаём…" : "Подтвердить бронь"}
+              <span>{agentMode ? "Бронь агентства создаётся только по открытому штатному тарифу MARINA SMART." : "Клетки — ночи. Допместа и скидки подтверждаются Core и сохраняются в аудите."}</span>
+              {!agentMode && !hold && <button type="button" onClick={() => void createHold()} disabled={busy || loading || !preview?.can_commit || !guestName.trim() || !phone.trim()}>
+                HOLD на 60 минут
+              </button>}
+              <button type="submit" disabled={busy || loading || (!hold && !preview?.can_commit) || !guestName.trim() || !phone.trim()}>
+                {busy ? "Создаём…" : hold ? "Подтвердить HOLD → бронь" : "Подтвердить бронь"}
               </button>
             </footer>
           </form>

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/finance", tags=["admin-hotel-finance"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -65,10 +65,7 @@ async def set_payment_requirement(
     """
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await conn.fetchrow('SELECT id FROM properties WHERE code=$1', user["property_code"])
-            if not prop:
-                raise HTTPException(status_code=503, detail="Property not loaded")
-            pid = prop["id"]
+            pid = await trusted_property_id(conn, user)
             row = await conn.fetchrow(
                 '''
                 SELECT id,status::text AS status,"quotedTotalKgs","requiredPrepaymentKgs"
@@ -153,12 +150,12 @@ async def finance_summary(
     end_exclusive_date = to_date + timedelta(days=1)
 
     async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
         prop = await conn.fetchrow(
-            'SELECT id,timezone,currency FROM properties WHERE code=$1', user["property_code"]
+            'SELECT id,timezone,currency FROM properties WHERE id=$1', pid
         )
         if not prop:
             raise HTTPException(status_code=503, detail="Property not loaded")
-        pid = prop["id"]
 
         # Prisma DateTime columns in the current PostgreSQL baseline are TIMESTAMP(3)
         # without timezone and are treated as UTC-naive storage by Resort Core.

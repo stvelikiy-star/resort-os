@@ -1,0 +1,35 @@
+name: MARINA Shared RC3 Source Integrity CI
+
+on:
+  pull_request:
+    paths:
+      - 'release/marina-smart-shared-rc3.json'
+      - 'scripts/marina_rc3_source_gate.py'
+      - 'scripts/test_marina_rc3_source_gate.py'
+      - '.github/workflows/marina-shared-rc3-source-ci.yml'
+      - 'services/api/app/**'
+      - 'apps/admin/**'
+      - 'packages/database/prisma/migrations/**'
+      - 'scripts/marina_shared_live_browser.mjs'
+      - 'scripts/marina_shared_role_auth_ci.py'
+      - 'scripts/marina_shared_release_restore_ci.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check pinned RC3 source and immutable 39-migration history
+        run: python scripts/marina_rc3_source_gate.py
+      - name: Verify source drift and unsafe deployment flags fail closed
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_rc3_source_gate.py' -v

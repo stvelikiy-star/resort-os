@@ -1,0 +1,24 @@
+# Disposable RC4 Guest QR Compose overlay for isolated CI ONLY.
+# Requires the normal shared Compose file, fresh seed and explicit env gates.
+# Never use this override for an external or production deployment.
+services:
+  api:
+    environment:
+      MARINA_SHARED_GUEST_QR_RC4_ENABLED: "${MARINA_SHARED_GUEST_QR_RC4_ENABLED:-false}"
+      MARINA_SHARED_GUEST_QR_RC4_CONFIRM: "${MARINA_SHARED_GUEST_QR_RC4_CONFIRM:-}"
+      MARINA_SHARED_GUEST_QR_RC4_ORIGIN: "${MARINA_SHARED_GUEST_QR_RC4_ORIGIN:-}"
+      GUEST_OS_PUBLIC_BASE_URL: "${GUEST_OS_PUBLIC_BASE_URL:-}"
+      MARINA_GUEST_QR_CI_CONFIRM: "${MARINA_GUEST_QR_CI_CONFIRM:-}"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        RELEASE_SHA: ${MARINA_STAGING_SHA:?Set the reviewed Git SHA}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13203:3000"

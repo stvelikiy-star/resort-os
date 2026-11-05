@@ -3,16 +3,17 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/dashboard", tags=["admin-dashboard"])
 manager_access = require_roles("OWNER", "MANAGER")
 
 
-async def property_context(conn, property_code: str):
+async def property_context(conn, user: dict[str, Any]):
+    property_id = await trusted_property_id(conn, user)
     row = await conn.fetchrow(
-        'SELECT id, code, name, timezone, currency FROM properties WHERE code=$1',
-        property_code,
+        'SELECT id, code, name, timezone, currency FROM properties WHERE id=$1',
+        property_id,
     )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -25,7 +26,7 @@ async def manager_dashboard(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn, user["property_code"])
+        prop = await property_context(conn, user)
         pid: uuid.UUID = prop["id"]
         today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
 

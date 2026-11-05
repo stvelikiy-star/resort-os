@@ -190,7 +190,7 @@ export default function ReportsBoard() {
         <div>
           <p className="eyebrow">OWNER CONTROL · RESORT CORE</p>
           <h1>Отчёты и аналитика</h1>
-          <p>Загрузка, продажи, деньги, категории, каналы, задолженность, операции и история номерного фонда — из одной базы Resort Core.</p>
+          <p>Загрузка, продажи, деньги, категории, каналы, задолженность, операции и история номерного фонда — из единой базы MARINA SMART.</p>
         </div>
         <div className="reports-actions">
           <button className="btn" onClick={() => preset(7)}>7 дней</button>
@@ -208,7 +208,7 @@ export default function ReportsBoard() {
         <label><span>С</span><input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></label>
         <label><span>По</span><input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} /></label>
         <label className="reports-compare-toggle"><input type="checkbox" checked={compareEnabled} onChange={(e) => setCompareEnabled(e.target.checked)} /><span>Сравнить с предыдущим периодом</span></label>
-        {report && <small>{report.range.days} календарных дней · данные Resort Core</small>}
+        {report && <small>{report.range.days} календарных дней · данные MARINA SMART</small>}
       </section>
 
       {error && <div className="error-box">{error}</div>}
@@ -250,7 +250,7 @@ export default function ReportsBoard() {
         <OwnerOccupancyMatrix fromDate={fromDate} toDate={toDate} />
 
         <section className="report-card report-chart-card">
-          <div className="report-card-head"><div><span>Динамика</span><h2>Загрузка по дням</h2></div><button className="btn sm" onClick={() => downloadCsv(`three-crowns-daily-${fromDate}-${toDate}.csv`, report.daily)}>CSV по дням</button></div>
+          <div className="report-card-head"><div><span>Динамика</span><h2>Загрузка по дням</h2></div><button className="btn sm" onClick={() => downloadCsv(`marina-smart-daily-${fromDate}-${toDate}.csv`, report.daily)}>CSV по дням</button></div>
           <div className="occupancy-chart" aria-label="График загрузки">
             {chartDaily.map((day) => <div className="occupancy-column" key={day.date} title={`${day.date}: ${day.occupancy_percent}% · ${money(day.received_kgs)}`}>
               <div className="occupancy-bar-wrap"><i style={{ height: `${Math.max(2, Math.min(100, day.occupancy_percent))}%` }} /></div>
@@ -290,7 +290,7 @@ export default function ReportsBoard() {
         </div>
 
         <section className="report-card">
-          <div className="report-card-head"><div><span>Номерной фонд</span><h2>Эффективность категорий</h2></div><button className="btn sm" onClick={() => downloadCsv(`three-crowns-room-types-${fromDate}-${toDate}.csv`, report.room_types)}>CSV категорий</button></div>
+          <div className="report-card-head"><div><span>Номерной фонд</span><h2>Эффективность категорий</h2></div><button className="btn sm" onClick={() => downloadCsv(`marina-smart-room-types-${fromDate}-${toDate}.csv`, report.room_types)}>CSV категорий</button></div>
           <div className="report-table-wrap"><table className="report-table"><thead><tr><th>Категория</th><th>Комнат</th><th>Броней</th><th>Ночей</th><th>Загрузка</th><th>Стоимость</th><th>ADR</th><th>RevPAR</th></tr></thead><tbody>
             {report.room_types.map((row) => <tr key={row.code}><td><strong>{row.name}</strong><small>{row.code}</small></td><td>{row.room_count}</td><td>{row.reservation_count}</td><td>{row.booked_room_nights}</td><td>{pct(row.occupancy_percent)}</td><td>{money(row.allocated_booked_value_kgs)}</td><td>{money(row.adr_kgs)}</td><td>{money(row.revpar_kgs)}</td></tr>)}
           </tbody></table></div>
@@ -303,7 +303,7 @@ export default function ReportsBoard() {
           </section>
 
           <section className="report-card">
-            <div className="report-card-head"><div><span>Контроль денег</span><h2>Текущая задолженность</h2></div><button className="btn sm" disabled={!report.debtors.length} onClick={() => downloadCsv(`three-crowns-debtors-${toDate}.csv`, report.debtors)}>CSV дебиторки</button></div>
+            <div className="report-card-head"><div><span>Контроль денег</span><h2>Текущая задолженность</h2></div><button className="btn sm" disabled={!report.debtors.length} onClick={() => downloadCsv(`marina-smart-debtors-${toDate}.csv`, report.debtors)}>CSV дебиторки</button></div>
             <div className="debtor-list">{report.debtors.slice(0, 12).map((row) => <div key={row.reservation_id}><div><strong>{row.booking_number} · {row.guest_name || "Гость"}</strong><span>{row.check_in} → {row.check_out}{row.phone ? ` · ${row.phone}` : ""}</span></div><b>{money(row.outstanding_kgs)}</b></div>)}{!report.debtors.length && <p className="report-empty">По активным броням задолженности нет.</p>}</div>
           </section>
         </div>

@@ -23,6 +23,7 @@ import "./reception-readiness.css";
 import "./inbox.css";
 import "./staff.css";
 import "./management-control.css";
+import "./hotel-setup.css";
 import "./room-detail.css";
 import "./room-qr.css";
 import "./service-points.css";
@@ -48,8 +49,8 @@ import "./mobile-hardening.css";
 import "./admin-experience.css";
 
 export const metadata: Metadata = {
-  title: "Три Короны — Resort OS",
-  description: "PMS, CRM, сайт и операционный центр Three Crowns",
+  title: "MARINA SMART — Hotel OS",
+  description: "PMS, CRM, сайт и операционный центр MARINA SMART",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

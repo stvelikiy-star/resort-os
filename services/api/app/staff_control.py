@@ -1,60 +1,118 @@
 import json
+import os
 import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import password_hasher, require_roles
+from .auth import password_hasher, require_roles, trusted_property_id, granted_modules_for_session
+from .section_permissions import SECTION_MODULES, effective_section_permissions, normalized_configured_permissions
 
 router = APIRouter(prefix="/api/v1/admin/staff", tags=["admin-staff"])
 manager_access = require_roles("OWNER", "MANAGER")
-owner_access = require_roles("OWNER")
+owner_access = require_roles("OWNER", module_grant=False)
 
+# Roles exposed to hotel owners must have a working sign-in surface. Legacy
+# enum values remain in the database for existing records but cannot be assigned.
 ManagedRole = Literal[
     "MANAGER",
     "RECEPTION",
+    "AGENT",
     "MAID",
     "TECHNICIAN",
-    "STORE_STAFF",
-    "DINING_STAFF",
-    "CONTENT_MANAGER",
+    "COOK",
+    "WAITER",
 ]
 MANAGED_ROLES = [
     "MANAGER",
     "RECEPTION",
+    "AGENT",
     "MAID",
     "TECHNICIAN",
-    "STORE_STAFF",
-    "DINING_STAFF",
-    "CONTENT_MANAGER",
+    "COOK",
+    "WAITER",
 ]
+
+
+def _check_staff_password(value: str) -> str:
+    is_demo = os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01"
+    min_size = 3 if is_demo else 8
+    if len(value) < min_size or (is_demo and len(value) > 10):
+        raise ValueError("Demo password must be 3-10 characters; live hotel password must be at least 8")
+    return value
 
 
 class StaffCreate(BaseModel):
     username: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
     display_name: str = Field(min_length=2, max_length=160)
-    password: str = Field(min_length=12, max_length=256)
+    password: str = Field(min_length=3, max_length=256)
+    
+    @model_validator(mode="after")
+    def password_policy(self):
+        _check_staff_password(self.password)
+        return self
     role: ManagedRole
+    booking_agent_id: uuid.UUID | None = None
+
+    @model_validator(mode="after")
+    def agent_binding_required(self):
+        if self.role == "AGENT" and self.booking_agent_id is None:
+            raise ValueError("AGENT requires a hotel-local booking_agent_id")
+        if self.role != "AGENT" and self.booking_agent_id is not None:
+            raise ValueError("Only AGENT may have booking_agent_id")
+        return self
 
 
 class StaffPatch(BaseModel):
     display_name: str | None = Field(default=None, min_length=2, max_length=160)
-    password: str | None = Field(default=None, min_length=12, max_length=256)
+    password: str | None = Field(default=None, min_length=3, max_length=256)
     role: ManagedRole | None = None
+    booking_agent_id: uuid.UUID | None = None
     active: bool | None = None
+    module_permissions: list[str] | None = Field(default=None, max_length=len(SECTION_MODULES))
 
     @model_validator(mode="after")
     def require_change(self):
+        if self.password is not None:
+            _check_staff_password(self.password)
+        if self.module_permissions is not None:
+            unknown = set(self.module_permissions) - SECTION_MODULES
+            if unknown:
+                raise ValueError(f"Unknown module permission: {sorted(unknown)[0]}")
+            self.module_permissions = sorted(set(self.module_permissions))
         if not self.model_fields_set:
             raise ValueError("At least one staff field must be provided")
         return self
 
 
-async def _property(conn, property_code: str):
+async def validate_owner_agent_binding(
+    conn, property_id: uuid.UUID, role: str, agent_id: uuid.UUID | None,
+    *, active: bool,
+) -> uuid.UUID | None:
+    """Only an active agency belonging to the authenticated hotel can be linked."""
+    if role != "AGENT":
+        if agent_id is not None:
+            raise HTTPException(status_code=422, detail={"code": "AGENT_LINK_WRONG_ROLE"})
+        return None
+    if agent_id is None:
+        if active:
+            raise HTTPException(status_code=422, detail={"code": "AGENT_LINK_REQUIRED"})
+        return None
+    status = await conn.fetchval(
+        """SELECT status FROM booking_agents WHERE id=$1 AND "propertyId"=$2""",
+        agent_id, property_id,
+    )
+    if status is None or (active and status != "ACTIVE"):
+        raise HTTPException(status_code=422, detail={"code": "AGENT_LINK_NOT_ACTIVE_IN_HOTEL"})
+    return agent_id
+
+
+async def _property(conn, user: dict[str, Any]):
+    property_id = await trusted_property_id(conn, user)
     prop = await conn.fetchrow(
-        'SELECT id,timezone FROM properties WHERE code=$1',
-        property_code,
+        'SELECT id,timezone FROM properties WHERE id=$1',
+        property_id,
     )
     if not prop:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -67,6 +125,8 @@ def _staff_payload(row) -> dict[str, Any]:
         "username": row["username"],
         "display_name": row["displayName"],
         "role": row["role"],
+        "booking_agent_id": str(row["bookingAgentId"]) if row.get("bookingAgentId") else None,
+        "module_permissions": granted_modules_for_session(row["role"], row["modulePermissions"]),
         "active": bool(row["isActive"]),
         "telegram_linked": row["telegramUserId"] is not None,
         "telegram_username": row["telegramUsername"],
@@ -109,7 +169,7 @@ async def staff_overview(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop = await _property(conn, user["property_code"])
+        prop = await _property(conn, user)
         pid = prop["id"]
         today = await conn.fetchval("SELECT (now() AT TIME ZONE $1)::date", prop["timezone"])
 
@@ -138,7 +198,7 @@ async def staff_overview(
               WHERE "revokedAt" IS NULL
               GROUP BY "userId"
             )
-            SELECT u.id,u.username,u."displayName",u.role::text AS role,u."isActive",
+            SELECT u.id,u.username,u."displayName",u.role::text AS role,u."isActive",u."modulePermissions",u."bookingAgentId",
                    u."telegramUserId",u."telegramUsername",u."telegramLinkedAt",u."createdAt",u."updatedAt",
                    COALESCE(ts.active_tasks,0)::int AS active_tasks,
                    COALESCE(ts.completed_today,0)::int AS completed_today,
@@ -152,8 +212,9 @@ async def staff_overview(
             ORDER BY
               CASE u.role::text
                 WHEN 'OWNER' THEN 0 WHEN 'MANAGER' THEN 1 WHEN 'RECEPTION' THEN 2
-                WHEN 'MAID' THEN 3 WHEN 'TECHNICIAN' THEN 4 WHEN 'DINING_STAFF' THEN 5
-                WHEN 'STORE_STAFF' THEN 6 WHEN 'CONTENT_MANAGER' THEN 7 ELSE 8
+                WHEN 'MAID' THEN 3 WHEN 'TECHNICIAN' THEN 4 WHEN 'COOK' THEN 5
+                WHEN 'WAITER' THEN 6 WHEN 'DINING_STAFF' THEN 7
+                WHEN 'STORE_STAFF' THEN 8 WHEN 'CONTENT_MANAGER' THEN 7 ELSE 8
               END,
               u."displayName"
             ''',
@@ -186,6 +247,8 @@ async def staff_overview(
                 "username": row["username"],
                 "display_name": row["displayName"],
                 "role": row["role"],
+                "booking_agent_id": str(row["bookingAgentId"]) if row["bookingAgentId"] else None,
+                "module_permissions": granted_modules_for_session(row["role"], row["modulePermissions"]),
                 "active": row["isActive"],
                 "telegram_linked": row["telegramUserId"] is not None,
                 "telegram_username": row["telegramUsername"],
@@ -201,6 +264,10 @@ async def staff_overview(
         "unassigned_active_tasks": dict(unassigned),
         "can_manage_access": user["role"] == "OWNER",
         "managed_roles": MANAGED_ROLES,
+        "staff_password_policy": {
+            "min_length": 3 if os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01" else 8,
+            "max_length": 10 if os.environ.get("APP_ENV") == "staging" and os.environ.get("PROPERTY_CODE") == "MARINA_HOTEL01" else 256,
+        },
         "truth": "This is task/session visibility only. It is not an attendance, payroll or employee-performance score.",
     }
 
@@ -215,7 +282,7 @@ async def create_staff_user(
     display_name = payload.display_name.strip()
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             existing = await conn.fetchval(
                 'SELECT id FROM staff_users WHERE "propertyId"=$1 AND username=$2',
                 prop["id"],
@@ -224,14 +291,17 @@ async def create_staff_user(
             if existing:
                 raise HTTPException(status_code=409, detail="Username already exists")
 
+            agent_id = await validate_owner_agent_binding(
+                conn, prop["id"], payload.role, payload.booking_agent_id, active=True,
+            )
             staff_id = uuid.uuid4()
             row = await conn.fetchrow(
                 '''
                 INSERT INTO staff_users (
-                  id,"propertyId",username,"displayName","passwordHash",role,"isActive","createdAt","updatedAt"
-                ) VALUES ($1,$2,$3,$4,$5,$6::"StaffRole",true,now(),now())
+                  id,"propertyId",username,"displayName","passwordHash",role,"bookingAgentId","isActive","createdAt","updatedAt"
+                ) VALUES ($1,$2,$3,$4,$5,$6::"StaffRole",$7,true,now(),now())
                 RETURNING id,username,"displayName",role::text AS role,"isActive",
-                          "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
+                          "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt","modulePermissions","bookingAgentId"
                 ''',
                 staff_id,
                 prop["id"],
@@ -239,6 +309,7 @@ async def create_staff_user(
                 display_name,
                 password_hasher.hash(payload.password),
                 payload.role,
+                agent_id,
             )
             after = _staff_payload(row)
             await _audit(
@@ -262,10 +333,10 @@ async def patch_staff_user(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            prop = await _property(conn, user["property_code"])
+            prop = await _property(conn, user)
             current = await conn.fetchrow(
                 '''
-                SELECT id,username,"displayName",role::text AS role,"isActive",
+                SELECT id,username,"displayName",role::text AS role,"isActive","modulePermissions","bookingAgentId",
                        "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
                 FROM staff_users
                 WHERE id=$1 AND "propertyId"=$2
@@ -286,7 +357,23 @@ async def patch_staff_user(
             display_name = payload.display_name.strip() if payload.display_name is not None else current["displayName"]
             role = payload.role if payload.role is not None else current["role"]
             active = payload.active if payload.active is not None else bool(current["isActive"])
+            module_permissions = (
+                payload.module_permissions
+                if "module_permissions" in payload.model_fields_set
+                else normalized_configured_permissions(current["modulePermissions"])
+            )
             password_hash = password_hasher.hash(payload.password) if payload.password is not None else None
+            if role != "AGENT":
+                if payload.booking_agent_id is not None:
+                    raise HTTPException(status_code=422, detail={"code": "AGENT_LINK_WRONG_ROLE"})
+                agent_id = None
+            else:
+                agent_id = (payload.booking_agent_id
+                            if "booking_agent_id" in payload.model_fields_set
+                            else current["bookingAgentId"])
+            agent_id = await validate_owner_agent_binding(
+                conn, prop["id"], role, agent_id, active=active,
+            )
 
             row = await conn.fetchrow(
                 '''
@@ -295,21 +382,27 @@ async def patch_staff_user(
                     role=$3::"StaffRole",
                     "isActive"=$4,
                     "passwordHash"=COALESCE($5,"passwordHash"),
+                    "modulePermissions"=$6::jsonb,
+                    "bookingAgentId"=$7,
                     "updatedAt"=now()
                 WHERE id=$1
-                RETURNING id,username,"displayName",role::text AS role,"isActive",
-                          "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
+                RETURNING id,username,"displayName",role::text AS role,"isActive","modulePermissions","bookingAgentId",
+                           "telegramUserId","telegramUsername","telegramLinkedAt","createdAt","updatedAt"
                 ''',
                 staff_id,
                 display_name,
                 role,
                 active,
                 password_hash,
+                json.dumps(module_permissions) if module_permissions is not None else None,
+                agent_id,
             )
             security_changed = (
                 role != current["role"]
                 or active != bool(current["isActive"])
                 or payload.password is not None
+                or agent_id != current["bookingAgentId"]
+                or "module_permissions" in payload.model_fields_set
             )
             if security_changed:
                 await conn.execute(

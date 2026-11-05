@@ -1,8 +1,26 @@
 export type PmsRoomDisplayInput = {
   code: string;
+  name?: string | null;
   room_type_name: string;
   beds_raw?: string | null;
 };
+
+export function pmsRoomDisplayNumber(room: PmsRoomDisplayInput, propertyCode?: string | null) {
+  if (propertyCode === "AK_BERMET_TEST") {
+    const visible = room.name?.trim().replace(/^Номер\s+/i, "").trim();
+    if (visible) return visible;
+  }
+  return room.code;
+}
+
+export function pmsStaffBuildingLabel(building: string | null | undefined, propertyCode?: string | null) {
+  const raw = building?.trim() || "Без корпуса";
+  if (propertyCode !== "AK_BERMET_TEST") return raw;
+  if (raw === "Garden 1" || raw === "Garden 2") return "GARDEN";
+  if (raw === "Коттеджи кирпичные") return "Кирпичные";
+  if (raw === "Коттеджи деревянные / срубы") return "Деревянные";
+  return raw;
+}
 
 function beds(room: PmsRoomDisplayInput) {
   return room.beds_raw?.trim() || "";

@@ -38,7 +38,7 @@ type Dashboard = {
   attention_tasks: AttentionTask[];
 };
 
-type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX";
+type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX" | "WHATSAPP";
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const taskType: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
@@ -57,7 +57,7 @@ function Drill({ children, to, onNavigate }: { children: React.ReactNode; to: Da
   return <button className="command-drill" onClick={() => onNavigate(to)}>{children}<span aria-hidden="true">→</span></button>;
 }
 
-export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: DashboardDestination) => void }) {
+export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavigate?: (tab: DashboardDestination) => void; isOwner?: boolean }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,12 +90,19 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
     <main className="work-shell dashboard-shell">
       <div className="work-head">
         <div>
-          <p className="eyebrow">Три Короны · управление</p>
+          <p className="eyebrow">MARINA SMART · управление</p>
           <h1>Command Center</h1>
-          <p className="subtitle">{data.property.local_date} · данные Resort Core · {data.property.timezone}</p>
+          <p className="subtitle">{data.property.local_date} · данные MARINA SMART · {data.property.timezone}</p>
         </div>
         <button className="btn" onClick={load}>Обновить</button>
       </div>
+
+      {isOwner && <section className="command-panel" aria-label="Диалоги WhatsApp">
+        <div className="command-panel-head">
+          <div><h2>WhatsApp / AI</h2></div>
+          <Drill to="WHATSAPP" onNavigate={onNavigate}>Открыть</Drill>
+        </div>
+      </section>}
 
       <OwnerExecutivePack />
       <OwnerControlV2 />
@@ -142,7 +149,7 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
             <div><span>Нужен ответ</span><strong>{data.communications.needs_reply}</strong></div>
             <div><span>Самое долгое ожидание</span><strong>{waitingLabel(data.communications.oldest_waiting_seconds)}</strong></div>
           </div>
-          <p className="command-note">Клиентские каналы V1 ведёт n8n. Resort OS хранит только доступные факты/аудит; SLA-порог не выдумывается.</p>
+          <p className="command-note">Клиентские каналы V1 ведёт n8n. Hotel OS хранит только доступные факты/аудит; SLA-порог не выдумывается.</p>
         </article>
 
         <article className="command-panel">

@@ -42,7 +42,7 @@ const CATEGORIES: Record<string, string> = {
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : "Ошибка MARINA SMART");
   return body;
 }
 
@@ -86,7 +86,7 @@ export default function KitchenAdmin() {
     (async () => {
       try {
         const me = await api("/core/api/v1/auth/me") as User;
-        if (!["OWNER", "MANAGER", "DINING_STAFF"].includes(me.role)) throw new Error("Нет доступа к кухне");
+        if (!["OWNER", "MANAGER"].includes(me.role)) throw new Error("Нет доступа к кухне");
         if (!cancelled) setUser(me);
         await api("/core/api/v1/ops/kitchen/sync-arrivals", { method: "POST" }).catch(() => null);
         if (!cancelled) await loadAll();
@@ -171,7 +171,7 @@ export default function KitchenAdmin() {
 
   return <main className={styles.shell}>
     <header className={styles.header}>
-      <div><p>Три Короны · Resort OS</p><h1>Kitchen Admin</h1><span>{user.display_name} · {user.role}</span></div>
+      <div><p>MARINA SMART · Hotel OS</p><h1>Kitchen Admin</h1><span>{user.display_name} · {user.role}</span></div>
       <a href="/">Моя смена</a>
     </header>
 
