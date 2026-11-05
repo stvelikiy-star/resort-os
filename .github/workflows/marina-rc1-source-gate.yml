@@ -28,4 +28,9 @@ jobs:
       - name: Run MARINA offline regression and source-lock negative tests
         env:
           PYTHONDONTWRITEBYTECODE: '1'
-        run: python -m unittest discover -s scripts -p 'test_marina_*.py' -v
+          MARINA_SHARED_BROWSER_CI_PASSWORD: synthetic-ci-only-restore-guard
+        run: |
+          # RC3 restore-test source is immutable. Supply the disposable CI-only
+          # fixture it requires without changing its reviewed security guard.
+          printf '{}' > /tmp/marina_shared_browser_receipts.json
+          python -m unittest discover -s scripts -p 'test_marina_*.py' -v

@@ -173,14 +173,15 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-          page = Path('apps/web/app/page.tsx').read_text(encoding='utf-8')
-          layout = Path('apps/web/app/layout.tsx').read_text(encoding='utf-8')
-          joined = page + '\n' + layout
-          assert 'AK BERMET' in joined
-          assert 'MARINA SMART' in joined
+          public_page = Path('apps/web/app/page.tsx').read_text(encoding='utf-8')
+          guest_page = Path('apps/web/app/guest/page.tsx').read_text(encoding='utf-8')
+          guest_landing = Path('apps/web/components/GuestLanding.tsx').read_text(encoding='utf-8')
+          assert 'Три Короны' in public_page and '3korony.com' in public_page
+          isolated_guest = guest_page + '\n' + guest_landing
+          assert 'AK BERMET' in isolated_guest and 'MARINA SMART' in isolated_guest
           for forbidden in ('Три Короны', 'Three Crowns', '3korony.com'):
-              assert forbidden not in joined, forbidden
-          print('PASS: dedicated MARINA guest web is isolated from Three Crowns branding')
+              assert forbidden not in isolated_guest, forbidden
+          print('PASS: approved public site and isolated MARINA guest route')
           PY
 
       - name: Validate backup and host scripts
