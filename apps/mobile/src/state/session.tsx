@@ -152,6 +152,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // session merely because the device previously opened that property.
     if (id === hotelId) return;
     const candidate = hotels.find(h => h.id === id);
+    // A provisioned customer app cannot enter the synthetic showroom even
+    // through a deep link or a future caller bypassing the connection screen.
+    if (candidate?.demo && hotels.some(h => !h.demo)) return;
     if (candidate && !candidate.demo && !isTrustedHotelOrigin(candidate.baseUrl)) return;
     const leaving = hotelId ? hotels.find(h => h.id === hotelId) : null;
     sessionRevision.current++;
@@ -191,6 +194,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       throw new ApiError('FORBIDDEN', 'Hotel switching is not available in a customer session');
     }
     const target = hotels.find(h => h.id === id);
+    if (target?.demo && hotels.some(h => !h.demo)) {
+      throw new ApiError('FORBIDDEN', 'DEMO is unavailable on a provisioned customer device');
+    }
     if (!target || (!target.demo && !isTrustedHotelOrigin(target.baseUrl))) {
       throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
     }
@@ -255,6 +261,10 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     const demoHotel = DEMO_HOTELS[0];
     // Never bypass production auth. This method explicitly uses the isolated
     // in-memory demo API, which does not make network calls.
+    // The LIVE device remains bound to its customer hotel even when signed out.
+    if (hotels.some(h => !h.demo)) {
+      throw new ApiError('FORBIDDEN', 'DEMO is unavailable on a provisioned customer device');
+    }
     const revision = ++sessionRevision.current;
     loginAttempt.current++;
     if (hotelId) dropApi(hotelId);
@@ -275,7 +285,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       }
       throw error;
     }
-  }, [hotelId]);
+  }, [hotelId, hotels]);
 
   const signIn = useCallback((username: string, password: string, selector?: SharedHotelSelector): Promise<AuthUser> => {
     if (!hotel || !api) return Promise.reject(new Error('no hotel'));
