@@ -10,12 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
 from .auth import require_roles, trusted_property_id
+from . import auth as auth_module
 from .guest_identity import resolve_or_create_guest
 from .main import price_room_type
 
 
 router = APIRouter(prefix="/api/v1/admin/pms/reservations", tags=["admin-pms-owner-grid"])
-manager_access = require_roles("OWNER", "MANAGER", "AGENT")
+manager_access = require_roles("OWNER", "MANAGER", "AGENT", "RECEPTION")
 
 # Owner-approved rule: these categories never accept extra places.
 EXTRA_BED_DENIED_ROOM_TYPES = {
@@ -186,6 +187,35 @@ def enforce_agent_booking_scope(payload: GridReservationPreviewPayload, agent_id
             "guest_phone": None,
         }
     )
+
+
+
+def enforce_reception_booking_scope(payload: GridReservationPreviewPayload):
+    """Shared RECEPTION may book the published core rate, never control pricing.
+
+    Keep this scoped to the explicitly gated shared-auth staging environment;
+    single-property legacy role authority must not broaden silently.
+    """
+    if not auth_module.MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        raise HTTPException(status_code=403, detail={"code": "RECEPTION_SHARED_ONLY"})
+    if (payload.manager_total_kgs is not None or payload.extra_bed_count != 0
+            or payload.extra_bed_unit_kgs is not None
+            or payload.discount_percent not in (None, 0)
+            or bool(payload.discount_reason)
+            or payload.agent_id is not None or payload.hold_id is not None):
+        raise HTTPException(status_code=403, detail={"code": "RECEPTION_PRICE_OR_HOLD_OVERRIDE_FORBIDDEN"})
+    if (isinstance(payload, GridReservationCommitPayload)
+            and payload.expected_pricing_source != "CORE_RATE"):
+        raise HTTPException(status_code=403, detail={"code": "RECEPTION_CORE_RATE_REQUIRED"})
+    # Rebooking a prior guest must not silently confer manager-only discounts.
+    # Identity is still resolved using the real guest phone during commit.
+    return payload.model_copy(update={
+        "manager_total_kgs": None, "extra_bed_count": 0,
+        "extra_bed_unit_kgs": None, "discount_percent": 0,
+        "discount_reason": None, "agent_id": None,
+        "hold_id": None, "guest_phone": None,
+    })
+
 
 
 async def load_agent(conn, property_id: uuid.UUID, agent_id: uuid.UUID | None):
@@ -400,6 +430,8 @@ async def preview_grid_reservation(
             if user["role"] == "AGENT":
                 linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
                 payload = enforce_agent_booking_scope(payload, linked_agent_id)
+            elif user["role"] == "RECEPTION":
+                payload = enforce_reception_booking_scope(payload)
             return await build_preview(conn, prop["id"], payload)
 
 
@@ -423,6 +455,9 @@ async def commit_grid_reservation(
                 from .pms_holds import expire_holds
                 await expire_holds(conn, prop["id"])
                 is_agent = user["role"] == "AGENT"
+                is_reception = user["role"] == "RECEPTION"
+                if is_reception:
+                    payload = enforce_reception_booking_scope(payload)
                 if is_agent:
                     linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
                     payload = enforce_agent_booking_scope(payload, linked_agent_id)
@@ -449,7 +484,7 @@ async def commit_grid_reservation(
                 commit_preview_payload = GridReservationPreviewPayload(
                     **{
                         **payload.model_dump(exclude={"guest_name", "phone", "email", "notes", "expected_total_kgs", "expected_pricing_source", "hold_id"}),
-                        "guest_phone": None if is_agent else payload.phone,
+                        "guest_phone": None if (is_agent or is_reception) else payload.phone,
                         "hold_id": payload.hold_id,
                     }
                 )
@@ -586,8 +621,11 @@ async def commit_grid_reservation(
                 )
                 if payload.hold_id is not None:
                     await conn.execute('UPDATE marina_reservation_holds SET "confirmedReservationId"=$2 WHERE id=$1 AND "propertyId"=$3', payload.hold_id, reservation_id, prop["id"])
-                audit_action = "AGENT_CREATE_RESERVATION_FROM_GRID" if is_agent else "MANAGER_CREATE_RESERVATION_FROM_GRID"
-                audit_source = "PMS_AGENT_GRID" if is_agent else "PMS_OWNER_GRID"
+                audit_action = ("AGENT_CREATE_RESERVATION_FROM_GRID" if is_agent else
+                                "RECEPTION_CREATE_RESERVATION_FROM_GRID" if is_reception else
+                                "MANAGER_CREATE_RESERVATION_FROM_GRID")
+                audit_source = ("PMS_AGENT_GRID" if is_agent else
+                                "PMS_RECEPTION_GRID" if is_reception else "PMS_OWNER_GRID")
                 await conn.execute(
                     '''
                     INSERT INTO audit_logs (
@@ -672,7 +710,9 @@ async def commit_grid_reservation(
         "pricing_source": preview["pricing"]["source"],
         "price_adjusted_at_commit": auto_discount_discovered_at_commit,
         "payment_created": False,
-        "payment_terms": "AGENT_CORE_RATE" if user["role"] == "AGENT" else "MANAGER_CONTROLLED",
+        "payment_terms": ("AGENT_CORE_RATE" if user["role"] == "AGENT" else
+                          "RECEPTION_CORE_RATE" if user["role"] == "RECEPTION" else
+                          "MANAGER_CONTROLLED"),
     }
 
 

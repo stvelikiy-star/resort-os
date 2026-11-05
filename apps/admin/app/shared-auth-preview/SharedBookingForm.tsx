@@ -24,10 +24,11 @@ function hotelDate(offset: number) {
 
 /** Shared staging only. All authority, price and availability stay on the server. */
 export default function SharedBookingForm({
-  rooms, onExpired,
+  rooms, onExpired, coreRateOnly = false,
 }: {
   rooms: Room[];
   onExpired: () => void;
+  coreRateOnly?: boolean;
 }) {
   const [roomId, setRoomId] = useState("");
   const [checkIn, setCheckIn] = useState(hotelDate(2));
@@ -40,11 +41,13 @@ export default function SharedBookingForm({
   const [success, setSuccess] = useState("");
 
   const fields = { room_id: roomId, check_in: checkIn, check_out: checkOut, adults: 2, children: 0, guest_phone: phone };
+  const priceAllowed = (source: string) => source === "CORE_RATE" ||
+    (!coreRateOnly && source === "MANAGER_OVERRIDE");
   const validQuote = quote &&
     quote.room.id === roomId && quote.check_in === checkIn && quote.check_out === checkOut &&
     quote.can_commit === true && Number.isSafeInteger(quote.pricing.total_kgs) &&
     Number(quote.pricing.total_kgs) > 0 &&
-    ["CORE_RATE", "MANAGER_OVERRIDE"].includes(quote.pricing.source) &&
+    priceAllowed(quote.pricing.source) &&
     rooms.some(room => room.id === roomId);
   function invalidate() {
     setQuote(null);
@@ -74,7 +77,7 @@ export default function SharedBookingForm({
       if (data.room?.id !== roomId || data.check_in !== checkIn || data.check_out !== checkOut ||
           !data.can_commit || !Number.isSafeInteger(data.pricing?.total_kgs) ||
           Number(data.pricing.total_kgs) <= 0 ||
-          !["CORE_RATE", "MANAGER_OVERRIDE"].includes(data.pricing.source)) {
+          !priceAllowed(data.pricing.source)) {
         throw new Error("unavailable or unverified quote");
       }
       setQuote(data);

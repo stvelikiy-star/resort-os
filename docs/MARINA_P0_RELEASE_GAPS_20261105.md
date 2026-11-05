@@ -30,3 +30,11 @@ This follow-up does not touch frozen RC3 source, migration SQL, DEMO, `apps/mobi
 
 - Staff browser shared login now requires eight password characters, matching canonical server validation, while legacy single-property six-character UI behavior is unchanged. Chromium HTTPS staff tests enforce this contract.
 - Existing booking form already discards its quote on guest-name/phone edits. The Chromium HTTPS PMS test now checks this positive behavior, including renewed quote before the booking commit. No server pricing logic is modified.
+
+## Stage 2 reception slice — implementation pending acceptance
+
+This new candidate introduces **RECEPTION core-rate-only booking** through the existing `/api/v1/admin/pms/reservations/new/preview` and `/commit` routes. The API explicitly forbids staff-set pricing, discounts, extra beds, agent IDs and HOLD conversion and retains the legacy single-property denial. The additive `/shared-reception` page uses authenticated hotel identity and a scoped room list. It is discoverable from the locked shared-auth landing via a new nested layout. No frozen RC3 source was modified.
+
+Coverage added: a Python scope regression and a two-hotel, real Chromium HTTPS browser test that attempts manager overrides (403), foreign room pricing (404), repeated booking (409), and accepts only core-rate 201 with no payment. **These are test requirements, not PASS claims until the final SHA CI has completed.**
+
+Kitchen/waiter shared workspaces, external provider delivery, target restore and production authorisation remain blocking.
