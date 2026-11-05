@@ -22,10 +22,10 @@ it('never applies an old PMS/Inbox read after the hotel identity changes', async
   const a = deferred<string>();
   const b = deferred<string>();
   const request = jest.fn((hotel: 'A' | 'B') => hotel === 'A' ? a.promise : b.promise);
-  const screen = render(<Panel hotel="A" request={request} />);
+  const screen = await render(<Panel hotel="A" request={request} />);
   expect(screen.getByTestId('data').props.children).toBe('none');
 
-  screen.rerender(<Panel hotel="B" request={request} />);
+  await screen.rerender(<Panel hotel="B" request={request} />);
   await waitFor(() => expect(request).toHaveBeenCalledWith('B'));
   await act(async () => { a.resolve('A-only guest content'); await a.promise; });
   expect(screen.getByTestId('hotel').props.children).toBe('B');
@@ -39,7 +39,7 @@ it('discards a pending response after its screen unmounts', async () => {
   const a = deferred<string>();
   const request = jest.fn(() => a.promise);
   const screen = render(<Panel hotel="A" request={request} />);
-  screen.unmount();
+  await screen.unmount();
   await act(async () => { a.resolve('old content'); await a.promise; });
   expect(request).toHaveBeenCalledTimes(1);
 });
