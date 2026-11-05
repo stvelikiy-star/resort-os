@@ -136,6 +136,13 @@ class LinkedAgentP0(unittest.TestCase):
         self.assertEqual(src.count('@router.post("/new/commit"'), 1)
         self.assertIn('AGENT_ACCOUNT_NOT_LINKED', src)
         self.assertIn('AGENT_HOLD_CONFIRM_FORBIDDEN', src)
+        # The occupancy grid must check ACTIVE company status, not just a
+        # non-null bookingAgentId; foreign guest PII stays redacted.
+        grid = (Path(__file__).resolve().parents[1] /
+                "services/api/app/main.py").read_text()
+        self.assertIn('JOIN booking_agents ba ON ba.id=su."bookingAgentId"', grid)
+        self.assertIn("ba.status='ACTIVE'", grid)
+        self.assertIn('block["reservation_agent_id"] == linked_agent_id', grid)
 
 
 if __name__ == "__main__":

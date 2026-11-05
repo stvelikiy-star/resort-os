@@ -450,7 +450,10 @@ async def pms_grid(
         property_id = await trusted_property_id(conn, _user)
         if _user["role"] == "AGENT":
             linked_agent_id = await conn.fetchval(
-                'SELECT "bookingAgentId" FROM staff_users WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
+                """SELECT su."bookingAgentId" FROM staff_users su
+                   JOIN booking_agents ba ON ba.id=su."bookingAgentId"
+                     AND ba."propertyId"=su."propertyId" AND ba.status='ACTIVE'
+                   WHERE su.id=$1 AND su."propertyId"=$2 AND su."isActive"=true""",
                 _user["id"],
                 property_id,
             )

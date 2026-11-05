@@ -337,6 +337,23 @@ try {
     await login.getByRole("button", { name: "Войти как агент" }).click();
     await page.getByText("Гостиница:", { exact: false }).waitFor();
     const form = page.getByRole("form", { name: "Форма бронирования" });
+    // An AGENT may see hotel occupancy but must not read other guests' PII.
+    const visibleGrid = await page.evaluate(async ([start,end]) => {
+      const response = await fetch("/core/api/v1/pms/grid?start=" + start + "&end=" + end,
+        { cache: "no-store" });
+      return { status: response.status, body: await response.json() };
+    }, [dateAfter(1), dateAfter(14)]);
+    assert.equal(visibleGrid.status, 200);
+    assert.equal(visibleGrid.body.property, "HOTEL_" + suffix);
+    assert.equal(visibleGrid.body.rooms.length, 1);
+    const occupied = visibleGrid.body.rooms[0].blocks
+      .filter(block => block.type === "RESERVATION");
+    assert(occupied.length >= 2, "Expected two hotel-local management/reception bookings");
+    for (const block of occupied) {
+      assert.equal(block.guest_name, null, "Other guests' names must not reach AGENT");
+      assert.equal(block.guest_phone, null, "Other guests' phones must not reach AGENT");
+      assert.equal(block.reservation_id, null, "Other agents' reservation IDs are private");
+    }
     const ownRoom = hotels[index].roomId;
     const wrongRoom = hotels[1 - index].roomId;
     await form.getByLabel("Номер").selectOption({ label: (
@@ -396,6 +413,17 @@ try {
     assert.equal(booking.pricing_source, "CORE_RATE");
     assert.equal(booking.payment_created, false);
     assert.equal(booking.payment_terms, "AGENT_CORE_RATE");
+    const agentGridAfterBooking = await page.evaluate(async ([start,end]) => {
+      const response = await fetch("/core/api/v1/pms/grid?start=" + start + "&end=" + end);
+      return { status: response.status, body: await response.json() };
+    }, [dateAfter(10), dateAfter(12)]);
+    assert.equal(agentGridAfterBooking.status, 200);
+    const ownBlocks = agentGridAfterBooking.body.rooms[0].blocks;
+    assert(ownBlocks.some(block => block.reservation_id === booking.reservation_id),
+      "Agent must see their own hotel-local booking");
+    assert(!ownBlocks.some(block => block.guest_phone &&
+      block.reservation_id !== booking.reservation_id),
+      "Agent grid must not expose other booking's personal data");
     assert.equal((await call(commitPath, {
       ...base, guest_name: "Agent Guest " + suffix, phone: "+996555771999",
       expected_total_kgs: quote.pricing.total_kgs,

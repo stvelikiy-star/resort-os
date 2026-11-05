@@ -153,3 +153,20 @@ a payment-service integration.
 self-service agent account management and production agent settlement remain
 separately gated. Do not touch RC3 locked source, customer DB, DEMO, Ubuntu,
 mobile or main. Run only necessary target tests and accept final single-SHA CI.
+
+### Agent grid source-level security correction
+
+While accepting the first agent slice, the Chromium test exposed a real
+role-boundary defect: the existing `GET /api/v1/pms/grid` checked that
+`staff_users.bookingAgentId` was non-null but did not verify that the agency
+still had `ACTIVE` status. The PMS booking preview/commit *did* require ACTIVE.
+These inconsistent checks must not allow deactivated agencies to see the hotel
+calendar.
+
+The follow-up changes the existing **single canonical grid query** to join
+`booking_agents` on both bookingAgentId and propertyId with `status='ACTIVE'`.
+No new endpoint, new DB column, migration or bypass. The existing agent privacy
+mask (foreign guest name, phone, reservation ID) is preserved. A new two-hotel
+browser check asserts that disabled/unlinked agent identities get 403 rather
+than the room inventory, and that active agents see only their own guest data.
+This correction is subject to exact-head HTTPS and regression acceptance.
