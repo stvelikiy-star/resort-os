@@ -285,7 +285,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       }
       throw error;
     }
-  }, [hotelId]);
+  }, [hotelId, hotels]);
 
   const signIn = useCallback((username: string, password: string, selector?: SharedHotelSelector): Promise<AuthUser> => {
     if (!hotel || !api) return Promise.reject(new Error('no hotel'));
