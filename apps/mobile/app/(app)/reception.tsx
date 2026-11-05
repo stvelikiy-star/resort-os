@@ -2,11 +2,12 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Search, Users, X } from 'lucide-react-native';
-import { Badge, Empty, SectionLabel, Segmented, PressScale } from '../../src/components/ui';
+import { Badge, Empty, SectionLabel, Segmented, PressScale, DemoBanner } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useLiveModules, ReceptionList, ReceptionReservation } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { contactInitials } from '../../src/i18n/statusLabels';
+import { demoReception } from '../../src/api/demoPresentation';
 import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
@@ -14,14 +15,15 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Reception() {
-  const { user, hotel, api, serverAuthMode } = useSession();
+  const { user, hotel, api, serverAuthMode, locale } = useSession();
+  const showroom = api?.mode === 'DEMO';
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'all' | 'arrivals' | 'departures' | 'staying'>('all');
-  const { data, loading, error, reload } = useAsync<ReceptionList | null>(() => live ? live.reception() : Promise.resolve(null), [live, user?.id]);
+  const { data, loading, error, reload } = useAsync<ReceptionList | null>(async () => showroom && api ? demoReception(locale, await api.listRooms()) : live ? live.reception() : null, [live, api, showroom, user?.id, locale]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const canInbox = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'inbox', serverAuthMode);
@@ -46,7 +48,7 @@ export default function Reception() {
   const card = (x: ReceptionReservation, index: number) => {
     const state = bookingState(x);
     return <StaggerItem index={index} key={x.id}><GlassCard testID={'reservation-' + x.id}
-      onPress={() => router.push({ pathname: '/reservation/[id]', params: { id: x.id } })}
+      onPress={!showroom ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}
       style={{ gap: space.sm }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
         <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
@@ -70,8 +72,9 @@ export default function Reception() {
     <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={live && serverAuthMode !== 'shared_auth_preview' ? <AIOrb label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
     {canInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
-    {!live ? <Empty text={copy.unavailable}/> : null}
-    {loading && live ? <LoadingShimmer count={3}/> : null}
+    {showroom ? <DemoBanner/> : null}
+    {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
+    {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <GlassCard style={{ gap: space.md }}>
