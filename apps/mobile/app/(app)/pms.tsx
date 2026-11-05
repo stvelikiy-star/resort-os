@@ -2,12 +2,13 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble } from 'lucide-react-native';
-import { Badge, Button, Empty, PressScale, SectionLabel, Segmented } from '../../src/components/ui';
+import { Badge, Button, Empty, PressScale, SectionLabel, Segmented, DemoBanner } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
 import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
 import { canOpenPmsReservation, pmsCellState } from '../../src/roles/pmsPresentation';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { demoGrid } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -25,14 +26,15 @@ const DAY_NAMES = {
   kz: ['Жс', 'Дс', 'Сс', 'Ср', 'Бс', 'Жм', 'Сб'],
 } as const;
 export default function Pms() {
-  const { hotel, user, locale } = useSession();
+  const { hotel, user, locale, api } = useSession();
+  const showroom = api?.mode === 'DEMO';
   const live = useLiveModules();
   const copy = useMobileCopy();
   const router = useRouter();
   const { c } = useTheme();
   const [start, setStart] = useState(() => localDate());
   const [filter, setFilter] = useState<'all' | 'attention'>('all');
-  const { data, loading, error, reload } = useAsync<Grid | null>(() => live ? live.pmsGrid(start, dayAt(start, DAYS)) : Promise.resolve(null), [live, user?.id, start]);
+  const { data, loading, error, reload } = useAsync<Grid | null>(async () => showroom && api ? demoGrid(locale, await api.listRooms(), hotel?.name ?? 'DEMO') : live ? live.pmsGrid(start, dayAt(start, DAYS)) : null, [live, api, showroom, user?.id, start, locale, hotel?.id]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const dates = Array.from({ length: DAYS }, (_, i) => dayAt(start, i));
@@ -50,7 +52,7 @@ export default function Pms() {
       : state === 'BLOCKED' ? '×' : state === 'CONFLICT' ? '!' : '—';
     const semantic = state === 'RESERVATION' ? copy.bookings : state === 'HOLD' ? copy.holds
       : state === 'BLOCKED' ? copy.blocked : state === 'CONFLICT' ? copy.conflict : copy.available;
-    const canOpen = canOpenPmsReservation(blocks, day, user?.role);
+    const canOpen = !showroom && canOpenPmsReservation(blocks, day, user?.role);
     return <PressScale key={day} testID={'pms-' + room.id + '-' + day}
       accessibilityLabel={room.code + ' ' + day + ' · ' + semantic}
       disabled={!canOpen} dimWhenDisabled={false} onPress={() => { if (canOpen) router.push({ pathname: '/reservation/[id]', params: { id: block.reservation_id! } }); }}
@@ -77,8 +79,9 @@ export default function Pms() {
           style={{ width: 48, minHeight: 48, borderRadius: radius.md, backgroundColor: c.surfaceAlt, justifyContent: 'center', alignItems: 'center' }}><CalendarDays color={c.primary} size={22}/></PressScale>
       </View>
     </GlassCard>
-    {!live ? <Empty text={copy.unavailable}/> : null}
-    {loading && live ? <LoadingShimmer count={3}/> : null}
+    {showroom ? <DemoBanner/> : null}
+    {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
+    {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <SectionLabel>{copy.rooms} · {data.rooms.length}</SectionLabel>
@@ -120,7 +123,7 @@ export default function Pms() {
       </View>
       <SectionLabel>{copy.bookings}</SectionLabel>
       {shownRooms.flatMap(room => room.blocks.filter(b => b.type === 'RESERVATION' && b.reservation_id).map(b => ({room, b}))).slice(0,24).map(({room,b}) =>
-        <GlassCard key={b.id} onPress={b.reservation_id && user?.role !== 'AGENT' ? () => router.push({ pathname:'/reservation/[id]', params:{id:b.reservation_id!} }) : undefined}>
+        <GlassCard key={b.id} onPress={!showroom && b.reservation_id && user?.role !== 'AGENT' ? () => router.push({ pathname:'/reservation/[id]', params:{id:b.reservation_id!} }) : undefined}>
           <Text style={[font.h2, { color:c.text }]}>{room.code} · {b.booking_number || '—'}</Text>
           <Text style={[font.small, { color:c.textMuted }]}>{b.start} → {b.end} · {b.guest_name || copy.readOnly}</Text>
         </GlassCard>)}
