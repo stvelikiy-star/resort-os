@@ -70,7 +70,7 @@ export default function Reception() {
   };
   return <FutureScreen>
     <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART"
-      right={live && serverAuthMode !== 'shared_auth_preview' ? <AIOrb label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
+      right={(live || showroom) && serverAuthMode !== 'shared_auth_preview' ? <AIOrb state={showroom ? 'offline' : 'idle'} label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
     {canInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
     {showroom ? <DemoBanner/> : null}
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
