@@ -160,89 +160,116 @@ async function main() {
     throw new Error('Expo Web connect screen did not mount');
   }
   try {
-    // Actual desktop-size regression from user screenshot: mobile login must never
-    // stretch to browser width. These are real rendered Expo Web measurements.
+    // This is the ACTUAL exported Expo Web application with synthetic DEMO staff.
+    // These images are not Android screenshots and never use a real hotel/API.
     await viewport(1440, 900);
-    const desktop = await evaluate('(() => { const node = document.querySelector(\'[data-testid="mobile-web-viewport"]\'); const rect = node?.getBoundingClientRect(); return { width: rect?.width ?? 0, x: rect?.x ?? 0, viewport: innerWidth, translate: document.documentElement.getAttribute("translate") }; })()');
-    if (desktop.width < 300 || desktop.width > 444 || Math.abs((desktop.x + desktop.width / 2) - desktop.viewport / 2) > 5) {
-      throw new Error('Desktop Expo Web is not centered in the mobile viewport: ' + JSON.stringify(desktop));
-    }
-    if (desktop.translate !== 'no') throw new Error('Browser translation may corrupt MARINA SMART brand text');
-    await screenshot('connect_ru_desktop_1440_after_mobile_frame');
-    await viewport(375, 812);
-    await click('[data-testid="segment-ru"]', 'Russian language');
+    const desktop = await evaluate('(() => { const node=document.querySelector(\'[data-testid="mobile-web-viewport"]\'); const r=node?.getBoundingClientRect(); return {width:r?.width??0,x:r?.x??0,viewport:innerWidth,translate:document.documentElement.getAttribute("translate")} })()');
+    if (desktop.width < 300 || desktop.width > 444 || Math.abs(desktop.x + desktop.width/2 - desktop.viewport/2) > 5)
+      throw new Error('Desktop mobile frame not centered: '+JSON.stringify(desktop));
+    if (desktop.translate !== 'no') throw new Error('Missing browser auto-translation protection');
+    await screenshot('connect_ru_desktop_1440');
+    await viewport(375,812);
+    await click('[data-testid="segment-ru"]','Russian language');
     await screenshot('connect_ru_light_375');
-    // The built-in quick DEMO launcher starts as MANAGER, not MAID.
-    await click('[data-testid="web-demo-start"]', 'demo manager launcher');
-    if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('Demo manager tasks navigation absent');
-    await diagnose('manager_tasks');
-    await screenshot('manager_tasks_ru_light_375_after_tab_fix');
-    await click('[data-testid="tab-more"]', 'manager overflow menu');
-    await screenshot('manager_more_ru_light_375');
-    await click('[data-testid="more-profile"]', 'manager profile in More');
-    if (!await waitFor('[data-testid="segment-dark"]')) throw new Error('Theme selector not visible');
-    await screenshot('manager_profile_ru_light_375');
-    await click('[data-testid="segment-dark"]', 'dark theme');
-    await screenshot('manager_profile_ru_dark_375');
-    await click('[data-testid="segment-kg"]', 'Kyrgyz language');
-    await screenshot('manager_profile_kg_dark_375');
-    await click('[data-testid="segment-kz"]', 'Kazakh language');
-    await screenshot('manager_profile_kz_dark_375');
-    await click('[data-testid="segment-en"]', 'English language');
-    await screenshot('manager_profile_en_dark_375');
-    await click('[data-testid="tab-tasks"]', 'manager tasks in dark mode');
-    await screenshot('manager_tasks_en_dark_375');
-    await click('[data-testid="tab-admin"]', 'manager team tab');
-    await screenshot('manager_team_en_dark_375');
-    await viewport(320, 640);
-    await diagnose('manager_team_320');
-    await screenshot('manager_team_en_dark_320_after_nav_fix');
-    await viewport(430, 932);
-    await screenshot('manager_team_en_dark_430');
-    // Real UI interaction, synthetic manager fixture only. No staff write is submitted.
-    // The visible "Assign" CTA used to be a decorative badge: enforce the
-    // selected-staff picker is now reachable from its own touch target.
-    await click('[data-testid="open-assign-t8"]', 'open actual assignment picker');
-    if (!await waitFor('[data-testid="assign-u-maid"]', 3000)) {
-      throw new Error('Manager assignment CTA did not open the eligible staff picker');
-    }
-    await screenshot('manager_assign_picker_en_dark_430');
-    await viewport(375, 812);
-    await click('[data-testid="tab-more"]', 'manager More menu');
-    await click('[data-testid="more-profile"]', 'manager profile');
-    await click('[data-testid="sign-out"]', 'manager signout for isolated MAID fixture');
+    await click('[data-testid="web-demo-start"]','one-tap synthetic owner showroom');
+    if (!await waitFor('[data-testid="tab-overview"]',6000)) throw new Error('Owner dashboard missing');
+    await screenshot('owner_overview_ru_light_375');
+    await click('[data-testid="tab-pms"]','owner PMS');
+    if (!await waitFor('[data-testid="pms-next"]')) throw new Error('PMS 7-day grid missing');
+    await screenshot('owner_pms_ru_light_375');
+    await click('[data-testid="pms-next"]','week navigation');
+    await screenshot('owner_pms_nextweek_ru_light_375');
+    await click('[data-testid="tab-reception"]','guest arrivals');
+    await screenshot('owner_reception_ru_light_375');
+    await click('[data-testid="tab-inbox"]','synthetic WhatsApp list');
+    if (!await waitFor('[data-testid="conversation-demo-chat-01"]')) throw new Error('DEMO inbox empty');
+    await screenshot('owner_inbox_ru_light_375');
+    await click('[data-testid="conversation-demo-chat-01"]','synthetic chat detail');
+    await screenshot('owner_conversation_ru_light_375');
+    await click('[aria-label="Закрыть"]','back to inbox');
+    await click('[data-testid="tab-more"]','owner More');
+    await screenshot('owner_more_ru_light_375');
+    await click('[data-testid="more-profile"]','owner profile');
+    await screenshot('owner_profile_ru_light_375');
+    await click('[data-testid="segment-dark"]','dark theme');
+    await screenshot('owner_profile_ru_dark_375');
+    await click('[data-testid="segment-kg"]','Kyrgyz language');
+    await screenshot('owner_profile_kg_dark_375');
+    await click('[data-testid="segment-kz"]','Kazakh language');
+    await screenshot('owner_profile_kz_dark_375');
+    await click('[data-testid="segment-en"]','English language');
+    await screenshot('owner_profile_en_dark_375');
+    await click('[data-testid="switch-demo-role"]','switch synthetic role');
     await screenshot('login_en_dark_375');
-    await viewport(1440, 900);
-    const loginFrame = await evaluate('(() => { const node = document.querySelector(\'[data-testid="mobile-web-viewport"]\'); const rect = node?.getBoundingClientRect(); return { width: rect?.width ?? 0, x: rect?.x ?? 0, viewport: innerWidth }; })()');
-    if (loginFrame.width < 300 || loginFrame.width > 444) {
-      throw new Error('Login stretches across desktop rather than mobile preview: ' + JSON.stringify(loginFrame));
-    }
-    await screenshot('login_en_dark_desktop_1440_after_mobile_frame');
-    await viewport(375, 812);
-    await click('[data-testid="demo-maid"]', 'built-in MAID fixture');
-    if (!await waitFor('[data-testid="tab-tasks"]')) throw new Error('DEMO MAID tasks navigation absent');
+    await viewport(1440,900);
+    const loginFrame=await evaluate('(() => { const r=document.querySelector(\'[data-testid="mobile-web-viewport"]\')?.getBoundingClientRect(); return {width:r?.width??0,x:r?.x??0,viewport:innerWidth} })()');
+    if (loginFrame.width < 300 || loginFrame.width > 444) throw new Error('Desktop login overstretched: '+JSON.stringify(loginFrame));
+    await screenshot('login_en_dark_desktop_1440');
+    await viewport(375,812);
+    await click('[data-testid="demo-manager"]','synthetic manager role');
+    if (!await waitFor('[data-testid="tab-overview"]')) throw new Error('Manager overview missing');
+    await screenshot('manager_overview_en_dark_375');
+    await click('[data-testid="tab-more"]','manager More');
+    await click('[data-testid="more-admin"]','manager team');
+    if (!await waitFor('[data-testid="open-assign-t8"]')) throw new Error('Manager task allocation missing');
+    await screenshot('manager_team_en_dark_375');
+    await viewport(320,640);
+    await screenshot('manager_team_en_dark_320');
+    await viewport(430,932);
+    await click('[data-testid="open-assign-t8"]','open staff picker (no write)');
+    if (!await waitFor('[data-testid="assign-u-maid"]')) throw new Error('Staff picker did not appear');
+    await screenshot('manager_assign_en_dark_430');
+    await viewport(375,812);
+    await click('[data-testid="tab-more"]','manager More');
+    await click('[data-testid="more-tasks"]','manager tasks');
+    await screenshot('manager_tasks_en_dark_375');
+    await click('[data-testid="tab-more"]','manager More');
+    await click('[data-testid="more-profile"]','manager profile');
+    await click('[data-testid="switch-demo-role"]','reception role selector');
+    await click('[data-testid="demo-reception"]','reception role');
+    if (!await waitFor('[data-testid="tab-reception"]')) throw new Error('Reception workspace missing');
+    await screenshot('reception_en_dark_375');
+    await click('[data-testid="segment-arrivals"]','arrival filter');
+    await screenshot('reception_arrivals_en_dark_375');
+    await click('[data-testid="tab-inbox"]','reception WhatsApp');
+    await screenshot('reception_inbox_en_dark_375');
+    await click('[data-testid="tab-profile"]','reception profile');
+    await click('[data-testid="switch-demo-role"]','maid role selector');
+    await click('[data-testid="demo-maid"]','maid role');
+    if (!await waitFor('[data-testid="task-t2"]')) throw new Error('MAID task fixture missing');
     await screenshot('maid_tasks_en_dark_375');
-    await click('[data-testid="tab-rooms"]', 'MAID rooms');
-    await screenshot('maid_rooms_en_dark_375_after_wrap_fix');
-    await click('[data-testid="room-r1"]', 'maid room detail');
+    await click('[data-testid="task-t2"]','housekeeping checklist');
+    await screenshot('maid_housekeeping_en_dark_375');
+    await click('[aria-label="Back"]','task detail back');
+    await click('[data-testid="tab-rooms"]','maid rooms');
+    await screenshot('maid_rooms_en_dark_375');
+    await click('[data-testid="room-r1"]','maid room detail');
     await screenshot('maid_room_detail_en_dark_375');
-    await click('[aria-label="Back"]', 'room detail return');
-    await click('[data-testid="tab-tasks"]', 'maid task queue');
-    await click('[data-testid="task-t2"]', 'maid housekeeping detail');
-    await screenshot('maid_housekeeping_detail_en_dark_375');
-    await click('[aria-label="Back"]', 'task detail return');
-    await click('[data-testid="tab-profile"]', 'maid profile');
-    await click('[data-testid="sign-out"]', 'maid signout for isolated technician');
-    await click('[data-testid="demo-tech"]', 'built-in TECHNICIAN fixture');
-    if (!await waitFor('[data-testid="tab-requests"]')) throw new Error('Technician repair tab not rendered');
-    await screenshot('tech_tasks_en_dark_375');
-    await click('[data-testid="tab-requests"]', 'technician repair queue');
-    await screenshot('tech_repairs_en_dark_375');
-    await click('[data-testid="new-request-btn"]', 'new maintenance form');
-    await screenshot('tech_new_request_en_dark_375');
-    await viewport(320, 640);
-    await diagnose('tech_new_request_320');
-    await screenshot('tech_new_request_en_dark_320');
+    await click('[aria-label="Back"]','room detail back');
+    await click('[data-testid="tab-profile"]','maid profile');
+    await click('[data-testid="switch-demo-role"]','technician role selector');
+    await click('[data-testid="demo-tech"]','technician role');
+    await screenshot('technician_tasks_en_dark_375');
+    await click('[data-testid="tab-requests"]','maintenance list');
+    await screenshot('technician_repairs_en_dark_375');
+    await click('[data-testid="new-request-btn"]','maintenance form');
+    await viewport(320,640);
+    await screenshot('technician_new_request_en_dark_320');
+    await viewport(375,812);
+    await click('[aria-label="Cancel"]','return to repairs');
+    await click('[data-testid="tab-profile"]','technician profile');
+    await click('[data-testid="switch-demo-role"]','cook selector');
+    await click('[data-testid="demo-cook"]','cook role');
+    if (!await waitFor('[data-testid="order-d-order-01"]')) throw new Error('Cook kitchen showroom missing');
+    await screenshot('cook_orders_en_dark_375');
+    await click('[data-testid="tab-profile"]','cook profile');
+    await click('[data-testid="switch-demo-role"]','waiter selector');
+    await click('[data-testid="demo-waiter"]','waiter role');
+    await screenshot('waiter_tables_en_dark_375');
+    await click('[data-testid="tab-profile"]','waiter profile');
+    await click('[data-testid="switch-demo-role"]','agent selector');
+    await click('[data-testid="demo-agent"]','agent role');
+    await screenshot('agent_pms_en_dark_375');
   } catch (e) {
     console.log('WEB_VISUAL_PARTIAL ' + String(e.message || e));
     await diagnose('partial');
