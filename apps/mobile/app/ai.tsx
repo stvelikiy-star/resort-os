@@ -4,6 +4,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { ChevronLeft, Send, ShieldCheck, Sparkles, UserRound } from 'lucide-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { useSession } from '../src/state/session';
+import { assistantSessionKey } from '../src/api/aiSession';
 import { useMobileCopy, aiMobileCopy } from '../src/i18n/mobileCopy';
 import { AssistantCapabilities, AssistantMessage, useLiveModules } from '../src/api/liveModules';
 import { useAsync } from '../src/lib/useAsync';
@@ -12,7 +13,7 @@ import { Button, DemoBanner, Empty, PressScale, SectionLabel } from '../src/comp
 import { font, radius, space } from '../src/theme/tokens';
 
 
-export default function Assistant() {
+function AssistantForSession() {
   const { user, locale, serverAuthMode, api } = useSession();
   const modules = useLiveModules();
   const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
@@ -94,4 +95,13 @@ export default function Assistant() {
       <Button testID="ai-send" label={t.send} icon={Send} disabled={busy || !capabilities?.configured || !prompt.trim()} onPress={() => void send()}/>
     </View>
   </FutureScreen>;
+}
+
+/** Unmount the old chat, pending reply and draft on a hotel/identity switch.
+ * A late response can only address its old, unmounted React instance.
+ */
+export default function Assistant() {
+  const { hotel, user, api, serverAuthMode } = useSession();
+  if (!hotel || !user || !api) return <Redirect href="/connect"/>;
+  return <AssistantForSession key={assistantSessionKey(hotel.id, user, api.mode)}/>;
 }
