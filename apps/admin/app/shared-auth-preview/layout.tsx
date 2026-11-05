@@ -10,6 +10,8 @@ export default function SharedAuthPreviewLayout({children}: Readonly<{children:R
       boxShadow: "0 3px 12px rgba(0,0,0,.14)",
     }}>
       <Link href="/shared-reception">Ресепшен: создать бронь</Link>
+      <span aria-hidden="true" style={{ margin: "0 10px" }}>·</span>
+      <Link href="/shared-agent">Агент: создать бронь</Link>
     </nav>
   </>;
 }

@@ -124,3 +124,32 @@ strict role guard unit tests; all mandatory exact-head CI PASS.
 
 Production cutover remains NO-GO. This is a stage-only manual cash ledger, not
 a payment-service integration.
+
+## Stage 2 AGENT linked-booking acceptance — PENDING exact-head CI
+
+- The canonical `/admin/pms/reservations/new/preview` and `/commit`
+  enforce a server-side, same-property **ACTIVE** `booking_agents` record
+  bound to the logged-in `staff_users.bookingAgentId`. The link is rechecked
+  for each booking attempt; role enum alone is not permission.
+- Reject manual total, extra-bed unit/count, discount and reason, foreign
+  agency ID and HOLD explicitly with 403 (no silent dropping).
+- Extend existing OWNER-only staff create/PATCH contract to include `AGENT`
+  with required `booking_agent_id`. Validate agency activity and property;
+  owner cannot attach a foreign or inactive company. Linking and disabling
+  an agent account revoke existing sessions, using the existing audit and
+  owner-only guard. No new API and no SQL migration.
+- Add a separate `/shared-agent` browser booking page using the canonical
+  grid and existing shared booking form in CORE_RATE-only mode. Login
+  verifies tenant, hotel, role and PMS module. No manual payments/price edits
+  are exposed to AGENT.
+- Add isolated disposable two-hotel agency fixture with active/inactive/
+  unlinked accounts; verify real owner creation, foreign cross-property 422,
+  unlinked/inactive 403, booking 201/409, no payment and session revocation.
+- Retain the original six-role staff lifecycle test separately; AGENT tests
+  cover owner linkage, identity and distinct rights. Legacy unreviewed roles
+  remain closed in shared mode.
+
+**This is not production acceptance**. External agency onboarding,
+self-service agent account management and production agent settlement remain
+separately gated. Do not touch RC3 locked source, customer DB, DEMO, Ubuntu,
+mobile or main. Run only necessary target tests and accept final single-SHA CI.

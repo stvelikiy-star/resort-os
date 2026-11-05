@@ -170,10 +170,12 @@ async def linked_agent_id_for_user(conn, property_id: uuid.UUID, user: dict[str,
 def enforce_agent_booking_scope(payload: GridReservationPreviewPayload, agent_id: uuid.UUID):
     if payload.manager_total_kgs is not None:
         raise HTTPException(status_code=403, detail={"code": "AGENT_MANAGER_PRICE_FORBIDDEN"})
-    if payload.extra_bed_count:
+    if payload.extra_bed_count or payload.extra_bed_unit_kgs is not None:
         raise HTTPException(status_code=403, detail={"code": "AGENT_EXTRA_BED_FORBIDDEN"})
-    if payload.discount_percent not in (None, 0):
+    if payload.discount_percent not in (None, 0) or bool(payload.discount_reason):
         raise HTTPException(status_code=403, detail={"code": "AGENT_DISCOUNT_FORBIDDEN"})
+    if payload.hold_id is not None:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_HOLD_CONFIRM_FORBIDDEN"})
     if payload.agent_id is not None and payload.agent_id != agent_id:
         raise HTTPException(status_code=403, detail={"code": "AGENT_ID_OVERRIDE_FORBIDDEN"})
     return payload.model_copy(

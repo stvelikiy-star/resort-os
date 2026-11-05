@@ -249,6 +249,173 @@ try {
     await context.close();
   }
   assert.notEqual(receptionBookings[0], receptionBookings[1]);
+
+  // Stage 2 AGENT: owner-bound ACTIVE agency -> two-hotel HTTPS booking.
+  // Agents cannot choose an organization, price, discount, HOLD or foreign room.
+  const agentIds = {
+    A: "11111111-2222-4333-8444-7777777777a1",
+    B: "11111111-2222-4333-8444-7777777777b1",
+  };
+  const disabledAgentIds = {
+    A: "11111111-2222-4333-8444-8888888888a1",
+    B: "11111111-2222-4333-8444-8888888888b1",
+  };
+  for (const [index, suffix] of ["A", "B"].entries()) {
+    const other = suffix === "A" ? "B" : "A";
+    const ownerPage = hotels[index].page;
+    const ownerCall = (method, path, payload) => ownerPage.evaluate(async arg => {
+      const res = await fetch("/core/api/v1/" + arg.path, {
+        method: arg.method,
+        headers: { "Content-Type": "application/json" },
+        body: arg.payload === undefined ? undefined : JSON.stringify(arg.payload),
+      });
+      return { status: res.status, body: await res.json().catch(() => null) };
+    }, { method, path, payload });
+    const userDef = {
+      username: "agent_verified", display_name: "CI Connected Agent " + suffix,
+      role: "AGENT", password,
+    };
+    assert.equal((await ownerCall("POST", "admin/staff", userDef)).status, 422,
+      "Owner cannot create an unbound agent");
+    assert.equal((await ownerCall("POST", "admin/staff",
+      { ...userDef, booking_agent_id: disabledAgentIds[suffix] })).status, 422,
+      "Owner cannot link a disabled company");
+    assert.equal((await ownerCall("POST", "admin/staff",
+      { ...userDef, booking_agent_id: agentIds[other] })).status, 422,
+      "Owner cannot link a foreign company's UUID");
+    assert.equal((await ownerCall("POST", "admin/staff",
+      { ...userDef, role: "MAID", booking_agent_id: agentIds[suffix] })).status, 422,
+      "Non-agent cannot carry an agency binding");
+    const created = await ownerCall("POST", "admin/staff",
+      { ...userDef, booking_agent_id: agentIds[suffix] });
+    assert.equal(created.status, 201, "Own hotel owner may link active agency");
+    assert.equal(created.body.role, "AGENT");
+    assert.equal(created.body.booking_agent_id, agentIds[suffix]);
+    assert.equal((await ownerCall("PATCH", "admin/staff/" + created.body.id,
+      { booking_agent_id: agentIds[other] })).status, 422,
+      "Owner must not rebind to foreign property");
+
+    const foreignOwner = hotels[1 - index].page;
+    const foreignUpdate = await foreignOwner.evaluate(async id => {
+      const res = await fetch("/core/api/v1/admin/staff/" + id, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: false }),
+      });
+      return res.status;
+    }, created.body.id);
+    assert.equal(foreignUpdate, 404, "Another owner cannot disable foreign agent");
+
+    // An authenticated role alone does not authorize an unlinked or inactive agency.
+    for (const invalidUser of ["agent_unlinked", "agent_inactive"]) {
+      const ctx = await browser.newContext();
+      const page = await ctx.newPage();
+      await page.goto(origin + "/shared-agent");
+      const login = page.getByRole("form", { name: "Вход агента" });
+      await login.getByLabel("Код организации").fill("tenant_" + suffix.toLowerCase());
+      await login.getByLabel("Код отеля").fill("HOTEL_" + suffix);
+      await login.getByLabel("Логин").fill(invalidUser);
+      await login.getByLabel("Пароль").fill(password);
+      await login.getByRole("button", { name: "Войти как агент" }).click();
+      await page.getByText("Агент не привязан к действующей организации", {
+        exact: false,
+      }).waitFor();
+      assert.equal(await page.getByRole("form", { name: "Форма бронирования" }).count(), 0);
+      await page.getByRole("button", { name: "Выйти" }).click();
+      await ctx.close();
+    }
+
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(origin + "/shared-auth-preview");
+    await page.getByRole("link", { name: "Агент: создать бронь" }).click();
+    await page.waitForURL(origin + "/shared-agent");
+    const login = page.getByRole("form", { name: "Вход агента" });
+    await login.getByLabel("Код организации").fill("tenant_" + suffix.toLowerCase());
+    await login.getByLabel("Код отеля").fill("HOTEL_" + suffix);
+    await login.getByLabel("Логин").fill("agent_verified");
+    await login.getByLabel("Пароль").fill(password);
+    await login.getByRole("button", { name: "Войти как агент" }).click();
+    await page.getByText("Гостиница:", { exact: false }).waitFor();
+    const form = page.getByRole("form", { name: "Форма бронирования" });
+    const ownRoom = hotels[index].roomId;
+    const wrongRoom = hotels[1 - index].roomId;
+    await form.getByLabel("Номер").selectOption({ label: (
+      suffix === "A" ? "A101" : "B202") + " · CI Room" });
+    await form.getByLabel("Заезд").fill(dateAfter(10));
+    await form.getByLabel("Выезд").fill(dateAfter(12));
+    await form.getByLabel("Имя гостя").fill("Agent Guest " + suffix);
+    await form.getByLabel("Телефон гостя").fill("+996555771999");
+    const call = (path, payload) => page.evaluate(async data => {
+      const res = await fetch("/core/api/v1/" + data.path, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data.payload),
+      });
+      return { status: res.status, body: await res.json().catch(() => null) };
+    }, { path, payload });
+    const base = { room_id: ownRoom, check_in: dateAfter(10),
+      check_out: dateAfter(12), adults: 2, children: 0 };
+    const quotePath = "admin/pms/reservations/new/preview";
+    const commitPath = "admin/pms/reservations/new/commit";
+    assert.equal((await call(quotePath,
+      { ...base, room_id: wrongRoom })).status, 404,
+      "Agent cannot quote room in other hotel");
+    for (const privileged of [
+      { manager_total_kgs: 1 }, { discount_percent: 9 },
+      { discount_reason: "AGENT_DISCOUNT" }, { extra_bed_unit_kgs: 500 },
+      { extra_bed_count: 1, extra_bed_unit_kgs: 500 },
+      { hold_id: "11111111-1111-4111-8111-111111111111" },
+      { agent_id: agentIds[other] },
+    ]) {
+      const denied = await call(quotePath, { ...base, ...privileged });
+      assert.equal(denied.status, 403, "Agent booking privilege escalation");
+    }
+    const quotedResponse = page.waitForResponse(r =>
+      r.url() === core + "/admin/pms/reservations/new/preview" &&
+      r.request().method() === "POST");
+    await form.getByRole("button", { name: "Проверить доступность и цену" }).click();
+    const quoted = await quotedResponse;
+    assert.equal(quoted.status(), 200);
+    const quote = await quoted.json();
+    assert.equal(quote.pricing.source, "CORE_RATE");
+    assert.equal(quote.pricing.total_kgs, suffix === "A" ? 6000 : 9000);
+    assert.equal(quote.agent.id, agentIds[suffix]);
+    assert.equal((await call(commitPath, {
+      ...base, guest_name: "Agent Unauthorized Price", phone: "+996555771999",
+      expected_total_kgs: 1, expected_pricing_source: "MANAGER_OVERRIDE",
+    })).status, 403, "Agent cannot commit a manager override");
+    page.once("dialog", d => d.accept());
+    const recordedResponse = page.waitForResponse(r =>
+      r.url() === core + "/admin/pms/reservations/new/commit" &&
+      r.request().method() === "POST");
+    await page.getByRole("button", { name: "Подтвердить бронь", exact: true }).click();
+    const confirmed = await recordedResponse;
+    assert.equal(confirmed.status(), 201);
+    const booking = await confirmed.json();
+    assert.equal(booking.room_id, ownRoom);
+    assert.equal(booking.agent_id, agentIds[suffix]);
+    assert.equal(booking.pricing_source, "CORE_RATE");
+    assert.equal(booking.payment_created, false);
+    assert.equal(booking.payment_terms, "AGENT_CORE_RATE");
+    assert.equal((await call(commitPath, {
+      ...base, guest_name: "Agent Guest " + suffix, phone: "+996555771999",
+      expected_total_kgs: quote.pricing.total_kgs,
+      expected_pricing_source: "CORE_RATE",
+    })).status, 409, "Agent booking must not double-sell inventory");
+    const oldIdentity = await page.evaluate(async () =>
+      (await fetch("/core/api/v1/auth/me")).status);
+    assert.equal(oldIdentity, 200);
+    const deactivated = await ownerCall("PATCH", "admin/staff/" + created.body.id,
+      { active: false });
+    assert.equal(deactivated.status, 200);
+    assert.equal(deactivated.body.active, false);
+    assert.equal((await page.evaluate(async () =>
+      (await fetch("/core/api/v1/auth/me")).status)), 401,
+      "Owner deactivation must revoke AGENT session immediately");
+    assert.equal((await ownerCall("PATCH", "admin/staff/" + created.body.id,
+      { active: true })).status, 200);
+    await ctx.close();
+  }
+  console.log("PASS: two-hotel linked AGENT core-rate bookings, owner-only company binding, foreign 404, privilege 403, replay 409 and revoked 401");
   console.log("PASS: Chromium HTTPS owner/reception bookings, cash-only P0 idempotency, 403/404/409 and bidirectional hotel isolation");
 } finally {
   await browser.close();

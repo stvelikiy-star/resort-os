@@ -76,6 +76,21 @@ services:
       MARINA_SHARED_DINING_P0_SEED_CONFIRM: ISOLATED_DINING_CI_ONLY
     command: [python, scripts/marina_shared_dining_p0_seed.py]
 
+  agent-seed:
+    <<: *api-image
+    profiles: [agent-ci]
+    network_mode: service:postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://marina_ci:${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_BROWSER_CI_PASSWORD: ${MARINA_STAGING_FIXTURE_PASSWORD:?Set a dedicated synthetic fixture password}
+      MARINA_SHARED_AGENT_P0_SEED_CONFIRM: ISOLATED_AGENT_CI_ONLY
+    command: [python, scripts/marina_shared_agent_p0_seed.py]
+
   api:
     <<: *api-image
     environment:

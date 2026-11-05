@@ -17,6 +17,7 @@ expected = {
     "TECHNICIAN",
     "COOK",
     "WAITER",
+    "AGENT",
 }
 assert set(MANAGED_ROLES) == expected, MANAGED_ROLES
 assert set(get_args(ManagedRole)) == expected, get_args(ManagedRole)
@@ -30,7 +31,7 @@ for role in ("COOK", "WAITER"):
     )
     StaffPatch(role=role)
 
-for role in ("OWNER", "AGENT", "STORE_STAFF", "DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"):
+for role in ("OWNER", "STORE_STAFF", "DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"):
     try:
         StaffCreate(
             username="test-legacy",
@@ -43,4 +44,20 @@ for role in ("OWNER", "AGENT", "STORE_STAFF", "DINING_STAFF", "CONTENT_MANAGER",
     else:
         raise AssertionError(f"{role} must not be assignable through staff management")
 
-print("PASS: owner staff-management roles match active role portals; COOK/WAITER are assignable; legacy roles are rejected")
+import uuid
+binding = uuid.uuid4()
+StaffCreate(username="test-agent", display_name="Test Agent",
+            password="Synthetic-Only-Password-2026", role="AGENT",
+            booking_agent_id=binding)
+StaffPatch(role="AGENT", booking_agent_id=binding)
+for value in ({"role":"AGENT"},
+              {"role":"COOK", "booking_agent_id":binding}):
+    try:
+        StaffCreate(username="invalid-agent", display_name="Invalid Agent",
+                    password="Synthetic-Only-Password-2026", **value)
+    except ValidationError:
+        pass
+    else:
+        raise AssertionError("Agent binding policy must reject invalid user")
+
+print("PASS: seven managed roles; AGENT requires binding; unreviewed legacy roles rejected")

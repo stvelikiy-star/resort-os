@@ -20,7 +20,9 @@ from marina_shared_live_browser_db import PASSWORD, SERVER_ROLES, dsn
 
 USERNAME_PREFIX = "p0-cycle-"
 ASSIGNABLE = ("MANAGER", "RECEPTION", "MAID", "TECHNICIAN", "COOK", "WAITER")
-assert set(ASSIGNABLE) == set(MANAGED_ROLES)
+# Existing six-role lifecycle stays intact; AGENT onboarding has its own contract.
+assert set(ASSIGNABLE).issubset(set(MANAGED_ROLES))
+assert "AGENT" in MANAGED_ROLES
 assert len(SERVER_ROLES) == 12
 assert len(ASSIGNABLE) == 6
 
