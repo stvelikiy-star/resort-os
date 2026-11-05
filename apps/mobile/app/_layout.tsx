@@ -31,6 +31,7 @@ function Shell() {
     <Stack.Screen name="new-request" options={{ presentation: 'modal' }} />
     <Stack.Screen name="scan" options={{ presentation: 'modal' }} />
     <Stack.Screen name="ai" options={{ presentation: 'modal' }} />
+    <Stack.Screen name="finance" options={{ presentation: 'card' }} />
   </Stack>;
   return (
     <>

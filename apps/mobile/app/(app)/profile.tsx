@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { LogOut, Repeat, Languages, Palette, ArrowLeftRight } from 'lucide-react-native';
+import { LogOut, Repeat, Languages, Palette, ArrowLeftRight, Wallet } from 'lucide-react-native';
 import Constants from 'expo-constants';
 import { Button, DemoBanner, Segmented, PressScale, Badge } from '../../src/components/ui';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
@@ -13,9 +13,12 @@ import { useTheme, ThemePref } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
 import { workspaceForSession } from '../../src/roles/registry';
 import { LOCALE_LABEL, LOCALES, Locale } from '../../src/i18n';
+import { canReadFinance } from '../../src/api/financeAccess';
+import { useMobileCopy } from '../../src/i18n/mobileCopy';
 
 export default function Profile() {
   const { t } = useTranslation();
+  const mobile = useMobileCopy();
   const { c, pref, setPref } = useTheme();
   const router = useRouter();
   const { user, hotel, hotels, api, serverAuthMode, locale, setLocale, signOut, switchHotel } = useSession();
@@ -86,6 +89,7 @@ export default function Profile() {
         </PressScale>)}
         {switchError ? <Text accessibilityRole="alert" style={[font.small, { color: c.danger }]}>{t('errors.generic')}</Text> : null}
       </GlassCard>
+      {api.mode === 'LIVE' && canReadFinance(user) ? <Button testID="profile-finance" label={mobile.financeTitle} icon={Wallet} variant="secondary" onPress={() => router.push('/finance')}/> : null}
       <View style={{ gap: space.sm, marginTop: space.md }}>
         {api.mode === 'DEMO' ? <Button testID="switch-demo-role" label={t('profile.switchDemoRole')} icon={ArrowLeftRight} variant="secondary" onPress={async () => { await signOut(); router.replace('/login'); }}/> : null}
         <Button label={t('connect.addHotel')} icon={Repeat} variant="secondary" onPress={() => router.push('/connect')} />

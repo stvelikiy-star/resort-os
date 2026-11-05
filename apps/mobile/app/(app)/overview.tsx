@@ -15,6 +15,7 @@ import { demoDashboard } from '../../src/api/demoPresentation';
 import { InventorySpectrum } from '../../src/components/InventorySpectrum';
 import { contactInitials } from '../../src/i18n/statusLabels';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { canReadFinance } from '../../src/api/financeAccess';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Overview() {
@@ -84,6 +85,7 @@ export default function Overview() {
         <MetricCard tone="cyan" icon={MessageCircle} label={copy.needsReply} value={count(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
         <MetricCard tone="warning" icon={BedDouble} label={copy.dirty} value={count(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
       </View>
+      {api?.mode === 'LIVE' && canReadFinance(user) ? <QuickAction icon={Wallet} label={copy.financeTitle} onPress={() => router.push('/finance')}/> : null}
       <SectionLabel>{copy.available}</SectionLabel>
       {canOpen('pms') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
       {canOpenInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
