@@ -43,6 +43,14 @@ class SharedEdgeContract(unittest.TestCase):
         b["ADMIN_HOST"] = "www." + a["PUBLIC_HOST"]
         self.assertIn("www aliases collide", " ".join(validate_shared_edge([a, b])))
 
+    def test_foreign_customer_cors_and_shared_cookie_domain_are_rejected(self):
+        a, b = self.config()
+        a["CORS_ORIGINS"] += ",https://" + b["ADMIN_HOST"]
+        a["COOKIE_DOMAIN"] = ".test-hotels.kg"
+        findings = " ".join(validate_shared_edge([a, b]))
+        self.assertIn("CORS_ORIGINS", findings)
+        self.assertIn("COOKIE_DOMAIN", findings)
+
     def test_bad_hostname_cannot_inject_caddy_config(self):
         a, b = self.config()
         b["PUBLIC_HOST"] = "bad.example.kg {\n reverse_proxy evil"
