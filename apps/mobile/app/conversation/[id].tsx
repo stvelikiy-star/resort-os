@@ -46,7 +46,7 @@ export default function ConversationScreen() {
   if (!user || (!showroom && !(user.module_permissions?.includes('WHATSAPP') || (user.role !== 'RECEPTION' && user.module_permissions?.includes('INBOX')))) || !['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const conversation = data?.conversation;
   return <FutureScreen>
-    <PressScale onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6 }}><ChevronLeft size={22} color={c.primary}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
+    <PressScale accessibilityLabel={copy.close} onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6 }}><ChevronLeft size={22} color={c.primary}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
     <PremiumHeader title={conversation?.contact_name || conversation?.contact_phone || copy.inboxTitle} subtitle={conversation?.channel_kind} eyebrow="MARINA SMART"/>
     {showroom ? <DemoBanner/> : null}
     {loading ? <LoadingShimmer count={3}/> : null}
