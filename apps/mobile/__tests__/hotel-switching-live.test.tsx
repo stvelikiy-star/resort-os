@@ -14,17 +14,17 @@ const identity = (key: 'A' | 'B'): AuthUser => ({
   tenant_id:key==='A'?'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa':'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   module_permissions:['FINANCE','OPS','PMS'],
 });
-const clients: Record<string, StaffApi> = {};
-const events: string[] = [];
+const mockClients: Record<string, StaffApi> = {};
+const mockEvents: string[] = [];
 function fakeApi(key: 'A' | 'B'): StaffApi {
   let signed = false;
   return {
     mode:'LIVE',
     authMode:async()=> 'single_property' as const,
-    login:async()=>{signed=true; events.push('login-'+key);return identity(key);},
-    logout:async()=>{signed=false;events.push('logout-'+key);},
+    login:async()=>{signed=true; mockEvents.push('login-'+key);return identity(key);},
+    logout:async()=>{signed=false;mockEvents.push('logout-'+key);},
     me:async()=>{
-      events.push('me-'+key);
+      mockEvents.push('me-'+key);
       if(!signed)throw new ApiError('UNAUTHORIZED');
       return identity(key);
     },
@@ -39,7 +39,7 @@ function fakeApi(key: 'A' | 'B'): StaffApi {
   };
 }
 jest.mock('../src/api/factory',()=>({
-  apiFor:(h:HotelConnection)=>clients[h.id],
+  apiFor:(h:HotelConnection)=>mockClients[h.id],
   dropApi:jest.fn(),
 }));
 jest.mock('../src/api/realApi',()=>({createRealApi:()=>({logout:async()=>undefined})}));
@@ -61,7 +61,7 @@ afterAll(()=>{
 });
 beforeEach(()=>{
   process.env.EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS='https://hotel-a.example,https://hotel-b.example';
-  clients[hotelA.id]=fakeApi('A');clients[hotelB.id]=fakeApi('B');events.length=0;
+  mockClients[hotelA.id]=fakeApi('A');mockClients[hotelB.id]=fakeApi('B');mockEvents.length=0;
 });
 function ViewPanel(){
   const {hotel,user,addHotel,switchHotel,signIn,api}=useSession();
@@ -104,9 +104,9 @@ it('retains independent verified LIVE sessions A→B→A on two signed, differen
   await waitFor(()=>expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id));
   await waitFor(()=>expect(screen.getByTestId('restored').props.children).toBe('yes'));
   expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
-  expect(events.filter(x=>x==='login-A')).toHaveLength(1);
-  expect(events).toContain('me-A');
+  expect(mockEvents.filter(x=>x==='login-A')).toHaveLength(1);
+  expect(mockEvents).toContain('me-A');
   fireEvent.press(screen.getByTestId('read'));
   await waitFor(()=>expect(screen.getByTestId('room').props.children).toBe('A-101'));
-  expect(events).not.toContain('logout-A');
+  expect(mockEvents).not.toContain('logout-A');
 });
