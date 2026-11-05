@@ -268,7 +268,7 @@ describe('real api contract (mock fetch)', () => {
     expect(u).toContain('PATCH /api/v1/ops/tasks/t/assignee');
     const body = JSON.parse(String(calls.find((c) => c.url.endsWith('complete-report'))!.init.body));
     expect(body.checklist).toHaveLength(5);
-    expect(body.evidence_urls).toEqual([]);
+    expect(body).not.toHaveProperty('evidence_urls');
   });
 });
 
