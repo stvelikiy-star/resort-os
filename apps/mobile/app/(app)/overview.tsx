@@ -42,7 +42,7 @@ export default function Overview() {
           style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border, backgroundColor: c.primarySoft, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={[font.h2, { color: c.primary }]}>{contactInitials(user.display_name) || '•'}</Text>
         </View>
-        {!shared && live && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb label="MARINA AI" size={38} onPress={() => router.push('/ai')}/> : null}
+        {!shared && (live || showroom) && ['OWNER','MANAGER'].includes(user.role) ? <AIOrb state={showroom ? 'offline' : 'idle'} label="MARINA AI" size={38} onPress={() => router.push('/ai')}/> : null}
       </View> : null}/>
     {hotel?.demo ? <DemoBanner/> : null}
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
