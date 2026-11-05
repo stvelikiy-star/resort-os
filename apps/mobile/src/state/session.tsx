@@ -194,6 +194,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       throw new ApiError('FORBIDDEN', 'Hotel switching is not available in a customer session');
     }
     const target = hotels.find(h => h.id === id);
+    if (target?.demo && hotels.some(h => !h.demo)) {
+      throw new ApiError('FORBIDDEN', 'DEMO is unavailable on a provisioned customer device');
+    }
     if (!target || (!target.demo && !isTrustedHotelOrigin(target.baseUrl))) {
       throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
     }
