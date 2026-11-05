@@ -35,6 +35,14 @@ def validate_shared_edge(hotels: list[dict[str, str]]) -> list[str]:
         for key in HOST_KEYS:
             if not FQDN.fullmatch(hotel.get(key, "").lower()):
                 problems.append(f"hotel_{i+1}: {key} must be a valid public DNS name")
+    # The public www redirect is a real additional edge hostname.
+    # Do not allow it to overlap another customer's API/Admin/Staff host.
+    all_hosts: list[str] = []
+    for item in hotels:
+        all_hosts.extend(item.get(key, "").lower() for key in HOST_KEYS)
+        all_hosts.append("www." + item.get("PUBLIC_HOST", "").lower())
+    if len(all_hosts) != len(set(all_hosts)):
+        problems.append("public host/redirect www aliases collide across service routes")
     for i, a in enumerate(hotels):
         for j in range(i + 1, len(hotels)):
             b = hotels[j]
