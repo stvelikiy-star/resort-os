@@ -53,7 +53,9 @@ async def trusted_property_id(conn, user):
     return user["property_id"]
 
 namespace={"uuid":uuid,"Any":object,"HTTPException":HttpException,
-"Request":object,"Depends":lambda x:None,"payment_access":object,"_totals":totals,
+"Request":object,"Depends":lambda x:None,
+"payment_access":object,"reception_cash_access":object,"_totals":totals,
+"enforce_reception_cash_scope":lambda user: None,
 "trusted_property_id":trusted_property_id}
 fn=functions["reservation_acquiring_readiness"]
 fn.decorator_list=[]
