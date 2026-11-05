@@ -6,6 +6,7 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, s
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .shared_dining_p0 import guard as shared_dining_staging_guard
 from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
@@ -13,6 +14,9 @@ from .guest_requests import authorized_context
 admin_router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen"])
 guest_router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-kitchen"])
 kitchen_operations_access = require_roles("OWNER", "MANAGER", "COOK")
+# A WAITER may mark only an assigned READY order SERVED; all other kitchen
+# routes preserve the original COOK/management permissions.
+kitchen_status_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
 kitchen_management_access = require_roles("OWNER", "MANAGER")
 # Legacy DINING_STAFF is intentionally not accepted: cook and waiter are server-separated.
 
@@ -401,18 +405,36 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
     return {"id": str(order_id), "order_number": order_number, "status": "NEW", "total_kgs": total, "financial_posting": "NONE_AUTOMATIC"}
 
 
+def enforce_waiter_service_request(user: dict[str, Any], target_status: str) -> None:
+    """WAITER cannot use kitchen mutations except served on staged dining."""
+    if user["role"] != "WAITER":
+        return
+    if target_status != "SERVED":
+        raise HTTPException(status_code=403, detail={"code": "WAITER_ONLY_SERVES"})
+    # This exception is never active in DEMO, production or legacy hotel mode.
+    shared_dining_staging_guard()
+
+
+def enforce_waiter_order_assignment(user: dict[str, Any], assigned_waiter_id: uuid.UUID | None) -> None:
+    if user["role"] == "WAITER" and str(assigned_waiter_id or "") != str(user["id"]):
+        raise HTTPException(status_code=403, detail={"code": "WAITER_ORDER_NOT_ASSIGNED"})
+
+
 @admin_router.patch("/orders/{order_id}/status")
-async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
+async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_status_access)):
+    enforce_waiter_service_request(user, payload.status)
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
             row = await conn.fetchrow(
-                '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId"
+                '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId","waiterId"
                    FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 order_id, pid,
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
+            if user["role"] == "WAITER":
+                enforce_waiter_order_assignment(user, row["waiterId"])
             if row["tableId"]:
                 await lock_dining_tables(conn, row["tableId"])
             if payload.status not in ORDER_TRANSITIONS[row["status"]]:

@@ -67,24 +67,28 @@ export default function SharedDiningShift({ user, onEnd }: {
   async function changeOrder(order: Order) {
     if (busy) return;
     const cook = user.role === "COOK";
-    const next = cook ? NEXT_KITCHEN_STATUS[order.status] : undefined;
+    const serve = !cook && order.status === "READY" && order.waiter_id === user.id;
+    const next = cook ? NEXT_KITCHEN_STATUS[order.status] : serve ? "SERVED" : undefined;
     if (cook && !next) return;
+    if (!cook && order.waiter_id === user.id && !serve) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      const url = cook
+      const url = (cook || serve)
         ? "/core/api/v1/kitchen/orders/" + order.id + "/status"
         : "/core/api/v1/dining/orders/" + order.id + "/waiter";
       const response = await fetch(url, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cook ? { status: next } : { waiter_id: user.id }),
+        body: JSON.stringify(cook || serve ? { status: next } : { waiter_id: user.id }),
       });
       if (response.status === 401) { onEnd(); return; }
       if (!response.ok) throw new Error("Mutation not confirmed");
       const result = await response.json();
-      if (result.id !== order.id || (cook
+      if (result.id !== order.id || (cook || serve
           ? result.status !== next
           : result.waiter_id !== user.id)) throw new Error("Unexpected receipt");
-      setNotice("Операция по заказу " + order.order_number + " подтверждена.");
+      setNotice(serve
+        ? "Заказ " + order.order_number + " выдан гостю."
+        : "Операция по заказу " + order.order_number + " подтверждена.");
       try { await refresh(); }
       catch { setError("Операция подтверждена сервером, но список не обновился."); }
     } catch {
@@ -126,6 +130,9 @@ export default function SharedDiningShift({ user, onEnd }: {
           {user.role === "WAITER" && order.waiter_id !== user.id &&
             <button type="button" className="shift-primary" disabled={busy}
               onClick={() => void changeOrder(order)}>Назначить заказ себе</button>}
+          {user.role === "WAITER" && order.waiter_id === user.id && order.status === "READY" &&
+            <button type="button" className="shift-primary" disabled={busy}
+              onClick={() => void changeOrder(order)}>Выдать гостю</button>}
         </article>)}
       </section>
     </>}

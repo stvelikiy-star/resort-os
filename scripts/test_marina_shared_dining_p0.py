@@ -2,13 +2,14 @@
 import os
 import sys
 import unittest
+import uuid
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import HTTPException
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services/api"))
-from app import auth, shared_dining_p0 as dining  # noqa: E402
+from app import auth, shared_dining_p0 as dining, kitchen  # noqa: E402
 
 
 ORDER_A = "11111111-2222-4333-8444-5555555555a1"
@@ -70,6 +71,38 @@ class SharedDiningP0Tests(unittest.TestCase):
                 "MARINA_SHARED_DINING_P0_CONFIRM": "REVIEWED_SHARED_DINING_STAGING_ONLY",
             }):
                 dining.guard()  # Explicit isolated staging only.
+
+    def test_waiter_can_only_serve_his_own_assigned_ready_order(self):
+        waiter_id = uuid.uuid4()
+        other_id = uuid.uuid4()
+        waiter = {"id": str(waiter_id), "role": "WAITER"}
+        cook = {"id": str(other_id), "role": "COOK"}
+        with patch.object(kitchen, "shared_dining_staging_guard") as stage:
+            kitchen.enforce_waiter_service_request(waiter, "SERVED")
+            stage.assert_called_once()
+            for status in ("NEW", "ACCEPTED", "COOKING", "READY", "CANCELLED"):
+                with self.subTest(status=status), self.assertRaises(HTTPException) as blocked:
+                    kitchen.enforce_waiter_service_request(waiter, status)
+                self.assertEqual(blocked.exception.status_code, 403)
+                self.assertEqual(blocked.exception.detail["code"], "WAITER_ONLY_SERVES")
+            kitchen.enforce_waiter_order_assignment(waiter, waiter_id)
+            for invalid in (None, other_id):
+                with self.subTest(assigned=invalid), self.assertRaises(HTTPException) as blocked:
+                    kitchen.enforce_waiter_order_assignment(waiter, invalid)
+                self.assertEqual(blocked.exception.status_code, 403)
+                self.assertEqual(blocked.exception.detail["code"], "WAITER_ORDER_NOT_ASSIGNED")
+            # The existing kitchen role retains its original status and order operations.
+            kitchen.enforce_waiter_service_request(cook, "COOKING")
+            kitchen.enforce_waiter_order_assignment(cook, None)
+
+    def test_waiter_serving_stays_closed_without_staging_guard(self):
+        waiter = {"id": str(uuid.uuid4()), "role": "WAITER"}
+        with patch.object(kitchen, "shared_dining_staging_guard",
+                          side_effect=HTTPException(status_code=503,
+                                                    detail="Shared dining not enabled")):
+            with self.assertRaises(HTTPException) as blocked:
+                kitchen.enforce_waiter_service_request(waiter, "SERVED")
+            self.assertEqual(blocked.exception.status_code, 503)
 
     def test_cannot_activate_on_demo_production_or_plain_cookie(self):
         with patch.object(auth, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True), (

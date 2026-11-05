@@ -65,3 +65,25 @@ provider, payments, AI, guest or unreviewed mutations are opened.
 **Evidence requirement:** successful exact-head CI for new kitchen/restaurant
 unit gate, Compose HTTPS Chrome staff end-to-end, full source integrity and
 relevant regressions. This document is not an acceptance receipt.
+
+## Stage 2 dining handoff — pending exact-head verification
+
+**Gap:** The shared WAITER could self-assign an order but was not authorised to mark
+its delivery after the cook prepared it. The canonical kitchen status transition
+already implements `READY -> SERVED` atomically, including audit, any guest task
+completion, released table status, and `NONE_AUTOMATIC` financial posting.
+
+**Change:** Only the existing `PATCH /api/v1/kitchen/orders/{id}/status`
+dependency admits WAITER. A WAITER must request `SERVED` (all other status
+changes are 403), must be the server-stored assigned waiter (403 otherwise)
+and must pass the shared-dining staging guard. The query is bound to the session's
+hotel ID, so foreign order IDs return 404. Existing COOK/manager permissions,
+order reads and creation paths remain unchanged; no new API routes or SQL are added.
+
+**Acceptance required:** Real two-property HTTPS Chromium through Staff to
+canonical API/PostgreSQL, verifying NEW -> ACCEPTED -> COOKING -> READY ->
+assigned WAITER -> SERVED; foreign 404; forbidden 403; duplicate 409; session
+logout 401; management read persists SERVED, without automatic charges or payments.
+
+The result is a **staging-only functional slice** until the final SHA CI finishes.
+Commercial revenue, real guest orders and production acceptance remain NO-GO.

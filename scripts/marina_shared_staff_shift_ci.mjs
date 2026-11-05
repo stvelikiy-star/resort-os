@@ -210,11 +210,31 @@ try {
           "Cook may not patch foreign hotel order");
         await ownCard.getByRole("button", { name: "Принять в работу" }).click();
         await ownCard.getByText("ACCEPTED", { exact: false }).waitFor();
-        const updated = await api(page, "kitchen/orders?status=ACTIVE");
-        assert.equal(updated.data.items.find(item => item.id === own)?.status, "ACCEPTED");
+        const accepted = await api(page, "kitchen/orders?status=ACTIVE");
+        assert.equal(accepted.data.items.find(item => item.id === own)?.status, "ACCEPTED");
+        await ownCard.getByRole("button", { name: "Начать приготовление" }).click();
+        await ownCard.getByText("COOKING", { exact: false }).waitFor();
+        const cooking = await api(page, "kitchen/orders?status=ACTIVE");
+        assert.equal(cooking.data.items.find(item => item.id === own)?.status, "COOKING");
+        await ownCard.getByRole("button", { name: "Заказ готов" }).click();
+        await ownCard.getByText("READY", { exact: false }).waitFor();
+        const ready = await api(page, "kitchen/orders?status=ACTIVE");
+        assert.equal(ready.data.items.find(item => item.id === own)?.status, "READY");
+        assert.equal((await api(page, "kitchen/orders/" + own + "/status",
+          "PATCH", { status: "READY" })).status, 409,
+          "READY cannot be replayed");
       } else {
         assert.equal((await api(page, "kitchen/orders")).status, 403,
-          "Waiter must not change kitchen production");
+          "Waiter must not access kitchen queue");
+        assert.equal((await api(page, "kitchen/orders/" + own + "/status",
+          "PATCH", { status: "COOKING" })).status, 403,
+          "Waiter cannot cook or change any other status");
+        assert.equal((await api(page, "kitchen/orders/" + own + "/status",
+          "PATCH", { status: "SERVED" })).status, 403,
+          "Unassigned waiter may not serve even a READY order");
+        assert.equal((await api(page, "kitchen/orders/" + foreign + "/status",
+          "PATCH", { status: "SERVED" })).status, 404,
+          "Foreign hotel order must be 404 for waiter");
         assert.equal((await api(page, "dining/orders/" + foreign + "/waiter",
           "PATCH", { waiter_id: me.data.id })).status, 404,
           "Waiter may not assign foreign order");
@@ -224,8 +244,18 @@ try {
         await ownCard.getByRole("button", { name: "Назначить заказ себе" }).click();
         await page.getByText("Операция по заказу CI-DINING-" + suffix +
           " подтверждена.", { exact: true }).waitFor();
-        const updated = await api(page, "dining/floor");
-        assert.equal(updated.data.orders.find(item => item.id === own)?.waiter_id, me.data.id);
+        const assigned = await api(page, "dining/floor");
+        assert.equal(assigned.data.orders.find(item => item.id === own)?.waiter_id, me.data.id);
+        assert.equal(assigned.data.orders.find(item => item.id === own)?.status, "READY");
+        await ownCard.getByRole("button", { name: "Выдать гостю" }).click();
+        await page.getByText("Заказ CI-DINING-" + suffix + " выдан гостю.", { exact: true }).waitFor();
+        const servedFloor = await api(page, "dining/floor");
+        assert.equal(servedFloor.status, 200);
+        assert(!servedFloor.data.orders.some(item => item.id === own),
+          "SERVED order must leave ACTIVE dining floor");
+        assert.equal((await api(page, "kitchen/orders/" + own + "/status",
+          "PATCH", { status: "SERVED" })).status, 409,
+          "Serving the same order twice must be 409");
       }
       await page.getByRole("button", { name: "Выйти" }).click();
       await page.getByLabel("Код организации").waitFor();
@@ -233,6 +263,25 @@ try {
       await context.close();
     }
   }
+  // Confirm real database-backed SERVED status via the canonical management read.
+  for (const suffix of ["A", "B"]) {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(admin + "/shared-auth-preview");
+    await page.getByLabel("Код отеля").waitFor();
+    const signed = await api(page, "auth/login", "POST", {
+      username: "owner", password, tenant_code: "tenant_" + suffix.toLowerCase(),
+      property_code: "HOTEL_" + suffix,
+    });
+    assert.equal(signed.status, 200);
+    const all = await api(page, "kitchen/orders?status=ALL");
+    assert.equal(all.status, 200);
+    assert.deepEqual(all.data.items.map(item => item.id), [diningOrderIds[suffix]]);
+    assert.equal(all.data.items[0].status, "SERVED");
+    assert.equal(all.data.items[0].financial_posting, "NONE_AUTOMATIC");
+    await context.close();
+  }
+  console.log("PASS: two-hotel COOK accepted/cooking/ready -> assigned WAITER served; status transitions, no auto payment, 401/403/404/409");
   console.log("PASS: two-hotel COOK/WAITER HTTPS sessions, scoped orders, status/assignment and 403/404 denials");
   console.log("PASS: Staff HTTPS four-role/property report lifecycles, inspection RBAC, replay denials, foreign 404 and hotel switch");
 } finally {
