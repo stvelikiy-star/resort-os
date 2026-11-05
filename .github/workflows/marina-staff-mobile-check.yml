@@ -44,6 +44,13 @@ jobs:
         run: npm test -- --ci
       - name: Export mobile web preview
         run: npm run web:export
+      - name: Archive authentic Expo Web role screenshots (not Android evidence)
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-expo-web-role-screenshots
+          path: apps/mobile/visual-evidence/*.jpg
+          retention-days: 14
+          if-no-files-found: error
       - name: Validate Expo configuration
         run: npx expo config --type public --json > /tmp/marina-staff-expo-config.json
   android-preview:
