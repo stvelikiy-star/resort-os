@@ -85,6 +85,7 @@ function ViewPanel(){
     <Pressable testID="read" onPress={()=>{void api?.listRooms().then(v=>setRoom(v[0]?.code??'none'));}}><Text>Read</Text></Pressable>
     <Pressable testID="select-demo" onPress={()=>{selectHotel(DEMO_HOTELS[0].id);setResult("selected-demo-attempt");}}><Text>Select demo</Text></Pressable>
     <Pressable testID="start-demo" onPress={()=>{void startDemo("owner").then(()=>setResult("unexpected-demo"),()=>setResult("demo-denied"));}}><Text>Start demo</Text></Pressable>
+    <Pressable testID="switch-demo" onPress={()=>{void switchHotel(DEMO_HOTELS[0].id).then(()=>setResult("unexpected-switch-demo"),()=>setResult("switch-demo-denied"));}}><Text>Switch to demo</Text></Pressable>
   </>;
 }
 it('LIVE device binds one origin and refuses a second hotel without losing session A',async()=>{
@@ -117,6 +118,10 @@ it('provisioned customer rejects direct DEMO selection and showroom launch witho
   expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
   fireEvent.press(screen.getByTestId('start-demo'));
   await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('demo-denied'));
+  expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
+  expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
+  fireEvent.press(screen.getByTestId('switch-demo'));
+  await waitFor(()=>expect(screen.getByTestId('result').props.children).toBe('switch-demo-denied'));
   expect(screen.getByTestId('hotel').props.children).toBe(hotelA.id);
   expect(screen.getByTestId('owner').props.children).toBe('HOTEL_A');
   expect(mockEvents).not.toContain('logout-A');
