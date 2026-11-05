@@ -108,5 +108,7 @@ it('retains independent verified LIVE sessions A→B→A on two signed, differen
   expect(mockEvents).toContain('me-A');
   fireEvent.press(screen.getByTestId('read'));
   await waitFor(()=>expect(screen.getByTestId('room').props.children).toBe('A-101'));
-  expect(mockEvents).not.toContain('logout-A');
+  // The *first sign-in* deliberately clears any stale A cookie. Switching
+  // to B and returning to A must not add a SECOND A logout.
+  expect(mockEvents.filter(x=>x==='logout-A')).toHaveLength(1);
 });
