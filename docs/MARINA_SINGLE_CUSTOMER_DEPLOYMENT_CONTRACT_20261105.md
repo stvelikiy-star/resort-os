@@ -15,6 +15,7 @@
 The same reviewed application source and migrations can be deployed many times, but **each hotel must have distinct runtime assets**:
 
 - Distinct `COMPOSE_PROJECT_NAME` and `PROPERTY_CODE` selected at provisioning.
+- Declare `MARINA_DEPLOYMENT_HOST_ID` (operator-managed identifier of the Ubuntu/VM instance). Two hotel configs using the existing standalone Compose must NOT share this ID: each Caddy binds host ports 80 and 443.
 - Distinct `HOST_DATA_DIR`, `BACKUP_DIR`, private PostgreSQL storage and database credentials.
 - Distinct public/admin/staff/API/automation domain hostnames, TLS and CORS allowlists.
 - Distinct `N8N_ENCRYPTION_KEY`, `AUTOMATION_SERVICE_KEY`, WhatsApp/Green API credentials and hotel knowledge files.
@@ -22,7 +23,7 @@ The same reviewed application source and migrations can be deployed many times, 
 - PostgreSQL must remain private; never map the database port to a public interface.
 - Use dedicated backups and prove a **clean independent restore** before onboarding a real client.
 
-The canonical `compose.production.yaml` is a **single installation blueprint**, not proof that multiple running installations are isolated. Explicit `COMPOSE_PROJECT_NAME` and unique host mounts are required to avoid Docker project/volume collisions.
+The canonical `compose.production.yaml` is a **single installation blueprint**, not proof that multiple running installations are isolated. For two customers on the **same Ubuntu host**, simply changing `COMPOSE_PROJECT_NAME` and domains is NOT sufficient: both Caddy instances bind host ports 80/443. Use separate hosts with this Compose. A shared Ubuntu fleet requires a separately reviewed single HTTPS edge/reverse proxy and internal per-hotel routing before deployment. Explicit `COMPOSE_PROJECT_NAME` and unique host mounts are required to avoid Docker project/volume collisions.
 
 ## Static preflight (non-destructive)
 
@@ -33,7 +34,7 @@ python3 scripts/verify_marina_customer_isolation.py \
   /secure/hotel-a/.env.production /secure/hotel-b/.env.production
 ```
 
-The script checks for collisions without printing secrets. It is intentionally stricter than Docker Compose defaults. A PASS **does not** confirm correct DNS, certificate issuance, actual PostgreSQL isolation, backups, restore or device E2E.
+The script checks for collisions without printing secrets. Set distinct `MARINA_DEPLOYMENT_HOST_ID` values only for genuinely separate Ubuntu/VM hosts; do not invent IDs to bypass the same-host 80/443 collision. It is intentionally stricter than Docker Compose defaults. A PASS **does not** confirm correct DNS, certificate issuance, actual PostgreSQL isolation, backups, restore or device E2E.
 
 ## Launch acceptance (still required)
 
