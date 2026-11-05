@@ -10,6 +10,17 @@ describe('role-aware compact bottom navigation', () => {
     expect(plan.showMore).toBe(true);
     expect(plan.primary.length + Number(plan.showMore)).toBeLessThanOrEqual(5);
   });
+  it('makes manager staff management accessible only with OPS and STAFF grants', () => {
+    const granted = workspaceForSession('MANAGER', ['DASHBOARD', 'PMS', 'WHATSAPP', 'OPS', 'STAFF'], 'LIVE');
+    const plan = mobileTabPlan(granted.tabs);
+    expect(granted.tabs).toContain('admin');
+    expect([...plan.primary, ...plan.overflow]).toContain('admin');
+    expect(plan.primary.length + Number(plan.showMore)).toBeLessThanOrEqual(5);
+
+    const noStaff = workspaceForSession('MANAGER', ['DASHBOARD', 'PMS', 'OPS'], 'LIVE');
+    expect(noStaff.tabs).not.toContain('admin');
+    expect(workspaceForSession('RECEPTION', ['PMS', 'STAFF', 'OPS'], 'LIVE').tabs).not.toContain('admin');
+  });
   it('has no More tab for limited staff and never introduces a forbidden module', () => {
     const ws = workspaceForSession('RECEPTION', ['RESERVATIONS', 'PMS', 'WHATSAPP'], 'LIVE', 'shared_auth_preview');
     const plan = mobileTabPlan(ws.tabs);
