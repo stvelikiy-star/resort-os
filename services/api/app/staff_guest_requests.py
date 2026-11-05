@@ -43,9 +43,13 @@ def guest_request_access(user: dict[str, Any], path: str) -> bool:
 
 
 def guest_request_codes(user: dict[str, Any]) -> set[str]:
-    if user.get("module_permissions_custom"):
-        return {"*"} if user_has_granted_requests(user) else set()
-    return allowed_codes(user["role"])
+    # Section grants may narrow access, but never widen the role's service-code
+    # ceiling. In particular, custom OPS/SERVICES cannot promote MAID or
+    # TECHNICIAN to handle arbitrary guest requests.
+    role_codes = allowed_codes(user["role"])
+    if user.get("module_permissions_custom") and not user_has_granted_requests(user):
+        return set()
+    return role_codes
 
 
 def user_has_granted_requests(user: dict[str, Any]) -> bool:
@@ -147,9 +151,11 @@ async def load_routed_task_for_update(conn, pid, task_id: uuid.UUID, user: dict[
     )
     if not task:
         raise HTTPException(status_code=404, detail="Guest request not found")
-    if not guest_request_access(user, "/api/v1/ops/guest-requests") or not (
-        user.get("module_permissions_custom") and user_has_granted_requests(user)
-    ) and not can_handle(user["role"], task["serviceCode"]):
+    # Claim/complete/cancel must enforce the same role ceiling as queue reads.
+    # A custom section grant is not a service-code wildcard.
+    if (not guest_request_access(user, "/api/v1/ops/guest-requests")
+            or not can_handle(user["role"], task["serviceCode"])
+            or not guest_request_codes(user)):
         raise HTTPException(status_code=403, detail="Request type not allowed for role")
     return task
 

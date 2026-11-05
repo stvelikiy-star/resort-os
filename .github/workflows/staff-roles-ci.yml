@@ -13,6 +13,7 @@ on:
       - 'services/api/app/auth.py'
       - 'services/api/app/telegram_auth.py'
       - 'scripts/verify_staff_roles.py'
+      - 'scripts/verify_guest_request_role_ceiling.py'
       - '.github/workflows/staff-roles-ci.yml'
   workflow_dispatch:
 
@@ -81,6 +82,9 @@ jobs:
         run: |
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_staff_roles.py
+
+      - name: Check guest-request role ceilings without database mutations
+        run: python3 scripts/verify_guest_request_role_ceiling.py
 
       - name: Seed canonical hotel
         run: python scripts/seed_from_intake.py

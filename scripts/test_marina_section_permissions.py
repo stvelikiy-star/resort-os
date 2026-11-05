@@ -61,7 +61,10 @@ assert allowed_types_for_user({"role": "RECEPTION", "module_permissions": ["OPS"
 assert allowed_types_for_user({"role": "MANAGER", "module_permissions": [], "module_permissions_custom": True}) == set()
 custom_service_staff = {"role": "WAITER", "module_permissions": ["SERVICES"], "module_permissions_custom": True}
 assert guest_request_access(custom_service_staff, "/api/v1/ops/guest-requests")
-assert guest_request_codes(custom_service_staff) == {"*"}
+# Section visibility must never override role-specific service-code routing.
+assert guest_request_codes(custom_service_staff) == set()
+assert guest_request_codes({"role": "MAID", "module_permissions": ["OPS"], "module_permissions_custom": True}) == {"HOUSEKEEPING", "TOWELS", "LINEN"}
+assert guest_request_codes({"role": "TECHNICIAN", "module_permissions": ["OPS"], "module_permissions_custom": True}) == {"MAINTENANCE"}
 assert not guest_request_access({"role": "RECEPTION", "module_permissions": [], "module_permissions_custom": True}, "/api/v1/ops/guest-requests")
 assert StaffPatch(module_permissions=["FINANCE", "FINANCE"]).module_permissions == ["FINANCE"]
 try:
