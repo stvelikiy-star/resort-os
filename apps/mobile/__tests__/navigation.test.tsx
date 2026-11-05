@@ -52,11 +52,17 @@ async function loginAs(role: string) {
 }
 
 describe('navigation, guards and screens', () => {
-  it('browser demo can open manager workspace without username or password', async () => {
-    const screen = await renderRouter(routes, { initialUrl: '/connect' });
+  it('browser demo opens synthetic OWNER showroom without a real hotel or credentials', async () => {
+    const screen = await renderRouter({
+      ...routes,
+      '(app)/overview': require('../app/(app)/overview').default,
+      '(app)/pms': require('../app/(app)/pms').default,
+      '(app)/reception': require('../app/(app)/reception').default,
+      '(app)/inbox': require('../app/(app)/inbox').default,
+    }, { initialUrl: '/connect' });
     await fireEvent.press(await screen.findByTestId('web-demo-start', {}, { timeout: 4000 }));
-    expect(await screen.findByTestId('tab-admin', {}, { timeout: 4000 })).toBeTruthy();
-    expect(await screen.findByTestId('task-t1', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('tab-overview', {}, { timeout: 4000 })).toBeTruthy();
+    expect(await screen.findByTestId('demo-banner', {}, { timeout: 4000 })).toBeTruthy();
   });
 
   it('unauthenticated direct profile link goes to hotel selection, not empty settings', async () => {
