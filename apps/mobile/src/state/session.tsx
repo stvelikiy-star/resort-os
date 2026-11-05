@@ -250,7 +250,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     setHotels([...DEMO_HOTELS, h]);
     void setItem('marina.hotels', JSON.stringify([h]));
     if (hotelId !== h.id) selectHotel(h.id);
-  }, [hotels, hotelId, selectHotel]);
+  }, [hotels, hotelId, selectHotel, sessions]);
   const startDemo = useCallback(async (username = 'manager'): Promise<AuthUser> => {
     const demoHotel = DEMO_HOTELS[0];
     // Never bypass production auth. This method explicitly uses the isolated
