@@ -21,7 +21,7 @@ it('allows only OWNER/MANAGER with FINANCE grants; not reception or a manager wi
   expect(canReadFinance(user('RECEPTION',['FINANCE']))).toBe(false);
 });
 it('reads confirmed finance/summary aggregates in shared mode, without bypassing 503 modules',async()=>{
-  const transport=jest.fn(async()=>response(200));
+  const transport=jest.fn(async (_url: string, _init?: RequestInit)=>response(200));
   const live=createLiveModules('https://platform.example',transport as typeof fetch,'shared_auth_preview');
   await expect(live.financeSummary('2026-10-07','2026-11-05')).resolves.toEqual(summary);
   expect(transport).toHaveBeenCalledTimes(1);
