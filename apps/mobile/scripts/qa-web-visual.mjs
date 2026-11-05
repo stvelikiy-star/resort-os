@@ -174,6 +174,9 @@ async function main() {
     await click('[data-testid="web-demo-start"]','one-tap synthetic owner showroom');
     if (!await waitFor('[data-testid="tab-overview"]',6000)) throw new Error('Owner dashboard missing');
     await screenshot('owner_overview_ru_light_375');
+    await click('[aria-label="MARINA AI"]','read-only MARINA AI showroom');
+    await screenshot('owner_ai_unavailable_ru_light_375');
+    await click('[aria-label="Назад"]','return from unavailable AI');
     await click('[data-testid="tab-pms"]','owner PMS');
     if (!await waitFor('[data-testid="pms-next"]')) throw new Error('PMS 7-day grid missing');
     await screenshot('owner_pms_ru_light_375');
