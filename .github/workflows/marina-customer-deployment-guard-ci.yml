@@ -6,7 +6,12 @@ on:
       - 'scripts/verify_marina_customer_isolation.py'
       - 'scripts/test_verify_marina_customer_isolation.py'
       - 'scripts/verify_marina_customer_compose_render.py'
+      - 'scripts/marina_shared_edge_config.py'
+      - 'scripts/test_marina_shared_edge_config.py'
+      - 'compose.marina-customer-shared-edge.yaml'
+      - 'deploy/Caddyfile.customer-gateway'
       - 'docs/MARINA_SINGLE_CUSTOMER_DEPLOYMENT_CONTRACT_20261105.md'
+      - 'docs/MARINA_SHARED_EDGE_ACCEPTANCE_20261105.md'
       - '.github/workflows/marina-customer-deployment-guard-ci.yml'
   workflow_dispatch:
 
@@ -16,18 +21,45 @@ permissions:
 jobs:
   static-customer-isolation:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 9
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Compile guard and tests
-        run: python3 -m py_compile scripts/verify_marina_customer_isolation.py scripts/test_verify_marina_customer_isolation.py scripts/verify_marina_customer_compose_render.py
+        run: python3 -m py_compile scripts/verify_marina_customer_isolation.py scripts/test_verify_marina_customer_isolation.py scripts/verify_marina_customer_compose_render.py scripts/marina_shared_edge_config.py scripts/test_marina_shared_edge_config.py
       - name: Validate fail-closed deployment configuration rules
-        run: python3 scripts/test_verify_marina_customer_isolation.py
-      - name: Render two separate customer Compose configurations (no containers)
+        run: |
+          python3 scripts/test_verify_marina_customer_isolation.py
+          python3 scripts/test_marina_shared_edge_config.py
+      - name: Render standalone and shared edge customer Compose configurations (no containers)
         run: python3 scripts/verify_marina_customer_compose_render.py
+      - name: Parse generated and customer gateway Caddy routes (no network listeners)
+        run: |
+          temp_dir="$(mktemp -d)"
+          trap 'rm -rf "$temp_dir"' EXIT
+          PYTHONPATH=scripts python3 - "$temp_dir" <<'PY'
+          from pathlib import Path
+          import sys
+          from marina_shared_edge_config import render
+          from test_verify_marina_customer_isolation import hotel
+          a, b = hotel(1), hotel(2)
+          b["MARINA_DEPLOYMENT_HOST_ID"] = a["MARINA_DEPLOYMENT_HOST_ID"]
+          Path(sys.argv[1], "Caddyfile").write_text(render([a, b])[0], encoding="utf-8")
+          PY
+          docker run --rm \
+            -e PUBLIC_HOST=hotel-1.test-hotels.kg \
+            -e ADMIN_HOST=admin.hotel-1.test-hotels.kg \
+            -e STAFF_HOST=staff.hotel-1.test-hotels.kg \
+            -e API_HOST=api.hotel-1.test-hotels.kg \
+            -e AUTOMATION_HOST=automation.hotel-1.test-hotels.kg \
+            -v "$PWD/deploy/Caddyfile.customer-gateway:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.4-alpine caddy adapt --config /etc/caddy/Caddyfile >/dev/null
+          docker run --rm \
+            -e TLS_EMAIL=synthetic@domain.invalid \
+            -v "$temp_dir/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.4-alpine caddy adapt --config /etc/caddy/Caddyfile >/dev/null
       - name: Record non-deployment acceptance boundary
         run: |
           echo "Static tests only: no production env, database, provider, DNS, Docker or customer records accessed."

@@ -25,6 +25,8 @@ def hotel(n):
         "STAFF_HOST": f"staff.hotel-{n}.test-hotels.kg",
         "API_HOST": f"api.hotel-{n}.test-hotels.kg",
         "AUTOMATION_HOST": f"automation.hotel-{n}.test-hotels.kg",
+        "CORS_ORIGINS": ",".join("https://" + prefix + f"hotel-{n}.test-hotels.kg" for prefix in ("", "admin.", "staff.")),
+        "COOKIE_DOMAIN": "",
         "COOKIE_SECURE": "true",
         "MARINA_TENANT_CONTEXT_ENABLED": "false",
     }
