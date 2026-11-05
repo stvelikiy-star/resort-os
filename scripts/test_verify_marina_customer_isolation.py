@@ -53,6 +53,12 @@ class CustomerIsolationContract(unittest.TestCase):
         findings = " ".join(validate_pair(a, b))
         self.assertIn("80/443 collision", findings)
 
+    def test_cross_customer_backup_data_path_overlap_is_blocked(self):
+        a, b = hotel(1), hotel(2)
+        b["BACKUP_DIR"] = a["HOST_DATA_DIR"] + "/stolen-backup"
+        findings = " ".join(validate_pair(a, b))
+        self.assertIn("HOST_DATA_DIR and BACKUP_DIR", findings)
+
     def test_single_property_and_secure_cookie_required(self):
         a = hotel(1)
         a["MARINA_TENANT_CONTEXT_ENABLED"] = "true"
