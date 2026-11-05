@@ -21,7 +21,7 @@ UNIQUE_KEYS = ("PROPERTY_CODE", "COMPOSE_PROJECT_NAME", "POSTGRES_DB",
                "AUTOMATION_SERVICE_KEY", "GREEN_API_ID_INSTANCE",
                "GREEN_API_TOKEN_INSTANCE", "GREEN_API_WEBHOOK_SECRET")
 PATH_KEYS = ("HOST_DATA_DIR", "BACKUP_DIR")
-REQUIRED = ("PROPERTY_CODE", "COMPOSE_PROJECT_NAME", "POSTGRES_DB",
+REQUIRED = ("PROPERTY_CODE", "COMPOSE_PROJECT_NAME", "MARINA_DEPLOYMENT_HOST_ID", "POSTGRES_DB",
             "POSTGRES_USER", "POSTGRES_PASSWORD", "N8N_ENCRYPTION_KEY",
             "AUTOMATION_SERVICE_KEY", "HOST_DATA_DIR", "BACKUP_DIR",
             "COOKIE_SECURE", "MARINA_TENANT_CONTEXT_ENABLED", *HOST_KEYS)
@@ -90,6 +90,13 @@ def validate_one(env: dict[str, str], label: str) -> list[str]:
 
 def validate_pair(a: dict[str, str], b: dict[str, str]) -> list[str]:
     errors: list[str] = []
+    # compose.production.yaml publishes 80/443 directly from each Caddy.
+    # It is safe to reuse on independent VMs, but two instances on one host
+    # would compete for the same ports. A shared edge needs another topology.
+    if a.get("MARINA_DEPLOYMENT_HOST_ID") and (
+        a["MARINA_DEPLOYMENT_HOST_ID"] == b.get("MARINA_DEPLOYMENT_HOST_ID")
+    ):
+        errors.append("same Ubuntu/VM host unsupported by compose.production.yaml (80/443 collision); use separate hosts until shared-edge topology is reviewed")
     for key in UNIQUE_KEYS:
         va, vb = a.get(key, "").strip(), b.get(key, "").strip()
         if va and vb and va == vb:
