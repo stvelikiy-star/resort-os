@@ -86,7 +86,7 @@ export default function Connect() {
         <Field label={t('connect.code')} placeholder={t('connect.codePh')} value={addr} onChangeText={setAddr} autoCapitalize="none" autoCorrect={false} keyboardType="url" testID="hotel-address" />
         {err ? <Text testID="connect-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
         <Button testID="connect-add" label={t('connect.addHotel')} icon={Link2} onPress={add} />
-        <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
+        <Button testID="connect-scan" label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
       </GlassCard>
       {Platform.OS === 'web' ? (
         <Card testID="web-live-cookie-notice" style={{ backgroundColor: c.warningSoft, gap: space.sm }}>

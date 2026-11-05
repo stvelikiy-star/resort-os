@@ -92,7 +92,7 @@ export default function Profile() {
       {api.mode === 'LIVE' && canReadFinance(user) ? <Button testID="profile-finance" label={mobile.financeTitle} icon={Wallet} variant="secondary" onPress={() => router.push('/finance')}/> : null}
       <View style={{ gap: space.sm, marginTop: space.md }}>
         {api.mode === 'DEMO' ? <Button testID="switch-demo-role" label={t('profile.switchDemoRole')} icon={ArrowLeftRight} variant="secondary" onPress={async () => { await signOut(); router.replace('/login'); }}/> : null}
-        <Button label={t('connect.addHotel')} icon={Repeat} variant="secondary" onPress={() => router.push('/connect')} />
+        <Button testID="profile-add-hotel" label={t('connect.addHotel')} icon={Repeat} variant="secondary" onPress={() => router.push('/connect')} />
         <Button testID="sign-out" label={t('profile.signOut')} icon={LogOut} variant="danger" onPress={async () => { await signOut(); router.replace('/login'); }} />
       </View>
     </FutureScreen>
