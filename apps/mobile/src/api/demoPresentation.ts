@@ -67,7 +67,7 @@ function demoRoom(rooms: readonly Room[], index: number): Room | undefined {
 /** Synthetic reservation cards only, without any personal/financial records. */
 export function demoReception(locale: Locale, rooms: readonly Room[]): ReceptionList {
   const l = labels[locale];
-  const definitions: Array<{ status: string; start: number; end: number; guest: string; roomIndex: number }> = [
+  const definitions: { status: string; start: number; end: number; guest: string; roomIndex: number }[] = [
     { status: 'GUARANTEED', start: 0, end: 2, guest: l.guestA, roomIndex: 0 },
     { status: 'CHECKED_IN', start: -2, end: 0, guest: l.guestB, roomIndex: 1 },
     { status: 'CHECKED_IN', start: -1, end: 2, guest: l.guestC, roomIndex: 2 },
