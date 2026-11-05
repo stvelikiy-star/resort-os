@@ -8,6 +8,8 @@ import { Hero, Logo, Wordmark } from '../../src/components/Brand';
 import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
 import { homeForSession } from '../../src/roles/registry';
+import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
+import { DEMO_HOTELS } from '../../src/api/hotels';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
 import { hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../../src/api/hotels';
@@ -63,6 +65,32 @@ export default function Connect() {
             }} />
         </GlassCard>
       }
+      {!installed ? (
+        <GlassCard testID="demo-role-entry" style={{ gap: space.sm }}>
+          <Text style={[font.small, { color: c.textMuted }]}>{t('login.demoRole')}</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {DEMO_ROLE_LOGINS.map(entry => (
+              <Button key={entry.username} testID={`connect-demo-${entry.username}`}
+                label={t('roles.' + entry.role)}
+                variant="secondary"
+                onPress={async () => {
+                  if (demoBusy) return;
+                  setDemoBusy(true);
+                  try {
+                    const member = await startDemo(entry.username);
+                    router.replace(homeForSession(member.role, member.module_permissions, 'DEMO'));
+                  } catch { setErr(t('errors.generic')); }
+                  finally { setDemoBusy(false); }
+                }} />
+            ))}
+          </View>
+          <Button testID="connect-demo-login" label={t('login.signIn')}
+            variant="secondary" onPress={() => {
+              selectHotel(DEMO_HOTELS[0].id);
+              router.replace('/login');
+            }} />
+        </GlassCard>
+      ) : null}
       {installed ? (
         <GlassCard style={{ gap: space.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
