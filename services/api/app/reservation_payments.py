@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
 from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
+from . import auth as auth_module
+from .section_permissions import user_has_section
 from .payment_idempotency import (
     ensure_same_payment_payload,
     lock_payment_identity,
@@ -17,6 +19,31 @@ from .payment_idempotency import (
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-payments"])
 payment_access = require_roles("OWNER", "MANAGER", module_grant=False)
+# Strictly separate reception cash intake from finance-review and refunds.
+# Do not broaden the old management-only cancellation/readiness access.
+reception_cash_access = require_roles("OWNER", "MANAGER", "RECEPTION", module_grant=False)
+
+
+def enforce_reception_cash_scope(user: dict[str, Any], *,
+                                 method: str | None = None,
+                                 paid_at: datetime | None = None) -> None:
+    if user["role"] != "RECEPTION":
+        return
+    if (not MARINA_SHARED_AUTH_PREVIEW_ENABLED
+            or os.environ.get("APP_ENV") != "staging"
+            or os.environ.get("MARINA_SHARED_RECEPTION_CASH_P0_ENABLED") != "true"
+            or os.environ.get("MARINA_SHARED_RECEPTION_CASH_P0_CONFIRM")
+                != "REVIEWED_RECEPTION_CASH_STAGING_ONLY"):
+        raise HTTPException(status_code=403,
+                            detail={"code": "RECEPTION_CASH_STAGING_DISABLED"})
+    auth_module.shared_auth_preview_guard()
+    if not user_has_section(user, "RESERVATIONS"):
+        raise HTTPException(status_code=403,
+                            detail={"code": "RECEPTION_RESERVATIONS_GRANT_REQUIRED"})
+    if method is not None and (method != "CASH" or paid_at is not None):
+        raise HTTPException(status_code=403,
+                            detail={"code": "RECEPTION_CASH_ONLY"})
+
 
 
 class ReservationPaymentPayload(BaseModel):
@@ -84,13 +111,14 @@ async def _totals(conn, reservation_id: uuid.UUID):
 async def reservation_acquiring_readiness(
     reservation_id: uuid.UUID,
     request: Request,
-    user: dict[str, Any] = Depends(payment_access),
+    user: dict[str, Any] = Depends(reception_cash_access),
 ):
     """Server-side payment readiness without claiming that a bank is connected.
 
     Reuses canonical reservation payments; never creates a charge, payment,
     external provider link or confirmed booking.
     """
+    enforce_reception_cash_scope(user)
     async with request.app.state.db.acquire() as conn:
         pid = await trusted_property_id(conn, user)
         row = await conn.fetchrow(
@@ -189,9 +217,10 @@ async def record_reservation_payment(
     reservation_id: uuid.UUID,
     payload: ReservationPaymentPayload,
     request: Request,
-    user: dict[str, Any] = Depends(payment_access),
+    user: dict[str, Any] = Depends(reception_cash_access),
 ):
     method = normalize_required_text(payload.method)
+    enforce_reception_cash_scope(user, method=method, paid_at=payload.paid_at)
     if method not in {"CASH", "CARD", "CARD_POS", "BANK_TRANSFER", "OTHER"}:
         raise HTTPException(status_code=422, detail={"code": "PAYMENT_METHOD_NOT_ALLOWED", "message": "Only non-QR manual payments may be recorded."})
     external_ref = normalize_optional_text(payload.external_ref)

@@ -24,11 +24,12 @@ function hotelDate(offset: number) {
 
 /** Shared staging only. All authority, price and availability stay on the server. */
 export default function SharedBookingForm({
-  rooms, onExpired, coreRateOnly = false,
+  rooms, onExpired, coreRateOnly = false, onCreated,
 }: {
   rooms: Room[];
   onExpired: () => void;
   coreRateOnly?: boolean;
+  onCreated?: () => void;
 }) {
   const [roomId, setRoomId] = useState("");
   const [checkIn, setCheckIn] = useState(hotelDate(2));
@@ -118,6 +119,7 @@ export default function SharedBookingForm({
           data.total_kgs !== quote.pricing.total_kgs) throw new Error("invalid commit reply");
       setSuccess("Бронирование " + data.booking_number + " создано сервером. " +
         "Оплата не проведена. Для обновления шахматки откройте раздел повторно.");
+      onCreated?.();
     } catch {
       setNotice("Результат отправки не подтверждён. Сначала проверьте существующие брони; " +
         "не отправляйте запрос повторно вслепую.");

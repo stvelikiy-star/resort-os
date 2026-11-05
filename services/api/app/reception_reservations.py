@@ -109,7 +109,7 @@ async def list_reception_reservations(
             }
             for row in rows
         ],
-        "truth": "One row per Reservation. Display room is selected from the active room schedule according to stay status and hotel-local date. Payment fields include only manager-recorded RECEIVED facts in Resort Core.",
+        "truth": "One row per Reservation. Display room is selected from the active room schedule according to stay status and hotel-local date. Payment fields include only staff-recorded RECEIVED facts in Resort Core; they do not prove bank settlement.",
     }
 
 

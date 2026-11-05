@@ -171,11 +171,85 @@ try {
     hotels[1 - index].id);
     assert.equal(own, 200);
     assert.equal(foreign, 404);
+
+    // P0 cash intake: only RECEPTION+CASH in isolated shared staging, with
+    // hotel-scoped reservation, server outstanding balance and idempotency.
+    const cashPath = "admin/booking/reservations/" + result.reservation_id + "/payments";
+    const scopedCash = { amount_kgs: 1000, method: "CASH",
+      idempotency_key: "synthetic-ci-only-reception-cash-" + suffix };
+    assert.equal((await api(cashPath, {
+      ...scopedCash, method: "BANK_TRANSFER",
+    })).status, 403, "Reception must never record bank transfer");
+    assert.equal((await api(cashPath, {
+      ...scopedCash, method: "CARD_POS",
+    })).status, 403, "Reception must never record card acquiring");
+    assert.equal((await api(cashPath, {
+      ...scopedCash, paid_at: new Date().toISOString(),
+    })).status, 403, "Reception must not backdate received cash");
+    assert.equal((await api(cashPath, {
+      ...scopedCash, amount_kgs: quote.pricing.total_kgs + 1,
+      idempotency_key: "synthetic-ci-only-overbalance-" + suffix,
+    })).status, 409, "Cash amount cannot exceed remaining balance");
+    const foreignCash = await api(
+      "admin/booking/reservations/" + hotels[1 - index].id + "/payments",
+      scopedCash,
+    );
+    assert.equal(foreignCash.status, 404, "Reception cannot add cash to foreign hotel");
+    const cancelFinance = await page.evaluate(async path =>
+      (await fetch("/core/api/v1/" + path)).status,
+    "admin/booking/reservations/" + result.reservation_id +
+      "/cancellation-finance-review");
+    assert.equal(cancelFinance, 403, "Reception must not gain manager finance review");
+
+    const cashier = page.getByRole("region", { name: "Ресепшен: учёт наличных" });
+    await cashier.getByLabel("Бронь для учёта оплаты").selectOption(result.reservation_id);
+    const panel = page.getByRole("region", {
+      name: "Внутренняя оплата " + result.booking_number,
+    });
+    await panel.getByRole("button", { name: "Записать полученную оплату" }).click();
+    await panel.getByRole("button", { name: "Проверить остаток" }).click();
+    const paymentForm = panel.getByRole("form", { name: "Форма ручной оплаты" });
+    await paymentForm.waitFor();
+    assert.deepEqual(await paymentForm.getByLabel("Способ получения")
+      .locator("option").allTextContents(), ["Наличные"]);
+    await paymentForm.getByLabel("Полученная сумма, KGS").fill("1000");
+    await paymentForm.getByRole("checkbox").check();
+    page.once("dialog", dialog => dialog.accept());
+    const receivedResponse = page.waitForResponse(response =>
+      response.url() === core + "/" + cashPath &&
+      response.request().method() === "POST");
+    await paymentForm.getByRole("button", { name: "Записать полученную сумму" }).click();
+    const received = await receivedResponse;
+    assert.equal(received.status(), 201, "Reception cash must be received server-side");
+    const recorded = await received.json();
+    assert.equal(recorded.reservation_id, result.reservation_id);
+    assert.equal(recorded.payment.method, "CASH");
+    assert.equal(recorded.payment.status, "RECEIVED");
+    assert.equal(recorded.payment.amount_kgs, 1000);
+    assert.equal(recorded.payment.provider, "MANAGER_MANUAL");
+    assert.equal(recorded.payment.recorded_by_role, "RECEPTION");
+    assert.equal(recorded.idempotent_replay, false);
+    const paymentKey = received.request().postDataJSON().idempotency_key;
+    const replay = await api(cashPath, {
+      amount_kgs: 1000, method: "CASH", idempotency_key: paymentKey,
+    });
+    assert.equal(replay.status, 201);
+    assert.equal(replay.body.idempotent_replay, true);
+    assert.equal(replay.body.payment_id, recorded.payment_id);
+    const afterCash = await page.evaluate(async () => {
+      const reply = await fetch("/core/api/v1/admin/reception/reservations",
+        { cache: "no-store" });
+      return { status: reply.status, body: await reply.json() };
+    });
+    assert.equal(afterCash.status, 200);
+    const row = afterCash.body.items.find(item => item.id === result.reservation_id);
+    assert.equal(row.paidKgs, 1000, "Duplicate cash payment would inflate ledger");
+    assert.equal(row.remainingKgs, quote.pricing.total_kgs - 1000);
     receptionBookings.push(result.reservation_id);
     await context.close();
   }
   assert.notEqual(receptionBookings[0], receptionBookings[1]);
-  console.log("PASS: Chromium HTTPS owner/reception bookings, core-rate ceilings and bidirectional hotel isolation");
+  console.log("PASS: Chromium HTTPS owner/reception bookings, cash-only P0 idempotency, 403/404/409 and bidirectional hotel isolation");
 } finally {
   await browser.close();
 }

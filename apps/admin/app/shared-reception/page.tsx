@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import SharedReceptionCash from "./SharedReceptionCash";
 import SharedBookingForm from "../shared-auth-preview/SharedBookingForm";
 
 type Identity = {
@@ -30,6 +31,10 @@ export default function SharedReceptionBookingPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [loadingRooms, setLoadingRooms] = useState(false);
+  const [bookingRefresh, setBookingRefresh] = useState(0);
+  const expire = useCallback(() => {
+    setRooms([]); setUser(null); setNotice("Сеанс истёк.");
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -137,7 +142,8 @@ export default function SharedReceptionBookingPage() {
     <section className="login-card" style={{ width: "100%", maxWidth: 880 }}>
       <p className="eyebrow">MARINA SMART · общая тестовая платформа</p>
       <h1>Ресепшен · новая бронь</h1>
-      <p>Обычный тариф гостиницы. Скидки, изменение цены, HOLD и учёт оплаты здесь недоступны.</p>
+      <p>Бронь создаётся по обычному тарифу гостиницы. Скидки, изменение цены и HOLD недоступны.
+        Отдельно можно записать только уже полученные наличные — не банковскую операцию.</p>
       <p><Link href="/shared-auth-preview">← Вернуться в рабочий кабинет</Link></p>
       {mode === "loading" && <p role="status">Проверяю режим платформы…</p>}
       {mode === "blocked" && <p role="alert">Общий режим гостиниц недоступен. Бронирование закрыто.</p>}
@@ -156,10 +162,10 @@ export default function SharedReceptionBookingPage() {
         <p role="status">Подтверждённый отель: <strong>{user.property_code}</strong> · {user.display_name}</p>
         {loadingRooms && <p role="status">Загружаю номера гостиницы…</p>}
         {!loadingRooms && !notice && rooms.length > 0 &&
-          <SharedBookingForm key={user.property_id} coreRateOnly rooms={rooms} onExpired={() => {
-            setRooms([]); setUser(null); setNotice("Сеанс истёк.");
-          }}/>}
+          <SharedBookingForm key={user.property_id} coreRateOnly rooms={rooms}
+            onExpired={expire} onCreated={() => setBookingRefresh(value => value + 1)} />}
         {!loadingRooms && !notice && rooms.length === 0 && <p>Нет доступного списка номеров.</p>}
+        <SharedReceptionCash user={user} onExpired={expire} refreshToken={bookingRefresh}/>
         <button className="btn" type="button" disabled={busy} onClick={() => void logout()}>Выйти</button>
       </>}
       {notice && <p role="alert">{notice}</p>}

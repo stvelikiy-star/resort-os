@@ -87,3 +87,40 @@ logout 401; management read persists SERVED, without automatic charges or paymen
 
 The result is a **staging-only functional slice** until the final SHA CI finishes.
 Commercial revenue, real guest orders and production acceptance remain NO-GO.
+
+## Stage 2 reception internal cash ledger — pending final SHA CI
+
+The canonical `GET /api/v1/admin/booking/reservations/{id}/acquiring-readiness`
+and `POST /api/v1/admin/booking/reservations/{id}/payments` now permit RECEPTION
+**only in explicitly opted-in shared staging**, with both a valid `RESERVATIONS`
+module grant and secure shared tenant session. `MANAGER`/`OWNER` authority is
+unchanged; cancellation-finance-review stays management-only.
+
+Only `CASH` with no user-supplied payment event time is permitted for
+RECEPTION. No provider/QR/card/bank transfer, online acquiring, refunds,
+manual rate changes, ledger deletion or elevated financial reporting.
+`MARINA_SHARED_RECEPTION_CASH_P0_ENABLED` defaults false and requires
+`MARINA_SHARED_RECEPTION_CASH_P0_CONFIRM=REVIEWED_RECEPTION_CASH_STAGING_ONLY`.
+The stage-only guard denies DEMO, the old single-hotel runtime, production,
+revoked RESERVATIONS module or missing approval before any write.
+
+No new finance endpoint or migration: the existing handler already performs
+transactional property-bound reservation locking, balance checks,
+`idempotencyKey` replay/conflict handling, and immutable audit metadata
+(`recorded_by_staff_id`, `recorded_by_role`, paid and recorded times).
+An internal `RECEIVED` row is an **operator's assertion of cash actually
+received**, not a bank settlement receipt.
+
+The existing `SharedManualPaymentPanel` was reused with a cash-only mode.
+The added shared reception list filters hotel-local reservations and rechecks
+the tenant/session before rendering the panel. The booking form refreshes the
+list when the server confirms a booking.
+
+**Required evidence:** browser form and real two-property PostgreSQL with
+correct internal receipts, denial of foreign hotel (404), manager-only finance
+review (403), forbidden card/bank/backdating (403), overbalance (409), repeat
+idempotency key returning the *same* payment ID and no double-received amount;
+strict role guard unit tests; all mandatory exact-head CI PASS.
+
+Production cutover remains NO-GO. This is a stage-only manual cash ledger, not
+a payment-service integration.

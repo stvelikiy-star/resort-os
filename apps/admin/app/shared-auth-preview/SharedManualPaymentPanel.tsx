@@ -20,9 +20,10 @@ const METHODS = [
 
 /** Records an already-received manual payment; never initiates acquiring. */
 export default function SharedManualPaymentPanel({
-  reservationId,bookingNumber,onExpired,onUpdated,
+  reservationId,bookingNumber,onExpired,onUpdated,receptionCashOnly=false,
 }:{
   reservationId:string;bookingNumber:string;onExpired:()=>void;onUpdated:()=>Promise<void>;
+  receptionCashOnly?:boolean;
 }){
   const [open,setOpen]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -57,7 +58,7 @@ export default function SharedManualPaymentPanel({
   const parsed=Number(amount);
   const canRecord=Boolean(review && !unverified && !busy && acknowledged &&
     Number.isSafeInteger(parsed) && parsed>0 && parsed<=review.remaining_kgs &&
-    METHODS.some(([key])=>key===method));
+    METHODS.some(([key])=>key===method) && (!receptionCashOnly || method==="CASH"));
   async function record(e:FormEvent){
     e.preventDefault();
     if(!canRecord || !review || submittedKey.current) return;
@@ -98,6 +99,7 @@ export default function SharedManualPaymentPanel({
       {open?"Скрыть учёт оплаты":"Записать полученную оплату"}
     </button>
     {open && <>
+      {receptionCashOnly && <p><strong>Ресепшен: разрешены только фактически полученные наличные.</strong></p>}
       <p><strong>Только внутренняя запись фактически полученных средств.</strong>
         Карта не списывается, ссылки на оплату и возвраты не создаются.</p>
       <button className="btn" type="button" disabled={busy || unverified}
@@ -109,7 +111,8 @@ export default function SharedManualPaymentPanel({
           value={amount} onChange={e=>setAmount(e.target.value)}/></label>
         <label>Способ получения<select disabled={busy} value={method}
           onChange={e=>setMethod(e.target.value as typeof method)}>
-          {METHODS.map(([key,label])=><option key={key} value={key}>{label}</option>)}
+          {METHODS.filter(([key])=>!receptionCashOnly || key==="CASH")
+            .map(([key,label])=><option key={key} value={key}>{label}</option>)}
         </select></label>
         <label>Примечание<input maxLength={500} disabled={busy} value={note}
           onChange={e=>setNote(e.target.value)}/></label>
