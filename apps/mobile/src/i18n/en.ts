@@ -5,7 +5,7 @@ export const en: Dict = {
   nav: { tasks: 'Tasks', rooms: 'Rooms', requests: 'Requests', admin: 'Manage', profile: 'Profile' },
   connect: {
     title: 'Connect to a hotel', subtitle: 'Each hotel is a separate secure connection. Hotel data is never mixed.',
-    addHotel: 'Add hotel', code: 'Invitation code or address', codePh: 'e.g. marina-bishkek', scan: 'Scan QR', demoHotels: 'Demo hotels',
+    addHotel: 'Add hotel', code: 'Invitation code or HTTPS address', codePh: 'e.g. marina-bishkek', scan: 'Scan QR', demoHotels: 'Demo hotels',
     tryDemoTitle: 'Explore MARINA SMART', tryDemoHint: 'Open the manager workspace, tasks and rooms. All content uses synthetic demo data.', tryDemoButton: 'Open manager demo',
     browserLiveNotice: 'In a browser, sign-in to a hotel on another domain may fail due to cookie and CORS restrictions. Use the Android app or an approved test domain for PMS access.',
     untrusted: 'This hotel address is not verified by MARINA SMART. Password entry is blocked. Ask the administrator to approve the hotel API origin in the signed app build.',
