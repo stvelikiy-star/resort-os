@@ -34,18 +34,29 @@ export function GlassCard({ children, style, onPress, testID }: { children: Reac
   const { c } = useTheme();
   return <Card testID={testID} onPress={onPress} style={[{ backgroundColor: c.glass, borderColor: c.glassBorder, borderWidth: 1, ...elevation.card }, style]}>{children}</Card>;
 }
-export function MetricCard({ icon: Icon, label, value, detail, onPress }: { icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void }) {
+export type MetricTone = 'primary' | 'gold' | 'cyan' | 'success' | 'warning';
+export function MetricCard({ icon: Icon, label, value, detail, onPress, tone = 'primary' }: {
+  icon: LucideIcon; label: string; value: string; detail?: string; onPress?: () => void; tone?: MetricTone;
+}) {
   const { c } = useTheme();
   const { width, fontScale } = useWindowDimensions();
   const oneColumn = metricNeedsFullWidth(width, fontScale, value);
-  return <GlassCard onPress={onPress} style={{ flexGrow: 1, flexBasis: oneColumn ? '100%' : '46%', minWidth: 0, gap: 10, padding: 16 }}>
+  const accent = tone === 'gold' ? c.gold : tone === 'cyan' ? c.cyan : tone === 'success' ? c.success : tone === 'warning' ? c.warning : c.primary;
+  const soft = tone === 'gold' || tone === 'warning' ? c.warningSoft : tone === 'success' ? c.successSoft : tone === 'cyan' ? c.infoSoft : c.primarySoft;
+  return <GlassCard onPress={onPress} style={{
+    flexGrow: 1, flexBasis: oneColumn ? '100%' : '46%', minWidth: 0,
+    gap: 9, minHeight: 174, padding: 17, borderTopWidth: 3, borderTopColor: accent,
+  }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-      <View style={{ width: 42, height: 42, borderRadius: 14, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}><Icon color={c.primary} size={iconography.metric}/></View>
-      {onPress ? <ArrowUpRight size={18} color={c.textMuted}/> : null}
+      <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: soft, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon color={accent} size={iconography.metric + 2} strokeWidth={1.9}/>
+      </View>
+      {onPress ? <ArrowUpRight size={21} color={accent}/> : null}
     </View>
-    <Text style={[font.metric, { color: c.text, flexShrink: 1 }]} adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={oneColumn ? 2 : 1}>{value}</Text>
-    <Text style={[font.small, { color: c.textMuted }]}>{label}</Text>
-    {detail ? <Text style={[font.label, { color: c.cyan }]}>{detail}</Text> : null}
+    <Text style={[font.metric, { color: c.text, flexShrink: 1, fontSize: oneColumn ? 32 : 29 }]}
+      adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={oneColumn ? 2 : 1}>{value}</Text>
+    <Text style={[font.small, { color: c.textMuted, flexShrink: 1, fontWeight: '600' }]}>{label}</Text>
+    {detail ? <Text style={[font.small, { color: c.info }]}>{detail}</Text> : null}
   </GlassCard>;
 }
 /** Real, server-sourced numeric KPI. Motion is disabled until OS preference is known. */
