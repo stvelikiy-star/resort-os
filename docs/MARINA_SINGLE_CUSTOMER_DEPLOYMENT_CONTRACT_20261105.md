@@ -6,12 +6,14 @@
 
 The current Web package still contains a Three Crowns-specific static homepage,
 contacts, media and SEO fallback. **This is NOT a reusable customer homepage.**
-The customer production Compose therefore sets
-`MARINA_CUSTOMER_SITE_GUARD=true` unconditionally. Until a reviewed
-per-property published-site CMS and no-leak acceptance exists, the Web origin
-must respond with a neutral unpublished page (and deny non-HTML requests).
-Do not disable this flag to make another hotel's public site visible. Admin,
-Staff and API remain separate and usable in the customer's own stack.
+The customer production Compose therefore runs a dedicated Caddy-based
+unpublished Web service instead of the legacy Next.js `apps/web` image.
+Until a reviewed per-property published-site CMS and no-leak acceptance
+exists, the public Web origin serves only a neutral unpublished page,
+denies non-HTML requests, and remains `noindex`/`no-store`.
+Do not replace this service with the legacy hotel site just to make a new
+customer's homepage visible. Admin, Staff and API remain separate and usable
+in the customer's own stack.
 Production onboarding is NO-GO until property-specific public content,
 metadata, links and media are accepted. See issue #378.
 
