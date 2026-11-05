@@ -43,9 +43,13 @@ def guest_request_access(user: dict[str, Any], path: str) -> bool:
 
 
 def guest_request_codes(user: dict[str, Any]) -> set[str]:
-    if user.get("module_permissions_custom"):
-        return {"*"} if user_has_granted_requests(user) else set()
-    return allowed_codes(user["role"])
+    # Section grants may narrow access, but never widen the role's service-code
+    # ceiling. In particular, custom OPS/SERVICES cannot promote MAID or
+    # TECHNICIAN to handle arbitrary guest requests.
+    role_codes = allowed_codes(user["role"])
+    if user.get("module_permissions_custom") and not user_has_granted_requests(user):
+        return set()
+    return role_codes
 
 
 def user_has_granted_requests(user: dict[str, Any]) -> bool:
