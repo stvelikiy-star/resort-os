@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft } from 'lucide-react-native';
 import { Button, DemoBanner, FadeIn, Field, PressScale, SectionLabel } from '../../src/components/ui';
 import { Hero, Logo, Wordmark } from '../../src/components/Brand';
 import { FutureScreen, GlassCard } from '../../src/components/Future';
@@ -11,7 +10,6 @@ import { useSession } from '../../src/state/session';
 import { homeForSession } from '../../src/roles/registry';
 import { ApiError } from '../../src/api/types';
 import type { AuthMode, StaffApi } from '../../src/api/types';
-import { checkedHotelSelector } from '../../src/api/sharedHotelAuth';
 import { isTrustedHotelOrigin } from '../../src/api/hotels';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
@@ -20,7 +18,7 @@ export default function Login() {
   const { t } = useTranslation();
   const { c } = useTheme();
   const router = useRouter();
-  const { hotel, api, signIn, leaveHotel } = useSession();
+  const { hotel, api, signIn } = useSession();
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -29,8 +27,6 @@ export default function Login() {
   const [modeResult, setModeResult] = useState<{ api: StaffApi; attempt: number; value: AuthMode } | null>(null);
   const [modeError, setModeError] = useState<{ api: StaffApi; attempt: number } | null>(null);
   const [modeRetry, setModeRetry] = useState(0);
-  const [tenantCode, setTenantCode] = useState('');
-  const [propertyCode, setPropertyCode] = useState('');
   const authMode: AuthMode | null = hotel?.demo ? 'demo' :
     modeResult?.api === api && modeResult?.attempt === modeRetry ? modeResult.value : null;
   const cannotDiscoverMode = modeError?.api === api && modeError?.attempt === modeRetry;
@@ -55,10 +51,10 @@ export default function Login() {
     setBusy(true); setErr(null);
     try {
       if (!authMode) throw new ApiError('UNKNOWN', 'Unverified hotel authentication mode');
-      const selector = authMode === 'shared_auth_preview' ? checkedHotelSelector({
-        tenant_code: tenantCode.trim(), property_code: propertyCode.trim(),
-      }) : undefined;
-      const me = await signIn(user, pass, selector);
+      // Customer login is always bound to its installed single-property origin.
+      // A shared-preview server must not silently expose a hotel selector.
+      if (authMode === 'shared_auth_preview') throw new ApiError('FORBIDDEN', 'Shared hotel login is unavailable in customer app');
+      const me = await signIn(user, pass);
       router.replace(homeForSession(me.role, me.module_permissions, api?.mode ?? 'LIVE', authMode));
     } catch (e) { const code = e instanceof ApiError ? e.code : 'UNKNOWN'; setErr(code === 'UNAUTHORIZED' || code === 'BAD_REQUEST' ? t('login.wrong') : code === 'OFFLINE' ? t('errors.offline') : code === 'PENDING_LOGOUT' ? t('login.logoutPending') : code === 'FORBIDDEN' ? t('errors.forbidden') : t('errors.generic')); } finally { busyRef.current = false; setBusy(false); }
   };
@@ -66,9 +62,6 @@ export default function Login() {
   if (hotel && !hotel.demo && !isTrustedHotelOrigin(hotel.baseUrl)) return <Redirect href="/connect"/>;
   return (
     <FutureScreen>
-      <PressScale onPress={() => { leaveHotel(); router.replace('/connect'); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel={t('login.change')}>
-        <ChevronLeft size={22} color={c.primary} /><Text style={[font.body, { color: c.primary }]}>{t('login.change')}</Text>
-      </PressScale>
       <FadeIn style={{ gap: space.sm }}>
         <Hero height={170}>
           <View style={{ flexDirection:'row',alignItems:'center',gap:12 }}><Logo size={56}/><Wordmark color="#FFFFFF"/></View>
@@ -78,17 +71,13 @@ export default function Login() {
         {hotel?.demo ? <DemoBanner /> : null}
       </FadeIn>
       <GlassCard style={{ gap: space.md }}>
-        {authMode === 'shared_auth_preview' ? <>
-          <Text style={[font.small, { color: c.textMuted }]}>{t('login.sharedHint')}</Text>
-          <Field label={t('login.tenantCode')} value={tenantCode} onChangeText={setTenantCode} autoCapitalize="none" autoCorrect={false} testID="login-tenant-code" />
-          <Field label={t('login.propertyCode')} value={propertyCode} onChangeText={setPropertyCode} autoCapitalize="none" autoCorrect={false} testID="login-property-code" />
-        </> : null}
+        {authMode === 'shared_auth_preview' ? <Text testID="login-shared-disabled" style={[font.small, { color: c.danger }]}>{t('errors.forbidden')}</Text> : null}
         {authMode === null ? <Button testID="login-mode-retry" label={t('login.checkMode')} variant="secondary" onPress={() => setModeRetry(x => x + 1)} /> : null}
         <Field label={t('login.username')} value={u} onChangeText={setU} autoCapitalize="none" autoCorrect={false} testID="login-username" />
         <Field label={t('login.password')} value={p} onChangeText={setP} secureTextEntry testID="login-password" />
         {err ? <Text testID="login-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
         {cannotDiscoverMode && authMode === null ? <Text testID="login-mode-error" style={[font.small, { color: c.danger }]}>{t('login.modeUnavailable')}</Text> : null}
-        <Button testID="login-submit" label={t('login.signIn')} onPress={() => go(u, p)} disabled={busy || !authMode || !u || !p || (authMode === 'shared_auth_preview' && (!tenantCode.trim() || !propertyCode.trim()))} />
+        <Button testID="login-submit" label={t('login.signIn')} onPress={() => go(u, p)} disabled={busy || !authMode || authMode === 'shared_auth_preview' || !u || !p} />
       </GlassCard>
       {hotel?.demo ? (
         <>
