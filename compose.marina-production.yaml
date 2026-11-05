@@ -163,27 +163,25 @@ services:
       retries: 10
     networks: [edge, backend]
 
+
   web:
-    image: marina-${MARINA_INSTANCE_SLUG:?Set MARINA_INSTANCE_SLUG}-web:${MARINA_RELEASE_SHA:?Set tested MARINA_RELEASE_SHA}
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-      args:
-        CORE_API_URL: http://api:8000
-        RELEASE_SHA: ${MARINA_RELEASE_SHA:-UNSET}
+    # Public Web stays unpublished until this hotel's own site content is approved.
+    # Never boot the legacy Three Crowns-specific apps/web for a different customer.
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
-    environment:
-      CORE_API_URL: http://api:8000
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    volumes:
+      - ./deploy/marina/customer-unpublished.Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/marina/customer-unpublished.html:/srv/index.html:ro
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/healthz"]
       interval: 20s
       timeout: 5s
       retries: 8
     networks: [edge, backend]
-
   admin:
     image: marina-${MARINA_INSTANCE_SLUG:?Set MARINA_INSTANCE_SLUG}-admin:${MARINA_RELEASE_SHA:?Set tested MARINA_RELEASE_SHA}
     build:

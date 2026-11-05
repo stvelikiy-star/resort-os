@@ -107,8 +107,17 @@ jobs:
           import yaml
           default = yaml.safe_load(open('/tmp/marina-compose-default.yml'))
           data = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
-          for name in ('migrate', 'provision', 'api', 'web', 'admin', 'staff'):
+          for name in ('migrate', 'provision', 'api', 'admin', 'staff'):
               assert data['services'][name]['image'] == 'marina-ak-bermet-ci-' + name + ':' + 'a' * 40
+          web = data['services']['web']
+          assert web['image'] == 'caddy:2.11.4-alpine'
+          assert web['command'] == ['caddy', 'run', '--config', '/etc/caddy/Caddyfile']
+          mounts = {entry['target']: entry for entry in web['volumes']}
+          assert mounts['/etc/caddy/Caddyfile']['read_only'] is True
+          assert mounts['/srv/index.html']['read_only'] is True
+          assert 'customer-unpublished.Caddyfile' in mounts['/etc/caddy/Caddyfile']['source']
+          assert 'customer-unpublished.html' in mounts['/srv/index.html']['source']
+          assert 'ports' not in web
           assert 'provision' not in default['services']
           assert data['services']['provision']['profiles'] == ['bootstrap']
           ports = {(p['published'], p['target'], p['protocol']) for p in data['services']['caddy']['ports']}
@@ -131,14 +140,19 @@ jobs:
           assert current['name'] == previous['name']
           assert current['networks'] == previous['networks']
           assert current['volumes'] == previous['volumes']
-          for name in ('migrate', 'provision', 'api', 'web', 'admin', 'staff'):
+          for name in ('migrate', 'provision', 'api', 'admin', 'staff'):
               service = previous['services'][name]
               assert service['image'] == 'marina-ak-bermet-ci-' + name + ':' + 'b' * 40
               assert service.get('volumes') == current['services'][name].get('volumes')
+          assert current['services']['web'] == previous['services']['web']
           assert current['services']['postgres'] == previous['services']['postgres']
           assert current['services']['n8n'] == previous['services']['n8n']
           print('PASS: release-specific application images; hotel database, storage and networks unchanged')
           PY
+      - name: Verify separate safe customer Web publication boundary
+        run: |
+          PYTHONPATH=scripts python3 -m unittest test_marina_customer_web_guard -v
+          docker run --rm -v "$PWD/deploy/marina/customer-unpublished.Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
       - name: Validate strict Caddy host routing
         run: |
           docker run --rm \
