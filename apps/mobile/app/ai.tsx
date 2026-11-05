@@ -4,34 +4,21 @@ import { Redirect, useRouter } from 'expo-router';
 import { ChevronLeft, Send, ShieldCheck, Sparkles, UserRound } from 'lucide-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { useSession } from '../src/state/session';
-import { useMobileCopy } from '../src/i18n/mobileCopy';
+import { useMobileCopy, aiMobileCopy } from '../src/i18n/mobileCopy';
 import { AssistantCapabilities, AssistantMessage, useLiveModules } from '../src/api/liveModules';
 import { useAsync } from '../src/lib/useAsync';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StatusPill } from '../src/components/Future';
 import { Button, DemoBanner, Empty, PressScale, SectionLabel } from '../src/components/ui';
 import { font, radius, space } from '../src/theme/tokens';
 
-const labels = {
-  ru: { title: 'MARINA AI', sub: 'Умный помощник по данным отеля', prompt: 'Спросите о работе отеля…', send: 'Спросить',
-    rights: 'Ответы только для чтения. AI не создаёт брони и платежи.', unavailable: 'AI-сервис не настроен для этого отеля.',
-    source: 'Контекст платформы', yes: 'Получен', no: 'Не подтверждён', empty: 'Опишите вопрос, чтобы получить ответ от сервера.', back: 'Назад', ready: 'AI подключён', offline: 'AI недоступен', processing: 'Обработка запроса…' },
-  kg: { title: 'MARINA AI', sub: 'Мейманкана боюнча акылдуу жардамчы', prompt: 'Мейманкана тууралуу суроо…', send: 'Суроо',
-    rights: 'Жооптор окуу үчүн гана. AI бронь же төлөм түзбөйт.', unavailable: 'Бул мейманканада AI кызматы жөндөлгөн эмес.',
-    source: 'Платформа контексти', yes: 'Алынды', no: 'Ырасталган эмес', empty: 'Серверден жооп алуу үчүн суроо бериңиз.', back: 'Артка', ready: 'AI туташты', offline: 'AI жеткиликсиз', processing: 'Суроо иштетилүүдө…' },
-  en: { title: 'MARINA AI', sub: 'Hotel-aware intelligent assistant', prompt: 'Ask about hotel operations…', send: 'Ask',
-    rights: 'Read-only answers. AI cannot create bookings or payments.', unavailable: 'AI is not configured for this hotel.',
-    source: 'Platform context', yes: 'Available', no: 'Unverified', empty: 'Ask a question to receive a server answer.', back: 'Back', ready: 'AI connected', offline: 'AI unavailable', processing: 'Processing request…' },
-  kz: { title: 'MARINA AI', sub: 'Қонақүй бойынша зияткер көмекші', prompt: 'Қонақүй жұмысы туралы сұраңыз…', send: 'Сұрау',
-    rights: 'Жауаптар тек оқуға арналған. AI брондау не төлем жасамайды.', unavailable: 'Бұл қонақүйде AI қызметі бапталмаған.',
-    source: 'Платформа контексі', yes: 'Бар', no: 'Расталмаған', empty: 'Серверден жауап алу үшін сұрақ қойыңыз.', back: 'Артқа', ready: 'AI қосылды', offline: 'AI қолжетімсіз', processing: 'Сұрау өңделуде…' },
-};
+
 export default function Assistant() {
   const { user, locale, serverAuthMode, api } = useSession();
   const modules = useLiveModules();
   const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
   const copy = useMobileCopy();
   const { c } = useTheme();
-  const t = labels[locale];
+  const t = aiMobileCopy[locale];
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
   const [inputFocused, setInputFocused] = useState(false);

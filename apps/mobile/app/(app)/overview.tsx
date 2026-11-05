@@ -56,7 +56,7 @@ export default function Overview() {
             <Text numberOfLines={1} style={[font.label, { color: '#C8E8F5' }]}>{data.property.name.toUpperCase()}</Text>
             <Text numberOfLines={1} style={[font.label, { color: '#C8E8F5' }]}>{data.property.local_date}</Text>
           </View>
-          <Text style={[font.label, { color:'#E7C480' }]}>{hotel?.demo ? copy.demoLabel : 'LIVE PMS'}</Text>
+          <Text style={[font.label, { color:'#E7C480' }]}>{hotel?.demo ? copy.demoLabel : copy.livePmsLabel}</Text>
         </View>
         <View style={{ flexDirection:'row', alignItems:'center', gap:width < 350 ? 6 : 12, marginTop:8 }}>
           <View style={{ flex:1 }}>

@@ -1,5 +1,5 @@
 import { dictionaries, LOCALES, localeFromDevice } from '../src/i18n';
-import { mobileCopyStrings } from '../src/i18n/mobileCopy';
+import { mobileCopyStrings, aiMobileCopy, pmsWeekdayLabels } from '../src/i18n/mobileCopy';
 
 const flat = (o: any, p = ''): Record<string, string> =>
   Object.entries(o).reduce((a, [k, v]) => (typeof v === 'object' ? { ...a, ...flat(v, `${p}${k}.`) } : { ...a, [`${p}${k}`]: String(v) }), {});
@@ -20,6 +20,16 @@ describe('localization RU/KG/EN/KZ', () => {
     for (const locale of LOCALES) {
       expect(Object.keys(mobileCopyStrings[locale]).sort()).toEqual(baseline);
       for (const value of Object.values(mobileCopyStrings[locale])) expect(value.trim()).not.toBe('');
+    }
+  });
+  it('keeps the moved AI copy and 7 PMS weekday names complete in every locale', () => {
+    const aiKeys = Object.keys(aiMobileCopy.ru).sort();
+    for (const locale of LOCALES) {
+      expect(Object.keys(aiMobileCopy[locale]).sort()).toEqual(aiKeys);
+      expect(Object.values(aiMobileCopy[locale]).every(v => !!v.trim())).toBe(true);
+      expect(pmsWeekdayLabels[locale]).toHaveLength(7);
+      expect(pmsWeekdayLabels[locale].every(v => !!v.trim())).toBe(true);
+      expect(mobileCopyStrings[locale].livePmsLabel).toBe('LIVE PMS');
     }
   });
   it('maps device language codes', () => {
