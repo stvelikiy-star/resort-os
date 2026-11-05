@@ -95,7 +95,7 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch, session
       const ack = await call('POST', `/api/v1/ops/tasks/${key}/complete-report`, {
         summary: report.comment?.trim() || 'Cleaning completed',
         checklist: HOUSEKEEPING_CHECKLIST.map((code) => ({ code, label: code, done: !!report.checklist[code] })),
-        evidence_urls: [], // photo upload needs the attachments API (backend item B5)
+        // Optional evidence_urls omitted: no attachment API or fake evidence upload.
       });
       return committedTask(key, ack);
     },

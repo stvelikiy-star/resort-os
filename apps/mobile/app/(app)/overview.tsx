@@ -15,6 +15,7 @@ import { demoDashboard } from '../../src/api/demoPresentation';
 import { InventorySpectrum } from '../../src/components/InventorySpectrum';
 import { contactInitials } from '../../src/i18n/statusLabels';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { canReadFinance } from '../../src/api/financeAccess';
 import { font, radius, space } from '../../src/theme/tokens';
 
 export default function Overview() {
@@ -51,8 +52,11 @@ export default function Overview() {
     {data ? <>
       <StaggerItem index={0}><Hero>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
-          <Text numberOfLines={2} style={[font.label, { color:'#C8E8F5', flex: 1, minWidth: 0 }]}>{data.property.name.toUpperCase()} · {data.property.local_date}</Text>
-          <Text style={[font.label, { color:'#E7C480' }]}>{hotel?.demo ? copy.demoLabel : 'LIVE PMS'}</Text>
+          <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+            <Text numberOfLines={1} style={[font.label, { color: '#C8E8F5' }]}>{data.property.name.toUpperCase()}</Text>
+            <Text numberOfLines={1} style={[font.label, { color: '#C8E8F5' }]}>{data.property.local_date}</Text>
+          </View>
+          <Text style={[font.label, { color:'#E7C480' }]}>{hotel?.demo ? copy.demoLabel : copy.livePmsLabel}</Text>
         </View>
         <View style={{ flexDirection:'row', alignItems:'center', gap:width < 350 ? 6 : 12, marginTop:8 }}>
           <View style={{ flex:1 }}>
@@ -81,6 +85,7 @@ export default function Overview() {
         <MetricCard tone="cyan" icon={MessageCircle} label={copy.needsReply} value={count(data.communications.needs_reply)} onPress={canOpenInbox ? () => router.push('/inbox') : undefined}/>
         <MetricCard tone="warning" icon={BedDouble} label={copy.dirty} value={count(data.rooms.dirty)} onPress={canOpen('pms') ? () => router.push('/pms') : undefined}/>
       </View>
+      {api?.mode === 'LIVE' && canReadFinance(user) ? <QuickAction icon={Wallet} label={copy.financeTitle} onPress={() => router.push('/finance')}/> : null}
       <SectionLabel>{copy.available}</SectionLabel>
       {canOpen('pms') ? <QuickAction icon={CalendarDays} label={copy.pms} onPress={() => router.push('/pms')}/> : null}
       {canOpenInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}

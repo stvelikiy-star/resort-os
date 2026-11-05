@@ -18,15 +18,16 @@ export default function Connect() {
   const { c } = useTheme();
   const router = useRouter();
   const { hotelAddress } = useLocalSearchParams<{ hotelAddress?: string }>();
-  const { hotels, addHotel, selectHotel, startDemo, locale, setLocale } = useSession();
+  const { hotels, addHotel, switchHotel, startDemo, locale, setLocale } = useSession();
   const [addr, setAddr] = useState(typeof hotelAddress === 'string' ? hotelAddress : '');
   const [err, setErr] = useState<string | null>(null);
   const [demoBusy, setDemoBusy] = useState(false);
 
-  const open = (id: string) => {
+  const open = async (id: string) => {
     const chosen = hotels.find(h => h.id === id);
     if (!chosen || (!chosen.demo && !isTrustedHotelOrigin(chosen.baseUrl))) { setErr(t('connect.untrusted')); return; }
-    selectHotel(id); router.push('/login');
+    try { const restored = await switchHotel(id); router.replace(restored ? '/profile' : '/login'); }
+    catch { setErr(t('connect.untrusted')); }
   };
   const add = () => {
     const r = parseHotelAddress(addr);
@@ -85,7 +86,7 @@ export default function Connect() {
         <Field label={t('connect.code')} placeholder={t('connect.codePh')} value={addr} onChangeText={setAddr} autoCapitalize="none" autoCorrect={false} keyboardType="url" testID="hotel-address" />
         {err ? <Text testID="connect-error" style={[font.small, { color: c.danger }]}>{err}</Text> : null}
         <Button testID="connect-add" label={t('connect.addHotel')} icon={Link2} onPress={add} />
-        <Button label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
+        <Button testID="connect-scan" label={t('connect.scan')} icon={QrCode} variant="secondary" onPress={() => router.push('/scan')} />
       </GlassCard>
       {Platform.OS === 'web' ? (
         <Card testID="web-live-cookie-notice" style={{ backgroundColor: c.warningSoft, gap: space.sm }}>

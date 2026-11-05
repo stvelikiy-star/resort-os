@@ -7,7 +7,7 @@ import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } fr
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
 import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
 import { canOpenPmsReservation, pmsCellState } from '../../src/roles/pmsPresentation';
-import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { useMobileCopy, pmsWeekdayLabels } from '../../src/i18n/mobileCopy';
 import { demoGrid } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
@@ -19,12 +19,7 @@ function dayAt(start: string, offset: number): string {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
 const DAYS = 7, CELL_WIDTH = 72, ROW_HEIGHT = 76, LABEL_WIDTH = 104;
-const DAY_NAMES = {
-  ru: ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'],
-  kg: ['Жек', 'Дүй', 'Шей', 'Шар', 'Бей', 'Жум', 'Ише'],
-  en: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-  kz: ['Жс', 'Дс', 'Сс', 'Ср', 'Бс', 'Жм', 'Сб'],
-} as const;
+
 export default function Pms() {
   const { hotel, user, locale, api } = useSession();
   const showroom = api?.mode === 'DEMO';
@@ -103,7 +98,7 @@ export default function Pms() {
               <View style={{ flexDirection: 'row', height: 46, alignItems: 'center' }}>
                 {dates.map(date => <View key={date} style={{ width: CELL_WIDTH, alignItems: 'center', paddingVertical: 7, borderRadius: radius.sm, backgroundColor: date === localDate() ? c.primarySoft : 'transparent' }}>
                   <Text style={[font.small, { color: date === localDate() ? c.primary : c.text, fontWeight: '800' }]}>{date.slice(5)}</Text>
-                  <Text style={[font.label, { color: c.textMuted }]}>{DAY_NAMES[locale][new Date(date + 'T12:00:00').getDay()]}</Text>
+                  <Text style={[font.label, { color: c.textMuted }]}>{pmsWeekdayLabels[locale][new Date(date + 'T12:00:00').getDay()]}</Text>
                 </View>)}
               </View>
               {shownRooms.map(room => <View key={room.id} style={{ flexDirection: 'row', height: ROW_HEIGHT, alignItems: 'center', borderBottomWidth: 1, borderColor: c.border }}>

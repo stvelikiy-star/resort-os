@@ -155,9 +155,14 @@ export function Field({ label, ...rest }: TextInputProps & { label: string }) {
   );
 }
 
+/** Compose translated headings with dates/counts without Array#toString commas. */
+export function sectionLabelText(children: React.ReactNode): string {
+  const parts = Array.isArray(children) ? children : [children];
+  return parts.map(part => (part == null || typeof part === 'boolean') ? '' : String(part)).join('').toUpperCase();
+}
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
-  return <Text style={[font.label, { color: c.textMuted, marginTop: space.sm }]}>{String(children).toUpperCase()}</Text>;
+  return <Text style={[font.label, { color: c.textMuted, marginTop: space.sm }]}>{sectionLabelText(children)}</Text>;
 }
 
 export function DemoBanner() {

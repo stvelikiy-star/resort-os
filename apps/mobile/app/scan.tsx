@@ -60,7 +60,7 @@ export default function ScanHotel() {
           <ShieldCheck color={c.success} size={20} />
           <Text style={[font.small, { color: c.textMuted, flex: 1 }]} >{t('scan.privacy')}</Text>
         </View>
-        <Button label={t('scan.back')} variant="secondary" onPress={() => router.replace('/connect')} />
+        <Button testID="scan-back" label={t('scan.back')} variant="secondary" onPress={() => router.replace('/connect')} />
       </Card>
     </Screen>
   );

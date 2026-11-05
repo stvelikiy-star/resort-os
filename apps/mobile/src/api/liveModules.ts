@@ -6,7 +6,7 @@ import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
 import type { AuthMode } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
-import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse } from './contractValidation';
+import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
@@ -63,6 +63,12 @@ export interface BookingCommit extends BookingDraft {
 export interface Hold {
   id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
 }
+export interface FinanceSummary {
+  range: { from: string; to: string; currency: string };
+  period_payments: { received_kgs: number; pending_created_kgs: number; received_count: number };
+  receivables_snapshot: { outstanding_kgs: number; debtor_count: number };
+  active_reservations_snapshot: { reservation_count: number; outstanding_kgs: number };
+}
 export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
 export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
 export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
@@ -89,6 +95,11 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
   };
   return {
     dashboard: async () => dashboardResponse(await request<unknown>('GET', p + '/admin/dashboard')),
+    financeSummary: async (from: string, to: string): Promise<FinanceSummary> => {
+      // Server OWNER/MANAGER + FINANCE permission guards remain authoritative;
+      // shared_auth_preview explicitly allows this read. No 503 bypass.
+      return financeSummaryResponse(await request<unknown>('GET', p + '/admin/finance/summary?from_date=' + safeIsoDate(from) + '&to_date=' + safeIsoDate(to)));
+    },
     reception: async () => {
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
       return receptionResponse(value);

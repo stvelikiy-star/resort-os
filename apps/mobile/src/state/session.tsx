@@ -24,6 +24,8 @@ interface SessionCtx {
   setLocale: (l: Locale) => void;
   addHotel: (h: HotelConnection) => void;
   selectHotel: (id: string) => void;
+  /** Retain verified per-origin in-memory sessions; never reuse shared-host cookies. */
+  switchHotel: (id: string) => Promise<boolean>;
   signIn: (username: string, password: string, selector?: SharedHotelSelector) => Promise<AuthUser>;
   /** Isolated synthetic preview: does not touch hotel APIs. */
   startDemo: (username?: string) => Promise<AuthUser>;
@@ -43,6 +45,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   // Sessions are keyed by hotel id: signing in to hotel A never exposes data of hotel B.
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
   const [serverAuthMode, setServerAuthMode] = useState<AuthMode | null>(null);
+  const authModesByHotel = useRef<Record<string, AuthMode>>({});
   const sessionRevision = useRef(0);
   const loginAttempt = useRef(0);
   // One native cookie jar per host: keep all LIVE sign-in cookie writes ordered.
@@ -174,6 +177,48 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       liveSignInTail.current = current.then(() => undefined, () => undefined);
     }
   }, [hotelId, hotels]);
+  const switchHotel = useCallback(async (id: string): Promise<boolean> => {
+    const target = hotels.find(h => h.id === id);
+    if (!target || (!target.demo && !isTrustedHotelOrigin(target.baseUrl))) {
+      throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
+    }
+    if (id === hotelId) return !!sessions[id];
+    const previous = hotelId ? hotels.find(h => h.id === hotelId) : null;
+    // Native HttpOnly cookies are scoped to HOST, not to tenant/property code.
+    // Two connections sharing a hostname can NEVER retain separate LIVE users.
+    if (previous && !previous.demo && !target.demo &&
+        new URL(previous.baseUrl).hostname === new URL(target.baseUrl).hostname) {
+      selectHotel(id); // existing fail-closed logout/host revocation boundary
+      return false;
+    }
+    const revision = ++sessionRevision.current;
+    loginAttempt.current++;
+    let remembered: AuthUser | null = sessions[id] ?? null;
+    if (remembered && !target.demo) {
+      try {
+        // Revalidate before revealing any cached LIVE identity or hotel data.
+        // A disconnected or revoked session requires login, not a stale preview.
+        const actual = await apiFor(target).me();
+        if (!sameSessionIdentity(remembered, actual)) throw new ApiError('UNAUTHORIZED');
+        remembered = actual;
+      } catch {
+        remembered = null;
+        dropApi(id);
+        setSessions(current => { const next = { ...current }; delete next[id]; return next; });
+        delete authModesByHotel.current[id];
+      }
+    }
+    if (revision !== sessionRevision.current) throw new ApiError('STALE_SESSION');
+    if (remembered && !target.demo) activateClientSession(apiFor(target));
+    if (remembered) {
+      const verified = remembered;
+      setSessions(current => ({ ...current, [id]: verified }));
+    }
+    setServerAuthMode(remembered ? authModesByHotel.current[id] ?? null : null);
+    setHotelId(id);
+    return !!remembered;
+  }, [hotelId, hotels, sessions, selectHotel]);
+
   const addHotel = useCallback((h: HotelConnection) => {
     if (h.demo || !isTrustedHotelOrigin(h.baseUrl)) throw new ApiError('FORBIDDEN', 'Hotel origin is not approved in this app build');
     setHotels((cur) => {
@@ -191,8 +236,22 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
       void setItem('marina.hotels', JSON.stringify(next.filter((x) => !x.demo)));
       return next;
     });
-    selectHotel(h.id);
-  }, [selectHotel]);
+    const previous = hotelId ? hotels.find(current => current.id === hotelId) : null;
+    const sameHost = previous && !previous.demo &&
+      new URL(previous.baseUrl).hostname === new URL(h.baseUrl).hostname;
+    if (sameHost) {
+      // Replacing /api/v1 with /core on one host must still revoke the
+      // old cookie and invalidate its cached user: this is NOT a second hotel.
+      selectHotel(h.id);
+    } else {
+      // New trusted host: its OS cookie is isolated by host, so other
+      // previously verified hotel sessions can remain in memory.
+      sessionRevision.current++;
+      loginAttempt.current++;
+      setServerAuthMode(null);
+      setHotelId(h.id);
+    }
+  }, [hotelId, hotels, selectHotel]);
   const startDemo = useCallback(async (username = 'manager'): Promise<AuthUser> => {
     const demoHotel = DEMO_HOTELS[0];
     // Never bypass production auth. This method explicitly uses the isolated
@@ -228,7 +287,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // not after waiting for an earlier native-cookie mutation to finish.
     const revision = ++sessionRevision.current;
     const attempt = ++loginAttempt.current;
-    setSessions({});
+    setSessions(current => { const next = { ...current }; delete next[hotel.id]; return next; });
     setServerAuthMode(null);
 
     if (!hotel.demo) dropApi(hotel.id);
@@ -290,8 +349,9 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         throw new ApiError('UNAUTHORIZED', 'Session context changed during login');
       }
       activateClientSession(loginApi);
+      if (chosenMode) authModesByHotel.current[hotel.id] = chosenMode;
       setServerAuthMode(chosenMode);
-      setSessions({ [hotel.id]: verified });
+      setSessions(current => ({ ...current, [hotel.id]: verified }));
       return verified;
     } catch (error) {
       if (loginStarted && !hotel.demo && isTrustedHotelOrigin(hotel.baseUrl)) {
@@ -321,6 +381,7 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     // for encrypted storage or a network call to remove the previous hotel.
     dropApi(hotel.id);
     setServerAuthMode(null);
+    delete authModesByHotel.current[hotel.id];
     setSessions((s) => { const n = { ...s }; delete n[hotel.id]; return n; });
 
     if (hotel.demo) {
@@ -365,8 +426,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
   }, [hotel, api, user, signOut]);
 
   const value = useMemo<SessionCtx>(() => ({
-    hotels, hotel, user, api, serverAuthMode, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut, leaveHotel: () => selectHotel(null),
-  }), [hotels, hotel, user, api, serverAuthMode, locale, setLocale, addHotel, selectHotel, signIn, startDemo, signOut]);
+    hotels, hotel, user, api, serverAuthMode, locale, setLocale, addHotel, selectHotel, switchHotel, signIn, startDemo, signOut, leaveHotel: () => selectHotel(null),
+  }), [hotels, hotel, user, api, serverAuthMode, locale, setLocale, addHotel, selectHotel, switchHotel, signIn, startDemo, signOut]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 

@@ -1,5 +1,5 @@
 import { ApiError } from './types';
-import type { Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, AssistantCapabilities, AssistantAnswer, Hold } from './liveModules';
+import type { FinanceSummary, Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, AssistantCapabilities, AssistantAnswer, Hold } from './liveModules';
 import type { AuthUser } from './types';
 const invalid=(where:string):never=>{ throw new ApiError('UNKNOWN','Hotel response contract mismatch: '+where); };
 const obj=(v:unknown,k:string):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:invalid(k);
@@ -22,6 +22,24 @@ export function dashboardResponse(v:unknown):Dashboard {
   const today=obj(x.today,'dashboard.today');arr(today.arrivals,'dashboard.arrivals');arr(today.departures,'dashboard.departures');
   arr(x.attention_tasks,'dashboard.attention_tasks').forEach((t,i)=>{const a=obj(t,'attention_task'+i);str(a.id,'attention_task.id');str(a.title,'attention_task.title');});
   return v as Dashboard;
+}
+/** Only render confirmed finance aggregates, never a guessed payment or profit. */
+export function financeSummaryResponse(v:unknown):FinanceSummary {
+  const x=obj(v,'finance.summary'),range=obj(x.range,'finance.range');
+  str(range.from,'finance.from');str(range.to,'finance.to');str(range.currency,'finance.currency');
+  const period=obj(x.period_payments,'finance.period');
+  const receivables=obj(x.receivables_snapshot,'finance.receivables');
+  const active=obj(x.active_reservations_snapshot,'finance.active');
+  for(const [value,key] of [
+    [period.received_kgs,'received_kgs'],[period.pending_created_kgs,'pending_created_kgs'],
+    [period.received_count,'received_count'],[receivables.outstanding_kgs,'outstanding_kgs'],
+    [receivables.debtor_count,'debtor_count'],[active.reservation_count,'reservation_count'],
+    [active.outstanding_kgs,'active.outstanding_kgs'],
+  ] as const) {
+    const n=num(value,'finance.'+key);
+    if(!Number.isSafeInteger(n)||n<0) invalid('finance.'+key);
+  }
+  return v as FinanceSummary;
 }
 export function gridResponse(v:unknown):Grid {
   const x=obj(v,'pms.grid');str(x.property,'pms.property');
