@@ -1,6 +1,6 @@
 import type { AuthMode, Role } from '../api/types';
 
-export type TabKey = 'overview' | 'reception' | 'pms' | 'inbox' | 'dining' | 'tasks' | 'rooms' | 'requests' | 'admin' | 'profile';
+export type TabKey = 'overview' | 'reception' | 'pms' | 'inbox' | 'dining' | 'kitchen' | 'tasks' | 'rooms' | 'requests' | 'admin' | 'profile';
 export interface Workspace {
   tabs: TabKey[];
   taskTypes: ('HOUSEKEEPING' | 'MAINTENANCE' | 'GUEST_REQUEST')[];
@@ -31,7 +31,7 @@ const DEMO_SHOWCASE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
-  COOK: ['dining', 'profile'],
+  COOK: ['kitchen', 'dining', 'profile'],
   WAITER: ['dining', 'profile'],
   AGENT: ['pms', 'profile'],
 };
@@ -50,13 +50,13 @@ const LIVE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
-  COOK: ['dining', 'profile'],
+  COOK: ['kitchen', 'dining', 'profile'],
   WAITER: ['dining', 'profile'],
   AGENT: ['pms', 'profile'],
 };
 const MODULE: Record<TabKey, string | null> = {
   overview: 'DASHBOARD', reception: 'RESERVATIONS', pms: 'PMS', inbox: 'WHATSAPP',
-  dining: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'STAFF', profile: null,
+  dining: 'DINING', kitchen: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'STAFF', profile: null,
 };
 /** UI visibility is only a convenience. Every endpoint still enforces hard role, property and custom module grants. */
 export function workspaceForSession(
@@ -70,7 +70,7 @@ export function workspaceForSession(
   // SharedAuthPreviewBoundary returns 503 for inbox and dining irrespective
   // of grants. The UI must never suggest these routes are LIVE-ready.
   const tabs = candidates.filter((tab) => {
-    if (sharedPreview && tab === 'dining') return false; // RC5 Inbox is server-gated; 403/503 still fail closed.
+    if (sharedPreview && (tab === 'dining' || tab === 'kitchen')) return false; // Both use the same unavailable Dining API; RC5 Inbox is server-gated.
     if (tab === 'inbox') return permissions.includes('WHATSAPP') || (role !== 'RECEPTION' && permissions.includes('INBOX'));
     if (tab === 'admin') return permissions.includes('OPS') && permissions.includes('STAFF');
     return !MODULE[tab] || permissions.includes(MODULE[tab]!);

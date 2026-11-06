@@ -180,6 +180,11 @@ async function main() {
     await click('[data-testid="tab-pms"]','owner PMS');
     if (!await waitFor('[data-testid="pms-next"]')) throw new Error('PMS 7-day grid missing');
     await screenshot('owner_pms_ru_light_375');
+    // A booked PMS cell must open the real screen component bottom sheet (DEMO read-only).
+    await click('[data-testid^="pms-"][aria-label*="Бронирования"]','open booked guest quick card');
+    if (!await waitFor('[data-testid="pms-booking-sheet"]')) throw new Error('PMS guest bottom sheet failed to open');
+    await screenshot('owner_pms_guest_sheet_ru_light_375');
+    await click('[data-testid="pms-sheet-close"]','close PMS guest quick card');
     await click('[data-testid="pms-next"]','week navigation');
     await screenshot('owner_pms_nextweek_ru_light_375');
     await click('[data-testid="tab-reception"]','guest arrivals');
@@ -261,7 +266,11 @@ async function main() {
     await click('[data-testid="tab-profile"]','technician profile');
     await click('[data-testid="switch-demo-role"]','cook selector');
     await click('[data-testid="demo-cook"]','cook role');
-    if (!await waitFor('[data-testid="order-d-order-01"]')) throw new Error('Cook kitchen showroom missing');
+    if (!await waitFor('[data-testid="kitchen-open-orders"]')) throw new Error('Cook kitchen dashboard missing');
+    if (await evaluate('location.pathname') !== '/kitchen') throw new Error('Cook landing route is not /kitchen');
+    await screenshot('cook_kitchen_en_dark_375');
+    await click('[data-testid="kitchen-open-orders"]','cook kitchen orders from dashboard');
+    if (!await waitFor('[data-testid="order-d-order-01"]')) throw new Error('Cook dining order showroom missing');
     await screenshot('cook_orders_en_dark_375');
     const diningMatrixFiles = [];
     for (const lang of ['ru', 'kg', 'en']) {

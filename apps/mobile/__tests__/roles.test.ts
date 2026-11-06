@@ -37,7 +37,7 @@ describe('role → workspace', () => {
     expect(workspaceForSession('MANAGER', ['PMS', 'STAFF'], 'LIVE').mobileReady).toBe(true);
     expect(workspaceForSession('MANAGER', ['PMS', 'WHATSAPP'], 'LIVE').tabs).toEqual(['pms', 'inbox', 'profile']);
     expect(workspaceForSession('RECEPTION', ['WHATSAPP', 'PMS', 'RESERVATIONS'], 'LIVE').tabs).toEqual(['reception', 'pms', 'inbox', 'profile']);
-    expect(workspaceForSession('COOK', ['DINING'], 'LIVE').tabs).toEqual(['dining', 'profile']);
+    expect(workspaceForSession('COOK', ['DINING'], 'LIVE').tabs).toEqual(['kitchen', 'dining', 'profile']);
     expect(workspaceForSession('WAITER', ['DINING'], 'LIVE').tabs).toEqual(['dining', 'profile']);
     expect(workspaceForSession('RECEPTION', ['OPS'], 'LIVE').tabs).toEqual(['profile']);
     expect(hasTabForSession('MANAGER', [], 'LIVE', 'admin')).toBe(false);
@@ -100,7 +100,7 @@ describe('STORE_STAFF release gate', () => {
       RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
       MAID: ['tasks', 'rooms', 'profile'],
       TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
-      COOK: ['dining', 'profile'],
+      COOK: ['kitchen', 'dining', 'profile'],
       WAITER: ['dining', 'profile'],
       STORE_STAFF: ['profile'],
     };
@@ -122,6 +122,8 @@ describe('Reception and Dining network-read role boundaries', () => {
     expect(hasTabForSession('COOK', [], 'LIVE', 'dining')).toBe(false);
     expect(hasTabForSession('WAITER', ['DINING'], 'LIVE', 'dining')).toBe(true);
     expect(hasTabForSession('COOK', ['DINING'], 'LIVE', 'dining', 'shared_auth_preview')).toBe(false);
+    expect(hasTabForSession('COOK', ['DINING'], 'LIVE', 'kitchen', 'shared_auth_preview')).toBe(false);
+    expect(hasTabForSession('WAITER', ['DINING'], 'LIVE', 'kitchen')).toBe(false);
     expect(hasTabForSession('RECEPTION', ['DINING'], 'LIVE', 'dining')).toBe(false);
     expect(hasTabForSession('STORE_STAFF', ['DINING'], 'LIVE', 'dining')).toBe(false);
   });

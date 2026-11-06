@@ -1,7 +1,7 @@
 import React from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
-import { ArrowUpRight, CircleUserRound, Grid2X2, BedDouble, CalendarDays, ClipboardCheck, MessageCircle, ConciergeBell, UtensilsCrossed, Wrench, ChartNoAxesCombined } from 'lucide-react-native';
+import { ArrowUpRight, CircleUserRound, BedDouble, CalendarDays, ClipboardCheck, MessageCircle, ConciergeBell, UtensilsCrossed, ChefHat, Wrench, LayoutDashboard, UsersRound } from 'lucide-react-native';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
 import { Empty, SectionLabel } from '../../src/components/ui';
 import { mobileTabPlan } from '../../src/roles/navigation';
@@ -12,9 +12,9 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
 
 const ICONS = {
-  overview: ChartNoAxesCombined, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
-  dining: UtensilsCrossed, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
-  admin: Grid2X2, profile: CircleUserRound,
+  overview: LayoutDashboard, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
+  dining: UtensilsCrossed, kitchen: ChefHat, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
+  admin: UsersRound, profile: CircleUserRound,
 } as const;
 export default function MoreScreen() {
   const { user, hotel, api, serverAuthMode } = useSession();
