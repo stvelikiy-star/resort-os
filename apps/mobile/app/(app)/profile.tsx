@@ -51,7 +51,7 @@ export default function Profile() {
         {row(t('profile.mode'), hotel?.demo ? t('profile.modeDemo') : t('profile.modeLive'))}
         {row(t('profile.version'), String(Constants.expoConfig?.version ?? '0.2.0'))}
       </GlassCard>
-      {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).mobileReady ? <GlassCard testID="role-soon"><Text style={[font.body, { color: c.textMuted }]}>{t('profile.roleSoon')}</Text></GlassCard> : null}
+      {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).mobileReady ? <GlassCard testID="role-soon"><Text accessibilityRole="text" style={[font.body, { color: c.textMuted }]}>{api.mode === 'LIVE' && user.role === 'STORE_STAFF' ? t('profile.storeUnavailable') : t('profile.roleSoon')}</Text></GlassCard> : null}
       <GlassCard style={{ gap: space.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <Languages size={23} color={c.cyan}/>
