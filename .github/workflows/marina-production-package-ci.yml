@@ -124,6 +124,7 @@ jobs:
           assert ports == {('80', 80, 'tcp'), ('443', 443, 'tcp'), ('443', 443, 'udp')}, ports
           assert 'ports' not in data['services']['postgres']
           assert data['services']['api']['environment']['MARINA_TENANT_CONTEXT_ENABLED'] == 'false'
+          assert data['services']['api']['environment']['MARINA_CUSTOMER_SITE_SAFE_MODE'] == 'true'
           assert data['services']['api']['environment']['ENABLE_PAYMENT_OPERATIONS'] == 'false'
           assert data['networks']['backend']['internal'] is True
           assert data['networks']['backend']['name'].startswith('marina-ak-bermet-ci_')
