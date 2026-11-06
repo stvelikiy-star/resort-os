@@ -120,7 +120,13 @@ async def assert_database_empty(conn: asyncpg.Connection) -> None:
         )
 
 
+def bootstrap_enabled_modules() -> str:
+    """Only the property site editor is enabled during new customer provisioning."""
+    return '["CONTENT"]' if os.environ.get("MARINA_CUSTOMER_SITE_SAFE_MODE", "").strip().lower() == "true" else '[]'
+
+
 async def provision(config: dict[str, str]) -> dict[str, str]:
+    enabled_modules = bootstrap_enabled_modules()
     owner_password_hash = OWNER_PASSWORD_HASHER.hash(config["owner_password"])
     conn = await asyncpg.connect(config["database_url"])
     try:
@@ -152,8 +158,8 @@ async def provision(config: dict[str, str]) -> dict[str, str]:
             await conn.execute(
                 '''INSERT INTO property_product_settings
                      (id,"propertyId","checkInTime","checkOutTime","enabledModules","createdAt","updatedAt")
-                   VALUES ($1,$2,TIME '14:00',TIME '12:00','[]'::jsonb,now(),now())''',
-                uuid.uuid4(), property_id,
+                   VALUES ($1,$2,TIME '14:00',TIME '12:00',$3::jsonb,now(),now())''',
+                uuid.uuid4(), property_id, enabled_modules,
             )
             await conn.execute(
                 '''INSERT INTO staff_users

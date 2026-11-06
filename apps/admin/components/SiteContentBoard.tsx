@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import SiteMediaBoard from "./SiteMediaBoard";
+import CustomerSiteBoard from "./CustomerSiteBoard";
 
 type Locale = "ru" | "kg" | "kz" | "en";
 type Content = Record<string, Record<string, string>>;
@@ -97,6 +98,7 @@ export default function SiteContentBoard() {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [locale, setLocale] = useState<Locale>("ru");
   const [drafts, setDrafts] = useState<Record<Locale, Content> | null>(null);
+  const [customerMode, setCustomerMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -108,7 +110,11 @@ export default function SiteContentBoard() {
     try {
       const response = await fetch("/core/api/v1/admin/site/content", { cache: "no-store" });
       if (!response.ok) throw new Error(`CMS ${response.status}`);
-      const payload = (await response.json()) as { items: ContentItem[] };
+      const payload = (await response.json()) as { items: ContentItem[]; mode?: string };
+      if (payload.mode === "customer") {
+        setCustomerMode(true);
+        return;
+      }
       setItems(payload.items);
       const next = {} as Record<Locale, Content>;
       for (const entry of payload.items) next[entry.locale] = cloneContent(entry.draft);
@@ -195,6 +201,7 @@ export default function SiteContentBoard() {
     }
   }
 
+  if (customerMode) return <CustomerSiteBoard />;
   if (loading) return <main className="content-board"><div className="content-state">Загружаю контент сайта…</div></main>;
   if (!current || !drafts) return <main className="content-board"><div className="content-state error">{error || "Контент не найден"}</div></main>;
 
