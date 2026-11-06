@@ -180,6 +180,11 @@ async function main() {
     await click('[data-testid="tab-pms"]','owner PMS');
     if (!await waitFor('[data-testid="pms-next"]')) throw new Error('PMS 7-day grid missing');
     await screenshot('owner_pms_ru_light_375');
+    // A booked PMS cell must open the real screen component bottom sheet (DEMO read-only).
+    await click('[data-testid^="pms-"][aria-label*="Бронирования"]','open booked guest quick card');
+    if (!await waitFor('[data-testid="pms-booking-sheet"]')) throw new Error('PMS guest bottom sheet failed to open');
+    await screenshot('owner_pms_guest_sheet_ru_light_375');
+    await click('[data-testid="pms-sheet-close"]','close PMS guest quick card');
     await click('[data-testid="pms-next"]','week navigation');
     await screenshot('owner_pms_nextweek_ru_light_375');
     await click('[data-testid="tab-reception"]','guest arrivals');
