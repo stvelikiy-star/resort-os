@@ -70,6 +70,16 @@ export default function GuestAiAssistant({ token, locale, onSessionExpired, onHa
       if (response.status === 401 || response.status === 404) {
         setMessages([]); setError(copy.expired); onSessionExpired(); return;
       }
+      // A provider outage happens AFTER the guest's stay session is checked by
+      // the guest-assistant endpoint. Keep AI truthfully unavailable, but allow
+      // an explicit request to real reception through the existing guest API.
+      // No help task is created here; the guest must confirm it separately.
+      if (response.status === 503) {
+        setError(copy.unavailable);
+        setHandoffQuestion(question.trim().slice(0, 1200));
+        setHandoffAvailable(HUMAN_HANDOFF_UI_ENABLED);
+        return;
+      }
       const body = await response.json();
       if (!response.ok || typeof body.answer !== "string") throw new Error();
       setMessages([...history, { role: "assistant", content: body.answer }]);
