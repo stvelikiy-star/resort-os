@@ -5,6 +5,8 @@ on:
     paths:
       - 'scripts/marina_green_poll.py'
       - 'scripts/marina_green_poll_test.py'
+      - 'scripts/marina_single_hotel_provider_preflight.py'
+      - 'scripts/test_marina_single_hotel_provider_preflight.py'
       - 'deploy/marina-fleet-api.Dockerfile'
       - '.github/workflows/marina-green-direct-ci.yml'
   workflow_dispatch:
@@ -26,3 +28,11 @@ jobs:
         run: |
           python -m py_compile scripts/marina_green_poll.py scripts/marina_green_poll_test.py
           python scripts/marina_green_poll_test.py -v
+      - name: Provider readiness must fail closed without live acceptance
+        run: |
+          PYTHONPATH=scripts python -m unittest test_marina_single_hotel_provider_preflight -v
+          set +e
+          python scripts/marina_single_hotel_provider_preflight.py
+          rc=$?
+          set -e
+          test "$rc" -eq 2
