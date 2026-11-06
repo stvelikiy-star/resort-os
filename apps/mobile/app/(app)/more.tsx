@@ -1,7 +1,7 @@
 import React from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
-import { ArrowUpRight, CircleUserRound, Grid2X2, BedDouble, CalendarDays, ClipboardCheck, MessageCircle, ConciergeBell, UtensilsCrossed, ChefHat, Wrench, ChartNoAxesCombined } from 'lucide-react-native';
+import { ArrowUpRight, CircleUserRound, BedDouble, CalendarDays, ClipboardCheck, MessageCircle, ConciergeBell, UtensilsCrossed, ChefHat, Wrench, ChartNoAxesCombined } from 'lucide-react-native';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
 import { Empty, SectionLabel } from '../../src/components/ui';
 import { mobileTabPlan } from '../../src/roles/navigation';
