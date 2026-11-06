@@ -166,7 +166,7 @@ export function diningProductionSnapshotsResponse(v: unknown): DiningProductionS
         if (typeof row.frozen_total_portions !== 'number' || !Number.isSafeInteger(row.frozen_total_portions) ||
             row.frozen_total_portions < 0) invalid('production.frozen_total_portions');
         if (typeof row.delta_total_portions !== 'number' || !Number.isSafeInteger(row.delta_total_portions) ||
-            row.delta_total_portions !== row.current_total_portions - row.frozen_total_portions)
+            Number(row.delta_total_portions) !== Number(row.current_total_portions) - Number(row.frozen_total_portions))
           invalid('production.delta_total_portions');
       }
     });
