@@ -38,6 +38,13 @@ class GuestHandoffUiSourceContract(unittest.TestCase):
         self.assertIn('no auto retry', COMP.lower())
         self.assertIn('setHandoffAvailable(false)', COMP)
 
+    def test_provider_unavailable_requires_explicit_request_and_flag(self):
+        self.assertIn('response.status === 503', COMP)
+        self.assertIn('setError(copy.unavailable)', COMP)
+        self.assertIn('setHandoffAvailable(HUMAN_HANDOFF_UI_ENABLED)', COMP)
+        self.assertIn('response.status === 401 || response.status === 404', COMP)
+        self.assertIn('requires_explicit_guest_action === true', COMP)
+
     def test_four_existing_guest_languages_preserved(self):
         for locale in ("ru:", "kg:", "kz:", "en:"):
             self.assertIn(locale, COMP)
