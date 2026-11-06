@@ -167,6 +167,10 @@ jobs:
             caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
       - name: Build the one-shot provisioner image
         run: docker build --file deploy/marina-provisioner.Dockerfile --tag marina-provisioner-ci:local .
+      - name: Verify customer site editor is initially enabled only for own hotel
+        run: |
+          docker run --rm --network none -v "$PWD/scripts:/work/scripts:ro" -w /work -e PYTHONPATH=/work/scripts \
+            --entrypoint python marina-provisioner-ci:local -m unittest test_marina_customer_provision_modules -v
       - name: Check package boundary
         run: |
           ! grep -E '3korony\.com|THREE_CROWNS|/srv/three-crowns' compose.marina-production.yaml .env.marina-production.example deploy/marina/Caddyfile
