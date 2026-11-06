@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { BedDouble, CalendarDays, ChefHat, CircleUserRound, ClipboardCheck,
-  ConciergeBell, LayoutDashboard, MessageCircle, Settings2, UsersRound,
+  ConciergeBell, LayoutDashboard, MessageCircle, UsersRound,
   UtensilsCrossed, Wrench } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { TabKey } from '../roles/registry';
