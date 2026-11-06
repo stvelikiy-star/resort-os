@@ -20,7 +20,8 @@ export default function Tasks() {
   const [filter, setFilter] = useState<'all' | 'active' | 'urgent'>('all');
   const { api, user, hotel, serverAuthMode, locale } = useSession();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
-  const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks() : Promise.resolve([])), [api, user?.id]);
+  const allowed = !!api && ws.tabs.includes('tasks');
+  const { data, loading, error, reload } = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, user?.id, allowed]);
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => { if (hasFocused.current) void reload(); else hasFocused.current = true; }, [reload]));
   const { active, finished, pct } = useMemo(() => {
@@ -32,6 +33,7 @@ export default function Tasks() {
     return { active, finished, pct: list.length ? Math.round((finished.length / list.length) * 100) : 0 };
   }, [data]);
   const visibleActive = filter === 'urgent' ? active.filter(task => task.priority === 'URGENT') : active;
+  if (!allowed) return <FutureScreen><Empty text={t('admin.forbidden')}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={t('tasks.title')} subtitle={hotel?.name} eyebrow={t(`roles.${user!.role}`)}/>
     {hotel?.demo ? <DemoBanner/> : null}

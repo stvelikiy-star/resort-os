@@ -20,7 +20,8 @@ export default function NewRequest() {
   const { c } = useTheme();
   const router = useRouter();
   const { api, user, hotel, serverAuthMode } = useSession();
-  const rooms = useAsync<Room[]>(() => api ? api.listRooms() : Promise.resolve([]), [api]);
+  const allowed = !!user && !!api && workspaceForSession(user.role, user.module_permissions, api.mode, serverAuthMode).canCreateMaintenance;
+  const rooms = useAsync<Room[]>(() => allowed ? api!.listRooms() : Promise.resolve([]), [api, user?.id, allowed]);
   const [cat, setCat] = useState<string>('PLUMBING');
   const [prio, setPrio] = useState<Priority>('NORMAL');
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export default function NewRequest() {
   useEffect(() => () => { if (returnTimer.current) clearTimeout(returnTimer.current); }, []);
 
   const send = async () => {
-    if (sendLock.current || unknownResult || !api || !user || !workspaceForSession(user.role, user.module_permissions, api.mode, serverAuthMode).canCreateMaintenance) return;
+    if (sendLock.current || unknownResult || !api || !user || !allowed) return;
     sendLock.current = true;
     setBusy(true); setMsg(null);
     let accepted = false;
@@ -56,7 +57,7 @@ export default function NewRequest() {
   };
 
   if (!user || !api) return <Redirect href="/connect" />;
-  if (!workspaceForSession(user.role, user.module_permissions, api.mode).canCreateMaintenance) return <Redirect href="/profile" />;
+  if (!allowed) return <Redirect href="/profile" />;
 
   return (
     <FutureScreen>

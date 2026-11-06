@@ -22,7 +22,8 @@ export default function Overview() {
   const { user, hotel, api, serverAuthMode, locale } = useSession();
   const showroom = api?.mode === 'DEMO';
   const shared = serverAuthMode === 'shared_auth_preview';
-  const canOpen = (tab: 'inbox' | 'pms' | 'tasks' | 'admin') => !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', tab, serverAuthMode);
+  const canOpen = (tab: 'overview' | 'inbox' | 'pms' | 'tasks' | 'admin') => !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', tab, serverAuthMode);
+  const allowed = canOpen('overview');
   const canOpenInbox = !shared && canOpen('inbox');
   const live = useLiveModules();
   const copy = useMobileCopy();
@@ -31,11 +32,12 @@ export default function Overview() {
   const { t: tr } = useTranslation();
   const priorityLabel = (priority: string) => ['URGENT', 'HIGH', 'NORMAL', 'LOW'].includes(priority) ? tr('tasks.' + priority.toLowerCase()) : priority;
   const router = useRouter();
-  const { data, loading, error, reload } = useAsync<Dashboard | null>(async () => showroom && api ? demoDashboard(hotel?.name ?? 'DEMO', await api.listRooms(), await api.listTasks(), locale) : live ? live.dashboard() : null, [live, api, showroom, hotel?.id, user?.id, locale, user?.module_permissions?.join(',')]);
+  const { data, loading, error, reload } = useAsync<Dashboard | null>(async () => !allowed ? null : showroom && api ? demoDashboard(hotel?.name ?? 'DEMO', await api.listRooms(), await api.listTasks(), locale) : live ? live.dashboard() : null, [live, api, showroom, hotel?.id, user?.id, locale, user?.module_permissions?.join(','), allowed]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const money = (value: number) => Number.isFinite(value) ? Number(value).toLocaleString('ru-RU') + ' KGS' : '—';
   const count = (value: number) => Number.isFinite(value) && value >= 0 ? String(value) : '—';
+  if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user ? copy.welcome + ', ' + user.display_name : 'MARINA SMART'}
       right={user ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

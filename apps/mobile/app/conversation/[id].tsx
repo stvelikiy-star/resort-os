@@ -11,6 +11,7 @@ import { formatChatTimestamp } from '../../src/i18n/dateLabels';
 import { demoConversationDetail } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
@@ -19,6 +20,7 @@ export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user, serverAuthMode, locale, api } = useSession();
   const showroom = api?.mode === 'DEMO';
+  const allowed = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'inbox', serverAuthMode);
   const modules = useLiveModules();
   const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
   const copy = useMobileCopy();
@@ -30,9 +32,9 @@ export default function ConversationScreen() {
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
   const [unknownResult, setUnknownResult] = useState(false);
-  const { data, loading, error, reload } = useAsync<ConversationDetail | null>(() => showroom && id ? Promise.resolve(demoConversationDetail(id, locale)) : live && id ? live.conversation(id) : Promise.resolve(null), [live, showroom, id, user?.id, locale]);
+  const { data, loading, error, reload } = useAsync<ConversationDetail | null>(() => !allowed ? Promise.resolve(null) : showroom && id ? Promise.resolve(demoConversationDetail(id, locale)) : live && id ? live.conversation(id) : Promise.resolve(null), [live, showroom, id, user?.id, locale, allowed]);
   const act = async (run: () => Promise<unknown>, clear = false) => {
-    if (locked.current || unknownResult) return;
+    if (locked.current || unknownResult || !allowed || !live) return;
     locked.current = true; setBusy(true); setFeedback(null);
     try { await run(); if (clear) setNote(''); setFeedback(copy.confirmed); await reload(); }
     catch(error: unknown) {
@@ -43,7 +45,7 @@ export default function ConversationScreen() {
     finally { locked.current = false; setBusy(false); }
   };
   if (serverAuthMode === 'shared_auth_preview') return <FutureScreen><Empty text={copy.unavailable}/></FutureScreen>;
-  if (!user || (!showroom && !(user.module_permissions?.includes('WHATSAPP') || (user.role !== 'RECEPTION' && user.module_permissions?.includes('INBOX')))) || !['OWNER','MANAGER','RECEPTION'].includes(user.role)) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
+  if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const conversation = data?.conversation;
   return <FutureScreen>
     <PressScale accessibilityLabel={copy.close} onPress={() => router.back()} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, gap: 6 }}><ChevronLeft size={22} color={c.primary}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
