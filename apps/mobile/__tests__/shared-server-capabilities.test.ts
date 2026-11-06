@@ -7,35 +7,30 @@ const ok = (data: unknown) => ({
 }) as Response;
 
 describe('canonical shared-auth staging server 503 admission contract', () => {
-  it('hides inbox/dining tabs even if the server granted WHATSAPP, INBOX or DINING', () => {
+  it('exposes RC5 Inbox navigation by role grant but retains hard server admission and hides Dining', () => {
     const grants = ['DASHBOARD','PMS','RESERVATIONS','WHATSAPP','INBOX','OPS','STAFF','DINING'];
     const owner = workspaceForSession('OWNER', grants, 'LIVE', 'shared_auth_preview');
     const manager = workspaceForSession('MANAGER', grants, 'LIVE', 'shared_auth_preview');
     const reception = workspaceForSession('RECEPTION', grants, 'LIVE', 'shared_auth_preview');
     const cook = workspaceForSession('COOK', grants, 'LIVE', 'shared_auth_preview');
     for (const w of [owner, manager, reception, cook]) {
-      expect(w.tabs).not.toContain('inbox');
+      if (w !== cook) expect(w.tabs).toContain('inbox');
       expect(w.tabs).not.toContain('dining');
     }
     expect(owner.tabs).toContain('pms');
     expect(owner.canSetRoomState).toBe(false);
     expect(homeForSession('COOK', grants, 'LIVE', 'shared_auth_preview')).toBe('/profile');
-    expect(reception.tabs).toEqual(['reception', 'pms', 'profile']);
+    expect(reception.tabs).toEqual(['reception', 'pms', 'inbox', 'profile']);
     // Legacy single-property retains its existing workspace until the
     // server explicitly reports shared mode. Do not disable working modules.
     expect(workspaceForSession('COOK', grants, 'LIVE','single_property').tabs).toContain('dining');
     expect(workspaceForSession('MANAGER', grants, 'LIVE','single_property').tabs).toContain('inbox');
   });
 
-  it('refuses all blocked shared workspaces BEFORE network, without simulating a 200', async () => {
+  it('refuses unreviewed dining/AI shared workspaces BEFORE network, without simulating a 200', async () => {
     const transport = jest.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ok({items: []}));
     const api = createLiveModules('https://platform.example/core',transport as unknown as typeof fetch,'shared_auth_preview');
     const attempts = [
-      () => api.conversations(),
-      () => api.conversation('abc'),
-      () => api.claimConversation('abc'),
-      () => api.conversationStatus('abc','OPEN'),
-      () => api.internalNote('abc','internal'),
       () => api.kitchenOrders(),
       () => api.kitchenStatus('abc','READY'),
       () => api.diningFloor(),
@@ -47,6 +42,14 @@ describe('canonical shared-auth staging server 503 admission contract', () => {
       await expect(attempt()).rejects.toMatchObject({code:'UNKNOWN'});
     }
     expect(transport).not.toHaveBeenCalled();
+  });
+
+  it('delegates RC5 Inbox availability to the server without bypassing 503', async () => {
+    const transport = jest.fn(async () => ({ok:false,status:503,redirected:false,json:async()=>({detail:'RC5 disabled'})} as Response));
+    const api = createLiveModules('https://platform.example/core',transport as unknown as typeof fetch,'shared_auth_preview');
+    await expect(api.conversations()).rejects.toMatchObject({code:'UNKNOWN'});
+    expect(transport).toHaveBeenCalledTimes(2); // safe GET gateway retry only
+    expect(String((transport as jest.Mock).mock.calls[0][0])).toContain('/api/v1/admin/inbox/conversations');
   });
 
   it('still allows reviewed shared PMS GET without extending server permissions', async () => {

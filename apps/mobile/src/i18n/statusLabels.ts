@@ -3,7 +3,7 @@ import type { MobileCopy } from './mobileCopy';
 type Translations = Pick<MobileCopy,
   'chatOpen' | 'chatWaitingGuest' | 'chatWaitingStaff' | 'chatResolved' | 'chatArchived' |
   'messageIncoming' | 'messageOutgoing' | 'messageInternal' |
-  'messageSent' | 'messageDelivered' | 'messageRead' | 'messageFailed' |
+  'messageQueueStatus' | 'messageSent' | 'messageDelivered' | 'messageRead' | 'messageFailed' |
   'orderNew' | 'orderAccepted' | 'orderCooking' | 'orderReady' | 'orderServed' | 'orderCancelled' |
   'tableAvailable' | 'tableOccupied' | 'tableReserved' | 'tableUnknown'
 >;
@@ -29,6 +29,7 @@ export function messageDirectionLabel(code: string, c: Translations): string {
 }
 export function deliveryStatusLabel(code: string, c: Translations): string {
   switch (code) {
+    case 'QUEUED': return c.messageQueueStatus;
     case 'SENT': return c.messageSent;
     case 'DELIVERED': return c.messageDelivered;
     case 'READ': return c.messageRead;

@@ -29,7 +29,10 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
   const parsed = parseHotelAddress(baseUrl);
   if (!parsed.ok) throw new Error('Invalid hotel API address');
   const root = parsed.baseUrl;
-  async function request<T>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
+  async function request<T>(method: HttpMethod, path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
+    if (idempotencyKey !== undefined && (method !== 'POST' || !/^[A-Za-z0-9._:-]{8,160}$/.test(idempotencyKey))) {
+      throw new ApiError('BAD_REQUEST', 'Invalid mutation idempotency key');
+    }
     const pathname = path.split('?')[0];
     // Reject relative-path tricks before URL normalization. No route may
     // escape the hotel API prefix or smuggle another path via encoded slashes.
@@ -62,7 +65,7 @@ export function createHotelHttpClient(baseUrl: string, transport: Transport = fe
       try {
         response = await transport(expectedUrl, {
           method, credentials: 'include', redirect: 'error', signal: controller.signal,
-          headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
+          headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
           body: body === undefined ? undefined : JSON.stringify(body),
         });
       } catch {

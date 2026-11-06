@@ -9,6 +9,9 @@ import { safeRouteId, safeIsoDate } from './routeId';
 import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
+export type WhatsAppDeliveryStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ';
+export interface OutboundCapabilities { whatsapp: { configured: boolean; human_only: boolean; queued_only: boolean; max_text_length: number } }
+export interface OutboundAck { conversation_id: string; message_id: string; delivery_status: WhatsAppDeliveryStatus; idempotent_replay: boolean; counts_as_response: boolean; auto_sent: false }
 export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
 export interface Conversation {
   id: string; channel_kind: string; channel_name: string | null; status: ConversationStatus;
@@ -85,7 +88,7 @@ export interface DiningFloor {
 }
 export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch, serverAuthMode: AuthMode | null = null, sessionIsActive?: () => boolean) {
   const http = createHotelHttpClient(baseUrl, transport, sessionIsActive);
-  const request = <T,>(method: HttpMethod, path: string, body?: unknown) => http.request<T>(method, path, body);
+  const request = <T,>(method: HttpMethod, path: string, body?: unknown, idempotencyKey?: string) => http.request<T>(method, path, body, idempotencyKey);
   const p = '/api/v1';
   const reviewGate = () => {
     if (serverAuthMode === 'shared_auth_preview') {
@@ -130,27 +133,42 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       return gridResponse(value);
     },
     conversations: async (needsReply?: boolean) => {
-      reviewGate();
       return inboxListResponse(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : '')));
     },
     conversation: async (id: string) => {
-      reviewGate();
       const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + safeRouteId(id));
       return conversationResponse(value);
     },
     claimConversation: async (id: string) => {
-      reviewGate();
       return conversationClaimAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'), id);
     },
     conversationStatus: async (id: string, status: ConversationStatus) => {
-      reviewGate();
       return conversationStatusAck(await request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }), id, status);
     },
     internalNote: async (id: string, text: string) => {
-      reviewGate();
       return noteAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }), id);
     },
-    // No WhatsApp sending: current server outbound is not multi-tenant accepted.
+    // RC5/RC8 remain opt-in and server-gated. A server 403/503 is authoritative.
+    outboundCapabilities: async (): Promise<OutboundCapabilities> => {
+      const value = await request<unknown>('GET', p + '/admin/inbox/outbound-capabilities');
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Invalid outbound capability response');
+      const w = (value as Record<string, unknown>).whatsapp;
+      if (!w || typeof w !== 'object') throw new ApiError('UNKNOWN', 'Missing WhatsApp capability');
+      const x = w as Record<string, unknown>;
+      if (typeof x.configured !== 'boolean' || typeof x.human_only !== 'boolean' || typeof x.queued_only !== 'boolean' || typeof x.max_text_length !== 'number')
+        throw new ApiError('UNKNOWN', 'Unverified WhatsApp capability');
+      return value as OutboundCapabilities;
+    },
+    sendWhatsAppText: async (id: string, text: string, key: string): Promise<OutboundAck> => {
+      if (!text.trim() || text.length > 4096) throw new ApiError('BAD_REQUEST', 'Invalid message length');
+      const value = await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/send-text', { text: text.trim() }, key);
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Unverified send acknowledgement');
+      const ack = value as Record<string, unknown>;
+      if (ack.conversation_id !== id || typeof ack.message_id !== 'string' || !['QUEUED','SENT','DELIVERED','READ'].includes(String(ack.delivery_status)) ||
+          typeof ack.idempotent_replay !== 'boolean' || typeof ack.counts_as_response !== 'boolean' || ack.auto_sent !== false)
+        throw new ApiError('UNKNOWN', 'Invalid message acknowledgement');
+      return ack as unknown as OutboundAck;
+    },
     kitchenOrders: async () => {
       reviewGate();
       return kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE'));

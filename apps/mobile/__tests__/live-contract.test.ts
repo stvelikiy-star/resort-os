@@ -11,9 +11,10 @@ describe('verified mobile live API boundaries', () => {
     expect(transport.mock.calls[0]?.[0]).toBe('https://hotel.example/core/api/v1/admin/inbox/conversations?limit=150&needs_reply=true');
     expect((transport.mock.calls[0]?.[1] as RequestInit).credentials).toBe('include');
   });
-  it('never tries Telegram send-text for WhatsApp or exports a WhatsApp sender', () => {
+  it('exposes only explicit human WhatsApp sending through RC8 server authority', () => {
     const api = createLiveModules('https://hotel.example');
-    expect('sendWhatsapp' in api).toBe(false);
+    expect(typeof api.sendWhatsAppText).toBe('function');
+    expect(typeof api.outboundCapabilities).toBe('function');
     expect('sendText' in api).toBe(false);
   });
   it('decodes the real reception camelCase list without guessing the values', async () => {
