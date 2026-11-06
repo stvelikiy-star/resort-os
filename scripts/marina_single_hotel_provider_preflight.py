@@ -27,12 +27,14 @@ def _valid_https_origin(value: str, allowed_host: str) -> bool:
 def readiness(env: dict[str, str]) -> dict[str, object]:
     hotel = env.get("PROPERTY_CODE", "").strip()
     issues = []
-    if not re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", hotel) or hotel == "MARINA_DEMO":
+    valid_hotel = bool(re.fullmatch(r"[A-Z][A-Z0-9_]{2,63}", hotel)) and hotel != "MARINA_DEMO"
+    if not valid_hotel:
         issues.append("PROPERTY_CODE_NOT_APPROVED")
 
     whatsapp_requested = env.get("ENABLE_GREEN_API_CONNECTION") == "true"
     paired = (
-        whatsapp_requested
+        valid_hotel
+        and whatsapp_requested
         and env.get("GREEN_API_PROPERTY_CODE") == hotel
         and bool(re.fullmatch(r"[0-9]{6,14}", env.get("GREEN_API_ID_INSTANCE", "")))
         and bool(re.fullmatch(r"[A-Za-z0-9_-]{16,256}", env.get("GREEN_API_TOKEN_INSTANCE", "")))
@@ -54,10 +56,11 @@ def readiness(env: dict[str, str]) -> dict[str, object]:
         or ""
     )
     key = env.get("OPENAI_API_KEY", "")
-    configured_ai = bool(key and model and _valid_https_origin(
-        env.get("OPENAI_API_BASE_URL", "https://api.openai.com/v1").removesuffix("/v1"),
-        "api.openai.com",
-    ))
+    ai_url = env.get("OPENAI_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    configured_ai = bool(
+        key and model and ai_url.endswith("/v1")
+        and _valid_https_origin(ai_url.removesuffix("/v1"), "api.openai.com")
+    )
     if not configured_ai:
         issues.append("MARINA_AI_PROVIDER_NOT_CONFIGURED")
 
@@ -66,7 +69,7 @@ def readiness(env: dict[str, str]) -> dict[str, object]:
     issues.extend(["WHATSAPP_LIVE_DELIVERY_NOT_ACCEPTED", "MARINA_AI_LIVE_HANDOFF_NOT_ACCEPTED"])
     return {
         "component": "marina-single-property-provider-preflight",
-        "property_binding": "VALID" if hotel and hotel != "MARINA_DEMO" and not issues[0:1] == ["PROPERTY_CODE_NOT_APPROVED"] else "BLOCKED",
+        "property_binding": "VALID" if valid_hotel else "BLOCKED",
         "whatsapp_config": "CONFIGURED_NOT_VERIFIED" if paired else "BLOCKED",
         "marina_ai_config": "CONFIGURED_NOT_VERIFIED" if configured_ai else "BLOCKED",
         "whatsapp_live_delivery": "NOT_ACCEPTED",
