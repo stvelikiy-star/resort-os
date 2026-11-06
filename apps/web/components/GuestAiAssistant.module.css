@@ -9,3 +9,8 @@
 .card summary:focus-visible, .card textarea:focus-visible, .card button:focus-visible { outline: 3px solid #7dd3fc; outline-offset: 3px; }
 .log { max-height: 320px; overflow-y: auto; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .card { padding: 16px; } .card button { width: 100%; } }
+
+.handoff { border-top: 1px solid #64748b; padding-top: 16px; margin-top: 18px; }
+.handoffConfirm { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+.questionPreview { width: 100%; overflow-wrap: anywhere; border-inline-start: 3px solid #dfbd76; padding-inline-start: 12px; }
+.card button.secondary { background: #334155; color: #f8fafc; }
