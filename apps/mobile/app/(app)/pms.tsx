@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble, UtensilsCrossed } from 'lucide-react-native';
 import { Badge, Button, Empty, PressScale, SectionLabel, Segmented, DemoBanner } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
@@ -86,6 +86,10 @@ export default function Pms() {
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.pms} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
+    {live && serverAuthMode !== 'shared_auth_preview' && user &&
+      ['OWNER','MANAGER','RECEPTION'].includes(user.role) ?
+      <Button testID="pms-meal-plans" variant="secondary" label={copy.mealPlansTitle} icon={UtensilsCrossed}
+        onPress={() => router.push('/meal-plans')}/> : null}
     {live && user && canStartBookingFromPms(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
     {live && CONFIRMED_BACKEND_FEATURES.pmsHolds && user && ['OWNER','MANAGER'].includes(user.role) ? <Button testID="pms-holds" variant="secondary" label={copy.holds} icon={Clock3} onPress={() => router.push('/holds')}/> : null}
     <GlassCard style={{ gap: 10 }}>
