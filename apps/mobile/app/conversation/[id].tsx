@@ -10,7 +10,7 @@ import { chatStatusLabel, deliveryStatusLabel, messageDirectionLabel } from '../
 import { formatChatTimestamp } from '../../src/i18n/dateLabels';
 import { demoConversationDetail } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
-import { wasWriteRejected } from '../../src/lib/writeOutcome';
+import { wasWhatsAppSendRejected, wasWriteRejected } from '../../src/lib/writeOutcome';
 import { acknowledgePendingOutbound, clearPendingOutbound, finishPendingOutbound, newOutboundKey, outboundJournalKey, readPendingOutbound, recordPendingOutbound } from '../../src/lib/pendingOutbound';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useSession } from '../../src/state/session';
@@ -69,7 +69,8 @@ export default function ConversationScreen() {
       setFeedback(ack.delivery_status === 'QUEUED' ? copy.messageQueued : deliveryStatusLabel(ack.delivery_status, copy));
       await reload();
     } catch (error: unknown) {
-      if (recorded && wasWriteRejected(error)) {
+      // HTTP 409 can mean OUTBOX_RECONCILIATION_REQUIRED: do NOT unlock retries.
+      if (recorded && wasWhatsAppSendRejected(error)) {
         await clearPendingOutbound(journal);
         setFeedback(copy.conflict);
       } else {
