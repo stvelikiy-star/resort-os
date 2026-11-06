@@ -38,7 +38,7 @@ jest.mock('../src/api/liveModules', () => ({
   useLiveModules: () => mockModules,
   localDate: (offset = 0) => offset === 1 ? '2026-11-07' : offset === 2 ? '2026-11-08' : '2026-11-06',
 }));
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), back: jest.fn() }), useLocalSearchParams: () => ({}) }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 
 const as = (role: Role, grants = ['PMS']) => { mockSession.user = { ...mockSession.user, role, module_permissions: grants }; };
