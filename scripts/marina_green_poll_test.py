@@ -22,7 +22,7 @@ GOOD = {
     },
 }
 CFG = {"base": "https://api.green-api.com", "instance": "1234567890",
-       "token": "synthetic-token", "key": "x"*40, "property": "MARINA_HOTEL01",
+       "token": "synthetic-provider-token", "key": "x"*40, "property": "MARINA_HOTEL01",
        "core": "http://127.0.0.1:8000"}
 
 
@@ -88,6 +88,39 @@ class GreenAdapterTests(unittest.TestCase):
         with self.assertRaises(adapter.AdapterError):
             asyncio.run(adapter.process_one(client, CFG))
         self.assertEqual([call[0] for call in client.calls], ["receive"])
+
+    def test_unreviewed_outgoing_event_is_never_deleted(self):
+        other = {**GOOD, "body": {**GOOD["body"], "typeWebhook": "outgoingMessageStatus"}}
+        c = Client(item=other)
+        with self.assertRaises(adapter.AdapterError):
+            asyncio.run(adapter.process_one(c, CFG))
+        self.assertEqual([x[0] for x in c.calls], ["receive"])
+
+    def test_provider_url_hotel_and_core_bindings_fail_closed(self):
+        good = {
+            "GREEN_API_URL": "https://api.green-api.com",
+            "GREEN_API_ID_INSTANCE": "1234567890",
+            "GREEN_API_TOKEN_INSTANCE": "synthetic-provider-token",
+            "GREEN_API_PROPERTY_CODE": "MARINA_HOTEL01",
+            "PROPERTY_CODE": "MARINA_HOTEL01",
+            "AUTOMATION_SERVICE_KEY": "x" * 40,
+            "RESORT_CORE_URL": "http://api:8000",
+        }
+        self.assertEqual(adapter.configuration(good)["property"], "MARINA_HOTEL01")
+        for update in (
+            {"GREEN_API_PROPERTY_CODE": "OTHER_HOTEL"},
+            {"PROPERTY_CODE": "MARINA_DEMO", "GREEN_API_PROPERTY_CODE": "MARINA_DEMO"},
+            {"GREEN_API_URL": "https://evil.example"},
+            {"GREEN_API_URL": "https://api.green-api.com.evil.example"},
+            {"GREEN_API_URL": "https://api.green-api.com/other"},
+            {"GREEN_API_URL": "https://user@api.green-api.com"},
+            {"GREEN_API_URL": "http://api.green-api.com"},
+            {"GREEN_API_TOKEN_INSTANCE": "short"},
+            {"RESORT_CORE_URL": "https://malicious.example"},
+        ):
+            with self.subTest(update=update):
+                with self.assertRaises(adapter.AdapterError):
+                    adapter.configuration({**good, **update})
 
     def test_no_received_item(self):
         c = Client(item=None)
