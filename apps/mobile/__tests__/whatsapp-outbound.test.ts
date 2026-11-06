@@ -2,16 +2,16 @@ import { createLiveModules } from '../src/api/liveModules';
 import { createHotelHttpClient } from '../src/api/http';
 import { acknowledgePendingOutbound, finishPendingOutbound, newOutboundKey, outboundJournalKey, readPendingOutbound, recordPendingOutbound, clearPendingOutbound } from '../src/lib/pendingOutbound';
 
-const store = new Map<string,string>();
+const mockStore = new Map<string,string>();
 jest.mock('../src/lib/storage', () => ({
-  getDurableItem: async (key: string) => store.get(key) ?? null,
-  setDurableItem: async (key: string, value: string) => { store.set(key,value); },
-  removeDurableItem: async (key: string) => { store.delete(key); },
+  getDurableItem: async (key: string) => mockStore.get(key) ?? null,
+  setDurableItem: async (key: string, value: string) => { mockStore.set(key,value); },
+  removeDurableItem: async (key: string) => { mockStore.delete(key); },
 }));
 const response=(value: unknown,status=200)=>({ok:status>=200&&status<300,status,redirected:false,json:async()=>value} as Response);
 const id='11111111-2222-3333-4444-555555555555';
 const ack={conversation_id:id,message_id:'22222222-3333-4444-5555-666666666666',delivery_status:'QUEUED',idempotent_replay:false,counts_as_response:false,auto_sent:false};
-beforeEach(()=>{store.clear();jest.clearAllMocks();});
+beforeEach(()=>{mockStore.clear();jest.clearAllMocks();});
 describe('RC8 WhatsApp outbound: explicit human send, never simulated delivery',()=>{
   it('uses the canonical send-text path, exact hotel cookie, and Idempotency-Key',async()=>{
     const transport=jest.fn(async()=>response(ack));
