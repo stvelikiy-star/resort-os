@@ -2,7 +2,7 @@ import { parseHotelAddress } from './hotels';
 import { ApiError } from './types';
 import { captureVerifiedHost, rejectVerifiedHost } from './unauthorizedSession';
 
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 type Transport = typeof fetch;
 
 /**

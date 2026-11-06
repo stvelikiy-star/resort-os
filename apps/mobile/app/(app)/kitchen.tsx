@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { ChefHat, CircleCheck, ClipboardList, CookingPot, ListChecks, UtensilsCrossed } from 'lucide-react-native';
 import { DemoBanner, Empty, SectionLabel, Button } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
-import { KitchenOrder, useLiveModules } from '../../src/api/liveModules';
+import { DiningProductionSnapshots, KitchenOrder, useLiveModules } from '../../src/api/liveModules';
 import { demoKitchenOrders } from '../../src/api/demoPresentation';
 import { kitchenWorkload } from '../../src/roles/kitchenSummary';
 import { hasTabForSession } from '../../src/roles/registry';
@@ -15,7 +15,8 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space } from '../../src/theme/tokens';
 
 /** COOK dashboard is an aggregation of authenticated active kitchen orders.
- * It never fabricates breakfast, meal-plan choices, menus or future dishes. */
+ * Separate server production snapshots are needed for included meal portions;
+ * orders are never combined numerically with included portions. */
 export default function KitchenDashboard() {
   const { user, hotel, api, locale, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
@@ -33,8 +34,13 @@ export default function KitchenDashboard() {
     [live, showroom, locale, user?.id, allowed],
   );
   const focused = useRef(false);
-  useFocusEffect(useCallback(() => { if(focused.current) void reload(); else focused.current = true; }, [reload]));
-  const summary = kitchenWorkload(data ?? []);
+  const { data: production, loading: productionLoading, error: productionError, reload: reloadProduction } =
+    useAsync<DiningProductionSnapshots | null>(
+      () => !allowed || showroom || !live ? Promise.resolve(null) : live.diningProductionSnapshots(),
+      [live, showroom, hotel?.id, user?.id, allowed],
+    );
+  useFocusEffect(useCallback(() => { if(focused.current) { void reload(); void reloadProduction(); } else focused.current = true; }, [reload, reloadProduction]));
+  const summary = kitchenWorkload(data ?? [], locale);
   const tile = (title: string, value: number, icon: React.ElementType, color: string) => {
     const Icon = icon;
     return <GlassCard key={title} style={{ flex: 1, minWidth: 0, minHeight: compact ? 113 : 126,
@@ -53,6 +59,37 @@ export default function KitchenDashboard() {
     {loading ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
+      <SectionLabel>{copy.kitchenMealPlan}</SectionLabel>
+      {showroom ? <GlassCard testID="kitchen-demo-meals-not-live" style={{gap:7}}>
+        <Text style={[font.body,{color:c.text}]}>{copy.kitchenMealPlanDemo}</Text>
+        <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
+      </GlassCard> : null}
+      {!showroom && productionLoading ? <LoadingShimmer count={1}/> : null}
+      {!showroom && productionError ? <ErrorState text={productionError.message}
+        retry={copy.retry} onRetry={reloadProduction}/> : null}
+      {production?.days.slice(0,2).map(day => <View key={day.service_date} testID={'kitchen-production-'+day.service_date} style={{gap:space.sm}}>
+        <Text style={[font.small,{color:c.cyan,fontWeight:'700'}]}>{day.service_date}</Text>
+        {day.meals.map(meal => <GlassCard key={meal.meal_type} testID={'kitchen-meal-'+day.service_date+'-'+meal.meal_type}
+          style={{minHeight:78,padding:13,gap:5,flexDirection:'row',alignItems:'center'}}>
+          <View style={{flex:1,minWidth:0,gap:4}}>
+            <Text style={[font.body,{color:c.text,fontWeight:'700'}]}>
+              {meal.meal_type === 'BREAKFAST' ? copy.kitchenBreakfast : meal.meal_type === 'LUNCH' ? copy.kitchenLunch : copy.kitchenDinner}
+            </Text>
+            <Text style={[font.small,{color:c.textMuted}]}>
+              {meal.current_adult_portions} {copy.kitchenAdults} · {meal.current_child_portions} {copy.kitchenChildren}
+            </Text>
+            {meal.state === 'FROZEN' ? <Text style={[font.small,{color:meal.changed_since_snapshot?c.warning:c.success}]}>
+              {copy.kitchenFrozen}: {meal.frozen_total_portions} · {copy.kitchenDelta}: {meal.delta_total_portions}
+            </Text> : null}
+            {meal.cutoff_status === 'UNCONFIGURED' ? <Text style={[font.small,{color:c.warning}]}>{copy.kitchenUnconfigured}</Text> : null}
+          </View>
+          <View style={{minWidth:44,alignItems:'center'}}>
+            <Text style={[font.h2,{color:c.primary,fontSize:25}]}>{meal.current_total_portions}</Text>
+            <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenPortions}</Text>
+          </View>
+        </GlassCard>)}
+      </View>)}
+      {!showroom && production ? <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealsNotOrders}</Text> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
@@ -81,10 +118,7 @@ export default function KitchenDashboard() {
         {copy.kitchenMissingItems}: {summary.unknownDishOrders}
       </Text> : null}
       <Button testID="kitchen-open-orders" label={copy.orders} icon={ListChecks} onPress={() => router.push('/dining')}/>
-      <GlassCard style={{ gap: 7 }}>
-        <Text style={[font.small,{color:c.warning,fontWeight:'700'}]}>{copy.kitchenMealPlanPending}</Text>
-        <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
-      </GlassCard>
+      <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
     </> : null}
   </FutureScreen>;
 }

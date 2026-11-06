@@ -1,5 +1,5 @@
 import { ApiError } from './types';
-import type { FinanceSummary, Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, AssistantCapabilities, AssistantAnswer, Hold } from './liveModules';
+import type { FinanceSummary, Dashboard, Grid, ReceptionList, Conversation, ConversationDetail, BookingPreview, KitchenOrder, DiningFloor, DiningProductionSnapshots, DiningStays, DiningStayEntitlements, MealPlanDraft, MealPlanAck, AssistantCapabilities, AssistantAnswer, Hold } from './liveModules';
 import type { AuthUser } from './types';
 const invalid=(where:string):never=>{ throw new ApiError('UNKNOWN','Hotel response contract mismatch: '+where); };
 const obj=(v:unknown,k:string):Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:invalid(k);
@@ -85,6 +85,96 @@ export function kitchenOrdersResponse(v:unknown):KitchenOrder[] {
   items.forEach((r,i)=>{const o=obj(r,'kitchen.order'+i);str(o.id,'kitchen.id');str(o.order_number,'kitchen.order_number');str(o.status,'kitchen.status');if(!Array.isArray(o.items))invalid('kitchen.items');});
   return items as KitchenOrder[];
 }
+/** Explicit included-meal production totals returned to OWNER/MANAGER/RECEPTION/COOK.
+ * These must NEVER be added directly to paid à-la-carte dish quantities. */
+export function diningStaysResponse(v: unknown): DiningStays {
+  const x = obj(v,'dining.stays'); str(x.local_date,'dining.stays.date');
+  arr(x.items,'dining.stays.items').forEach((value,i)=>{
+    const row=obj(value,'dining.stays.'+i);
+    for(const k of ['stay_id','reservation_id','booking_number','check_in','check_out','guest_name'])
+      str(row[k],'dining.stays.'+k);
+    for(const k of ['adults','children','entitlement_count']) {
+      const n=num(row[k],'dining.stays.'+k);
+      if(!Number.isSafeInteger(n)||n<0) invalid('dining.stays.'+k);
+    }
+  });
+  return v as DiningStays;
+}
+export function diningStayEntitlementsResponse(v: unknown, stayId: string): DiningStayEntitlements {
+  const x = obj(v,'dining.entitlements');
+  const stay=obj(x.stay,'dining.stay');
+  if(str(stay.id,'dining.stay.id')!==stayId) invalid('dining.stay mismatch');
+  arr(x.items,'dining.entitlements.items').forEach((value,i)=>{
+    const row=obj(value,'dining.entitlement.'+i);
+    str(row.id,'dining.entitlement.id');
+    if(str(row.stay_id,'dining.entitlement.stay_id')!==stayId) invalid('dining.entitlement.stay mismatch');
+    str(row.service_date,'dining.entitlement.date');
+    const meal=str(row.meal_type,'dining.entitlement.meal');
+    if(!['BREAKFAST','LUNCH','DINNER'].includes(meal)) invalid('dining.entitlement.meal');
+    if(!['ACTIVE','CANCELLED'].includes(str(row.status,'dining.entitlement.status'))) invalid('dining.entitlement.status');
+    for(const k of ['adult_portions','child_portions']) {
+      const n=num(row[k],'dining.entitlement.'+k);
+      if(!Number.isSafeInteger(n)||n<0) invalid('dining.entitlement.'+k);
+    }
+  });
+  return v as DiningStayEntitlements;
+}
+/** Response echo and post-write readback are mandatory for meal-plan mutations. */
+export function diningMealPlanAck(v:unknown, stayId:string, draft:MealPlanDraft):MealPlanAck {
+  const x=obj(v,'dining.meal-plan.ack');
+  if(str(x.stay_id,'dining.meal-plan.stay_id')!==stayId) invalid('dining.meal-plan.stay mismatch');
+  if(str(x.from_date,'dining.meal-plan.from')!==draft.from_date ||
+      str(x.through_date,'dining.meal-plan.through')!==draft.through_date) invalid('dining.meal-plan.dates mismatch');
+  const count=num(x.updated_items,'dining.meal-plan.updated_items');
+  if(!Number.isSafeInteger(count)||count<1) invalid('dining.meal-plan.updated_items');
+  if(num(x.adult_portions,'dining.meal-plan.adults')!==draft.adult_portions ||
+     num(x.child_portions,'dining.meal-plan.children')!==draft.child_portions)
+    invalid('dining.meal-plan.portions mismatch');
+  const meals=arr(x.meals,'dining.meal-plan.meals');
+  if(meals.length!==draft.meals.length||meals.some(m=>!draft.meals.includes(m as 'BREAKFAST'|'LUNCH'|'DINNER')))
+    invalid('dining.meal-plan.meals mismatch');
+  return v as MealPlanAck;
+}
+
+export function diningProductionSnapshotsResponse(v: unknown): DiningProductionSnapshots {
+  const x = obj(v, 'dining.production-snapshots');
+  str(x.from_date, 'production.from_date'); str(x.through_date, 'production.through_date');
+  arr(x.days, 'production.days').forEach((value, dayIndex) => {
+    const day = obj(value, 'production.day.' + dayIndex);
+    str(day.service_date, 'production.day.date');
+    const seen = new Set<string>();
+    arr(day.meals, 'production.day.meals').forEach((value, mealIndex) => {
+      const row = obj(value, 'production.meal.' + mealIndex);
+      const type = str(row.meal_type, 'production.meal.type');
+      if (!['BREAKFAST', 'LUNCH', 'DINNER'].includes(type) || seen.has(type)) invalid('production.meal.type');
+      seen.add(type);
+      str(row.service_date, 'production.meal.date');
+      if (row.service_date !== day.service_date) invalid('production.meal.date mismatch');
+      const state = str(row.state, 'production.state');
+      if (!['OPEN','FROZEN'].includes(state)) invalid('production.state');
+      const cutoff = str(row.cutoff_status, 'production.cutoff');
+      if (!['UNCONFIGURED','BEFORE_CUTOFF','CUTOFF_REACHED'].includes(cutoff)) invalid('production.cutoff');
+      for (const k of ['current_adult_portions','current_child_portions','current_total_portions','current_entitlement_count']) {
+        const amount = num(row[k], 'production.' + k);
+        if (!Number.isSafeInteger(amount) || amount < 0) invalid('production.' + k);
+      }
+      if (row.current_total_portions !== Number(row.current_adult_portions) + Number(row.current_child_portions))
+        invalid('production.total mismatch');
+      if (row.changed_since_snapshot !== undefined && typeof row.changed_since_snapshot !== 'boolean')
+        invalid('production.changed_since_snapshot');
+      if (state === 'FROZEN') {
+        if (typeof row.frozen_total_portions !== 'number' || !Number.isSafeInteger(row.frozen_total_portions) ||
+            row.frozen_total_portions < 0) invalid('production.frozen_total_portions');
+        if (typeof row.delta_total_portions !== 'number' || !Number.isSafeInteger(row.delta_total_portions) ||
+            Number(row.delta_total_portions) !== Number(row.current_total_portions) - Number(row.frozen_total_portions))
+          invalid('production.delta_total_portions');
+      }
+    });
+    if (seen.size !== 3) invalid('production.three_meals');
+  });
+  return v as DiningProductionSnapshots;
+}
+
 export function diningFloorResponse(v:unknown):DiningFloor {
   const x=obj(v,'dining');
   arr(x.tables,'dining.tables').forEach((t,i)=>{const o=obj(t,'dining.table'+i);str(o.id,'dining.table.id');str(o.code,'dining.table.code');});

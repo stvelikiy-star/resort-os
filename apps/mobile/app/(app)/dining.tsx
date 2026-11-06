@@ -6,6 +6,7 @@ import { Badge, Button, Empty, SectionLabel, DemoBanner } from '../../src/compon
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { DiningFloor, KitchenOrder, KitchenStatus, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
+import { kitchenItemName } from '../../src/i18n/kitchenLabels';
 import { orderStatusLabel, diningTableStatusLabel } from '../../src/i18n/statusLabels';
 import { demoDiningFloor, demoKitchenOrders } from '../../src/api/demoPresentation';
 import { useSession } from '../../src/state/session';
@@ -71,7 +72,7 @@ export default function Dining() {
       {'items' in o && Array.isArray(o.items) && o.items.length ? <View style={{ gap: 4, borderTopWidth: 1, borderColor: c.border, paddingTop: 10 }}>
         {o.items.map((item, index) => <View key={item.id || index} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <CheckCircle2 size={15} color={c.cyan}/>
-          <Text style={[font.body, { color: c.text, flex: 1 }]}>{typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity + ' × ' : ''}{item.name || '—'}</Text>
+          <Text style={[font.body, { color: c.text, flex: 1 }]}>{typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity + ' × ' : ''}{kitchenItemName(item, locale) || '—'}</Text>
         </View>)}
       </View> : null}
       {'notes' in o && o.notes ? <Text style={[font.small, { color: c.text }]}>{o.notes}</Text> : null}
