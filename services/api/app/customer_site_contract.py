@@ -37,7 +37,9 @@ def validate_customer_site_content(locale: str, content: Any) -> dict[str, dict[
             value = value.strip()
             if any(ord(char) < 32 for char in value) or len(value) > MAX_FIELD_LEN and field != "subtitle":
                 raise HTTPException(422, detail=f"Customer site {section}.{field} has invalid characters/length")
-            if field in ("phone", "whatsapp") and not PHONE_PATTERN.fullmatch(value):
+            if field in ("phone", "whatsapp") and (
+                not PHONE_PATTERN.fullmatch(value) or not 7 <= sum(char.isdigit() for char in value) <= 15
+            ):
                 raise HTTPException(422, detail=f"Customer site {field} must be a phone number")
             if field == "email" and not EMAIL_PATTERN.fullmatch(value):
                 raise HTTPException(422, detail="Customer site email is invalid")
