@@ -44,10 +44,10 @@ describe('role-aware compact bottom navigation', () => {
   it('has no More tab for limited staff and never introduces a forbidden module', () => {
     const ws = workspaceForSession('RECEPTION', ['RESERVATIONS', 'PMS', 'WHATSAPP'], 'LIVE', 'shared_auth_preview');
     const plan = mobileTabPlan(ws.tabs);
-    expect(plan.primary).toEqual(['reception', 'pms', 'profile']);
+    expect(plan.primary).toEqual(['reception', 'pms', 'inbox', 'profile']);
     expect(plan.overflow).toEqual([]);
     expect(plan.showMore).toBe(false);
-    expect([...plan.primary, ...plan.overflow]).not.toContain('inbox');
+    expect([...plan.primary, ...plan.overflow]).toContain('inbox');
   });
   it('does not duplicate or invent privileges', () => {
     const p = mobileTabPlan(['tasks', 'rooms', 'requests', 'admin', 'profile', 'profile']);
@@ -56,13 +56,13 @@ describe('role-aware compact bottom navigation', () => {
 });
 
 describe('direct Inbox route authorization', () => {
-  it('requires WhatsApp/Inbox grant in LIVE and blocks server-disabled shared preview', () => {
+  it('requires WhatsApp/Inbox grants while shared RC5 admission remains server-authoritative', () => {
     expect(hasTabForSession('MANAGER', ['DASHBOARD'], 'LIVE', 'inbox')).toBe(false);
     expect(hasTabForSession('MAID', ['WHATSAPP'], 'LIVE', 'inbox')).toBe(false);
     expect(hasTabForSession('RECEPTION', ['INBOX'], 'LIVE', 'inbox')).toBe(false);
     expect(hasTabForSession('RECEPTION', ['WHATSAPP'], 'LIVE', 'inbox')).toBe(true);
     expect(hasTabForSession('MANAGER', ['INBOX'], 'LIVE', 'inbox')).toBe(true);
-    expect(hasTabForSession('OWNER', ['WHATSAPP'], 'LIVE', 'inbox', 'shared_auth_preview')).toBe(false);
+    expect(hasTabForSession('OWNER', ['WHATSAPP'], 'LIVE', 'inbox', 'shared_auth_preview')).toBe(true);
   });
 });
 
