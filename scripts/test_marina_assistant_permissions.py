@@ -152,6 +152,18 @@ class RouterPermissions(unittest.TestCase):
             self.assertNotIn("hotel", bundle["live_context"])
             self.assertFalse(bundle["property_rules"]["available"])
 
+    def test_handoff_uses_existing_guest_request_and_staff_routing(self):
+        from app import staff_guest_requests
+        handoff = guest.explicit_human_handoff_option()
+        self.assertEqual(handoff["body"], {"request_code": "ADMIN"})
+        self.assertIn(handoff["request_code"], guest_requests.REQUEST_LABELS)
+        self.assertTrue(staff_guest_requests.can_handle("RECEPTION", "ADMIN"))
+        self.assertTrue(staff_guest_requests.can_handle("MANAGER", "ADMIN"))
+        self.assertFalse(staff_guest_requests.can_handle("MAID", "ADMIN"))
+        self.assertFalse(staff_guest_requests.can_handle("TECHNICIAN", "ADMIN"))
+        self.assertEqual(handoff["status"], "NOT_REQUESTED")
+        self.assertFalse(handoff["task_created"])
+
     def test_guest_isolation_and_revocation(self):
         sid, gid, qid, pid, room = [uuid.uuid4() for _ in range(5)]
         qr = {"qr_id": qid, "propertyId": pid, "roomId": room, "room_code": "101"}
@@ -184,6 +196,14 @@ class RouterPermissions(unittest.TestCase):
                     self.assertNotIn(str(sid), prompt)
                     self.assertTrue(result.json()["read_only"])
                     self.assertFalse(result.json()["can_mutate"])
+                    handoff = result.json()["human_handoff"]
+                    self.assertTrue(handoff["available"])
+                    self.assertEqual(handoff["status"], "NOT_REQUESTED")
+                    self.assertEqual(handoff["request_code"], "ADMIN")
+                    self.assertEqual(handoff["http_method"], "POST")
+                    self.assertEqual(handoff["endpoint_suffix"], "/requests")
+                    self.assertTrue(handoff["requires_explicit_guest_action"])
+                    self.assertFalse(handoff["task_created"])
                     query, args = app.state.db.queries[-1]
                     self.assertEqual(args, (pid, sid))
                     self.assertIn('"propertyId"=$1 AND "stayId"=$2', query)
