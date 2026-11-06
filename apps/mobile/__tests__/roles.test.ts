@@ -109,3 +109,20 @@ describe('STORE_STAFF release gate', () => {
     }
   });
 });
+
+
+describe('Reception and Dining network-read role boundaries', () => {
+  it('Reception requires the RESERVATIONS grant and never borrows PMS access', () => {
+    expect(hasTabForSession('RECEPTION', ['PMS'], 'LIVE', 'reception')).toBe(false);
+    expect(hasTabForSession('RECEPTION', ['RESERVATIONS'], 'LIVE', 'reception')).toBe(true);
+    expect(hasTabForSession('MANAGER', ['PMS'], 'LIVE', 'reception')).toBe(false);
+    expect(hasTabForSession('MAID', ['RESERVATIONS'], 'LIVE', 'reception')).toBe(false);
+  });
+  it('Dining fails closed for wrong roles, missing grants and shared-auth preview', () => {
+    expect(hasTabForSession('COOK', [], 'LIVE', 'dining')).toBe(false);
+    expect(hasTabForSession('WAITER', ['DINING'], 'LIVE', 'dining')).toBe(true);
+    expect(hasTabForSession('COOK', ['DINING'], 'LIVE', 'dining', 'shared_auth_preview')).toBe(false);
+    expect(hasTabForSession('RECEPTION', ['DINING'], 'LIVE', 'dining')).toBe(false);
+    expect(hasTabForSession('STORE_STAFF', ['DINING'], 'LIVE', 'dining')).toBe(false);
+  });
+});

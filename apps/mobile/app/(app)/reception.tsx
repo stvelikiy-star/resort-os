@@ -18,13 +18,14 @@ import { font, radius, space } from '../../src/theme/tokens';
 export default function Reception() {
   const { user, hotel, api, serverAuthMode, locale } = useSession();
   const showroom = api?.mode === 'DEMO';
+  const allowed = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'reception', serverAuthMode);
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'all' | 'arrivals' | 'departures' | 'staying'>('all');
-  const { data, loading, error, reload } = useAsync<ReceptionList | null>(async () => showroom && api ? demoReception(locale, await api.listRooms()) : live ? live.reception() : null, [live, api, showroom, user?.id, locale]);
+  const { data, loading, error, reload } = useAsync<ReceptionList | null>(async () => !allowed ? null : showroom && api ? demoReception(locale, await api.listRooms()) : live ? live.reception() : null, [live, api, showroom, user?.id, locale, allowed]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const canInbox = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'inbox', serverAuthMode);
@@ -69,6 +70,7 @@ export default function Reception() {
       </View>
     </GlassCard></StaggerItem>;
   };
+  if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={(live || showroom) && serverAuthMode !== 'shared_auth_preview' ? <AIOrb state={showroom ? 'offline' : 'idle'} label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
