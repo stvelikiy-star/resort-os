@@ -1,7 +1,7 @@
 import React from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
-import { ArrowUpRight, CircleUserRound, Grid2X2, BedDouble, CalendarDays, ClipboardCheck, MessageCircle, ConciergeBell, UtensilsCrossed, Wrench, ChartNoAxesCombined } from 'lucide-react-native';
+import { ArrowUpRight, CircleUserRound, Grid2X2, BedDouble, CalendarDays, ClipboardCheck, MessageCircle, ConciergeBell, UtensilsCrossed, ChefHat, Wrench, ChartNoAxesCombined } from 'lucide-react-native';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
 import { Empty, SectionLabel } from '../../src/components/ui';
 import { mobileTabPlan } from '../../src/roles/navigation';
@@ -13,7 +13,7 @@ import { font, space } from '../../src/theme/tokens';
 
 const ICONS = {
   overview: ChartNoAxesCombined, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
-  dining: UtensilsCrossed, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
+  dining: UtensilsCrossed, kitchen: ChefHat, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
   admin: Grid2X2, profile: CircleUserRound,
 } as const;
 export default function MoreScreen() {
