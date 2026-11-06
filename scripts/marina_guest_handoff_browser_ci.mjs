@@ -46,8 +46,18 @@ async function readyPage(requestBehavior = "success", result = aiResult) {
   });
   const response = await page.goto(base, { waitUntil: "domcontentloaded", timeout: 60000 });
   if (response.status() !== 200) throw new Error("QA fixture not served");
+  // Next.js may stream HTML before React hydration. Wait for React event handlers
+  // before filling the controlled textarea; otherwise onChange can be missed.
+  await page.waitForFunction(() => {
+    const field = document.querySelector("textarea");
+    return Boolean(field && Object.keys(field).some((key) => key.startsWith("__reactProps$")));
+  }, null, { timeout: 30000 });
   await page.locator("summary").click();
   await page.getByRole("textbox", { name: "Ваш вопрос" }).fill("Прошу помочь с заселением");
+  await page.waitForFunction(() => {
+    const button = [...document.querySelectorAll("button")].find((item) => item.textContent?.trim() === "Спросить");
+    return Boolean(button && !button.disabled);
+  }, null, { timeout: 15000 });
   await page.getByRole("button", { name: "Спросить" }).click();
   await page.getByText(aiResult.answer).waitFor();
   return { page, getPosts: () => posts };
