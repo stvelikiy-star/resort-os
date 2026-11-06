@@ -22,11 +22,11 @@ const aiResult = {
   },
 };
 
-async function readyPage(requestBehavior = "success", result = aiResult) {
+async function readyPage(requestBehavior = "success", result = aiResult, aiHttpStatus = 200) {
   let posts = 0;
   const page = await ctx.newPage();
   await page.route("**/core/api/v1/guest-os/rooms/synthetic-guest-token/assistant/chat", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(result) });
+    await route.fulfill({ status: aiHttpStatus, contentType: "application/json", body: JSON.stringify(result) });
   });
   await page.route("**/core/api/v1/guest-os/rooms/synthetic-guest-token/requests", async (route) => {
     posts += 1;
@@ -59,7 +59,8 @@ async function readyPage(requestBehavior = "success", result = aiResult) {
     return Boolean(button && !button.disabled);
   }, null, { timeout: 15000 });
   await page.getByRole("button", { name: "Спросить" }).click();
-  await page.getByText(aiResult.answer).waitFor();
+  if (aiHttpStatus === 200) await page.getByText(aiResult.answer).waitFor();
+  else await page.getByRole("alert").waitFor();
   return { page, getPosts: () => posts };
 }
 
@@ -98,6 +99,25 @@ try {
   if (await rejected.page.getByRole("button", { name: "Позвать администратора" }).count()) throw new Error("Untrusted handoff metadata was accepted");
   console.log("PASS_UNREVIEWED_HANDOFF_METADATA_REJECTED");
   await rejected.page.close();
+
+  const unavailable = await readyPage("success", {detail:"AI provider not configured"}, 503);
+  await unavailable.page.getByText("Помощник временно недоступен. Свяжитесь с ресепшеном.").waitFor();
+  if (unavailable.getPosts() !== 0) throw new Error("AI outage created guest request without explicit consent");
+  await unavailable.page.getByRole("button", { name: "Позвать администратора" }).click();
+  if (unavailable.getPosts() !== 0) throw new Error("Outage fallback created request without confirmation");
+  await unavailable.page.getByRole("button", { name: "Подтвердить заявку" }).click();
+  await unavailable.page.getByText("Заявка администратору создана. Статус появится в ваших заявках.").waitFor();
+  if (unavailable.getPosts() !== 1) throw new Error("Outage fallback did not create exactly one confirmed request");
+  console.log("PASS_AI_503_EXPLICIT_HUMAN_HELP_NO_AUTO_REQUEST");
+  await unavailable.page.close();
+
+  const expired = await readyPage("success", {detail:"Guest session expired"}, 401);
+  if (await expired.page.getByRole("button", { name: "Позвать администратора" }).count()) {
+    throw new Error("Guest session expired but still offered handoff");
+  }
+  if (expired.getPosts() !== 0) throw new Error("Expired guest made request");
+  console.log("PASS_AI_401_EXPIRED_NO_HUMAN_HELP");
+  await expired.page.close();
 
   if (errors.length) throw new Error("React browser exceptions: " + errors.join("; "));
   console.log("GUEST_EXPLICIT_HANDOFF_PLAYWRIGHT_PASS");
