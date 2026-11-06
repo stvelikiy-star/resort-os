@@ -39,6 +39,19 @@ class SingleHotelProviderPreflight(unittest.TestCase):
         self.assertEqual(result["commercial_status"], "NO_GO")
         self.assertEqual(result["property_binding"], "BLOCKED")
 
+    def test_invalid_hotel_never_claims_whatapp_configured(self):
+        result = readiness({**GOOD, "PROPERTY_CODE": "bad-name", "GREEN_API_PROPERTY_CODE": "bad-name"})
+        self.assertEqual(result["property_binding"], "BLOCKED")
+        self.assertEqual(result["whatsapp_config"], "BLOCKED")
+
+    def test_trailing_slash_in_documented_openai_origin_is_supported(self):
+        result = readiness({**GOOD, "OPENAI_API_BASE_URL": "https://api.openai.com/v1/"})
+        self.assertEqual(result["marina_ai_config"], "CONFIGURED_NOT_VERIFIED")
+
+    def test_openai_wrong_path_is_blocked(self):
+        result = readiness({**GOOD, "OPENAI_API_BASE_URL": "https://api.openai.com/invalid"})
+        self.assertEqual(result["marina_ai_config"], "BLOCKED")
+
     def test_provider_hostname_mismatch(self):
         result = readiness({**GOOD, "GREEN_API_URL": "https://api.green-api.com.evil.example"})
         self.assertEqual(result["whatsapp_config"], "BLOCKED")
