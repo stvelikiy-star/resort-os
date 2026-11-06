@@ -48,6 +48,11 @@ class PerHotelSiteTests(unittest.TestCase):
         with self.assertRaises(HTTPException):
             site_content.validate_public_content("ru", changed)
 
+    def test_punctuation_only_phone_denied(self):
+        changed = {**GOOD, "contacts": {**GOOD["contacts"], "whatsapp": "(---) ---"}}
+        with self.assertRaises(HTTPException):
+            validate_customer_site_content("en", changed)
+
     def test_unknown_fields_denied(self):
         changed = {**GOOD, "hero": {**GOOD["hero"], "unreviewed": "extra"}}
         with self.assertRaises(HTTPException):
