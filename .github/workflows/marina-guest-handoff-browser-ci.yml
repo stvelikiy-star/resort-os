@@ -1,0 +1,66 @@
+name: MARINA Guest Handoff Browser CI
+
+on:
+  pull_request:
+    paths:
+      - 'apps/web/components/GuestAiAssistant.tsx'
+      - 'apps/web/components/GuestAiAssistant.module.css'
+      - 'apps/web/components/GuestConciergeRuntime.tsx'
+      - 'scripts/marina_guest_handoff_browser_ci.mjs'
+      - 'scripts/fixtures/marina_guest_handoff_qa_page.tsx'
+      - '.github/workflows/marina-guest-handoff-browser-ci.yml'
+  workflow_dispatch:
+
+jobs:
+  synthetic-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install isolated test dependencies
+        run: |
+          npm ci --prefix apps/web --ignore-scripts --no-audit --no-fund
+          npm install --prefix /tmp/marina-playwright --no-save --no-audit --no-fund playwright@1.56.1
+      - name: Launch temporary local fixture (never part of the customer site)
+        shell: bash
+        env:
+          NEXT_PUBLIC_MARINA_GUEST_HANDOFF_ENABLED: 'true'
+          NEXT_TELEMETRY_DISABLED: '1'
+          CORE_API_URL: http://127.0.0.1:19999
+        run: |
+          set -euo pipefail
+          mkdir -p apps/web/app/qa-guest-handoff
+          cp scripts/fixtures/marina_guest_handoff_qa_page.tsx apps/web/app/qa-guest-handoff/page.tsx
+          (
+            cd apps/web
+            ./node_modules/.bin/next dev -p 15661 --hostname 0.0.0.0
+          ) > /tmp/marina-guest-handoff-next.log 2>&1 &
+          echo $! > /tmp/marina-guest-handoff-next.pid
+          for attempt in $(seq 1 60); do
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 4 http://127.0.0.1:15661/qa-guest-handoff || true)
+            if [ "$code" = "200" ]; then
+              echo 'QA_FIXTURE_HTTP_200'
+              exit 0
+            fi
+            sleep 2
+          done
+          tail -40 /tmp/marina-guest-handoff-next.log
+          exit 1
+      - name: Chromium guest confirmation / cancellation / duplicate / timeout
+        run: |
+          docker run --rm --network host --ipc host \
+            -v /tmp/marina-playwright:/work/playwright:ro \
+            -v "$PWD/scripts/marina_guest_handoff_browser_ci.mjs:/work/test.mjs:ro" \
+            mcr.microsoft.com/playwright:v1.56.1-noble node /work/test.mjs
+      - name: Remove temporary test route and local server
+        if: always()
+        run: |
+          if [ -f /tmp/marina-guest-handoff-next.pid ]; then
+            kill "$(cat /tmp/marina-guest-handoff-next.pid)" || true
+          fi
+          rm -rf apps/web/app/qa-guest-handoff
