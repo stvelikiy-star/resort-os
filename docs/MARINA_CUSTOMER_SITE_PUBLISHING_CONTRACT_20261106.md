@@ -36,7 +36,7 @@ Legacy content and seeded hotel marketing claims are never used as a fallback.
 
 ## Acceptance completed on synthetic single hotel
 
-- Python contract tests: 9/9 PASS.
+- Python contract tests: 11/11 PASS.
 - Real isolated HTTPS + PostgreSQL: unpublished 404/neutral page, OWNER login, CMS view, draft, publish, second version, RU/EN separation with KG unpublished, logout.
 - Exact evidence: `/home/agent/marina-release-candidates/rc-customer-site-https-e2e-20261106.log`.
 - No changes to HOTEL01, DEMO or other projects.
