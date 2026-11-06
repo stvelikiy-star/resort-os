@@ -11,6 +11,7 @@ import { useMobileCopy, pmsWeekdayLabels } from '../../src/i18n/mobileCopy';
 import { demoGrid } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { useSession } from '../../src/state/session';
+import { canStartBookingFromPms } from '../../src/roles/bookingAccess';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius } from '../../src/theme/tokens';
@@ -63,7 +64,7 @@ export default function Pms() {
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.pms} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
-    {live && user && ['OWNER','MANAGER','AGENT'].includes(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
+    {live && user && canStartBookingFromPms(user.role) ? <Button testID="pms-new-booking" label={copy.newBooking} icon={Plus} onPress={() => router.push('/new-booking')}/> : null}
     {live && CONFIRMED_BACKEND_FEATURES.pmsHolds && user && ['OWNER','MANAGER'].includes(user.role) ? <Button testID="pms-holds" variant="secondary" label={copy.holds} icon={Clock3} onPress={() => router.push('/holds')}/> : null}
     <GlassCard style={{ gap: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
