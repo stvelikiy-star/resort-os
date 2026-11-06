@@ -4,7 +4,7 @@ import json
 from fastapi import APIRouter, Cookie, HTTPException, Request
 
 from .guest_os import GUEST_COOKIE, guest_property_info
-from .guest_requests import authorized_context
+from .guest_requests import REQUEST_LABELS, authorized_context
 from .hotel_rules import load_rules
 from .marina_assistant import MarinaAssistantRequest, _ask_openai, _enforce_rate_limit
 
@@ -53,6 +53,27 @@ async def _guest_context(request: Request, token: str, raw_session: str | None):
     }, str(session["id"])
 
 
+def explicit_human_handoff_option() -> dict[str, object]:
+    """Read-only hint for clients, never a claim that a staff task exists.
+
+    Consumers must use the existing guest-requests endpoint with a separate,
+    explicit guest action and the existing QR/PIN session. MARINA AI cannot
+    create, claim, or complete a task from natural-language conversation.
+    """
+    assert "ADMIN" in REQUEST_LABELS
+    return {
+        "available": True,
+        "status": "NOT_REQUESTED",
+        "request_code": "ADMIN",
+        "requires_explicit_guest_action": True,
+        "action": "CREATE_GUEST_REQUEST",
+        "endpoint_suffix": "/requests",
+        "http_method": "POST",
+        "body": {"request_code": "ADMIN"},
+        "task_created": False,
+    }
+
+
 @router.post("/rooms/{token}/assistant/chat")
 async def guest_assistant_chat(
     token: str, payload: MarinaAssistantRequest, request: Request,
@@ -74,4 +95,5 @@ say it is unknown and refer to reception. Keep answers short and practical.
                           "conversation": [m.model_dump() for m in payload.messages]},
                          ensure_ascii=False, default=str)
     answer = await _ask_openai(prompt)
-    return {"answer": answer, "read_only": True, "can_mutate": False}
+    return {"answer": answer, "read_only": True, "can_mutate": False,
+            "human_handoff": explicit_human_handoff_option()}
