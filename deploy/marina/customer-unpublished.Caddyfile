@@ -11,6 +11,16 @@
     respond "OK" 200
   }
 
+  @homepage {
+    method GET
+    path /
+    header Accept *text/html*
+  }
+  handle @homepage {
+    rewrite * /api/v1/site/customer-page?{query}
+    reverse_proxy api:8000
+  }
+
   @unpublished {
     method GET
     header Accept *text/html*
