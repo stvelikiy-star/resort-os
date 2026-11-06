@@ -1,6 +1,6 @@
 import type { Dict } from './ru';
 export const kg: Dict = {
-  common: { appName: 'MARINA SMART', cancel: 'Жокко чыгаруу', save: 'Сактоо', back: 'Артка', next: 'Кийинки', done: 'Бүттү', retry: 'Кайра аракет', loading: 'Жүктөлүүдө…', empty: 'Азырынча эч нерсе жок', demo: 'ДЕМО РЕЖИМ · PMS маалыматы эмес', room: 'Бөлмө', all: 'Баары' },
+  common: { appName: 'MARINA SMART', cancel: 'Жокко чыгаруу', save: 'Сактоо', back: 'Артка', next: 'Кийинки', done: 'Бүттү', retry: 'Кайра аракет', loading: 'Жүктөлүүдө…', empty: 'Азырынча эч нерсе жок', demo: 'ДЕМО РЕЖИМИ · PMSтин чыныгы маалыматтары эмес', room: 'Бөлмө', all: 'Баары' },
   scan: {"title":"QR-кодду сканерлөө","instructions":"Камераны мейманкананын туташуу QR-кодуна багыттаңыз.","checking":"Камерага уруксат текшерилүүдө…","permission":"Камерага уруксат берүү","invalid":"QR-код мейманкананын коопсуз HTTPS дарегин камтышы керек.","privacy":"QR-код даректи гана берет. Кирүү өзүнчө аткарылат.","back":"Мейманкана тандоосуна кайтуу"},
   nav: { tasks: 'Тапшырмалар', rooms: 'Бөлмөлөр', requests: 'Оңдоо', admin: 'Башкаруу', profile: 'Жеке кабинет' },
   connect: {
