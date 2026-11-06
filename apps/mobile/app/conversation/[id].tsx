@@ -4,13 +4,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, MessageSquareText, CheckCheck, AlertTriangle } from 'lucide-react-native';
 import { Badge, Button, Empty, Field, PressScale, SectionLabel, DemoBanner } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
-import { ConversationDetail, useLiveModules } from '../../src/api/liveModules';
+import { ConversationDetail, OutboundCapabilities, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { chatStatusLabel, deliveryStatusLabel, messageDirectionLabel } from '../../src/i18n/statusLabels';
 import { formatChatTimestamp } from '../../src/i18n/dateLabels';
 import { demoConversationDetail } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
+import { acknowledgePendingOutbound, clearPendingOutbound, finishPendingOutbound, newOutboundKey, outboundJournalKey, readPendingOutbound, recordPendingOutbound } from '../../src/lib/pendingOutbound';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -28,6 +29,10 @@ export default function ConversationScreen() {
   const { c } = useTheme();
   const { width } = useWindowDimensions();
   const [note, setNote] = useState('');
+  const [reply, setReply] = useState('');
+  const journal = id && user ? outboundJournalKey(user.property_code, user.id, id) : null;
+  const { data: pending, reload: reloadPending } = useAsync(() => journal ? readPendingOutbound(journal) : Promise.resolve(null), [journal]);
+  const { data: outboundCaps } = useAsync<OutboundCapabilities | null>(() => allowed && !showroom && live ? live.outboundCapabilities() : Promise.resolve(null), [live, allowed, showroom, user?.id]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -44,6 +49,49 @@ export default function ConversationScreen() {
     }
     finally { locked.current = false; setBusy(false); }
   };
+  const canSend = !!live && !showroom && allowed && !!user && ['OWNER','MANAGER','RECEPTION'].includes(user.role) &&
+    data?.conversation?.channel_kind === 'WHATSAPP' && outboundCaps?.whatsapp.configured === true &&
+    outboundCaps.whatsapp.human_only === true && outboundCaps.whatsapp.queued_only === true &&
+    (user.role !== 'RECEPTION' || data.conversation.assigned_to_id === user.id);
+  const sendReply = async () => {
+    const content = reply.trim();
+    if (!canSend || !journal || !id || !content || content.length > Math.min(4096, outboundCaps?.whatsapp.max_text_length ?? 4096) ||
+        locked.current || busy || unknownResult || pending) return;
+    locked.current = true; setBusy(true); setFeedback(null);
+    let recorded = false;
+    try {
+      const key = newOutboundKey();
+      recorded = await recordPendingOutbound(journal, content, key);
+      if (!recorded) { setUnknownResult(true); setFeedback(copy.outboundReview); return; }
+      const ack = await live!.sendWhatsAppText(id, content, key);
+      await clearPendingOutbound(journal);
+      setReply('');
+      setFeedback(ack.delivery_status === 'QUEUED' ? copy.messageQueued : deliveryStatusLabel(ack.delivery_status, copy));
+      await reload();
+    } catch (error: unknown) {
+      if (recorded && wasWriteRejected(error)) {
+        await clearPendingOutbound(journal);
+        setFeedback(copy.conflict);
+      } else {
+        setUnknownResult(true);
+        setFeedback(copy.outboundReview);
+      }
+    } finally {
+      finishPendingOutbound(journal); await reloadPending(); locked.current = false; setBusy(false);
+    }
+  };
+  const reviewUnknown = () => Alert.alert(copy.outboundReview, copy.outboundReviewConfirm, [
+    { text: copy.close, style: 'cancel' },
+    { text: copy.outboundReviewed, onPress: () => { void (async () => {
+      if (!journal || !pending) return;
+      // The employee must reconcile the WhatsApp history; never resend the same key.
+      await reload();
+      if (await acknowledgePendingOutbound(journal, pending)) {
+        setUnknownResult(false);
+        await reloadPending();
+      }
+    })(); } },
+  ]);
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const conversation = data?.conversation;
   return <FutureScreen>
@@ -86,7 +134,14 @@ export default function ConversationScreen() {
       <Field label={copy.notePlaceholder} value={note} onChangeText={setNote} multiline maxLength={12000} testID="internal-note-input"/>
       <Button label={copy.saveNote} testID="save-internal-note" disabled={busy || unknownResult || !note.trim()} onPress={() => void act(() => live!.internalNote(id!, note.trim()), true)}/>
       </> : null}
-      <GlassCard><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><MessageSquareText size={22} color={c.warning}/><Text style={[font.small, { flex: 1, color: c.textMuted }]}>{copy.noSend}</Text></View></GlassCard>
+      {canSend ? <>
+        <SectionLabel>{copy.sendWhatsApp}</SectionLabel>
+        <Field testID="whatsapp-reply-input" label={copy.replyPlaceholder} value={reply} onChangeText={setReply} multiline maxLength={4096}/>
+        <Button testID="whatsapp-send" label={copy.sendWhatsApp} disabled={busy || unknownResult || !!pending || !reply.trim()} onPress={() => void sendReply()}/>
+      </> : <GlassCard><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><MessageSquareText size={22} color={c.warning}/><Text style={[font.small, { flex: 1, color: c.textMuted }]}>{copy.noSend}</Text></View></GlassCard>}
+      {pending ? <GlassCard><Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.outboundReview}</Text>
+        <Button testID="whatsapp-review" variant="secondary" label={copy.outboundReviewed} onPress={reviewUnknown}/>
+      </GlassCard> : null}
       {feedback ? <Text testID={unknownResult ? 'inbox-unknown-result' : 'inbox-feedback'} accessibilityRole="alert" style={[font.small, { color: unknownResult ? c.warning : c.primary }]}>{feedback}</Text> : null}
     </> : null}
   </FutureScreen>;
