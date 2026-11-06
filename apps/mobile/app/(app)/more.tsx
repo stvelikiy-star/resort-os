@@ -12,9 +12,9 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, space } from '../../src/theme/tokens';
 
 const ICONS = {
-  overview: ChartNoAxesCombined, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
+  overview: LayoutDashboard, UsersRound, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
   dining: UtensilsCrossed, kitchen: ChefHat, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
-  admin: Grid2X2, profile: CircleUserRound,
+  admin: UsersRound, profile: CircleUserRound,
 } as const;
 export default function MoreScreen() {
   const { user, hotel, api, serverAuthMode } = useSession();
