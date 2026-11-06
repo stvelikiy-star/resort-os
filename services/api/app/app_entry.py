@@ -85,6 +85,7 @@ from .service_point_payments import public_router as service_point_payments_publ
 from .service_points import admin_router as service_points_admin_router
 from .service_points import public_router as service_points_public_router
 from .site_content import router as site_content_router
+from .customer_site_page import router as customer_site_page_router
 from .site_media import router as site_media_router
 from .staff_control import router as staff_control_router
 from .staff_guest_requests import router as staff_guest_requests_router
@@ -160,6 +161,7 @@ _strip_disabled_booking_payment_mutations()
 app.include_router(health_router)
 app.include_router(runtime_capabilities_router)
 app.include_router(site_content_router)
+app.include_router(customer_site_page_router)
 app.include_router(site_media_router)
 app.include_router(public_ai_admin_router)
 app.include_router(marina_assistant_router)
