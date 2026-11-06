@@ -9,6 +9,7 @@ import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { orderStatusLabel, diningTableStatusLabel } from '../../src/i18n/statusLabels';
 import { demoDiningFloor, demoKitchenOrders } from '../../src/api/demoPresentation';
 import { useSession } from '../../src/state/session';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -16,8 +17,10 @@ import { font, space } from '../../src/theme/tokens';
 
 const NEXT: Partial<Record<KitchenStatus, KitchenStatus>> = { NEW: 'ACCEPTED', ACCEPTED: 'COOKING', COOKING: 'READY' };
 export default function Dining() {
-  const { user, hotel, api, locale } = useSession();
+  const { user, hotel, api, locale, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
+  const allowed = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'dining', serverAuthMode)
+    && ['COOK', 'WAITER', 'OWNER', 'MANAGER'].includes(user.role);
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
@@ -25,7 +28,7 @@ export default function Dining() {
   const singleColumn = width < 365 || fontScale > 1.35;
   const cook = user?.role === 'COOK';
   const waiter = user?.role === 'WAITER';
-  const { data, loading, error, reload } = useAsync<KitchenOrder[] | DiningFloor | null>(() => showroom ? Promise.resolve(cook ? demoKitchenOrders(locale) : demoDiningFloor(locale)) : live ? cook ? live.kitchenOrders() : live.diningFloor() : Promise.resolve(null), [live, showroom, cook, user?.id, locale]);
+  const { data, loading, error, reload } = useAsync<KitchenOrder[] | DiningFloor | null>(() => !allowed ? Promise.resolve(null) : showroom ? Promise.resolve(cook ? demoKitchenOrders(locale) : demoDiningFloor(locale)) : live ? cook ? live.kitchenOrders() : live.diningFloor() : Promise.resolve(null), [live, showroom, cook, user?.id, locale, allowed]);
   const focused = useRef(false);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -47,7 +50,7 @@ export default function Dining() {
       Alert.alert(rejected ? copy.conflict : copy.resultUnknown);
     } finally { locked.current = false; setBusy(false); }
   }}]);
-  if (!user || (!showroom && !user.module_permissions?.includes('DINING')) || !['COOK','WAITER','OWNER','MANAGER'].includes(user.role))
+  if (!allowed)
     return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.dining} subtitle={hotel?.name} eyebrow="MARINA SMART" right={cook ? <ChefHat size={27} color={c.primary}/> : <UtensilsCrossed size={27} color={c.primary}/>}/>
