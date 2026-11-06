@@ -44,7 +44,6 @@ export default function ConversationScreen() {
     }
     finally { locked.current = false; setBusy(false); }
   };
-  if (serverAuthMode === 'shared_auth_preview') return <FutureScreen><Empty text={copy.unavailable}/></FutureScreen>;
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const conversation = data?.conversation;
   return <FutureScreen>
