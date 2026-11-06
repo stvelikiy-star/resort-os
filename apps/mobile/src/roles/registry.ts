@@ -70,7 +70,7 @@ export function workspaceForSession(
   // SharedAuthPreviewBoundary returns 503 for inbox and dining irrespective
   // of grants. The UI must never suggest these routes are LIVE-ready.
   const tabs = candidates.filter((tab) => {
-    if (sharedPreview && tab === 'dining') return false; // RC5 Inbox is server-gated; 403/503 still fail closed.
+    if (sharedPreview && (tab === 'dining' || tab === 'kitchen')) return false; // Both use the same unavailable Dining API; RC5 Inbox is server-gated.
     if (tab === 'inbox') return permissions.includes('WHATSAPP') || (role !== 'RECEPTION' && permissions.includes('INBOX'));
     if (tab === 'admin') return permissions.includes('OPS') && permissions.includes('STAFF');
     return !MODULE[tab] || permissions.includes(MODULE[tab]!);
