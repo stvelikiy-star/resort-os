@@ -162,10 +162,10 @@ describe('booking access boundary', () => {
     expect(view.queryByTestId('booking-preview')).toBeNull();
     expect(mockModules.pmsGrid).not.toHaveBeenCalled();
   });
-  it('does not widen cancel or schedule: the live client exposes no such operation', () => {
+  it('keeps cancellation blocked while schedule is a separate manager-only UI operation', () => {
     const actual = jest.requireActual<typeof import('../src/api/liveModules')>('../src/api/liveModules');
     const names = Object.keys(actual.createLiveModules('https://hotel.example', jest.fn() as unknown as typeof fetch));
-    expect(names.filter(name => /cancel|schedule|reschedul|move/i.test(name))).toEqual([]);
-    expect(names).toEqual(expect.arrayContaining(['bookingPreview', 'bookingCommit']));
+    expect(names.filter(name => /cancel|reschedul|move/i.test(name))).toEqual([]);
+    expect(names).toEqual(expect.arrayContaining(['bookingPreview', 'bookingCommit', 'schedulePreview', 'scheduleCommit']));
   });
 });

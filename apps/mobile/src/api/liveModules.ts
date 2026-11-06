@@ -56,6 +56,13 @@ export interface BookingPreview {
   conflicts: { block_type: string; start: string; end: string }[];
   pricing: { source: 'CORE_RATE' | 'MANAGER_OVERRIDE'; sellable: boolean; total_kgs: number | null; discount_percent: number; reason?: string | null };
 }
+export interface ScheduleSegment { room_id: string; start: string; end: string }
+export interface SchedulePreview {
+  reservation: { version: string }; can_commit: boolean;
+  proposed_check_in: string; proposed_check_out: string;
+  conflicts: unknown[]; pricing: { suggested_total_kgs: number | null; delta_kgs: number | null };
+}
+export interface ScheduleCommitAck { ok: true; reservation_id: string; version: string; check_in: string; check_out: string }
 export interface BookingDraft {
   room_id: string; check_in: string; check_out: string; adults: number; children: number;
   guest_phone: string;
@@ -110,6 +117,37 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     reservation: async (id: string) => objectResponse(await request<unknown>('GET', p + '/admin/reception/reservations/' + safeRouteId(id)), 'reservation'),
     checkIn: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-in'), id, 'CHECKED_IN'),
     checkOut: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-out'), id, 'CHECKED_OUT'),
+    schedulePreview: async (id: string, segments: ScheduleSegment[]): Promise<SchedulePreview> => {
+      if (segments.length !== 1) throw new ApiError('BAD_REQUEST', 'Only one-room date changes are enabled on mobile');
+      const segment = segments[0];
+      if (segment.start >= segment.end) throw new ApiError('BAD_REQUEST', 'Invalid reservation dates');
+      const payload = { segments: [{ room_id: safeRouteId(segment.room_id), start: safeIsoDate(segment.start), end: safeIsoDate(segment.end) }] };
+      const value = await request<unknown>('POST', p + '/admin/pms/reservations/' + safeRouteId(id) + '/schedule/preview', payload);
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Invalid schedule preview');
+      const x = value as Record<string, unknown>, reservation = x.reservation as Record<string, unknown> | null;
+      if (!reservation || typeof reservation.version !== 'string' || typeof x.can_commit !== 'boolean' ||
+          !Array.isArray(x.conflicts) || typeof x.proposed_check_in !== 'string' || typeof x.proposed_check_out !== 'string' ||
+          !x.pricing || typeof x.pricing !== 'object')
+        throw new ApiError('UNKNOWN', 'Invalid schedule preview');
+      return value as SchedulePreview;
+    },
+    scheduleCommit: async (id: string, segments: ScheduleSegment[], version: string): Promise<ScheduleCommitAck> => {
+      if (segments.length !== 1 || typeof version !== 'string' || version.length < 10 || version.length > 80)
+        throw new ApiError('BAD_REQUEST', 'Invalid reservation schedule');
+      const segment = segments[0];
+      if (segment.start >= segment.end) throw new ApiError('BAD_REQUEST', 'Invalid reservation dates');
+      const payload = {
+        segments: [{ room_id: safeRouteId(segment.room_id), start: safeIsoDate(segment.start), end: safeIsoDate(segment.end) }],
+        expected_version: version,
+      };
+      const value = await request<unknown>('POST', p + '/admin/pms/reservations/' + safeRouteId(id) + '/schedule/commit', payload);
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Invalid schedule commit acknowledgement');
+      const x = value as Record<string, unknown>;
+      if (x.ok !== true || x.reservation_id !== id || typeof x.version !== 'string' ||
+          typeof x.check_in !== 'string' || typeof x.check_out !== 'string')
+        throw new ApiError('UNKNOWN', 'Invalid schedule commit acknowledgement');
+      return value as ScheduleCommitAck;
+    },
     bookingPreview: async (draft: BookingDraft) => bookingPreviewResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/preview', draft)),
     bookingCommit: async (draft: BookingCommit) => bookingCommitResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/commit', draft)),
     holds: async (): Promise<Hold[]> => {
