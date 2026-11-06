@@ -21,6 +21,7 @@ on:
       - 'apps/staff/components/WaiterEntry.tsx'
       - 'scripts/marina_ai_embedded_contract.py'
       - 'scripts/test_marina_assistant_permissions.py'
+      - 'scripts/test_marina_guest_handoff_ui_contract.py'
       - 'apps/web/components/GuestAiAssistant.tsx'
       - 'apps/web/components/GuestAiAssistant.module.css'
       - 'apps/web/components/GuestConciergeRuntime.tsx'
@@ -55,6 +56,8 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci --prefix apps/web
       - run: npm run typecheck --prefix apps/web
+      - name: Guest human handoff UI safety contract
+        run: python3 -m unittest scripts.test_marina_guest_handoff_ui_contract -v
 
   admin-typecheck:
     runs-on: ubuntu-latest
