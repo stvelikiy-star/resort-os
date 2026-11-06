@@ -31,8 +31,8 @@ export default function ConversationScreen() {
   const [note, setNote] = useState('');
   const [reply, setReply] = useState('');
   const journal = id && user ? outboundJournalKey(user.property_code, user.id, id) : null;
-  const { data: pending, reload: reloadPending } = useAsync(() => journal ? readPendingOutbound(journal) : Promise.resolve(null), [journal]);
-  const { data: outboundCaps } = useAsync<OutboundCapabilities | null>(() => allowed && !showroom && live ? live.outboundCapabilities() : Promise.resolve(null), [live, allowed, showroom, user?.id]);
+  const { data: pending, loading: journalLoading, error: journalError, reload: reloadPending } = useAsync(() => journal ? readPendingOutbound(journal) : Promise.resolve(null), [journal]);
+  const { data: outboundCaps } = useAsync<OutboundCapabilities | null>(() => allowed && !showroom && live && typeof live.outboundCapabilities === 'function' ? live.outboundCapabilities() : Promise.resolve(null), [live, allowed, showroom, user?.id]);
   const [feedback, setFeedback] = useState<string | null>(null);
   const locked = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -56,7 +56,7 @@ export default function ConversationScreen() {
   const sendReply = async () => {
     const content = reply.trim();
     if (!canSend || !journal || !id || !content || content.length > Math.min(4096, outboundCaps?.whatsapp.max_text_length ?? 4096) ||
-        locked.current || busy || unknownResult || pending) return;
+        locked.current || busy || unknownResult || pending || journalLoading || !!journalError) return;
     locked.current = true; setBusy(true); setFeedback(null);
     let recorded = false;
     try {
@@ -137,8 +137,9 @@ export default function ConversationScreen() {
       {canSend ? <>
         <SectionLabel>{copy.sendWhatsApp}</SectionLabel>
         <Field testID="whatsapp-reply-input" label={copy.replyPlaceholder} value={reply} onChangeText={setReply} multiline maxLength={4096}/>
-        <Button testID="whatsapp-send" label={copy.sendWhatsApp} disabled={busy || unknownResult || !!pending || !reply.trim()} onPress={() => void sendReply()}/>
+        <Button testID="whatsapp-send" label={copy.sendWhatsApp} disabled={busy || unknownResult || journalLoading || !!journalError || !!pending || !reply.trim()} onPress={() => void sendReply()}/>
       </> : <GlassCard><View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}><MessageSquareText size={22} color={c.warning}/><Text style={[font.small, { flex: 1, color: c.textMuted }]}>{copy.noSend}</Text></View></GlassCard>}
+      {journalError ? <GlassCard><Text accessibilityRole="alert" style={[font.body, { color: c.danger }]}>{copy.outboundReview}</Text></GlassCard> : null}
       {pending ? <GlassCard><Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.outboundReview}</Text>
         <Button testID="whatsapp-review" variant="secondary" label={copy.outboundReviewed} onPress={reviewUnknown}/>
       </GlassCard> : null}
