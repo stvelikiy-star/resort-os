@@ -4,6 +4,7 @@ import { Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, MessageCircle, ShieldAlert, Wallet, CalendarDays, ClipboardCheck, Users, Wrench, Sparkles } from 'lucide-react-native';
 import { Hero } from '../../src/components/Brand';
+import { OwnerControlDashboard } from '../../src/components/OwnerControlDashboard';
 import { DemoBanner, Empty, SectionLabel } from '../../src/components/ui';
 import { AIOrb, AnimatedKpi, ErrorState, FutureScreen, GlassCard, LoadingShimmer, MetricCard, OccupancyRing, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
@@ -51,7 +52,7 @@ export default function Overview() {
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
     {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
-    {data ? <>
+    {data ? user?.role === 'OWNER' && user ? <OwnerControlDashboard data={data} user={user} copy={copy} canOpen={canOpen} canOpenInbox={canOpenInbox} showroom={showroom}/> : <>
       <StaggerItem index={0}><Hero>
         <View style={{ flexDirection:'row', alignItems:'center', justifyContent:'space-between' }}>
           <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
