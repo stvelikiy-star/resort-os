@@ -5,7 +5,8 @@
 
 ## Safety boundary
 
-- `compose.marina-production.yaml` sets `MARINA_CUSTOMER_SITE_SAFE_MODE=true` only on its API container. Existing legacy resort deployments are unaffected.
+- `compose.marina-production.yaml` sets `MARINA_CUSTOMER_SITE_SAFE_MODE=true` on its API and one-shot provisioner. Existing legacy resort deployments are unaffected.
+- On initial one-shot provisioning, only the optional `CONTENT` module is enabled for the hotel's OWNER; other optional modules remain disabled. The OWNER may subsequently change module settings with the existing authenticated hotel-setup API. This prevents a newly provisioned owner from being locked out of the site's editor.
 - The customer Web is a separate pinned Caddy service. It does not run the frozen Three Crowns / AK BERMET public Next.js app.
 - Caddy proxies only browser `GET /` to `api:8000/api/v1/site/customer-page` (query `locale=ru|kg|en` preserved).
 - Until explicitly published, the homepage is a neutral multilingual preparation page with `noindex`/no cache. Other HTML paths remain neutral, while old static resources, APIs and media return 503 from the Web origin.
