@@ -52,7 +52,7 @@ export default function Pms() {
       : state === 'BLOCKED' || state === 'CONFLICT' ? c.danger : c.textMuted;
     const label = state === 'RESERVATION' && block ? shortPmsGuestLabel(block)
       : state === 'HOLD' ? 'HOLD' : state === 'BLOCKED' ? '×'
-      : state === 'CONFLICT' ? '!' : '＋';
+      : state === 'CONFLICT' ? '!' : '+';
     const semantic = state === 'RESERVATION' ? copy.bookings : state === 'HOLD' ? copy.holds
       : state === 'BLOCKED' ? copy.blocked : state === 'CONFLICT' ? copy.conflict : copy.available;
     const free = isPmsDateFree(room, day, localDate()) && (!!showroom || canCreateBooking(user));
