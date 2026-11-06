@@ -6,7 +6,7 @@ import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
 import type { AuthMode } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
-import { stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
+import { diningProductionSnapshotsResponse, stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type WhatsAppDeliveryStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ';
@@ -83,11 +83,28 @@ export interface AssistantMessage { role: 'user' | 'assistant'; content: string 
 export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
 export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
 export type KitchenStatus = 'NEW' | 'ACCEPTED' | 'COOKING' | 'READY' | 'SERVED' | 'CANCELLED';
+export interface KitchenOrderItem {
+  id?: string; name?: string; name_ru?: string; name_kg?: string;
+  name_en?: string; name_kz?: string | null; quantity?: number;
+}
 export interface KitchenOrder {
   id: string; order_number: string; status: KitchenStatus;
   table_code: string | null; room_code: string | null; total_kgs: number;
-  notes: string | null; items: { id?: string; name?: string; quantity?: number }[];
+  source?: string; meal_type?: string | null; guest_count?: number;
+  notes: string | null; items: KitchenOrderItem[];
 }
+/** GET /api/v1/dining/production-snapshots: explicit *included* portions,
+ * separate from à-la-carte orders. A frozen baseline is never silently rewritten. */
+export interface DiningProductionSnapshotMeal {
+  service_date: string; meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER';
+  current_adult_portions: number; current_child_portions: number;
+  current_total_portions: number; current_entitlement_count: number;
+  state: 'OPEN' | 'FROZEN'; cutoff_status: 'UNCONFIGURED' | 'BEFORE_CUTOFF' | 'CUTOFF_REACHED';
+  frozen_total_portions: number | null; delta_total_portions: number | null;
+  changed_since_snapshot: boolean; meal_start: string | null; cutoff_at: string | null;
+}
+export interface DiningProductionSnapshotDay { service_date: string; meals: DiningProductionSnapshotMeal[] }
+export interface DiningProductionSnapshots { from_date: string; through_date: string; days: DiningProductionSnapshotDay[] }
 export interface DiningFloor {
   tables: { id: string; code: string; name: string; status: string; seats: number }[];
   orders: { id: string; order_number: string; status: string; table_code: string | null;
@@ -210,6 +227,12 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     kitchenOrders: async () => {
       reviewGate();
       return kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE'));
+    },
+    diningProductionSnapshots: async (from: string, through: string): Promise<DiningProductionSnapshots> => {
+      reviewGate();
+      const payload = await request<unknown>('GET', p + '/dining/production-snapshots?from_date=' +
+        safeIsoDate(from) + '&through_date=' + safeIsoDate(through));
+      return diningProductionSnapshotsResponse(payload);
     },
     kitchenStatus: async (id: string, status: KitchenStatus) => {
       reviewGate();
