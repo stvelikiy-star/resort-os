@@ -1,6 +1,6 @@
 import type { AuthMode, Role } from '../api/types';
 
-export type TabKey = 'overview' | 'reception' | 'pms' | 'inbox' | 'dining' | 'tasks' | 'rooms' | 'requests' | 'admin' | 'profile';
+export type TabKey = 'overview' | 'reception' | 'pms' | 'inbox' | 'dining' | 'kitchen' | 'tasks' | 'rooms' | 'requests' | 'admin' | 'profile';
 export interface Workspace {
   tabs: TabKey[];
   taskTypes: ('HOUSEKEEPING' | 'MAINTENANCE' | 'GUEST_REQUEST')[];
@@ -31,7 +31,7 @@ const DEMO_SHOWCASE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
-  COOK: ['dining', 'profile'],
+  COOK: ['kitchen', 'dining', 'profile'],
   WAITER: ['dining', 'profile'],
   AGENT: ['pms', 'profile'],
 };
@@ -56,7 +56,7 @@ const LIVE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
 };
 const MODULE: Record<TabKey, string | null> = {
   overview: 'DASHBOARD', reception: 'RESERVATIONS', pms: 'PMS', inbox: 'WHATSAPP',
-  dining: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'STAFF', profile: null,
+  dining: 'DINING', kitchen: 'DINING', tasks: 'OPS', rooms: 'OPS', requests: 'OPS', admin: 'STAFF', profile: null,
 };
 /** UI visibility is only a convenience. Every endpoint still enforces hard role, property and custom module grants. */
 export function workspaceForSession(
