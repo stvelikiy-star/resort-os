@@ -46,8 +46,9 @@ export default function ReservationScreen() {
   const oneRoom = segments.length === 1 && typeof segments[0].room_id === 'string';
   const roomId = oneRoom ? String(segments[0].room_id) : null;
   const canEditDates = allowed && !!live && !!user && ['OWNER','MANAGER'].includes(user.role) &&
-    !!user.module_permissions?.includes('PMS') && oneRoom;
-  const validDates = /^\\d{4}-\\d{2}-\\d{2}$/.test(newStart) && /^\\d{4}-\\d{2}-\\d{2}$/.test(newEnd) &&
+    !!user.module_permissions?.includes('PMS') && oneRoom &&
+    ['GUARANTEED','CHECKED_IN'].includes(String((data?.reservation as Record<string,unknown> | undefined)?.status ?? ''));
+  const validDates = /^\d{4}-\d{2}-\d{2}$/.test(newStart) && /^\d{4}-\d{2}-\d{2}$/.test(newEnd) &&
     newStart < newEnd;
   const previewDateChange = async () => {
     if (!canEditDates || !roomId || !id || !validDates || dateLock.current || datesUnknown) return;
@@ -121,7 +122,7 @@ export default function ReservationScreen() {
         </> : null}
       </Card> : allowed && user && ['OWNER','MANAGER'].includes(user.role) && data && !oneRoom ?
         <Text style={[font.small,{color:c.textMuted}]}>{copy.scheduleUnavailable}</Text> : null}
-            <Text style={[font.small, { color: c.textMuted }]}>{copy.readOnly} · {copy.paymentsNotProfit}</Text>
+      <Text style={[font.small, { color: c.textMuted }]}>{copy.readOnly} · {copy.paymentsNotProfit}</Text>
       {feedback ? <Card><Text accessibilityRole="alert" testID={unknownResult ? 'reservation-unknown-result' : 'reservation-feedback'} style={[font.body, { color: unknownResult ? c.warning : c.text }]}>{feedback}</Text></Card> : null}
     </> : null}
   </Screen>;
