@@ -13,8 +13,8 @@ Status: **SOURCE IMPLEMENTED, NOT ENABLED**, 2026-10-21.
   per-property idempotency key and external message identifier.
 - **No n8n, Nextbot, public webhook, browser-held Green token, AI auto-send,
   payment, HOLD or confirmed reservation in this stage.**
-- Group/newsletter/non-text inbound messages are **not acknowledged** and halt
-  the pilot worker, avoiding silent loss; an operator must reconcile them.
+- Group/newsletter/non-text inbound messages and **all unreviewed webhook types**, including outgoing delivery status, are **not acknowledged** and halt
+  the pilot worker, avoiding silent loss; an operator must reconcile them before resuming. This is a limited text-inbound pilot, not a complete status-consumer.
   Do not launch on hotels needing media/group support before implementing their
   adapters and consent rules.
 - The Core's service key is required. If not configured, the adapter fails
@@ -27,6 +27,10 @@ Required private environment variables in ONE hotel's runtime:
 - `GREEN_API_TOKEN_INSTANCE`: provider token (do not commit or post)
 - `AUTOMATION_SERVICE_KEY`: **same** high-entropy secret in Core and adapter
 - `PROPERTY_CODE`: bound hotel, e.g. `MARINA_HOTEL01`
+- `GREEN_API_PROPERTY_CODE`: must equal `PROPERTY_CODE` exactly (independent owner pairing)
+- `GREEN_API_URL` is restricted to the documented Green-API HTTPS provider host, never an arbitrary URL.
+- `RESORT_CORE_URL` (optional) must be the trusted local Core endpoint: `http://127.0.0.1:8000`, `http://localhost:8000`, or the private Compose service `http://api:8000`.
+- `GREEN_API_TOKEN_INSTANCE` must have at least 16 permitted token characters; do not paste tokens into chat.
 Optional: `RESORT_CORE_URL`, defaults to `http://127.0.0.1:8000` for
 in-container operation. Do not put Core behind a public internet-facing
 service-key endpoint.
