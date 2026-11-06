@@ -6,6 +6,7 @@ import { LogOut, Languages, Palette, ArrowLeftRight, Wallet } from 'lucide-react
 import Constants from 'expo-constants';
 import { Button, DemoBanner, Segmented } from '../../src/components/ui';
 import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
+import { RoleProfileWorkspaces } from '../../src/components/RoleProfileWorkspaces';
 import { useSession } from '../../src/state/session';
 import { Hero } from '../../src/components/Brand';
 import { contactInitials } from '../../src/i18n/statusLabels';
@@ -22,6 +23,7 @@ export default function Profile() {
   const { c, pref, setPref } = useTheme();
   const router = useRouter();
   const { user, hotel, api, serverAuthMode, locale, setLocale, signOut } = useSession();
+  const allowedTabs = user ? workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).tabs : [];
   if (!user || !hotel || !api) return <Redirect href="/connect" />;
   const row = (k: string, v: string) => (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.md, paddingVertical: 8 }}>
@@ -52,6 +54,7 @@ export default function Profile() {
         {row(t('profile.version'), String(Constants.expoConfig?.version ?? '0.2.0'))}
       </GlassCard>
       {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).mobileReady ? <GlassCard testID="role-soon"><Text accessibilityRole="text" style={[font.body, { color: c.textMuted }]}>{api.mode === 'LIVE' && user.role === 'STORE_STAFF' ? t('profile.storeUnavailable') : t('profile.roleSoon')}</Text></GlassCard> : null}
+      <RoleProfileWorkspaces tabs={allowedTabs} onOpen={tab => router.push(('/' + tab) as never)}/>
       <GlassCard style={{ gap: space.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <Languages size={23} color={c.cyan}/>
