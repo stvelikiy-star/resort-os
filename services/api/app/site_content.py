@@ -10,9 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .customer_site_contract import validate_customer_site_content
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 SCOPE = "PUBLIC_SITE"
+CUSTOMER_SITE_SAFE_MODE = os.environ.get("MARINA_CUSTOMER_SITE_SAFE_MODE", "").lower() == "true"
 SUPPORTED_LOCALES = ("ru", "kg", "kz", "en")
 DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "data" / "site_content_defaults.json"
 MAX_CONTENT_BYTES = 50_000
@@ -96,7 +98,7 @@ def decode_jsonb(value: Any, fallback: dict[str, Any]) -> dict[str, Any]:
 
 def validate_locale(locale: str) -> str:
     normalized = locale.lower().strip()
-    if normalized not in SUPPORTED_LOCALES:
+    if normalized not in SUPPORTED_LOCALES or (CUSTOMER_SITE_SAFE_MODE and normalized not in ("ru", "kg", "en")):
         raise HTTPException(status_code=404, detail="Unsupported locale")
     return normalized
 
@@ -116,6 +118,13 @@ def validate_public_content(locale: str, content: dict[str, Any]) -> None:
     exist in the reviewed locale defaults. This prevents the CMS from becoming
     an arbitrary parallel marketing schema and keeps runtime selectors stable.
     """
+    if CUSTOMER_SITE_SAFE_MODE:
+        validate_customer_site_content(locale, content)
+        combined = "\n".join(_content_strings(content))
+        for label, pattern in FORBIDDEN_PUBLIC_CONTENT.items():
+            if pattern.search(combined):
+                raise HTTPException(status_code=422, detail={"code": "PUBLIC_CONTENT_TRUTH_VIOLATION", "rule": label, "locale": locale})
+        return
     template = default_for(locale)
     encoded = json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(encoded) > MAX_CONTENT_BYTES:
@@ -180,13 +189,13 @@ async def load_row(conn, property_id: uuid.UUID, locale: str) -> dict[str, Any] 
     )
     if not row:
         return None
-    fallback = default_for(locale)
+    fallback = {} if CUSTOMER_SITE_SAFE_MODE else default_for(locale)
     raw_published = decode_jsonb(row["publishedJson"], {})
     return {
         "id": row["id"],
         "locale": row["locale"],
         "draftJson": decode_jsonb(row["draftJson"], fallback),
-        "publishedJson": merge_with_defaults(fallback, raw_published) if raw_published else {},
+        "publishedJson": (raw_published if CUSTOMER_SITE_SAFE_MODE else merge_with_defaults(fallback, raw_published)) if raw_published else {},
         "version": row["version"],
         "publishedVersion": row["publishedVersion"],
         "publishedAt": row["publishedAt"],
@@ -201,7 +210,13 @@ async def public_site_content(request: Request, locale: str = "ru"):
         property_id = await get_property_id(conn)
         row = await load_row(conn, property_id, locale)
     if not row or not row["publishedJson"]:
+        if CUSTOMER_SITE_SAFE_MODE:
+            raise HTTPException(status_code=404, detail="Site not published")
         return {"property": PROPERTY_CODE, "locale": locale, "content": default_for(locale), "published_version": 0, "published_at": None, "source": "DEFAULT"}
+    if CUSTOMER_SITE_SAFE_MODE:
+        if not row["publishedVersion"]:
+            raise HTTPException(status_code=404, detail="Site not published")
+        validate_customer_site_content(locale, row["publishedJson"])
     return {"property": PROPERTY_CODE, "locale": locale, "content": row["publishedJson"], "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "source": "DATABASE"}
 
 
@@ -210,14 +225,14 @@ async def admin_site_content(request: Request, _user: dict[str, Any] = Depends(m
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
         items = []
-        for locale in SUPPORTED_LOCALES:
+        for locale in (("ru", "kg", "en") if CUSTOMER_SITE_SAFE_MODE else SUPPORTED_LOCALES):
             row = await load_row(conn, property_id, locale)
             if not row:
-                default = default_for(locale)
-                items.append({"locale": locale, "draft": default, "published": default, "version": 0, "published_version": 0, "published_at": None, "updated_at": None, "source": "DEFAULT"})
+                default = {} if CUSTOMER_SITE_SAFE_MODE else default_for(locale)
+                items.append({"locale": locale, "draft": default, "published": default, "version": 0, "published_version": 0, "published_at": None, "updated_at": None, "source": "UNPUBLISHED" if CUSTOMER_SITE_SAFE_MODE else "DEFAULT"})
             else:
                 items.append({"locale": locale, "draft": row["draftJson"], "published": row["publishedJson"] or default_for(locale), "version": row["version"], "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "updated_at": row["updatedAt"], "source": "DATABASE"})
-    return {"property": PROPERTY_CODE, "items": items}
+    return {"property": PROPERTY_CODE, "mode": "customer" if CUSTOMER_SITE_SAFE_MODE else "legacy", "items": items}
 
 
 @router.put("/api/v1/admin/site/content/{locale}/draft")
@@ -259,6 +274,8 @@ async def publish_site_content(locale: str, request: Request, user: dict[str, An
             property_id = await get_property_id(conn)
             row = await load_row(conn, property_id, locale)
             if not row:
+                if CUSTOMER_SITE_SAFE_MODE:
+                    raise HTTPException(409, detail="Explicit customer draft required before publication")
                 seed_content = default_for(locale)
                 validate_public_content(locale, seed_content)
                 seed = json.dumps(seed_content, ensure_ascii=False)
