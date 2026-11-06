@@ -15,6 +15,14 @@ describe('localization RU/KG/EN/KZ', () => {
       for (const k of Object.keys(base)) { expect(d[k].trim()).not.toBe(''); expect(ph(d[k])).toBe(ph(base[k])); }
     });
   }
+  it('STORE_STAFF absence of server operations is explained in every locale', () => {
+    for (const locale of LOCALES) {
+      const notice = dictionaries[locale].profile.storeUnavailable;
+      expect(notice.trim().length).toBeGreaterThan(60);
+      expect(notice).toMatch(/API/);
+      expect(notice).not.toMatch(/coming soon|скоро/i);
+    }
+  });
   it('LIVE mobile copy has equal keys and non-empty values in RU/KG/EN/KZ', () => {
     const baseline = Object.keys(mobileCopyStrings.ru).sort();
     for (const locale of LOCALES) {
