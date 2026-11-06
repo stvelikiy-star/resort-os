@@ -228,11 +228,11 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       reviewGate();
       return kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE'));
     },
-    diningProductionSnapshots: async (from: string, through: string): Promise<DiningProductionSnapshots> => {
+    diningProductionSnapshots: async (from?: string, through?: string): Promise<DiningProductionSnapshots> => {
       reviewGate();
-      const payload = await request<unknown>('GET', p + '/dining/production-snapshots?from_date=' +
-        safeIsoDate(from) + '&through_date=' + safeIsoDate(through));
-      return diningProductionSnapshotsResponse(payload);
+      // By default the backend uses the HOTEL-local date, not the phone timezone.
+      const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
+      return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
     },
     kitchenStatus: async (id: string, status: KitchenStatus) => {
       reviewGate();
