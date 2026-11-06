@@ -9,6 +9,7 @@ import { acknowledgePendingBooking, clearPendingBooking, finishPendingBooking, r
 import { wasWriteRejected } from '../src/lib/writeOutcome';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
+import { canCreateBooking } from '../src/roles/bookingAccess';
 import { useAsync } from '../src/lib/useAsync';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { FutureScreen, GlassCard, PremiumHeader, LoadingShimmer, ErrorState } from '../src/components/Future';
@@ -33,7 +34,7 @@ export default function NewBooking() {
 function BookingForm({ journalKey }: { journalKey: string | null }) {
   const live = useLiveModules();
   const { user, locale, hotel } = useSession();
-  const allowed = !!user && ['OWNER','MANAGER','AGENT'].includes(user.role) && !!user.module_permissions?.includes('PMS');
+  const allowed = canCreateBooking(user);
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();

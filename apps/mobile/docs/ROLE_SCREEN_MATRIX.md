@@ -6,7 +6,7 @@ Source of truth: `src/roles/registry.ts` plus backend `services/api/app/auth.py`
 |---|---|---|---|
 | OWNER | Overview, PMS, Inbox, Team, Profile; AI modal | PMS preview/commit/HOLD, ops status, Inbox status/notes | PARTIAL |
 | MANAGER | Overview, PMS, Inbox, Tasks, Profile; AI modal | PMS preview/commit/HOLD, ops, Inbox | PARTIAL |
-| RECEPTION | Reception, PMS, Inbox, Profile; AI modal | Check-in/out only within server roles/grants, Inbox notes | PARTIAL |
+| RECEPTION | Reception, PMS, Inbox, Profile; AI modal | Check-in/out and new booking (preview → commit, published core rate only; server-enforced 403 RECEPTION_* codes) within server roles/grants, Inbox notes. Cancel and date changes stay OWNER/MANAGER; LIVE NOT VERIFIED | PARTIAL |
 | MAID | Tasks, Rooms, Profile | task claim, checklist, inspection handoff | PARTIAL, photo API missing |
 | TECHNICIAN | Tasks, Requests (repair), Rooms, Profile | maintenance task states and creation where authorized | PARTIAL |
 | COOK | Dining, Profile | kitchen order state (server-authorized) | PARTIAL |
