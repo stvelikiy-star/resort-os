@@ -9,6 +9,10 @@ import Admin from '../app/(app)/admin';
 import TaskDetail from '../app/task/[id]';
 import RoomDetail from '../app/room/[id]';
 import NewRequest from '../app/new-request';
+import Reservation from '../app/reservation/[id]';
+import Conversation from '../app/conversation/[id]';
+import NewBooking from '../app/new-booking';
+import Assistant from '../app/ai';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import type { AuthUser, Role, Room } from '../src/api/types';
 
@@ -18,7 +22,11 @@ const mockApi = {
   listRooms: jest.fn(async (): Promise<Room[]> => []),
   listStaff: jest.fn(async () => []),
 };
-const mockModules = { dashboard: jest.fn(async () => null) };
+const mockModules = {
+  dashboard: jest.fn(async () => null), reservation: jest.fn(async () => null),
+  conversation: jest.fn(async () => null), pmsGrid: jest.fn(async () => null),
+  assistantCapabilities: jest.fn(async () => null),
+};
 const mockSession = {
   api: mockApi,
   user: { id: 'staff', username: 'staff', display_name: 'Staff', property_code: 'TEST_HOTEL', role: 'MANAGER', module_permissions: [] } as AuthUser,
@@ -27,7 +35,10 @@ const mockSession = {
   locale: 'en',
 };
 jest.mock('../src/state/session', () => ({ useSession: () => mockSession }));
-jest.mock('../src/api/liveModules', () => ({ useLiveModules: () => mockModules }));
+jest.mock('../src/api/liveModules', () => ({
+  useLiveModules: () => mockModules,
+  localDate: (offset = 0) => offset === 1 ? '2026-11-07' : offset === 2 ? '2026-11-08' : '2026-11-06',
+}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
   useFocusEffect: jest.fn(), useLocalSearchParams: () => ({ id: 'r1' }), Redirect: () => null,
@@ -43,6 +54,8 @@ const panels = [
   { name: 'task detail', Screen: TaskDetail, reads: [mockApi.listTasks], grant: ['OPS'] },
   { name: 'room detail', Screen: RoomDetail, reads: [mockApi.listRooms, mockApi.listTasks], grant: ['OPS'] },
   { name: 'new maintenance', Screen: NewRequest, reads: [mockApi.listRooms], grant: ['OPS'] },
+  { name: 'reservation', Screen: Reservation, reads: [mockModules.reservation], grant: ['RESERVATIONS'] },
+  { name: 'conversation', Screen: Conversation, reads: [mockModules.conversation], grant: ['WHATSAPP'] },
 ];
 
 function identity(role: Role, grants: string[]) {
@@ -54,6 +67,30 @@ function panel(Screen: React.ComponentType) {
 beforeEach(() => {
   jest.clearAllMocks();
   identity('MANAGER', []);
+});
+
+it('checks booking permissions before loading the room grid on a direct link', async () => {
+  identity('MAID', ['PMS']);
+  await render(panel(NewBooking));
+  expect(mockModules.pmsGrid).not.toHaveBeenCalled();
+});
+
+it('loads the booking grid only after PMS is granted and stops again on revoke', async () => {
+  identity('MANAGER', []);
+  const screen = await render(panel(NewBooking));
+  expect(mockModules.pmsGrid).not.toHaveBeenCalled();
+  identity('MANAGER', ['PMS']);
+  await screen.rerender(panel(NewBooking));
+  await waitFor(() => expect(mockModules.pmsGrid).toHaveBeenCalledTimes(1));
+  identity('MANAGER', []);
+  await screen.rerender(panel(NewBooking));
+  expect(mockModules.pmsGrid).toHaveBeenCalledTimes(1);
+});
+
+it('checks the assistant role before loading capabilities on a direct link', async () => {
+  identity('COOK', ['DASHBOARD', 'DINING']);
+  await render(panel(Assistant));
+  expect(mockModules.assistantCapabilities).not.toHaveBeenCalled();
 });
 
 describe.each(panels)('$name network-read boundary', ({ Screen, reads, grant }) => {

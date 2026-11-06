@@ -14,6 +14,7 @@ import { font, space } from '../../src/theme/tokens';
 export default function ReservationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useSession();
+  const allowed = !!user && ['OWNER','MANAGER','RECEPTION'].includes(user.role) && !!user.module_permissions?.includes('RESERVATIONS');
   const live = useLiveModules();
   const copy = useMobileCopy();
   const router = useRouter();
@@ -22,9 +23,9 @@ export default function ReservationScreen() {
   const [busy, setBusy] = useState(false);
   const [unknownResult, setUnknownResult] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
-  const { data, loading, error, reload } = useAsync<Record<string, unknown> | null>(() => live && id ? live.reservation(id) : Promise.resolve(null), [live, id, user?.id]);
+  const { data, loading, error, reload } = useAsync<Record<string, unknown> | null>(() => allowed && live && id ? live.reservation(id) : Promise.resolve(null), [live, id, user?.id, allowed]);
   const act = (kind: 'in' | 'out') => Alert.alert(copy.confirm, '', [{ text: copy.close, style: 'cancel' }, { text: copy.choose, onPress: async () => {
-    if (locked.current || unknownResult || !live || !id) return;
+    if (locked.current || unknownResult || !allowed || !live || !id) return;
     locked.current = true; setBusy(true); setFeedback(null);
     try { await (kind === 'in' ? live.checkIn(id) : live.checkOut(id)); setFeedback(copy.confirmed); await reload(); }
     catch (error: unknown) {
@@ -34,7 +35,7 @@ export default function ReservationScreen() {
     }
     finally { locked.current = false; setBusy(false); }
   }}]);
-  if (!user || !['OWNER','MANAGER','RECEPTION'].includes(user.role) || !user.module_permissions?.includes('RESERVATIONS'))
+  if (!allowed)
     return <Screen><Empty text={copy.denied}/></Screen>;
   const x = (data?.reservation && typeof data.reservation === 'object' ? data.reservation as Record<string, unknown> : {}) as Record<string, unknown>;
   const guest = (data?.guest && typeof data.guest === 'object' ? data.guest as Record<string, unknown> : {}) as Record<string, unknown>;

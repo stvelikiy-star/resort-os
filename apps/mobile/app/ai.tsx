@@ -16,7 +16,8 @@ import { font, radius, space } from '../src/theme/tokens';
 function AssistantForSession() {
   const { user, locale, serverAuthMode, api } = useSession();
   const modules = useLiveModules();
-  const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
+  const allowed = !!user && ['OWNER','MANAGER','RECEPTION'].includes(user.role) && serverAuthMode !== 'shared_auth_preview';
+  const live = allowed ? modules : null;
   const copy = useMobileCopy();
   const { c } = useTheme();
   const t = aiMobileCopy[locale];
@@ -28,7 +29,7 @@ function AssistantForSession() {
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const [busy, setBusy] = useState(false);
-  const { data: capabilities, loading, error: capsError, reload } = useAsync<AssistantCapabilities | null>(() => live ? live.assistantCapabilities() : Promise.resolve(null), [live, user?.id]);
+  const { data: capabilities, loading, error: capsError, reload } = useAsync<AssistantCapabilities | null>(() => allowed && live ? live.assistantCapabilities() : Promise.resolve(null), [live, user?.id, allowed]);
   const send = async () => {
     const query = prompt.trim();
     if (!live || !capabilities?.configured || lock.current || !query || query.length > 3000) return;

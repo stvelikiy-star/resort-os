@@ -33,6 +33,7 @@ export default function NewBooking() {
 function BookingForm({ journalKey }: { journalKey: string | null }) {
   const live = useLiveModules();
   const { user, locale, hotel } = useSession();
+  const allowed = !!user && ['OWNER','MANAGER','AGENT'].includes(user.role) && !!user.module_permissions?.includes('PMS');
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
@@ -54,7 +55,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const busyLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const validDates = dateValid(start) && dateValid(end) && start < end && (Date.parse(end + 'T12:00:00') - Date.parse(start + 'T12:00:00')) / 86400000 <= 60;
-  const { data: grid, loading, error: gridError, reload } = useAsync(() => live && validDates ? live.pmsGrid(start, end) : Promise.resolve(null), [live, start, end, validDates]);
+  const { data: grid, loading, error: gridError, reload } = useAsync(() => allowed && live && validDates ? live.pmsGrid(start, end) : Promise.resolve(null), [live, start, end, validDates, allowed]);
   const draft = (): BookingDraft => ({ room_id: roomId, check_in: start, check_out: end,
     adults: Number(adults), children: Number(children), guest_phone: phone.trim() });
   const resetPreview = () => { setPreview(null); setError(null); };
@@ -64,14 +65,14 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   };
   const validate = () => validDates && roomId && name.trim().length >= 2 && phone.trim().length >= 5 && Number.isInteger(Number(adults)) && Number(adults) >= 1 && Number(adults) <= 20 && Number.isInteger(Number(children)) && Number(children) >= 0 && Number(children) <= 20;
   const doPreview = async () => {
-    if (!live || !validate() || busyLock.current || lockedForReview || completed) return;
+    if (!allowed || !live || !validate() || busyLock.current || lockedForReview || completed) return;
     busyLock.current = true; setBusy(true); setError(null); setPreview(null);
     try { setPreview(await live.bookingPreview(draft())); }
     catch(e) { setError(e instanceof Error ? e.message : copy.unknown); }
     finally { busyLock.current = false; setBusy(false); }
   };
   const doCommit = () => Alert.alert(copy.confirm, copy.total + ': ' + preview?.pricing.total_kgs + ' KGS', [{text: copy.close,style:'cancel'}, {text:copy.commit,onPress: async () => {
-    if (!live || !journalKey || !preview?.can_commit || !preview.pricing.total_kgs || busyLock.current || lockedForReview || completed) return;
+    if (!allowed || !live || !journalKey || !preview?.can_commit || !preview.pricing.total_kgs || busyLock.current || lockedForReview || completed) return;
     busyLock.current = true; setBusy(true); setError(null);
     const payload = { ...draft(), guest_name: name.trim(), phone: phone.trim(),
       expected_total_kgs: preview.pricing.total_kgs, expected_pricing_source: preview.pricing.source };
@@ -138,7 +139,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       finally { await journal.reload(); busyLock.current = false; setBusy(false); }
     }},
   ]);
-  if (!user || !['OWNER','MANAGER','AGENT'].includes(user.role) || !user.module_permissions?.includes('PMS')) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
+  if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PressScale onPress={() => router.back()} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center' }}><ChevronLeft color={c.primary} size={24}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
     <PremiumHeader title={copy.newBooking} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
