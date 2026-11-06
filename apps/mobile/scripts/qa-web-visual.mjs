@@ -261,7 +261,11 @@ async function main() {
     await click('[data-testid="tab-profile"]','technician profile');
     await click('[data-testid="switch-demo-role"]','cook selector');
     await click('[data-testid="demo-cook"]','cook role');
-    if (!await waitFor('[data-testid="order-d-order-01"]')) throw new Error('Cook kitchen showroom missing');
+    if (!await waitFor('[data-testid="kitchen-open-orders"]')) throw new Error('Cook kitchen dashboard missing');
+    if (await evaluate('location.pathname') !== '/kitchen') throw new Error('Cook landing route is not /kitchen');
+    await screenshot('cook_kitchen_en_dark_375');
+    await click('[data-testid="kitchen-open-orders"]','cook kitchen orders from dashboard');
+    if (!await waitFor('[data-testid="order-d-order-01"]')) throw new Error('Cook dining order showroom missing');
     await screenshot('cook_orders_en_dark_375');
     const diningMatrixFiles = [];
     for (const lang of ['ru', 'kg', 'en']) {
