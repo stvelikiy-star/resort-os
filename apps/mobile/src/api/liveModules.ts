@@ -6,7 +6,7 @@ import { createHotelHttpClient, HttpMethod } from './http';
 import { ApiError } from './types';
 import type { AuthMode } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
-import { diningProductionSnapshotsResponse, stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
+import { diningStaysResponse, diningStayEntitlementsResponse, diningMealPlanAck, diningProductionSnapshotsResponse, stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
 
 export type WhatsAppDeliveryStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ';
@@ -105,6 +105,31 @@ export interface DiningProductionSnapshotMeal {
 }
 export interface DiningProductionSnapshotDay { service_date: string; meals: DiningProductionSnapshotMeal[] }
 export interface DiningProductionSnapshots { from_date: string; through_date: string; days: DiningProductionSnapshotDay[] }
+export interface DiningStay {
+  stay_id: string; stay_status: string; reservation_id: string; reservation_status: string;
+  booking_number: string; check_in: string; check_out: string;
+  adults: number; children: number; guest_name: string;
+  room_code: string | null; entitlement_count: number;
+}
+export interface DiningStays { local_date: string; items: DiningStay[] }
+export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER';
+export interface DiningEntitlement {
+  id: string; stay_id: string; service_date: string; meal_type: MealType;
+  adult_portions: number; child_portions: number;
+  status: 'ACTIVE' | 'CANCELLED'; notes: string | null;
+}
+export interface DiningStayEntitlements {
+  stay: { id: string; booking_number: string; check_in: string; check_out: string; guest_name: string; room_code: string | null };
+  items: DiningEntitlement[];
+}
+export interface MealPlanDraft {
+  from_date: string; through_date: string; meals: MealType[];
+  adult_portions: number; child_portions: number; notes?: string | null; replace_range: false;
+}
+export interface MealPlanAck {
+  stay_id: string; updated_items: number; meals: MealType[];
+  from_date: string; through_date: string; adult_portions: number; child_portions: number;
+}
 export interface DiningFloor {
   tables: { id: string; code: string; name: string; status: string; seats: number }[];
   orders: { id: string; order_number: string; status: string; table_code: string | null;
@@ -233,6 +258,32 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       // By default the backend uses the HOTEL-local date, not the phone timezone.
       const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
       return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
+    },
+    diningStays: async (): Promise<DiningStays> => {
+      reviewGate();
+      return diningStaysResponse(await request<unknown>('GET', p + '/dining/stays'));
+    },
+    diningStayEntitlements: async (stayId: string): Promise<DiningStayEntitlements> => {
+      reviewGate();
+      return diningStayEntitlementsResponse(await request<unknown>(
+        'GET', p + '/dining/stays/' + safeRouteId(stayId) + '/entitlements'), stayId);
+    },
+    diningMealPlan: async (stayId: string, draft: MealPlanDraft): Promise<MealPlanAck> => {
+      reviewGate();
+      if (!draft.meals.length || draft.meals.length > 3 ||
+          new Set(draft.meals).size !== draft.meals.length ||
+          draft.meals.some(m => !['BREAKFAST','LUNCH','DINNER'].includes(m)) ||
+          !Number.isSafeInteger(draft.adult_portions) || draft.adult_portions < 0 ||
+          !Number.isSafeInteger(draft.child_portions) || draft.child_portions < 0 ||
+          draft.adult_portions + draft.child_portions < 1 || draft.replace_range !== false) {
+        throw new ApiError('BAD_REQUEST', 'Invalid included-meal plan');
+      }
+      const payload = { ...draft, from_date: safeIsoDate(draft.from_date), through_date: safeIsoDate(draft.through_date) };
+      if (payload.from_date > payload.through_date || payload.from_date === '' || payload.through_date === '') {
+        throw new ApiError('BAD_REQUEST', 'Invalid meal plan dates');
+      }
+      return diningMealPlanAck(await request<unknown>(
+        'PUT', p + '/dining/stays/' + safeRouteId(stayId) + '/meal-plan', payload), stayId, draft);
     },
     kitchenStatus: async (id: string, status: KitchenStatus) => {
       reviewGate();
