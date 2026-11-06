@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, ClipboardList } from 'lucide-react-native';
+import { ChevronLeft, ClipboardList } from 'lucide-react-native';
 import type { DiningStay, DiningStayEntitlements, DiningStays, MealType } from '../src/api/liveModules';
 import { useLiveModules } from '../src/api/liveModules';
 import { useSession } from '../src/state/session';
@@ -16,7 +16,7 @@ import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } fr
 const MEALS: MealType[] = ['BREAKFAST','LUNCH','DINNER'];
 const isoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) &&
   !Number.isNaN(Date.parse(value+'T12:00:00')) &&
-  new Date(value+'T12:00:00').getFullYear()===Number(value.slice(0,4));
+  new Date(value+'T12:00:00').toISOString().slice(0,10)===value;
 const portions = (value: string) => /^\d{1,2}$/.test(value) && Number(value)>=0 && Number(value)<=50;
 
 /** One hotel and server-gated RECEPTION/OWNER/MANAGER only.
@@ -145,7 +145,7 @@ export default function MealPlans() {
         <View style={{flex:1}}><Field label={copy.adults} value={adults} onChangeText={setAdults} keyboardType="number-pad"/></View>
         <View style={{flex:1}}><Field label={copy.children} value={children} onChangeText={setChildren} keyboardType="number-pad"/></View>
       </View>
-      <Field label={copy.note} value={notes} onChangeText={setNotes} maxLength={1000}/>
+      <Field label={copy.mealPlanNotes} value={notes} onChangeText={setNotes} maxLength={1000}/>
       <Text style={[font.small,{color:c.textMuted}]}>{copy.mealNoPayments}</Text>
       {needsReview ? <View style={{gap:space.sm}}>
         <Text accessibilityRole="alert" style={[font.body,{color:c.warning}]}>{copy.mealReviewRequired}</Text>
