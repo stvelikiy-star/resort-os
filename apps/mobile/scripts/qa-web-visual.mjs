@@ -301,8 +301,10 @@ async function main() {
     const localeBack = { ru: 'Закрыть', kg: 'Жабуу', en: 'Close' };
     const aiBack = { ru: 'Назад', kg: 'Артка', en: 'Back' };
     async function matrixCapture(route, lang, theme) {
-      for (const width of [320, 375, 430]) {
-        await viewport(width, width === 320 ? 690 : width === 375 ? 812 : 932);
+      // Target 360/393dp specifically on reception to catch Kyrgyz wrap regressions without multiplying all screenshots.
+      const widths = route === 'reception' ? [320, 360, 375, 393, 430] : [320, 375, 430];
+      for (const width of widths) {
+        await viewport(width, width === 320 ? 690 : width <= 375 ? 812 : 932);
         const url = await evaluate('location.pathname');
         const expected = route === 'conversation' ? '/conversation/demo-chat-01' : route === 'ai' ? '/ai' : '/' + route;
         if (url !== expected) throw new Error('Visual matrix wrong route: expected ' + expected + ', got ' + url);
