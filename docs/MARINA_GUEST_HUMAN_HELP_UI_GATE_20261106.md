@@ -43,9 +43,13 @@ Date: 2026-11-06. Separate Draft PR layered on #387.
   (static safety/regression assertions, not browser E2E).
 - Existing server guest AI route/permission contract 11/11 PASS on parent #387.
 - The temporary local Next QA route used to try browser interaction has been
-  removed. Browser UI E2E was **not accepted**: the QA fixture encountered
-  routing/import errors, and the Ubuntu host was near memory limits. Do not
-  treat the attempted Chromium test as successful.
+  removed. The first Ubuntu browser attempt was **not accepted**: the QA fixture
+  encountered routing/import errors while the host was near memory limits.
+- The separate GitHub workflow `marina-guest-handoff-browser-ci.yml` generates
+  the QA route **only in the disposable CI runner** and checks mobile Chromium
+  confirmation, cancel, one request, duplicate 409, network error and strict
+  server handoff metadata. Do not claim this browser acceptance until the
+  actual GitHub job is SUCCESS on the final SHA.
 - Full guest QR/PIN → UI confirm → canonical DB task → reception claim →
   completion → guest observes DONE must run on a dedicated disposable
   single-hotel environment, plus mobile 390px viewport and RU/KG/EN.
