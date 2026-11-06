@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Badge, Button, Empty, Field, PressScale, SectionLabel } from '../src/components/ui';
 import { BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
@@ -38,9 +38,17 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
-  const [start, setStart] = useState(localDate(1));
-  const [end, setEnd] = useState(localDate(2));
-  const [roomId, setRoomId] = useState('');
+  const params = useLocalSearchParams<{ room_id?: string; check_in?: string; check_out?: string }>();
+  const selectedStart = typeof params.check_in === 'string' ? params.check_in : '';
+  const selectedEnd = typeof params.check_out === 'string' ? params.check_out : '';
+  const validSelection = dateValid(selectedStart) && dateValid(selectedEnd) &&
+    selectedStart >= localDate() && selectedStart < selectedEnd &&
+    (Date.parse(selectedEnd + 'T12:00:00') - Date.parse(selectedStart + 'T12:00:00')) / 86400000 <= 60;
+  const selectedRoom = typeof params.room_id === 'string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(params.room_id)
+    ? params.room_id : '';
+  const [start, setStart] = useState(() => validSelection ? selectedStart : localDate(1));
+  const [end, setEnd] = useState(() => validSelection ? selectedEnd : localDate(2));
+  const [roomId, setRoomId] = useState(() => validSelection ? selectedRoom : '');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [adults, setAdults] = useState('2');
