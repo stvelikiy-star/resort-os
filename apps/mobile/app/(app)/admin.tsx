@@ -29,8 +29,8 @@ export default function Admin() {
   // Never repeat a staff write if its server acknowledgment was lost.
   const [unknownResult, setUnknownResult] = useState(false);
   const [tick, setTick] = useState(0);
-  const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick]);
-  const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff() : Promise.resolve([])), [api, tick]);
+  const tasks = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, tick, user?.id, allowed]);
+  const staff = useAsync<StaffMember[]>(() => (allowed ? api!.listStaff() : Promise.resolve([])), [api, tick, user?.id, allowed]);
   const reloadTasks = tasks.reload;
   const reloadStaff = staff.reload;
   const hasFocused = useRef(false);

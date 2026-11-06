@@ -20,12 +20,14 @@ export default function Requests() {
   const { c } = useTheme();
   const { api, user, hotel, serverAuthMode, locale } = useSession();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
-  const { data, loading, error, reload } = useAsync<Task[]>(() => (ws.mobileReady ? api!.listTasks({ type: 'MAINTENANCE' }) : Promise.resolve([])), [api, user?.id, ws.mobileReady]);
+  const allowed = !!api && ws.tabs.includes('requests');
+  const { data, loading, error, reload } = useAsync<Task[]>(() => (allowed ? api!.listTasks({ type: 'MAINTENANCE' }) : Promise.resolve([])), [api, user?.id, allowed]);
   const active = useMemo(() => (data ?? []).filter(x => x.status !== 'DONE' && x.status !== 'CANCELLED'), [data]);
   const urgent = active.filter(x => x.priority === 'URGENT').length;
   const finished = useMemo(() => (data ?? []).filter(x => x.status === 'DONE' || x.status === 'CANCELLED'), [data]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
+  if (!allowed) return <FutureScreen><Empty text={t('admin.forbidden')}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={t('mt.list')} subtitle={hotel?.name} eyebrow={t('roles.' + user!.role)}/>
     {ws.mobileReady && ws.canCreateMaintenance ? <Button testID="new-request-btn" label={t('mt.newRequest')} icon={Plus} onPress={() => router.push('/new-request')}/> : null}

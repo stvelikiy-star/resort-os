@@ -7,6 +7,7 @@ import { Empty, SectionLabel, Segmented, toneColors } from '../../src/components
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { RoomStateBadge, roomTone } from '../../src/components/domain';
 import { useAsync } from '../../src/lib/useAsync';
+import { hasTabForSession } from '../../src/roles/registry';
 import { useSession } from '../../src/state/session';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -21,14 +22,16 @@ export default function Rooms() {
   const singleColumn = width < 375 || fontScale > 1.35;
   const [filter, setFilter] = useState<'all' | 'clean' | 'attention'>('all');
   const router = useRouter();
-  const { api, hotel } = useSession();
-  const { data, loading, error, reload } = useAsync<Room[]>(() => api!.listRooms(), [api]);
+  const { api, hotel, user, serverAuthMode } = useSession();
+  const allowed = !!api && !!user && hasTabForSession(user.role, user.module_permissions, api.mode, 'rooms', serverAuthMode);
+  const { data, loading, error, reload } = useAsync<Room[]>(() => allowed ? api!.listRooms() : Promise.resolve([]), [api, user?.id, allowed]);
   const visible = useMemo(() => (data ?? []).filter(r => filter === 'all' || (filter === 'clean' ? r.state === 'CLEAN' : r.state === 'DIRTY' || r.state === 'IN_INSPECTION' || r.state === 'TECH_BLOCK')), [data, filter]);
   const hasFocused = useRef(false);
   useFocusEffect(useCallback(() => {
     if (hasFocused.current) void reload();
     else hasFocused.current = true;
   }, [reload]));
+  if (!allowed) return <FutureScreen><Empty text={t('admin.forbidden')}/></FutureScreen>;
   return (
     <FutureScreen>
       <PremiumHeader title={t('rooms.title')} subtitle={hotel?.name} eyebrow="MARINA SMART"/>

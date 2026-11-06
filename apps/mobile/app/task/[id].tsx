@@ -22,7 +22,8 @@ export default function TaskDetail() {
   const router = useRouter();
   const { api, user, hotel, serverAuthMode, locale } = useSession();
   const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
-  const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => user && api && ws.mobileReady ? (await api.listTasks()).find((x) => x.id === id) ?? null : null, [api, id, user?.id]);
+  const allowed = !!user && !!api && ws.tabs.includes('tasks');
+  const { data: task, loading, error, reload, setData } = useAsync<Task | null>(async () => allowed ? (await api!.listTasks()).find((x) => x.id === id) ?? null : null, [api, id, user?.id, allowed]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
   const [comment, setComment] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export default function TaskDetail() {
   const actionLock = useRef(false);
 
   const run = async (fn: () => Promise<Task>, okMsg?: string) => {
-    if (actionLock.current || unknownResult || !user || !api || !ws.mobileReady) return;
+    if (actionLock.current || unknownResult || !user || !api || !allowed) return;
     actionLock.current = true;
     setBusy(true); setMsg(null); setActionError(false);
     try {
@@ -52,7 +53,7 @@ export default function TaskDetail() {
   };
 
   if (!user || !api) return <Redirect href="/connect" />;
-  if (!ws.mobileReady) return <Redirect href="/profile" />;
+  if (!allowed) return <Redirect href="/profile" />;
   if (loading && !task) return <FutureScreen><LoadingShimmer count={3}/></FutureScreen>;
   if (error) return <FutureScreen><ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/></FutureScreen>;
   if (!task) return <FutureScreen><Empty text={t('errors.notFound')} /></FutureScreen>;

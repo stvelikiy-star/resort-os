@@ -24,10 +24,11 @@ export default function RoomCard() {
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState(false);
   const ws = workspaceForSession(user?.role ?? 'AGENT', user?.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
-  const room = useAsync<Room | null>(async () => user && api && ws.mobileReady ? (await api.listRooms()).find((r) => r.id === id) ?? null : null, [api, id, user?.id]);
-  const tasks = useAsync<Task[]>(async () => user && api && ws.mobileReady ? (await api.listTasks()).filter((x) => x.room_id === id && x.status !== 'DONE' && x.status !== 'CANCELLED') : [], [api, id, user?.id]);
+  const allowed = !!user && !!api && ws.tabs.includes('rooms');
+  const room = useAsync<Room | null>(async () => allowed ? (await api!.listRooms()).find((r) => r.id === id) ?? null : null, [api, id, user?.id, allowed]);
+  const tasks = useAsync<Task[]>(async () => allowed ? (await api!.listTasks()).filter((x) => x.room_id === id && x.status !== 'DONE' && x.status !== 'CANCELLED') : [], [api, id, user?.id, allowed]);
   if (!user || !api) return <Redirect href="/connect" />;
-  if (!ws.mobileReady) return <Redirect href="/profile" />;
+  if (!allowed) return <Redirect href="/profile" />;
   if (room.error) return <FutureScreen><ErrorState text={room.error.message} retry={t('common.retry')} onRetry={room.reload}/></FutureScreen>;
   if (!room.data) return <FutureScreen>{room.loading ? <LoadingShimmer count={3}/> : <Empty text={t('errors.notFound')}/>}</FutureScreen>;
   const r = room.data;
