@@ -15,7 +15,7 @@ function snapshot() {
   const meals=(['BREAKFAST','LUNCH','DINNER'] as const).map((meal_type,i)=>({
     service_date:'2026-11-06',meal_type,current_adult_portions:i+1,current_child_portions:i,
     current_total_portions:2*i+1,current_entitlement_count:1,state:'OPEN',
-    cutoff_status:'BEFORE_CUTOFF',frozen_total_portions:null,delta_total_portions:null,
+    cutoff_status:'BEFORE_CUTOFF',frozen_total_portions:null as number | null,delta_total_portions:null as number | null,
     changed_since_snapshot:false,meal_start:null,cutoff_at:null,
   }));
   return {from_date:'2026-11-06',through_date:'2026-11-06',days:[{service_date:'2026-11-06',meals}]};
