@@ -25,7 +25,7 @@ describe('verified kitchen workload', () => {
   it('does not invent menu items from incomplete order details',()=>{
     const r=kitchenWorkload([order('1','NEW',[]),order('2','ACCEPTED',[{name:undefined,quantity:3},{name:'Суп',quantity:0}])]);
     expect(r.totalActive).toBe(2);
-    expect(r.unknownDishOrders).toBe(1);
+    expect(r.unknownDishOrders).toBe(2); // Both an empty order and an order with invalid quantity/name need review.
     expect(r.dishesToPrepare).toEqual([]);
   });
   it('does not merge across properties because input is only the active hotel API response',()=>{
