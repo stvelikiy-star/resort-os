@@ -77,6 +77,9 @@ export default function Reception() {
     <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={(live || showroom) && serverAuthMode !== 'shared_auth_preview' ? <AIOrb state={showroom ? 'offline' : 'idle'} label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
     {canInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
+    {live && !showroom && serverAuthMode !== 'shared_auth_preview' &&
+      <QuickAction icon={CalendarDays} label={copy.mealPlansTitle} onPress={() => router.push('/meal-plans')}/>}
+
     {showroom ? <DemoBanner/> : null}
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
     {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
