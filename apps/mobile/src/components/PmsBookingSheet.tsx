@@ -42,6 +42,8 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
   const name = [readValue(guest.first_name), readValue(guest.last_name)].filter(Boolean).join(' ') ||
     (block?.guest_name || copy.guest);
   const phone = !showroom ? readValue(guest.phone) : null;
+  const email = !showroom ? readValue(guest.email) : null;
+  const source = !showroom ? readValue(readObject(record.source).channel) : null;
   const phoneDialable = !!phone && /^\+?[\d() .-]{5,25}$/.test(phone);
   const isReservation = selected?.state === 'RESERVATION';
   const status = readValue(reservation.status) || selected?.state || '—';
@@ -87,6 +89,10 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
               <Text style={[font.h2,{color:c.text}]}>{name}</Text>
               <Text style={[font.small,{color:c.textMuted}]}>{copy.phone}</Text>
               <Text style={[font.body,{color:c.text}]}>{phone ?? '—'}</Text>
+              {email ? <><Text style={[font.small,{color:c.textMuted}]}>{copy.guestEmail}</Text>
+                <Text style={[font.body,{color:c.text}]}>{email}</Text></> : null}
+              {source ? <><Text style={[font.small,{color:c.textMuted}]}>{copy.bookingSource}</Text>
+                <Text style={[font.body,{color:c.text}]}>{source}</Text></> : null}
               {readValue(reservation.booking_number) ? <Text style={[font.small,{color:c.textMuted}]}>
                 {copy.bookings}: {String(reservation.booking_number)}
               </Text> : null}
