@@ -49,7 +49,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
       </View>
       <Text adjustsFontSizeToFit minimumFontScale={0.55} numberOfLines={1}
         style={[font.metric, { fontSize: compact ? 23 : 27, color: c.text, minWidth: 0 }]}>{value}</Text>
-      <Text numberOfLines={2} style={[font.small, { color: c.textMuted, fontWeight: '650', lineHeight: 17 }]}>{title}</Text>
+      <Text numberOfLines={2} style={[font.small, { color: c.textMuted, fontWeight: '600', lineHeight: 17 }]}>{title}</Text>
     </GlassCard>;
   };
   const row = (...items: React.ReactNode[]) => <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.sm }}>{items}</View>;
