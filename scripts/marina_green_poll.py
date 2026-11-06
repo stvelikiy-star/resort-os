@@ -9,6 +9,7 @@ import asyncio
 import os
 import re
 import sys
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -19,7 +20,7 @@ class AdapterError(RuntimeError):
 
 def configuration(env):
     keys = ("GREEN_API_URL", "GREEN_API_ID_INSTANCE", "GREEN_API_TOKEN_INSTANCE",
-            "AUTOMATION_SERVICE_KEY", "PROPERTY_CODE")
+            "AUTOMATION_SERVICE_KEY", "PROPERTY_CODE", "GREEN_API_PROPERTY_CODE")
     absent = [key for key in keys if not env.get(key)]
     if absent:
         raise AdapterError("Missing required per-hotel settings: " + ", ".join(absent))
@@ -28,16 +29,31 @@ def configuration(env):
     instance = str(env["GREEN_API_ID_INSTANCE"])
     if not re.fullmatch(r"[0-9]{6,14}", instance):
         raise AdapterError("Invalid GREEN_API_ID_INSTANCE")
+    if (env["PROPERTY_CODE"] == "MARINA_DEMO"
+            or env["GREEN_API_PROPERTY_CODE"] != env["PROPERTY_CODE"]):
+        raise AdapterError("WhatsApp instance must be bound to this hotel only")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,256}", env["GREEN_API_TOKEN_INSTANCE"]):
+        raise AdapterError("Invalid GREEN_API_TOKEN_INSTANCE")
     base = env["GREEN_API_URL"].rstrip("/")
-    if not base.startswith("https://") or "@" in base or "?" in base or "#" in base:
-        raise AdapterError("GREEN_API_URL must be a clean HTTPS base URL")
+    try:
+        parsed = urlsplit(base)
+    except ValueError:
+        raise AdapterError("GREEN_API_URL must be a documented HTTPS provider origin") from None
+    host = parsed.hostname or ""
+    if (parsed.scheme != "https" or parsed.netloc != host or parsed.path
+            or parsed.query or parsed.fragment
+            or not re.fullmatch(r"(?:[a-z0-9-]+\.)?api\.green-?api\.com", host)):
+        raise AdapterError("GREEN_API_URL must be a documented HTTPS provider origin")
+    core = env.get("RESORT_CORE_URL", "http://127.0.0.1:8000").rstrip("/")
+    if core not in {"http://127.0.0.1:8000", "http://localhost:8000", "http://api:8000"}:
+        raise AdapterError("Core must be on the approved local or private Docker address")
     return {
         "base": base,
         "instance": instance,
         "token": env["GREEN_API_TOKEN_INSTANCE"],
         "key": env["AUTOMATION_SERVICE_KEY"],
         "property": env["PROPERTY_CODE"],
-        "core": env.get("RESORT_CORE_URL", "http://127.0.0.1:8000").rstrip("/"),
+        "core": core,
     }
 
 
@@ -52,7 +68,8 @@ def normalize(item, expected_instance, property_code):
     if not isinstance(receipt, int) or receipt < 0:
         raise AdapterError("Invalid receipt; refusing to acknowledge")
     if body.get("typeWebhook") != "incomingMessageReceived":
-        return receipt, None
+        # Unknown events may contain delivery statuses. Do not delete from queue.
+        raise AdapterError("Unsupported webhook event; manual reconciliation required")
     sender = body.get("senderData") or {}
     chat = sender.get("chatId", "")
     if not isinstance(chat, str) or not re.fullmatch(r"[0-9]{5,18}@c\.us", chat):
@@ -106,7 +123,7 @@ async def process_one(client, cfg):
             raise AdapterError(f"Core inbox rejected delivery (HTTP {stored.status_code}); message not acknowledged")
     ack = await client.delete(f'{endpoint}/deleteNotification/{cfg["token"]}/{receipt}')
     ack.raise_for_status()
-    return "INGESTED" if payload is not None else "SKIPPED_UNSUPPORTED"
+    return "INGESTED"
 
 
 async def run(once):
