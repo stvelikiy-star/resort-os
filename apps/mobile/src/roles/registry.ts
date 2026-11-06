@@ -50,7 +50,7 @@ const LIVE_TABS: Partial<Record<Role, readonly TabKey[]>> = {
   RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
   MAID: ['tasks', 'rooms', 'profile'],
   TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
-  COOK: ['dining', 'profile'],
+  COOK: ['kitchen', 'dining', 'profile'],
   WAITER: ['dining', 'profile'],
   AGENT: ['pms', 'profile'],
 };
