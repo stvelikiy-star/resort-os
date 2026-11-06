@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Search, Users, X } from 'lucide-react-native';
 import { Badge, Empty, SectionLabel, Segmented, PressScale, DemoBanner } from '../../src/components/ui';
@@ -22,6 +22,8 @@ export default function Reception() {
   const live = useLiveModules();
   const copy = useMobileCopy();
   const { c } = useTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const compactMetrics = width < 375 || fontScale > 1.25;
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [view, setView] = useState<'all' | 'arrivals' | 'departures' | 'staying'>('all');
@@ -85,24 +87,24 @@ export default function Reception() {
           <CalendarDays color="#E6BD70" size={21}/>
           <Text style={[font.small, { color: '#C8E8F5', letterSpacing: 0.8 }]}>{copy.today} · {data.local_date}</Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: space.lg, marginTop: space.lg }}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: compactMetrics ? space.sm : space.lg, marginTop: space.lg }}>
+          <View style={{ flex: 1, minWidth: 0, flexDirection: compactMetrics ? 'column' : 'row', alignItems: compactMetrics ? 'flex-start' : 'center', gap: compactMetrics ? 6 : 10 }}>
             <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(73,220,183,0.18)', alignItems: 'center', justifyContent: 'center' }}>
               <LogIn size={24} color="#73EBC9"/>
             </View>
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ width: '100%', minWidth: 0, gap: 2 }}>
               <Text style={[font.metric, { color: '#FFFFFF' }]}>{arrivals.length}</Text>
-              <Text numberOfLines={2} style={[font.small, { color: '#D9EAF6' }]}>{copy.arrivals}</Text>
+              <Text style={[font.small, { color: '#D9EAF6', flexShrink: 1 }]}>{copy.arrivals}</Text>
             </View>
           </View>
           <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.2)' }}/>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flex: 1, minWidth: 0, flexDirection: compactMetrics ? 'column' : 'row', alignItems: compactMetrics ? 'flex-start' : 'center', gap: compactMetrics ? 6 : 10 }}>
             <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(230,189,112,0.17)', alignItems: 'center', justifyContent: 'center' }}>
               <LogOut size={24} color="#E6BD70"/>
             </View>
-            <View style={{ flex: 1, gap: 2 }}>
+            <View style={{ width: '100%', minWidth: 0, gap: 2 }}>
               <Text style={[font.metric, { color: '#FFFFFF' }]}>{departures.length}</Text>
-              <Text numberOfLines={2} style={[font.small, { color: '#D9EAF6' }]}>{copy.departures}</Text>
+              <Text style={[font.small, { color: '#D9EAF6', flexShrink: 1 }]}>{copy.departures}</Text>
             </View>
           </View>
         </View>
