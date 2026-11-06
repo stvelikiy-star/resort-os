@@ -34,12 +34,12 @@ export default function KitchenDashboard() {
     [live, showroom, locale, user?.id, allowed],
   );
   const focused = useRef(false);
-  useFocusEffect(useCallback(() => { if(focused.current) { void reload(); void reloadProduction(); } else focused.current = true; }, [reload, reloadProduction]));
   const { data: production, loading: productionLoading, error: productionError, reload: reloadProduction } =
     useAsync<DiningProductionSnapshots | null>(
       () => !allowed || showroom || !live ? Promise.resolve(null) : live.diningProductionSnapshots(),
       [live, showroom, hotel?.id, user?.id, allowed],
     );
+  useFocusEffect(useCallback(() => { if(focused.current) { void reload(); void reloadProduction(); } else focused.current = true; }, [reload, reloadProduction]));
   const summary = kitchenWorkload(data ?? [], locale);
   const tile = (title: string, value: number, icon: React.ElementType, color: string) => {
     const Icon = icon;
