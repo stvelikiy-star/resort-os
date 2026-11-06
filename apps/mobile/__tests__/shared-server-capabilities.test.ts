@@ -49,7 +49,7 @@ describe('canonical shared-auth staging server 503 admission contract', () => {
     const api = createLiveModules('https://platform.example/core',transport as unknown as typeof fetch,'shared_auth_preview');
     await expect(api.conversations()).rejects.toMatchObject({code:'UNKNOWN'});
     expect(transport).toHaveBeenCalledTimes(2); // safe GET gateway retry only
-    expect(String(transport.mock.calls[0][0])).toContain('/api/v1/admin/inbox/conversations');
+    expect(String((transport as jest.Mock).mock.calls[0][0])).toContain('/api/v1/admin/inbox/conversations');
   });
 
   it('still allows reviewed shared PMS GET without extending server permissions', async () => {
