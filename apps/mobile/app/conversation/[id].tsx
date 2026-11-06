@@ -22,7 +22,7 @@ export default function ConversationScreen() {
   const showroom = api?.mode === 'DEMO';
   const allowed = !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'inbox', serverAuthMode);
   const modules = useLiveModules();
-  const live = serverAuthMode === 'shared_auth_preview' ? null : modules;
+  const live = modules;
   const copy = useMobileCopy();
   const router = useRouter();
   const { c } = useTheme();
