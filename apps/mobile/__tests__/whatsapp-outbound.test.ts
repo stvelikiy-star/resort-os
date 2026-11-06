@@ -1,5 +1,7 @@
 import { createLiveModules } from '../src/api/liveModules';
 import { createHotelHttpClient } from '../src/api/http';
+import { wasWhatsAppSendRejected } from '../src/lib/writeOutcome';
+import { ApiError } from '../src/api/types';
 import { acknowledgePendingOutbound, finishPendingOutbound, newOutboundKey, outboundJournalKey, readPendingOutbound, recordPendingOutbound, clearPendingOutbound } from '../src/lib/pendingOutbound';
 
 const mockStore = new Map<string,string>();
@@ -25,6 +27,35 @@ describe('RC8 WhatsApp outbound: explicit human send, never simulated delivery',
     expect(options).toMatchObject({method:'POST',credentials:'include',redirect:'error'});
     expect((options.headers as Record<string,string>)['Idempotency-Key']).toBe('mobile-1111222233334444');
     expect(JSON.parse(String(options.body))).toEqual({text:'Hello'});
+  });
+  it('retains durable journal on RC8 409 reconciliation requirement and never resends',async()=>{
+    const transport=jest.fn(async()=>response({detail:{code:'OUTBOX_RECONCILIATION_REQUIRED',automatic_retry_safe:false}},409));
+    const api=createLiveModules('https://hotel.example',transport as typeof fetch);
+    const journal=outboundJournalKey('HOTEL_A','staff',id);
+    const key='mobile-1111222233334444';
+    expect(await recordPendingOutbound(journal,'Hello',key)).toBe(true);
+    try {
+      await api.sendWhatsAppText(id,'Hello',key);
+      throw Error('Expected server rejection');
+    } catch(error:unknown) {
+      expect(error).toMatchObject({code:'CONFLICT'});
+      // Match the screen's send-result policy: unknown 409 must stay pending.
+      if (wasWhatsAppSendRejected(error)) await clearPendingOutbound(journal);
+    } finally {
+      finishPendingOutbound(journal);
+    }
+    expect((await readPendingOutbound(journal))?.key).toBe(key);
+    expect(await recordPendingOutbound(journal,'Hello',newOutboundKey())).toBe(false);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+  it('only clears pending send for definitive pre-provider rejections',()=>{
+    expect(wasWhatsAppSendRejected(new ApiError('CONFLICT'))).toBe(false);
+    expect(wasWhatsAppSendRejected(new ApiError('OFFLINE'))).toBe(false);
+    expect(wasWhatsAppSendRejected(new ApiError('UNKNOWN'))).toBe(false);
+    expect(wasWhatsAppSendRejected(new ApiError('FORBIDDEN'))).toBe(false); // could be redirect refusal
+    expect(wasWhatsAppSendRejected(new ApiError('BAD_REQUEST'))).toBe(true);
+    expect(wasWhatsAppSendRejected(new ApiError('UNAUTHORIZED'))).toBe(true);
+    expect(wasWhatsAppSendRejected(new ApiError('NOT_FOUND'))).toBe(true);
   });
   it('never retries a failed WhatsApp POST, even when the result is unknown',async()=>{
     const transport=jest.fn(async()=>{throw Error('lost ack');});
