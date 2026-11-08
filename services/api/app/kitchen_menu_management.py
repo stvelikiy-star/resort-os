@@ -8,7 +8,8 @@ import asyncpg
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
-from .auth import require_roles, trusted_property_id
+from .auth import current_user, require_roles, trusted_property_id
+from .section_permissions import user_has_section
 from .kitchen import DRAFT_MENU
 
 router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen-menu-management"])
@@ -107,8 +108,18 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
     return {"created": created, "draft": True, "truth": "TEST_STAGING_BOOTSTRAP_ONLY"}
 
 
+async def menu_create_access(request: Request, user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
+    if user.get("role") == "COOK":
+        if not user_has_section(user, "DINING"):
+            raise HTTPException(status_code=403, detail="Insufficient permission")
+        return user
+    return await manager_access(request, user)
+
+
 @router.post("/menu", status_code=status.HTTP_201_CREATED)
-async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str, Any] = Depends(manager_access)):
+async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str, Any] = Depends(menu_create_access)):
+    if user.get("role") == "COOK" and not payload.is_draft:
+        raise HTTPException(status_code=403, detail={"code": "COOK_MENU_DRAFT_REQUIRED"})
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await _property_id(conn, user)

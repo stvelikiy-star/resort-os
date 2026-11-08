@@ -95,6 +95,17 @@ export interface KitchenOrder {
 }
 /** GET /api/v1/dining/production-snapshots: explicit *included* portions,
  * separate from à-la-carte orders. A frozen baseline is never silently rewritten. */
+export const KITCHEN_MENU_CATEGORIES = ['BREAKFAST', 'SOUP', 'SALAD', 'MAIN', 'SIDE', 'DESSERT', 'DRINK'] as const;
+export type KitchenMenuDraft = {
+  code: string;
+  category: typeof KITCHEN_MENU_CATEGORIES[number];
+  name_ru: string;
+  name_kg: string;
+  name_en: string;
+  name_kz: string;
+  price_kgs: number;
+};
+
 export interface DiningProductionSnapshotMeal {
   service_date: string; meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER';
   current_adult_portions: number; current_child_portions: number;
@@ -258,6 +269,16 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       // By default the backend uses the HOTEL-local date, not the phone timezone.
       const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
       return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
+    },
+    createKitchenMenuDraft: async (draft: KitchenMenuDraft) => {
+      reviewGate();
+      const item = objectResponse(await request<unknown>('POST', p + '/kitchen/menu', {
+        ...draft, is_active: true, is_draft: true,
+      }), 'menu draft');
+      if (typeof item.id !== 'string' || item.is_draft !== true || item.code !== draft.code) {
+        throw new ApiError('UNKNOWN', 'Menu draft could not be verified');
+      }
+      return item.id;
     },
     captureDiningProduction: async (day: string, meal: DiningProductionSnapshotMeal['meal_type']) => {
       reviewGate();
