@@ -502,6 +502,29 @@ def main() -> None:
     assert agent_committed["payment_terms"] == "AGENT_CORE_RATE"
     assert agent_committed["discount_percent"] == 0
 
+    services_path = "/api/v1/admin/guest-services"
+    agent_reservation_id = agent_committed["reservation_id"]
+    service_payload = {"reservation_id": agent_reservation_id, "service_code": "TRANSFER"}
+    service = expect(agent.post(services_path, json=service_payload), 201, "Agent requests transfer for own reservation")
+    assert service["reservation_id"] == agent_reservation_id and service["status"] == "OPEN"
+    expect(agent.post(services_path, json=service_payload), 409, "Duplicate agent transfer denied")
+    expect(
+        agent.post(services_path, json={**service_payload, "reservation_id": reservation_id}),
+        404,
+        "Agent cannot request transfer for a reservation outside the agency",
+    )
+    expect(
+        agent.post(services_path, json={**service_payload, "service_code": "MAINTENANCE"}),
+        403,
+        "Agent cannot create maintenance tasks",
+    )
+    visible_services = expect(
+        owner.get(services_path, params={"reservation_id": agent_reservation_id}),
+        200,
+        "Owner reads the agent transfer request",
+    )
+    assert any(item["id"] == service["id"] for item in visible_services["items"])
+
     agent_grid_after = expect(
         agent.get("/api/v1/pms/grid", params={"start": check_in.isoformat(), "end": check_out.isoformat()}),
         200,
