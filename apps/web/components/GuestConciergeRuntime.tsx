@@ -376,7 +376,7 @@ const COPY = {
   },
 } as const;
 
-const SERVICE_ORDER: RequestCode[] = ["MEALS", "HOUSEKEEPING", "TRANSFER", "MAINTENANCE", "SAUNA", "EXCURSIONS", "TOWELS", "LINEN", "BILLIARDS", "ADMIN"];
+const SERVICE_ORDER: RequestCode[] = ["ADMIN", "MEALS", "HOUSEKEEPING", "TRANSFER", "MAINTENANCE", "SAUNA", "EXCURSIONS", "TOWELS", "LINEN", "BILLIARDS"];
 const SERVICE_ICONS: Record<RequestCode, string> = { MEALS: "🍽", HOUSEKEEPING: "✦", TRANSFER: "↗", MAINTENANCE: "⌁", SAUNA: "♨", EXCURSIONS: "⌖", TOWELS: "▤", LINEN: "▧", BILLIARDS: "●", PARKING: "P", ADMIN: "?" };
 
 function dateLabel(value: string, locale: Locale) {
