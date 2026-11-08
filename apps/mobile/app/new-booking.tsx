@@ -10,6 +10,8 @@ import { wasWriteRejected } from '../src/lib/writeOutcome';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { canCreateBooking } from '../src/roles/bookingAccess';
+import { demoGrid } from '../src/api/demoPresentation';
+import { hasTabForSession } from '../src/roles/registry';
 import { useAsync } from '../src/lib/useAsync';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { FutureScreen, GlassCard, PremiumHeader, LoadingShimmer, ErrorState } from '../src/components/Future';
@@ -33,8 +35,9 @@ export default function NewBooking() {
 
 function BookingForm({ journalKey }: { journalKey: string | null }) {
   const live = useLiveModules();
-  const { user, locale, hotel } = useSession();
-  const allowed = canCreateBooking(user);
+  const { user, locale, hotel, api } = useSession();
+  const showroom = api?.mode === 'DEMO';
+  const allowed = showroom ? !!user && hasTabForSession(user.role, user.module_permissions, 'DEMO', 'pms') : canCreateBooking(user);
   const copy = useMobileCopy();
   const { c } = useTheme();
   const router = useRouter();
@@ -44,7 +47,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const validSelection = dateValid(selectedStart) && dateValid(selectedEnd) &&
     selectedStart >= localDate() && selectedStart < selectedEnd &&
     (Date.parse(selectedEnd + 'T12:00:00') - Date.parse(selectedStart + 'T12:00:00')) / 86400000 <= 60;
-  const selectedRoom = typeof params.room_id === 'string' && /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(params.room_id)
+  const selectedRoom = typeof params.room_id === 'string' && (showroom || /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(params.room_id))
     ? params.room_id : '';
   const [start, setStart] = useState(() => validSelection ? selectedStart : localDate(1));
   const [end, setEnd] = useState(() => validSelection ? selectedEnd : localDate(2));
@@ -59,12 +62,16 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const journal = useAsync(() => journalKey ? readPendingBooking(journalKey) : Promise.resolve(null), [journalKey]);
   const [readback, setReadback] = useState<string | null>(null);
   const [unknown, setUnknown] = useState(false);
-  const lockedForReview = unknown || !!journal.data || !!journal.error || journal.loading || !journalKey;
+  const lockedForReview = unknown || !!journal.data || !!journal.error || journal.loading || (!journalKey && !showroom);
   const [completed, setCompleted] = useState(false);
   const busyLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const validDates = dateValid(start) && dateValid(end) && start < end && (Date.parse(end + 'T12:00:00') - Date.parse(start + 'T12:00:00')) / 86400000 <= 60;
-  const { data: grid, loading, error: gridError, reload } = useAsync(() => allowed && live && validDates ? live.pmsGrid(start, end) : Promise.resolve(null), [live, start, end, validDates, allowed]);
+  const { data: grid, loading, error: gridError, reload } = useAsync(async () => {
+    if (!allowed || !validDates) return null;
+    if (showroom) return demoGrid(locale, await api.listRooms(), hotel?.name ?? 'DEMO');
+    return live ? live.pmsGrid(start, end) : null;
+  }, [api, live, start, end, validDates, allowed, showroom, locale, hotel?.name]);
   const draft = (): BookingDraft => ({ room_id: roomId, check_in: start, check_out: end,
     adults: Number(adults), children: Number(children), guest_phone: phone.trim() });
   const resetPreview = () => { setPreview(null); setError(null); };
@@ -151,8 +158,8 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PressScale onPress={() => router.back()} style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center' }}><ChevronLeft color={c.primary} size={24}/><Text style={[font.body, { color: c.primary }]}>{copy.close}</Text></PressScale>
-    <PremiumHeader title={copy.newBooking} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
-    {!live ? <Empty text={copy.unavailable}/> : null}
+    <PremiumHeader title={{ ru: 'Предварительное бронирование', en: 'Booking preview', kg: 'Алдын ала брондоо', kz: 'Алдын ала брондау' }[locale]} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
+    {showroom ? <Empty text={copy.demoOnlyCard}/> : !live ? <Empty text={copy.unavailable}/> : null}
     <Field label={copy.start + ' · ' + copy.dateFormat} value={start} onChangeText={v => {setStart(v);setRoomId('');resetPreview();}} autoCapitalize="none"/>
     <Field label={copy.end + ' · ' + copy.dateFormat} value={end} onChangeText={v => {setEnd(v);setRoomId('');resetPreview();}} autoCapitalize="none"/>
     <SectionLabel>{copy.rooms}</SectionLabel>
@@ -160,7 +167,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
     {gridError ? <ErrorState text={gridError.message} retry={copy.retry} onRetry={reload}/> : null}
     <View style={{ flexDirection:'row',flexWrap:'wrap',gap:space.sm }}>
       {(grid?.rooms ?? []).map(room => {
-        const available = !room.blocks.length && room.operational_state !== 'TECH_BLOCK';
+        const available = !room.blocks.some(block => block.start < end && start < block.end) && room.operational_state !== 'TECH_BLOCK';
         return <PressScale key={room.id} testID={'booking-room-' + room.id} disabled={!available || lockedForReview || completed}
           onPress={() => {setRoomId(room.id);resetPreview();}}
           style={{ minWidth: 90,minHeight:48,borderRadius:12,padding:12,backgroundColor: roomId === room.id ? c.primary : c.surfaceAlt,opacity:available?1:0.45,alignItems:'center',justifyContent:'center' }}>
@@ -174,7 +181,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       <View style={{flex:1}}><Field label={copy.adults} value={adults} onChangeText={v=>{setAdults(v);resetPreview();}} keyboardType="number-pad"/></View>
       <View style={{flex:1}}><Field label={copy.children} value={children} onChangeText={v=>{setChildren(v);resetPreview();}} keyboardType="number-pad"/></View>
     </View>
-    <Button testID="booking-preview" label={copy.preview} disabled={!validate() || busy || lockedForReview || completed} onPress={() => void doPreview()}/>
+    <Button testID="booking-preview" label={copy.preview} disabled={!live || !validate() || busy || lockedForReview || completed} onPress={() => void doPreview()}/>
     {preview ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:preview.can_commit?c.success:c.danger}}>
       <Text style={[font.h2,{color:c.text}]}>{preview.room.code} · {preview.nights} {copy.nights}</Text>
       <Badge label={preview.pricing.source} tone="primary"/>

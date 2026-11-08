@@ -7,7 +7,7 @@ import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } fr
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
 import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
 import { pmsCellState } from '../../src/roles/pmsPresentation';
-import { extendPmsDateSelection, isPmsDateFree, shortPmsGuestLabel, type PmsDateSelection } from '../../src/roles/pmsSelection';
+import { isPmsDateFree, shortPmsGuestLabel } from '../../src/roles/pmsSelection';
 import { PmsBookingSheet, type PmsSelectedBlock } from '../../src/components/PmsBookingSheet';
 import { useMobileCopy, pmsWeekdayLabels } from '../../src/i18n/mobileCopy';
 import { demoGrid } from '../../src/api/demoPresentation';
@@ -35,7 +35,6 @@ export default function Pms() {
   const [start, setStart] = useState(() => localDate());
   const [filter, setFilter] = useState<'all' | 'attention'>('all');
   const [selectedBlock, setSelectedBlock] = useState<PmsSelectedBlock | null>(null);
-  const [selectedRange, setSelectedRange] = useState<PmsDateSelection | null>(null);
   const { data, loading, error, reload } = useAsync<Grid | null>(async () => !allowed ? null : showroom && api ? demoGrid(locale, await api.listRooms(), hotel?.name ?? 'DEMO') : live ? live.pmsGrid(start, dayAt(start, DAYS)) : null, [live, api, showroom, user?.id, start, locale, hotel?.id, allowed]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
@@ -56,8 +55,6 @@ export default function Pms() {
     const semantic = state === 'RESERVATION' ? copy.bookings : state === 'HOLD' ? copy.holds
       : state === 'BLOCKED' ? copy.blocked : state === 'CONFLICT' ? copy.conflict : copy.available;
     const free = isPmsDateFree(room, day, localDate()) && (!!showroom || canCreateBooking(user));
-    const activeRange = !!selectedRange && room.id === selectedRange.roomId &&
-      selectedRange.start <= day && day < selectedRange.end;
     const openBlock = !!block && (showroom || user?.role !== 'AGENT' || state !== 'RESERVATION');
     return <PressScale key={day} testID={'pms-' + room.id + '-' + day}
       accessibilityLabel={room.code + ' ' + day + ' · ' + semantic + (block?.guest_name ? ' · ' + block.guest_name : '')}
@@ -65,18 +62,17 @@ export default function Pms() {
       onPress={() => {
         if (state === 'FREE' && free) {
           setSelectedBlock(null);
-          setSelectedRange(current => extendPmsDateSelection(current, room, day, localDate()));
+          router.push({ pathname: '/new-booking', params: { room_id: room.id, check_in: day, check_out: dayAt(day, 1) } });
         } else if (block && openBlock) {
-          setSelectedRange(null);
           setSelectedBlock({room, block, state});
         }
       }}
       style={{ width: CELL_WIDTH - 4, height: ROW_HEIGHT - 6, marginRight: 4, borderRadius: radius.sm,
-        backgroundColor: activeRange ? c.successSoft : tone, justifyContent: 'center', alignItems: 'center',
-        paddingHorizontal: 3, borderWidth: activeRange ? 2 : 1,
-        borderColor: activeRange ? c.success : state === 'RESERVATION' ? tone : c.border }}>
+        backgroundColor: tone, justifyContent: 'center', alignItems: 'center',
+        paddingHorizontal: 3, borderWidth: 1,
+        borderColor: state === 'RESERVATION' ? tone : c.border }}>
       <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}
-        style={[font.small, { color: activeRange ? c.success : ink, fontSize: state === 'RESERVATION' ? 11 : 17,
+        style={[font.small, { color: ink, fontSize: state === 'RESERVATION' ? 11 : 17,
           fontWeight: '800', textAlign: 'center' }]}>{label}</Text>
     </PressScale>;
   };
@@ -138,16 +134,6 @@ export default function Pms() {
           </ScrollView>
         </View>
       </GlassCard>
-      {selectedRange ? <GlassCard testID="pms-selected-range" style={{ gap: 9, borderColor: c.success, borderWidth: 1 }}>
-        <Text style={[font.h2, { color: c.text }]}>{copy.rangeSelected}: {selectedRange.roomCode}</Text>
-        <Text style={[font.body, { color: c.text }]}>{selectedRange.start} → {selectedRange.end}</Text>
-        <Text style={[font.small, { color: c.textMuted }]}>{copy.rangeHint}</Text>
-        {showroom ? <Text style={[font.small, { color: c.warning }]}>{copy.demoOnlyCard}</Text>
-        : canCreateBooking(user) ? <Button testID="pms-book-selected-range" label={copy.newBooking}
-          onPress={() => router.push({ pathname: '/new-booking',
-            params: { room_id: selectedRange.roomId, check_in: selectedRange.start, check_out: selectedRange.end } })}/> : null}
-        <Button variant="secondary" label={copy.close} onPress={() => setSelectedRange(null)}/>
-      </GlassCard> : null}
       {shownRooms.length === 0 ? <Empty text={filter === 'attention' ? copy.empty : copy.noRooms}/> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         <Badge label={'● ' + copy.bookings} tone="primary"/>
