@@ -127,12 +127,13 @@ describe('navigation, guards and screens', () => {
     await waitFor(() => expect(screen.getByTestId('task-msg')).toBeTruthy(), { timeout: 4000 });
   });
 
-  it('manager sees admin tab', async () => {
+  it('manager sees PMS and admin tabs and can open inbox from More', async () => {
     const screen = await loginAs('manager');
     await screen.findByTestId('task-t1', {}, { timeout: 4000 });
     expect(screen.getByTestId('tab-admin')).toBeTruthy();
-    expect(screen.getByTestId('tab-inbox')).toBeTruthy();
-    expect(screen.getByTestId('tab-more')).toBeTruthy();
+    expect(screen.getByTestId('tab-pms')).toBeTruthy();
+    await fireEvent.press(screen.getByTestId('tab-more'));
+    expect(await screen.findByTestId('more-inbox')).toBeTruthy();
   });
 
   it('manager can assign an unassigned cleaning task from the admin screen', async () => {

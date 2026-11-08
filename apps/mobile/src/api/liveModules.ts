@@ -259,6 +259,19 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
       return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
     },
+    captureDiningProduction: async (day: string, meal: DiningProductionSnapshotMeal['meal_type']) => {
+      reviewGate();
+      const serviceDate = safeIsoDate(day);
+      const path = p + '/dining/production-snapshots';
+      await request<unknown>('POST', path, { service_date: serviceDate, meal_type: meal });
+      const result = diningProductionSnapshotsResponse(await request<unknown>(
+        'GET', path + '?from_date=' + serviceDate + '&through_date=' + serviceDate,
+      ));
+      if (!result.days.some(item => item.service_date === serviceDate &&
+        item.meals.some(value => value.meal_type === meal && value.state === 'FROZEN'))) {
+        throw new ApiError('UNKNOWN', 'Production snapshot could not be verified');
+      }
+    },
     diningStays: async (): Promise<DiningStays> => {
       reviewGate();
       return diningStaysResponse(await request<unknown>('GET', p + '/dining/stays'));

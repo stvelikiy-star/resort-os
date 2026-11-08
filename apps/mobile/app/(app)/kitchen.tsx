@@ -1,10 +1,10 @@
-import React, { useCallback, useRef } from 'react';
-import { Text, View, useWindowDimensions } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Alert, Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ChefHat, CircleCheck, ClipboardList, CookingPot, ListChecks, UtensilsCrossed } from 'lucide-react-native';
 import { DemoBanner, Empty, SectionLabel, Button } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
-import { DiningProductionSnapshots, KitchenOrder, useLiveModules } from '../../src/api/liveModules';
+import { DiningProductionSnapshotMeal, DiningProductionSnapshots, KitchenOrder, useLiveModules } from '../../src/api/liveModules';
 import { demoKitchenOrders } from '../../src/api/demoPresentation';
 import { kitchenWorkload } from '../../src/roles/kitchenSummary';
 import { hasTabForSession } from '../../src/roles/registry';
@@ -40,6 +40,29 @@ export default function KitchenDashboard() {
       [live, showroom, hotel?.id, user?.id, allowed],
     );
   useFocusEffect(useCallback(() => { if(focused.current) { void reload(); void reloadProduction(); } else focused.current = true; }, [reload, reloadProduction]));
+  const captureLock = useRef(false);
+  const [capturing, setCapturing] = useState(false);
+  const captureLabel = {
+    ru: 'Зафиксировать план готовки', en: 'Freeze cooking plan',
+    kg: 'Тамак даярдоо планын бекитүү', kz: 'Ас дайындау жоспарын бекіту',
+  }[locale];
+  const capture = (date: string, meal: DiningProductionSnapshotMeal) => {
+    Alert.alert(captureLabel, date + ' · ' + meal.current_total_portions + ' ' + copy.kitchenPortions, [
+      { text: copy.close, style: 'cancel' },
+      { text: copy.confirm, onPress: async () => {
+        if (!allowed || !live || showroom || captureLock.current) return;
+        captureLock.current = true;
+        setCapturing(true);
+        try { await live.captureDiningProduction(date, meal.meal_type); }
+        catch (e) { Alert.alert(copy.unknown, e instanceof Error ? e.message : copy.resultUnknown); }
+        finally {
+          await reloadProduction();
+          captureLock.current = false;
+          setCapturing(false);
+        }
+      } },
+    ]);
+  };
   const summary = kitchenWorkload(data ?? [], locale);
   const tile = (title: string, value: number, icon: React.ElementType, color: string) => {
     const Icon = icon;
@@ -81,6 +104,9 @@ export default function KitchenDashboard() {
             {meal.state === 'FROZEN' ? <Text style={[font.small,{color:meal.changed_since_snapshot?c.warning:c.success}]}>
               {copy.kitchenFrozen}: {meal.frozen_total_portions} · {copy.kitchenDelta}: {meal.delta_total_portions}
             </Text> : null}
+            {meal.state !== 'FROZEN' && meal.cutoff_status === 'CUTOFF_REACHED' ?
+              <Button label={captureLabel} variant="secondary" disabled={capturing}
+                onPress={() => capture(day.service_date, meal)}/> : null}
             {meal.cutoff_status === 'UNCONFIGURED' ? <Text style={[font.small,{color:c.warning}]}>{copy.kitchenUnconfigured}</Text> : null}
           </View>
           <View style={{minWidth:44,alignItems:'center'}}>
