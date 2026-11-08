@@ -3,13 +3,39 @@
     Cache-Control "private, no-store"
     X-Robots-Tag "noindex, nofollow"
     X-Content-Type-Options "nosniff"
-    Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    Referrer-Policy "no-referrer"
   }
 
   @health path /healthz
   handle @health {
     respond "OK" 200
   }
+
+  handle /g/* {
+    reverse_proxy guest-web:3000
+  }
+
+  handle /_marina_guest/_next/static/* {
+    uri strip_prefix /_marina_guest
+    reverse_proxy guest-web:3000
+  }
+
+  @guest_api path /core/api/v1/guest-os/rooms/* /core/api/v1/guest-os/logout
+  handle @guest_api {
+    uri strip_prefix /core
+    reverse_proxy api:8000
+  }
+
+  # Internal application routes must never fall through to the HTML placeholder.
+  @private_paths path /core/* /_marina_guest/*
+  handle @private_paths {
+    respond 404
+  }
+
+  @site_html {
+    not path /g/* /core/* /_marina_guest/*
+  }
+  header @site_html Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 
   @homepage {
     method GET

@@ -25,6 +25,20 @@ class CustomerWebPublicationGuard(unittest.TestCase):
         self.assertIn("Content-Security-Policy", source)
         self.assertIn("path /healthz", source)
 
+    def test_guest_web_has_a_narrow_private_boundary(self):
+        compose = (ROOT / "compose.marina-production.yaml").read_text()
+        guest_web = compose.split("\n  guest-web:\n", 1)[1].split("\n  web:\n", 1)[0]
+        self.assertIn("deploy/marina/guest-web.Dockerfile", guest_web)
+        self.assertNotIn("ports:", guest_web)
+        dockerfile = (ROOT / "deploy/marina/guest-web.Dockerfile").read_text()
+        self.assertIn("COPY apps/web/app/g ./app/g", dockerfile)
+        self.assertNotIn("COPY apps/web ./", dockerfile)
+        gateway = (ROOT / "deploy/marina/customer-unpublished.Caddyfile").read_text()
+        self.assertIn("handle /g/*", gateway)
+        self.assertIn("handle /_marina_guest/_next/static/*", gateway)
+        self.assertIn("@guest_api path /core/api/v1/guest-os/rooms/* /core/api/v1/guest-os/logout", gateway)
+        self.assertIn("@private_paths path /core/* /_marina_guest/*", gateway)
+
     def test_neutral_page_has_no_foreign_hotel_data(self):
         source = (ROOT / "deploy/marina/customer-unpublished.html").read_text()
         self.assertIn("MARINA SMART", source)

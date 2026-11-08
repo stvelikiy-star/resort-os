@@ -166,6 +166,16 @@ services:
     networks: [edge, backend]
 
 
+  guest-web:
+    image: marina-${MARINA_INSTANCE_SLUG:?Set MARINA_INSTANCE_SLUG}-guest-web:${MARINA_RELEASE_SHA:?Set tested MARINA_RELEASE_SHA}
+    build:
+      context: .
+      dockerfile: deploy/marina/guest-web.Dockerfile
+      args:
+        RELEASE_SHA: ${MARINA_RELEASE_SHA}
+    restart: unless-stopped
+    networks: [backend]
+
   web:
     # Public Web stays unpublished until this hotel's own site content is approved.
     # Never boot the legacy Three Crowns-specific apps/web for a different customer.
