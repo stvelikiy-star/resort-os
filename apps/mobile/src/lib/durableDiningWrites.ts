@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 /** A pending POST is not evidence of failure. Keep the lock across app restarts. */
-export type PendingDiningWrite = { operation: 'CREATE_TABLE' | 'CREATE_ORDER'; startedAt: string };
+export type PendingDiningWrite = { operation: 'CREATE_TABLE' | 'CREATE_ORDER' | 'CREATE_MENU_DRAFT'; startedAt: string };
 
 function key(hotelId: string, userId: string): string {
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(hotelId) || !/^[A-Za-z0-9_-]{1,100}$/.test(userId)) {
@@ -16,7 +16,7 @@ export async function readPendingDiningWrite(hotelId: string, userId: string): P
   const value: unknown = JSON.parse(raw);
   if (!value || typeof value !== 'object') throw new Error('Invalid pending dining write');
   const record = value as Record<string, unknown>;
-  if (!['CREATE_TABLE', 'CREATE_ORDER'].includes(String(record.operation)) ||
+  if (!['CREATE_TABLE', 'CREATE_ORDER', 'CREATE_MENU_DRAFT'].includes(String(record.operation)) ||
       typeof record.startedAt !== 'string') throw new Error('Invalid pending dining write');
   return record as PendingDiningWrite;
 }
