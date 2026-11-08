@@ -141,6 +141,14 @@ export interface MealPlanAck {
   stay_id: string; updated_items: number; meals: MealType[];
   from_date: string; through_date: string; adult_portions: number; child_portions: number;
 }
+export interface WaiterMenuItem {
+  id: string;
+  name_ru: string;
+  name_kg: string;
+  name_en: string;
+  name_kz: string;
+  price_kgs: number;
+}
 export interface DiningFloor {
   tables: { id: string; code: string; name: string; status: string; seats: number }[];
   orders: { id: string; order_number: string; status: string; table_code: string | null;
@@ -269,6 +277,34 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       // By default the backend uses the HOTEL-local date, not the phone timezone.
       const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
       return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
+    },
+    waiterMenu: async (): Promise<WaiterMenuItem[]> => {
+      reviewGate();
+      const menu = objectResponse(await request<unknown>('GET', p + '/kitchen/menu'), 'waiter menu');
+      if (!Array.isArray(menu.items)) throw new ApiError('UNKNOWN', 'Invalid waiter menu');
+      return menu.items.map(value => {
+        const item = objectResponse(value, 'menu item');
+        const { id, name_ru, name_kg, name_en, name_kz, price_kgs } = item;
+        if (typeof id !== 'string' || typeof name_ru !== 'string' || typeof name_kg !== 'string' ||
+          typeof name_en !== 'string' || typeof name_kz !== 'string' ||
+          typeof price_kgs !== 'number' || !Number.isSafeInteger(price_kgs) || price_kgs < 0) {
+          throw new ApiError('UNKNOWN', 'Invalid waiter menu item');
+        }
+        return item.is_active === true && item.is_draft === false
+          ? { id: safeRouteId(id), name_ru, name_kg, name_en, name_kz, price_kgs } : null;
+      }).filter((item): item is WaiterMenuItem => item !== null);
+    },
+    createDiningTable: async (table: { code: string; name: string; seats: number }) => {
+      reviewGate();
+      const result = objectResponse(await request<unknown>('POST', p + '/kitchen/tables', table), 'table');
+      if (typeof result.id !== 'string' || result.code !== table.code) throw new ApiError('UNKNOWN', 'Invalid table acknowledgement');
+    },
+    createDiningTableOrder: async (table: string, items: { menu_item_id: string; quantity: number }[]) => {
+      reviewGate();
+      const result = objectResponse(await request<unknown>('POST', p + '/kitchen/orders', {
+        source: 'TABLE', table_id: safeRouteId(table), items,
+      }), 'table order');
+      if (typeof result.id !== 'string' || result.status !== 'NEW') throw new ApiError('UNKNOWN', 'Invalid order acknowledgement');
     },
     createKitchenMenuDraft: async (draft: KitchenMenuDraft) => {
       reviewGate();

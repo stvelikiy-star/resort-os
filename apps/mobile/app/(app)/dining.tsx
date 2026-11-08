@@ -14,6 +14,7 @@ import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { WaiterOperations } from '../../src/components/WaiterOperations';
 import { font, space } from '../../src/theme/tokens';
 
 const NEXT: Partial<Record<KitchenStatus, KitchenStatus>> = { NEW: 'ACCEPTED', ACCEPTED: 'COOKING', COOKING: 'READY' };
@@ -56,6 +57,7 @@ export default function Dining() {
   return <FutureScreen>
     <PremiumHeader title={copy.dining} subtitle={hotel?.name} eyebrow="MARINA SMART" right={cook ? <ChefHat size={27} color={c.primary}/> : <UtensilsCrossed size={27} color={c.primary}/>}/>
     {showroom ? <DemoBanner/> : null}
+    {waiter && live && !showroom && floor ? <WaiterOperations key={hotel?.id + ':' + user.id} live={live} tables={floor.tables} reload={reload}/> : null}
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
     {unknownResult ? <GlassCard testID="dining-unknown-result"><Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.resultUnknown}</Text></GlassCard> : null}
     {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
