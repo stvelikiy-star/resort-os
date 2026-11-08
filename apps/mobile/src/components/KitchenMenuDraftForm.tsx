@@ -2,6 +2,8 @@ import React, { useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { KITCHEN_MENU_CATEGORIES, KitchenMenuDraft } from '../api/liveModules';
 import { wasWriteRejected } from '../lib/writeOutcome';
+import { beginPendingDiningWrite, clearPendingDiningWrite, readPendingDiningWrite } from '../lib/durableDiningWrites';
+import { useAsync } from '../lib/useAsync';
 import { useSession } from '../state/session';
 import { useMobileCopy } from '../i18n/mobileCopy';
 import { Button, Field, SectionLabel } from './ui';
@@ -24,7 +26,11 @@ const categories = {
 } as const;
 
 export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft) => Promise<string> }) {
-  const { locale } = useSession();
+  const { locale, hotel, user } = useSession();
+  const identity = hotel?.id && user?.id ? { hotelId: hotel.id, userId: user.id } : null;
+  const pending = useAsync(() => identity ? readPendingDiningWrite(identity.hotelId, identity.userId) : Promise.reject(new Error('Missing hotel identity')),
+    [identity?.hotelId, identity?.userId]);
+  const blocked = pending.loading || !!pending.error || !!pending.data;
   const copy = useMobileCopy();
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
@@ -43,20 +49,32 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
     setValues(current => ({ ...current, [field]: value }));
   };
   const submit = async () => {
-    if (!valid || unknown || lock.current) return;
+    if (!valid || unknown || blocked || !identity || lock.current) return;
     lock.current = true;
     setBusy(true);
     setMessage('');
+    let recorded = false;
     try {
+      await beginPendingDiningWrite(identity.hotelId, identity.userId, 'CREATE_MENU_DRAFT');
+      recorded = true;
+      await pending.reload();
       await save({
         code, category, price_kgs: price, name_ru: values.name_ru.trim(), name_kg: values.name_kg.trim(),
         name_en: values.name_en.trim(), name_kz: values.name_kz.trim(),
       });
+      await clearPendingDiningWrite(identity.hotelId, identity.userId);
+      await pending.reload();
       setValues(EMPTY);
       setMessage(saved);
     } catch (error) {
-      const rejected = wasWriteRejected(error);
-      setUnknown(!rejected);
+      const rejected = recorded && wasWriteRejected(error);
+      if (recorded && rejected) {
+        try { await clearPendingDiningWrite(identity.hotelId, identity.userId); }
+        catch { setUnknown(true); }
+      } else {
+        setUnknown(true);
+      }
+      await pending.reload();
       setMessage(rejected ? copy.denied : copy.resultUnknown);
     } finally {
       lock.current = false;
@@ -76,7 +94,8 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
         label={categories[locale][index]} variant={category === item ? 'primary' : 'secondary'}
         onPress={() => setCategory(item)}/>)}
     </View>
-    <Button label={copy.confirm} disabled={!valid || busy || unknown} onPress={() => void submit()}/>
+    {blocked || unknown ? <Text accessibilityRole="alert" style={{ color: c.text }}>{copy.resultUnknown}</Text> : null}
+    <Button label={copy.confirm} disabled={!valid || busy || unknown || blocked} onPress={() => void submit()}/>
     {message ? <Text accessibilityRole="alert" style={{ color: c.text }}>{message}</Text> : null}
     <Button label={copy.close} variant="secondary" disabled={busy} onPress={() => setOpen(false)}/>
   </GlassCard>;
