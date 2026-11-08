@@ -3,7 +3,7 @@ import { Alert, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Badge, Button, Empty, Field, PressScale, SectionLabel } from '../src/components/ui';
-import { BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
+import { AGENT_SERVICES, AgentServiceCode, BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
 import { ApiError } from '../src/api/types';
 import { acknowledgePendingBooking, clearPendingBooking, finishPendingBooking, readPendingBooking, recordPendingBooking } from '../src/lib/pendingBooking';
 import { wasWriteRejected } from '../src/lib/writeOutcome';
@@ -24,6 +24,13 @@ const reviewCopy = {
   kz: { review: 'Шахматкадан тексеру', missing: 'Бөлме немесе жазба қолжетімсіз.', storage: 'Бронь журналы қолжетімсіз. Қайта тексеріңіз.', candidate: 'Ықтимал бронь: ', unconfirmed: 'Сәйкестік расталмады. Платформадан тексеріңіз.', ack: 'Платформадан тексердім', manual: 'Нәтижені платформадан тексеріп, жаңа бронь қажет пе екенін шешкеніңізді растаңыз.' },
 };
 
+const agentServiceLabels = {
+  ru: ['Добавить услугу', 'Трансфер', 'Питание', 'Парковка', 'Сауна', 'Бильярд', 'Экскурсия'],
+  en: ['Add service', 'Transfer', 'Meals', 'Parking', 'Sauna', 'Billiards', 'Excursion'],
+  kg: ['Кызмат кошуу', 'Трансфер', 'Тамактануу', 'Унаа токтотуучу жай', 'Сауна', 'Бильярд', 'Экскурсия'],
+  kz: ['Қызмет қосу', 'Трансфер', 'Тамақтану', 'Автотұрақ', 'Сауна', 'Бильярд', 'Экскурсия'],
+} as const;
+
 function dateValid(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T12:00:00')); }
 export default function NewBooking() {
   const { user, hotel } = useSession();
@@ -35,7 +42,7 @@ export default function NewBooking() {
 
 function BookingForm({ journalKey }: { journalKey: string | null }) {
   const live = useLiveModules();
-  const { user, locale, hotel, api } = useSession();
+  const { user, locale, hotel, api, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
   const allowed = showroom ? !!user && hasTabForSession(user.role, user.module_permissions, 'DEMO', 'pms') : canCreateBooking(user);
   const copy = useMobileCopy();
@@ -58,6 +65,10 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const [children, setChildren] = useState('0');
   const [preview, setPreview] = useState<BookingPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reservationId, setReservationId] = useState<string | null>(null);
+  const [serviceOpen, setServiceOpen] = useState(false);
+  const [serviceMessage, setServiceMessage] = useState('');
+  const [serviceUnknown, setServiceUnknown] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const journal = useAsync(() => journalKey ? readPendingBooking(journalKey) : Promise.resolve(null), [journalKey]);
   const [readback, setReadback] = useState<string | null>(null);
@@ -76,6 +87,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
     adults: Number(adults), children: Number(children), guest_phone: phone.trim() });
   const resetPreview = () => { setPreview(null); setError(null); };
   const resetForm = () => {
+    setReservationId(null); setServiceOpen(false); setServiceMessage(''); setServiceUnknown(false);
     setCompleted(false); setUnknown(false); setResult(null); setError(null); setPreview(null);
     setStart(localDate(1)); setEnd(localDate(2)); setRoomId(''); setName(''); setPhone(''); setAdults('2'); setChildren('0');
   };
@@ -106,6 +118,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       }
       try {
         const saved = await live.bookingCommit(payload);
+        setReservationId(saved.reservation_id);
         setResult(saved.booking_number + ' · ' + saved.total_kgs + ' KGS');
         setPreview(null);
         setCompleted(true);
@@ -125,6 +138,27 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       busyLock.current = false; setBusy(false);
     }
   }}]);
+  const addService = (service: AgentServiceCode, label: string) => Alert.alert(agentServiceLabels[locale][0], label, [
+    { text: copy.close, style: 'cancel' },
+    { text: copy.confirm, onPress: async () => {
+      if (!live || !reservationId || !allowed || user?.role !== 'AGENT' ||
+        showroom || serverAuthMode === 'shared_auth_preview' || busyLock.current || serviceUnknown) return;
+      busyLock.current = true;
+      setBusy(true);
+      setServiceMessage('');
+      try {
+        await live.addAgentGuestService(reservationId, service);
+        setServiceMessage(copy.confirmed + ' · ' + label);
+      } catch (error) {
+        const rejected = wasWriteRejected(error);
+        setServiceUnknown(!rejected);
+        setServiceMessage(rejected && error instanceof Error ? error.message : copy.resultUnknown);
+      } finally {
+        busyLock.current = false;
+        setBusy(false);
+      }
+    } },
+  ]);
   const reconcile = async () => {
     const pending = journal.data;
     if (!live || !pending || busyLock.current) return;
@@ -191,7 +225,14 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       <Button testID="booking-commit" label={copy.commit} disabled={!preview.can_commit || busy || lockedForReview || completed} onPress={doCommit}/>
     </GlassCard> : null}
     {result ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:c.success}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
-      <Button testID="booking-create-another" label={copy.anotherBooking} variant="secondary" onPress={resetForm}/>
+      {user?.role === 'AGENT' && live && reservationId && serverAuthMode !== 'shared_auth_preview' ? <>
+        <Button label={agentServiceLabels[locale][0]} variant="secondary" disabled={busy} onPress={() => setServiceOpen(!serviceOpen)}/>
+        {serviceOpen ? AGENT_SERVICES.map((service, index) => <Button key={service}
+          label={agentServiceLabels[locale][index + 1]} variant="secondary" disabled={busy || serviceUnknown}
+          onPress={() => addService(service, agentServiceLabels[locale][index + 1])}/>) : null}
+        {serviceMessage ? <Text accessibilityRole="alert" style={[font.body, { color: c.text }]}>{serviceMessage}</Text> : null}
+      </> : null}
+      <Button testID="booking-create-another" label={copy.anotherBooking} variant="secondary" disabled={busy} onPress={resetForm}/>
     </GlassCard> : null}
     {error ? <GlassCard><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{error}</Text></GlassCard> : null}
     {journal.error ? <Button label={reviewCopy[locale].storage} onPress={journal.reload}/> : null}

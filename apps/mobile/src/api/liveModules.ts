@@ -141,6 +141,9 @@ export interface MealPlanAck {
   stay_id: string; updated_items: number; meals: MealType[];
   from_date: string; through_date: string; adult_portions: number; child_portions: number;
 }
+export const AGENT_SERVICES = ['TRANSFER', 'MEALS', 'PARKING', 'SAUNA', 'BILLIARDS', 'EXCURSIONS'] as const;
+export type AgentServiceCode = typeof AGENT_SERVICES[number];
+
 export interface WaiterMenuItem {
   id: string;
   name_ru: string;
@@ -277,6 +280,16 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       // By default the backend uses the HOTEL-local date, not the phone timezone.
       const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
       return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
+    },
+    addAgentGuestService: async (reservation: string, serviceCode: AgentServiceCode) => {
+      reviewGate();
+      const reservationId = safeRouteId(reservation);
+      const task = objectResponse(await request<unknown>('POST', p + '/admin/guest-services', {
+        reservation_id: reservationId, service_code: serviceCode,
+      }), 'guest service');
+      if (typeof task.id !== 'string' || task.reservation_id !== reservationId || task.service_code !== serviceCode) {
+        throw new ApiError('UNKNOWN', 'Invalid guest service acknowledgement');
+      }
     },
     waiterMenu: async (): Promise<WaiterMenuItem[]> => {
       reviewGate();
