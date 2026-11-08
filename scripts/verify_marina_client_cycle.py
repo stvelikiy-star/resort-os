@@ -599,8 +599,34 @@ def main() -> None:
     waiter = login(WAITER_USERNAME, WAITER_PASSWORD)
     waiter_floor = expect(waiter.get("/api/v1/dining/floor"), 200, "Waiter dining floor access")
     assert isinstance(waiter_floor, dict)
-    waiter_menu_denied = waiter.get("/api/v1/kitchen/menu")
-    assert waiter_menu_denied.status_code == 403, waiter_menu_denied.text
+    menu_path = "/api/v1/kitchen/menu"
+    dish = expect(
+        kitchen.post(menu_path, json={
+            "code": f"QA_{reservation_id.replace('-', '')[:12]}", "category": "DRINK",
+            "name_ru": "Чай QA", "name_kg": "Чай QA", "name_en": "QA tea", "name_kz": "Шай QA",
+            "price_kgs": 50, "is_draft": True,
+        }),
+        201,
+        "Cook creates a draft dish",
+    )
+    menu = expect(waiter.get(menu_path), 200, "Waiter reads approved menu")
+    assert all(item["id"] != dish["id"] and item["is_active"] and not item["is_draft"] for item in menu["items"])
+    table = expect(
+        waiter.post("/api/v1/kitchen/tables", json={
+            "code": f"W{reservation_id.replace('-', '')[:12]}", "name": "QA waiter table", "seats": 4,
+        }),
+        201,
+        "Waiter creates a table",
+    )
+    order_path = "/api/v1/kitchen/orders"
+    order_body = {"source": "TABLE", "table_id": table["id"], "items": [{"menu_item_id": dish["id"], "quantity": 2}]}
+    expect(waiter.post(order_path, json=order_body), 409, "Waiter cannot order a draft dish")
+    expect(waiter.post(order_path, json={**order_body, "source": "ROOM"}), 403, "Waiter cannot create room orders")
+    expect(owner.patch(f"{menu_path}/{dish['id']}", json={"is_draft": False}), 200, "Owner approves dish")
+    order = expect(waiter.post(order_path, json=order_body), 201, "Waiter creates table order")
+    assert order["total_kgs"] == 100 and order["status"] == "NEW"
+    kitchen_orders = expect(kitchen.get(order_path), 200, "Kitchen reads new waiter order")
+    assert any(item["id"] == order["id"] and item["table_code"] == table["code"] for item in kitchen_orders["items"])
 
     technician = login(TECHNICIAN_USERNAME, TECHNICIAN_PASSWORD)
     technician_tasks = expect(technician.get("/api/v1/ops/tasks", params={"limit": 50}), 200, "Technician tasks access")
