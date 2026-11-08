@@ -25,6 +25,7 @@ const pinned = {
   'kitchen.py': 'e9bc209a207098c8923923a114f8d8a479ccd3de',
   'dining_production_snapshots.py': '9cb67ec129fd587f6cead26f6efaf236ef17d84a',
   'dining_control.py': '80c4defa448f0e82671f743215a307705f5dd002',
+  'guest_services.py': '7e8abb3a5a8879fe67ab6edb49df0c9333875686',
   'marina_assistant.py': '7b4e50bd9bd853cfeed438ac8fccb5e310a0f773',
   'stays.py': '7412700ee2801199ed518976039abe23c351c150',
 };
@@ -43,6 +44,7 @@ const contracts = [
   ['kitchen.py','admin_router','/api/v1/kitchen',['get /menu','post /tables','get /orders','post /orders','patch /orders/{order_id}/status']],
   ['dining_production_snapshots.py','router','/api/v1/dining',['get /production-snapshots','post /production-snapshots']],
   ['dining_control.py','router','/api/v1/dining',['get /floor','patch /orders/{order_id}/waiter']],
+  ['guest_services.py','router','/api/v1/admin/guest-services',['post ']],
   ['marina_assistant.py','router','/api/v1/assistant',['get /capabilities','post /chat']],
   ['stays.py','router','/api/v1/admin/stays',['post /reservations/{reservation_id}/check-in','post /reservations/{reservation_id}/check-out']],
 ];

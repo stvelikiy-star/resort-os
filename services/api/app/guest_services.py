@@ -5,7 +5,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles, trusted_property_id
+from .auth import current_user, require_roles, trusted_property_id
+from .pms_reservation_create import linked_agent_id_for_user
+from .section_permissions import user_has_section
 
 router = APIRouter(prefix="/api/v1/admin/guest-services", tags=["guest-services"])
 center_access = require_roles("OWNER", "MANAGER", "RECEPTION")
@@ -200,29 +202,45 @@ async def list_guest_services(
     }
 
 
+AGENT_SERVICE_CODES = {"TRANSFER", "MEALS", "PARKING", "SAUNA", "BILLIARDS", "EXCURSIONS"}
+
+
+async def guest_service_create_access(request: Request, user: dict[str, Any] = Depends(current_user)):
+    if user.get("role") == "AGENT":
+        if not user_has_section(user, "PMS"):
+            raise HTTPException(status_code=403, detail="Insufficient permission")
+        return user
+    return await center_access(request, user)
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_guest_service(
     payload: GuestServiceCreate,
     request: Request,
-    user: dict[str, Any] = Depends(center_access),
+    user: dict[str, Any] = Depends(guest_service_create_access),
 ):
     code = service_code(payload.service_code)
+    agent = user.get("role") == "AGENT"
+    if agent and (code not in AGENT_SERVICE_CODES or payload.priority != "NORMAL"):
+        raise HTTPException(status_code=403, detail={"code": "AGENT_GUEST_SERVICE_SCOPE"})
     description = payload.description.strip() if payload.description and payload.description.strip() else None
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
+            agent_id = await linked_agent_id_for_user(conn, pid, user) if agent else None
             reservation = await conn.fetchrow(
                 '''
                 SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
                        r."primaryGuestId",g."firstName",g.phone
                 FROM reservations r
                 LEFT JOIN guests g ON g.id=r."primaryGuestId"
-                WHERE r.id=$1 AND r."propertyId"=$2
+                WHERE r.id=$1 AND r."propertyId"=$2 AND ($3::uuid IS NULL OR r."agentId"=$3)
                 FOR UPDATE OF r
                 ''',
                 payload.reservation_id,
                 pid,
+                agent_id,
             )
             if not reservation:
                 raise HTTPException(status_code=404, detail="Reservation not found")
