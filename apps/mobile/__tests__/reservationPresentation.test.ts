@@ -1,4 +1,4 @@
-import { reservationAmount, reservationGuestName, reservationStatusLabel, reservationTelephone } from '../src/roles/reservationPresentation';
+import { reservationAmount, reservationGuestName, reservationRoomStateLabel, reservationStatusLabel, reservationTelephone } from '../src/roles/reservationPresentation';
 
 const copy = {
   awaitingArrival: 'Ожидает заезда', checkedIn: 'Заселён', checkedOut: 'Выселен',
@@ -30,4 +30,13 @@ describe('live reservation card presentation is truthful and role-independent', 
     expect(reservationAmount(0)).toContain('0');
     expect(reservationAmount(5200)).toContain('KGS');
   });
+});
+
+test('known housekeeping and repair statuses display in the active language', () => {
+  const translations = { clean: 'Готов', dirty: 'Уборка', checking: 'На проверке', tech: 'Ремонт' };
+  expect(reservationRoomStateLabel('CLEAN', translations)).toBe('Готов');
+  expect(reservationRoomStateLabel('DIRTY', translations)).toBe('Уборка');
+  expect(reservationRoomStateLabel('IN_INSPECTION', translations)).toBe('На проверке');
+  expect(reservationRoomStateLabel('TECH_BLOCK', translations)).toBe('Ремонт');
+  expect(reservationRoomStateLabel('UNKNOWN', translations)).toBe('UNKNOWN');
 });
