@@ -7,6 +7,7 @@ import { AGENT_SERVICES, AgentServiceCode, BookingDraft, BookingPreview, localDa
 import { ApiError } from '../src/api/types';
 import { acknowledgePendingBooking, clearPendingBooking, finishPendingBooking, readPendingBooking, recordPendingBooking } from '../src/lib/pendingBooking';
 import { wasWriteRejected } from '../src/lib/writeOutcome';
+import { beginPendingAgentService, clearPendingAgentService, readPendingAgentService } from '../src/lib/pendingAgentService';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { canCreateBooking } from '../src/roles/bookingAccess';
@@ -69,6 +70,12 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const [serviceOpen, setServiceOpen] = useState(false);
   const [serviceMessage, setServiceMessage] = useState('');
   const [serviceUnknown, setServiceUnknown] = useState(false);
+  const agentIdentity = user?.role === 'AGENT' && hotel?.id && user.id
+    ? { hotelId: hotel.id, userId: user.id } : null;
+  const agentPending = useAsync(() => agentIdentity
+    ? readPendingAgentService(agentIdentity.hotelId, agentIdentity.userId) : Promise.resolve(null),
+    [agentIdentity?.hotelId, agentIdentity?.userId]);
+  const serviceLocked = serviceUnknown || agentPending.loading || !!agentPending.error || !!agentPending.data;
   const [result, setResult] = useState<string | null>(null);
   const journal = useAsync(() => journalKey ? readPendingBooking(journalKey) : Promise.resolve(null), [journalKey]);
   const [readback, setReadback] = useState<string | null>(null);
@@ -142,16 +149,30 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
     { text: copy.close, style: 'cancel' },
     { text: copy.confirm, onPress: async () => {
       if (!live || !reservationId || !allowed || user?.role !== 'AGENT' ||
-        showroom || serverAuthMode === 'shared_auth_preview' || busyLock.current || serviceUnknown) return;
+        showroom || serverAuthMode === 'shared_auth_preview' || busyLock.current || serviceLocked || !agentIdentity) return;
       busyLock.current = true;
       setBusy(true);
       setServiceMessage('');
+      let recorded = false;
       try {
+        await beginPendingAgentService(agentIdentity.hotelId, agentIdentity.userId, reservationId, service);
+        recorded = true;
+        await agentPending.reload();
         await live.addAgentGuestService(reservationId, service);
+        await clearPendingAgentService(agentIdentity.hotelId, agentIdentity.userId);
+        await agentPending.reload();
         setServiceMessage(copy.confirmed + ' · ' + label);
       } catch (error) {
-        const rejected = wasWriteRejected(error);
-        setServiceUnknown(!rejected);
+        // 409 may mean the service already exists (GUEST_SERVICE_DUPLICATE_ACTIVE).
+        // Never clear the journal on 409 without manual server reconciliation.
+        const rejected = recorded && error instanceof ApiError && error.code !== 'CONFLICT' && wasWriteRejected(error);
+        if (rejected) {
+          try { await clearPendingAgentService(agentIdentity.hotelId, agentIdentity.userId); }
+          catch { setServiceUnknown(true); }
+        } else {
+          setServiceUnknown(true);
+        }
+        await agentPending.reload().catch(() => {});
         setServiceMessage(rejected && error instanceof Error ? error.message : copy.resultUnknown);
       } finally {
         busyLock.current = false;
@@ -224,12 +245,19 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       {!preview.can_commit ? <Text style={[font.body,{color:c.danger}]}>{copy.conflict} · {preview.pricing.reason || ''}</Text> : null}
       <Button testID="booking-commit" label={copy.commit} disabled={!preview.can_commit || busy || lockedForReview || completed} onPress={doCommit}/>
     </GlassCard> : null}
+    {user?.role === 'AGENT' && serviceLocked && !showroom ? <GlassCard testID="agent-service-pending" style={{gap:8,borderLeftWidth:4,borderLeftColor:c.warning}}>
+      <Text accessibilityRole="alert" style={[font.body,{color:c.warning}]}>{copy.resultUnknown}</Text>
+      {agentPending.data ? <Text style={[font.small,{color:c.text}]}>{agentPending.data.serviceCode} · {agentPending.data.reservationId}</Text> : null}
+      <Text style={[font.small,{color:c.text}]}>{reviewCopy[locale].manual}</Text>
+      <Button label={copy.retry} disabled={busy} variant="secondary" onPress={() => void agentPending.reload()}/>
+    </GlassCard> : null}
     {result ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:c.success}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
       {user?.role === 'AGENT' && live && reservationId && serverAuthMode !== 'shared_auth_preview' ? <>
-        <Button label={agentServiceLabels[locale][0]} variant="secondary" disabled={busy} onPress={() => setServiceOpen(!serviceOpen)}/>
+        <Button label={agentServiceLabels[locale][0]} variant="secondary" disabled={busy || serviceLocked} onPress={() => setServiceOpen(!serviceOpen)}/>
         {serviceOpen ? AGENT_SERVICES.map((service, index) => <Button key={service}
-          label={agentServiceLabels[locale][index + 1]} variant="secondary" disabled={busy || serviceUnknown}
+          label={agentServiceLabels[locale][index + 1]} variant="secondary" disabled={busy || serviceLocked}
           onPress={() => addService(service, agentServiceLabels[locale][index + 1])}/>) : null}
+        {serviceLocked ? <Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.resultUnknown} · {reviewCopy[locale].manual}</Text> : null}
         {serviceMessage ? <Text accessibilityRole="alert" style={[font.body, { color: c.text }]}>{serviceMessage}</Text> : null}
       </> : null}
       <Button testID="booking-create-another" label={copy.anotherBooking} variant="secondary" disabled={busy} onPress={resetForm}/>
