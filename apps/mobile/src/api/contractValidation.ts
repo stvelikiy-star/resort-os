@@ -208,6 +208,20 @@ export function diningProductionSnapshotsResponse(v: unknown): DiningProductionS
       }
       if (row.current_total_portions !== Number(row.current_adult_portions) + Number(row.current_child_portions))
         invalid('production.total mismatch');
+      if (row.current_checked_in_total_portions !== undefined || row.current_expected_arrival_total_portions !== undefined) {
+        for (const prefix of ['current_checked_in','current_expected_arrival']) {
+          for (const suffix of ['adult_portions','child_portions','total_portions','stay_count']) {
+            const key = prefix+'_'+suffix;
+            const amount=num(row[key],'production.'+key);
+            if (!Number.isSafeInteger(amount)||amount<0) invalid('production.'+key);
+          }
+          if (Number(row[prefix+'_total_portions']) !==
+              Number(row[prefix+'_adult_portions']) + Number(row[prefix+'_child_portions']))
+            invalid('production.'+prefix+'.total mismatch');
+        }
+        if (Number(row.current_checked_in_total_portions) + Number(row.current_expected_arrival_total_portions)
+          !== Number(row.current_total_portions)) invalid('production.stage totals mismatch');
+      }
       if (row.changed_since_snapshot !== undefined && typeof row.changed_since_snapshot !== 'boolean')
         invalid('production.changed_since_snapshot');
       if (state === 'FROZEN') {
@@ -219,6 +233,14 @@ export function diningProductionSnapshotsResponse(v: unknown): DiningProductionS
       }
     });
     if (seen.size !== 3) invalid('production.three_meals');
+    // Checked-in and pending-arrival STAY counts are distinct bookings, not
+    // number of persons. Both must come from the hotel server or neither.
+    if (day.checked_in_stays_with_meals !== undefined || day.expected_arrival_stays_with_meals !== undefined) {
+      for (const key of ['checked_in_stays_with_meals','expected_arrival_stays_with_meals']) {
+        const n=num(day[key],'production.day.'+key);
+        if (!Number.isSafeInteger(n) || n < 0) invalid('production.day.'+key);
+      }
+    }
   });
   return v as DiningProductionSnapshots;
 }
