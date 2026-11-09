@@ -23,7 +23,7 @@ const mockApi = {
   listStaff: jest.fn(async () => []),
 };
 const mockModules = {
-  dashboard: jest.fn(async () => null), reservation: jest.fn(async () => null),
+  dashboard: jest.fn(async () => null), reservation: jest.fn(async (): Promise<Record<string, unknown> | null> => null),
   conversation: jest.fn(async () => null), pmsGrid: jest.fn(async () => null),
   assistantCapabilities: jest.fn(async () => null),
 };
