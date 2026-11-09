@@ -10,7 +10,7 @@ import { useMobileCopy } from '../i18n/mobileCopy';
 import { useTheme } from '../theme/ThemeProvider';
 import { font, radius, space } from '../theme/tokens';
 import { Empty, SectionLabel } from './ui';
-import { GlassCard } from './Future';
+import { GlassCard, StaggerItem } from './Future';
 
 type Copy = ReturnType<typeof useMobileCopy>;
 type OwnerTab = 'overview' | 'pms' | 'tasks' | 'inbox' | 'admin';
@@ -37,7 +37,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
   const metric = (icon: LucideIcon, title: string, value: string, tint: string, action?: () => void) => {
     const Icon = icon;
     return <GlassCard key={title} onPress={action} style={{
-      flex: 1, minWidth: 0, minHeight: compact ? 124 : 136, padding: compact ? 11 : 14,
+      flex: 1, flexBasis: compact ? '100%' : '46%', minWidth: 0, minHeight: compact ? 112 : 136, padding: compact ? 12 : 14,
       gap: 8, justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: tint,
     }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -52,7 +52,9 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
       <Text numberOfLines={2} style={[font.small, { color: c.textMuted, fontWeight: '600', lineHeight: 17 }]}>{title}</Text>
     </GlassCard>;
   };
-  const row = (...items: React.ReactNode[]) => <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.sm }}>{items}</View>;
+  const row = (index: number, ...items: React.ReactNode[]) => <StaggerItem index={index}>
+    <View style={{ flexDirection: 'row', flexWrap: compact ? 'wrap' : 'nowrap', alignItems: 'stretch', gap: space.sm }}>{items}</View>
+  </StaggerItem>;
   const canFinance = !showroom && canReadFinance(user);
   const nav = [
     { title: copy.pms, icon: CalendarCheck2, route: '/pms' as const, show: canOpen('pms') },
@@ -88,19 +90,19 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
 
     <View style={{ gap: space.sm }}>
       <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
-      {row(
+      {row(0,
         metric(DoorOpen, copy.arrivals, count(data.stays.arrivals_today), c.cyan, canOpen('pms') ? open('/pms') : undefined),
         metric(CalendarClock, copy.departures, count(data.stays.departures_today), c.gold, canOpen('pms') ? open('/pms') : undefined),
       )}
-      {row(
+      {row(1,
         metric(MessageSquareText, copy.needsReply, count(data.communications.needs_reply), c.cyan, canOpenInbox ? open('/inbox') : undefined),
         metric(BedDouble, copy.dirty, count(data.rooms.dirty), c.warning, canOpen('pms') ? open('/pms') : undefined),
       )}
-      {row(
+      {row(2,
         metric(ClipboardCheck, copy.housekeepingOverview, count(data.tasks.housekeeping_active), c.success, canOpen('tasks') ? open('/tasks') : undefined),
         metric(Wrench, copy.maintenanceOverview, count(data.tasks.maintenance_active), c.warning, canOpen('tasks') ? open('/tasks') : undefined),
       )}
-      {canFinance ? row(
+      {canFinance ? row(3,
         metric(Wallet, copy.revenue, currency(data.finance.confirmed_payments_today_kgs), c.gold, open('/finance')),
         metric(ShieldAlert, copy.debt, currency(data.finance.active_reservations_remaining_kgs), c.warning, open('/finance')),
       ) : null}
@@ -122,7 +124,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
     </View>
     <View style={{ gap: space.sm }}>
       <SectionLabel>{copy.roomCondition}</SectionLabel>
-      {row(
+      {row(4,
         metric(BedDouble, copy.clean, count(data.rooms.clean), c.success),
         metric(ShieldAlert, copy.tech, count(data.rooms.tech_block), c.danger),
       )}
