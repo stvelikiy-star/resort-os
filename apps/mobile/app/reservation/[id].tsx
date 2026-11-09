@@ -5,7 +5,7 @@ import { BedDouble, CalendarDays, ChevronLeft, KeyRound, Mail, Phone, Wallet } f
 import { Badge, Button, Card, Empty, Field, PressScale, Screen, Title } from '../../src/components/ui';
 import { SchedulePreview, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
-import { reservationAmount, reservationGuestName, reservationStatusLabel, reservationTelephone } from '../../src/roles/reservationPresentation';
+import { reservationAmount, reservationGuestName, reservationRoomStateLabel, reservationStatusLabel, reservationTelephone } from '../../src/roles/reservationPresentation';
 import { canReadFinance } from '../../src/api/financeAccess';
 import { GlassCard, PremiumHeader } from '../../src/components/Future';
 import { useAsync } from '../../src/lib/useAsync';
@@ -123,7 +123,7 @@ export default function ReservationScreen() {
           <Text style={[font.body, { color: c.text, flex: 1 }]} numberOfLines={2}>{roomTitle}</Text>
         </View> : null}
         {typeof room.state === 'string' && room.state.trim() ?
-          <Text style={[font.small, { color: c.textMuted }]}>{copy.roomCondition}: {room.state}</Text> : null}
+          <Text style={[font.small, { color: c.textMuted }]}>{copy.roomCondition}: {reservationRoomStateLabel(room.state, copy)}</Text> : null}
         {phone ? <Button testID="reservation-call-guest" label={copy.callGuest} icon={Phone}
           variant="secondary" onPress={() => void Linking.openURL(phone)}/> : null}
         {email ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
