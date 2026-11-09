@@ -23,7 +23,7 @@ const mockApi = {
   listStaff: jest.fn(async () => []),
 };
 const mockModules = {
-  dashboard: jest.fn(async () => null), reservation: jest.fn(async () => null),
+  dashboard: jest.fn(async () => null), reservation: jest.fn(async (): Promise<Record<string, unknown> | null> => null),
   conversation: jest.fn(async () => null), pmsGrid: jest.fn(async () => null),
   assistantCapabilities: jest.fn(async () => null),
 };
@@ -165,4 +165,32 @@ it('removes already displayed rooms as soon as OPS is revoked', async () => {
   await screen.rerender(panel(Rooms));
   expect(screen.queryByText('ROOM-SECRET')).toBeNull();
   expect(mockApi.listRooms).toHaveBeenCalledTimes(1);
+});
+
+const reservationWithFinancials = {
+  reservation: { booking_number: 'QA-RBAC-1', status: 'CANCELLED',
+    check_in: '2026-11-09', check_out: '2026-11-10' },
+  guest: { first_name: 'Test', last_name: 'Guest', phone: null, email: null },
+  room: { code: '1', room_type_name: 'Спальный', state: 'CLEAN' },
+  schedule: [],
+  finance: { total_kgs: 9001, paid_kgs: 1000, remaining_kgs: 8001 },
+};
+
+it('hides reservation finance immediately when FINANCE grant is revoked', async () => {
+  mockModules.reservation.mockResolvedValue(reservationWithFinancials);
+  identity('MANAGER', ['RESERVATIONS', 'FINANCE']);
+  const screen = await render(panel(Reservation));
+  expect(await screen.findByTestId('reservation-finance')).toBeTruthy();
+  identity('MANAGER', ['RESERVATIONS']);
+  await screen.rerender(panel(Reservation));
+  expect(screen.queryByTestId('reservation-finance')).toBeNull();
+  expect(screen.queryByText(/9.001 KGS/)).toBeNull();
+});
+
+it('never shows reservation finance to RECEPTION, even when FINANCE is present in grants', async () => {
+  mockModules.reservation.mockResolvedValue(reservationWithFinancials);
+  identity('RECEPTION', ['RESERVATIONS', 'FINANCE']);
+  const screen = await render(panel(Reservation));
+  await waitFor(() => expect(mockModules.reservation).toHaveBeenCalledTimes(1));
+  expect(screen.queryByTestId('reservation-finance')).toBeNull();
 });
