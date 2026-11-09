@@ -59,6 +59,21 @@ def source_fingerprint(rows: list[Any]) -> str:
 def aggregate_rows(rows: list[Any]) -> dict[str, Any]:
     adult = sum(int(row["adultPortions"]) for row in rows)
     child = sum(int(row["childPortions"]) for row in rows)
+    # Service-specific occupancy and expected arrivals. Never include guest
+    # identity: COOK receives ONLY aggregate counts for their own hotel.
+    # A stay with both breakfast and dinner must not be called two guests.
+    breakdown: dict[str, int] = {}
+    if all("stay_status" in row.keys() and "stay_id" in row.keys() for row in rows):
+        for stage, status in (("checked_in", "ACTIVE"), ("expected_arrival", "PENDING")):
+            subset = [row for row in rows if row["stay_status"] == status]
+            adult_count = sum(int(row["adultPortions"]) for row in subset)
+            child_count = sum(int(row["childPortions"]) for row in subset)
+            breakdown.update({
+                f"current_{stage}_adult_portions": adult_count,
+                f"current_{stage}_child_portions": child_count,
+                f"current_{stage}_total_portions": adult_count + child_count,
+                f"current_{stage}_stay_count": len({str(row["stay_id"]) for row in subset}),
+            })
     return {
         "adult_portions": adult,
         "child_portions": child,
@@ -66,13 +81,15 @@ def aggregate_rows(rows: list[Any]) -> dict[str, Any]:
         "entitlement_count": len(rows),
         "source_fingerprint": source_fingerprint(rows),
         "source_max_updated_at": max((row["updatedAt"] for row in rows), default=None),
+        **breakdown,
     }
 
 
 async def current_rows(conn, pid: uuid.UUID, service_date: date, meal_type: str) -> list[Any]:
     return list(
         await conn.fetch(
-            '''SELECT e.id,e."adultPortions",e."childPortions",e."updatedAt"
+            '''SELECT e.id,e."adultPortions",e."childPortions",e."updatedAt",
+                      e."stayId" AS stay_id,s.status::text AS stay_status
                FROM dining_entitlements e
                JOIN stays s ON s.id=e."stayId"
                WHERE e."propertyId"=$1 AND e."serviceDate"=$2 AND e."mealType"=$3
@@ -197,7 +214,8 @@ async def production_snapshots(
             raise HTTPException(status_code=422, detail="Production snapshot range must be 1-32 days")
 
         source_rows = await conn.fetch(
-            '''SELECT e.id,e."serviceDate",e."mealType",e."adultPortions",e."childPortions",e."updatedAt"
+            '''SELECT e.id,e."serviceDate",e."mealType",e."adultPortions",e."childPortions",e."updatedAt",
+                      e."stayId" AS stay_id,s.status::text AS stay_status
                FROM dining_entitlements e
                JOIN stays s ON s.id=e."stayId"
                WHERE e."propertyId"=$1 AND e."serviceDate" BETWEEN $2 AND $3
@@ -262,10 +280,24 @@ async def production_snapshots(
                     "current_child_portions": current["child_portions"],
                     "current_total_portions": current["total_portions"],
                     "current_entitlement_count": current["entitlement_count"],
+                    **{key: value for key, value in current.items() if key.startswith("current_")},
                     **snapshot_payload(snapshot_by_key.get((day, meal)), current, cutoff),
                 }
             )
-        days.append({"service_date": day, "meals": meals})
+        # A single stay may have multiple meal entitlements. Count unique stays
+        # for this SERVICE DATE, never sum per-meal stay counts as guest count.
+        day_rows = [row for meal in MEALS for row in grouped.get((day, meal), [])]
+        day_counts = {}
+        if all("stay_status" in row.keys() and "stay_id" in row.keys() for row in day_rows):
+            day_counts = {
+                "checked_in_stays_with_meals": len({
+                    str(row["stay_id"]) for row in day_rows if row["stay_status"] == "ACTIVE"
+                }),
+                "expected_arrival_stays_with_meals": len({
+                    str(row["stay_id"]) for row in day_rows if row["stay_status"] == "PENDING"
+                }),
+            }
+        days.append({"service_date": day, "meals": meals, **day_counts})
         day += timedelta(days=1)
 
     return {
