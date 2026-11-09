@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble, UtensilsCrossed } from 'lucide-react-native';
 import { Badge, Button, Empty, PressScale, SectionLabel, Segmented, DemoBanner } from '../../src/components/ui';
@@ -17,6 +17,7 @@ import { canCreateBooking, canStartBookingFromPms } from '../../src/roles/bookin
 import { hasTabForSession } from '../../src/roles/registry';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius } from '../../src/theme/tokens';
+import { filterPmsRooms, type PmsRoomFilter } from '../../src/roles/pmsRoomFilter';
 
 function dayAt(start: string, offset: number): string {
   const d = new Date(start + 'T12:00:00'); d.setDate(d.getDate() + offset);
@@ -33,13 +34,14 @@ export default function Pms() {
   const router = useRouter();
   const { c } = useTheme();
   const [start, setStart] = useState(() => localDate());
-  const [filter, setFilter] = useState<'all' | 'attention'>('all');
+  const [filter, setFilter] = useState<PmsRoomFilter>('all');
+  const [roomSearch, setRoomSearch] = useState('');
   const [selectedBlock, setSelectedBlock] = useState<PmsSelectedBlock | null>(null);
   const { data, loading, error, reload } = useAsync<Grid | null>(async () => !allowed ? null : showroom && api ? demoGrid(locale, await api.listRooms(), hotel?.name ?? 'DEMO') : live ? live.pmsGrid(start, dayAt(start, DAYS)) : null, [live, api, showroom, user?.id, start, locale, hotel?.id, allowed]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => { if (focused.current) void reload(); else focused.current = true; }, [reload]));
   const dates = Array.from({ length: DAYS }, (_, i) => dayAt(start, i));
-  const shownRooms = (data?.rooms ?? []).filter(room => filter === 'all' || ['DIRTY', 'IN_INSPECTION', 'TECH_BLOCK'].includes(room.operational_state));
+  const shownRooms = filterPmsRooms(data?.rooms ?? [], roomSearch, filter, start, localDate());
   const occupancyFor = (room: GridRoom, day: string) => room.blocks.filter(b => b.start <= day && day < b.end);
   const cell = (room: GridRoom, day: string) => {
     const blocks = occupancyFor(room, day);
@@ -106,8 +108,15 @@ export default function Pms() {
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <SectionLabel>{copy.rooms} · {data.rooms.length}</SectionLabel>
-      <Segmented value={filter} options={[{ key: 'all', label: copy.all }, { key: 'attention', label: copy.needsAttention }]} onChange={setFilter}/>
-      <Text style={[font.small, { color: c.textMuted }]}>{copy.gridHint}</Text>
+      <TextInput testID="pms-room-search" accessibilityLabel={copy.roomSearch}
+        placeholder={copy.roomSearch} placeholderTextColor={c.textMuted} value={roomSearch}
+        onChangeText={setRoomSearch} autoCorrect={false}
+        style={[font.body, { color: c.text, backgroundColor: c.surface, borderColor: c.border,
+          borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 50 }]}/>
+      <Segmented value={filter} options={[{ key: 'all', label: copy.all },
+        { key: 'free', label: copy.freeOnDate }, { key: 'reserved', label: copy.reservedOnDate },
+        { key: 'attention', label: copy.needsAttention }]} onChange={setFilter}/>
+      <Text style={[font.small, { color: c.textMuted }]}>{copy.gridHint} · {start}</Text>
       <GlassCard style={{ padding: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
           <View style={{ width: LABEL_WIDTH, flexShrink: 0 }}>
@@ -135,7 +144,7 @@ export default function Pms() {
           </ScrollView>
         </View>
       </GlassCard>
-      {shownRooms.length === 0 ? <Empty text={filter === 'attention' ? copy.empty : copy.noRooms}/> : null}
+      {shownRooms.length === 0 ? <Empty text={roomSearch.trim() || filter !== 'all' ? copy.empty : copy.noRooms}/> : null}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         <Badge label={'● ' + copy.bookings} tone="primary"/>
         <Badge label={'H ' + copy.holds} tone="warning"/>
