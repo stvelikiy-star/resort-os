@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, Text, TextInput, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble, UtensilsCrossed } from 'lucide-react-native';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock3, Plus, BedDouble, UtensilsCrossed, Search, X } from 'lucide-react-native';
 import { Badge, Button, Empty, PressScale, SectionLabel, Segmented, DemoBanner } from '../../src/components/ui';
 import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
 import { Grid, GridRoom, localDate, useLiveModules } from '../../src/api/liveModules';
@@ -108,11 +108,20 @@ export default function Pms() {
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <SectionLabel>{copy.rooms} · {data.rooms.length}</SectionLabel>
-      <TextInput testID="pms-room-search" accessibilityLabel={copy.roomSearch}
-        placeholder={copy.roomSearch} placeholderTextColor={c.textMuted} value={roomSearch}
-        onChangeText={setRoomSearch} autoCorrect={false}
-        style={[font.body, { color: c.text, backgroundColor: c.surface, borderColor: c.border,
-          borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 16, minHeight: 50 }]}/>
+      <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 54, gap: 8,
+        paddingHorizontal: 12, backgroundColor: c.surface, borderColor: c.border,
+        borderWidth: 1, borderRadius: radius.md }}>
+        <Search size={20} color={c.textMuted}/>
+        <TextInput testID="pms-room-search" accessibilityLabel={copy.roomSearch}
+          placeholder={copy.roomSearch} placeholderTextColor={c.textMuted} value={roomSearch}
+          onChangeText={setRoomSearch} autoCorrect={false} returnKeyType="search"
+          style={[font.body, { color: c.text, flex: 1, minWidth: 0, paddingVertical: 10 }]}/>
+        {roomSearch ? <PressScale testID="pms-room-clear-search" accessibilityLabel={copy.clearSearch}
+          onPress={() => setRoomSearch('')}
+          style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <X size={20} color={c.textMuted}/>
+        </PressScale> : null}
+      </View>
       <Segmented value={filter} options={[{ key: 'all', label: copy.all },
         { key: 'free', label: copy.freeOnDate }, { key: 'reserved', label: copy.reservedOnDate },
         { key: 'attention', label: copy.needsAttention }]} onChange={setFilter}/>
