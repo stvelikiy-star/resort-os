@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { Redirect, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, DemoBanner, FadeIn, Field, PressScale, SectionLabel } from '../../src/components/ui';
-import { Hero, Logo, Wordmark } from '../../src/components/Brand';
+import { BrandLockup, Hero } from '../../src/components/Brand';
 import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { DEMO_ROLE_LOGINS } from '../../src/api/demoApi';
 import { useSession } from '../../src/state/session';
@@ -64,7 +64,7 @@ export default function Login() {
     <FutureScreen>
       <FadeIn style={{ gap: space.sm }}>
         <Hero height={170}>
-          <View style={{ flexDirection:'row',alignItems:'center',gap:12 }}><Logo size={56}/><Wordmark color="#FFFFFF"/></View>
+          <BrandLockup size={56}/>
           <Text style={[font.title,{color:'#FFFFFF',marginTop:14}]}>{t('login.title')}</Text>
         </Hero>
         <Text style={[font.body, { color: c.textMuted }]}>{t('login.hotel')}: {hotel?.name}</Text>
