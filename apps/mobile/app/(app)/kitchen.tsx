@@ -7,6 +7,8 @@ import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } fr
 import { DiningProductionSnapshotMeal, DiningProductionSnapshots, KitchenOrder, useLiveModules } from '../../src/api/liveModules';
 import { demoKitchenOrders } from '../../src/api/demoPresentation';
 import { kitchenWorkload } from '../../src/roles/kitchenSummary';
+import { kitchenForecast } from '../../src/roles/kitchenForecast';
+import { CHEF_PLAN_COPY } from '../../src/i18n/extendedOperations';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
@@ -65,6 +67,8 @@ export default function KitchenDashboard() {
     ]);
   };
   const summary = kitchenWorkload(data ?? [], locale);
+  const forecast = kitchenForecast(production ?? null);
+  const chefCopy = CHEF_PLAN_COPY[locale];
   const tile = (title: string, value: number, icon: React.ElementType, color: string) => {
     const Icon = icon;
     return <GlassCard key={title} style={{ flex: 1, minWidth: 0, minHeight: compact ? 113 : 126,
@@ -84,7 +88,7 @@ export default function KitchenDashboard() {
     {loading ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
-      <SectionLabel>{copy.kitchenMealPlan}</SectionLabel>
+      <SectionLabel>{chefCopy.seven}</SectionLabel>
       {showroom ? <GlassCard testID="kitchen-demo-meals-not-live" style={{gap:7}}>
         <Text style={[font.body,{color:c.text}]}>{copy.kitchenMealPlanDemo}</Text>
         <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
@@ -92,7 +96,23 @@ export default function KitchenDashboard() {
       {!showroom && productionLoading ? <LoadingShimmer count={1}/> : null}
       {!showroom && productionError ? <ErrorState text={productionError.message}
         retry={copy.retry} onRetry={reloadProduction}/> : null}
-      {production?.days.slice(0,2).map(day => <View key={day.service_date} testID={'kitchen-production-'+day.service_date} style={{gap:space.sm}}>
+      {forecast ? <GlassCard testID="kitchen-verified-weekly-forecast" style={{gap:space.sm, borderLeftWidth:4,borderLeftColor:c.cyan}}>
+        <Text style={[font.h2,{color:c.text}]}>{chefCopy.total}: {forecast.portions}</Text>
+        <Text style={[font.small,{color:c.textMuted}]}>{forecast.days} · {chefCopy.sevenDays}</Text>
+        <Text style={[font.body,{color:c.text}]}>{chefCopy.adults}: {forecast.adultPortions} · {chefCopy.children}: {forecast.childPortions}</Text>
+        <Text style={[font.body,{color:c.text}]}>{chefCopy.morning}: {forecast.byMeal.BREAKFAST}</Text>
+        <Text style={[font.body,{color:c.text}]}>{chefCopy.midday}: {forecast.byMeal.LUNCH}</Text>
+        <Text style={[font.body,{color:c.text}]}>{chefCopy.evening}: {forecast.byMeal.DINNER}</Text>
+        {forecast.frozenMeals ? <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.frozen}: {forecast.frozenMeals}</Text> : null}
+        {forecast.changesAfterFreeze ? <Text accessibilityRole="alert" style={[font.body,{color:c.warning}]}>
+          {chefCopy.changes}: {forecast.changesAfterFreeze} · {chefCopy.netChange}: {forecast.netPortionDelta > 0 ? '+' : ''}{forecast.netPortionDelta}
+        </Text> : null}
+        {forecast.unconfiguredMeals ? <Text accessibilityRole="alert" style={[font.small,{color:c.warning}]}>
+          {chefCopy.unconfigured}: {forecast.unconfiguredMeals}
+        </Text> : null}
+        <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.fromStays}</Text>
+      </GlassCard> : null}
+      {production?.days.map(day => <View key={day.service_date} testID={'kitchen-production-'+day.service_date} style={{gap:space.sm}}>
         <Text style={[font.small,{color:c.cyan,fontWeight:'700'}]}>{day.service_date}</Text>
         {day.meals.map(meal => <GlassCard key={meal.meal_type} testID={'kitchen-meal-'+day.service_date+'-'+meal.meal_type}
           style={{minHeight:78,padding:13,gap:5,flexDirection:'row',alignItems:'center'}}>
@@ -118,6 +138,12 @@ export default function KitchenDashboard() {
         </GlassCard>)}
       </View>)}
       {!showroom && production ? <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealsNotOrders}</Text> : null}
+      {!showroom ? <>
+        <SectionLabel>{chefCopy.procurement}</SectionLabel>
+        <GlassCard testID="kitchen-procurement-data-pending" style={{gap:space.sm,borderLeftWidth:4,borderLeftColor:c.warning}}>
+          <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.procurementUnavailable}</Text>
+        </GlassCard>
+      </> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
