@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { beginPendingAgentService, clearPendingAgentService, readPendingAgentService } from '../src/lib/pendingAgentService';
+import { acknowledgePendingAgentService, beginPendingAgentService, clearPendingAgentService, readPendingAgentService from '../src/lib/pendingAgentService';
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(), setItemAsync: jest.fn(), deleteItemAsync: jest.fn(),
@@ -53,4 +53,25 @@ test('does not accept invalid identities or reservation references', async () =>
 test('only explicit clearing deletes persisted pending journal', async () => {
   await clearPendingAgentService(HOTEL, USER);
   expect(del).toHaveBeenCalledWith('marina.agent-service.pending.' + HOTEL + '.' + USER);
+});
+
+test('manual acknowledgement clears the exact inspected agent service journal', async () => {
+  const record = { reservationId: RESERVATION, serviceCode: 'TRANSFER', startedAt: '2026-11-09T06:00:00.000Z' };
+  get.mockResolvedValue(JSON.stringify(record));
+  await expect(acknowledgePendingAgentService(HOTEL, USER, record)).resolves.toBe(true);
+  expect(del).toHaveBeenCalledTimes(1);
+});
+
+test('changed journal cannot be cleared from stale inspection', async () => {
+  const original = { reservationId: RESERVATION, serviceCode: 'TRANSFER', startedAt: '2026-11-09T06:00:00.000Z' };
+  get.mockResolvedValue(JSON.stringify({ ...original, startedAt: '2026-11-09T06:01:00.000Z' }));
+  await expect(acknowledgePendingAgentService(HOTEL, USER, original)).resolves.toBe(false);
+  expect(del).not.toHaveBeenCalled();
+});
+
+test('missing journal cannot be manually acknowledged', async () => {
+  await expect(acknowledgePendingAgentService(HOTEL, USER, {
+    reservationId: RESERVATION, serviceCode: 'MEALS', startedAt: '2026-11-09T06:00:00.000Z',
+  })).resolves.toBe(false);
+  expect(del).not.toHaveBeenCalled();
 });
