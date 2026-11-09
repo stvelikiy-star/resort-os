@@ -35,10 +35,24 @@ try {
     for (const [locale, [open, quick, unavailable]] of Object.entries(copy)) {
       await page.setViewportSize(locale === "ru" ? { width: 1440, height: 900 } : { width: 390, height: 844 });
       await page.goto(base, { waitUntil: "networkidle" });
-      await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
-      // Verify the page switched languages before asserting assistant translations.
-      // A click may precede React hydration, especially after a fresh navigation.
-      await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected, locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale);
+      // A fresh Next.js navigation can render locale buttons before React hydration.
+      // Retry ONLY the idempotent language-selection click, never the assistant POST.
+      const expectedLanguage = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
+      let languageReady = false;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
+        try {
+          await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected,
+            expectedLanguage, { timeout: 3500 });
+          languageReady = true;
+          break;
+        } catch (error) {
+          if (attempt === 3) {
+            throw new Error(`Locale switch did not hydrate: surface=${base} locale=${locale} current=${await page.locator("html").getAttribute("lang")}`, { cause: error });
+          }
+        }
+      }
+      assert(languageReady, `Locale ${locale} did not become active`);
       await page.getByRole("button", { name: open, exact: true }).click();
       const panel = page.getByRole("region", { name: "MARINA AI", exact: true });
       const received = page.waitForResponse(response => response.request().method() === "POST"
