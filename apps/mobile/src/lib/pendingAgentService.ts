@@ -41,3 +41,17 @@ export async function beginPendingAgentService(
 export async function clearPendingAgentService(hotelId: string, userId: string): Promise<void> {
   await SecureStore.deleteItemAsync(key(hotelId, userId));
 }
+
+/** Clear only the exact journal the operator has reviewed in the platform.
+ * This is a manual acknowledgement, NOT server proof of request delivery.
+ */
+export async function acknowledgePendingAgentService(
+  hotelId: string, userId: string, inspected: PendingAgentService,
+): Promise<boolean> {
+  const current = await readPendingAgentService(hotelId, userId);
+  if (!current || current.reservationId !== inspected.reservationId ||
+      current.serviceCode !== inspected.serviceCode ||
+      current.startedAt !== inspected.startedAt) return false;
+  await clearPendingAgentService(hotelId, userId);
+  return true;
+}

@@ -7,7 +7,7 @@ import { AGENT_SERVICES, AgentServiceCode, BookingDraft, BookingPreview, localDa
 import { ApiError } from '../src/api/types';
 import { acknowledgePendingBooking, clearPendingBooking, finishPendingBooking, readPendingBooking, recordPendingBooking } from '../src/lib/pendingBooking';
 import { wasWriteRejected } from '../src/lib/writeOutcome';
-import { beginPendingAgentService, clearPendingAgentService, readPendingAgentService } from '../src/lib/pendingAgentService';
+import { acknowledgePendingAgentService, beginPendingAgentService, clearPendingAgentService, readPendingAgentService } from '../src/lib/pendingAgentService';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { canCreateBooking } from '../src/roles/bookingAccess';
@@ -24,6 +24,13 @@ const reviewCopy = {
   kg: { review: 'Шахматкадан текшерүү', missing: 'Бөлмө же жазуу жеткиликсиз.', storage: 'Бронь журналы жеткиликсиз. Кайра текшериңиз.', candidate: 'Мүмкүн болгон бронь: ', unconfirmed: 'Дал келген бронь ырасталган жок. Платформадан текшериңиз.', ack: 'Платформадан текшердим', manual: 'Платформадан жыйынтыкты текшерип, жаңы бронь керекпи чечкениңизди ырастаңыз.' },
   kz: { review: 'Шахматкадан тексеру', missing: 'Бөлме немесе жазба қолжетімсіз.', storage: 'Бронь журналы қолжетімсіз. Қайта тексеріңіз.', candidate: 'Ықтимал бронь: ', unconfirmed: 'Сәйкестік расталмады. Платформадан тексеріңіз.', ack: 'Платформадан тексердім', manual: 'Нәтижені платформадан тексеріп, жаңа бронь қажет пе екенін шешкеніңізді растаңыз.' },
 };
+
+const agentReconcileCopy = {
+  ru: { action: 'Я сверил заявку с менеджером', warning: 'Проверьте в платформе бронь, код услуги и статус заявки с менеджером. Подтверждение только снимает локальную блокировку и НЕ создаёт новую заявку.', confirm: 'Я проверил результат заявки в платформе и понимаю, что повторная отправка может создать дубль.' },
+  en: { action: 'I verified with the manager', warning: 'Verify the reservation, service code and request status with the manager in the platform. This only clears the local lock; it does NOT create another request.', confirm: 'I checked the request outcome in the platform and understand that a new submission could create a duplicate.' },
+  kg: { action: 'Арызды менеджер менен текшердим', warning: 'Платформадан бронду, кызмат кодун жана арыздын абалын менеджер менен текшериңиз. Бул аракет жергиликтүү бөгөттү гана алып салат, жаңы арыз түзбөйт.', confirm: 'Арыздын жыйынтыгын платформадан текшердим. Кайра жөнөтүү кайталанган арыз түзүшү мүмкүн экенин түшүнөм.' },
+  kz: { action: 'Өтінімді менеджермен тексердім', warning: 'Платформада брондауды, қызмет кодын және өтінім күйін менеджермен тексеріңіз. Бұл әрекет тек жергілікті бұғаттауды алып тастайды, жаңа өтінім жасамайды.', confirm: 'Өтінім нәтижесін платформада тексердім. Қайта жіберу қайталанған өтінім жасауы мүмкін екенін түсінемін.' },
+} as const;
 
 const agentServiceLabels = {
   ru: ['Добавить услугу', 'Трансфер', 'Питание', 'Парковка', 'Сауна', 'Бильярд', 'Экскурсия'],
@@ -180,6 +187,21 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       }
     } },
   ]);
+  const acknowledgeAgentService = () => Alert.alert(agentReconcileCopy[locale].action,
+    agentReconcileCopy[locale].confirm, [
+      { text: copy.close, style: 'cancel' },
+      { text: copy.confirm, onPress: async () => {
+        const inspected = agentPending.data;
+        if (!agentIdentity || !inspected || busyLock.current || busy) return;
+        busyLock.current = true; setBusy(true);
+        try {
+          if (await acknowledgePendingAgentService(agentIdentity.hotelId, agentIdentity.userId, inspected)) {
+            setServiceUnknown(false); setServiceMessage('');
+          }
+        } catch { setServiceMessage(copy.resultUnknown); }
+        finally { await agentPending.reload(); busyLock.current = false; setBusy(false); }
+      } },
+    ]);
   const reconcile = async () => {
     const pending = journal.data;
     if (!live || !pending || busyLock.current) return;
@@ -248,8 +270,10 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
     {user?.role === 'AGENT' && serviceLocked && !showroom ? <GlassCard testID="agent-service-pending" style={{gap:8,borderLeftWidth:4,borderLeftColor:c.warning}}>
       <Text accessibilityRole="alert" style={[font.body,{color:c.warning}]}>{copy.resultUnknown}</Text>
       {agentPending.data ? <Text style={[font.small,{color:c.text}]}>{agentPending.data.serviceCode} · {agentPending.data.reservationId}</Text> : null}
-      <Text style={[font.small,{color:c.text}]}>{reviewCopy[locale].manual}</Text>
+      <Text style={[font.small,{color:c.text}]}>{agentReconcileCopy[locale].warning}</Text>
       <Button label={copy.retry} disabled={busy} variant="secondary" onPress={() => void agentPending.reload()}/>
+      {agentPending.data ? <Button testID="agent-service-acknowledge" label={agentReconcileCopy[locale].action}
+        disabled={busy} variant="secondary" onPress={acknowledgeAgentService}/> : null}
     </GlassCard> : null}
     {result ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:c.success}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
       {user?.role === 'AGENT' && live && reservationId && serverAuthMode !== 'shared_auth_preview' ? <>
