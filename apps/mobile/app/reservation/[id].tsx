@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Alert, Linking, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BedDouble, CalendarDays, ChevronLeft, KeyRound, Mail, Phone, Wallet } from 'lucide-react-native';
-import { Badge, Button, Card, Empty, Field, PressScale, Screen, Title } from '../../src/components/ui';
+import { Badge, Button, Card, Empty, Field, PressScale, Screen } from '../../src/components/ui';
 import { SchedulePreview, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { reservationAmount, reservationGuestName, reservationRoomStateLabel, reservationStatusLabel, reservationTelephone } from '../../src/roles/reservationPresentation';
