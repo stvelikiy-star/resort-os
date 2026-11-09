@@ -75,9 +75,26 @@ export interface Hold {
 }
 export interface FinanceSummary {
   range: { from: string; to: string; currency: string };
-  period_payments: { received_kgs: number; pending_created_kgs: number; received_count: number };
-  receivables_snapshot: { outstanding_kgs: number; debtor_count: number };
-  active_reservations_snapshot: { reservation_count: number; outstanding_kgs: number };
+  period_payments: { received_kgs: number; pending_created_kgs: number; received_count: number;
+    pending_created_count?: number; failed_count?: number; cancelled_count?: number };
+  receivables_snapshot: { outstanding_kgs: number; debtor_count: number;
+    checked_out_count?: number; checked_out_kgs?: number; in_house_count?: number; in_house_kgs?: number;
+    pre_arrival_count?: number; pre_arrival_kgs?: number };
+  active_reservations_snapshot: { reservation_count: number; outstanding_kgs: number;
+    booked_total_kgs?: number; received_kgs?: number };
+  /** Optional to support older server versions. Current RC409 supplies all of these.
+   * Missing fields must be omitted from UI, NEVER replaced by invented zero values. */
+  received_by_method?: { method: string; amount_kgs: number; payment_count: number }[];
+  received_by_day?: { local_date: string; amount_kgs: number; payment_count: number }[];
+  awaiting_prepayment_snapshot?: { request_count: number; required_kgs: number;
+    received_kgs: number; remaining_kgs: number };
+  refunded_snapshot_all_time?: { amount_kgs: number; payment_count: number };
+  finance_exceptions?: { snapshot: { overpaid_count: number; overpaid_kgs: number;
+    cancelled_with_received_count: number; cancelled_with_received_kgs: number } };
+  debtors?: { reservation_id: string; booking_number: string; status: string;
+    guest_name?: string | null; room_code?: string | null; remaining_kgs: number }[];
+  recent_payments?: { id: string; amount_kgs: number; method: string; status: string;
+    booking_number?: string | null; guest_name?: string | null }[];
 }
 export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
 export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
