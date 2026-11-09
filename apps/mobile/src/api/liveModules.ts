@@ -127,11 +127,21 @@ export interface DiningProductionSnapshotMeal {
   service_date: string; meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER';
   current_adult_portions: number; current_child_portions: number;
   current_total_portions: number; current_entitlement_count: number;
+  /** Newer Core: breakdown of verified meal portions by checked-in vs pending stays.
+   * Optional until the matching server candidate is deployed; never infer it. */
+  current_checked_in_adult_portions?: number; current_checked_in_child_portions?: number;
+  current_checked_in_total_portions?: number; current_checked_in_stay_count?: number;
+  current_expected_arrival_adult_portions?: number; current_expected_arrival_child_portions?: number;
+  current_expected_arrival_total_portions?: number; current_expected_arrival_stay_count?: number;
   state: 'OPEN' | 'FROZEN'; cutoff_status: 'UNCONFIGURED' | 'BEFORE_CUTOFF' | 'CUTOFF_REACHED';
   frozen_total_portions: number | null; delta_total_portions: number | null;
   changed_since_snapshot: boolean; meal_start: string | null; cutoff_at: string | null;
 }
-export interface DiningProductionSnapshotDay { service_date: string; meals: DiningProductionSnapshotMeal[] }
+export interface DiningProductionSnapshotDay {
+  service_date: string; meals: DiningProductionSnapshotMeal[];
+  /** Number of distinct stays/bookings with included meals, NOT unique guests. */
+  checked_in_stays_with_meals?: number; expected_arrival_stays_with_meals?: number;
+}
 export interface DiningProductionSnapshots { from_date: string; through_date: string; days: DiningProductionSnapshotDay[] }
 export interface DiningStay {
   stay_id: string; stay_status: string; reservation_id: string; reservation_status: string;
