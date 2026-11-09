@@ -38,3 +38,14 @@ export function reservationAmount(value: unknown): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
   return Math.round(value).toLocaleString('ru-RU') + ' KGS';
 }
+
+/** Translate the known housekeeping/repair states without changing their meaning. */
+export function reservationRoomStateLabel(code: string, copy: Pick<MobileCopy, 'clean' | 'dirty' | 'checking' | 'tech'>): string {
+  switch (code) {
+    case 'CLEAN': return copy.clean;
+    case 'DIRTY': return copy.dirty;
+    case 'IN_INSPECTION': return copy.checking;
+    case 'TECH_BLOCK': return copy.tech;
+    default: return code;
+  }
+}
