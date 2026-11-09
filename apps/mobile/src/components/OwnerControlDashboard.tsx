@@ -60,7 +60,10 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
     { title: copy.tasks, icon: ClipboardCheck, route: '/tasks' as const, show: canOpen('tasks') },
     { title: copy.staffOverview, icon: UsersRound, route: '/admin' as const, show: canOpen('admin') },
   ].filter(item => item.show);
-  const occupancy = Math.min(100, Math.max(0, Number.isFinite(data.stays.occupancy_percent) ? data.stays.occupancy_percent : 0));
+  // An empty inventory is not 0% occupancy: it means the property has no verified denominator.
+  const occupancyKnown = Number.isInteger(data.rooms.total) && data.rooms.total > 0 &&
+    Number.isFinite(data.stays.occupancy_percent) && data.stays.occupancy_percent >= 0 && data.stays.occupancy_percent <= 100;
+  const occupancy = occupancyKnown ? data.stays.occupancy_percent : 0;
   return <View testID="owner-control-dashboard" style={{ gap: space.lg }}>
     <GlassCard style={{ padding: compact ? 17 : 20, backgroundColor: c.surface, gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
@@ -71,16 +74,16 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
         <Text style={[font.label, { color: c.gold }]}>{showroom ? copy.demoLabel : copy.livePmsLabel}</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <Text style={[font.display, { color: c.text, fontSize: compact ? 38 : 44 }]}>{count(occupancy)}%</Text>
+        <Text style={[font.display, { color: c.text, fontSize: compact ? 38 : 44 }]}>{occupancyKnown ? count(occupancy) + "%" : "—"}</Text>
         <Text style={[font.small, { color: c.textMuted, flexShrink: 1, textAlign: 'right' }]}>
           {copy.occupancy} · {count(data.stays.occupied_rooms)}/{count(data.rooms.total)}
         </Text>
       </View>
-      <View accessible accessibilityRole="progressbar" accessibilityLabel={copy.occupancy}
+      {occupancyKnown ? <View accessible accessibilityRole="progressbar" accessibilityLabel={copy.occupancy}
         accessibilityValue={{ min: 0, max: 100, now: Math.round(occupancy) }}
         style={{ height: 9, backgroundColor: c.surfaceAlt, borderRadius: radius.pill, overflow: 'hidden' }}>
         <View style={{ height: 9, width: occupancy + '%', backgroundColor: c.cyan, borderRadius: radius.pill }}/>
-      </View>
+      </View> : null}
     </GlassCard>
 
     <View style={{ gap: space.sm }}>

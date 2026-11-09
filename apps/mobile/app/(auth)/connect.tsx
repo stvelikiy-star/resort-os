@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Building2, Link2, QrCode, ShieldCheck } from 'lucide-react-native';
 import { Button, Card, DemoBanner, FadeIn, Field, SectionLabel, Segmented } from '../../src/components/ui';
-import { Hero, Logo, Wordmark } from '../../src/components/Brand';
+import { BrandLockup, Hero } from '../../src/components/Brand';
 import { FutureScreen, GlassCard } from '../../src/components/Future';
 import { useSession } from '../../src/state/session';
 import { homeForSession } from '../../src/roles/registry';
@@ -40,7 +40,7 @@ export default function Connect() {
     <FutureScreen>
       <FadeIn style={{ gap: space.md }}>
         <Hero height={196}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Logo size={68}/><Wordmark color="#FFFFFF"/></View>
+          <BrandLockup size={68}/>
           <Text style={[font.title, { color: '#FFFFFF', marginTop: 16 }]}>{t('connect.title')}</Text>
           <Text style={[font.small, { color: '#D7E9F5', marginTop: 5 }]}>{t('connect.subtitle')}</Text>
         </Hero>

@@ -12,6 +12,14 @@ export function Logo({ size = 56 }: { size?: number }) {
   return <Image source={MARINA_SEAL} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="contain" accessibilityLabel="MARINA SMART" />;
 }
 
+/** One aligned brand lockup for all entry screens. Never replace the approved logo with a generated icon. */
+export function BrandLockup({ size = 56, color = '#FFFFFF' }: { size?: number; color?: string }) {
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 }}>
+    <Logo size={size}/>
+    <View style={{ flexShrink: 1, justifyContent: 'center' }}><Wordmark color={color}/></View>
+  </View>;
+}
+
 export function Hero({ children, height }: { children: React.ReactNode; height?: number }) {
   const { c } = useTheme();
   return <LinearGradientFallback style={{ borderRadius: radius.xl, padding: space.xl, minHeight: height ?? 184, overflow: 'hidden', borderWidth: 1, borderColor: c.glassBorder }}>
