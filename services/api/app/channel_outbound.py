@@ -84,18 +84,24 @@ async def outbound_capabilities(
             "instagram": {"configured": False},
             "truth": "Human WhatsApp sends are QUEUED until a verified provider callback confirms SENT or DELIVERED; AI auto-send stays disabled.",
         }
-    if user.get("role") == "RECEPTION":
-        raise HTTPException(403, detail="Outbound capabilities are not available to this role")
+    # In single-property mode RECEPTION may inspect honest WhatsApp
+    # capabilities to show "not connected"; this NEVER authorizes a send.
+    # Legacy Telegram remains OWNER/MANAGER only and the send-text route
+    # independently enforces the RECEPTION claim/adapter restriction.
+    reception = user.get("role") == "RECEPTION"
     return {
         "telegram": {
             "channel_code": TELEGRAM_SALES_CHANNEL_CODE,
-            "inbound_configured": telegram_sales_inbound_configured(),
-            "outbound_configured": telegram_sales_outbound_configured(),
+            "inbound_configured": False if reception else telegram_sales_inbound_configured(),
+            "outbound_configured": False if reception else telegram_sales_outbound_configured(),
             "max_text_length": 4096,
         },
         "whatsapp": {
             "configured": False,
             "configured_in_core": False,
+            "human_only": True,
+            "queued_only": True,
+            "max_text_length": 4096,
             "delivery_owner": "n8n/provider adapter",
             "evidence_endpoint": "/api/v1/automation/inbox/messages",
         },
