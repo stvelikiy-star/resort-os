@@ -163,7 +163,9 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
         await agentPending.reload();
         setServiceMessage(copy.confirmed + ' · ' + label);
       } catch (error) {
-        const rejected = recorded && wasWriteRejected(error);
+        // 409 may mean the service already exists (GUEST_SERVICE_DUPLICATE_ACTIVE).
+        // Never clear the journal on 409 without manual server reconciliation.
+        const rejected = recorded && error instanceof ApiError && error.code !== 'CONFLICT' && wasWriteRejected(error);
         if (rejected) {
           try { await clearPendingAgentService(agentIdentity.hotelId, agentIdentity.userId); }
           catch { setServiceUnknown(true); }
@@ -242,6 +244,12 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       {preview.pricing.discount_percent ? <Text style={[font.small,{color:c.textMuted}]} >{copy.discount}: {preview.pricing.discount_percent}%</Text> : null}
       {!preview.can_commit ? <Text style={[font.body,{color:c.danger}]}>{copy.conflict} · {preview.pricing.reason || ''}</Text> : null}
       <Button testID="booking-commit" label={copy.commit} disabled={!preview.can_commit || busy || lockedForReview || completed} onPress={doCommit}/>
+    </GlassCard> : null}
+    {user?.role === 'AGENT' && serviceLocked && !showroom ? <GlassCard testID="agent-service-pending" style={{gap:8,borderLeftWidth:4,borderLeftColor:c.warning}}>
+      <Text accessibilityRole="alert" style={[font.body,{color:c.warning}]}>{copy.resultUnknown}</Text>
+      {agentPending.data ? <Text style={[font.small,{color:c.text}]}>{agentPending.data.serviceCode} · {agentPending.data.reservationId}</Text> : null}
+      <Text style={[font.small,{color:c.text}]}>{reviewCopy[locale].manual}</Text>
+      <Button label={copy.retry} disabled={busy} variant="secondary" onPress={() => void agentPending.reload()}/>
     </GlassCard> : null}
     {result ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:c.success}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
       {user?.role === 'AGENT' && live && reservationId && serverAuthMode !== 'shared_auth_preview' ? <>
