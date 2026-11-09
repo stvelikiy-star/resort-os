@@ -22,7 +22,7 @@ function dayAt(start: string, offset: number): string {
   const d = new Date(start + 'T12:00:00'); d.setDate(d.getDate() + offset);
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
 }
-const DAYS = 7, CELL_WIDTH = 72, ROW_HEIGHT = 76, LABEL_WIDTH = 104;
+const DAYS = 7, CELL_WIDTH = 72, ROW_HEIGHT = 90, LABEL_WIDTH = 122;
 
 export default function Pms() {
   const { hotel, user, locale, api, serverAuthMode } = useSession();
@@ -57,7 +57,7 @@ export default function Pms() {
     const free = isPmsDateFree(room, day, localDate()) && (!!showroom || canCreateBooking(user));
     const openBlock = !!block && (showroom || user?.role !== 'AGENT' || state !== 'RESERVATION');
     return <PressScale key={day} testID={'pms-' + room.id + '-' + day}
-      accessibilityLabel={room.code + ' ' + day + ' · ' + semantic + (block?.guest_name ? ' · ' + block.guest_name : '')}
+      accessibilityLabel={room.code + ' · ' + (room.name?.trim() || room.room_type_name) + ' · ' + day + ' · ' + semantic + (block?.guest_name ? ' · ' + block.guest_name : '')}
       disabled={!free && !openBlock} dimWhenDisabled={false}
       onPress={() => {
         if (state === 'FREE' && free) {
@@ -116,7 +116,8 @@ export default function Pms() {
             </View>
             {shownRooms.map(room => <View key={room.id} style={{ height: ROW_HEIGHT, justifyContent: 'center', paddingRight: 6, borderBottomWidth: 1, borderColor: c.border }}>
               <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{room.code}</Text>
-              <Text style={[font.small, { color: room.operational_state === 'TECH_BLOCK' ? c.danger : c.textMuted }]} numberOfLines={2}>{roomState(room)}</Text>
+              <Text style={[font.small, { color: c.text, fontWeight: '600' }]} numberOfLines={1}>{room.name?.trim() || room.room_type_name || '—'}</Text>
+              <Text style={[font.small, { color: room.operational_state === 'TECH_BLOCK' ? c.danger : c.textMuted }]} numberOfLines={1}>{roomState(room)}</Text>
             </View>)}
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator accessibilityLabel={copy.pms}>
