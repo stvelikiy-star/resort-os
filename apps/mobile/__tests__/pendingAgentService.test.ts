@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { acknowledgePendingAgentService, beginPendingAgentService, clearPendingAgentService, readPendingAgentService from '../src/lib/pendingAgentService';
+import { acknowledgePendingAgentService, beginPendingAgentService, clearPendingAgentService, readPendingAgentService } from '../src/lib/pendingAgentService';
 
 jest.mock('expo-secure-store', () => ({
   getItemAsync: jest.fn(), setItemAsync: jest.fn(), deleteItemAsync: jest.fn(),
