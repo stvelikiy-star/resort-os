@@ -39,6 +39,54 @@ export function financeSummaryResponse(v:unknown):FinanceSummary {
     const n=num(value,'finance.'+key);
     if(!Number.isSafeInteger(n)||n<0) invalid('finance.'+key);
   }
+  // RC409 exposes deeper owner finance; never render partial or malformed
+  // extended rows as authoritative money. Older contracts may omit the set.
+  const nonnegative = (value: unknown, path: string) => {
+    const n = num(value, path);
+    if (!Number.isSafeInteger(n) || n < 0) invalid(path);
+  };
+  for (const field of ['pending_created_count', 'failed_count', 'cancelled_count']) {
+    if (period[field] !== undefined) nonnegative(period[field], 'finance.period.' + field);
+  }
+  for (const field of ['checked_out_count','checked_out_kgs','in_house_count','in_house_kgs',
+    'pre_arrival_count','pre_arrival_kgs']) {
+    if (receivables[field] !== undefined) nonnegative(receivables[field], 'finance.receivables.' + field);
+  }
+  for (const field of ['booked_total_kgs','received_kgs']) {
+    if (active[field] !== undefined) nonnegative(active[field], 'finance.active.' + field);
+  }
+  for (const key of ['received_by_method','received_by_day']) {
+    if (x[key] !== undefined) arr(x[key], 'finance.' + key).forEach((entry,i) => {
+      const row = obj(entry,'finance.'+key+i);
+      str(row[key === 'received_by_method' ? 'method' : 'local_date'], 'finance.'+key+'.key');
+      nonnegative(row.amount_kgs,'finance.'+key+'.amount');
+      nonnegative(row.payment_count,'finance.'+key+'.count');
+    });
+  }
+  if (x.awaiting_prepayment_snapshot !== undefined) {
+    const row = obj(x.awaiting_prepayment_snapshot,'finance.prepayment');
+    for (const k of ['request_count','required_kgs','received_kgs','remaining_kgs'])
+      nonnegative(row[k],'finance.prepayment.'+k);
+  }
+  if (x.refunded_snapshot_all_time !== undefined) {
+    const row = obj(x.refunded_snapshot_all_time,'finance.refunded');
+    nonnegative(row.amount_kgs,'finance.refunded.amount');nonnegative(row.payment_count,'finance.refunded.count');
+  }
+  if (x.finance_exceptions !== undefined) {
+    const row = obj(obj(x.finance_exceptions,'finance.exceptions').snapshot,'finance.exceptions.snapshot');
+    for (const k of ['overpaid_count','overpaid_kgs','cancelled_with_received_count','cancelled_with_received_kgs'])
+      nonnegative(row[k],'finance.exceptions.'+k);
+  }
+  if (x.debtors !== undefined) arr(x.debtors,'finance.debtors').forEach((v,i) => {
+    const row=obj(v,'finance.debtor.'+i);
+    str(row.reservation_id,'finance.debtor.id');str(row.booking_number,'finance.debtor.booking');
+    str(row.status,'finance.debtor.status');nonnegative(row.remaining_kgs,'finance.debtor.remaining');
+  });
+  if (x.recent_payments !== undefined) arr(x.recent_payments,'finance.recent').forEach((v,i) => {
+    const row=obj(v,'finance.recent.'+i);
+    str(row.id,'finance.recent.id');str(row.method,'finance.recent.method');
+    str(row.status,'finance.recent.status');nonnegative(row.amount_kgs,'finance.recent.amount');
+  });
   return v as FinanceSummary;
 }
 export function gridResponse(v:unknown):Grid {
@@ -160,6 +208,20 @@ export function diningProductionSnapshotsResponse(v: unknown): DiningProductionS
       }
       if (row.current_total_portions !== Number(row.current_adult_portions) + Number(row.current_child_portions))
         invalid('production.total mismatch');
+      if (row.current_checked_in_total_portions !== undefined || row.current_expected_arrival_total_portions !== undefined) {
+        for (const prefix of ['current_checked_in','current_expected_arrival']) {
+          for (const suffix of ['adult_portions','child_portions','total_portions','stay_count']) {
+            const key = prefix+'_'+suffix;
+            const amount=num(row[key],'production.'+key);
+            if (!Number.isSafeInteger(amount)||amount<0) invalid('production.'+key);
+          }
+          if (Number(row[prefix+'_total_portions']) !==
+              Number(row[prefix+'_adult_portions']) + Number(row[prefix+'_child_portions']))
+            invalid('production.'+prefix+'.total mismatch');
+        }
+        if (Number(row.current_checked_in_total_portions) + Number(row.current_expected_arrival_total_portions)
+          !== Number(row.current_total_portions)) invalid('production.stage totals mismatch');
+      }
       if (row.changed_since_snapshot !== undefined && typeof row.changed_since_snapshot !== 'boolean')
         invalid('production.changed_since_snapshot');
       if (state === 'FROZEN') {
@@ -171,6 +233,14 @@ export function diningProductionSnapshotsResponse(v: unknown): DiningProductionS
       }
     });
     if (seen.size !== 3) invalid('production.three_meals');
+    // Checked-in and pending-arrival STAY counts are distinct bookings, not
+    // number of persons. Both must come from the hotel server or neither.
+    if (day.checked_in_stays_with_meals !== undefined || day.expected_arrival_stays_with_meals !== undefined) {
+      for (const key of ['checked_in_stays_with_meals','expected_arrival_stays_with_meals']) {
+        const n=num(day[key],'production.day.'+key);
+        if (!Number.isSafeInteger(n) || n < 0) invalid('production.day.'+key);
+      }
+    }
   });
   return v as DiningProductionSnapshots;
 }
