@@ -114,6 +114,12 @@ export default function KitchenDashboard() {
       </GlassCard> : null}
       {production?.days.map(day => <View key={day.service_date} testID={'kitchen-production-'+day.service_date} style={{gap:space.sm}}>
         <Text style={[font.small,{color:c.cyan,fontWeight:'700'}]}>{day.service_date}</Text>
+        {day.checked_in_stays_with_meals !== undefined &&
+         day.expected_arrival_stays_with_meals !== undefined ?
+          <GlassCard testID={'kitchen-stay-occupancy-'+day.service_date} style={{gap:4,padding:11}}>
+            <Text style={[font.small,{color:c.success}]}>{chefCopy.checkedInStays}: {day.checked_in_stays_with_meals}</Text>
+            <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.expectedStays}: {day.expected_arrival_stays_with_meals}</Text>
+          </GlassCard> : null}
         {day.meals.map(meal => <GlassCard key={meal.meal_type} testID={'kitchen-meal-'+day.service_date+'-'+meal.meal_type}
           style={{minHeight:78,padding:13,gap:5,flexDirection:'row',alignItems:'center'}}>
           <View style={{flex:1,minWidth:0,gap:4}}>
@@ -123,6 +129,11 @@ export default function KitchenDashboard() {
             <Text style={[font.small,{color:c.textMuted}]}>
               {meal.current_adult_portions} {copy.kitchenAdults} · {meal.current_child_portions} {copy.kitchenChildren}
             </Text>
+            {meal.current_checked_in_total_portions !== undefined &&
+             meal.current_expected_arrival_total_portions !== undefined ?
+              <Text style={[font.small,{color:c.textMuted}]}>
+                {chefCopy.checkedInPortions}: {meal.current_checked_in_total_portions} · {chefCopy.expectedPortions}: {meal.current_expected_arrival_total_portions}
+              </Text> : null}
             {meal.state === 'FROZEN' ? <Text style={[font.small,{color:meal.changed_since_snapshot?c.warning:c.success}]}>
               {copy.kitchenFrozen}: {meal.frozen_total_portions} · {copy.kitchenDelta}: {meal.delta_total_portions}
             </Text> : null}
