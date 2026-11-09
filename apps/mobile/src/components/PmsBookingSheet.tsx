@@ -5,6 +5,7 @@ import type { GridBlock, GridRoom, useLiveModules } from '../api/liveModules';
 import type { GridCellState } from '../roles/pmsPresentation';
 import { useAsync } from '../lib/useAsync';
 import { useMobileCopy } from '../i18n/mobileCopy';
+import { reservationGuestName, reservationRoomStateLabel, reservationStatusLabel, reservationTelephone } from '../roles/reservationPresentation';
 import { useTheme } from '../theme/ThemeProvider';
 import { font, radius, space } from '../theme/tokens';
 import { Badge, Button, Empty } from './ui';
@@ -39,14 +40,15 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
   const guest = readObject(record.guest);
   const room = selected?.room;
   const block = selected?.block;
-  const name = [readValue(guest.first_name), readValue(guest.last_name)].filter(Boolean).join(' ') ||
-    (block?.guest_name || copy.guest);
+  const name = reservationGuestName(guest.first_name, guest.last_name, block?.guest_name || copy.guest);
   const phone = !showroom ? readValue(guest.phone) : null;
+  const dial = !showroom ? reservationTelephone(phone) : null;
   const email = !showroom ? readValue(guest.email) : null;
   const source = !showroom ? readValue(readObject(record.source).channel) : null;
-  const phoneDialable = !!phone && /^\+?[\d() .-]{5,25}$/.test(phone);
+
   const isReservation = selected?.state === 'RESERVATION';
-  const status = readValue(reservation.status) || selected?.state || '—';
+  const status = reservationStatusLabel(readValue(reservation.status) || selected?.state || '—', copy);
+  const roomName = [room?.code, room?.name?.trim() || room?.room_type_name].filter(Boolean).join(' · ');
   return <Modal visible={!!selected} transparent animationType="slide" onRequestClose={onClose}>
     <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,9,20,0.68)' }}>
       <Pressable accessibilityRole="button" accessibilityLabel={copy.close} onPress={onClose} style={{ flex: 1 }}/>
@@ -58,7 +60,7 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
         <View style={{ width: 44, height: 5, borderRadius: 3, backgroundColor: c.border, alignSelf: 'center', marginBottom: space.md }}/>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.md }}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[font.label,{color:c.cyan}]}>{room?.code || '—'} · {block?.booking_number || copy.pms}</Text>
+            <Text style={[font.label,{color:c.cyan}]}>{roomName || '—'} · {block?.booking_number || copy.pms}</Text>
             <Text style={[font.h2,{color:c.text, marginTop: 5}]} numberOfLines={2}>
               {isReservation ? name : selected?.state === 'HOLD' ? copy.holds : selected?.state === 'CONFLICT' ? copy.conflict : copy.blocked}
             </Text>
@@ -79,6 +81,9 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
             <UserRound size={20} color={c.primary}/>
             <Text style={[font.body,{color:c.text, flex:1}]}>{copy.status}: {status}</Text>
           </View>
+          {room?.operational_state ? <Text style={[font.small,{color:c.textMuted}]}>
+            {copy.roomCondition}: {reservationRoomStateLabel(room.operational_state, copy)}
+          </Text> : null}
           {details.loading ? <Text style={[font.small,{color:c.textMuted}]}>{copy.loading}</Text> : null}
           {details.error ? <Text accessibilityRole="alert" style={[font.small,{color:c.danger}]}>
             {details.error.message} · {copy.retry}
@@ -97,8 +102,8 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
                 {copy.bookings}: {String(reservation.booking_number)}
               </Text> : null}
             </View>
-            {phoneDialable ? <Button testID="pms-call-guest" label={copy.callGuest} icon={Phone}
-              variant="secondary" onPress={() => void Linking.openURL('tel:' + phone!.replace(/[^\d+]/g,''))}/> : null}
+            {dial ? <Button testID="pms-call-guest" label={copy.callGuest} icon={Phone}
+              variant="secondary" onPress={() => void Linking.openURL(dial)}/> : null}
             {!showroom && id && canOpenDetails ? <Button testID="pms-open-booking" label={copy.openBooking}
               icon={ChevronRight} disabled={details.loading || !!details.error} onPress={() => { onClose(); onOpen(id); }}/> : null}
           </> : <Empty text={copy.pmsUnavailableAction}/>}
