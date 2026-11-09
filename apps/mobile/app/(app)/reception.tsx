@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Search, Users, X } from 'lucide-react-native';
+import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Plus, Search, Users, X } from 'lucide-react-native';
 import { Badge, Empty, SectionLabel, Segmented, PressScale, DemoBanner } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useLiveModules, ReceptionList, ReceptionReservation } from '../../src/api/liveModules';
@@ -10,6 +10,7 @@ import { contactInitials } from '../../src/i18n/statusLabels';
 import { demoReception } from '../../src/api/demoPresentation';
 import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
+import { canCreateBooking } from '../../src/roles/bookingAccess';
 import { useAsync } from '../../src/lib/useAsync';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Hero } from '../../src/components/Brand';
@@ -76,6 +77,8 @@ export default function Reception() {
   return <FutureScreen>
     <PremiumHeader title={copy.reception} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={(live || showroom) && serverAuthMode !== 'shared_auth_preview' ? <AIOrb state={showroom ? 'offline' : 'idle'} label="MARINA AI" size={44} onPress={() => router.push('/ai')}/> : null}/>
+    {live && !showroom && serverAuthMode !== 'shared_auth_preview' && canCreateBooking(user) ?
+      <QuickAction icon={Plus} label={copy.newBooking} onPress={() => router.push('/new-booking')}/> : null}
     {canInbox ? <QuickAction icon={MessageCircle} label={copy.inbox} onPress={() => router.push('/inbox')}/> : null}
     {live && !showroom && serverAuthMode !== 'shared_auth_preview' &&
       <QuickAction icon={CalendarDays} label={copy.mealPlansTitle} onPress={() => router.push('/meal-plans')}/>}
