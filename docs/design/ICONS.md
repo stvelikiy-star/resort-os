@@ -72,6 +72,6 @@ Mobile использует установленный `lucide-react-native`; we
 `admin→UsersRound`, `profile→CircleUserRound`.
 
 Для будущего web-адаптера тот же контракт имён и semantic roles зафиксирован без
-runtime-зависимости в `apps/web/lib/module-icon-manifest.ts`. Он не подключён к рабочим
+runtime-зависимости в `apps/admin/lib/module-icon-manifest.ts`. Он не подключён к рабочим
 экранам. Соответствие 11 `TabKey`, уникальность и mobile/web parity проверяет
 `node scripts/validate-module-icons.mjs`.

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const tabSource = read('apps/mobile/src/roles/registry.ts');
 const mobileSource = read('apps/mobile/src/theme/moduleIcons.ts');
-const webSource = read('apps/web/lib/module-icon-manifest.ts');
+const webSource = read('apps/admin/lib/module-icon-manifest.ts');
 
 const tabMatch = tabSource.match(/export type TabKey\s*=\s*([^;]+);/);
 if (!tabMatch) throw new Error('TabKey declaration not found');
