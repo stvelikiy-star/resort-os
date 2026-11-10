@@ -63,7 +63,7 @@ async def assert_source_three(source: str) -> None:
         assert await conn.fetchval("SELECT count(*) FROM staff_users")==25
         assert await conn.fetchval("SELECT count(*) FROM reservations")==6
         assert await conn.fetchval("SELECT count(*) FROM payments")==2
-        assert len(await verify_committed_ledger(conn,ROOT))==39
+        assert len(await verify_committed_ledger(conn,ROOT))==40
     finally:
         await conn.close()
 
@@ -84,7 +84,7 @@ def command(args,env=None) -> None:
 async def verify_ledger(target: str) -> None:
     conn=await asyncpg.connect(target)
     try:
-        assert len(await verify_committed_ledger(conn,ROOT))==39
+        assert len(await verify_committed_ledger(conn,ROOT))==40
     finally:
         await conn.close()
 
