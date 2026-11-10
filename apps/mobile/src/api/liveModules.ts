@@ -203,6 +203,17 @@ export interface DiningFloor {
   orders: { id: string; order_number: string; status: string; table_code: string | null;
     room_code: string | null; waiter_id: string | null; waiter_name: string | null }[];
 }
+export type ReceptionGuestRequest = {
+  id: string;
+  title: string;
+  description: string | null;
+  room_code: string | null;
+  service_date: string | null;
+  service_time: string | null;
+  assigned_to_id: string | null;
+  status: 'OPEN' | 'IN_PROGRESS';
+};
+
 export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch, serverAuthMode: AuthMode | null = null, sessionIsActive?: () => boolean) {
   const http = createHotelHttpClient(baseUrl, transport, sessionIsActive);
   const request = <T,>(method: HttpMethod, path: string, body?: unknown, idempotencyKey?: string) => http.request<T>(method, path, body, idempotencyKey);
@@ -223,6 +234,40 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     reception: async () => {
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
       return receptionResponse(value);
+    },
+    receptionGuestRequests: async (): Promise<ReceptionGuestRequest[]> => {
+      reviewGate();
+      const queue = objectResponse(await request<unknown>('GET', p + '/ops/guest-requests?status=ACTIVE&limit=200'), 'guest requests');
+      if (!Array.isArray(queue.items)) throw new ApiError('UNKNOWN', 'Invalid guest request queue');
+      return queue.items.map(value => {
+        const item = objectResponse(value, 'guest request');
+        const nullableString = (field: string): string | null => {
+          const value = item[field];
+          if (value === null || typeof value === 'string') return value;
+          throw new ApiError('UNKNOWN', 'Invalid guest request field: ' + field);
+        };
+        if (typeof item.id !== 'string' || typeof item.title !== 'string' ||
+            (item.status !== 'OPEN' && item.status !== 'IN_PROGRESS')) {
+          throw new ApiError('UNKNOWN', 'Invalid guest request');
+        }
+        return {
+          id: safeRouteId(item.id), title: item.title, status: item.status,
+          description: nullableString('description'), room_code: nullableString('room_code'),
+          service_date: nullableString('service_date'), service_time: nullableString('service_time'),
+          assigned_to_id: nullableString('assigned_to_id'),
+        };
+      });
+    },
+    updateReceptionGuestRequest: async (id: string, action: 'claim' | 'complete', userId: string) => {
+      reviewGate();
+      const key = safeRouteId(id);
+      const result = objectResponse(await request<unknown>('POST', p + '/ops/guest-requests/' + key + '/' + action), 'guest request action');
+      const status = action === 'claim' ? 'IN_PROGRESS' : 'DONE';
+      if (result.id !== key || result.status !== status ||
+          (action === 'claim' && result.assigned_to_id !== userId)) {
+        throw new ApiError('UNKNOWN', 'Invalid guest request acknowledgement');
+      }
+      return status;
     },
     reservation: async (id: string) => objectResponse(await request<unknown>('GET', p + '/admin/reception/reservations/' + safeRouteId(id)), 'reservation'),
     checkIn: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-in'), id, 'CHECKED_IN'),
