@@ -64,9 +64,14 @@ Mobile использует установленный `lucide-react-native`; we
 подключённой store-функции. `CONTENT_MANAGER` и `BEACH_PARTNER` — legacy vocabulary:
 не придумывать рабочие пространства или иконки без подтверждённого продукта.
 
-Текущий канонический tab mapping уже одинаков в трёх mobile-компонентах:
+Канонический tab mapping хранится в `apps/mobile/src/theme/moduleIcons.ts` и используется
+тремя mobile-компонентами:
 `overview→LayoutDashboard`, `reception→ConciergeBell`, `pms→CalendarDays`,
 `inbox→MessageCircle`, `dining→UtensilsCrossed`, `kitchen→ChefHat`,
 `tasks→ClipboardCheck`, `rooms→BedDouble`, `requests→Wrench`,
-`admin→UsersRound`, `profile→CircleUserRound`. На следующем этапе его можно вынести в
-один совместимый TypeScript mapping после отдельной проверки циклических импортов.
+`admin→UsersRound`, `profile→CircleUserRound`.
+
+Для будущего web-адаптера тот же контракт имён и semantic roles зафиксирован без
+runtime-зависимости в `apps/web/lib/module-icon-manifest.ts`. Он не подключён к рабочим
+экранам. Соответствие 11 `TabKey`, уникальность и mobile/web parity проверяет
+`node scripts/validate-module-icons.mjs`.
