@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -175,21 +175,41 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
     </View>
   </PressScale>;
 }
-export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
+export function PremiumEntrance({ index = 0, children, distance = 12, scaleFrom = 1 }: {
+  index?: number; children: React.ReactNode; distance?: number; scaleFrom?: number;
+}) {
   const { allowed, ready } = useMotionPreference();
-  const [fade] = useState(() => new Animated.Value(0));
+  // Fail visible while the OS preference resolves and whenever the app is backgrounded.
+  const [progress] = useState(() => new Animated.Value(1));
   const appeared = useRef(false);
-  useEffect(() => {
-    if (!ready) return;
-    if (appeared.current || !allowed) {
-      appeared.current = true;
-      fade.setValue(1);
+  useLayoutEffect(() => {
+    if (!ready || appeared.current || !allowed) {
+      if (ready) appeared.current = true;
+      progress.stopAnimation();
+      progress.setValue(1);
       return;
     }
     appeared.current = true;
-    fade.setValue(0);
-    const animation = Animated.timing(fade, { toValue: 1, duration: motion.card, delay: cappedStagger(index), useNativeDriver: true });
-    animation.start(); return () => animation.stop();
-  }, [allowed, ready, fade, index]);
-  return <Animated.View style={{ opacity: fade, transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }}>{children}</Animated.View>;
+    progress.setValue(0);
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: motionPresets.entrance.duration,
+      easing: motionPresets.entrance.easing,
+      delay: cappedStagger(index),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [allowed, ready, progress, index]);
+  return <Animated.View style={{
+    opacity: progress,
+    transform: [
+      { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [distance, 0] }) },
+      { scale: progress.interpolate({ inputRange: [0, 1], outputRange: [scaleFrom, 1] }) },
+    ],
+  }}>{children}</Animated.View>;
+}
+
+export function StaggerItem({ index, children }: { index: number; children: React.ReactNode }) {
+  return <PremiumEntrance index={index}>{children}</PremiumEntrance>;
 }
