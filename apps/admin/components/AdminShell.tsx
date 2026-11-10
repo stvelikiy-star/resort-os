@@ -41,10 +41,13 @@ type User = {
 
 type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "WHATSAPP" | "OPS" | "STAFF" | "SETTINGS" | "HOTEL_RULES" | "CHANNELS";
 
+type MarinaUiPreference = "legacy" | "future-luxury";
+
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const SESSION_CHECK_INTERVAL_MS = 30_000;
 const DEFAULT_ENABLED_MODULES = ["GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"];
+const MARINA_UI_STORAGE_KEY = "marina-admin-ui";
 
 function canEnterAdmin(role?: string | null, permissions?: string[] | null, customPermissions = false): boolean {
   return Boolean((role && ADMIN_ROLES.has(role)) || (customPermissions && permissions?.length));
@@ -85,6 +88,25 @@ export default function AdminShell() {
   const [enabledModules, setEnabledModules] = useState<string[]>(DEFAULT_ENABLED_MODULES);
   const [hotelName, setHotelName] = useState<string>("");
   const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
+  const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(MARINA_UI_STORAGE_KEY) === "future-luxury") {
+        setUiPreference("future-luxury");
+      }
+    } catch {
+      // Storage can be unavailable in private/restricted browser contexts; legacy remains safe.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && uiPreference === "future-luxury") {
+      document.documentElement.dataset.marinaUi = "future-luxury";
+    } else {
+      document.documentElement.removeAttribute("data-marina-ui");
+    }
+  }, [uiPreference, user]);
 
   useEffect(() => {
     let disposed = false;
@@ -260,6 +282,15 @@ export default function AdminShell() {
     }
   }
 
+  function chooseUiPreference(nextPreference: MarinaUiPreference) {
+    setUiPreference(nextPreference);
+    try {
+      window.localStorage.setItem(MARINA_UI_STORAGE_KEY, nextPreference);
+    } catch {
+      // The in-memory choice still works for the current authenticated session.
+    }
+  }
+
   if (checking) {
     return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
@@ -336,7 +367,13 @@ export default function AdminShell() {
             </div>
           </details>}
         </nav>
-        <button className="logout-button" onClick={logout}>Выйти</button>
+        <div className="admin-shell-actions">
+          <div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
+            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
+            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
+          </div>
+          <button className="logout-button" onClick={logout}>Выйти</button>
+        </div>
       </div>
       {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}
       {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} onNavigate={(destination) => setTab(destination as Tab)} />}
