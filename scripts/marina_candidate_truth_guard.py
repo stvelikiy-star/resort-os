@@ -40,9 +40,13 @@ def validate_source_lock(manifest: dict, root: Path) -> list[str]:
     migration_dir = root / "packages/database/prisma/migrations"
     actual = {p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(migration_dir.glob("*/migration.sql"))}
+    # The immutable RC2 digest covers the historical 39 entries; the current
+    # release adds zz115, but an unreviewed zz999 must still fail closed.
+    if set(actual) != set(EXPECTED_MIGRATIONS):
+        errors.append("committed migration files differ from the reviewed release contract")
     historical = {name: actual.get(name) for name in RC2_LOCKED_MIGRATIONS}
     if manifest.get("migration_sha256") != historical:
-        errors.append("RC2 migration SHA-256 lock differs from original 39 SQL sources")
+        errors.append("migration SHA-256 lock differs from committed SQL")
     required = manifest.get("required_workflows")
     if (not isinstance(required, list) or not all(isinstance(x, str) for x in required)
             or len(required) != len(REQUIRED_WORKFLOWS)

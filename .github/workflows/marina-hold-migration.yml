@@ -38,6 +38,7 @@ jobs:
           baseline="$RUNNER_TEMP/prisma-pre-hold"
           cp -a packages/database/prisma "$baseline"
           rm -rf "$baseline/migrations/zz114_marina_60minute_holds_20261029"
+          rm -rf "$baseline/migrations/zz115_marina_chef_production_targets_20261110"
           (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = 38
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 0

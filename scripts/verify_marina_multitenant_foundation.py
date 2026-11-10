@@ -175,8 +175,14 @@ def main() -> int:
     ):
         if marker not in manifest:
             raise AssertionError(f"candidate manifest marker missing: {marker}")
-    committed_migrations = len(list((ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")))
-    if json.loads(manifest).get("migration_count") != committed_migrations:
+    # This is the immutable RC2 candidate manifest, not the live 40-migration
+    # release ledger. Preserve the original count and reject all unexpected SQL.
+    from release_contract import EXPECTED_MIGRATIONS
+    committed = {item.parent.name for item in
+                 (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")}
+    if (json.loads(manifest).get("migration_count") != 39
+            or len(EXPECTED_MIGRATIONS) != 40
+            or committed != set(EXPECTED_MIGRATIONS)):
         raise AssertionError("candidate migration count does not match committed migration files")
 
     current_state = read("knowledge/MARINA_SMART_CURRENT_STATE_20261008.md")

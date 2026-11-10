@@ -40,7 +40,7 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
   const [unknown, setUnknown] = useState(false);
   const [message, setMessage] = useState('');
   const lock = useRef(false);
-  const [title, codeLabel, priceLabel, saved] = labels[locale];
+  const [title, codeLabel, , saved] = labels[locale];
   const code = values.code.trim().toUpperCase();
   const valid = /^[A-Z0-9](?:[A-Z0-9_]{0,58}[A-Z0-9])$/.test(code) &&
     FIELDS.every(field => values[field].trim());
