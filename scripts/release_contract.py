@@ -49,6 +49,7 @@ EXPECTED_MIGRATIONS = (
     "zz112_marina_staff_module_permissions_20261022",
     "zz113_marina_housekeeping_schedule_date_20261027",
     "zz114_marina_60minute_holds_20261029",
+    "zz115_marina_chef_production_targets_20261110",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make

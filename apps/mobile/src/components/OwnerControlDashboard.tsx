@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ArrowUpRight, BedDouble, CalendarCheck2, CalendarClock, ClipboardCheck, DoorOpen, MessageSquareText, ShieldAlert, UsersRound, Wallet, Wrench } from 'lucide-react-native';
+import { ArrowUpRight, BedDouble, CalendarCheck2, CalendarClock, ClipboardCheck, DoorOpen, MessageSquareText, ShieldAlert, UsersRound, Wallet, Wrench, ChefHat } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { Dashboard } from '../api/liveModules';
 import { canReadFinance } from '../api/financeAccess';
@@ -13,7 +13,7 @@ import { Empty, SectionLabel } from './ui';
 import { GlassCard, StaggerItem } from './Future';
 
 type Copy = ReturnType<typeof useMobileCopy>;
-type OwnerTab = 'overview' | 'pms' | 'tasks' | 'inbox' | 'admin';
+type OwnerTab = 'overview' | 'pms' | 'tasks' | 'inbox' | 'admin' | 'kitchen';
 interface Props {
   data: Dashboard;
   user: AuthUser;
@@ -33,7 +33,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
   const count = (n: number) => Number.isFinite(n) && n >= 0 ? String(Math.round(n)) : '—';
   const currency = (n: number) => Number.isFinite(n) && n >= 0
     ? Math.round(n).toLocaleString('ru-RU') + ' KGS' : '—';
-  const open = (route: '/pms' | '/inbox' | '/tasks' | '/admin' | '/finance') => () => router.push(route);
+  const open = (route: '/pms' | '/inbox' | '/tasks' | '/admin' | '/finance' | '/kitchen') => () => router.push(route);
   const metric = (icon: LucideIcon, title: string, value: string, tint: string, action?: () => void) => {
     const Icon = icon;
     return <GlassCard key={title} onPress={action} style={{
@@ -61,6 +61,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
     { title: copy.inbox, icon: MessageSquareText, route: '/inbox' as const, show: canOpenInbox },
     { title: copy.tasks, icon: ClipboardCheck, route: '/tasks' as const, show: canOpen('tasks') },
     { title: copy.staffOverview, icon: UsersRound, route: '/admin' as const, show: canOpen('admin') },
+    { title: copy.kitchen, icon: ChefHat, route: '/kitchen' as const, show: !showroom && canOpen('kitchen') },
   ].filter(item => item.show);
   // An empty inventory is not 0% occupancy: it means the property has no verified denominator.
   const occupancyKnown = Number.isInteger(data.rooms.total) && data.rooms.total > 0 &&

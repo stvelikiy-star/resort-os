@@ -123,6 +123,25 @@ export type KitchenMenuDraft = {
   price_kgs: number;
 };
 
+export interface KitchenProductionMenuItem {
+  id: string; code: string; category: string;
+  name_ru: string; name_kg: string; name_en: string; name_kz: string;
+}
+export interface KitchenProductionTarget {
+  id: string; menu_item_id: string; service_date: string; meal_type: string;
+  planned_quantity: number; prepared_quantity: number; remaining_quantity: number;
+  name_ru: string; name_kg: string; name_en: string; name_kz: string; notes: string | null;
+  updated_at: string;
+}
+export interface KitchenProductionTargets {
+  from_date: string; through_date: string; items: KitchenProductionTarget[];
+}
+export type KitchenProductionInput = {
+  menu_item_id: string; service_date: string;
+  meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'OTHER';
+  planned_quantity: number; prepared_quantity: number;
+};
+
 export interface DiningProductionSnapshotMeal {
   service_date: string; meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER';
   current_adult_portions: number; current_child_portions: number;
@@ -346,10 +365,55 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       }), 'table order');
       if (typeof result.id !== 'string' || result.status !== 'NEW') throw new ApiError('UNKNOWN', 'Invalid order acknowledgement');
     },
+    kitchenProductionMenu: async (): Promise<KitchenProductionMenuItem[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/production-menu'), 'production menu');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN', 'Invalid production menu');
+      return payload.items.map(value => {
+        const row = objectResponse(value, 'production menu item');
+        for (const name of ['name_ru', 'name_kg', 'name_en', 'name_kz', 'code']) {
+          if (typeof row[name] !== 'string') throw new ApiError('UNKNOWN', 'Invalid menu name');
+        }
+        return { id: safeRouteId(String(row.id)), code: String(row.code), category: String(row.category),
+          name_ru: String(row.name_ru), name_kg: String(row.name_kg),
+          name_en: String(row.name_en), name_kz: String(row.name_kz) };
+      });
+    },
+    kitchenProductionTargets: async (): Promise<KitchenProductionTargets> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/production-targets'), 'production targets');
+      if (!Array.isArray(payload.items) || typeof payload.from_date !== 'string' ||
+          typeof payload.through_date !== 'string') throw new ApiError('UNKNOWN', 'Invalid production targets');
+      const items = payload.items.map(value => {
+        const row = objectResponse(value, 'production target');
+        for (const field of ['planned_quantity', 'prepared_quantity', 'remaining_quantity']) {
+          if (!Number.isSafeInteger(row[field]) || Number(row[field]) < 0) throw new ApiError('UNKNOWN', 'Invalid production count');
+        }
+        return { ...row, id: safeRouteId(String(row.id)), menu_item_id: safeRouteId(String(row.menu_item_id)),
+          service_date: safeIsoDate(String(row.service_date)) } as KitchenProductionTarget;
+      });
+      return { from_date: String(payload.from_date), through_date: String(payload.through_date), items };
+    },
+    saveKitchenProductionTarget: async (target: KitchenProductionInput): Promise<void> => {
+      reviewGate();
+      if (!Number.isSafeInteger(target.planned_quantity) || target.planned_quantity < 0 ||
+          target.planned_quantity > 10000 || !Number.isSafeInteger(target.prepared_quantity) ||
+          target.prepared_quantity < 0 || target.prepared_quantity > target.planned_quantity) {
+        throw new ApiError('BAD_REQUEST', 'Invalid planned/prepared servings');
+      }
+      const payload = { ...target, menu_item_id: safeRouteId(target.menu_item_id),
+        service_date: safeIsoDate(target.service_date) };
+      const result = objectResponse(await request<unknown>('PUT', p + '/kitchen/production-targets', payload), 'production target');
+      if (result.planned_quantity !== payload.planned_quantity ||
+          result.prepared_quantity !== payload.prepared_quantity ||
+          result.remaining_quantity !== payload.planned_quantity - payload.prepared_quantity) {
+        throw new ApiError('UNKNOWN', 'Production target acknowledgement mismatch');
+      }
+    },
     createKitchenMenuDraft: async (draft: KitchenMenuDraft) => {
       reviewGate();
       const item = objectResponse(await request<unknown>('POST', p + '/kitchen/menu', {
-        ...draft, is_active: true, is_draft: true,
+        ...draft, is_active: false, is_draft: true,
       }), 'menu draft');
       if (typeof item.id !== 'string' || item.is_draft !== true || item.code !== draft.code) {
         throw new ApiError('UNKNOWN', 'Menu draft could not be verified');

@@ -10,7 +10,7 @@ import { Button, Field, SectionLabel } from './ui';
 import { GlassCard } from './Future';
 import { useTheme } from '../theme/ThemeProvider';
 
-const EMPTY = { code: '', name_ru: '', name_kg: '', name_en: '', name_kz: '', price: '' };
+const EMPTY = { code: '', name_ru: '', name_kg: '', name_en: '', name_kz: '' };
 const FIELDS = ['name_ru', 'name_kg', 'name_en', 'name_kz'] as const;
 const labels = {
   ru: ['Добавить блюдо', 'Код блюда', 'Цена (сом)', 'Черновик сохранён'],
@@ -42,9 +42,8 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
   const lock = useRef(false);
   const [title, codeLabel, priceLabel, saved] = labels[locale];
   const code = values.code.trim().toUpperCase();
-  const price = Number(values.price);
   const valid = /^[A-Z0-9](?:[A-Z0-9_]{0,58}[A-Z0-9])$/.test(code) &&
-    /^\d+$/.test(values.price) && price <= 100000 && FIELDS.every(field => values[field].trim());
+    FIELDS.every(field => values[field].trim());
   const update = (field: keyof typeof EMPTY, value: string) => {
     setValues(current => ({ ...current, [field]: value }));
   };
@@ -59,7 +58,7 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
       recorded = true;
       await pending.reload();
       await save({
-        code, category, price_kgs: price, name_ru: values.name_ru.trim(), name_kg: values.name_kg.trim(),
+        code, category, price_kgs: 0, name_ru: values.name_ru.trim(), name_kg: values.name_kg.trim(),
         name_en: values.name_en.trim(), name_kz: values.name_kz.trim(),
       });
       await clearPendingDiningWrite(identity.hotelId, identity.userId);
@@ -84,11 +83,10 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
   if (!open) return <Button label={title} variant="secondary" onPress={() => setOpen(true)}/>;
   return <GlassCard style={{ gap: 8 }}>
     <SectionLabel>{title}</SectionLabel>
+    <Text style={{color:c.textMuted}}>Цена и публикация утверждаются менеджером · Price requires approval</Text>
     <Field label={codeLabel} value={values.code} onChangeText={value => update('code', value)} maxLength={60}/>
     {FIELDS.map(field => <Field key={field} label={field.slice(-2).toUpperCase()}
       value={values[field]} maxLength={160} onChangeText={value => update(field, value)}/>)}
-    <Field label={priceLabel} value={values.price} onChangeText={value => update('price', value)}
-      keyboardType="number-pad" maxLength={6}/>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
       {KITCHEN_MENU_CATEGORIES.map((item, index) => <Button key={item}
         label={categories[locale][index]} variant={category === item ? 'primary' : 'secondary'}
