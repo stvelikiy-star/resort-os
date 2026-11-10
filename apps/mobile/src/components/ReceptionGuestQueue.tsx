@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Text } from 'react-native';
 import type { createLiveModules, ReceptionGuestRequest } from '../api/liveModules';
 import type { Locale } from '../i18n';
+import type { AuthUser, AuthMode } from '../api/types';
 import { useMobileCopy } from '../i18n/mobileCopy';
 import { useAsync } from '../lib/useAsync';
 import { useTheme } from '../theme/ThemeProvider';
@@ -15,7 +16,13 @@ const labels = {
   en: ['Guest requests', 'Claim', 'Complete', 'New', 'In progress', 'Completed', 'Refresh', 'Could not load guest requests', 'Action unconfirmed. Check the refreshed queue.'],
 } as const;
 
-export function ReceptionGuestQueue({ live, userId, locale }: {
+export function canUseStaffGuestQueue(user: AuthUser | null | undefined, mode: AuthMode | null) {
+  return !!user && mode !== 'shared_auth_preview' &&
+    ['RECEPTION', 'MAID', 'TECHNICIAN'].includes(user.role) &&
+    (!user.module_permissions_custom || user.module_permissions.includes('OPS') || user.module_permissions.includes('SERVICES'));
+}
+
+export function StaffGuestQueue({ live, userId, locale }: {
   live: Pick<ReturnType<typeof createLiveModules>, 'receptionGuestRequests' | 'updateReceptionGuestRequest'>;
   userId: string;
   locale: Locale;
