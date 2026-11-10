@@ -13,6 +13,7 @@ import { hasTabForSession } from '../../src/roles/registry';
 import { canCreateBooking } from '../../src/roles/bookingAccess';
 import { useAsync } from '../../src/lib/useAsync';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { ReceptionGuestQueue } from '../../src/components/ReceptionGuestQueue';
 import { Hero } from '../../src/components/Brand';
 import { font, radius, space } from '../../src/theme/tokens';
 
@@ -83,6 +84,9 @@ export default function Reception() {
     {live && !showroom && serverAuthMode !== 'shared_auth_preview' &&
       <QuickAction icon={CalendarDays} label={copy.mealPlansTitle} onPress={() => router.push('/meal-plans')}/>}
 
+    {live && user?.role === 'RECEPTION' && serverAuthMode !== 'shared_auth_preview' &&
+      (!user.module_permissions_custom || user.module_permissions.includes('OPS') || user.module_permissions.includes('SERVICES')) ?
+      <ReceptionGuestQueue key={JSON.stringify([hotel?.id, user.id])} live={live} userId={user.id} locale={locale}/> : null}
     {showroom ? <DemoBanner/> : null}
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
     {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
