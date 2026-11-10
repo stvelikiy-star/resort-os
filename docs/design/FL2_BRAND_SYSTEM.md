@@ -22,7 +22,7 @@ The user-approved original is the **flat teal circular seal** with compass, ship
 Measured from the **existing baseline**, not new guessed colors:
 - Light body text on white: 15.65:1; light muted text: 5.37:1 — pass AA normal text.
 - Dark body text on surface: 15.09:1; muted: 9.20:1 — pass AA.
-- **BLOCKER before live UI migration:** light inactive nav text `#63788D` on `#F5FAFF` yields **4.35:1**, below 4.5:1.
+- **RESOLVED in FL2 accessibility PR:** light inactive nav text now uses existing muted-text `#586D80` against `#F5FAFF`; contrast is checked in CI. Original baseline was `#63788D`, **4.35:1** (<4.5:1).
 - **Do not use champagne as text on white:** `#D5A64B` on white yields **2.24:1**; use decoration, badge backgrounds with separately verified dark text, or a reviewed darker accessible text variant.
 
 Keep runtime values untouched until reviewed visual fix, and enforce these color-pair checks during implementation.

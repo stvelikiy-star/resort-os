@@ -18,7 +18,7 @@
         "warning": "#8D590E", "warningSoft": "#FFF2D9", "danger": "#AA303A", "dangerSoft": "#FBE6EA",
         "info": "#14659A", "infoSoft": "#E0F2FC", "heroFrom": "#061B38", "heroTo": "#155A87",
         "shadow": "#0C3455", "glass": "#FFFFFF", "glassBorder": "#DFEBF4", "gold": "#D5A64B",
-        "cyan": "#007E9B", "iris": "#6743B4", "glow": "#E2F7FF", "navActive": "#073B70", "navInactive": "#63788D"
+        "cyan": "#007E9B", "iris": "#6743B4", "glow": "#E2F7FF", "navActive": "#073B70", "navInactive": "#586D80"
       },
       "dark": {
         "background": "#061225", "surface": "#10213D", "surfaceAlt": "#172A49", "border": "#2C4260",
