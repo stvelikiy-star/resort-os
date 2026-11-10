@@ -1,0 +1,77 @@
+{
+  "scope": "React Native Expo Web screenshot evidence, never Android/emulator",
+  "code_sha": "1b55a5a48a4ca5c616d4b0d8aa179591882d82ef",
+  "workflow_run_id": 41875555127,
+  "workflow_job_id": 126734622122,
+  "browser": "Headless Google Chrome, locally served Expo Web export",
+  "fixture": "Built-in isolated DEMO property and synthetic staff only. No real hotel / LIVE API.",
+  "capture_script": "apps/mobile/scripts/qa-web-visual.mjs",
+  "screenshots": [
+    "connect_ru_light_375.jpg",
+    "manager_tasks_ru_light_375_after_tab_fix.jpg",
+    "manager_more_ru_light_375.jpg",
+    "manager_profile_ru_light_375.jpg",
+    "manager_profile_ru_dark_375.jpg",
+    "manager_profile_kg_dark_375.jpg",
+    "manager_profile_kz_dark_375.jpg",
+    "manager_profile_en_dark_375.jpg",
+    "manager_tasks_en_dark_375.jpg",
+    "manager_team_en_dark_375.jpg",
+    "manager_team_en_dark_320_after_nav_fix.jpg",
+    "manager_team_en_dark_430.jpg",
+    "login_en_dark_375.jpg",
+    "maid_tasks_en_dark_375.jpg",
+    "maid_rooms_en_dark_375_after_wrap_fix.jpg",
+    "maid_room_detail_en_dark_375.jpg",
+    "maid_housekeeping_detail_en_dark_375.jpg",
+    "tech_tasks_en_dark_375.jpg",
+    "tech_repairs_en_dark_375.jpg",
+    "tech_new_request_en_dark_375.jpg",
+    "tech_new_request_en_dark_320.jpg"
+  ],
+  "before_after": [
+    {
+      "issue": "RU MANAGER 375px: clipped team tab",
+      "before": "before_manager_tasks_ru_light_375.jpg",
+      "after": "manager_tasks_ru_light_375_after_tab_fix.jpg"
+    },
+    {
+      "issue": "EN MANAGER 320px: clipped Repairs tab",
+      "before": "before_manager_team_en_dark_320.jpg",
+      "after": "manager_team_en_dark_320_after_nav_fix.jpg"
+    },
+    {
+      "issue": "EN MAID 375px: clipped arrival text",
+      "before": "before_maid_rooms_en_dark_375.jpg",
+      "after": "maid_rooms_en_dark_375_after_wrap_fix.jpg"
+    },
+    {
+      "issue": "KG MANAGER 375px: clipped task/room tabs",
+      "before": "before_manager_profile_kg_dark_375.jpg",
+      "after": "manager_profile_kg_dark_375.jpg"
+    },
+    {
+      "issue": "KZ MANAGER 375px: clipped task/room/repair tabs",
+      "before": "before_manager_profile_kz_dark_375.jpg",
+      "after": "manager_profile_kz_dark_375.jpg"
+    }
+  ],
+  "dimensions_dp": [
+    320,
+    375,
+    430
+  ],
+  "locales": [
+    "ru",
+    "kg",
+    "en",
+    "kz"
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "android_screenshots": 0,
+  "screen_reader_device_tested": false,
+  "font_200_percent_native_tested": false
+}

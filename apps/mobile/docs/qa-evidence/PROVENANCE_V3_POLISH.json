@@ -1,0 +1,17 @@
+{
+  "kind": "authentic_Expo_Web_screenshot",
+  "not_android": true,
+  "synthetic_fixture": "built-in DEMO",
+  "source_commit": "4f6ce9dd5d58ab6ad16463059e114a405ce3f28c",
+  "github_actions_run": 41880546889,
+  "github_actions_job": 126752023955,
+  "run_eventually_cancelled": true,
+  "no_live_hotel": true,
+  "no_write_performed": true,
+  "files": [
+    "tech_new_request_en_dark_320_verified.jpg",
+    "manager_profile_ru_dark_375_verified.jpg",
+    "manager_assign_picker_en_dark_430_verified.jpg"
+  ],
+  "description": "Extracted verbatim from WEB_VISUAL_JPEG lines emitted by actual headless Chrome screenshots; source code commits after this SHA are not visually certified by these images."
+}
