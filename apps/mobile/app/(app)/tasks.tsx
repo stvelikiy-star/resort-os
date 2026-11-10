@@ -13,12 +13,15 @@ import { useSession } from '../../src/state/session';
 import { workspaceForSession } from '../../src/roles/registry';
 import { font } from '../../src/theme/tokens';
 import type { Task } from '../../src/api/types';
+import { useLiveModules } from '../../src/api/liveModules';
+import { StaffGuestQueue, canUseStaffGuestQueue } from '../../src/components/ReceptionGuestQueue';
 
 export default function Tasks() {
   const { t } = useTranslation();
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'active' | 'urgent'>('all');
   const { api, user, hotel, serverAuthMode, locale } = useSession();
+  const live = useLiveModules();
   const ws = workspaceForSession(user!.role, user!.module_permissions, api?.mode ?? 'LIVE', serverAuthMode);
   const allowed = !!api && ws.tabs.includes('tasks');
   const { data, loading, error, reload } = useAsync<Task[]>(() => (allowed ? api!.listTasks() : Promise.resolve([])), [api, user?.id, allowed]);
@@ -37,6 +40,8 @@ export default function Tasks() {
   return <FutureScreen>
     <PremiumHeader title={t('tasks.title')} subtitle={hotel?.name} eyebrow={t(`roles.${user!.role}`)}/>
     {hotel?.demo ? <DemoBanner/> : null}
+    {live && user && (user.role === 'MAID' || user.role === 'TECHNICIAN') && canUseStaffGuestQueue(user, serverAuthMode) ?
+      <StaffGuestQueue key={JSON.stringify([hotel?.id, user.id])} live={live} userId={user.id} locale={locale}/> : null}
     {data && !error ? <StaggerItem index={0}>
       <Hero height={170}>
         <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}>
