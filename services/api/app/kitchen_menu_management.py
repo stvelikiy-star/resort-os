@@ -2,6 +2,8 @@ import json
 import os
 import re
 import uuid
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import Any, Literal
 
 import asyncpg
@@ -13,6 +15,9 @@ from .kitchen import DRAFT_MENU
 
 router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen-menu-management"])
 manager_access = require_roles("OWNER", "MANAGER")
+draft_create_access = require_roles("OWNER", "MANAGER", "COOK")
+production_read_access = require_roles("OWNER", "MANAGER", "COOK")
+production_write_access = require_roles("MANAGER", "COOK")
 Category = Literal["BREAKFAST", "SOUP", "SALAD", "MAIN", "SIDE", "DESSERT", "DRINK"]
 
 
@@ -107,8 +112,17 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
     return {"created": created, "draft": True, "truth": "TEST_STAGING_BOOTSTRAP_ONLY"}
 
 
+def validate_menu_create_permissions(payload: MenuCreate, user: dict[str, Any]) -> None:
+    """COOK may propose only inactive, zero-price drafts; management publishes."""
+    if user["role"] == "COOK" and (
+        not payload.is_draft or payload.is_active or payload.price_kgs != 0
+    ):
+        raise HTTPException(status_code=403, detail="COOK can create only inactive zero-price menu drafts")
+
+
 @router.post("/menu", status_code=status.HTTP_201_CREATED)
-async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str, Any] = Depends(manager_access)):
+async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str, Any] = Depends(draft_create_access)):
+    validate_menu_create_permissions(payload, user)
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await _property_id(conn, user)
@@ -167,3 +181,144 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
             after = _item(row)
             await _audit(conn, pid, user, "UPDATE_MENU_ITEM", item_id, before, after)
     return after
+
+
+# A dated preparation target is neither a guest bill nor a menu stock quantity.
+# All queries require a validated property identity; composite FK in zz115
+# prevents cross-property references even if a caller bypasses API code.
+class ProductionTargetWrite(BaseModel):
+    service_date: date
+    meal_type: Literal["BREAKFAST", "LUNCH", "DINNER", "OTHER"]
+    menu_item_id: uuid.UUID
+    planned_quantity: int = Field(ge=0, le=10000)
+    prepared_quantity: int = Field(default=0, ge=0, le=10000)
+    notes: str | None = Field(default=None, max_length=500)
+
+
+def _production_item(row: Any) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]), "menu_item_id": str(row["menuItemId"]),
+        "service_date": row["serviceDate"].isoformat(), "meal_type": row["mealType"],
+        "planned_quantity": row["plannedQuantity"],
+        "prepared_quantity": row["preparedQuantity"],
+        "remaining_quantity": row["plannedQuantity"] - row["preparedQuantity"],
+        "notes": row["notes"], "name_ru": row["nameRu"],
+        "name_kg": row["nameKg"], "name_en": row["nameEn"],
+        "name_kz": row["nameKz"], "updated_at": row["updatedAt"].isoformat(),
+    }
+
+
+@router.get("/production-menu")
+async def production_menu(request: Request, user: dict[str, Any] = Depends(production_read_access)):
+    # Published menu only: exclude unapproved drafts.
+    async with request.app.state.db.acquire() as conn:
+        pid = await _property_id(conn, user)
+        rows = await conn.fetch(
+            '''SELECT id,code,category,"nameRu","nameKg","nameEn","nameKz"
+               FROM kitchen_menu_items
+               WHERE "propertyId"=$1 AND "isActive"=true AND "isDraft"=false
+               ORDER BY "sortOrder",code''', pid,
+        )
+    return {"items": [
+        {"id": str(r["id"]), "code": r["code"], "category": r["category"],
+         "name_ru": r["nameRu"], "name_kg": r["nameKg"],
+         "name_en": r["nameEn"], "name_kz": r["nameKz"]}
+        for r in rows
+    ]}
+
+
+@router.get("/production-targets")
+async def production_targets(
+    request: Request,
+    from_date: date | None = None,
+    through_date: date | None = None,
+    user: dict[str, Any] = Depends(production_read_access),
+):
+    async with request.app.state.db.acquire() as conn:
+        pid = await _property_id(conn, user)
+        tz_name = await conn.fetchval('SELECT timezone FROM properties WHERE id=$1', pid)
+        try:
+            today = datetime.now(ZoneInfo(tz_name or "Asia/Bishkek")).date()
+        except (KeyError, ValueError):
+            today = datetime.now(ZoneInfo("Asia/Bishkek")).date()
+        start = from_date or today
+        end = through_date or (start + timedelta(days=6))
+        if end < start or (end - start).days > 31:
+            raise HTTPException(status_code=422, detail="Production period must be 1-32 days")
+        rows = await conn.fetch(
+            '''SELECT t.id,t."menuItemId",t."serviceDate",t."mealType",
+                      t."plannedQuantity",t."preparedQuantity",t.notes,t."updatedAt",
+                      m."nameRu",m."nameKg",m."nameEn",m."nameKz"
+               FROM kitchen_production_targets t
+               JOIN kitchen_menu_items m
+                 ON m.id=t."menuItemId" AND m."propertyId"=t."propertyId"
+               WHERE t."propertyId"=$1 AND t."serviceDate" BETWEEN $2 AND $3
+               ORDER BY t."serviceDate",t."mealType",m."nameRu"''', pid, start, end,
+        )
+    return {"from_date": start.isoformat(), "through_date": end.isoformat(),
+            "items": [_production_item(r) for r in rows]}
+
+
+@router.put("/production-targets")
+async def upsert_production_target(
+    payload: ProductionTargetWrite,
+    request: Request,
+    user: dict[str, Any] = Depends(production_write_access),
+):
+    # Idempotent replacement for one meal/dish/day, with audit trail.
+    if payload.prepared_quantity > payload.planned_quantity:
+        raise HTTPException(status_code=422, detail="Prepared portions exceed plan")
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await _property_id(conn, user)
+            menu = await conn.fetchrow(
+                '''SELECT id FROM kitchen_menu_items
+                   WHERE id=$1 AND "propertyId"=$2
+                     AND "isActive"=true AND "isDraft"=false
+                   FOR SHARE''', payload.menu_item_id, pid,
+            )
+            if menu is None:
+                raise HTTPException(status_code=404, detail="Published menu item not found")
+            existing = await conn.fetchrow(
+                '''SELECT id,"plannedQuantity","preparedQuantity"
+                   FROM kitchen_production_targets
+                   WHERE "propertyId"=$1 AND "menuItemId"=$2
+                     AND "serviceDate"=$3 AND "mealType"=$4 FOR UPDATE''',
+                pid, payload.menu_item_id, payload.service_date, payload.meal_type,
+            )
+            record_id = existing["id"] if existing else uuid.uuid4()
+            row = await conn.fetchrow(
+                '''INSERT INTO kitchen_production_targets
+                     (id,"propertyId","menuItemId","serviceDate","mealType",
+                      "plannedQuantity","preparedQuantity",notes,"updatedById")
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+                   ON CONFLICT ("propertyId","menuItemId","serviceDate","mealType")
+                   DO UPDATE SET "plannedQuantity"=EXCLUDED."plannedQuantity",
+                     "preparedQuantity"=EXCLUDED."preparedQuantity",
+                     notes=EXCLUDED.notes,"updatedById"=EXCLUDED."updatedById",
+                     "updatedAt"=now()
+                   RETURNING id,"plannedQuantity","preparedQuantity"''',
+                record_id, pid, payload.menu_item_id, payload.service_date,
+                payload.meal_type, payload.planned_quantity,
+                payload.prepared_quantity, payload.notes, user["id"],
+            )
+            await conn.execute(
+                '''INSERT INTO audit_logs
+                     (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                      source,result,"beforeJson","afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'UPSERT_KITCHEN_PRODUCTION_TARGET',
+                           'KitchenProductionTarget',$4,'CHEF_OS','SUCCESS',
+                           $5::jsonb,$6::jsonb,now())''',
+                uuid.uuid4(), pid, user["id"], str(row["id"]),
+                json.dumps(dict(existing) if existing else None, default=str),
+                json.dumps({"planned_quantity": row["plannedQuantity"],
+                            "prepared_quantity": row["preparedQuantity"],
+                            "service_date": payload.service_date.isoformat(),
+                            "meal_type": payload.meal_type}, default=str),
+            )
+    return {"id": str(row["id"]), "service_date": payload.service_date.isoformat(),
+            "meal_type": payload.meal_type,
+            "planned_quantity": row["plannedQuantity"],
+            "prepared_quantity": row["preparedQuantity"],
+            "remaining_quantity": row["plannedQuantity"] - row["preparedQuantity"],
+            "financial_posting": "NONE_AUTOMATIC"}

@@ -75,7 +75,7 @@ async def create_and_compare(dsn: str, hotel: NewHotel) -> dict:
     conn = await asyncpg.connect(dsn)
     try:
         assert await existing_hotel_pairs(conn) == list(EXISTING_CODES)
-        assert len(await verify_committed_ledger(conn, ROOT)) == 39
+        assert len(await verify_committed_ledger(conn, ROOT)) == 40
         assert await conn.fetchval("SELECT count(*) FROM staff_users") == 24
         assert await conn.fetchval("SELECT count(*) FROM reservations") == 6
         assert await conn.fetchval("SELECT count(*) FROM payments") == 2
@@ -123,7 +123,7 @@ async def create_and_compare(dsn: str, hotel: NewHotel) -> dict:
             LEFT JOIN reservation_requests req ON req.id=pay."requestId"
             WHERE res."propertyId"=$1 OR req."propertyId"=$1
         ''', ids["property"]) == 0
-        assert len(await verify_committed_ledger(conn, ROOT)) == 39
+        assert len(await verify_committed_ledger(conn, ROOT)) == 40
         try:
             await provision_additive(conn, hotel)
         except RuntimeError as exc:
@@ -136,7 +136,7 @@ async def create_and_compare(dsn: str, hotel: NewHotel) -> dict:
 
     print("MARINA_SHARED_THIRD_HOTEL_ADDITIVE_DATA_PASS: "
           "2 existing properties byte-for-byte preserved; exactly 6 additive "
-          "new-hotel rows; 39 migrations/constraints preserved; forced rollback "
+          "new-hotel rows; 40 migrations/constraints preserved; forced rollback "
           "and duplicate attempt left database unchanged", flush=True)
     return {key: str(value) for key, value in ids.items()}
 

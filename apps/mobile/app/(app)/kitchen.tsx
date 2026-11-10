@@ -15,6 +15,7 @@ import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { KitchenMenuDraftForm } from '../../src/components/KitchenMenuDraftForm';
+import { KitchenProductionPlanner } from '../../src/components/KitchenProductionPlanner';
 import { font, radius, space } from '../../src/theme/tokens';
 
 /** COOK dashboard is an aggregation of authenticated active kitchen orders.
@@ -23,7 +24,8 @@ import { font, radius, space } from '../../src/theme/tokens';
 export default function KitchenDashboard() {
   const { user, hotel, api, locale, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
-  const allowed = user?.role === 'COOK' &&
+  const readOnly = user?.role === 'OWNER';
+  const allowed = (user?.role === 'COOK' || readOnly) &&
     hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'kitchen', serverAuthMode);
   const live = useLiveModules();
   const copy = useMobileCopy();
@@ -42,7 +44,17 @@ export default function KitchenDashboard() {
       () => !allowed || showroom || !live ? Promise.resolve(null) : live.diningProductionSnapshots(),
       [live, showroom, hotel?.id, user?.id, allowed],
     );
-  useFocusEffect(useCallback(() => { if(focused.current) { void reload(); void reloadProduction(); } else focused.current = true; }, [reload, reloadProduction]));
+  const { data: productionMenu, loading: menuLoading, error: menuError, reload: reloadMenu } =
+    useAsync(() => !allowed || showroom || !live ? Promise.resolve(null) : live.kitchenProductionMenu(),
+      [live, showroom, hotel?.id, user?.id, allowed]);
+  const { data: targets, loading: targetLoading, error: targetError, reload: reloadTargets } =
+    useAsync(() => !allowed || showroom || !live ? Promise.resolve(null) : live.kitchenProductionTargets(),
+      [live, showroom, hotel?.id, user?.id, allowed]);
+  useFocusEffect(useCallback(() => {
+    if(focused.current) {
+      void reload(); void reloadProduction(); void reloadTargets(); void reloadMenu();
+    } else focused.current = true;
+  }, [reload, reloadProduction, reloadTargets, reloadMenu]));
   const captureLock = useRef(false);
   const [capturing, setCapturing] = useState(false);
   const captureLabel = {
@@ -50,10 +62,11 @@ export default function KitchenDashboard() {
     kg: 'Тамак даярдоо планын бекитүү', kz: 'Ас дайындау жоспарын бекіту',
   }[locale];
   const capture = (date: string, meal: DiningProductionSnapshotMeal) => {
+    if (readOnly) return;
     Alert.alert(captureLabel, date + ' · ' + meal.current_total_portions + ' ' + copy.kitchenPortions, [
       { text: copy.close, style: 'cancel' },
       { text: copy.confirm, onPress: async () => {
-        if (!allowed || !live || showroom || captureLock.current) return;
+        if (!allowed || readOnly || !live || showroom || captureLock.current) return;
         captureLock.current = true;
         setCapturing(true);
         try { await live.captureDiningProduction(date, meal.meal_type); }
@@ -83,12 +96,17 @@ export default function KitchenDashboard() {
     <PremiumHeader title={copy.kitchen} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={<ChefHat color={c.primary} size={25}/>}/>
     {showroom ? <DemoBanner/> : null}
-    {live && !showroom ? <KitchenMenuDraftForm key={hotel?.id + ':' + user.id} save={live.createKitchenMenuDraft}/> : null}
+    {live && !showroom && !readOnly ? <KitchenMenuDraftForm key={hotel?.id + ':' + user.id} save={live.createKitchenMenuDraft}/> : null}
     {!showroom && !live ? <Empty text={copy.unavailable}/> : null}
     {loading ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
     {data ? <>
       <SectionLabel>{chefCopy.seven}</SectionLabel>
+      {!showroom && menuLoading || !showroom && targetLoading ? <LoadingShimmer count={1}/> : null}
+      {!showroom && menuError ? <ErrorState text={menuError.message} retry={copy.retry} onRetry={reloadMenu}/> : null}
+      {!showroom && targetError ? <ErrorState text={targetError.message} retry={copy.retry} onRetry={reloadTargets}/> : null}
+      {!showroom && live && targets && productionMenu ? <KitchenProductionPlanner
+        live={live} menu={productionMenu} targets={targets} reload={reloadTargets} readOnly={readOnly}/> : null}
       {showroom ? <GlassCard testID="kitchen-demo-meals-not-live" style={{gap:7}}>
         <Text style={[font.body,{color:c.text}]}>{copy.kitchenMealPlanDemo}</Text>
         <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
@@ -137,7 +155,7 @@ export default function KitchenDashboard() {
             {meal.state === 'FROZEN' ? <Text style={[font.small,{color:meal.changed_since_snapshot?c.warning:c.success}]}>
               {copy.kitchenFrozen}: {meal.frozen_total_portions} · {copy.kitchenDelta}: {meal.delta_total_portions}
             </Text> : null}
-            {meal.state !== 'FROZEN' && meal.cutoff_status === 'CUTOFF_REACHED' ?
+            {!readOnly && meal.state !== 'FROZEN' && meal.cutoff_status === 'CUTOFF_REACHED' ?
               <Button label={captureLabel} variant="secondary" disabled={capturing}
                 onPress={() => capture(day.service_date, meal)}/> : null}
             {meal.cutoff_status === 'UNCONFIGURED' ? <Text style={[font.small,{color:c.warning}]}>{copy.kitchenUnconfigured}</Text> : null}
@@ -182,7 +200,7 @@ export default function KitchenDashboard() {
       {summary.unknownDishOrders ? <Text accessibilityRole="alert" style={[font.small,{color:c.warning}]}>
         {copy.kitchenMissingItems}: {summary.unknownDishOrders}
       </Text> : null}
-      <Button testID="kitchen-open-orders" label={copy.orders} icon={ListChecks} onPress={() => router.push('/dining')}/>
+      {!readOnly ? <Button testID="kitchen-open-orders" label={copy.orders} icon={ListChecks} onPress={() => router.push('/dining')}/> : null}
       <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
     </> : null}
   </FutureScreen>;

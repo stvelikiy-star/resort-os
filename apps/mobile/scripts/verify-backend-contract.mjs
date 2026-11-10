@@ -21,7 +21,7 @@ const pinned = {
   'reception_reservations.py': 'a86688a3dc69cf639cb79bea8d7e243569f57e41',
   'pms_reservation_create.py': 'c5d7fb9fd6b5a36e6c7c9c0b46d8d83155fe306b',
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
-  'kitchen_menu_management.py': '6247836cc8fa39a8699383e712b42843e987adaf',
+  'kitchen_menu_management.py': '8bd30d19bf92d2e4156877d9ccc49c7727c235ea',
   'kitchen.py': 'af86e40323b16226f6f969e209bc03d64a85a285',
   'dining_production_snapshots.py': '717f2070a0924ab73456e364a5d4a8cf03c0c47e',
   'dining_control.py': '80c4defa448f0e82671f743215a307705f5dd002',
@@ -40,7 +40,7 @@ const contracts = [
   ['main.py','app','',['get /api/v1/pms/grid']],
   ['pms_reservation_create.py','router','/api/v1/admin/pms/reservations',['post /new/preview','post /new/commit']],
   ['inbox.py','router','/api/v1/admin/inbox',['get /conversations','get /conversations/{conversation_id}','post /conversations/{conversation_id}/claim','patch /conversations/{conversation_id}/status','post /conversations/{conversation_id}/notes']],
-  ['kitchen_menu_management.py','router','/api/v1/kitchen',['post /menu']],
+  ['kitchen_menu_management.py','router','/api/v1/kitchen',['post /menu','get /production-menu','get /production-targets','put /production-targets']],
   ['kitchen.py','admin_router','/api/v1/kitchen',['get /menu','post /tables','get /orders','post /orders','patch /orders/{order_id}/status']],
   ['dining_production_snapshots.py','router','/api/v1/dining',['get /production-snapshots','post /production-snapshots']],
   ['dining_control.py','router','/api/v1/dining',['get /floor','patch /orders/{order_id}/waiter']],
@@ -84,4 +84,4 @@ for (const [method, path] of [['get',''],['post',''],['delete','/{hold_id}']]) {
   routeCount++;
 }
 process.stdout.write('MARINA MOBILE PINNED_BACKEND_ROUTES: ' + routeCount + '/' + routeCount + ' VERIFIED\n');
-process.stdout.write('MARINA MOBILE PINNED_CORE_SHA: 73725dc2fd11ad45a5d9bc23a2c21dd732bd61d7\n');
+process.stdout.write('MARINA MOBILE PINNED_CORE_BASE_SHA: 73725dc2fd11ad45a5d9bc23a2c21dd732bd61d7\n');

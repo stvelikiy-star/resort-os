@@ -92,10 +92,16 @@ describe('STORE_STAFF release gate', () => {
     }
   });
 
+  it('OWNER kitchen is viewable only with a DINING grant; other roles get no implicit access', () => {
+    expect(hasTabForSession('OWNER', ['DASHBOARD'], 'LIVE', 'kitchen')).toBe(false);
+    expect(hasTabForSession('OWNER', ['DASHBOARD', 'DINING'], 'LIVE', 'kitchen')).toBe(true);
+    expect(hasTabForSession('WAITER', ['DASHBOARD', 'DINING'], 'LIVE', 'kitchen')).toBe(false);
+  });
+
   it('all eight operational roles keep their hard LIVE ceilings', () => {
     const allGrants = ['OPS', 'PMS', 'FINANCE', 'STAFF', 'DINING', 'WHATSAPP', 'RESERVATIONS', 'DASHBOARD'];
     const expected: Record<string, readonly string[]> = {
-      OWNER: ['overview', 'pms', 'inbox', 'admin', 'tasks', 'rooms', 'requests', 'profile'],
+      OWNER: ['overview', 'pms', 'inbox', 'kitchen', 'admin', 'tasks', 'rooms', 'requests', 'profile'],
       MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'rooms', 'requests', 'admin', 'profile'],
       RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
       MAID: ['tasks', 'rooms', 'profile'],

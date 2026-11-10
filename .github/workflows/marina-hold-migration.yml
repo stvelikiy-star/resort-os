@@ -38,6 +38,7 @@ jobs:
           baseline="$RUNNER_TEMP/prisma-pre-hold"
           cp -a packages/database/prisma "$baseline"
           rm -rf "$baseline/migrations/zz114_marina_60minute_holds_20261029"
+          rm -rf "$baseline/migrations/zz115_marina_chef_production_targets_20261110"
           (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc 'select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null')" = 38
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 0
@@ -47,7 +48,7 @@ jobs:
           pg_dump -h localhost -U hold_ci -d hold_ci -Fc -f "$RUNNER_TEMP/backup.dump"
           (cd packages/database && npx prisma migrate deploy --schema prisma/schema.prisma)
           test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from information_schema.tables where table_name='marina_reservation_holds'")" = 1
-          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 39
+          test "$(psql -h localhost -U hold_ci -d hold_ci -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 40
       - name: Verify HOLD 60-minute database invariants
         shell: bash
         run: |
@@ -66,7 +67,7 @@ jobs:
           createdb -h localhost -U hold_ci hold_upgraded_restore
           pg_restore -h localhost -U hold_ci -d hold_upgraded_restore --exit-on-error --no-owner --no-acl "$RUNNER_TEMP/upgraded.dump"
           for db in hold_ci hold_upgraded_restore; do
-            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")" = 39
+            test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")" = 40
             test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM information_schema.tables WHERE table_name='marina_reservation_holds'")" = 1
             test "$(psql -h localhost -U hold_ci -d "$db" -Atc "SELECT count(*) FROM pg_constraint WHERE conrelid='marina_reservation_holds'::regclass AND conname IN ('marina_hold_valid_range','marina_hold_valid_expiration')")" = 2
           done

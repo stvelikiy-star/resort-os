@@ -6,6 +6,7 @@ on:
       - 'release/marina-smart-current-candidate.json'
       - 'scripts/marina_candidate_truth_guard.py'
       - 'scripts/test_marina_rc1_source_lock.py'
+      - 'scripts/marina_rc1_current_regressions.py'
       - '.github/workflows/marina-rc1-source-gate.yml'
   workflow_dispatch:
 
@@ -18,6 +19,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Historical RC3 Git blobs must be retrievable; fail closed on drift.
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -33,4 +36,4 @@ jobs:
           # RC3 restore-test source is immutable. Supply the disposable CI-only
           # fixture it requires without changing its reviewed security guard.
           printf '{}' > /tmp/marina_shared_browser_receipts.json
-          python -m unittest discover -s scripts -p 'test_marina_*.py' -v
+          python scripts/marina_rc1_current_regressions.py

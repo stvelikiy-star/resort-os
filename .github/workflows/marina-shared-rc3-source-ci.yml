@@ -5,6 +5,8 @@ on:
     paths:
       - 'release/marina-smart-shared-rc3.json'
       - 'scripts/marina_rc3_source_gate.py'
+      - 'scripts/marina_rc3_additive_gate.py'
+      - 'scripts/test_marina_rc3_additive_gate.py'
       - 'scripts/test_marina_rc3_source_gate.py'
       - '.github/workflows/marina-shared-rc3-source-ci.yml'
       - 'services/api/app/**'
@@ -29,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Check pinned RC3 source and immutable 39-migration history
-        run: python scripts/marina_rc3_source_gate.py
-      - name: Verify source drift and unsafe deployment flags fail closed
-        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_rc3_source_gate.py' -v
+      - name: Preserve immutable RC3 Git blobs and verify additive 40th migration
+        run: python scripts/marina_rc3_additive_gate.py
+      - name: Verify immutable migration hashes and unsafe deployment flags fail closed
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_rc3_additive_gate.py' -v

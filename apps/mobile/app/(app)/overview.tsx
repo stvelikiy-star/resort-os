@@ -23,7 +23,7 @@ export default function Overview() {
   const { user, hotel, api, serverAuthMode, locale } = useSession();
   const showroom = api?.mode === 'DEMO';
   const shared = serverAuthMode === 'shared_auth_preview';
-  const canOpen = (tab: 'overview' | 'inbox' | 'pms' | 'tasks' | 'admin') => !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', tab, serverAuthMode);
+  const canOpen = (tab: 'overview' | 'inbox' | 'pms' | 'tasks' | 'admin' | 'kitchen') => !!user && hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', tab, serverAuthMode);
   const allowed = canOpen('overview');
   const canOpenInbox = !shared && canOpen('inbox');
   const live = useLiveModules();

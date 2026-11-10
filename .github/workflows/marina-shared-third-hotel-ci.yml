@@ -55,6 +55,8 @@ jobs:
       MARINA_AI_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Historical RC3 Git blobs must be retrievable; fail closed on drift.
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -62,7 +64,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify frozen RC3 source/39 Prisma SQL migrations remain unchanged
-        run: python scripts/marina_rc3_source_gate.py
+        run: python scripts/marina_rc3_additive_gate.py
       - name: Apply existing migrations to disposable empty PostgreSQL
         working-directory: packages/database
         run: |

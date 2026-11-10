@@ -15,6 +15,11 @@ STATE_PATH = ROOT / "knowledge" / "MARINA_SMART_CURRENT_STATE_20261008.md"
 EXPECTED_BRANCH = "release/marina-shared-platform-rc2-20261104"
 EXPECTED_PR = 314
 EXPECTED_REVIEWED_SOURCE = "62a2caec856e8fe32801c9156d90de655298ad33"
+# RC2 metadata is historical, immutable evidence for exactly the first 39
+# migrations; newer release candidates add migrations separately.
+RC2_LOCKED_MIGRATIONS = EXPECTED_MIGRATIONS[:39]
+assert len(RC2_LOCKED_MIGRATIONS) == 39
+assert RC2_LOCKED_MIGRATIONS[-1] == "zz114_marina_60minute_holds_20261029"
 ADDITIONAL_REQUIRED_WORKFLOWS = ("marina-shared-live-browser-postgres-ci.yml",)
 REQUIRED_WORKFLOWS = frozenset({
     "marina-staging-readiness-ci.yml", "marina-rc1-source-gate.yml",
@@ -35,7 +40,12 @@ def validate_source_lock(manifest: dict, root: Path) -> list[str]:
     migration_dir = root / "packages/database/prisma/migrations"
     actual = {p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(migration_dir.glob("*/migration.sql"))}
-    if manifest.get("migration_sha256") != actual:
+    # The immutable RC2 digest covers the historical 39 entries; the current
+    # release adds zz115, but an unreviewed zz999 must still fail closed.
+    if set(actual) != set(EXPECTED_MIGRATIONS):
+        errors.append("committed migration files differ from the reviewed release contract")
+    historical = {name: actual.get(name) for name in RC2_LOCKED_MIGRATIONS}
+    if manifest.get("migration_sha256") != historical:
         errors.append("migration SHA-256 lock differs from committed SQL")
     required = manifest.get("required_workflows")
     if (not isinstance(required, list) or not all(isinstance(x, str) for x in required)
@@ -76,7 +86,7 @@ def main() -> int:
         "status": "INTERNAL_CANDIDATE_STAGING_REQUIRED",
         "source_branch": EXPECTED_BRANCH,
         "pull_request": EXPECTED_PR,
-        "migration_count": len(EXPECTED_MIGRATIONS),
+        "migration_count": len(RC2_LOCKED_MIGRATIONS),
         "tenant_model": "Tenant/Property",
         "tenant_context_enabled": False,
         "staging_gate": "isolated_synthetic_shared_pms",
@@ -117,7 +127,7 @@ def main() -> int:
             f"PR: #{EXPECTED_PR}",
             f"Branch: {EXPECTED_BRANCH}",
             f"Application baseline: {manifest.get('candidate_commit', '')}",
-            f"Migration ledger: {len(EXPECTED_MIGRATIONS)} migrations",
+            f"Migration ledger: {len(RC2_LOCKED_MIGRATIONS)} migrations",
             "Tenant/Property",
             "tenant_id",
             "property_id",
