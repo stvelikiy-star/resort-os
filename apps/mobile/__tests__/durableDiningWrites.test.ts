@@ -1,4 +1,6 @@
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { hotelConnectionId } from '../src/api/hotels';
 import { beginPendingDiningWrite, clearPendingDiningWrite, readPendingDiningWrite } from '../src/lib/durableDiningWrites';
 
 jest.mock('expo-secure-store', () => ({
@@ -49,4 +51,37 @@ test('clears journal only when caller explicitly confirms write outcome', async 
 test('rejects untrusted hotel or user key', async () => {
   await expect(beginPendingDiningWrite('../hotel', USER, 'CREATE_ORDER')).rejects.toThrow(/identity/);
   expect(set).not.toHaveBeenCalled();
+});
+
+test('accepts an approved live DNS hostname in the durable key', async () => {
+  const hotelId = hotelConnectionId('https://mobile.rc430.example.com/core');
+  await beginPendingDiningWrite(hotelId, USER, 'PRODUCTION_TARGET');
+  expect(set).toHaveBeenCalledWith('marina.dining.pending.' + hotelId + '.' + USER,
+    expect.stringContaining('"operation":"PRODUCTION_TARGET"'));
+});
+
+test('persists the non-secret journal in browser storage without native SecureStore', async () => {
+  const previousOS = Platform.OS;
+  const previousStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const entries = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => entries.get(key) ?? null,
+    setItem: (key: string, value: string) => entries.set(key, value),
+    removeItem: (key: string) => entries.delete(key),
+  } });
+  try {
+    Platform.OS = 'web';
+    const hotelId = hotelConnectionId('https://mobile.rc430.example.com/core');
+    await beginPendingDiningWrite(hotelId, USER, 'PRODUCTION_TARGET');
+    await expect(readPendingDiningWrite(hotelId, USER)).resolves.toMatchObject({ operation: 'PRODUCTION_TARGET' });
+    await clearPendingDiningWrite(hotelId, USER);
+    await expect(readPendingDiningWrite(hotelId, USER)).resolves.toBeNull();
+    expect(get).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  } finally {
+    Platform.OS = previousOS;
+    if (previousStorage) Object.defineProperty(globalThis, 'localStorage', previousStorage);
+    else Reflect.deleteProperty(globalThis, 'localStorage');
+  }
 });
