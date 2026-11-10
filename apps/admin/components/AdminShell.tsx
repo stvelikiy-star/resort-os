@@ -28,6 +28,7 @@ import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 import MarinaAiAssistant from "./MarinaAiAssistant";
 import ChannelManagerBoard from "./ChannelManagerBoard";
+import { readMarinaUiPreference, writeMarinaUiPreference, type MarinaUiPreference } from "../lib/marina-ui-preference";
 
 type User = {
   id: string;
@@ -41,13 +42,10 @@ type User = {
 
 type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "WHATSAPP" | "OPS" | "STAFF" | "SETTINGS" | "HOTEL_RULES" | "CHANNELS";
 
-type MarinaUiPreference = "legacy" | "future-luxury";
-
 const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const SESSION_CHECK_INTERVAL_MS = 30_000;
 const DEFAULT_ENABLED_MODULES = ["GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"];
-const MARINA_UI_STORAGE_KEY = "marina-admin-ui";
 
 function canEnterAdmin(role?: string | null, permissions?: string[] | null, customPermissions = false): boolean {
   return Boolean((role && ADMIN_ROLES.has(role)) || (customPermissions && permissions?.length));
@@ -91,13 +89,7 @@ export default function AdminShell() {
   const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
 
   useEffect(() => {
-    try {
-      if (window.localStorage.getItem(MARINA_UI_STORAGE_KEY) === "future-luxury") {
-        setUiPreference("future-luxury");
-      }
-    } catch {
-      // Storage can be unavailable in private/restricted browser contexts; legacy remains safe.
-    }
+    setUiPreference(readMarinaUiPreference());
   }, []);
 
   useEffect(() => {
@@ -284,11 +276,7 @@ export default function AdminShell() {
 
   function chooseUiPreference(nextPreference: MarinaUiPreference) {
     setUiPreference(nextPreference);
-    try {
-      window.localStorage.setItem(MARINA_UI_STORAGE_KEY, nextPreference);
-    } catch {
-      // The in-memory choice still works for the current authenticated session.
-    }
+    writeMarinaUiPreference(nextPreference);
   }
 
   if (checking) {
