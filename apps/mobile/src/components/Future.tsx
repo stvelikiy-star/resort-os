@@ -4,7 +4,7 @@ import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles 
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
-import { cappedStagger, useMotionAllowed, useMotionPreference } from '../theme/motion';
+import { cappedStagger, motionPresets, useMotionAllowed, useMotionPreference } from '../theme/motion';
 import { elevation, font, iconography, motion, radius, space } from '../theme/tokens';
 import { Badge, Card, PressScale, Screen, Title } from './ui';
 import { Logo } from './Brand';
