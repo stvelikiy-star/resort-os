@@ -64,7 +64,7 @@ function OccupancyProgress({ value, label, color, trackColor }: {
 /** Stable two-column executive grid. Only verified dashboard fields are displayed;
  * absent financial permissions never turn into fake zero-value financial tiles. */
 export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox, showroom }: Props) {
-  const { c } = useTheme();
+  const { c, name } = useTheme();
   const router = useRouter();
   const { width, fontScale } = useWindowDimensions();
   const compact = width < 350 || fontScale > 1.3;
@@ -112,7 +112,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
           <Text numberOfLines={1} style={[font.label, { color: c.cyan }]}>{data.property.name.toUpperCase()}</Text>
           <Text style={[font.small, { color: c.textMuted, marginTop: 4 }]}>{data.property.local_date}</Text>
         </View>
-        <Text style={[font.label, { color: c.gold }]}>{showroom ? copy.demoLabel : copy.livePmsLabel}</Text>
+        <Text style={[font.label, { color: name === 'light' ? c.warning : c.gold }]}>{showroom ? copy.demoLabel : copy.livePmsLabel}</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <Text style={[font.display, { color: c.text, fontSize: compact ? 38 : 44 }]}>{occupancyKnown ? count(occupancy) + "%" : "—"}</Text>

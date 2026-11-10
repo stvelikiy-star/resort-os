@@ -31,6 +31,14 @@ if(data.locales.join('/') !== 'RU/KG/EN') fail('Unapproved locale baseline chang
 for(const character of ['Ң','ң','Ө','ө','Ү','ү']){
  if(!data.localeGlyphs.includes(character)) fail('Kyrgyz glyph coverage checklist lost '+character);
 }
+for(const theme of ['light','dark']) {
+ const c=data.theme[theme];
+ const goldTextColor=theme==='light'?c.warning:c.gold;
+ if(contrast(goldTextColor,c.surface)<4.5) fail(`premium wordmark text ${theme} is below WCAG AA`);
+}
+for (const fileName of ['apps/mobile/src/components/Brand.tsx','apps/mobile/src/components/OwnerControlDashboard.tsx']) {
+ if(!file(fileName).includes("name === 'light' ? c.warning : c.gold")) fail(fileName+' has lost accessible light gold text mapping');
+}
 const ts = file('apps/mobile/src/theme/tokens.ts');
 const mapped = {background:'bg',onPrimary:'primaryText'};
 for (const theme of ['light','dark']) {
