@@ -2,6 +2,7 @@
   "name": "@resort-os/root-verification",
   "private": true,
   "scripts": {
+    "design:validate": "node ./scripts/validate-design-foundation.mjs",
     "test": "node ./control-center-verify.mjs"
   }
 }

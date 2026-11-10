@@ -1,0 +1,63 @@
+{
+  "$schemaVersion": 1,
+  "name": "MARINA SMART semantic foundation",
+  "status": "reference-only",
+  "sources": {
+    "mobile": "apps/mobile/src/theme/tokens.ts",
+    "mobileMotion": "apps/mobile/src/theme/motion.ts",
+    "admin": "apps/admin/app/globals.css",
+    "staff": "apps/staff/app/globals.css",
+    "roles": "apps/mobile/src/api/types.ts"
+  },
+  "mobile": {
+    "color": {
+      "light": {
+        "background": "#F5FAFF", "surface": "#FFFFFF", "surfaceAlt": "#EEF7FC", "border": "#DCE8F3",
+        "text": "#10243D", "textMuted": "#586D80", "primary": "#073B70", "onPrimary": "#FFFFFF",
+        "primarySoft": "#DFF2FB", "accent": "#D5A64B", "success": "#176A54", "successSoft": "#E2F5EC",
+        "warning": "#8D590E", "warningSoft": "#FFF2D9", "danger": "#AA303A", "dangerSoft": "#FBE6EA",
+        "info": "#14659A", "infoSoft": "#E0F2FC", "heroFrom": "#061B38", "heroTo": "#155A87",
+        "shadow": "#0C3455", "glass": "#FFFFFF", "glassBorder": "#DFEBF4", "gold": "#D5A64B",
+        "cyan": "#007E9B", "iris": "#6743B4", "glow": "#E2F7FF", "navActive": "#073B70", "navInactive": "#63788D"
+      },
+      "dark": {
+        "background": "#061225", "surface": "#10213D", "surfaceAlt": "#172A49", "border": "#2C4260",
+        "text": "#F4F8FF", "textMuted": "#B3C6DC", "primary": "#00D8FF", "onPrimary": "#061225",
+        "primarySoft": "#103B56", "accent": "#E6BD70", "success": "#61DFB7", "successSoft": "#103C37",
+        "warning": "#F4CC7B", "warningSoft": "#44351F", "danger": "#FF9CA4", "dangerSoft": "#48252D",
+        "info": "#91D6FF", "infoSoft": "#163656", "heroFrom": "#020C1D", "heroTo": "#15385D",
+        "shadow": "#000000", "glass": "#122A47", "glassBorder": "#36506C", "gold": "#E6BD70",
+        "cyan": "#00D8FF", "iris": "#A987FF", "glow": "#123951", "navActive": "#00D8FF", "navInactive": "#B3C6DC"
+      }
+    },
+    "space": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "xxl": 32, "huge": 40 },
+    "radius": { "sm": 12, "md": 18, "lg": 24, "xl": 30, "pill": 999 },
+    "typography": {
+      "display": { "size": 34, "weight": 800, "letterSpacing": -1.1 },
+      "title": { "size": 27, "weight": 800, "letterSpacing": -0.6 },
+      "h2": { "size": 19, "weight": 700, "letterSpacing": -0.3 },
+      "body": { "size": 16, "weight": 500, "lineHeight": 24 },
+      "small": { "size": 13, "weight": 500, "lineHeight": 19 },
+      "label": { "size": 12, "weight": 700, "letterSpacing": 0.6 },
+      "metric": { "size": 30, "weight": 800, "letterSpacing": -0.6 }
+    },
+    "touchTarget": 56,
+    "icon": { "nav": 23, "action": 22, "metric": 24, "stroke": 1.9, "strokeActive": 2.5 },
+    "motionMs": { "press": 125, "tab": 220, "card": 320, "modal": 340, "chart": 700, "cardStagger": 55 },
+    "motionPolicy": { "maxStaggerCards": 6, "reducedMotion": "disable", "background": "disable", "unknownPreference": "disable" }
+  },
+  "webLegacy": {
+    "themeSupport": "light-only",
+    "fontFamily": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "admin": {
+      "background": "#f4f6f3", "surface": "#ffffff", "text": "#16231d", "textMuted": "#6f7c75", "border": "#dfe5e1", "brand": "#173f31", "brandSoft": "#e9f0ec",
+      "status": { "clean": "#dff3e5", "dirty": "#f9dddd", "inspection": "#fff0bd", "tech": "#e2e5e4", "unknown": "#eef1ef", "reservation": "#dce8f8", "maintenance": "#eee4f6", "manual": "#f5eadc" }
+    },
+    "staff": {
+      "background": "#f3f5f2", "surface": "#fff", "text": "#15231d", "textMuted": "#6e7a74", "border": "#dfe5e1", "brand": "#173f31", "brandStrong": "#245942", "surfaceSoft": "#e8f0eb",
+      "status": { "urgent": "#c74d4d", "high": "#d2902e", "gold": "#b88a2a", "goldSoft": "#f5ecd8" }
+    },
+    "motionPolicy": "not-centralized-no-reduced-motion-contract"
+  },
+  "roles": ["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN", "STORE_STAFF", "DINING_STAFF", "COOK", "WAITER", "CONTENT_MANAGER", "BEACH_PARTNER"]
+}
