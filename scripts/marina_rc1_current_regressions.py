@@ -15,6 +15,9 @@ import unittest
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
+# When launched as scripts/foo.py, Python adds scripts/ but not the repo root.
+# Current FastAPI contract tests import services.api.app; include the real root.
+sys.path.insert(0,str(ROOT))
 sys.path.insert(0,str(ROOT/"scripts"))
 from marina_rc3_source_gate import RC2_FILE,RC3_FILE,REQUIRED_WORKFLOWS,git_blob_sha
 
