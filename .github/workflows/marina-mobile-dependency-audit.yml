@@ -1,0 +1,162 @@
+name: MARINA Mobile Dependency Audit
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      # Independently run source diagnostics for every mobile change,
+      # even when the strict Expo version gate fails before Jest.
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-mobile-dependency-audit.yml'
+  schedule:
+    # Scheduled workflows run only from GitHub's default branch after an approved merge.
+    - cron: '15 3 * * 1'
+permissions:
+  contents: read
+jobs:
+  audit:
+    name: npm audit of production dependency tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Reproducible install
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify diagnostic parser behavior
+        run: node --test scripts/audit-provenance.nodecheck.mjs
+      - name: Preserve complete audit inventory with dependency provenance
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-audit.json || true
+          node scripts/audit-provenance.mjs /tmp/marina-mobile-audit.json package-lock.json > /tmp/marina-mobile-audit-provenance.json
+          node -e "const a=require('/tmp/marina-mobile-audit-provenance.json'); console.log('AUDIT_PROVENANCE:',JSON.stringify(a.counts),'DIAGNOSTIC_NOT_RELEASE_CLEARANCE')"
+      - name: Upload security evidence even on failed gate
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-audit-provenance
+          path: |
+            /tmp/marina-mobile-audit.json
+            /tmp/marina-mobile-audit-provenance.json
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Fail on production moderate-or-higher advisories
+        run: npm audit --omit=dev --audit-level=moderate
+
+  nonbreaking-fix-rehearsal:
+    name: Safe dependency fix rehearsal (no force, no repository write)
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Install immutable lockfile
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Save current advisory inventory
+        run: |
+          npm audit --omit=dev --json > /tmp/marina-mobile-audit-before.json || true
+          node -e "const a=require('/tmp/marina-mobile-audit-before.json'); console.log('BEFORE:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+      - name: Rehearse only nonbreaking lockfile patches
+        run: |
+          npm audit fix --package-lock-only --ignore-scripts --no-fund > /tmp/marina-mobile-fix.log 2>&1 || true
+          tail -n 25 /tmp/marina-mobile-fix.log
+          git diff --stat -- package-lock.json
+          git diff -- package-lock.json > /tmp/marina-mobile-lockfile-candidate.patch
+          npm audit --omit=dev --json > /tmp/marina-mobile-audit-after.json || true
+          node -e "const a=require('/tmp/marina-mobile-audit-after.json'); console.log('AFTER:',JSON.stringify(a.metadata?.vulnerabilities ?? {}))"
+          test -s /tmp/marina-mobile-audit-after.json
+      - name: Save independently reviewable candidate
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marina-mobile-security-rehearsal
+          path: |
+            /tmp/marina-mobile-audit-before.json
+            /tmp/marina-mobile-audit-after.json
+            /tmp/marina-mobile-lockfile-candidate.patch
+            /tmp/marina-mobile-fix.log
+          retention-days: 7
+          if-no-files-found: warn
+
+  source-diagnostics:
+    name: Mobile source diagnostics (NOT a release gate substitute)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Install exact lockfile with native build support
+        run: npm ci --no-audit --no-fund
+      - name: Verify backend declaration pin and advisory classifier
+        run: |
+          node scripts/verify-backend-contract.mjs
+          node --test scripts/audit-provenance.nodecheck.mjs
+      - name: TypeScript and ESLint code checks
+        run: |
+          npm run typecheck
+          npm run lint
+      - name: Full Jest regression (SDK version gate remains separate)
+        run: npm test -- --ci --runInBand
+      - name: Expo web export (SDK version gate remains separate)
+        run: npm run web:export
+
+  android-metro-advisory-diagnostic:
+    name: Android Metro source map advisory check (NOT npm audit waiver)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - name: Reproducible Expo mobile dependency install
+        run: npm ci --no-audit --no-fund
+      - name: Verify source map inspection contract and official Expo versions
+        run: |
+          node --test scripts/verify-android-source-audit.nodecheck.mjs
+          npx expo install --check
+      - name: Build production Android JavaScript bundle with source maps
+        run: npx expo export --platform android --source-maps --output-dir dist-metro-audit --max-workers 2
+      - name: Compare all npm advisory nodes with Android Metro module sources
+        env:
+          MARINA_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          npm audit --omit=dev --json > /tmp/marina-metro-advisories.json || true
+          node scripts/verify-android-source-audit.mjs \
+            /tmp/marina-metro-advisories.json \
+            dist-metro-audit \
+            /tmp/marina-metro-advisory-evidence.json
+      - name: Preserve diagnostic evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-mobile-android-metro-advisory-evidence
+          path: |
+            /tmp/marina-metro-advisories.json
+            /tmp/marina-metro-advisory-evidence.json
+          retention-days: 7
+          if-no-files-found: warn
