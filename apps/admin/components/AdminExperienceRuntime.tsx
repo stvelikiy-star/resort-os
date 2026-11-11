@@ -267,6 +267,7 @@ const common: Phrase[] = [
   // Guest reviews, WhatsApp and staff access — explicit RU/KG/KZ/EN.
   { ru: "Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.", kg: "Тышкы шлюз кирүү өтүнүчүн өткөргөн жок. Cloudflare Access'ти текшериңиз же жергиликтүү даректи ачыңыз.", kz: "Сыртқы шлюз кіру сұрауын өткізбеді. Cloudflare Access-ті тексеріңіз немесе жергілікті мекенжайды ашыңыз.", en: "The external gateway rejected the sign-in request. Check Cloudflare Access or open the local address." },
   { ru: "Разделы MARINA SMART", kg: "MARINA SMART бөлүмдөрү", kz: "MARINA SMART бөлімдері", en: "MARINA SMART sections" },
+  { ru: "Внешний вид интерфейса", kg: "Интерфейстин көрүнүшү", kz: "Интерфейс көрінісі", en: "Interface appearance" },
   { ru: "NPS сохранён. Требуется работа с гостем.", kg: "NPS сакталды. Конок менен иштөө керек.", kz: "NPS сақталды. Қонақпен жұмыс қажет.", en: "NPS saved. Guest follow-up is required." },
   { ru: "Оценка гостя", kg: "Коноктун баасы", kz: "Қонақ бағасы", en: "Guest rating" },
   { ru: "Оценка записана. Срочная задача управляющего открыта.", kg: "Баа сакталды. Башкаруучу үчүн шашылыш тапшырма ачылды.", kz: "Баға сақталды. Басқарушыға шұғыл тапсырма ашылды.", en: "Rating saved. An urgent manager task has been opened." },

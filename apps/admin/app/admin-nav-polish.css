@@ -1,1 +1,46 @@
-.admin-nav{display:grid;grid-template-columns:minmax(180px,auto) minmax(0,1fr) auto;align-items:center;gap:12px}.admin-tabs{min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;padding:2px}.admin-tabs button{flex:0 0 auto;white-space:nowrap}.admin-tabs button:focus-visible,.logout-button:focus-visible{outline:2px solid rgba(30,79,59,.3);outline-offset:2px}.logout-button{white-space:nowrap}.admin-identity{padding-right:4px}.admin-identity strong{white-space:nowrap}.admin-identity span{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@media(max-width:1080px){.admin-nav{grid-template-columns:1fr auto}.admin-tabs{grid-column:1/-1;grid-row:2;width:100%;order:initial}.admin-identity{min-width:0}}@media(max-width:600px){.auth-toolbar.admin-nav{position:sticky;top:0;padding:7px 10px}.admin-tabs{margin:0 -2px;padding-bottom:4px}.admin-tabs button,.logout-button{padding:7px 10px;font-size:10px}.admin-identity span{max-width:160px}}
+.admin-nav{display:grid;grid-template-columns:minmax(180px,auto) minmax(0,1fr) auto;align-items:center;gap:12px}.admin-tabs{min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;padding:2px}.admin-tabs button{flex:0 0 auto;white-space:nowrap}.admin-tabs button:focus-visible,.logout-button:focus-visible,.shell-theme-toggle button:focus-visible{outline:2px solid rgba(30,79,59,.3);outline-offset:2px}.logout-button{white-space:nowrap}.admin-identity{padding-right:4px}.admin-identity strong{white-space:nowrap}.admin-identity span{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.admin-shell-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}.shell-theme-toggle{display:flex;align-items:center;gap:2px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}.shell-theme-toggle button{min-height:28px;border:0;border-radius:999px;padding:5px 8px;background:transparent;color:var(--muted);font:800 9px/1 system-ui,sans-serif;cursor:pointer;white-space:nowrap}.shell-theme-toggle button[aria-pressed="true"]{background:var(--brand);color:#fff}@media(max-width:1080px){.admin-nav{grid-template-columns:1fr auto}.admin-tabs{grid-column:1/-1;grid-row:2;width:100%;order:initial}.admin-identity{min-width:0}}@media(max-width:600px){.auth-toolbar.admin-nav{position:sticky;top:0;padding:7px 10px}.admin-tabs{margin:0 -2px;padding-bottom:4px}.admin-tabs button,.logout-button{padding:7px 10px;font-size:10px}.admin-identity span{max-width:160px}.admin-shell-actions{gap:4px}.shell-theme-toggle button{padding:5px 6px;font-size:8px}}
+
+/* Phase one: only the authenticated shell chrome adopts Future Luxury.
+   Operational boards, tables, calendars, dashboards and finance surfaces keep
+   their existing palettes until their own visual QA phases. */
+html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav{
+  --fl-navy:#073b70;
+  --fl-navy-deep:#042846;
+  --fl-cyan:#00d8ff;
+  --fl-champagne:#e6bd70;
+  border-color:rgba(0,216,255,.18);
+  background:linear-gradient(135deg,rgba(4,40,70,.98),rgba(7,59,112,.97));
+  box-shadow:0 12px 32px rgba(3,28,54,.24);
+  color:#f5faff;
+}
+html[data-marina-ui="future-luxury"] .admin-identity strong{color:#fff;letter-spacing:.025em}
+html[data-marina-ui="future-luxury"] .admin-identity span{color:rgba(245,250,255,.72)}
+html[data-marina-ui="future-luxury"] .hotel-brand-logo-small{border-color:rgba(230,189,112,.44);box-shadow:0 0 0 1px rgba(230,189,112,.1)}
+html[data-marina-ui="future-luxury"] .admin-tabs{scrollbar-color:rgba(0,216,255,.38) transparent}
+html[data-marina-ui="future-luxury"] .admin-tabs>button,
+html[data-marina-ui="future-luxury"] .admin-more-menu>summary,
+html[data-marina-ui="future-luxury"] .logout-button{color:rgba(245,250,255,.82);transition:color 125ms ease,background-color 220ms ease,box-shadow 220ms ease,transform 125ms ease}
+html[data-marina-ui="future-luxury"] .admin-tabs>button:hover,
+html[data-marina-ui="future-luxury"] .admin-more-menu>summary:hover,
+html[data-marina-ui="future-luxury"] .logout-button:hover{background:rgba(0,216,255,.11);color:#fff}
+html[data-marina-ui="future-luxury"] .admin-tabs>button:active,
+html[data-marina-ui="future-luxury"] .admin-more-menu>summary:active,
+html[data-marina-ui="future-luxury"] .logout-button:active{transform:translateY(1px)}
+html[data-marina-ui="future-luxury"] .admin-tabs>button.active{background:linear-gradient(135deg,#00a9cc,#007e9b);color:#fff;box-shadow:0 7px 18px rgba(0,216,255,.18)}
+html[data-marina-ui="future-luxury"] .admin-more-menu[open]>summary{background:rgba(0,216,255,.14);color:#fff}
+html[data-marina-ui="future-luxury"] .admin-more-panel{border-color:rgba(0,216,255,.25);background:linear-gradient(150deg,#062f59,#073b70);box-shadow:0 22px 58px rgba(3,23,46,.42)}
+html[data-marina-ui="future-luxury"] .admin-more-panel button{color:rgba(245,250,255,.82);transition:color 125ms ease,background-color 220ms ease}
+html[data-marina-ui="future-luxury"] .admin-more-panel button:hover{background:rgba(0,216,255,.11);color:#fff}
+html[data-marina-ui="future-luxury"] .admin-more-panel button.active{background:#007e9b;color:#fff}
+html[data-marina-ui="future-luxury"] .admin-nav-section-label{border-color:rgba(230,189,112,.22);color:var(--fl-champagne)}
+html[data-marina-ui="future-luxury"] .shell-theme-toggle{border-color:rgba(230,189,112,.3);background:rgba(2,26,51,.44)}
+html[data-marina-ui="future-luxury"] .shell-theme-toggle button{color:rgba(245,250,255,.7);transition:color 125ms ease,background-color 220ms ease}
+html[data-marina-ui="future-luxury"] .shell-theme-toggle button[aria-pressed="true"]{background:var(--fl-champagne);color:var(--fl-navy-deep)}
+html[data-marina-ui="future-luxury"] .admin-tabs button:focus-visible,
+html[data-marina-ui="future-luxury"] .admin-more-menu>summary:focus-visible,
+html[data-marina-ui="future-luxury"] .logout-button:focus-visible,
+html[data-marina-ui="future-luxury"] .shell-theme-toggle button:focus-visible{outline:2px solid var(--fl-cyan);outline-offset:2px}
+
+@media(max-width:760px){html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav{background:linear-gradient(160deg,#042846,#073b70)}html[data-marina-ui="future-luxury"] .admin-tabs{padding-block:4px}html[data-marina-ui="future-luxury"] .admin-tabs>button{min-height:40px}}
+@media(max-width:430px){.admin-shell-actions{width:100%;justify-content:space-between}.admin-nav{grid-template-columns:1fr}.admin-tabs{grid-row:3}.shell-theme-toggle button{min-height:32px}}
+@media(prefers-reduced-motion:reduce){html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav *,html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav *::before,html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}

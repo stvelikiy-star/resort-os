@@ -28,6 +28,7 @@ import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 import MarinaAiAssistant from "./MarinaAiAssistant";
 import ChannelManagerBoard from "./ChannelManagerBoard";
+import { readMarinaUiPreference, writeMarinaUiPreference, type MarinaUiPreference } from "../lib/marina-ui-preference";
 
 type User = {
   id: string;
@@ -85,6 +86,19 @@ export default function AdminShell() {
   const [enabledModules, setEnabledModules] = useState<string[]>(DEFAULT_ENABLED_MODULES);
   const [hotelName, setHotelName] = useState<string>("");
   const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
+  const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
+
+  useEffect(() => {
+    setUiPreference(readMarinaUiPreference());
+  }, []);
+
+  useEffect(() => {
+    if (user && uiPreference === "future-luxury") {
+      document.documentElement.dataset.marinaUi = "future-luxury";
+    } else {
+      document.documentElement.removeAttribute("data-marina-ui");
+    }
+  }, [uiPreference, user]);
 
   useEffect(() => {
     let disposed = false;
@@ -260,6 +274,11 @@ export default function AdminShell() {
     }
   }
 
+  function chooseUiPreference(nextPreference: MarinaUiPreference) {
+    setUiPreference(nextPreference);
+    writeMarinaUiPreference(nextPreference);
+  }
+
   if (checking) {
     return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
@@ -336,7 +355,13 @@ export default function AdminShell() {
             </div>
           </details>}
         </nav>
-        <button className="logout-button" onClick={logout}>Выйти</button>
+        <div className="admin-shell-actions">
+          <div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
+            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
+            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
+          </div>
+          <button className="logout-button" onClick={logout}>Выйти</button>
+        </div>
       </div>
       {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}
       {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} onNavigate={(destination) => setTab(destination as Tab)} />}
