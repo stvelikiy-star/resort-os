@@ -132,7 +132,7 @@ jobs:
         run: python scripts/verify_kitchen_menu_management.py
 
       - name: Test recipe validation and exact ingredient totals
-        run: python scripts/test_marina_kitchen_recipes.py
+        run: PYTHONPATH=. python scripts/test_marina_kitchen_recipes.py
 
       - name: Verify recipe storage, permissions and concurrent updates
         run: ALLOW_KITCHEN_RECIPE_TEST_WRITES=1 python scripts/verify_kitchen_recipes.py

@@ -175,13 +175,13 @@ def main() -> int:
     ):
         if marker not in manifest:
             raise AssertionError(f"candidate manifest marker missing: {marker}")
-    # This is the immutable RC2 candidate manifest, not the live 40-migration
+    # This is the immutable RC2 candidate manifest, not the live 41-migration
     # release ledger. Preserve the original count and reject all unexpected SQL.
     from release_contract import EXPECTED_MIGRATIONS
     committed = {item.parent.name for item in
                  (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")}
     if (json.loads(manifest).get("migration_count") != 39
-            or len(EXPECTED_MIGRATIONS) != 40
+            or len(EXPECTED_MIGRATIONS) != 41
             or committed != set(EXPECTED_MIGRATIONS)):
         raise AssertionError("candidate migration count does not match committed migration files")
 
