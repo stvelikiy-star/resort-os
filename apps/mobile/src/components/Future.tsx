@@ -12,7 +12,13 @@ import { metricNeedsFullWidth } from '../theme/layout';
 
 export function FutureScreen({ children }: { children: React.ReactNode }) {
   const { c } = useTheme();
-  return <Screen><View style={{ position: 'absolute', top: -100, right: -140, width: 320, height: 320, borderRadius: 160, backgroundColor: c.glow, opacity: 0.5 }} pointerEvents="none" />{children}</Screen>;
+  return <Screen>
+    <View pointerEvents="none" style={{ position: 'absolute', top: -110, right: -140, width: 340, height: 340, borderRadius: 170,
+      backgroundColor: c.glow, opacity: 0.52 }}/>
+    <View pointerEvents="none" style={{ position: 'absolute', top: 120, left: -158, width: 280, height: 280, borderRadius: 140,
+      backgroundColor: c.primarySoft, opacity: 0.22 }}/>
+    {children}
+  </Screen>;
 }
 export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRight = false }: { title: string; subtitle?: string; eyebrow?: string; right?: React.ReactNode; inlineCompactRight?: boolean }) {
   const { c } = useTheme();
@@ -26,8 +32,12 @@ export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRi
     borderRadius: radius.lg, backgroundColor: c.glass,
     borderWidth: 1, borderColor: c.glassBorder,
     shadowColor: c.shadow, shadowOpacity: 0.07, shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 }, elevation: 2,
+    shadowOffset: { width: 0, height: 5 }, elevation: 2, overflow: 'hidden',
   }}>
+    <View pointerEvents="none" style={{ position: 'absolute', left: 20, right: 20, top: 0, height: 2,
+      borderRadius: 1, backgroundColor: c.cyan, opacity: 0.6 }}/>
+    <View pointerEvents="none" style={{ position: 'absolute', right: -55, top: -85, width: 174, height: 174,
+      borderRadius: 87, backgroundColor: c.primarySoft, opacity: 0.32 }}/>
     <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center', flex: stackRight ? undefined : 1, minWidth: 0 }}>
       <Logo size={width < 350 ? 42 : 50}/>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -57,10 +67,11 @@ export function MetricCard({ icon: Icon, label, value, detail, onPress, tone = '
   const soft = tone === 'gold' || tone === 'warning' ? c.warningSoft : tone === 'success' ? c.successSoft : tone === 'cyan' ? c.infoSoft : c.primarySoft;
   return <GlassCard onPress={onPress} style={{
     flexGrow: 1, flexBasis: oneColumn ? '100%' : '46%', minWidth: 0,
-    gap: 9, minHeight: 174, padding: 17, borderTopWidth: 3, borderTopColor: accent,
+    gap: 10, minHeight: 174, padding: 17, borderTopWidth: 3, borderTopColor: accent,
   }}>
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-      <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: soft, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: soft,
+        borderWidth: 1, borderColor: c.glassBorder, alignItems: 'center', justifyContent: 'center' }}>
         <Icon color={accent} size={iconography.metric + 2} strokeWidth={1.9}/>
       </View>
       {onPress ? <ArrowUpRight size={21} color={accent}/> : null}
@@ -97,6 +108,7 @@ export function AnimatedKpi({ value, suffix = '', style, testID }: { value: numb
 
 /** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
 export function OccupancyRing({ percent, label, size = 112 }: { percent: number; label: string; size?: number }) {
+  const { c } = useTheme();
   const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
   const circumference = 2 * Math.PI * 42;
   const length = circumference * safe / 100;
@@ -104,18 +116,21 @@ export function OccupancyRing({ percent, label, size = 112 }: { percent: number;
     accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
     style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
     <Svg pointerEvents="none" width={size} height={size} viewBox="0 0 112 112">
-      <Circle cx="56" cy="56" r="42" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="8"/>
-      <Circle cx="56" cy="56" r="42" fill="none" stroke="#00D8FF" strokeWidth="8"
+      <Circle cx="56" cy="56" r="42" fill="none" stroke={c.border} strokeWidth="8"/>
+      <Circle cx="56" cy="56" r="42" fill="none" stroke={c.cyan} strokeWidth="8"
         strokeLinecap="round" strokeDasharray={`${length} ${circumference}`} transform="rotate(-90 56 56)"/>
     </Svg>
     <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={[font.h2, { color: '#FFFFFF', fontSize: 22 }]}>{Math.round(safe)}%</Text>
+      <Text style={[font.h2, { color: c.text, fontSize: 22 }]}>{Math.round(safe)}%</Text>
     </View>
   </View>;
 }
 export function QuickAction({ icon: Icon, label, onPress, testID }: { icon: LucideIcon; label: string; onPress: () => void; testID?: string }) {
   const { c } = useTheme();
-  return <PressScale onPress={onPress} testID={testID} accessibilityLabel={label} style={{ minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, borderRadius: radius.lg, backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.border }}>
+  return <PressScale onPress={onPress} testID={testID} accessibilityLabel={label} style={{ minHeight: 72,
+    flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg,
+    borderRadius: radius.lg, backgroundColor: c.glass, borderWidth: 1, borderColor: c.glassBorder,
+    shadowColor: c.shadow, ...elevation.card }}>
     <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' }}><Icon color={c.primary} size={22}/></View>
     <Text style={[font.h2, { color: c.text, flex: 1 }]}>{label}</Text><ArrowUpRight color={c.primary} size={20}/>
   </PressScale>;
