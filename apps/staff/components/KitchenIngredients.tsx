@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./ChefProduction.module.css";
+import KitchenStock from "./KitchenStock";
 
 type Ingredient = { name: string; unit: "KG" | "L" | "PCS"; quantity_per_portion: string };
 type Recipe = { version: number; status: "DRAFT" | "APPROVED"; is_sample: boolean; ingredients: Ingredient[] };
@@ -9,7 +10,7 @@ type Dish = { id: string; name_ru: string; recipe: Recipe | null };
 type Requirements = {
   contains_sample_data: boolean; is_complete: boolean;
   items: Array<{ name: string; unit: string; planned_quantity: string; prepared_quantity: string; remaining_quantity: string }>;
-  missing_recipes: Array<{ name_ru: string; service_date: string }>;
+  missing_recipes: Array<{ name_ru: string; service_date: string }>; inventory_deducted?: boolean;
 };
 type Targets = {
   items: Array<{ id: string; name_ru: string; planned_quantity: number; prepared_quantity: number; remaining_quantity: number }>;
@@ -115,7 +116,7 @@ export default function KitchenIngredients({ fromDate, throughDate, userRole }: 
       <p>На весь план: {item.planned_quantity} · На приготовленные порции: {item.prepared_quantity} · На оставшиеся порции: {item.remaining_quantity}</p>
     </div>)}
     {data?.is_complete && !data.items.length ? <p>Нет потребности на выбранный период</p> : null}
-    <p>Потребность по нормам. Складские остатки не вычтены.</p>
+    <p>{data?.is_complete ? (data.inventory_deducted ? "Фактический расход приготовленных порций списан со склада." : "Потребность по рецептурам рассчитана. Списание производится отдельно.") : "Заполните рецептуры для полного расчёта потребности."}</p>
     {userRole==="OWNER" || userRole==="MANAGER" ? <>
       <label>Блюдо для рецептуры<select aria-label="Блюдо для рецептуры" value={dishId} onChange={e=>setDishId(e.target.value)}>
         <option value="">Выберите блюдо</option>
@@ -123,5 +124,6 @@ export default function KitchenIngredients({ fromDate, throughDate, userRole }: 
       </select></label>
       {dish ? <RecipeEditor key={dish.id+":"+(dish.recipe?.version ?? 0)} dish={dish} reload={load}/> : null}
     </> : null}
+    <KitchenStock fromDate={fromDate} throughDate={throughDate} userRole={userRole}/>
   </section>;
 }

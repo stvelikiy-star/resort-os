@@ -75,6 +75,16 @@ export interface BookingCommit extends BookingDraft {
 export interface Hold {
   id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
 }
+export interface KitchenStockItem {
+  id:string; name:string; unit:'KG'|'L'|'PCS'; cost_per_unit_kgs:string; is_sample:boolean; balance:string;
+}
+export interface KitchenStockSnapshot {
+  items:KitchenStockItem[]; production_cost_kgs:string;
+  inventory_deducted_only_on_explicit_consume:true;
+}
+export interface KitchenStockConsumeAck {
+  consumed_portions:number; already_processed:boolean; cost_kgs:string; payment_created:false;
+}
 export interface FinanceSummary {
   kitchen_stock_cost?: {real_production_cost_kgs: string; sample_production_cost_kgs: string;
     movement_count: number; basis: 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'};
@@ -415,6 +425,34 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         source: 'TABLE', table_id: safeRouteId(table), items,
       }), 'table order');
       if (typeof result.id !== 'string' || result.status !== 'NEW') throw new ApiError('UNKNOWN', 'Invalid order acknowledgement');
+    },
+    kitchenStock: async (): Promise<KitchenStockSnapshot> => {
+      reviewGate();
+      const payload=objectResponse(await request<unknown>('GET',p+'/kitchen/stock'),'stock');
+      if(!Array.isArray(payload.items) || payload.inventory_deducted_only_on_explicit_consume!==true ||
+        typeof payload.production_cost_kgs!=='string' || !/^\d+(?:\.\d+)?$/.test(payload.production_cost_kgs))
+        throw new ApiError('UNKNOWN','Invalid stock response');
+      const rows=payload.items.map(value=>{
+        const row=objectResponse(value,'stock item');
+        if(typeof row.name!=='string'||!['KG','L','PCS'].includes(String(row.unit))||typeof row.is_sample!=='boolean'||
+          typeof row.balance!=='string'||!/^\d+(?:\.\d+)?$/.test(row.balance)||
+          typeof row.cost_per_unit_kgs!=='string'||!/^\d+(?:\.\d+)?$/.test(row.cost_per_unit_kgs))
+          throw new ApiError('UNKNOWN','Invalid stock item');
+        return {...row,id:safeRouteId(String(row.id))} as KitchenStockItem;
+      });
+      return {items:rows,production_cost_kgs:payload.production_cost_kgs,
+        inventory_deducted_only_on_explicit_consume:true};
+    },
+    consumeKitchenStock: async (productionTargetId:string):Promise<KitchenStockConsumeAck> => {
+      reviewGate();
+      const payload=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/consume',{
+        production_target_id:safeRouteId(productionTargetId),
+      }),'stock consumption');
+      if(!Number.isSafeInteger(payload.consumed_portions)||Number(payload.consumed_portions)<0||
+        typeof payload.already_processed!=='boolean'||payload.payment_created!==false||
+        typeof payload.cost_kgs!=='string'||!/^\d+(?:\.\d+)?$/.test(payload.cost_kgs))
+        throw new ApiError('UNKNOWN','Invalid stock consumption acknowledgment');
+      return payload as unknown as KitchenStockConsumeAck;
     },
     kitchenProductionMenu: async (): Promise<KitchenProductionMenuItem[]> => {
       reviewGate();

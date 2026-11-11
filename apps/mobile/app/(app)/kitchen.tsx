@@ -16,6 +16,7 @@ import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { KitchenMenuDraftForm } from '../../src/components/KitchenMenuDraftForm';
 import { KitchenIngredients } from '../../src/components/KitchenIngredients';
+import { KitchenStockMobile } from '../../src/components/KitchenStockMobile';
 import { KitchenProductionPlanner } from '../../src/components/KitchenProductionPlanner';
 import { font, radius, space } from '../../src/theme/tokens';
 
@@ -51,11 +52,14 @@ export default function KitchenDashboard() {
   const { data: targets, loading: targetLoading, error: targetError, reload: reloadTargets } =
     useAsync(() => !allowed || showroom || !live ? Promise.resolve(null) : live.kitchenProductionTargets(),
       [live, showroom, hotel?.id, user?.id, allowed]);
+  const { data: stock, error: stockError, reload: reloadStock } =
+    useAsync(() => !allowed || showroom || !live ? Promise.resolve(null) : live.kitchenStock(),
+      [live, showroom, hotel?.id, user?.id, allowed]);
   useFocusEffect(useCallback(() => {
     if(focused.current) {
-      void reload(); void reloadProduction(); void reloadTargets(); void reloadMenu();
+      void reload(); void reloadProduction(); void reloadTargets(); void reloadMenu(); void reloadStock();
     } else focused.current = true;
-  }, [reload, reloadProduction, reloadTargets, reloadMenu]));
+  }, [reload, reloadProduction, reloadTargets, reloadMenu, reloadStock]));
   const captureLock = useRef(false);
   const [capturing, setCapturing] = useState(false);
   const captureLabel = {
@@ -175,6 +179,9 @@ export default function KitchenDashboard() {
           <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.procurementUnavailable}</Text>
         </GlassCard>}
       </> : null}
+      {!showroom && stockError ? <ErrorState text={stockError.message} retry={copy.retry} onRetry={reloadStock}/> : null}
+      {!showroom && live && stock && targets ? <KitchenStockMobile stock={stock} targets={targets}
+        consume={live.consumeKitchenStock} reload={async()=>{await reloadStock();await reloadTargets();}} readOnly={readOnly}/> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
