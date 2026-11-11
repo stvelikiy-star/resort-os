@@ -19,7 +19,15 @@ export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRi
   const { width, fontScale } = useWindowDimensions();
   const compact = !!right && (width < 375 || fontScale > 1.25);
   const stackRight = compact && !inlineCompactRight;
-  return <View style={{ flexDirection: stackRight ? 'column' : 'row', alignItems: stackRight ? 'stretch' : 'center', gap: space.md, paddingVertical: space.sm }}>
+  return <View style={{
+    flexDirection: stackRight ? 'column' : 'row',
+    alignItems: stackRight ? 'stretch' : 'center', gap: space.md,
+    marginBottom: 2, paddingHorizontal: 15, paddingVertical: 13,
+    borderRadius: radius.lg, backgroundColor: c.glass,
+    borderWidth: 1, borderColor: c.glassBorder,
+    shadowColor: c.shadow, shadowOpacity: 0.07, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 }, elevation: 2,
+  }}>
     <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'center', flex: stackRight ? undefined : 1, minWidth: 0 }}>
       <Logo size={width < 350 ? 42 : 50}/>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
@@ -32,7 +40,11 @@ export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRi
 }
 export function GlassCard({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
   const { c } = useTheme();
-  return <Card testID={testID} onPress={onPress} style={[{ backgroundColor: c.glass, borderColor: c.glassBorder, borderWidth: 1, ...elevation.card }, style]}>{children}</Card>;
+  return <Card testID={testID} onPress={onPress} style={[{
+    backgroundColor: c.glass, borderColor: c.glassBorder, borderWidth: 1,
+    borderRadius: radius.lg, shadowColor: c.shadow, ...elevation.card,
+    overflow: 'hidden',
+  }, style]}>{children}</Card>;
 }
 export type MetricTone = 'primary' | 'gold' | 'cyan' | 'success' | 'warning';
 export function MetricCard({ icon: Icon, label, value, detail, onPress, tone = 'primary' }: {

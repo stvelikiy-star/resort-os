@@ -85,6 +85,9 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
 
   const roomReady = data.rooms.clean;
   const roomNeedsWork = data.rooms.dirty + data.rooms.in_inspection + data.rooms.tech_block;
+  // Presentation-only ring uses the existing server occupancy; no synthetic trend.
+  const occupancyVisual = Number.isFinite(data.stays.occupancy_percent)
+    ? Math.max(0, Math.min(100, data.stays.occupancy_percent)) : 0;
 
   return (
     <main className="work-shell dashboard-shell" data-fl2-owner={isOwner ? "true" : undefined}>
@@ -104,10 +107,6 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
         </div>
       </section>}
 
-      <OwnerExecutivePack />
-      <OwnerControlV2 />
-      <OwnerOperationsPerformance />
-
       <section className="command-kpis">
         <article><span>Загрузка сейчас</span><strong>{data.stays.occupancy_percent}%</strong><small>{data.stays.occupied_rooms} из {data.rooms.total} номеров</small></article>
         <article><span>Заезды сегодня</span><strong>{data.stays.arrivals_today}</strong><small>гарантированные брони</small></article>
@@ -121,12 +120,19 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
       <section className="command-grid">
         <article className="command-panel">
           <div className="command-panel-head"><div><p className="eyebrow">Номерной фонд</p><h2>{data.rooms.total} номеров · состояние</h2></div><Drill to="PMS" onNavigate={onNavigate}>Открыть шахматку</Drill></div>
+          <div className="fl2-room-state-visual">
+            <div className="fl2-real-occupancy-ring"
+              role="img" aria-labelledby="fl2-owner-occupancy-caption fl2-owner-occupancy-value"
+              style={{ background: `conic-gradient(#25d7d9 0% ${occupancyVisual}%, #244b5f ${occupancyVisual}% 100%)` }}>
+              <div><strong id="fl2-owner-occupancy-value">{occupancyVisual}%</strong><span id="fl2-owner-occupancy-caption">Загрузка</span></div>
+            </div>
           <div className="room-state-grid">
             <div className="state-clean"><strong>{data.rooms.clean}</strong><span>Готовы</span></div>
             <div className="state-dirty"><strong>{data.rooms.dirty}</strong><span>Нужна уборка</span></div>
             <div className="state-inspection"><strong>{data.rooms.in_inspection}</strong><span>На проверке</span></div>
             <div className="state-tech"><strong>{data.rooms.tech_block}</strong><span>TECH_BLOCK</span></div>
             <div><strong>{data.rooms.unknown}</strong><span>Не указан статус</span></div>
+          </div>
           </div>
           <p className="command-note">Готовы сейчас: {roomReady}. Физическое состояние номера не подменяет коммерческую занятость.</p>
         </article>
@@ -195,6 +201,12 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
           </div>)}
         </div>}
       </section>
+
+      {/* Existing Owner executive/forecast/operations components are preserved;
+          placed after the immediate operational summary for a denser first viewport. */}
+      <OwnerExecutivePack />
+      <OwnerControlV2 />
+      <OwnerOperationsPerformance />
     </main>
   );
 }
