@@ -49,6 +49,7 @@ import "./three-crowns-admin.css";
 import "./mobile-hardening.css";
 import "./admin-experience.css";
 import "./fl2-owner-dashboard.css";
+import "./fl2-premium-visual.css";
 
 export const metadata: Metadata = {
   title: "MARINA SMART — Hotel OS",

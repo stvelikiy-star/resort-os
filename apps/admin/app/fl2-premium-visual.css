@@ -1,0 +1,282 @@
+/* MARINA SMART — Future Luxury premium visual alignment.
+ * Applies only to opt-in Future Luxury; existing JSX callbacks / RBAC / Core API untouched.
+ * The source of all displayed metrics remains the existing server-driven components. */
+html[data-marina-ui="future-luxury"] {
+  --fl2-night:#061521;--fl2-abyss:#091e2e;--fl2-panel:#102d3d;--fl2-tile:#14384b;
+  --fl2-edge:rgba(82,198,218,.24);--fl2-ink:#f4fbff;--fl2-muted:#b4cbd7;
+  --fl2-cyan:#26cdd7;--fl2-cyan-bright:#45e3e5;--fl2-warm:#e7c187;
+  color-scheme:dark;
+  background:var(--fl2-night);
+}
+html[data-marina-ui="future-luxury"] body{
+  background:radial-gradient(ellipse at 85% 0%,rgba(23,111,135,.28),transparent 36%),
+             linear-gradient(145deg,#061521 0%,#092030 59%,#071723 100%) fixed;
+  color:var(--fl2-ink);
+}
+@media(min-width:1101px){
+  html[data-marina-ui="future-luxury"] body{padding-left:260px}
+  html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav{
+    position:fixed;z-index:1400;inset:0 auto 0 0;width:260px;height:100dvh;
+    box-sizing:border-box;display:flex;flex-direction:column;align-items:stretch;gap:16px;
+    padding:24px 12px 16px;
+    background:linear-gradient(164deg,#092335 0%,#0e3044 60%,#071826 100%);
+    border:0;border-right:1px solid rgba(64,212,224,.24);
+    border-radius:0;overflow:visible;
+  }
+  html[data-marina-ui="future-luxury"] .admin-identity{
+    display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px;
+    padding:6px 6px 18px;border-bottom:1px solid var(--fl2-edge);
+    text-align:center;min-height:135px;
+  }
+  html[data-marina-ui="future-luxury"] .admin-identity .marina-brand-logo-small{
+    height:78px;width:78px;object-fit:contain;border:0;box-shadow:none;
+  }
+  html[data-marina-ui="future-luxury"] .admin-identity>div{
+    flex:0 0 100%;display:grid;gap:6px;min-width:0;
+  }
+  html[data-marina-ui="future-luxury"] .admin-identity strong{
+    color:white;font-size:15px;font-weight:800;letter-spacing:.06em;white-space:normal;
+  }
+  html[data-marina-ui="future-luxury"] .admin-identity span{
+    display:block;max-width:100%;font-size:11px;white-space:normal;line-height:1.35;
+  }
+  html[data-marina-ui="future-luxury"] .admin-tabs{
+    display:flex;flex-direction:column;align-items:stretch;
+    gap:4px;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+    padding:3px 5px;scrollbar-gutter:stable;overscroll-behavior:contain;
+  }
+  html[data-marina-ui="future-luxury"] .admin-tabs>button,
+  html[data-marina-ui="future-luxury"] .admin-more-menu>summary{
+    flex:none;display:flex;align-items:center;justify-content:flex-start;
+    min-height:42px;width:100%;padding:10px 13px;border-radius:11px;
+    font-size:12px;letter-spacing:.01em;text-align:left;white-space:normal;
+    border:1px solid transparent;
+  }
+  html[data-marina-ui="future-luxury"] .admin-tabs>button.active{
+    border:1px solid rgba(107,244,241,.55);background:linear-gradient(125deg,#087f89,#0aa5ae);
+    box-shadow:0 7px 18px rgba(0,207,213,.17);
+  }
+  html[data-marina-ui="future-luxury"] .admin-more-menu{
+    position:relative;display:block;width:100%;
+  }
+  html[data-marina-ui="future-luxury"] .admin-more-panel{
+    position:relative;inset:auto;max-height:none;box-shadow:none;min-width:0;width:100%;
+    padding:7px 3px 8px;background:rgba(0,8,18,.18);border-radius:12px;
+    max-width:100%;overflow:visible;
+  }
+  html[data-marina-ui="future-luxury"] .admin-more-panel button{
+    min-height:35px;white-space:normal;font-size:11px;text-align:left;
+  }
+  html[data-marina-ui="future-luxury"] .admin-nav-section-label{
+    margin-top:12px;color:var(--fl2-warm);font-size:10px;
+  }
+  html[data-marina-ui="future-luxury"] .admin-shell-actions{
+    flex-direction:column;align-items:stretch;gap:9px;padding-top:12px;
+    border-top:1px solid var(--fl2-edge);flex-shrink:0;
+  }
+  html[data-marina-ui="future-luxury"] .shell-theme-toggle{
+    justify-content:center;
+  }
+  html[data-marina-ui="future-luxury"] .logout-button{min-height:36px}
+  html[data-marina-ui="future-luxury"] main.work-shell,
+  html[data-marina-ui="future-luxury"] main.management-shell,
+  html[data-marina-ui="future-luxury"] .owner-pms-stack{
+    max-width:none;width:min(100%,1850px);
+  }
+}
+html[data-marina-ui="future-luxury"] main.work-shell{
+  color:var(--fl2-ink);padding:clamp(15px,2vw,28px);
+}
+html[data-marina-ui="future-luxury"] main.work-shell.dashboard-shell{
+  display:flex;flex-direction:column;gap:16px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head{
+  border-radius:22px!important;min-height:150px;box-sizing:border-box;
+  background:
+    radial-gradient(ellipse at 92% 22%,rgba(30,188,205,.24),transparent 42%),
+    linear-gradient(112deg,rgba(5,25,42,.98) 0%,rgba(15,57,73,.96) 100%)!important;
+  border-color:rgba(63,207,216,.38)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .work-head h1{
+  font-size:clamp(27px,3vw,38px);line-height:1.2;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,185px),1fr));gap:12px;
+  margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article{
+  border-radius:18px!important;min-height:130px;box-sizing:border-box;
+  background:linear-gradient(152deg,rgba(18,59,76,.94),rgba(8,32,47,.99))!important;
+  box-shadow:inset 0 1px 0 rgba(113,224,230,.11),0 14px 30px rgba(0,0,0,.12);
+  border:1px solid rgba(47,205,215,.3)!important;
+  padding:20px 17px!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article>strong{
+  font-size:clamp(24px,2.15vw,32px);font-weight:850;letter-spacing:-.035em;
+  font-variant-numeric:tabular-nums;line-height:1.3;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article::after{
+  content:"";display:block;width:66px;height:3px;margin-top:12px;
+  background:linear-gradient(90deg,var(--fl2-cyan),transparent);
+  border-radius:99px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid.two{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid>.command-panel,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid.two>.command-panel,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-panel{
+  background:linear-gradient(160deg,#112e3f,#0b2435)!important;
+  color:var(--fl2-ink)!important;border:1px solid var(--fl2-edge)!important;
+  border-radius:19px!important;box-shadow:0 15px 36px rgba(0,7,15,.13);
+  padding:20px!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head h2{
+  font-size:clamp(17px,1.6vw,21px);font-weight:780;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money{
+  border-color:var(--fl2-edge);gap:4px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list>div,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money>div,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .stay-row,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .attention-row{
+  background:rgba(35,86,103,.23)!important;border:1px solid rgba(82,198,218,.11)!important;
+  border-radius:11px;color:#f5fcff!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list span,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money span{
+  color:#bed5e0!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list strong,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money strong{
+  color:#f4fcff!important;font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-drill{
+  border:1px solid rgba(40,207,214,.45)!important;
+  background:rgba(17,170,184,.14)!important;color:#68eff0!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-drill span{
+  color:#68eff0!important;
+}
+/* Preserve all real Owner Executive and operations blocks; visually harmonize their wrappers */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .owner-executive,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .owner-v2{
+  border:1px solid rgba(49,192,211,.22);border-radius:20px;overflow:hidden;
+  box-shadow:0 17px 40px rgba(0,7,19,.11);
+}
+/* Actual PMS grid: pure presentation, same real reservations and selection mechanics. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack{
+  --fl2-pms-panel:#0b2737;--fl2-pms-sub:#15374a;
+  color:var(--fl2-ink);padding:clamp(13px,1.4vw,22px);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-shell{
+  background:linear-gradient(155deg,#102f41,#082332);
+  border:1px solid rgba(55,200,214,.32);border-radius:22px;padding:18px;
+  color:var(--fl2-ink);box-shadow:0 24px 50px rgba(0,9,19,.20);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title h1{
+  color:white;font-size:clamp(23px,2.2vw,31px);letter-spacing:-.025em;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title p{
+  color:#bfd5df;line-height:1.5;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar{
+  background:rgba(0,18,29,.25);border:1px solid var(--fl2-edge);border-radius:15px;
+  padding:12px;gap:8px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar select,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar button,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-search,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker{
+  border:1px solid rgba(58,171,190,.28);background:#143647;color:#effbff;
+  border-radius:10px;min-height:38px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar input{
+  color:#fff;min-height:34px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack input::placeholder{
+  color:#a2c1ce;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-window-switch button.active{
+  color:#052a35;background:var(--fl2-cyan);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-selection-help{
+  background:rgba(22,103,119,.22);color:#bce8ec;border-radius:11px;
+  padding:10px 13px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-scroll{
+  background:#092738;border:1px solid rgba(51,198,210,.35);
+  border-radius:15px;box-shadow:inset 0 1px 12px rgba(0,0,0,.17);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-head{
+  background:#173a4b;border-color:var(--fl2-edge);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-head,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-state-head,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head{
+  background:#163847;color:#eafaff;border-color:rgba(74,184,200,.22);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head.today{
+  background:#075363;color:#8ffbfa;border-color:#25dbe0;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-row{
+  background:#0b2a3b;border-color:rgba(69,167,187,.17);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-row:nth-child(even){background:#103245}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label{
+  background:transparent;color:#eafaff;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state{
+  color:#eafaff;border-color:rgba(69,167,187,.2);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell{
+  border-color:rgba(57,169,187,.18);background:rgba(21,60,76,.36);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.today{
+  background:rgba(5,178,190,.12);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.free:hover{
+  background:rgba(23,208,203,.27);outline:1px solid #40ece8;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.selected{
+  background:rgba(32,205,210,.40)!important;outline:2px solid #3ceadf;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar{
+  border-radius:11px;color:#fff;text-shadow:0 1px 1px rgba(0,17,24,.4);
+  box-shadow:0 4px 14px rgba(0,0,0,.16);
+  transition:filter 160ms ease,box-shadow 160ms ease,transform 160ms ease;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar:hover{
+  filter:brightness(1.13);box-shadow:0 5px 18px rgba(14,199,206,.22);transform:translateY(-1px);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-legend{
+  color:#c0d6de;gap:12px;padding:10px 3px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-pms-switches button{
+  border:1px solid var(--fl2-edge);background:#12394b;color:#dbf8fa;border-radius:12px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-pms-switches button.active{
+  background:#09828d;border-color:#40cdd5;
+}
+@media(max-width:1100px){
+  html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav{
+    background:linear-gradient(120deg,#071d30,#0d3a49);
+  }
+}
+@media(max-width:760px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid,
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid.two{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] main.work-shell{padding:14px}
+  html[data-marina-ui="future-luxury"] .owner-pms-stack{padding:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar,
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-drill{
+    transition:none!important;transform:none!important;
+  }
+}

@@ -11,6 +11,7 @@ import { useTheme } from '../theme/ThemeProvider';
 import { font, radius, space } from '../theme/tokens';
 import { motionPresets, useMotionPreference } from '../theme/motion';
 import { Empty, SectionLabel } from './ui';
+import { InventorySpectrum } from './InventorySpectrum';
 import { GlassCard, StaggerItem } from './Future';
 
 type Copy = ReturnType<typeof useMobileCopy>;
@@ -122,6 +123,15 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
       </View>
       {occupancyKnown ? <OccupancyProgress value={occupancy} label={copy.occupancy}
         color={c.cyan} trackColor={c.surfaceAlt}/> : null}
+    </GlassCard>
+
+    <GlassCard style={{ padding: 15, gap: 12, borderLeftWidth: 3, borderLeftColor: c.cyan }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <Text style={[font.h2, { color: c.text, flex: 1 }]}>{copy.roomCondition}</Text>
+        <Text style={[font.small, { color: c.textMuted }]}>{count(data.rooms.total)}</Text>
+      </View>
+      <InventorySpectrum totals={data.rooms} total={data.rooms.total}
+        labels={{ clean: copy.clean, dirty: copy.dirty, inspection: copy.checking, blocked: copy.tech }}/>
     </GlassCard>
 
     <View style={{ gap: space.sm }}>

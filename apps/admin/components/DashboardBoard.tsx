@@ -104,10 +104,6 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
         </div>
       </section>}
 
-      <OwnerExecutivePack />
-      <OwnerControlV2 />
-      <OwnerOperationsPerformance />
-
       <section className="command-kpis">
         <article><span>Загрузка сейчас</span><strong>{data.stays.occupancy_percent}%</strong><small>{data.stays.occupied_rooms} из {data.rooms.total} номеров</small></article>
         <article><span>Заезды сегодня</span><strong>{data.stays.arrivals_today}</strong><small>гарантированные брони</small></article>
@@ -195,6 +191,12 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
           </div>)}
         </div>}
       </section>
+
+      {/* Existing Owner executive/forecast/operations components are preserved;
+          placed after the immediate operational summary for a denser first viewport. */}
+      <OwnerExecutivePack />
+      <OwnerControlV2 />
+      <OwnerOperationsPerformance />
     </main>
   );
 }
