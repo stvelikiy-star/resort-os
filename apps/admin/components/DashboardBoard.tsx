@@ -122,9 +122,9 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
           <div className="command-panel-head"><div><p className="eyebrow">Номерной фонд</p><h2>{data.rooms.total} номеров · состояние</h2></div><Drill to="PMS" onNavigate={onNavigate}>Открыть шахматку</Drill></div>
           <div className="fl2-room-state-visual">
             <div className="fl2-real-occupancy-ring"
-              role="img" aria-label={`Загрузка сейчас: ${occupancyVisual}%`}
+              role="img" aria-labelledby="fl2-owner-occupancy-caption fl2-owner-occupancy-value"
               style={{ background: `conic-gradient(#25d7d9 0% ${occupancyVisual}%, #244b5f ${occupancyVisual}% 100%)` }}>
-              <div><strong>{occupancyVisual}%</strong><span>Загрузка</span></div>
+              <div><strong id="fl2-owner-occupancy-value">{occupancyVisual}%</strong><span id="fl2-owner-occupancy-caption">Загрузка</span></div>
             </div>
           <div className="room-state-grid">
             <div className="state-clean"><strong>{data.rooms.clean}</strong><span>Готовы</span></div>
