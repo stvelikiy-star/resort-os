@@ -1,0 +1,219 @@
+/* MARINA SMART Future Luxury 2.0 — unchanged operational modules, opt-in visuals. */
+html[data-marina-ui="future-luxury"] {
+  --flops-card:#112f41;
+  --flops-tint:#183e50;
+  --flops-border:rgba(54,198,213,.29);
+  --flops-text:#ecfaff;
+  --flops-muted:#b4cddc;
+  --flops-accent:#32d4d9;
+}
+html[data-marina-ui="future-luxury"] .rates-shell,
+html[data-marina-ui="future-luxury"] .staff-shell,
+html[data-marina-ui="future-luxury"] .reports-shell,
+html[data-marina-ui="future-luxury"] .marketing-shell {
+  max-width:none;color:var(--flops-text);
+}
+html[data-marina-ui="future-luxury"] .reports-shell{background:transparent;padding:clamp(13px,2vw,28px)}
+html[data-marina-ui="future-luxury"] .reports-head,
+html[data-marina-ui="future-luxury"] .rates-shell>.work-head,
+html[data-marina-ui="future-luxury"] .staff-shell>.work-head,
+html[data-marina-ui="future-luxury"] .marketing-head {
+  padding:clamp(18px,2vw,26px);border-radius:21px;
+  background:linear-gradient(112deg,#0a273a,#105565);
+  color:#f6fcff;border:1px solid rgba(55,193,209,.34);
+  box-shadow:0 14px 36px rgba(3,15,28,.16);
+}
+html[data-marina-ui="future-luxury"] .reports-head h1,
+html[data-marina-ui="future-luxury"] .rates-shell .work-head h1,
+html[data-marina-ui="future-luxury"] .staff-shell .work-head h1,
+html[data-marina-ui="future-luxury"] .marketing-head h1 {
+  color:#f4fbff;font-size:clamp(26px,2.5vw,36px);
+}
+html[data-marina-ui="future-luxury"] .rates-shell .work-head .subtitle,
+html[data-marina-ui="future-luxury"] .staff-shell .work-head .subtitle,
+html[data-marina-ui="future-luxury"] .marketing-head p,
+html[data-marina-ui="future-luxury"] .reports-head p:last-child{
+  color:#c2dae6;
+}
+html[data-marina-ui="future-luxury"] .request-list{display:grid;gap:12px}
+html[data-marina-ui="future-luxury"] .request-card,
+html[data-marina-ui="future-luxury"] .reports-kpis>article,
+html[data-marina-ui="future-luxury"] .report-card,
+html[data-marina-ui="future-luxury"] .reports-comparison,
+html[data-marina-ui="future-luxury"] .staff-kpis>article,
+html[data-marina-ui="future-luxury"] .staff-unassigned>div,
+html[data-marina-ui="future-luxury"] .staff-table,
+html[data-marina-ui="future-luxury"] .staff-controls,
+html[data-marina-ui="future-luxury"] .rate-group,
+html[data-marina-ui="future-luxury"] .rates-shell .management-kpis>article,
+html[data-marina-ui="future-luxury"] .marketing-kpis>article,
+html[data-marina-ui="future-luxury"] .marketing-panel{
+  background:linear-gradient(154deg,#143649,#092a3a);
+  color:#f1fcff;
+  border:1px solid var(--flops-border);
+  border-radius:16px;
+  box-shadow:0 12px 26px rgba(1,12,22,.1);
+}
+html[data-marina-ui="future-luxury"] .request-card{
+  border-left:3px solid var(--flops-accent);
+  padding:clamp(13px,1.5vw,20px);
+}
+html[data-marina-ui="future-luxury"] .reports-kpis>article,
+html[data-marina-ui="future-luxury"] .staff-kpis>article,
+html[data-marina-ui="future-luxury"] .marketing-kpis>article{
+  min-height:115px;
+}
+html[data-marina-ui="future-luxury"] .reports-kpis strong,
+html[data-marina-ui="future-luxury"] .staff-kpis strong,
+html[data-marina-ui="future-luxury"] .marketing-kpis strong{
+  color:#f3fcff;font-variant-numeric:tabular-nums;
+  font-size:clamp(20px,2vw,28px);
+}
+html[data-marina-ui="future-luxury"] .reports-kpis span,
+html[data-marina-ui="future-luxury"] .reports-kpis small,
+html[data-marina-ui="future-luxury"] .staff-kpis span,
+html[data-marina-ui="future-luxury"] .marketing-kpis span,
+html[data-marina-ui="future-luxury"] .marketing-kpis small,
+html[data-marina-ui="future-luxury"] .request-card small,
+html[data-marina-ui="future-luxury"] .report-card small{
+  color:var(--flops-muted);font-size:11px;line-height:1.4;
+}
+html[data-marina-ui="future-luxury"] .reports-filter,
+html[data-marina-ui="future-luxury"] .rates-shell .management-controls{
+  background:rgba(14,50,66,.72);border:1px solid var(--flops-border);
+  border-radius:14px;padding:12px;
+}
+html[data-marina-ui="future-luxury"] .reports-filter span,
+html[data-marina-ui="future-luxury"] .reports-filter small,
+html[data-marina-ui="future-luxury"] .report-card-head>div>span,
+html[data-marina-ui="future-luxury"] .marketing-panel-head>div>p:not(.eyebrow){
+  color:#b9d3df;
+}
+html[data-marina-ui="future-luxury"] .report-card h2,
+html[data-marina-ui="future-luxury"] .marketing-panel h2{
+  color:#f2fcff;
+}
+html[data-marina-ui="future-luxury"] .staff-row{
+  border-color:rgba(76,193,211,.19);
+}
+html[data-marina-ui="future-luxury"] .staff-row.header,
+html[data-marina-ui="future-luxury"] .rate-period-row.rate-period-head{
+  color:#c7e5e9;background:#194756;
+}
+html[data-marina-ui="future-luxury"] .staff-row strong,
+html[data-marina-ui="future-luxury"] .staff-row b,
+html[data-marina-ui="future-luxury"] .rate-period-row strong,
+html[data-marina-ui="future-luxury"] .request-card strong{
+  color:#f4fbff;
+}
+html[data-marina-ui="future-luxury"] .staff-row small,
+html[data-marina-ui="future-luxury"] .staff-truth,
+html[data-marina-ui="future-luxury"] .staff-unassigned span{
+  color:#b8d2db;
+}
+html[data-marina-ui="future-luxury"] .reports-shell input,
+html[data-marina-ui="future-luxury"] .staff-shell input,
+html[data-marina-ui="future-luxury"] .staff-shell select,
+html[data-marina-ui="future-luxury"] .rates-shell input,
+html[data-marina-ui="future-luxury"] .rates-shell select,
+html[data-marina-ui="future-luxury"] .marketing-shell select{
+  background:#173d50;color:#edfaff;
+  border:1px solid rgba(70,189,206,.43);
+  border-radius:10px;min-height:40px;
+}
+html[data-marina-ui="future-luxury"] .reports-shell input:focus-visible,
+html[data-marina-ui="future-luxury"] .staff-shell input:focus-visible,
+html[data-marina-ui="future-luxury"] .rates-shell input:focus-visible,
+html[data-marina-ui="future-luxury"] .request-card button:focus-visible{
+  outline:3px solid #e6bd70;outline-offset:2px;
+}
+/* Correct contrast in the ice-light theme without reimplementing any controls. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"]{
+  --flops-card:#fff;
+  --flops-tint:#eaf5f8;
+  --flops-border:#c6dfe8;
+  --flops-text:#0c3246;
+  --flops-muted:#4e6c7c;
+  --flops-accent:#098b96;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-shell,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-shell,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-shell{
+  color:var(--flops-text);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell>.work-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-shell>.work-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-head{
+  color:#0d3449;background:linear-gradient(120deg,#fff,#e6f4f8);
+  border-color:#c6e0e7;box-shadow:0 11px 30px rgba(18,67,86,.06);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-head h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell .work-head h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-shell .work-head h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-head h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .report-card h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-panel h2{
+  color:#0a3448;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-head p:last-child,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-head p,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-shell>.work-head .subtitle{
+  color:#526f80;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .request-card,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-kpis>article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .report-card,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-comparison,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-kpis>article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-unassigned>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-table,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-controls,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rate-group,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell .management-kpis>article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-kpis>article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-panel{
+  color:#0d3448;background:linear-gradient(150deg,#fff,#f1f8fb);
+  border-color:#cfdee7;box-shadow:0 12px 26px rgba(17,71,90,.05);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-kpis strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-kpis strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-kpis strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-row strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-row b,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rate-period-row strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .request-card strong{
+  color:#0b3449;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-kpis span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-kpis span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-kpis span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-kpis small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-row small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-truth{
+  color:#526f80;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-row.header,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rate-period-row.rate-period-head{
+  color:#285469;background:#e1f1f5;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-filter,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell .management-controls{
+  background:#eff8fa;border-color:#cadfe7;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reports-shell input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-shell input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .staff-shell select,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .rates-shell select,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-shell select{
+  background:white;color:#143e53;border-color:#c3dee7;
+}
+@media(max-width:760px) {
+  html[data-marina-ui="future-luxury"] .reports-shell,
+  html[data-marina-ui="future-luxury"] .marketing-shell{padding:13px}
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .request-card{animation:none!important;transform:none!important}
+}
