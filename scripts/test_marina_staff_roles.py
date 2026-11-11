@@ -18,11 +18,12 @@ expected = {
     "COOK",
     "WAITER",
     "AGENT",
+    "STORE_STAFF",
 }
 assert set(MANAGED_ROLES) == expected, MANAGED_ROLES
 assert set(get_args(ManagedRole)) == expected, get_args(ManagedRole)
 
-for role in ("COOK", "WAITER"):
+for role in ("COOK", "WAITER", "STORE_STAFF"):
     StaffCreate(
         username=f"test-{role.lower()}",
         display_name=f"Test {role}",
@@ -31,7 +32,7 @@ for role in ("COOK", "WAITER"):
     )
     StaffPatch(role=role)
 
-for role in ("OWNER", "STORE_STAFF", "DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"):
+for role in ("OWNER", "DINING_STAFF", "CONTENT_MANAGER", "BEACH_PARTNER"):
     try:
         StaffCreate(
             username="test-legacy",
@@ -60,4 +61,16 @@ for value in ({"role":"AGENT"},
     else:
         raise AssertionError("Agent binding policy must reject invalid user")
 
-print("PASS: seven managed roles; AGENT requires binding; unreviewed legacy roles rejected")
+print("PASS: eight managed roles; AGENT requires binding; unreviewed legacy roles rejected")
+
+from app.section_permissions import role_or_section_allowed
+custom_store={"role":"STORE_STAFF","module_permissions_custom":True,"module_permissions":["DINING","FINANCE","STAFF"]}
+assert role_or_section_allowed(custom_store,"/api/v1/kitchen/stock",("STORE_STAFF","OWNER"))
+for path,roles in [
+ ("/api/v1/kitchen/production-targets",("COOK","MANAGER")),
+ ("/api/v1/kitchen/stock/consume",("COOK","MANAGER")),
+ ("/api/v1/admin/finance/summary",("OWNER","MANAGER")),
+ ("/api/v1/admin/staff",("OWNER",)),
+]:
+ assert not role_or_section_allowed(custom_store,path,roles),path
+print("PASS: STORE_STAFF custom module grants never elevate role")

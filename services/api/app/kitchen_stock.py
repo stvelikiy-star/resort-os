@@ -8,8 +8,9 @@ from .auth import require_roles, trusted_property_id
 from .kitchen_recipes import read_recipe
 
 router = APIRouter(prefix='/api/v1/kitchen/stock', tags=['kitchen-stock'])
-read_access = require_roles('OWNER', 'MANAGER', 'COOK')
+read_access = require_roles('OWNER', 'MANAGER', 'COOK', 'STORE_STAFF')
 manage_access = require_roles('OWNER', 'MANAGER')
+receipt_access = require_roles('OWNER', 'MANAGER', 'STORE_STAFF')
 consume_access = require_roles('MANAGER', 'COOK')
 
 class ItemWrite(BaseModel):
@@ -62,7 +63,7 @@ async def create_item(body: ItemWrite, request: Request, user=Depends(manage_acc
         return {'id':str(row['id']),'status':'CREATED'}
 
 @router.post('/receipts',status_code=201)
-async def create_receipt(body: ReceiptWrite, request: Request, user=Depends(manage_access)):
+async def create_receipt(body: ReceiptWrite, request: Request, user=Depends(receipt_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid=await trusted_property_id(conn,user)

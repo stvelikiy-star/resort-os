@@ -18,6 +18,7 @@ DEFAULT_ROLE_MODULES: dict[str, tuple[str, ...]] = {
     "TECHNICIAN": ("OPS",),
     "COOK": ("DINING",),
     "WAITER": ("DINING",),
+    "STORE_STAFF": ("DINING",),
 }
 
 
@@ -134,6 +135,10 @@ def role_or_section_allowed(
     user: dict[str, Any], path: str, allowed_roles: tuple[str, ...], *, module_grant: bool = True
 ) -> bool:
     role = user.get("role")
+    # STORE_STAFF is an explicit stock-receipt role. A custom DINING/FINANCE
+    # module grant must never promote it to COOK, MANAGER or OWNER endpoints.
+    if role == "STORE_STAFF" and role not in allowed_roles:
+        return False
     if role == "OWNER" and "OWNER" in allowed_roles:
         return True
     modules = section_for_path(path)

@@ -23,6 +23,7 @@ ManagedRole = Literal[
     "TECHNICIAN",
     "COOK",
     "WAITER",
+    "STORE_STAFF",
 ]
 MANAGED_ROLES = [
     "MANAGER",
@@ -32,6 +33,7 @@ MANAGED_ROLES = [
     "TECHNICIAN",
     "COOK",
     "WAITER",
+    "STORE_STAFF",
 ]
 
 

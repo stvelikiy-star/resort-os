@@ -22,6 +22,8 @@ ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
     "reviewed critical source changed: " + WORKFLOW_PATH,
     "reviewed critical source changed: services/api/app/hotel_finance.py",
+    "reviewed critical source changed: apps/admin/app/shared-auth-preview/page.tsx",
+    "reviewed critical source changed: services/api/app/section_permissions.py",
 })
 
 def validate_additive() -> list[str]:

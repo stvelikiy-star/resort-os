@@ -24,3 +24,13 @@ test('does not substitute demo inventory for an unavailable live stock service',
   const m=createLiveModules('https://aska.example',jest.fn(async()=>response(404,{detail:'Not Found'})) as typeof fetch,'single_property');
   await expect(m.kitchenStock()).rejects.toBeDefined();
 });
+
+test('validates stock receipts and does not turn receipt into a payment',async()=>{
+  const payload={id:'33333333-3333-4333-8333-333333333333',quantity:'1.000000',payment_created:false};
+  const fetchMock=jest.fn(async()=>response(201,payload));
+  const api=createLiveModules('https://aska.example',fetchMock as typeof fetch,'single_property');
+  await expect(api.receiveKitchenStock(stock.items[0].id,'1')).resolves.toEqual(payload);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  await expect(api.receiveKitchenStock(stock.items[0].id,'-1')).rejects.toMatchObject({code:'BAD_REQUEST'});
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});

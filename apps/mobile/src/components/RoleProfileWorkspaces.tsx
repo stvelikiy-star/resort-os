@@ -2,7 +2,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { BedDouble, CalendarDays, ChefHat, CircleUserRound, ClipboardCheck,
   ConciergeBell, LayoutDashboard, MessageCircle, UsersRound,
-  UtensilsCrossed, Wrench } from 'lucide-react-native';
+  UtensilsCrossed, Wrench, Package } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { TabKey } from '../roles/registry';
 import { useMobileCopy } from '../i18n/mobileCopy';
@@ -13,7 +13,7 @@ import { SectionLabel } from './ui';
 
 const ICONS: Record<TabKey, LucideIcon> = {
   overview: LayoutDashboard, reception: ConciergeBell, pms: CalendarDays,
-  inbox: MessageCircle, dining: UtensilsCrossed, kitchen: ChefHat,
+  inbox: MessageCircle, dining: UtensilsCrossed, kitchen: ChefHat, store: Package,
   tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
   admin: UsersRound, profile: CircleUserRound,
 };

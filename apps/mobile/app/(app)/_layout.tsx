@@ -2,7 +2,7 @@ import React from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Redirect, Tabs, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Grid2X2, ClipboardCheck, BedDouble, LayoutDashboard, UsersRound, CircleUserRound, Wrench, MessageCircle, CalendarDays, ConciergeBell, UtensilsCrossed, ChefHat } from 'lucide-react-native';
+import { Grid2X2, ClipboardCheck, BedDouble, LayoutDashboard, UsersRound, CircleUserRound, Wrench, MessageCircle, CalendarDays, ConciergeBell, UtensilsCrossed, ChefHat, Package } from 'lucide-react-native';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { hasTabForSession, homeForSession, workspaceForSession, TabKey } from '../../src/roles/registry';
@@ -12,10 +12,10 @@ import { iconography, radius } from '../../src/theme/tokens';
 
 const ICONS = {
   overview: LayoutDashboard, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
-  dining: UtensilsCrossed, kitchen: ChefHat, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
+  dining: UtensilsCrossed, kitchen: ChefHat, store: Package, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
   admin: UsersRound, profile: CircleUserRound,
 } as const;
-const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
+const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'store', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
 export default function AppTabs() {
   const { user, api, serverAuthMode, locale } = useSession();
   const pathname = usePathname();

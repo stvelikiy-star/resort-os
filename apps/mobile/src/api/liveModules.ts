@@ -443,6 +443,17 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       return {items:rows,production_cost_kgs:payload.production_cost_kgs,
         inventory_deducted_only_on_explicit_consume:true};
     },
+    receiveKitchenStock: async (stockItemId:string, quantity:string):Promise<{id:string;quantity:string;payment_created:false}> => {
+      reviewGate();
+      if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity) || Number(quantity)<=0)
+        throw new ApiError('BAD_REQUEST','Positive stock receipt quantity required');
+      const payload=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/receipts',{
+        stock_item_id:safeRouteId(stockItemId),quantity,notes:'Mobile inventory receipt',
+      }),'stock receipt');
+      if (typeof payload.id!=='string'||typeof payload.quantity!=='string'||payload.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid stock receipt acknowledgment');
+      return {id:safeRouteId(payload.id),quantity:payload.quantity,payment_created:false};
+    },
     consumeKitchenStock: async (productionTargetId:string):Promise<KitchenStockConsumeAck> => {
       reviewGate();
       const payload=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/consume',{

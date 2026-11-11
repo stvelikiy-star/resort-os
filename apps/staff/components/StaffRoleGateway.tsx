@@ -1,4 +1,5 @@
 "use client";
+import StoreStaffStock from "./StoreStaffStock";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
@@ -255,7 +256,7 @@ export default function StaffRoleGateway() {
         <button className="shift-ghost" onClick={() => void logout()}>Выйти</button>
       </header>
       {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
-      {user.role === "STORE_STAFF" && <div className="shift-empty"><strong>Кабинет магазина пока не введён в эксплуатацию.</strong><span>Склад, продажи и списания недоступны: для них ещё нет принятого серверного контура. Обратитесь к владельцу гостиницы; операции нельзя проводить через другие роли или вне учёта.</span></div>}
+      {user.role === "STORE_STAFF" && <StoreStaffStock />}
       {user.role === "COOK" && <div className="shift-empty"><strong>Kitchen Admin готов к работе.</strong><span>Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.</span><a className="shift-primary" href="/kitchen">Открыть Kitchen Admin</a></div>}
       {user.role === "RECEPTION" && <div className="shift-empty"><strong>Рабочая очередь ниже обновляется автоматически.</strong><span>Берите заявку в работу и закрывайте её после фактического выполнения.</span></div>}
     </main>
