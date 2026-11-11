@@ -17,7 +17,9 @@ class PaymentRequirementPayload(BaseModel):
 
 
 def reservation_ledger_item(row) -> dict[str, Any]:
-    total = int(row["totalKgs"] or 0)
+    accommodation = int(row["totalKgs"] or 0)
+    extras = int(row.get("extras_kgs", 0) or 0)
+    total = (0 if row["status"] == "CANCELLED" else accommodation) + extras
     received = int(row["received_kgs"] or 0)
     remaining = max(total - received, 0)
     overpaid = max(received - total, 0)
@@ -41,6 +43,8 @@ def reservation_ledger_item(row) -> dict[str, Any]:
         "guest_phone": row["phone"],
         "room_code": row["room_code"],
         "total_kgs": total,
+        "accommodation_kgs": 0 if status == "CANCELLED" else accommodation,
+        "extras_kgs": extras,
         "received_kgs": received,
         "remaining_kgs": remaining,
         "overpaid_kgs": overpaid,
@@ -240,13 +244,19 @@ async def finance_summary(
               FROM payments
               WHERE status='RECEIVED' AND "reservationId" IS NOT NULL
               GROUP BY "reservationId"
+            ), extras AS (
+              SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS extras_kgs
+              FROM guest_folio_charges
+              WHERE status NOT IN ('WAIVED','VOID') AND "reservationId" IS NOT NULL
+              GROUP BY "reservationId"
             )
             SELECT COUNT(*)::int AS reservation_count,
-                   COALESCE(SUM(r."totalKgs"),0)::bigint AS booked_total_kgs,
+                   COALESCE(SUM(r."totalKgs"+COALESCE(e.extras_kgs,0)),0)::bigint AS booked_total_kgs,
                    COALESCE(SUM(COALESCE(x.received_kgs,0)),0)::bigint AS received_kgs,
-                   COALESCE(SUM(GREATEST(r."totalKgs"-COALESCE(x.received_kgs,0),0)),0)::bigint AS outstanding_kgs
+                   COALESCE(SUM(GREATEST(r."totalKgs"+COALESCE(e.extras_kgs,0)-COALESCE(x.received_kgs,0),0)),0)::bigint AS outstanding_kgs
             FROM reservations r
             LEFT JOIN received x ON x."reservationId"=r.id
+            LEFT JOIN extras e ON e."reservationId"=r.id
             WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
             ''',
             pid,
@@ -294,8 +304,14 @@ async def finance_summary(
               FROM payments
               WHERE "reservationId" IS NOT NULL
               GROUP BY "reservationId"
+            ), extras AS (
+              SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS extras_kgs
+              FROM guest_folio_charges
+              WHERE status NOT IN ('WAIVED','VOID') AND "reservationId" IS NOT NULL
+              GROUP BY "reservationId"
             )
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r."totalKgs",
+                   COALESCE(ex.extras_kgs,0)::bigint AS extras_kgs,
                    g."firstName",g."lastName",g.phone,
                    COALESCE(ps.received_kgs,0)::bigint AS received_kgs,
                    COALESCE(ps.received_count,0)::int AS received_count,
@@ -304,6 +320,7 @@ async def finance_summary(
             FROM reservations r
             LEFT JOIN guests g ON g.id=r."primaryGuestId"
             LEFT JOIN payment_stats ps ON ps."reservationId"=r.id
+            LEFT JOIN extras ex ON ex."reservationId"=r.id
             LEFT JOIN stays s ON s."reservationId"=r.id
             LEFT JOIN LATERAL (
               SELECT room.code
@@ -444,7 +461,7 @@ async def finance_summary(
         "truth": {
             "received": "Period received totals include only stored Payment.status=RECEIVED facts. Property-local calendar boundaries are converted to UTC-naive timestamps because the committed PostgreSQL baseline stores Prisma DateTime values as TIMESTAMP(3) without timezone.",
             "pending": "Pending total is an internal payment-record snapshot; it is not recognized revenue and does not mean automation is collecting payment.",
-            "active_reservations": "Active reservation totals are a current internal snapshot of GUARANTEED/CHECKED_IN reservation values and stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
+            "active_reservations": "Active reservation totals include accommodation and non-waived/non-void folio extras, less stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
             "receivables": "Debtor counts and amounts are calculated over the complete GUARANTEED/CHECKED_IN/CHECKED_OUT reservation ledger. A CHECKED_OUT balance remains visible for operational follow-up regardless of historical ledger size.",
             "ledger": "The reservation_ledger response is a newest-first preview capped for payload size; reservation_ledger_meta declares truncation. Receivable and exception snapshots are calculated before that preview cap.",
             "exceptions": "Overpayment and cancelled-reservation-with-received-payment flags are complete operational reconciliation exceptions, not automatic refund decisions.",
