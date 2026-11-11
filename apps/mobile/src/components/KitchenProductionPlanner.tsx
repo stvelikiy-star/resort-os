@@ -8,6 +8,7 @@ import { wasWriteRejected } from '../lib/writeOutcome';
 import { useSession } from '../state/session';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button, Field, SectionLabel } from './ui';
+import { KitchenRecipeEditor, RECIPE_COPY } from './KitchenIngredients';
 import { GlassCard } from './Future';
 
 const messages = {
@@ -20,12 +21,13 @@ const meals = ['BREAKFAST', 'LUNCH', 'DINNER', 'OTHER'] as const;
 type Meal = typeof meals[number];
 
 export function KitchenProductionPlanner({
-  live, menu, targets, reload, readOnly,
+  live, menu, targets, reload, reloadMenu, readOnly,
 }: {
   live: ReturnType<typeof createLiveModules>;
   menu: KitchenProductionMenuItem[];
   targets: KitchenProductionTargets;
   reload: () => Promise<unknown>;
+  reloadMenu: () => Promise<unknown>;
   readOnly: boolean;
 }) {
   const { locale, user, hotel } = useSession();
@@ -34,6 +36,8 @@ export function KitchenProductionPlanner({
   const [date, setDate] = useState(localDate());
   const [meal, setMeal] = useState<Meal>('LUNCH');
   const [dish, setDish] = useState('');
+  const [recipeDish, setRecipeDish] = useState('');
+  const recipeItem = menu.find(item => item.id === recipeDish);
   const [planned, setPlanned] = useState('');
   const [prepared, setPrepared] = useState('0');
   const [status, setStatus] = useState('');
@@ -95,6 +99,15 @@ export function KitchenProductionPlanner({
       <Text style={{color:c.textMuted}}>{item.service_date} · {item.meal_type}</Text>
       <Text style={{color:c.text}}>{t[2]}: {item.planned_quantity} · {t[3]}: {item.prepared_quantity} · Осталось: {item.remaining_quantity}</Text>
     </View>) : <Text style={{color:c.textMuted}}>{t[8]}</Text>}
+    {readOnly && menu.length ? <>
+      <SectionLabel>{RECIPE_COPY[locale].choose}</SectionLabel>
+      {menu.map(item => <Button key={item.id}
+        label={item['name_'+locale as 'name_ru'|'name_kg'|'name_en'|'name_kz'] || item.name_ru}
+        variant={recipeDish===item.id?'primary':'secondary'} onPress={()=>setRecipeDish(item.id)}/>)}
+      {recipeItem ? <KitchenRecipeEditor key={recipeItem.id+':'+(recipeItem.recipe?.version ?? 0)}
+        recipe={recipeItem.recipe} save={input=>live.saveKitchenRecipe(recipeItem.id,input)}
+        reload={async()=>{await Promise.all([reload(),reloadMenu()]);}}/> : null}
+    </> : null}
     {!readOnly ? <>
       {menu.length ? <>
         <Field label={t[1]} value={date} onChangeText={setDate} maxLength={10}/>

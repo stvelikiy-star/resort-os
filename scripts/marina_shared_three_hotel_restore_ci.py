@@ -22,6 +22,7 @@ from marina_shared_add_hotel import staged_configuration
 from marina_shared_live_browser_db import RECEIPTS,PASSWORD
 from marina_two_property_restore_e2e import snapshot,pg_arguments
 from marina_shared_release_restore_ci import public_schema_metadata
+from release_contract import EXPECTED_MIGRATIONS
 from prisma_migration_ledger import verify_committed_ledger
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -63,7 +64,7 @@ async def assert_source_three(source: str) -> None:
         assert await conn.fetchval("SELECT count(*) FROM staff_users")==25
         assert await conn.fetchval("SELECT count(*) FROM reservations")==6
         assert await conn.fetchval("SELECT count(*) FROM payments")==2
-        assert len(await verify_committed_ledger(conn,ROOT))==40
+        assert len(await verify_committed_ledger(conn,ROOT)) == len(EXPECTED_MIGRATIONS)
     finally:
         await conn.close()
 
@@ -84,7 +85,7 @@ def command(args,env=None) -> None:
 async def verify_ledger(target: str) -> None:
     conn=await asyncpg.connect(target)
     try:
-        assert len(await verify_committed_ledger(conn,ROOT))==40
+        assert len(await verify_committed_ledger(conn,ROOT)) == len(EXPECTED_MIGRATIONS)
     finally:
         await conn.close()
 

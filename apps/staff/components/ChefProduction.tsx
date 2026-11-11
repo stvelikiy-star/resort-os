@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import KitchenIngredients from "./KitchenIngredients";
 import { shiftHotelDateIso } from "../lib/hotelDate";
 
 import styles from "./ChefProduction.module.css";
@@ -173,6 +174,8 @@ export default function ChefProduction({ userRole }: Props) {
       <article><strong>{loading ? "…" : todayDay?.meals.find((m) => m.meal_type === "DINNER")?.total_portions ?? 0}</strong><span>ужин</span></article>
       <article className={departures.length ? styles.attention : ""}><strong>{loading ? "…" : departures.length}</strong><span>выездных отметок сегодня</span></article>
     </div>
+
+    <KitchenIngredients fromDate={fromDate} throughDate={throughDate} userRole={userRole}/>
 
     {loading && !data ? <div className={styles.empty}>Загружаю производственный план…</div> : <div className={styles.days}>{data?.days.map((day) => <article className={styles.day} key={day.service_date}>
       <div className={styles.dayHead}><div><small>{day.service_date === today ? "СЕГОДНЯ" : "ДАТА"}</small><h3>{day.service_date}</h3></div><b>{day.meals.reduce((sum, meal) => sum + meal.total_portions, 0)} порц.</b></div>
