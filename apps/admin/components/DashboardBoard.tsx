@@ -87,7 +87,7 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
   const roomNeedsWork = data.rooms.dirty + data.rooms.in_inspection + data.rooms.tech_block;
 
   return (
-    <main className="work-shell dashboard-shell">
+    <main className="work-shell dashboard-shell" data-fl2-owner={isOwner ? "true" : undefined}>
       <div className="work-head">
         <div>
           <p className="eyebrow">MARINA SMART · управление</p>

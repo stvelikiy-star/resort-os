@@ -1,0 +1,125 @@
+/* Stage 4a: opt-in OWNER Command Center only.
+   No selectors for PMS grid, reservations, finance, kitchen, staff or API state.
+   Readable data-first surfaces, low-cost opacity/transform animations. */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] {
+  --fl2-owner-ink: #f4f8ff;
+  --fl2-owner-muted: #b3c6dc;
+  --fl2-owner-accent: #00d8ff;
+  --fl2-owner-champagne: #e6bd70;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(18px, 2.3vw, 28px) !important;
+  border: 1px solid rgba(0, 216, 255, .24) !important;
+  border-radius: 22px !important;
+  background: linear-gradient(120deg, #061225 0%, #10213d 60%, #154365 100%) !important;
+  box-shadow: 0 18px 44px rgba(2, 12, 29, .22);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head::after {
+  content: "";
+  position: absolute;
+  right: -80px;
+  top: -110px;
+  width: 260px;
+  aspect-ratio: 1;
+  border: 1px solid rgba(0, 216, 255, .16);
+  border-radius: 50%;
+  box-shadow: 0 0 0 35px rgba(0, 216, 255, .025), 0 0 0 72px rgba(0, 216, 255, .018);
+  pointer-events: none;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > * {
+  position: relative;
+  z-index: 1;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head h1 {
+  color: var(--fl2-owner-ink) !important;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head .eyebrow {
+  color: var(--fl2-owner-champagne) !important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head .subtitle {
+  color: var(--fl2-owner-muted) !important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn {
+  min-height: 44px;
+  border: 1px solid rgba(0, 216, 255, .7);
+  border-radius: 12px;
+  background: var(--fl2-owner-accent);
+  color: #061225;
+  font-weight: 750;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn:hover {
+  filter: brightness(1.09);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn:active {
+  transform: scale(.98);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn:focus-visible {
+  outline: 3px solid var(--fl2-owner-champagne);
+  outline-offset: 2px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr));
+  gap: 12px;
+  margin-block: 16px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article {
+  position: relative;
+  min-width: 0;
+  padding: 18px 16px !important;
+  background: linear-gradient(165deg, #10213d 0%, #142d4b 100%) !important;
+  border: 1px solid rgba(0, 216, 255, .23) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 10px 30px rgba(2, 12, 29, .12);
+  transition: border-color 180ms ease, box-shadow 200ms ease, transform 180ms ease;
+  animation: fl2-owner-kpi-enter 360ms both cubic-bezier(.2,.8,.2,1);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(2) { animation-delay: 40ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(3) { animation-delay: 80ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(4) { animation-delay: 120ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(5) { animation-delay: 160ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(6) { animation-delay: 200ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(7) { animation-delay: 240ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:hover {
+  border-color: rgba(0, 216, 255, .65) !important;
+  box-shadow: 0 14px 36px rgba(2, 12, 29, .22);
+  transform: translateY(-2px);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > strong {
+  color: var(--fl2-owner-ink) !important;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(23px, 2.1vw, 28px);
+  overflow-wrap: anywhere;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > span,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > small {
+  color: var(--fl2-owner-muted) !important;
+  overflow-wrap: anywhere;
+}
+@keyframes fl2-owner-kpi-enter {
+  from { opacity: 0; transform: translateY(9px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 620px) {
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head {
+    padding: 16px !important;
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn {
+    transition: none !important;
+    transform: none !important;
+  }
+}

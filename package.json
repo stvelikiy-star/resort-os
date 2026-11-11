@@ -7,6 +7,7 @@
     "test": "node ./control-center-verify.mjs",
     "design:fl2:brand": "node ./scripts/validate-fl2-brand-tokens.mjs",
     "design:fl2:accessibility": "node ./scripts/validate-fl2-accessibility.mjs",
-    "design:fl2:components": "node ./scripts/validate-fl2-component-kit.mjs"
+    "design:fl2:components": "node ./scripts/validate-fl2-component-kit.mjs",
+    "design:fl2:owner": "node ./scripts/validate-fl2-owner-visual.mjs"
   }
 }
