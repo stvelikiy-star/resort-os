@@ -205,3 +205,43 @@ This repository package is not production acceptance by itself. Before live use,
 - no payment or OTA action is presented as connected until its official provider integration is configured and tested.
 
 No deployment, DNS update, production migration, customer data import, or live booking was performed while preparing this package.
+
+
+## Isolated RC441 monitoring schedule
+
+The RC441-only runner reuses the reviewed production service, structured-log and
+backup checks. It uses the RC441 Compose wrapper and pins HTTPS probes to the
+loopback port with the RC CA and hostname verification. It never restarts an
+application. Its template paths are specific to the isolated Ubuntu RC441.
+
+Install the user units from this reviewed checkout:
+
+```bash
+install -m 644 deploy/marina/marina-rc441-monitor.service ~/.config/systemd/user/
+install -m 644 deploy/marina/marina-rc441-monitor.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now marina-rc441-monitor.timer
+```
+
+The first run is scheduled after 30 seconds, then every five minutes. The user
+manager must have lingering enabled to continue without an interactive login.
+The service writes a private atomic state file under the RC441
+`monitoring/status.json` and logs the same non-secret result to the user journal.
+Desktop notifications require a working notification service in that user's
+session. Changed error conditions and recovery trigger a notification.
+Repeating errors are deduplicated, including changing backup-age values.
+Notification rejection keeps the run RED and is retried on the next run.
+Acceptance of a notification by the local desktop daemon does not confirm
+delivery to a phone or human acknowledgement.
+
+Inspect the actual target and result:
+
+```bash
+systemctl --user show marina-rc441-monitor.timer -p LastTriggerUSec -p ActiveState
+journalctl --user -u marina-rc441-monitor.service -n 10 --no-pager
+```
+
+A missing verified backup or disk usage above 85% of user-available capacity
+keeps the overall result RED even while every application is healthy.
+A RED run exits with status 2, so the oneshot service reports failure while the
+timer remains active. External HTTPS acceptance remains a separate gate.

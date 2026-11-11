@@ -12,6 +12,10 @@ on:
       - 'scripts/test_marina_production_preflight.py'
       - 'scripts/production_backup.sh'
       - 'scripts/production_backup_test.sh'
+      - 'scripts/marina_rc441_monitor.py'
+      - 'scripts/test_marina_rc441_monitor.py'
+      - 'scripts/production_monitoring_check.py'
+      - 'scripts/production_monitoring_contract_test.py'
       - 'scripts/host_preflight.sh'
       - 'docs/MARINA_UBUNTU_PRODUCTION_RUNBOOK.md'
       - 'docs/MARINA_PRE_CONNECTION_READINESS_20261022.md'
@@ -88,6 +92,10 @@ jobs:
           grep -q '^FACT: memory_mb=' /tmp/marina-host-preflight.log
           grep -q '^FACT: root_free_gb=' /tmp/marina-host-preflight.log
           bash scripts/production_backup_test.sh
+      - name: Test RC441 monitoring and notification delivery rules
+        run: |
+          python scripts/test_marina_rc441_monitor.py
+          python scripts/production_monitoring_contract_test.py
       - name: Validate rendered Compose topology and isolation
         run: |
           docker compose --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-default.yml
