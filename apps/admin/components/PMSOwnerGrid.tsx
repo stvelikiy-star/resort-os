@@ -399,7 +399,9 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
   }
 
   const dayWidth = windowDays >= 31 ? 26 : 34;
-  const template = `300px 58px repeat(${windowDays}, ${dayWidth}px)`;
+  // Pure layout preference: Legacy falls back to the original 300px / 58px.
+  // Future Luxury can make the sticky columns narrower on mobile, retaining all dates/actions.
+  const template = `var(--fl2-pms-room-width, 300px) var(--fl2-pms-status-width, 58px) repeat(${windowDays}, ${dayWidth}px)`;
 
   return (
     <section className="owner-grid-shell">
