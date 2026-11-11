@@ -7,6 +7,9 @@ on:
       - 'services/api/app/kitchen.py'
       - 'services/api/app/kitchen_menu_management.py'
       - 'services/api/app/kitchen_recipes.py'
+      - 'services/api/app/kitchen_stock.py'
+      - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
+      - 'scripts/test_marina_kitchen_stock.py'
       - 'packages/database/prisma/migrations/zz116_marina_kitchen_recipes_20261111/**'
       - 'scripts/test_marina_kitchen_recipes.py'
       - 'scripts/verify_kitchen_recipes.py'
@@ -130,6 +133,9 @@ jobs:
 
       - name: Run Kitchen Menu Management E2E
         run: python scripts/verify_kitchen_menu_management.py
+
+      - name: Test kitchen stock contracts
+        run: PYTHONPATH=. python scripts/test_marina_kitchen_stock.py
 
       - name: Test recipe validation and exact ingredient totals
         run: PYTHONPATH=. python scripts/test_marina_kitchen_recipes.py

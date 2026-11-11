@@ -76,6 +76,8 @@ export interface Hold {
   id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
 }
 export interface FinanceSummary {
+  kitchen_stock_cost?: {real_production_cost_kgs: string; sample_production_cost_kgs: string;
+    movement_count: number; basis: 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'};
   range: { from: string; to: string; currency: string };
   period_payments: { received_kgs: number; pending_created_kgs: number; received_count: number;
     pending_created_count?: number; failed_count?: number; cancelled_count?: number };

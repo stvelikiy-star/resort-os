@@ -63,6 +63,16 @@ export function financeSummaryResponse(v:unknown):FinanceSummary {
       nonnegative(row.payment_count,'finance.'+key+'.count');
     });
   }
+  if (x.kitchen_stock_cost !== undefined) {
+    const cost = obj(x.kitchen_stock_cost,'finance.stock_cost');
+    const validateMoney = (value: unknown, key: string) => {
+      if (typeof value !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/.test(value)) invalid(key);
+    };
+    validateMoney(cost.real_production_cost_kgs,'finance.real_stock_cost');
+    validateMoney(cost.sample_production_cost_kgs,'finance.sample_stock_cost');
+    nonnegative(cost.movement_count,'finance.stock_movement_count');
+    if (cost.basis !== 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT') invalid('finance.stock_cost_basis');
+  }
   if (x.awaiting_prepayment_snapshot !== undefined) {
     const row = obj(x.awaiting_prepayment_snapshot,'finance.prepayment');
     for (const k of ['request_count','required_kgs','received_kgs','remaining_kgs'])

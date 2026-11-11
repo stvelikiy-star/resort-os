@@ -104,6 +104,14 @@ export default function Finance() {
               String(data.refunded_snapshot_all_time.payment_count)) : null}
         </GlassCard>
       </> : null}
+      {data.kitchen_stock_cost ? <>
+        <SectionLabel>{extra.stockCost}</SectionLabel>
+        <GlassCard style={{gap:space.sm}}>
+          {line(extra.stockCost,data.kitchen_stock_cost.real_production_cost_kgs+' '+data.range.currency,extra.stockNotice)}
+          {Number(data.kitchen_stock_cost.sample_production_cost_kgs) > 0 ?
+            line(extra.sampleCost,data.kitchen_stock_cost.sample_production_cost_kgs+' '+data.range.currency) : null}
+        </GlassCard>
+      </> : null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>

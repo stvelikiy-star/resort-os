@@ -51,6 +51,7 @@ EXPECTED_MIGRATIONS = (
     "zz114_marina_60minute_holds_20261029",
     "zz115_marina_chef_production_targets_20261110",
     "zz116_marina_kitchen_recipes_20261111",
+    "zz117_marina_kitchen_stock_20261111",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -101,6 +102,14 @@ CRITICAL_CONSTRAINTS = frozenset(
         "operational_tasks_service_point_context_check",
         "kitchen_menu_availability_meal_check",
         "kitchen_menu_recipe_shape",
+        "kitchen_stock_item_unit_check",
+        "kitchen_stock_item_unit_cost_check",
+        "kitchen_stock_item_name_check",
+        "kitchen_stock_movement_kind_check",
+        "kitchen_stock_movement_quantity_check",
+        "kitchen_stock_movement_cost_check",
+        "kitchen_stock_movement_context_check",
+        "kitchen_stock_progress_quantity_check",
         "kitchen_table_reservations_party_check",
         "kitchen_table_reservations_time_check",
         "kitchen_table_reservations_status_check",

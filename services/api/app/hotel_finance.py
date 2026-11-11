@@ -403,6 +403,16 @@ async def finance_summary(
             pid,
         )
 
+        stock_cost = await conn.fetchrow(
+            '''SELECT COALESCE(SUM(m.quantity*m."unitCostKgs") FILTER (WHERE NOT i."isSample"),0) AS real_cost,
+                      COALESCE(SUM(m.quantity*m."unitCostKgs") FILTER (WHERE i."isSample"),0) AS sample_cost,
+                      COUNT(*)::int AS movement_count
+               FROM kitchen_stock_movements m JOIN kitchen_stock_items i
+                 ON i.id=m."stockItemId" AND i."propertyId"=m."propertyId"
+               WHERE m."propertyId"=$1 AND m.kind='PRODUCTION'
+                 AND m."createdAt">=$2 AND m."createdAt"<$3''',pid,from_ts,to_ts,
+        )
+
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
         return name or row["request_guest"] or None
@@ -423,6 +433,12 @@ async def finance_summary(
             "storage_timezone": "UTC",
             "from_timestamp": from_ts,
             "to_timestamp_exclusive": to_ts,
+        },
+        "kitchen_stock_cost": {
+            "real_production_cost_kgs": str(stock_cost["real_cost"]),
+            "sample_production_cost_kgs": str(stock_cost["sample_cost"]),
+            "movement_count": stock_cost["movement_count"],
+            "basis": "EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT",
         },
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],

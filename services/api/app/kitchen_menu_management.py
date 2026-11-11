@@ -249,16 +249,25 @@ async def production_targets(
         rows = await conn.fetch(
             '''SELECT t.id,t."menuItemId",t."serviceDate",t."mealType",
                       t."plannedQuantity",t."preparedQuantity",t.notes,t."updatedAt",
+                      COALESCE(sp."deductedPortions",0)::int AS deducted_portions,
                       m."nameRu",m."nameKg",m."nameEn",m."nameKz",m.recipe
                FROM kitchen_production_targets t
                JOIN kitchen_menu_items m
                  ON m.id=t."menuItemId" AND m."propertyId"=t."propertyId"
+               LEFT JOIN kitchen_stock_production_progress sp
+                 ON sp."productionTargetId"=t.id AND sp."propertyId"=t."propertyId"
                WHERE t."propertyId"=$1 AND t."serviceDate" BETWEEN $2 AND $3
                ORDER BY t."serviceDate",t."mealType",m."nameRu"''', pid, start, end,
         )
+    requirements = ingredient_requirements(rows)
+    prepared_rows = [row for row in rows if row["preparedQuantity"] > 0]
+    # Reflect actual explicit stock consumption, not merely the planned recipe need.
+    requirements["inventory_deducted"] = bool(prepared_rows) and all(
+        row["deducted_portions"] == row["preparedQuantity"] for row in prepared_rows
+    )
     return {"from_date": start.isoformat(), "through_date": end.isoformat(),
             "items": [_production_item(r) for r in rows],
-            "ingredient_requirements": ingredient_requirements(rows)}
+            "ingredient_requirements": requirements}
 
 
 @router.put("/production-targets")
