@@ -1,0 +1,254 @@
+/* MARINA SMART Future Luxury: actual reservation/reception UI.
+   View-only CSS — no status transitions, filters, API or room assignments touched. */
+html[data-marina-ui="future-luxury"] .reception-shell{
+  --fl2-reception-ink:#f4fbff;
+  --fl2-reception-muted:#b5cedc;
+  --fl2-reception-border:rgba(72,205,217,.29);
+  --fl2-reception-card:#0d2a3d;
+  color:var(--fl2-reception-ink);
+  width:min(100%,1850px);max-width:none;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head{
+  border:1px solid var(--fl2-reception-border);
+  background:linear-gradient(120deg,#0a2a3e,#0b4555);
+  border-radius:20px;padding:clamp(18px,2vw,26px);
+  box-shadow:0 15px 35px rgba(0,12,23,.17);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head h1{
+  color:#f8fcff;letter-spacing:-.035em;
+  font-size:clamp(26px,2.6vw,36px);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head .subtitle{color:#bbd6df}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head .eyebrow{color:#e6bd70}
+html[data-marina-ui="future-luxury"] .reception-controls{
+  background:rgba(11,40,58,.95);
+  color:#f1fcff;
+  border-color:var(--fl2-reception-border);
+  border-radius:17px;padding:14px;
+  grid-template-columns:minmax(190px,1fr) minmax(160px,230px) minmax(160px,220px) auto;
+  gap:10px;
+}
+html[data-marina-ui="future-luxury"] .reception-controls input,
+html[data-marina-ui="future-luxury"] .reception-controls select{
+  background:#15384a;color:#eefbff;
+  border-color:rgba(74,185,202,.37);
+  min-height:44px;
+}
+html[data-marina-ui="future-luxury"] .reception-controls input::placeholder{color:#aec7d4}
+html[data-marina-ui="future-luxury"] .reception-controls span{color:#c3d9e5}
+html[data-marina-ui="future-luxury"] .reception-card{
+  background:linear-gradient(155deg,rgba(20,55,72,.95),rgba(10,37,53,.98));
+  border:1px solid rgba(52,205,215,.24);
+  border-left:3px solid #22c8d2;
+  border-radius:18px;color:#f3fcff;
+  padding:clamp(12px,1.2vw,18px);
+  box-shadow:0 12px 28px rgba(0,10,23,.12);
+  transition:border-color 170ms ease,transform 170ms ease,box-shadow 170ms ease;
+}
+html[data-marina-ui="future-luxury"] .reception-card:hover{
+  border-color:rgba(80,230,237,.63);
+  box-shadow:0 18px 38px rgba(0,11,24,.18);
+  transform:translateY(-2px);
+}
+html[data-marina-ui="future-luxury"] .reception-card>div{min-width:0}
+html[data-marina-ui="future-luxury"] .reception-card b,
+html[data-marina-ui="future-luxury"] .reception-card strong{
+  color:#f5fcff;font-variant-numeric:tabular-nums;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .reception-card .field-label,
+html[data-marina-ui="future-luxury"] .reception-card small{
+  color:#b9d3df;
+}
+html[data-marina-ui="future-luxury"] .reception-card a{
+  color:#6ae7ed;
+}
+html[data-marina-ui="future-luxury"] .reception-card .balance-due{color:#ffc393}
+html[data-marina-ui="future-luxury"] .reception-card .balance-ok{color:#70eac4}
+html[data-marina-ui="future-luxury"] .reception-card .status-pill{
+  display:inline-flex;min-height:25px;align-items:center;
+  padding:4px 9px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.18);
+}
+html[data-marina-ui="future-luxury"] .reception-card .status-pill.s-GUARANTEED{
+  background:#12466e;color:#c2e7ff;
+}
+html[data-marina-ui="future-luxury"] .reception-card .status-pill.s-CHECKED_IN{
+  background:#0e574e;color:#98f8d9;
+}
+html[data-marina-ui="future-luxury"] .reception-card .status-pill.s-CHECKED_OUT{
+  background:#2c4451;color:#e1f0f5;
+}
+html[data-marina-ui="future-luxury"] .reception-card .status-pill.s-CANCELLED,
+html[data-marina-ui="future-luxury"] .reception-card .status-pill.s-NO_SHOW{
+  background:#672f3e;color:#ffccd2;
+}
+html[data-marina-ui="future-luxury"] .reception-actions .btn,
+html[data-marina-ui="future-luxury"] .reception-shell .work-head .btn,
+html[data-marina-ui="future-luxury"] .reception-readiness-actions .btn{
+  border-radius:11px;min-height:41px;
+}
+html[data-marina-ui="future-luxury"] .reception-actions .btn.primary{
+  background:#22d0d6;color:#082b38;
+}
+html[data-marina-ui="future-luxury"] .reception-readiness{
+  color:#f0fbff;
+  max-width:none;padding:0 clamp(12px,1.5vw,24px);
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-head{
+  background:linear-gradient(115deg,#123246,#0e4252);
+  border-color:var(--fl2-reception-border);
+  box-shadow:0 15px 37px rgba(0,12,23,.14);
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-head h2{
+  color:#f4fcff;
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-head .eyebrow{color:#e4c18b}
+html[data-marina-ui="future-luxury"] .reception-readiness-head span{color:#bed8e3}
+html[data-marina-ui="future-luxury"] .reception-readiness-actions>strong{
+  background:#087e8b;
+  color:white;
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-list article{
+  color:#f6fcff;
+  background:#123044;
+  border-color:var(--fl2-reception-border);
+  box-shadow:0 8px 25px rgba(1,13,22,.1);
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-list article strong,
+html[data-marina-ui="future-luxury"] .reception-readiness-list article b{
+  color:#f3fbff;
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-list article small{color:#f1c98f}
+html[data-marina-ui="future-luxury"] .reception-readiness-list article span{color:#c3d8e2}
+html[data-marina-ui="future-luxury"] .reception-readiness-ok{
+  color:#a7f1d4;background:#124237;
+  border-color:#2e987f;
+}
+html[data-marina-ui="future-luxury"] .reception-readiness-ok span{color:#b8e5d2}
+html[data-marina-ui="future-luxury"] .detail-backdrop{
+  background:rgba(1,10,22,.77);
+  backdrop-filter:blur(5px);
+}
+html[data-marina-ui="future-luxury"] .reservation-detail{
+  color:#edfaff;
+  background:linear-gradient(155deg,#132e43,#0b2539);
+  border-color:rgba(68,205,216,.36);
+  border-radius:23px;
+  box-shadow:0 35px 100px rgba(0,7,20,.53);
+}
+html[data-marina-ui="future-luxury"] .reservation-detail h2,
+html[data-marina-ui="future-luxury"] .reservation-detail h3,
+html[data-marina-ui="future-luxury"] .reservation-detail strong{
+  color:#f4fcff;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-summary>div,
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-money>div,
+html[data-marina-ui="future-luxury"] .reservation-detail .audit-list>div,
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-rows>div{
+  color:#edfaff;background:rgba(37,81,103,.36);
+  border:1px solid rgba(71,181,196,.17);
+  border-radius:12px;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-section,
+html[data-marina-ui="future-luxury"] .reservation-detail>header{
+  border-color:rgba(77,194,210,.22);
+}
+html[data-marina-ui="future-luxury"] .reservation-detail span,
+html[data-marina-ui="future-luxury"] .reservation-detail small,
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-muted{
+  color:#bcd5e1;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail a{color:#5be5ed}
+html[data-marina-ui="future-luxury"] .reservation-detail .status-pill.s-GUARANTEED{background:#163f5b;color:#c7e7ff}
+html[data-marina-ui="future-luxury"] .reservation-detail .status-pill.s-CHECKED_IN{background:#0c534b;color:#a3f6da}
+html[data-marina-ui="future-luxury"] .reception-shell button:focus-visible,
+html[data-marina-ui="future-luxury"] .reception-shell input:focus-visible,
+html[data-marina-ui="future-luxury"] .reception-shell select:focus-visible,
+html[data-marina-ui="future-luxury"] .reservation-detail button:focus-visible{
+  outline:3px solid #e7bd72;outline-offset:2px;
+}
+/* Light visual mode — no changes to booking data, roles, API or actions. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell{
+  --fl2-reception-ink:#0b3046;
+  --fl2-reception-muted:#456677;
+  --fl2-reception-border:#c3dce6;
+  color:#0b3046;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .work-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-controls,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-head{
+  color:#0b3046;
+  background:linear-gradient(145deg,#fff,#f2fafc);
+  border-color:#c3dce6;
+  box-shadow:0 12px 30px rgba(14,64,91,.07);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .work-head h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card b,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-head h2{
+  color:#092d42;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .work-head .subtitle,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card .field-label,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-head span{
+  color:#4a6b7b;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-controls input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-controls select{
+  background:#fff;color:#0c354c;border-color:#c5dfe8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-controls input::placeholder{color:#6c8392}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-controls span{color:#456777}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card a{color:#007889}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card .balance-due{color:#a24b25}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card .balance-ok{color:#177658}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card .status-pill.s-GUARANTEED{background:#d6ecfc;color:#1c5b88}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card .status-pill.s-CHECKED_IN{background:#d4f5e8;color:#18654b}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-card .status-pill.s-CHECKED_OUT{background:#e5edf0;color:#486475}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-list article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-ok{
+  background:#fff;color:#0b3046;border-color:#c9e0e7;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-list article strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-list article b{color:#153f51}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-list article span{color:#4d687c}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-list article small{color:#92621d}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-readiness-ok span{color:#557466}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail{
+  background:#fff;color:#102f45;border-color:#c8dfe7;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail h3,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail strong{color:#0c3246}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail .detail-summary>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail .detail-money>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail .audit-list>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail .detail-rows>div{
+  background:#edf7fa;color:#113b50;border-color:#d0e5ec;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail .detail-muted{color:#4d6e7d}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail a{color:#087a8a}
+@media(max-width:1250px){
+  html[data-marina-ui="future-luxury"] .reception-controls{
+    grid-template-columns:minmax(190px,1fr) minmax(150px,220px);
+  }
+}
+@media(max-width:720px){
+  html[data-marina-ui="future-luxury"] .reception-controls{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .reception-card{grid-template-columns:1fr 1fr}
+  html[data-marina-ui="future-luxury"] .reception-card .reception-actions{grid-column:1/-1}
+}
+@media(max-width:520px){
+  html[data-marina-ui="future-luxury"] .reception-card{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .reception-card .reception-actions{grid-column:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .reception-card{
+    transition:none!important;transform:none!important;
+  }
+}
