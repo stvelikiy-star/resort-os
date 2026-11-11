@@ -6,6 +6,8 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -85,6 +87,56 @@ def main() -> None:
         green = run_case(tmp, backup_dir, snapshot, logs)
         assert green.returncode == 0, green.stdout + green.stderr
         assert "RESULT: PRODUCTION MONITORING GREEN" in green.stdout
+
+        marina_snapshot = tmp / "marina-containers.json"
+        marina_services = ("caddy", "api", "web", "admin", "staff", "guest-web", "postgres")
+        marina_rows = [
+            {"service": service, "state": "running",
+             "health": "" if service == "caddy" else "healthy", "restart_count": 0}
+            for service in marina_services
+        ]
+        marina_snapshot.write_text(json.dumps(marina_rows), encoding="utf-8")
+        marina_args = [
+            argument
+            for service in marina_services
+            for argument in ("--required-service", service)
+        ]
+        result = run_case(tmp, backup_dir, marina_snapshot, logs, marina_args)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "FACT: required_services=7" in result.stdout
+
+        for service in ("postgres", "guest-web"):
+            missing = [row for row in marina_rows if row["service"] != service]
+            marina_snapshot.write_text(json.dumps(missing), encoding="utf-8")
+            require_red(run_case(tmp, backup_dir, marina_snapshot, logs, marina_args),
+                        f"required service missing: {service}")
+            unhealthy = [dict(row, health="unhealthy") if row["service"] == service
+                         else row for row in marina_rows]
+            marina_snapshot.write_text(json.dumps(unhealthy), encoding="utf-8")
+            require_red(run_case(tmp, backup_dir, marina_snapshot, logs, marina_args),
+                        f"service not healthy: {service}")
+
+        class BrowserEndpoint(BaseHTTPRequestHandler):
+            def do_GET(self):
+                code = 200 if "text/html" in self.headers.get("Accept", "") else 503
+                self.send_response(code)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), BrowserEndpoint)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            url = f"http://127.0.0.1:{server.server_port}/"
+            result = run_case(tmp, backup_dir, snapshot, logs,
+                              ["--endpoint", f"customer-web={url}"])
+            assert result.returncode == 0, result.stdout + result.stderr
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join()
 
         stale_root = tmp / "stale"
         stale_backup = write_backup(stale_root, now - timedelta(hours=30))

@@ -171,10 +171,13 @@ def gather_container_snapshot(compose_file: str, env_file: str | None) -> list[d
     return snapshot
 
 
-def check_containers(snapshot: list[dict[str, Any]], max_restarts: int) -> list[str]:
+def check_containers(
+    snapshot: list[dict[str, Any]], max_restarts: int,
+    required_services: tuple[str, ...] = REQUIRED_SERVICES,
+) -> list[str]:
     errors: list[str] = []
     by_service = {str(item.get("service")): item for item in snapshot}
-    for service in REQUIRED_SERVICES:
+    for service in required_services:
         item = by_service.get(service)
         if not item:
             errors.append(f"required service missing: {service}")
@@ -223,7 +226,7 @@ def gather_api_logs(compose_file: str, env_file: str | None, since: str) -> str:
 
 def check_endpoint(name: str, url: str, timeout: float) -> str | None:
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "three-crowns-monitor/1"})
+        request = urllib.request.Request(url, headers={"User-Agent": "three-crowns-monitor/1", "Accept": "text/html,application/json;q=0.9,*/*;q=0.8"})
         with urllib.request.urlopen(request, timeout=timeout) as response:
             if not 200 <= response.status < 300:
                 return f"endpoint {name} returned HTTP {response.status}"
@@ -260,6 +263,8 @@ def main() -> int:
     parser.add_argument("--max-backup-age-hours", type=float, default=24.0)
     parser.add_argument("--max-disk-used-percent", type=float, default=85.0)
     parser.add_argument("--max-restarts", type=int, default=3)
+    parser.add_argument("--required-service", action="append", default=[],
+                        help="Required Compose service; repeat to replace the legacy service list")
     parser.add_argument("--max-5xx", type=int, default=0)
     parser.add_argument("--logs-since", default="15m")
     parser.add_argument("--min-tls-days", type=float, default=14.0)
@@ -273,6 +278,7 @@ def main() -> int:
     parser.add_argument("--require-network", action="store_true")
     parser.add_argument("--timeout", type=float, default=5.0)
     args = parser.parse_args()
+    required_services = tuple(dict.fromkeys(args.required_service)) or REQUIRED_SERVICES
 
     errors: list[str] = []
 
@@ -284,7 +290,7 @@ def main() -> int:
             snapshot = canonical_container_snapshot(snapshot_raw)
         else:
             snapshot = gather_container_snapshot(args.compose_file, args.env_file)
-        errors.extend(check_containers(snapshot, args.max_restarts))
+        errors.extend(check_containers(snapshot, args.max_restarts, required_services))
     except Exception as exc:
         errors.append(f"container inspection failed: {type(exc).__name__}: {exc}")
 
@@ -333,7 +339,7 @@ def main() -> int:
             print(f"ALERT: {error}")
         print("RESULT: PRODUCTION MONITORING RED")
         return 1
-    print("FACT: required_services=6")
+    print(f"FACT: required_services={len(required_services)}")
     print("FACT: backup_receipt=verified")
     print("FACT: structured_5xx_window=green")
     print("RESULT: PRODUCTION MONITORING GREEN")
