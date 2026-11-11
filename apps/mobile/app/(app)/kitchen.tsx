@@ -15,6 +15,7 @@ import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { KitchenMenuDraftForm } from '../../src/components/KitchenMenuDraftForm';
+import { KitchenIngredients } from '../../src/components/KitchenIngredients';
 import { KitchenProductionPlanner } from '../../src/components/KitchenProductionPlanner';
 import { font, radius, space } from '../../src/theme/tokens';
 
@@ -106,7 +107,7 @@ export default function KitchenDashboard() {
       {!showroom && menuError ? <ErrorState text={menuError.message} retry={copy.retry} onRetry={reloadMenu}/> : null}
       {!showroom && targetError ? <ErrorState text={targetError.message} retry={copy.retry} onRetry={reloadTargets}/> : null}
       {!showroom && live && targets && productionMenu ? <KitchenProductionPlanner
-        live={live} menu={productionMenu} targets={targets} reload={reloadTargets} readOnly={readOnly}/> : null}
+        live={live} menu={productionMenu} targets={targets} reload={reloadTargets} reloadMenu={reloadMenu} readOnly={readOnly}/> : null}
       {showroom ? <GlassCard testID="kitchen-demo-meals-not-live" style={{gap:7}}>
         <Text style={[font.body,{color:c.text}]}>{copy.kitchenMealPlanDemo}</Text>
         <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
@@ -169,9 +170,10 @@ export default function KitchenDashboard() {
       {!showroom && production ? <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealsNotOrders}</Text> : null}
       {!showroom ? <>
         <SectionLabel>{chefCopy.procurement}</SectionLabel>
+        {targets?.ingredient_requirements ? <KitchenIngredients data={targets.ingredient_requirements}/> :
         <GlassCard testID="kitchen-procurement-data-pending" style={{gap:space.sm,borderLeftWidth:4,borderLeftColor:c.warning}}>
           <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.procurementUnavailable}</Text>
-        </GlassCard>
+        </GlassCard>}
       </> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>

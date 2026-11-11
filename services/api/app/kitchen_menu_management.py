@@ -2,7 +2,7 @@ import json
 import os
 import re
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from typing import Any, Literal
 
@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from .auth import require_roles, trusted_property_id
 from .kitchen import DRAFT_MENU
+from .kitchen_recipes import RecipeWrite, ingredient_requirements, read_recipe
 
 router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen-menu-management"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -214,7 +215,7 @@ async def production_menu(request: Request, user: dict[str, Any] = Depends(produ
     async with request.app.state.db.acquire() as conn:
         pid = await _property_id(conn, user)
         rows = await conn.fetch(
-            '''SELECT id,code,category,"nameRu","nameKg","nameEn","nameKz"
+            '''SELECT id,code,category,"nameRu","nameKg","nameEn","nameKz",recipe
                FROM kitchen_menu_items
                WHERE "propertyId"=$1 AND "isActive"=true AND "isDraft"=false
                ORDER BY "sortOrder",code''', pid,
@@ -222,7 +223,7 @@ async def production_menu(request: Request, user: dict[str, Any] = Depends(produ
     return {"items": [
         {"id": str(r["id"]), "code": r["code"], "category": r["category"],
          "name_ru": r["nameRu"], "name_kg": r["nameKg"],
-         "name_en": r["nameEn"], "name_kz": r["nameKz"]}
+         "name_en": r["nameEn"], "name_kz": r["nameKz"], "recipe": read_recipe(r["recipe"])}
         for r in rows
     ]}
 
@@ -248,7 +249,7 @@ async def production_targets(
         rows = await conn.fetch(
             '''SELECT t.id,t."menuItemId",t."serviceDate",t."mealType",
                       t."plannedQuantity",t."preparedQuantity",t.notes,t."updatedAt",
-                      m."nameRu",m."nameKg",m."nameEn",m."nameKz"
+                      m."nameRu",m."nameKg",m."nameEn",m."nameKz",m.recipe
                FROM kitchen_production_targets t
                JOIN kitchen_menu_items m
                  ON m.id=t."menuItemId" AND m."propertyId"=t."propertyId"
@@ -256,7 +257,8 @@ async def production_targets(
                ORDER BY t."serviceDate",t."mealType",m."nameRu"''', pid, start, end,
         )
     return {"from_date": start.isoformat(), "through_date": end.isoformat(),
-            "items": [_production_item(r) for r in rows]}
+            "items": [_production_item(r) for r in rows],
+            "ingredient_requirements": ingredient_requirements(rows)}
 
 
 @router.put("/production-targets")
@@ -322,3 +324,53 @@ async def upsert_production_target(
             "prepared_quantity": row["preparedQuantity"],
             "remaining_quantity": row["plannedQuantity"] - row["preparedQuantity"],
             "financial_posting": "NONE_AUTOMATIC"}
+
+@router.get("/menu/{item_id}/recipe")
+async def menu_recipe(
+    item_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(production_read_access),
+):
+    async with request.app.state.db.acquire() as conn:
+        pid = await _property_id(conn, user)
+        row = await conn.fetchrow(
+            'SELECT recipe FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2',
+            item_id, pid,
+        )
+        if row is None:
+            raise HTTPException(status_code=404, detail="Menu item not found")
+    return {"menu_item_id": str(item_id), "recipe": read_recipe(row["recipe"])}
+
+
+@router.put("/menu/{item_id}/recipe")
+async def save_menu_recipe(
+    item_id: uuid.UUID,
+    payload: RecipeWrite,
+    request: Request,
+    user: dict[str, Any] = Depends(manager_access),
+):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await _property_id(conn, user)
+            row = await conn.fetchrow(
+                'SELECT recipe FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
+                item_id, pid,
+            )
+            if row is None:
+                raise HTTPException(status_code=404, detail="Menu item not found")
+            before = read_recipe(row["recipe"])
+            version = before["version"] if before else 0
+            if payload.expected_version != version:
+                raise HTTPException(status_code=409, detail={"code": "KITCHEN_RECIPE_CONFLICT"})
+            recipe = {
+                **payload.model_dump(mode="json", exclude={"expected_version"}),
+                "version": version + 1,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await conn.execute(
+                'UPDATE kitchen_menu_items SET recipe=$3::jsonb,"updatedAt"=now() '
+                'WHERE id=$1 AND "propertyId"=$2',
+                item_id, pid, json.dumps(recipe, ensure_ascii=False),
+            )
+            await _audit(conn, pid, user, "UPDATE_MENU_RECIPE", item_id, before, recipe)
+    return {"menu_item_id": str(item_id), "recipe": recipe}

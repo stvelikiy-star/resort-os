@@ -1,3 +1,5 @@
+import { kitchenRecipe, ingredientRequirements } from './kitchenRecipes';
+import type { KitchenRecipe, IngredientRequirements, RecipeInput } from './kitchenRecipes';
 import { clientSessionGuard } from './unauthorizedSession';
 import { useMemo } from 'react';
 import { useSession } from '../state/session';
@@ -124,6 +126,7 @@ export type KitchenMenuDraft = {
 };
 
 export interface KitchenProductionMenuItem {
+  recipe?: KitchenRecipe | null;
   id: string; code: string; category: string;
   name_ru: string; name_kg: string; name_en: string; name_kz: string;
 }
@@ -135,6 +138,7 @@ export interface KitchenProductionTarget {
 }
 export interface KitchenProductionTargets {
   from_date: string; through_date: string; items: KitchenProductionTarget[];
+  ingredient_requirements?: IngredientRequirements;
 }
 export type KitchenProductionInput = {
   menu_item_id: string; service_date: string;
@@ -421,7 +425,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         }
         return { id: safeRouteId(String(row.id)), code: String(row.code), category: String(row.category),
           name_ru: String(row.name_ru), name_kg: String(row.name_kg),
-          name_en: String(row.name_en), name_kz: String(row.name_kz) };
+          name_en: String(row.name_en), name_kz: String(row.name_kz), recipe: kitchenRecipe(row.recipe) };
       });
     },
     kitchenProductionTargets: async (): Promise<KitchenProductionTargets> => {
@@ -437,7 +441,17 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         return { ...row, id: safeRouteId(String(row.id)), menu_item_id: safeRouteId(String(row.menu_item_id)),
           service_date: safeIsoDate(String(row.service_date)) } as KitchenProductionTarget;
       });
-      return { from_date: String(payload.from_date), through_date: String(payload.through_date), items };
+      return { from_date: String(payload.from_date), through_date: String(payload.through_date), items,
+        ingredient_requirements: ingredientRequirements(payload.ingredient_requirements) };
+    },
+    saveKitchenRecipe: async (menuItemId: string, input: RecipeInput): Promise<void> => {
+      reviewGate();
+      const response = objectResponse(await request<unknown>('PUT',
+        p + '/kitchen/menu/' + safeRouteId(menuItemId) + '/recipe', input), 'recipe');
+      const saved = kitchenRecipe(response.recipe);
+      if (!saved || saved.version !== input.expected_version + 1) {
+        throw new ApiError('UNKNOWN', 'Recipe acknowledgement mismatch');
+      }
     },
     saveKitchenProductionTarget: async (target: KitchenProductionInput): Promise<void> => {
       reviewGate();
