@@ -4,6 +4,7 @@
   "scripts": {
     "design:validate": "node ./scripts/validate-design-foundation.mjs",
     "design:fl2:audit": "node ./scripts/validate-fl2-functional-baseline.mjs",
-    "test": "node ./control-center-verify.mjs"
+    "test": "node ./control-center-verify.mjs",
+    "design:fl2:brand": "node ./scripts/validate-fl2-brand-tokens.mjs"
   }
 }
