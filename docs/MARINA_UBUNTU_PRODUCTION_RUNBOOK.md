@@ -104,9 +104,35 @@ COMPOSE_FILE=/srv/marina-smart/<slug>/compose.marina-production.yaml \
 bash /srv/marina-smart/<slug>/scripts/production_backup.sh
 ```
 
-The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. With the required S3 configuration, the shared script uploads each artifact beneath the Marina-specific prefix and verifies each object with a HEAD request. Before production acceptance, perform a clean restore rehearsal from the off-host copy on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
+The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. For MARINA, configure the public recovery key fingerprint with the S3 settings. The script encrypts one archive, uploads it beneath the instance prefix, downloads it again and compares the encrypted bytes before advancing the success receipt. Keep the recovery private key separately. Before production acceptance, perform a clean restore rehearsal from the off-host copy on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
 
 The backup script has been tested synthetically, but off-host retention policy, Ubuntu systemd scheduling, disk/health alerts, and an observed restore on the actual target still require explicit verification before go-live.
+
+
+## Monitoring the MARINA service set
+
+Pass the enabled services explicitly to the existing monitoring checker. For the
+standard MARINA stack with PostgreSQL and Guest Web, use:
+
+```bash
+python3 scripts/production_monitoring_check.py \
+  --compose-file compose.marina-production.yaml \
+  --env-file .env.marina-production \
+  --backup-dir /srv/marina-smart/<slug>/backups \
+  --disk-path /srv/marina-smart/<slug> \
+  --required-service caddy --required-service api \
+  --required-service web --required-service admin --required-service staff \
+  --required-service guest-web --required-service postgres \
+  --require-offsite
+```
+
+Include `--required-service n8n` when that service is enabled. Add the actual
+external `--endpoint NAME=URL` and `--tls-host HOST` arguments with
+`--require-network` for HTTPS acceptance. The checker requests HTML as a
+browser does, so the customer publication placeholder can be distinguished
+from an unavailable HTTP endpoint. HTTP success alone does not accept the
+hotel's website content. Scheduling and notification delivery still require
+a tested result on the target host.
 
 
 ## Application update and rollback boundary
