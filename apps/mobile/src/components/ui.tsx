@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/ThemeProvider';
 import { elevation, font, motion, radius, space, TOUCH } from '../theme/tokens';
+import { AlertTriangle, CheckCircle2, CircleDot, Info, XCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 export function FadeIn({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
@@ -120,12 +121,21 @@ export function toneColors(c: ReturnType<typeof useTheme>['c'], tone: Tone) {
   }
 }
 
+/** Shared visual language: color is never the only status signal.
+ * A translated label remains authoritative; icon is decorative/redundant.
+ * Caller-supplied icon always wins, preserving existing domain semantics.
+ */
+const BADGE_ICONS: Record<Exclude<Tone, 'neutral'>, LucideIcon> = {
+  primary: CircleDot, success: CheckCircle2, warning: AlertTriangle,
+  danger: XCircle, info: Info,
+};
 export function Badge({ label, tone = 'neutral', icon: Icon }: { label: string; tone?: Tone; icon?: LucideIcon }) {
+  const SemanticIcon = Icon ?? (tone === 'neutral' ? undefined : BADGE_ICONS[tone]);
   const { c } = useTheme();
   const t = toneColors(c, tone);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.bg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, alignSelf: 'flex-start', maxWidth: '100%' }}>
-      {Icon ? <Icon size={13} color={t.fg} /> : null}
+      {SemanticIcon ? <SemanticIcon size={13} color={t.fg} /> : null}
       <Text style={[font.label, { color: t.fg, flexShrink: 1 }]}>{label}</Text>
     </View>
   );

@@ -4,6 +4,7 @@ import AdminLocaleSanitizer from "../components/AdminLocaleSanitizer";
 import "./globals.css";
 import "./auth.css";
 import "./admin-nav-polish.css";
+import "./fl2-ui-kit.css";
 import "./nfc.css";
 import "./finance.css";
 import "./hotel-finance.css";
