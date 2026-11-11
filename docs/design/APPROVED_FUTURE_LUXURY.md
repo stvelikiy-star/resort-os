@@ -9,6 +9,7 @@ marketing is frozen. Admin, staff and web runtime are unchanged until separately
   light), and champagne (`#E6BD70` dark / `#D5A64B` light). The light counterpart uses
   `#F5FAFF` background, white surfaces and navy primary; semantic status colors retain meaning.
 - Use one transparent **ORIGINAL MARINA SMART PNG** master across admin, staff and mobile.
+  See [APPROVED_LOGO_MASTER.md](APPROVED_LOGO_MASTER.md) for the newly approved flat circular master and SHA-256. The verified binary is NOT YET INSTALLED in the repository.
   The source asset is **UNVERIFIED**. Do not replace it with existing different artwork,
   redraw it, or ship a logo change until provenance and pixel-level approval are recorded.
 - Lucide vocabulary and sizes are defined in `ICONS.md`; icons communicate functions, never
