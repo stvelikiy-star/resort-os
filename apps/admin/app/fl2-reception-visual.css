@@ -252,3 +252,190 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reservation-detail
     transition:none!important;transform:none!important;
   }
 }
+
+
+/* FL2 responsive visual acceptance: keep every original booking field and action.
+ * The legacy six-column layout is unchanged; breakpoints apply only to Future Luxury.
+ * Four date/finance groups remain intact on medium and narrow screens. */
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+  min-width:0;
+  grid-template-columns:140px minmax(165px,1.15fr) minmax(130px,.72fr) minmax(185px,1.03fr) minmax(165px,1fr) minmax(120px,auto);
+  align-items:center;
+  gap:clamp(10px,1.2vw,18px);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card > div{
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-booking{
+  color:var(--fl2-reception-ink);
+  font-weight:850;
+  letter-spacing:.015em;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card .field-label{
+  display:block;
+  font-size:11px;
+  font-weight:700;
+  line-height:1.4;
+  margin-bottom:5px;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card b{
+  font-size:clamp(12px,1vw,15px);
+  line-height:1.42;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-finance b{
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions{
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+  gap:8px;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions .btn{
+  min-height:44px;
+  white-space:nowrap;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card:has(.status-pill.s-CHECKED_IN){
+  border-left-color:#35d8be;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card:has(.status-pill.s-CANCELLED),
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card:has(.status-pill.s-NO_SHOW){
+  border-left-color:#e88a9a;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card:has(.status-pill.s-CHECKED_OUT){
+  border-left-color:#81aec1;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions .btn:focus-visible,
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card a:focus-visible{
+  outline:3px solid #e7c187;
+  outline-offset:2px;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-summary > div,
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-money > div{
+  min-width:0;
+  padding:clamp(11px,1.2vw,15px);
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-summary strong,
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-money strong{
+  overflow-wrap:anywhere;
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-summary span,
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-money span{
+  font-size:11px;
+  line-height:1.4;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-section{
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .reservation-detail .detail-rows>div,
+html[data-marina-ui="future-luxury"] .reservation-detail .audit-list>div{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+@media(max-width:1750px){
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:minmax(130px,.7fr) minmax(165px,1.3fr) minmax(135px,.8fr);
+    gap:12px;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions{
+    justify-content:flex-start;
+  }
+}
+@media(max-width:1050px){
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:13px;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions{
+    grid-column:1 / -1;
+  }
+  html[data-marina-ui="future-luxury"] .reservation-detail .detail-summary{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .reservation-detail .detail-rows>div{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:760px){
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions{
+    grid-column:1/-1;
+  }
+  html[data-marina-ui="future-luxury"] .reservation-detail{
+    border-radius:20px 20px 0 0;
+  }
+}
+@media(max-width:520px){
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions{
+    grid-column:auto;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card .reception-actions .btn{
+    flex:1 1 120px;
+  }
+  html[data-marina-ui="future-luxury"] .reservation-detail .detail-summary{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .reservation-detail .detail-rows>div{
+    grid-template-columns:1fr;
+  }
+}
+
+/* On narrow screens the inherited horizontal work-head places Refresh on top
+   of its subtitle; stack it without removing or replacing the actual action. */
+@media(max-width:760px){
+  html[data-marina-ui="future-luxury"] .reception-shell .work-head{
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    align-items:start;
+    justify-items:start;
+    gap:14px;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .work-head > div{
+    min-width:0;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .work-head .subtitle{
+    margin-top:8px;
+    margin-bottom:0;
+    line-height:1.5;
+    overflow-wrap:anywhere;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .work-head > .btn{
+    position:static;
+    min-height:44px;
+    margin:0;
+  }
+}
+
+/* Desktop and tablet: explicitly allocate the action its own grid cell.
+   This avoids collisions with long live subtitles and dynamic translations. */
+html[data-marina-ui="future-luxury"] .reception-shell .work-head{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;
+  gap:14px 22px;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head > div{
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head .subtitle{
+  max-width:100%;
+  line-height:1.5;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .work-head > .btn{
+  justify-self:start;
+  min-height:44px;
+}
+@media(max-width:1750px){
+  html[data-marina-ui="future-luxury"] .reception-shell .work-head{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
