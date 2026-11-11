@@ -1,12 +1,11 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Plus, Search, Users, X } from 'lucide-react-native';
+import { BedDouble, CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Plus, Search, X } from 'lucide-react-native';
 import { Badge, Empty, SectionLabel, Segmented, PressScale, DemoBanner } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
 import { useLiveModules, ReceptionList, ReceptionReservation } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
-import { contactInitials } from '../../src/i18n/statusLabels';
 import { demoReception } from '../../src/api/demoPresentation';
 import { useSession } from '../../src/state/session';
 import { hasTabForSession } from '../../src/roles/registry';
@@ -54,14 +53,21 @@ export default function Reception() {
     const state = bookingState(x);
     return <StaggerItem index={index} key={x.id}><GlassCard testID={'reservation-' + x.id}
       onPress={!showroom ? () => router.push({ pathname: '/reservation/[id]', params: { id: x.id } }) : undefined}
-      style={{ gap: space.sm }}>
+      style={{ gap: space.md, borderLeftWidth: 3,
+        borderLeftColor: state.tone === 'danger' ? c.danger :
+          state.tone === 'warning' ? c.warning :
+          state.tone === 'success' ? c.success : c.cyan }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
-        <View style={{ width: 44, height: 44, borderRadius: radius.md, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-          {x.firstName ? <Text style={[font.h2, { color: c.primary }]}>{contactInitials(x.firstName)}</Text> : <Users size={22} color={c.primary}/>} 
+        <View style={{ width: 63, height: 62, borderRadius: radius.md,
+          backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center',
+          borderWidth: 1, borderColor: c.glassBorder, gap: 2 }}>
+          <BedDouble size={21} color={c.primary}/>
+          <Text style={[font.small, { color: c.primary, fontWeight: '800' }]}
+            numberOfLines={1} adjustsFontSizeToFit>{x.room_code || '—'}</Text>
         </View>
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={[font.h2, { color: c.text }]} numberOfLines={1}>{x.firstName || x.bookingNumber}</Text>
-          <Text style={[font.small, { color: c.textMuted }]}>{x.bookingNumber} · {x.room_code || '—'}</Text>
+        <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+          <Text style={[font.h2, { color: c.text }]} numberOfLines={2}>{x.firstName || x.bookingNumber}</Text>
+          <Text style={[font.small, { color: c.textMuted }]} numberOfLines={1}>{x.bookingNumber}</Text>
         </View>
         <ChevronRight color={c.primary} size={22}/>
       </View>
