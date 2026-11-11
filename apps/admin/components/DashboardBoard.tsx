@@ -85,6 +85,9 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
 
   const roomReady = data.rooms.clean;
   const roomNeedsWork = data.rooms.dirty + data.rooms.in_inspection + data.rooms.tech_block;
+  // Presentation-only ring uses the existing server occupancy; no synthetic trend.
+  const occupancyVisual = Number.isFinite(data.stays.occupancy_percent)
+    ? Math.max(0, Math.min(100, data.stays.occupancy_percent)) : 0;
 
   return (
     <main className="work-shell dashboard-shell" data-fl2-owner={isOwner ? "true" : undefined}>
@@ -117,12 +120,19 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
       <section className="command-grid">
         <article className="command-panel">
           <div className="command-panel-head"><div><p className="eyebrow">Номерной фонд</p><h2>{data.rooms.total} номеров · состояние</h2></div><Drill to="PMS" onNavigate={onNavigate}>Открыть шахматку</Drill></div>
+          <div className="fl2-room-state-visual">
+            <div className="fl2-real-occupancy-ring"
+              role="img" aria-label={`Загрузка сейчас: ${occupancyVisual}%`}
+              style={{ background: `conic-gradient(#25d7d9 0% ${occupancyVisual}%, #244b5f ${occupancyVisual}% 100%)` }}>
+              <div><strong>{occupancyVisual}%</strong><span>Загрузка</span></div>
+            </div>
           <div className="room-state-grid">
             <div className="state-clean"><strong>{data.rooms.clean}</strong><span>Готовы</span></div>
             <div className="state-dirty"><strong>{data.rooms.dirty}</strong><span>Нужна уборка</span></div>
             <div className="state-inspection"><strong>{data.rooms.in_inspection}</strong><span>На проверке</span></div>
             <div className="state-tech"><strong>{data.rooms.tech_block}</strong><span>TECH_BLOCK</span></div>
             <div><strong>{data.rooms.unknown}</strong><span>Не указан статус</span></div>
+          </div>
           </div>
           <p className="command-note">Готовы сейчас: {roomReady}. Физическое состояние номера не подменяет коммерческую занятость.</p>
         </article>

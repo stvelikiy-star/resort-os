@@ -280,3 +280,36 @@ html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-pms-switches button
     transition:none!important;transform:none!important;
   }
 }
+
+
+/* Existing Core occupancy percentage, shown in a real data-only premium donut. */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-room-state-visual{
+  display:flex;align-items:center;gap:clamp(12px,1.5vw,26px);flex-wrap:wrap;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring{
+  position:relative;display:grid;place-items:center;flex:0 0 152px;
+  width:152px;height:152px;border-radius:50%;
+  border:1px solid rgba(84,234,232,.4);
+  box-shadow:0 0 22px rgba(24,197,205,.16);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring>div{
+  display:grid;place-content:center;width:112px;height:112px;
+  border-radius:50%;background:#102d3d;text-align:center;color:#f1fdff;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring strong{
+  font-size:28px;font-variant-numeric:tabular-nums;line-height:1.15;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring span{
+  color:#b2cfda;font-size:12px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-room-state-visual .room-state-grid{
+  flex:1 1 290px;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));
+}
+@media(max-width:600px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring{
+    flex-basis:120px;width:120px;height:120px;
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring>div{
+    width:88px;height:88px;
+  }
+}
