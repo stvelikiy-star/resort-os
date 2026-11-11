@@ -5,8 +5,8 @@ import { LinearGradientFallback } from './gradient';
 import { useTheme } from '../theme/ThemeProvider';
 import { font, radius, space } from '../theme/tokens';
 
-/** Existing compass-and-ship asset; original vector brand-master sign-off remains separate. */
-const MARINA_SEAL = require('../../assets/marina-staff-app-icon.png');
+/** Canonical user-approved flat circular MARINA SMART PNG; checksum enforced by logo install gate. */
+const MARINA_SEAL = require('../../assets/marina-smart-approved.png');
 
 export function Logo({ size = 56 }: { size?: number }) {
   return <Image source={MARINA_SEAL} style={{ width: size, height: size, borderRadius: size / 2 }} resizeMode="contain" accessibilityLabel="MARINA SMART" />;

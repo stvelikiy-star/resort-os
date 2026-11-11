@@ -280,14 +280,14 @@ export default function AdminShell() {
   }
 
   if (checking) {
-    return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
+    return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
 
   if (!user) {
     return (
       <main className="login-screen">
         <form className="login-card" onSubmit={login}>
-          <img className="marina-brand-logo" src="/marina-smart-logo.webp" alt="MARINA SMART" />
+          <img className="marina-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" />
           <p className="eyebrow">MARINA SMART · Hotel OS</p>
           <h1>Вход в управление</h1>
           <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
@@ -311,7 +311,7 @@ export default function AdminShell() {
     <>
       <div className="auth-toolbar admin-nav">
         <div className="admin-identity">
-          <img className="marina-brand-logo-small" src="/marina-smart-logo.webp" alt="MARINA SMART" />
+          <img className="marina-brand-logo-small" src="/marina-smart-approved.png" alt="MARINA SMART" />
           {hotelLogoUrl && <img className="hotel-brand-logo-small" src={hotelLogoUrl} alt={hotelName || "Логотип отеля"} />}
           <div><strong>MARINA SMART · Hotel OS</strong><span>{hotelName ? `${hotelName} · ` : ""}{user.display_name} · {user.role}</span></div>
         </div>
