@@ -1,5 +1,5 @@
-import React from 'react';
-import { Text, View, useWindowDimensions } from 'react-native';
+import React, { useLayoutEffect, useRef, useState } from 'react';
+import { Animated, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowUpRight, BedDouble, CalendarCheck2, CalendarClock, ClipboardCheck, DoorOpen, MessageSquareText, ShieldAlert, UsersRound, Wallet, Wrench, ChefHat } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -9,6 +9,7 @@ import type { AuthUser } from '../api/types';
 import { useMobileCopy } from '../i18n/mobileCopy';
 import { useTheme } from '../theme/ThemeProvider';
 import { font, radius, space } from '../theme/tokens';
+import { motionPresets, useMotionPreference } from '../theme/motion';
 import { Empty, SectionLabel } from './ui';
 import { GlassCard, StaggerItem } from './Future';
 
@@ -21,6 +22,43 @@ interface Props {
   canOpen: (tab: OwnerTab) => boolean;
   canOpenInbox: boolean;
   showroom: boolean;
+}
+
+export function occupancyProgress(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
+}
+
+function OccupancyProgress({ value, label, color, trackColor }: {
+  value: number; label: string; color: string; trackColor: string;
+}) {
+  const safe = occupancyProgress(value);
+  const { allowed, ready } = useMotionPreference();
+  const [progress] = useState(() => new Animated.Value(1));
+  const appeared = useRef(false);
+  useLayoutEffect(() => {
+    progress.stopAnimation();
+    if (!ready || appeared.current || !allowed) {
+      if (ready) appeared.current = true;
+      progress.setValue(1);
+      return;
+    }
+    appeared.current = true;
+    progress.setValue(0);
+    const animation = Animated.timing(progress, {
+      toValue: 1,
+      duration: motionPresets.chart.duration,
+      easing: motionPresets.chart.easing,
+      useNativeDriver: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [allowed, ready, progress, safe]);
+  const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${safe}%`] });
+  return <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
+    accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
+    style={{ height: 9, backgroundColor: trackColor, borderRadius: radius.pill, overflow: 'hidden' }}>
+    <Animated.View style={{ height: 9, width, backgroundColor: color, borderRadius: radius.pill }}/>
+  </View>;
 }
 
 /** Stable two-column executive grid. Only verified dashboard fields are displayed;
@@ -82,11 +120,8 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
           {copy.occupancy} · {count(data.stays.occupied_rooms)}/{count(data.rooms.total)}
         </Text>
       </View>
-      {occupancyKnown ? <View accessible accessibilityRole="progressbar" accessibilityLabel={copy.occupancy}
-        accessibilityValue={{ min: 0, max: 100, now: Math.round(occupancy) }}
-        style={{ height: 9, backgroundColor: c.surfaceAlt, borderRadius: radius.pill, overflow: 'hidden' }}>
-        <View style={{ height: 9, width: occupancy + '%', backgroundColor: c.cyan, borderRadius: radius.pill }}/>
-      </View> : null}
+      {occupancyKnown ? <OccupancyProgress value={occupancy} label={copy.occupancy}
+        color={c.cyan} trackColor={c.surfaceAlt}/> : null}
     </GlassCard>
 
     <View style={{ gap: space.sm }}>
