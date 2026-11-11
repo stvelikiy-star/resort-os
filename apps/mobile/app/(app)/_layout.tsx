@@ -2,19 +2,15 @@ import React from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Redirect, Tabs, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Grid2X2, ClipboardCheck, BedDouble, LayoutDashboard, UsersRound, CircleUserRound, Wrench, MessageCircle, CalendarDays, ConciergeBell, UtensilsCrossed, ChefHat } from 'lucide-react-native';
+import { Grid2X2 } from 'lucide-react-native';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { hasTabForSession, homeForSession, workspaceForSession, TabKey } from '../../src/roles/registry';
 import { mobileTabPlan } from '../../src/roles/navigation';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { iconography, radius } from '../../src/theme/tokens';
+import { moduleIcons } from '../../src/theme/moduleIcons';
 
-const ICONS = {
-  overview: LayoutDashboard, reception: ConciergeBell, pms: CalendarDays, inbox: MessageCircle,
-  dining: UtensilsCrossed, kitchen: ChefHat, tasks: ClipboardCheck, rooms: BedDouble, requests: Wrench,
-  admin: UsersRound, profile: CircleUserRound,
-} as const;
 const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
 export default function AppTabs() {
   const { user, api, serverAuthMode, locale } = useSession();
@@ -53,7 +49,7 @@ export default function AppTabs() {
     tabBarLabelStyle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1, marginTop: 3 },
   }}>
     {ORDER.map((key) => {
-      const Icon = ICONS[key];
+      const Icon = moduleIcons[key];
       return <Tabs.Screen key={key} name={key} options={{
         title: copy[key], tabBarLabel: tabTitle(key),
         // Keep overflow routes registered and navigable from More, but remove
