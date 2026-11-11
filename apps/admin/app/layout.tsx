@@ -50,6 +50,7 @@ import "./mobile-hardening.css";
 import "./admin-experience.css";
 import "./fl2-owner-dashboard.css";
 import "./fl2-premium-visual.css";
+import "./fl2-owner-pms-finish.css";
 
 export const metadata: Metadata = {
   title: "MARINA SMART — Hotel OS",
