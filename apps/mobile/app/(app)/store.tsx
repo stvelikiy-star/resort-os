@@ -1,5 +1,5 @@
 import React, {useCallback, useRef, useState} from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Text } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { FutureScreen, PremiumHeader, GlassCard, LoadingShimmer, ErrorState } from '../../src/components/Future';
 import { Button, Empty, Field, SectionLabel } from '../../src/components/ui';
