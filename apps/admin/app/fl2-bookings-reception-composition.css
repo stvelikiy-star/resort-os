@@ -1,0 +1,355 @@
+/* MARINA SMART Future Luxury 2.0, actual reservation & reception modules.
+ * Pure opt-in presentation. Existing check-in/out, NFC, folio, audit, rate
+ * calculations, validations and role permissions are untouched. */
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell){
+  --fl2b-surface:#0d2d3e;
+  --fl2b-raised:#174254;
+  --fl2b-line:rgba(76,202,216,.3);
+  --fl2b-ink:#f1fbff;
+  --fl2b-muted:#bad4df;
+  --fl2b-accent:#3dd8d7;
+  max-width:none;
+  color:var(--fl2b-ink);
+  padding:clamp(12px,1.6vw,25px);
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head{
+  box-sizing:border-box;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  padding:clamp(20px,2.3vw,32px)!important;
+  border-radius:21px!important;
+  border:1px solid var(--fl2b-line)!important;
+  background:radial-gradient(circle at 90% 15%,rgba(24,199,204,.17),transparent 35%),linear-gradient(117deg,#0b283b,#115467)!important;
+  box-shadow:0 17px 37px rgba(2,13,25,.13);
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head h1{
+  color:#f5fcff!important;
+  font-size:clamp(26px,2.6vw,39px);
+  line-height:1.2;
+  letter-spacing:-.038em;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head .eyebrow{
+  color:#eac88e!important;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:.13em;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head .subtitle{
+  color:#c6dce5!important;
+  font-size:12px;
+  line-height:1.6;
+  max-width:850px;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head .work-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head .work-actions select{
+  min-height:44px;
+  min-width:150px;
+  border-radius:10px;
+  background:#174557;
+  color:#f4fcff;
+  border:1px solid var(--fl2b-line);
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head button{
+  min-height:44px;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-list,
+html[data-marina-ui="future-luxury"] .reception-shell .reception-list{
+  display:grid;
+  gap:12px;
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-card,
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+  box-sizing:border-box;
+  min-width:0;
+  display:grid;
+  gap:clamp(10px,1.1vw,17px);
+  align-items:center;
+  padding:clamp(14px,1.5vw,21px)!important;
+  border:1px solid var(--fl2b-line)!important;
+  border-left:4px solid #32cbd2!important;
+  border-radius:17px!important;
+  background:linear-gradient(152deg,#12384b,#0e293a)!important;
+  color:var(--fl2b-ink);
+  box-shadow:0 10px 27px rgba(0,11,22,.12);
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-card{
+  grid-template-columns:minmax(118px,.72fr) minmax(120px,1.12fr) minmax(90px,.65fr) minmax(155px,1.14fr) minmax(110px,.85fr) minmax(105px,.7fr) minmax(155px,1.1fr);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+  grid-template-columns:minmax(125px,.68fr) minmax(135px,1fr) minmax(105px,.7fr) minmax(175px,1.08fr) minmax(160px,1fr) minmax(158px,.95fr);
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card)>div{
+  min-width:0;overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) :is(b,strong){
+  color:var(--fl2b-ink);
+  font-size:clamp(12px,1vw,14px);
+  font-variant-numeric:tabular-nums;
+  line-height:1.35;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) .field-label{
+  display:block;
+  color:var(--fl2b-muted);
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.045em;
+  margin-bottom:6px;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) :is(small,.room-move-note){
+  color:var(--fl2b-muted);
+  font-size:11px;
+  line-height:1.45;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) a{
+  color:#81eef1;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  font-size:12px;
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-id{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-id>span{
+  color:#b9ecea;
+  background:#205466;
+  border:1px solid #387d88;
+  padding:5px 9px;
+  border-radius:999px;
+  font-size:10px;
+  font-weight:750;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-actions,.reception-actions){
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
+  justify-content:flex-start;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-actions,.reception-actions) .btn{
+  min-height:44px;
+  min-width:0;
+  border-radius:11px;
+  white-space:normal;
+  padding:10px 12px;
+  font-size:11px;
+  line-height:1.3;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) .btn.primary:not(:disabled){
+  color:#06303b;
+  background:linear-gradient(105deg,#19bec8,#52e0dc);
+  border-color:#38cdd1;
+  font-weight:850;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-controls{
+  display:grid;
+  grid-template-columns:minmax(195px,1fr) minmax(145px,.55fr) minmax(135px,.55fr) auto;
+  padding:13px;
+  gap:10px;
+  border:1px solid var(--fl2b-line);
+  border-radius:15px;
+  background:#103447;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-controls :is(input,select){
+  box-sizing:border-box;min-width:0;min-height:44px;
+  color:var(--fl2b-ink);background:#194455;border:1px solid var(--fl2b-line);
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-controls span{
+  color:var(--fl2b-muted);
+  text-align:left;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-finance .balance-due{
+  color:#ffd19b;font-weight:850;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reception-finance .balance-ok{
+  color:#aff3d1;font-weight:850;
+}
+/* Confirmed booking modal/folio/schedule/audit: keep all original form controls. */
+html[data-marina-ui="future-luxury"] .reception-shell .reservation-detail,
+html[data-marina-ui="future-luxury"] .fl2-reservations .nfc-modal{
+  color:var(--fl2b-ink);
+  background:linear-gradient(156deg,#143b4f,#0b283a);
+  border:1px solid var(--fl2b-line);
+  border-radius:21px;
+  padding:clamp(16px,2vw,27px);
+  box-shadow:0 28px 82px rgba(0,8,21,.42);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reservation-detail>header{
+  border-bottom:1px solid var(--fl2b-line);
+  padding-bottom:18px;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .reservation-detail h2{
+  color:var(--fl2b-ink);
+  letter-spacing:-.035em;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .detail-section{
+  border-top:1px solid var(--fl2b-line);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .detail-section h3{
+  color:var(--fl2b-ink);
+}
+html[data-marina-ui="future-luxury"] .reception-shell :is(.detail-summary>div,.detail-money>div,.detail-rows>div,.audit-list>div){
+  color:var(--fl2b-ink);
+  background:var(--fl2b-raised);
+  border:1px solid var(--fl2b-line);
+  border-radius:11px;
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .reception-shell :is(.detail-summary,.detail-money,.detail-rows,.audit-list) :is(span,time,small){
+  color:var(--fl2b-muted);
+}
+html[data-marina-ui="future-luxury"] .reception-shell :is(.detail-summary,.detail-money,.detail-rows,.audit-list) :is(strong,b){
+  color:var(--fl2b-ink);
+}
+html[data-marina-ui="future-luxury"] .reception-shell .detail-rows>div{
+  grid-template-columns:minmax(160px,1fr) minmax(125px,.8fr) minmax(100px,.55fr) minmax(130px,.7fr);
+  gap:12px;
+}
+html[data-marina-ui="future-luxury"] .reception-shell .detail-muted{
+  color:var(--fl2b-muted);
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations :is(.nfc-modal input,.nfc-modal select){
+  min-height:44px;
+  background:var(--fl2b-raised);
+  color:var(--fl2b-ink);
+  border:1px solid var(--fl2b-line);
+  border-radius:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .nfc-warning{
+  background:#4c3d2a;
+  color:#fff0d4;
+  border:1px solid #9f824d;
+  border-radius:13px;
+}
+html[data-marina-ui="future-luxury"] .fl2-reservations .nfc-warning :is(strong,span){color:#fff0d4}
+html[data-marina-ui="future-luxury"] .fl2-reservations .nfc-wallet-panel{
+  color:var(--fl2b-ink);
+  background:var(--fl2b-raised);
+  border:1px solid var(--fl2b-line);
+  border-radius:14px;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(button,input,select,textarea,a):focus-visible{
+  outline:3px solid #e8c887;outline-offset:3px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell){
+  --fl2b-surface:#fff;
+  --fl2b-raised:#edf7fa;
+  --fl2b-line:#c5dfe8;
+  --fl2b-ink:#12394b;
+  --fl2b-muted:#4c6d7d;
+  --fl2b-accent:#087f90;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell)>.work-head{
+  background:radial-gradient(circle at 89% 9%,#d4eef2,transparent 39%),linear-gradient(117deg,#fff,#e8f5f9)!important;
+  border-color:var(--fl2b-line)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell)>.work-head h1{color:var(--fl2b-ink)!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell)>.work-head .subtitle{color:var(--fl2b-muted)!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell)>.work-head .eyebrow{color:#80591b!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell)>.work-head .work-actions select{
+  background:#fff;color:var(--fl2b-ink);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card){
+  color:var(--fl2b-ink);
+  background:linear-gradient(156deg,#fff,#f1f9fb)!important;
+  border-color:var(--fl2b-line)!important;
+  box-shadow:0 10px 24px rgba(16,82,103,.08);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) :is(b,strong){
+  color:var(--fl2b-ink);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) :is(small,.field-label,.room-move-note){
+  color:var(--fl2b-muted);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card) a{
+  color:#096d81;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-reservations .reservation-id>span{
+  background:#def4f6;color:#08677a;border-color:#b8e1e8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .reception-controls{
+  background:#edf7fa;border-color:var(--fl2b-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .reception-controls :is(input,select){
+  background:#fff;color:var(--fl2b-ink);border-color:var(--fl2b-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .reception-finance .balance-due{color:#91551a}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .reception-finance .balance-ok{color:#1b7553}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .reservation-detail,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-reservations .nfc-modal{
+  color:var(--fl2b-ink);
+  background:linear-gradient(156deg,#fff,#f1f9fb);
+  border-color:var(--fl2b-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .reservation-detail h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell .detail-section h3{color:var(--fl2b-ink)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell :is(.detail-summary>div,.detail-money>div,.detail-rows>div,.audit-list>div){
+  background:var(--fl2b-raised);color:var(--fl2b-ink);border-color:var(--fl2b-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell :is(.detail-summary,.detail-money,.detail-rows,.audit-list) :is(strong,b){color:var(--fl2b-ink)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .reception-shell :is(.detail-summary,.detail-money,.detail-rows,.audit-list) :is(span,time,small){color:var(--fl2b-muted)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-reservations .nfc-warning{
+  color:#78541b;background:#fff4df;border-color:#dbbc7a;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-reservations .nfc-warning :is(strong,span){color:#78541b}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-reservations :is(.nfc-modal input,.nfc-modal select){background:#fff;color:var(--fl2b-ink)}
+@media(max-width:1350px){
+  html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-card{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media(max-width:850px){
+  html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-card,
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-controls{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .detail-rows>div{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:600px){
+  html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell)>.work-head{
+    align-items:stretch;flex-direction:column;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-card,
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-card{
+    grid-template-columns:minmax(0,1fr);
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-controls{
+    grid-template-columns:minmax(0,1fr);
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .detail-rows>div{
+    grid-template-columns:minmax(0,1fr);
+  }
+  html[data-marina-ui="future-luxury"] .fl2-reservations .reservation-actions .btn,
+  html[data-marina-ui="future-luxury"] .reception-shell .reception-actions .btn{
+    width:100%;
+  }
+  html[data-marina-ui="future-luxury"] .reception-shell .reservation-detail,
+  html[data-marina-ui="future-luxury"] .fl2-reservations .nfc-modal{
+    width:100%;
+    max-height:92svh;
+    overflow:auto;
+    border-radius:20px 20px 0 0;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] :is(.fl2-reservations,.reception-shell) :is(.reservation-card,.reception-card,.btn){
+    animation:none!important;transition:none!important;transform:none!important;
+  }
+}
