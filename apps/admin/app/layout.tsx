@@ -57,6 +57,7 @@ import "./fl2-operational-web.css";
 import "./fl2-guest-touchpoints.css";
 import "./fl2-operations-knowledge-growth.css";
 import "./fl2-interaction-polish.css";
+import "./fl2-owner-composition.css";
 
 export const metadata: Metadata = {
   title: "MARINA SMART — Hotel OS",

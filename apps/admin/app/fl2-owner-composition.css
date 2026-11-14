@@ -1,0 +1,456 @@
+/*
+ * MARINA SMART FUTURE LUXURY 2.0 — OWNER composition pass.
+ * No new API calls, UI actions, financial totals, booking transitions or roles.
+ * Source of all values is DashboardBoard / original OWNER component tree.
+ * A presentation-only enhancement on the authenticated opt-in skin.
+ */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] {
+  --fl2o-surface: #0d2a3b;
+  --fl2o-raised: #143c50;
+  --fl2o-text: #effaff;
+  --fl2o-muted: #bbd4df;
+  --fl2o-line: rgba(82, 205, 216, .32);
+  --fl2o-accent: #33d1d7;
+  --fl2o-accent-ink: #062b38;
+  --fl2o-warm: #e9c68e;
+  max-width: min(100%, 1800px);
+  box-sizing: border-box;
+  padding: clamp(12px, 1.6vw, 25px);
+  margin-inline: auto;
+  display:flex;
+  flex-direction:column;
+  gap:clamp(13px, 1.4vw, 20px);
+  color:var(--fl2o-text);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  min-height:136px;
+  padding:clamp(21px,2.4vw,34px)!important;
+  background:
+    radial-gradient(circle at 86% 10%,rgba(18,192,202,.18),transparent 33%),
+    linear-gradient(114deg,#071d2e,#0d3547 62%,#125062)!important;
+  border:1px solid var(--fl2o-line)!important;
+  border-radius:22px!important;
+  box-shadow:0 16px 42px rgba(1,10,23,.18);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head::after{
+  width:230px;right:-65px;top:-90px;opacity:.55;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head h1{
+  font-size:clamp(28px,3vw,43px);
+  line-height:1.12;
+  letter-spacing:-.045em;
+  color:#f5fcff!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head .eyebrow{
+  font-size:11px;
+  letter-spacing:.13em;
+  color:var(--fl2o-warm)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head .subtitle{
+  margin-top:11px;
+  font-size:12px;
+  line-height:1.6;
+  color:#d1e4eb!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > button{
+  align-self:center;
+  min-width:122px;
+  min-height:44px;
+  padding-inline:18px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis{
+  order:1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:clamp(11px,1vw,15px);
+  margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:space-between;
+  min-height:132px;
+  min-width:0;
+  padding:clamp(17px,1.6vw,23px)!important;
+  background:linear-gradient(145deg,rgba(20,61,78,.98),rgba(10,35,51,.98))!important;
+  border:1px solid var(--fl2o-line)!important;
+  border-radius:18px!important;
+  box-shadow:inset 0 1px rgba(175,255,255,.10),0 10px 27px rgba(0,8,22,.11);
+  gap:7px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article::after{
+  content:"";
+  position:absolute;
+  bottom:0;
+  left:18px;
+  width:64px;
+  height:3px;
+  background:linear-gradient(90deg,var(--fl2o-accent),transparent);
+  border-radius:3px;
+  margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(6){
+  border-color:rgba(233,198,142,.37)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(6)::after{
+  background:linear-gradient(90deg,var(--fl2o-warm),transparent);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > span{
+  display:block;
+  margin:0;
+  color:var(--fl2o-muted)!important;
+  font-size:11px;
+  font-weight:750;
+  letter-spacing:.035em;
+  text-transform:none;
+  line-height:1.38;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > strong{
+  color:var(--fl2o-text)!important;
+  font-variant-numeric:tabular-nums;
+  font-size:clamp(23px,2.35vw,34px);
+  line-height:1.16;
+  letter-spacing:-.045em;
+  overflow-wrap:anywhere;
+  margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > small{
+  margin:0;
+  min-height:2.6em;
+  color:var(--fl2o-muted)!important;
+  font-size:10.5px;
+  line-height:1.38;
+}
+/* WhatsApp panel is a real navigation control; never show a made-up LIVE pulse. */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-panel[aria-label="Диалоги WhatsApp"]{
+  order:2;
+  background:linear-gradient(105deg,#0d3549,#124655)!important;
+  border:1px solid rgba(60,204,212,.34)!important;
+  border-radius:15px!important;
+  padding:15px 18px!important;
+  box-shadow:0 10px 22px rgba(0,9,22,.10);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-panel[aria-label="Диалоги WhatsApp"] .command-panel-head{
+  align-items:center;
+  margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-panel[aria-label="Диалоги WhatsApp"] h2{
+  font-size:15px;
+  font-weight:800;
+  color:#e9fbff;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid{
+  order:3;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:clamp(12px,1.2vw,18px);
+  margin:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid > .command-panel,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid.two > .command-panel,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .attention-panel{
+  min-width:0;
+  padding:clamp(17px,1.6vw,24px)!important;
+  background:linear-gradient(154deg,#102e40,#0b2737)!important;
+  border:1px solid var(--fl2o-line)!important;
+  border-radius:18px!important;
+  box-shadow:0 12px 28px rgba(0,10,25,.11);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head{
+  gap:14px;
+  align-items:center;
+  flex-wrap:wrap;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--fl2o-line);
+  margin-bottom:15px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head h2{
+  color:var(--fl2o-text)!important;
+  font-size:clamp(17px,1.6vw,22px);
+  letter-spacing:-.025em;
+  line-height:1.25;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head .eyebrow{
+  font-size:10px;
+  letter-spacing:.12em;
+  color:var(--fl2o-warm)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-drill{
+  min-height:40px;
+  border-radius:10px!important;
+  border-color:rgba(72,205,215,.38)!important;
+  color:#74edf1!important;
+  background:rgba(34,124,142,.15)!important;
+  padding:8px 12px;
+  white-space:normal;
+  text-align:left;
+  line-height:1.3;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-drill:hover{
+  border-color:#42d8dc!important;
+  background:rgba(38,156,173,.28)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list{
+  background:transparent;
+  border:0;
+  gap:7px;
+  overflow:visible;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list>div{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:15px;
+  padding:13px 15px;
+  background:var(--fl2o-raised)!important;
+  border:1px solid var(--fl2o-line)!important;
+  border-radius:11px!important;
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list>div span{
+  color:var(--fl2o-muted)!important;
+  font-size:12px;
+  line-height:1.4;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list>div strong{
+  color:var(--fl2o-text)!important;
+  font-size:clamp(15px,1.2vw,19px);
+  font-variant-numeric:tabular-nums;
+  text-align:right;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money{
+  gap:10px;
+  border:0;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money>div{
+  min-width:0;
+  background:var(--fl2o-raised)!important;
+  border:1px solid var(--fl2o-line)!important;
+  border-radius:11px!important;
+  padding:15px 13px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money span{
+  font-size:10px;
+  color:var(--fl2o-muted)!important;
+  line-height:1.45;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money strong{
+  font-size:clamp(15px,1.3vw,20px);
+  letter-spacing:-.02em;
+  line-height:1.35;
+  word-break:normal;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-room-state-visual{
+  gap:clamp(16px,1.6vw,27px);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-room-state-visual .room-state-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:9px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid>div{
+  background:var(--fl2o-raised)!important;
+  border:1px solid var(--fl2o-line)!important;
+  border-radius:11px!important;
+  padding:12px;
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid strong{
+  font-size:clamp(21px,2vw,26px);
+  color:var(--fl2o-text)!important;
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid span{
+  color:var(--fl2o-muted)!important;
+  line-height:1.4;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .stay-list{
+  gap:8px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .stay-row{
+  min-width:0;
+  grid-template-columns:minmax(110px,.6fr) minmax(0,1.4fr);
+  background:var(--fl2o-raised)!important;
+  border:1px solid var(--fl2o-line)!important;
+  color:var(--fl2o-text)!important;
+  border-radius:11px;
+  padding:13px;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .stay-row span{
+  color:var(--fl2o-muted)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .stay-row a{
+  color:#73edf0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .attention-table{
+  background:transparent;
+  border:0;
+  gap:7px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .attention-row{
+  border-radius:11px!important;
+  background:var(--fl2o-raised)!important;
+  border:1px solid var(--fl2o-line)!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-note{
+  color:var(--fl2o-muted)!important;
+  line-height:1.6;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-note.danger-text{
+  color:#ffb3b8!important;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .attention-panel,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .owner-executive,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .owner-v2,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .owner-operations{
+  order:4;
+}
+/* Daylight legibility, parity with dark layout — no theme-specific hidden content. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"]{
+  --fl2o-surface:#fff;
+  --fl2o-raised:#ecf6f9;
+  --fl2o-text:#12384c;
+  --fl2o-muted:#507082;
+  --fl2o-line:#c9e0e9;
+  --fl2o-accent:#087d90;
+  --fl2o-accent-ink:#fff;
+  --fl2o-warm:#875d1c;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .work-head{
+  background:radial-gradient(circle at 89% 8%,#d2eef1,transparent 37%),linear-gradient(114deg,#fff,#e9f5f9)!important;
+  border-color:var(--fl2o-line)!important;
+  box-shadow:0 12px 30px rgba(17,71,91,.10);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .work-head h1{color:#11394c!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .work-head .eyebrow{color:var(--fl2o-warm)!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .work-head .subtitle{color:var(--fl2o-muted)!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article{
+  background:linear-gradient(152deg,#fff,#edf7fa)!important;
+  box-shadow:0 10px 26px rgba(15,74,93,.075);
+  border-color:var(--fl2o-line)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article>strong{
+  color:var(--fl2o-text)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article>span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis>article>small{
+  color:var(--fl2o-muted)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-panel[aria-label="Диалоги WhatsApp"]{
+  background:linear-gradient(105deg,#fff,#e8f5f8)!important;
+  border-color:var(--fl2o-line)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-panel[aria-label="Диалоги WhatsApp"] h2{
+  color:var(--fl2o-text);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-grid>.command-panel,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-grid.two>.command-panel,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .attention-panel{
+  background:linear-gradient(155deg,#fff,#f4fafd)!important;
+  border-color:var(--fl2o-line)!important;
+  box-shadow:0 10px 27px rgba(9,63,87,.07);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head h2{
+  color:var(--fl2o-text)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head .eyebrow{
+  color:var(--fl2o-warm)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-drill{
+  color:#0b7383!important;
+  background:#e4f4f7!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-drill span{
+  color:#0b7383!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-list>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-money>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .stay-row,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .attention-row{
+  color:var(--fl2o-text)!important;
+  background:var(--fl2o-raised)!important;
+  border-color:var(--fl2o-line)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-list strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-money strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid strong{
+  color:var(--fl2o-text)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-list span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-money span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .stay-row span{
+  color:var(--fl2o-muted)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid>div{
+  background:var(--fl2o-raised)!important;
+  border-color:var(--fl2o-line)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-note{
+  color:var(--fl2o-muted)!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-note.danger-text{color:#97314b!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .stay-row a{color:#087d90}
+@media(max-width:1100px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media(max-width:820px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-grid{
+    grid-template-columns:minmax(0,1fr);
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:480px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head{
+    flex-direction:column;
+    align-items:flex-start;
+    min-height:0;
+    gap:18px;
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > button{
+    width:100%;
+    align-self:stretch;
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article{
+    min-height:150px;
+    padding:14px!important;
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article > strong{
+    font-size:clamp(19px,5.2vw,27px);
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money{
+    grid-template-columns:minmax(0,1fr);
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .stay-row{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+@media(max-width:345px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis{
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article{
+    animation:none!important;
+    transform:none!important;
+    transition:none!important;
+  }
+}
