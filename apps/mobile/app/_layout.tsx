@@ -6,11 +6,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 import { SessionProvider, useSession } from '../src/state/session';
 import { shouldFrameMobileWeb, WEB_MOBILE_PREVIEW_WIDTH } from '../src/theme/layout';
+import { primeMotionPreference, useMotionAllowed } from '../src/theme/motion';
+
+// Resolve OS Reduce Motion before the first screen mounts so entrances never flash.
+primeMotionPreference();
 
 function Shell() {
   const { name, c } = useTheme();
   const { width } = useWindowDimensions();
   const { locale } = useSession();
+  const motionAllowed = useMotionAllowed();
   const framed = shouldFrameMobileWeb(Platform.OS, width);
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -25,12 +30,14 @@ function Shell() {
       document.head.appendChild(meta);
     }
   }, [locale]);
-  const navigation = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: 'fade_from_bottom' }}>
+  // Screen transitions stay on the native stack (no JS-driven frames); Reduce Motion => none.
+  const modalAnimation = motionAllowed ? 'slide_from_bottom' as const : 'none' as const;
+  const navigation = <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg }, animation: motionAllowed ? 'fade_from_bottom' : 'none' }}>
     <Stack.Screen name="task/[id]" options={{ presentation: 'card' }} />
     <Stack.Screen name="room/[id]" options={{ presentation: 'card' }} />
-    <Stack.Screen name="new-request" options={{ presentation: 'modal' }} />
-    <Stack.Screen name="scan" options={{ presentation: 'modal' }} />
-    <Stack.Screen name="ai" options={{ presentation: 'modal' }} />
+    <Stack.Screen name="new-request" options={{ presentation: 'modal', animation: modalAnimation }} />
+    <Stack.Screen name="scan" options={{ presentation: 'modal', animation: modalAnimation }} />
+    <Stack.Screen name="ai" options={{ presentation: 'modal', animation: modalAnimation }} />
     <Stack.Screen name="finance" options={{ presentation: 'card' }} />
   </Stack>;
   return (

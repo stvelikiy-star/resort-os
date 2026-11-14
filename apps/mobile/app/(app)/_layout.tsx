@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { Easing, useWindowDimensions } from 'react-native';
 import { Redirect, Tabs, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Grid2X2 } from 'lucide-react-native';
@@ -8,7 +8,9 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { hasTabForSession, homeForSession, workspaceForSession, TabKey } from '../../src/roles/registry';
 import { mobileTabPlan } from '../../src/roles/navigation';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
-import { iconography, radius } from '../../src/theme/tokens';
+import { motion } from '../../src/theme/tokens';
+import { useMotionAllowed } from '../../src/theme/motion';
+import { TabIcon } from '../../src/components/Motion';
 import { moduleIcons } from '../../src/theme/moduleIcons';
 
 const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
@@ -19,6 +21,7 @@ export default function AppTabs() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { width, fontScale } = useWindowDimensions();
+  const motionAllowed = useMotionAllowed();
   const compact = width < 355 || fontScale > 1.35;
   const tabTitle = (key: TabKey) => {
     if (key === 'overview' && compact) return copy.homeShort;
@@ -40,6 +43,9 @@ export default function AppTabs() {
   }
   return <Tabs screenOptions={{
     headerShown: false,
+    // Short cross-fade between tab scenes; none under Reduce Motion. Tab set and routes are unchanged.
+    animation: motionAllowed ? 'fade' : 'none',
+    transitionSpec: { animation: 'timing', config: { duration: motion.tab, easing: Easing.out(Easing.cubic) } },
     tabBarActiveTintColor: c.navActive, tabBarInactiveTintColor: c.navInactive,
     tabBarStyle: {
       backgroundColor: c.glass, borderTopColor: c.glassBorder, borderTopWidth: 1,
@@ -60,19 +66,14 @@ export default function AppTabs() {
         tabBarItemStyle: plan.primary.includes(key)
           ? { flex: 1, minWidth: 0 }
           : { display: 'none', width: 0, flex: 0 },
-        tabBarIcon: ({ color, focused }) =>
-          <View style={{ minWidth: 50, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent',
-            borderWidth: focused ? 1 : 0, borderColor: c.glassBorder }}>
-            <Icon size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/>
-          </View>,
+        tabBarIcon: ({ color, focused }) => <TabIcon icon={Icon} focused={focused} color={color}/>,
         tabBarButtonTestID: 'tab-' + key,
       }} />;
     })}
     <Tabs.Screen name="more" options={{
       title: copy.moreMenu, href: plan.showMore ? undefined : null,
       tabBarButtonTestID: 'tab-more',
-      tabBarIcon: ({ color, focused }) => <View style={{ minWidth: 50, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent',
-            borderWidth: focused ? 1 : 0, borderColor: c.glassBorder }}><Grid2X2 size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/></View>,
+      tabBarIcon: ({ color, focused }) => <TabIcon icon={Grid2X2} focused={focused} color={color}/>,
     }}/>
   </Tabs>;
 }

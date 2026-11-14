@@ -7,7 +7,8 @@ import { SchedulePreview, useLiveModules } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { reservationAmount, reservationGuestName, reservationRoomStateLabel, reservationStatusLabel, reservationTelephone } from '../../src/roles/reservationPresentation';
 import { canReadFinance } from '../../src/api/financeAccess';
-import { GlassCard, PremiumHeader } from '../../src/components/Future';
+import { GlassCard, PremiumEntrance, PremiumHeader, StaggerItem } from '../../src/components/Future';
+import { ConfirmedChange } from '../../src/components/Motion';
 import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useSession } from '../../src/state/session';
@@ -102,7 +103,7 @@ export default function ReservationScreen() {
     {loading ? <Empty text={copy.loading}/> : null}
     {error ? <Card onPress={reload}><Text accessibilityRole="alert" style={[font.body, { color: c.danger }]}>{error.message} · {copy.retry}</Text></Card> : null}
     {data ? <>
-      <GlassCard testID="reservation-guest-summary" style={{ gap: space.md, padding: space.lg }}>
+      <StaggerItem index={0}><GlassCard testID="reservation-guest-summary" style={{ gap: space.md, padding: space.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <View style={{ width: 48, height: 48, borderRadius: 15, alignItems: 'center',
             justifyContent: 'center', backgroundColor: c.primarySoft }}>
@@ -113,7 +114,8 @@ export default function ReservationScreen() {
             <Text style={[font.small, { color: c.textMuted }]}>{copy.bookings} · {text(x, 'booking_number')}</Text>
           </View>
         </View>
-        <Badge label={reservationStatusLabel(text(x, 'status'), copy)} tone="info"/>
+        {/* Animates only when the SERVER-reported status changes (after reload); never on a pending or failed action. */}
+        <ConfirmedChange value={text(x, 'status')}><Badge label={reservationStatusLabel(text(x, 'status'), copy)} tone="info"/></ConfirmedChange>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <CalendarDays size={20} color={c.cyan}/>
           <Text style={[font.body, { color: c.text, flex: 1 }]}>{text(x, 'check_in')} → {text(x, 'check_out')}</Text>
@@ -129,8 +131,8 @@ export default function ReservationScreen() {
         {email ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Mail size={19} color={c.textMuted}/><Text selectable style={[font.small, { color: c.text, flex: 1 }]}>{email}</Text>
         </View> : null}
-      </GlassCard>
-      {canFinance && (money('total_kgs') || money('paid_kgs') || money('remaining_kgs')) ? <GlassCard
+      </GlassCard></StaggerItem>
+      {canFinance && (money('total_kgs') || money('paid_kgs') || money('remaining_kgs')) ? <StaggerItem index={1}><GlassCard
         testID="reservation-finance" style={{ gap: space.sm, padding: space.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Wallet size={21} color={c.gold}/><Text style={[font.h2, { color: c.text }]}>{copy.financeTitle}</Text>
@@ -139,7 +141,7 @@ export default function ReservationScreen() {
         {money('paid_kgs') ? <Text style={[font.body, { color: c.text }]}>{copy.financeReceived}: {money('paid_kgs')}</Text> : null}
         {money('remaining_kgs') ? <Text style={[font.body, { color: c.text }]}>{copy.financeDebt}: {money('remaining_kgs')}</Text> : null}
         <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text>
-      </GlassCard> : null}
+      </GlassCard></StaggerItem> : null}
       {text(x, 'status') === 'GUARANTEED' ? <Button testID="reservation-checkin" label={copy.checkIn} disabled={busy || unknownResult} onPress={() => act('in')}/> : null}
       {text(x, 'status') === 'CHECKED_IN' ? <Button testID="reservation-checkout" label={copy.checkOut} disabled={busy || unknownResult} onPress={() => act('out')}/> : null}
       {canEditDates ? <Card style={{ gap: space.md }}>
@@ -165,7 +167,7 @@ export default function ReservationScreen() {
       </Card> : allowed && user && ['OWNER','MANAGER'].includes(user.role) && data && !oneRoom ?
         <Text style={[font.small,{color:c.textMuted}]}>{copy.scheduleUnavailable}</Text> : null}
       <Text style={[font.small, { color: c.textMuted }]}>{copy.readOnly} · {copy.paymentsNotProfit}</Text>
-      {feedback ? <Card><Text accessibilityRole="alert" testID={unknownResult ? 'reservation-unknown-result' : 'reservation-feedback'} style={[font.body, { color: unknownResult ? c.warning : c.text }]}>{feedback}</Text></Card> : null}
+      {feedback ? <PremiumEntrance distance={8}><Card><Text accessibilityRole="alert" testID={unknownResult ? 'reservation-unknown-result' : 'reservation-feedback'} style={[font.body, { color: unknownResult ? c.warning : c.text }]}>{feedback}</Text></Card></PremiumEntrance> : null}
     </> : null}
   </Screen>;
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { Redirect, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { ArrowUpRight } from 'lucide-react-native';
-import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
+import { FutureScreen, GlassCard, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { Empty, SectionLabel } from '../../src/components/ui';
 import { mobileTabPlan } from '../../src/roles/navigation';
 import { workspaceForSession, TabKey, homeForSession } from '../../src/roles/registry';
@@ -25,16 +25,16 @@ export default function MoreScreen() {
     <PremiumHeader title={copy.moreMenu} subtitle={hotel?.name} eyebrow="MARINA SMART"/>
     <SectionLabel>{copy.available}</SectionLabel>
     <View style={{ gap: space.md }}>
-      {overflow.map((key: TabKey) => {
+      {overflow.map((key: TabKey, index: number) => {
         const Icon = moduleIcons[key];
-        return <GlassCard key={key} testID={'more-' + key} onPress={() => router.push('/' + key as never)}
+        return <StaggerItem key={key} index={index}><GlassCard testID={'more-' + key} onPress={() => router.push('/' + key as never)}
           style={{ minHeight: 76, flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: c.primarySoft, justifyContent: 'center', alignItems: 'center' }}>
             <Icon size={24} color={c.primary}/>
           </View>
           <Text style={[font.h2, { color: c.text, flex: 1 }]}>{copy[key]}</Text>
           <ArrowUpRight size={20} color={c.textMuted}/>
-        </GlassCard>;
+        </GlassCard></StaggerItem>;
       })}
     </View>
     {!overflow.length ? <Empty text={copy.empty}/> : null}

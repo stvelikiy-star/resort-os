@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { LogOut, Languages, Palette, ArrowLeftRight, Wallet } from 'lucide-react-native';
 import Constants from 'expo-constants';
 import { Button, DemoBanner, Segmented } from '../../src/components/ui';
-import { FutureScreen, GlassCard, PremiumHeader } from '../../src/components/Future';
+import { FutureScreen, GlassCard, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { RoleProfileWorkspaces } from '../../src/components/RoleProfileWorkspaces';
 import { useSession } from '../../src/state/session';
 import { Hero } from '../../src/components/Brand';
@@ -34,7 +34,7 @@ export default function Profile() {
   return (
     <FutureScreen>
       <PremiumHeader title={t('profile.title')} subtitle={hotel.name} eyebrow="MARINA SMART"/>
-      <Hero height={154}>
+      <StaggerItem index={0}><Hero height={154}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.lg }}>
           <View style={{ width: 66, height: 66, borderRadius: 33, borderWidth: 1, borderColor: '#E6BD70', backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}>
             <Text style={[font.title, { color: '#FFFFFF' }]}>{contactInitials(user.display_name) || '•'}</Text>
@@ -45,16 +45,16 @@ export default function Profile() {
             <Text numberOfLines={1} style={[font.label, { color: '#E6BD70' }]}>{user.username}</Text>
           </View>
         </View>
-      </Hero>
+      </Hero></StaggerItem>
       {hotel?.demo ? <DemoBanner /> : null}
-      <GlassCard>
+      <StaggerItem index={1}><GlassCard>
         {row(t('profile.hotel'), hotel?.name ?? '')}
         {row(t('profile.role'), user ? t(`roles.${user.role}`) : '')}
         {row(t('profile.mode'), hotel?.demo ? t('profile.modeDemo') : t('profile.modeLive'))}
         {row(t('profile.version'), String(Constants.expoConfig?.version ?? '0.2.0'))}
-      </GlassCard>
+      </GlassCard></StaggerItem>
       {user && !workspaceForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', serverAuthMode).mobileReady ? <GlassCard testID="role-soon"><Text accessibilityRole="text" style={[font.body, { color: c.textMuted }]}>{api.mode === 'LIVE' && user.role === 'STORE_STAFF' ? t('profile.storeUnavailable') : t('profile.roleSoon')}</Text></GlassCard> : null}
-      <RoleProfileWorkspaces tabs={allowedTabs} onOpen={tab => router.push(('/' + tab) as never)}/>
+      <StaggerItem index={2}><RoleProfileWorkspaces tabs={allowedTabs} onOpen={tab => router.push(('/' + tab) as never)}/></StaggerItem>
       <GlassCard style={{ gap: space.lg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <Languages size={23} color={c.cyan}/>
