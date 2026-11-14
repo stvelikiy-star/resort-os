@@ -412,3 +412,158 @@ html[data-marina-ui="future-luxury"] .guest-offer-card-actions button:focus-visi
     transition:none!important;
   }
 }
+
+/* Guest-service settings: existing Core-backed meal, delivery and housekeeping
+ * values are rendered unchanged; only the work surface adapts to the theme. */
+html[data-marina-ui="future-luxury"] .service-settings{
+  max-width:none;color:var(--fl-guest-text);
+  padding:clamp(14px,2vw,27px);
+}
+html[data-marina-ui="future-luxury"] .service-settings-head{
+  background:linear-gradient(115deg,#0c2e41,#135363);
+  border:1px solid var(--fl-guest-line);
+  padding:clamp(16px,2vw,27px);
+  border-radius:20px;
+  box-shadow:0 16px 36px rgba(0,8,20,.12);
+}
+html[data-marina-ui="future-luxury"] .service-settings-head h1{
+  color:#f5fcff;
+  font-size:clamp(25px,2.6vw,36px);
+}
+html[data-marina-ui="future-luxury"] .service-settings-head p:last-child{
+  color:#c3dce5;
+}
+html[data-marina-ui="future-luxury"] .service-settings-card,
+html[data-marina-ui="future-luxury"] .settings-check,
+html[data-marina-ui="future-luxury"] .settings-rule{
+  background:var(--fl-guest-surface);
+  color:var(--fl-guest-text);
+  border:1px solid var(--fl-guest-line);
+  border-radius:17px;
+  box-shadow:0 11px 27px rgba(0,8,19,.08);
+}
+html[data-marina-ui="future-luxury"] .service-settings-card{
+  padding:clamp(14px,1.8vw,23px);
+}
+html[data-marina-ui="future-luxury"] .service-settings-title h2,
+html[data-marina-ui="future-luxury"] .settings-check strong{
+  color:var(--fl-guest-text);
+}
+html[data-marina-ui="future-luxury"] .service-settings-title small,
+html[data-marina-ui="future-luxury"] .service-settings-card>p,
+html[data-marina-ui="future-luxury"] .service-settings-grid label,
+html[data-marina-ui="future-luxury"] .service-settings-grid label>small,
+html[data-marina-ui="future-luxury"] .settings-rule{
+  color:var(--fl-guest-muted);
+}
+html[data-marina-ui="future-luxury"] .service-settings-grid input{
+  color:var(--fl-guest-text);
+  background:var(--fl-guest-panel);
+  border:1px solid var(--fl-guest-line);
+  min-height:44px;
+}
+html[data-marina-ui="future-luxury"] .settings-check{
+  background:var(--fl-guest-panel);
+  box-shadow:none;
+}
+html[data-marina-ui="future-luxury"] .settings-check input{
+  accent-color:var(--fl-guest-accent);
+  min-height:0;
+}
+html[data-marina-ui="future-luxury"] .service-settings-save{
+  background:linear-gradient(110deg,#0b3043,#155365);
+  border:1px solid rgba(63,206,216,.4);
+  border-radius:16px;
+  color:#fff;
+}
+html[data-marina-ui="future-luxury"] .service-settings-save span{
+  color:#c7dce6;
+}
+html[data-marina-ui="future-luxury"] .service-settings-save .btn.primary{
+  color:#052a35;
+  background:linear-gradient(100deg,#20c4cb,#55ddda);
+  min-height:44px;
+  border-radius:11px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .service-settings-head{
+  background:linear-gradient(110deg,#fff,#e7f4f8);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .service-settings-head h1{color:#0e364b}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .service-settings-head p:last-child{color:#506d7c}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .service-settings-save{
+  color:#0b3749;background:linear-gradient(110deg,#fff,#def1f6);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .service-settings-save span{color:#537283}
+/* Existing site-content editor, locale tabs, publish status and image upload.
+ * Do not add/remove fields or change publish/preview operations. */
+html[data-marina-ui="future-luxury"] .content-board{
+  color:var(--fl-guest-text);
+  max-width:none;
+  padding:clamp(14px,2vw,27px);
+}
+html[data-marina-ui="future-luxury"] .content-head{
+  color:#f5fcff;
+  background:linear-gradient(120deg,#092a3c,#0e4a59);
+  padding:clamp(17px,2vw,26px);
+  border-radius:20px;
+  border:1px solid var(--fl-guest-line);
+}
+html[data-marina-ui="future-luxury"] .content-head h1{
+  color:#f5fcff;
+}
+html[data-marina-ui="future-luxury"] .content-card,
+html[data-marina-ui="future-luxury"] .content-state,
+html[data-marina-ui="future-luxury"] .content-status-row{
+  color:var(--fl-guest-text);
+  background:var(--fl-guest-surface);
+  border:1px solid var(--fl-guest-line);
+  border-radius:16px;
+}
+html[data-marina-ui="future-luxury"] .content-card-head h2,
+html[data-marina-ui="future-luxury"] .content-card-head h3{
+  color:var(--fl-guest-text);
+}
+html[data-marina-ui="future-luxury"] .content-field,
+html[data-marina-ui="future-luxury"] .content-field label,
+html[data-marina-ui="future-luxury"] .content-field small{
+  color:var(--fl-guest-muted);
+}
+html[data-marina-ui="future-luxury"] .content-field input,
+html[data-marina-ui="future-luxury"] .content-field select,
+html[data-marina-ui="future-luxury"] .content-field textarea{
+  min-height:42px;
+  color:var(--fl-guest-text);
+  background:var(--fl-guest-panel);
+  border:1px solid var(--fl-guest-line);
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .content-savebar{
+  color:var(--fl-guest-text);
+  background:var(--fl-guest-panel);
+  border:1px solid var(--fl-guest-line);
+  border-radius:13px;
+}
+html[data-marina-ui="future-luxury"] .locale-tabs button{
+  min-height:39px;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .content-head .btn-primary,
+html[data-marina-ui="future-luxury"] .content-savebar .btn.primary{
+  min-height:44px;
+  background:linear-gradient(105deg,#0fc5ca,#5bdedb);
+  color:#052d39;
+  border-radius:11px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .content-head{
+  background:linear-gradient(110deg,#fff,#e5f4f8);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .content-head h1{
+  color:#11394b;
+}
+@media(max-width:760px){
+  html[data-marina-ui="future-luxury"] .service-settings-head{display:grid;gap:12px}
+  html[data-marina-ui="future-luxury"] .service-settings-grid.four,
+  html[data-marina-ui="future-luxury"] .service-settings-grid.two{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .content-grid{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .content-head-actions{flex-wrap:wrap}
+}
