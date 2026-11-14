@@ -85,6 +85,7 @@ export function AnimatedKpi({ value, suffix = '', style, testID }: { value: numb
 
 /** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
 export function OccupancyRing({ percent, label, size = 112 }: { percent: number; label: string; size?: number }) {
+  const { c } = useTheme();
   const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
   const circumference = 2 * Math.PI * 42;
   const length = circumference * safe / 100;
@@ -92,12 +93,12 @@ export function OccupancyRing({ percent, label, size = 112 }: { percent: number;
     accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
     style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
     <Svg pointerEvents="none" width={size} height={size} viewBox="0 0 112 112">
-      <Circle cx="56" cy="56" r="42" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="8"/>
-      <Circle cx="56" cy="56" r="42" fill="none" stroke="#00D8FF" strokeWidth="8"
+      <Circle cx="56" cy="56" r="42" fill="none" stroke={c.border} strokeWidth="8"/>
+      <Circle cx="56" cy="56" r="42" fill="none" stroke={c.cyan} strokeWidth="8"
         strokeLinecap="round" strokeDasharray={`${length} ${circumference}`} transform="rotate(-90 56 56)"/>
     </Svg>
     <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={[font.h2, { color: '#FFFFFF', fontSize: 22 }]}>{Math.round(safe)}%</Text>
+      <Text style={[font.h2, { color: c.text, fontSize: 22 }]}>{Math.round(safe)}%</Text>
     </View>
   </View>;
 }
