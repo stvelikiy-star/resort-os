@@ -439,3 +439,6 @@ html[data-marina-ui="future-luxury"] .reception-shell .work-head > .btn{
     grid-template-columns:minmax(0,1fr);
   }
 }
+
+/* The actual modal must cover the fixed navigation, not sit behind it. */
+html[data-marina-ui="future-luxury"] .detail-backdrop { z-index:3000; }

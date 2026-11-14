@@ -499,3 +499,6 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .v8-builder :is(.v8
   html[data-marina-ui="future-luxury"] .v8-builder :is(.v8-builder-summary,.v8-builder-rules,.v8-builder-dates,.v8-segment-timeline,.v8-segments,.v8-builder-preview-actions,.v8-preview) { margin-left:12px;margin-right:12px; }
   html[data-marina-ui="future-luxury"] .v8-preview-money { grid-template-columns:minmax(0,1fr); }
 }
+
+html[data-marina-ui="future-luxury"] .v8-builder-head .eyebrow { color:var(--fl2-warm,#e7c187);font-size:11px; }
+html[data-marina-ui="future-luxury"] .v8-segment-index span { font-size:10px;overflow-wrap:normal; }
