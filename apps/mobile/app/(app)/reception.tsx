@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { BedDouble, CalendarDays, ChevronRight, LogIn, LogOut, MessageCircle, Plus, Search, X } from 'lucide-react-native';
 import { Badge, Empty, SectionLabel, Segmented, PressScale, DemoBanner } from '../../src/components/ui';
 import { AIOrb, ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, QuickAction, StaggerItem } from '../../src/components/Future';
+import { ConfirmedChange } from '../../src/components/Motion';
 import { useLiveModules, ReceptionList, ReceptionReservation } from '../../src/api/liveModules';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { demoReception } from '../../src/api/demoPresentation';
@@ -72,7 +73,7 @@ export default function Reception() {
         <ChevronRight color={c.primary} size={22}/>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <Badge label={state.label} tone={state.tone}/>
+        <ConfirmedChange value={x.status}><Badge label={state.label} tone={state.tone}/></ConfirmedChange>
         {x.room_state === 'DIRTY' ? <Badge label={copy.dirty} tone="warning"/> : null}
         {x.room_state === 'TECH_BLOCK' ? <Badge label={copy.tech} tone="danger"/> : null}
         <Text style={[font.small, { color: c.textMuted }]}>{x.checkIn} → {x.checkOut}</Text>

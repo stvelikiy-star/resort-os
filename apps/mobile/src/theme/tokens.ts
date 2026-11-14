@@ -58,6 +58,12 @@ export const elevation = { card: { shadowOpacity: 0.08, shadowRadius: 16, shadow
 export const TOUCH = 56;
 export const motion = {
   press: 125, tab: 220, card: 320, modal: 340, chart: 700,
+  /** Bottom sheet: enter is slightly slower than exit so dismissal never feels sluggish. */
+  sheetIn: 320, sheetOut: 220,
+  /** Server-confirmed status swap and tab-icon focus. */
+  status: 240, tabIcon: 200,
+  /** Bounded "work in progress" loops: pulses/rotations before settling static. */
+  maxShimmerPulses: 3, maxOrbTurns: 8,
   cardStagger: 55, maxStaggerCards: 6,
   spring: { speed: 30, bounciness: 5 },
 } as const;
