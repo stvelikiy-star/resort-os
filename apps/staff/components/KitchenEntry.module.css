@@ -3,3 +3,101 @@
 .pulse{max-width:1500px;margin:0 auto;padding:22px 22px 0}.pulseHead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:22px;border-radius:22px;background:linear-gradient(135deg,#0b2850,#124d84 65%,#2177b1);color:#fff;box-shadow:0 20px 50px rgba(15,55,95,.18)}.pulseHead p{margin:0 0 4px;color:#cfe4fa;font-size:10px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.pulseHead h2{margin:0;font-size:28px;letter-spacing:-.035em}.pulseHead span{display:block;margin-top:5px;color:#d8e8f7;font-size:11px}.pulseActions{display:flex;gap:8px;flex-wrap:wrap}.pulseActions button,.pulseActions a{min-height:38px;display:inline-flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.28);border-radius:11px;background:rgba(255,255,255,.1);color:#fff;padding:0 12px;font-weight:800;cursor:pointer;text-decoration:none;font-size:12px}.pulseActions button:hover,.pulseActions a:hover{background:rgba(255,255,255,.18)}.metrics{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:9px;margin-top:10px}.metrics article{min-height:112px;display:flex;flex-direction:column;justify-content:space-between;padding:14px;border:1px solid #dce6f0;border-radius:15px;background:#fff;color:#173654;box-shadow:0 8px 24px rgba(26,62,100,.05)}.metrics strong{font-size:28px;letter-spacing:-.04em}.metrics span{font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:#55708e}.metrics small{font-size:9px;color:#7c8fa3}.metrics article.attention{border-color:#eac98d;background:#fff9ec}.guide{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:12px 14px;border:1px solid #d9e5f1;border-radius:14px;background:#f3f8fd;color:#506b87;font-size:10px;line-height:1.55}.guide b{color:#173f68;white-space:nowrap}
 
 @media(max-width:1050px){.metrics{grid-template-columns:repeat(3,1fr)}}@media(max-width:720px){.pulse{padding:12px 12px 0}.pulseHead{align-items:flex-start;flex-direction:column;padding:18px}.pulseActions{width:100%}.pulseActions button,.pulseActions a{flex:1}.metrics{grid-template-columns:1fr 1fr}.guide{display:grid}.loginCard{padding:24px}.loginCard h1{font-size:34px}}@media(max-width:430px){.metrics{grid-template-columns:1fr}.loginPage{padding:12px}.loginCard{border-radius:22px;padding:20px}.pulseHead h2{font-size:24px}}
+
+/* Future Luxury 2.0 — Staff entry and actual kitchen pulse.
+   Login/logout, metrics, role navigation and Core requests unchanged. */
+.loginPage{
+  background:radial-gradient(circle at 82% 12%,rgba(33,196,199,.16),transparent 38%),linear-gradient(148deg,#081f30,#0e3245 58%,#091f32);
+}
+.loginCard{
+  border:1px solid rgba(74,202,216,.35);
+  background:linear-gradient(145deg,rgba(15,50,68,.95),rgba(7,29,44,.98));
+  box-shadow:0 29px 76px rgba(0,9,23,.28);
+}
+.loginCard p{color:#ebc891}
+.loginCard h1{font-size:clamp(30px,4vw,43px);color:#f3fcff}
+.loginCard>span,.loginCard label{color:#c6dde6}
+.loginCard input{
+  background:#10354a;
+  color:#f2fbff;
+  border-color:rgba(80,201,217,.36);
+}
+.loginCard input:focus-visible{outline:3px solid #ebc88f;outline-offset:2px}
+.loginCard a{color:#83eaf0}
+.primary:not(:disabled){
+  background:linear-gradient(105deg,#18bfc8,#54dfda);
+  color:#06303c;
+  border:1px solid #3dcbd0;
+}
+.error{background:#4e2b39;color:#ffe8ed;border-color:#ac6574}
+.pulseHead{
+  background:radial-gradient(circle at 90% 5%,rgba(34,201,205,.18),transparent 37%),linear-gradient(115deg,#092c40,#125768);
+  border:1px solid rgba(87,207,215,.32);
+  box-shadow:0 16px 42px rgba(5,54,72,.14);
+}
+.pulseHead p{color:#eac889}
+.pulseHead h2{color:#f5fcff;letter-spacing:-.04em}
+.pulseHead span{color:#c6e2e8}
+.pulseActions button,.pulseActions a{
+  min-height:44px;
+  background:rgba(13,65,82,.65);
+  border:1px solid rgba(103,216,220,.42);
+  border-radius:11px;
+  color:#f5fcff;
+}
+.pulseActions button:hover,.pulseActions a:hover{background:rgba(44,158,166,.36)}
+.metrics{gap:11px}
+.metrics article{
+  min-width:0;
+  background:linear-gradient(155deg,#fff,#f1f9fb);
+  border:1px solid #c7e1e7;
+  border-top:3px solid #13bcc5;
+  border-radius:17px;
+  box-shadow:0 10px 26px rgba(9,66,89,.07);
+}
+.metrics strong{color:#12394a;font-variant-numeric:tabular-nums}
+.metrics span,.metrics small{color:#516f7c}
+.metrics article.attention{background:#fff3df;border-color:#ddb773}
+.guide{
+  background:#eaf6f8;border:1px solid #c5dfe7;
+  color:#4a6d7b;border-radius:13px;
+}
+.guide b{color:#176172}
+.pulseActions :is(button,a):focus-visible,.loginCard :is(button,a):focus-visible{
+  outline:3px solid #eac88c;outline-offset:3px;
+}
+@media(prefers-color-scheme:dark){
+  .metrics article{
+    background:linear-gradient(155deg,#143c4e,#0d2e41);
+    border-color:rgba(78,199,215,.3);
+    color:#f2fbff;
+  }
+  .metrics strong{color:#f2fbff}
+  .metrics span,.metrics small{color:#bed6e0}
+  .metrics article.attention{background:#53442e;border-color:#b2935e}
+  .guide{background:#143d4e;color:#c8dfe5;border-color:rgba(80,198,213,.34)}
+  .guide b{color:#8ce6e9}
+}
+@media(prefers-color-scheme:light){
+  .loginPage{
+    background:radial-gradient(circle at 85% 11%,#d2edf1,transparent 40%),linear-gradient(155deg,#fff,#e9f5f8);
+  }
+  .loginCard{
+    background:linear-gradient(145deg,#fff,#f1f9fb);
+    border-color:#bedce6;
+    box-shadow:0 22px 49px rgba(11,80,102,.1);
+  }
+  .loginCard p{color:#805a1f}
+  .loginCard h1{color:#10394c}
+  .loginCard>span,.loginCard label{color:#506d7c}
+  .loginCard input{background:#fff;color:#123b4d;border-color:#bfdce5}
+  .loginCard a{color:#087b89}
+  .error{background:#fff0f3;color:#8d3048;border-color:#dba1ad}
+}
+@media(max-width:430px){
+  .pulseActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pulseActions button,.pulseActions a{min-width:0}
+}
+@media(prefers-reduced-motion:reduce){
+  .loginCard :is(button,a),.pulseActions :is(button,a){transition:none!important;animation:none!important}
+}
