@@ -14,10 +14,11 @@ const serviceSettings = read('apps/admin/components/GuestServiceSettingsBoard.ts
 const siteContent = read('apps/admin/components/SiteContentBoard.tsx');
 const group = read('apps/admin/components/GroupBookingBoard.tsx');
 const channel = read('apps/admin/components/ChannelManagerBoard.tsx');
+const nfc = read('apps/admin/components/NfcFinanceBoard.tsx');
 const groupCss = read('apps/admin/components/GroupBookingBoard.module.css');
 const channelCss = read('apps/admin/components/ChannelManagerBoard.module.css');
 assert(layout.includes('import "./fl2-guest-touchpoints.css";'),'CSS import');
-for (const marker of ['.inbox-row','.inbox-detail','.outbound-reply-form','.service-point-payment-row','.service-point-svg','.room-qr-table-wrap','.guest-offer-editor','.guest-offer-list-panel','[data-fl2-theme="light"]','prefers-reduced-motion','.service-settings-card','.content-card','.content-savebar']) {
+for (const marker of ['.inbox-row','.inbox-detail','.outbound-reply-form','.service-point-payment-row','.service-point-svg','.room-qr-table-wrap','.guest-offer-editor','.guest-offer-list-panel','[data-fl2-theme="light"]','prefers-reduced-motion','.service-settings-card','.content-card','.content-savebar','.nfc-finance-shell']) {
   assert(css.includes(marker), 'missing visual selector ' + marker);
 }
 assert(!css.includes('visibility:hidden') && !css.includes('pointer-events:none'), 'global visual state could hide existing actions');
@@ -29,7 +30,8 @@ for(const [src,markers] of [
   [serviceSettings,['service-settings-save','service-settings-grid','room_delivery_enabled','save']],
   [siteContent,['content-savebar','locale-tabs','content-field','publish']],
   [group,['styles.searchFields','styles.filters','styles.rooms','styles.commitCard','onSubmit={commit}','selectVisible','setSelected(new Set())']],
-  [channel,['styles.providers','styles.form','styles.list','onSubmit={submit}','/core/api/v1/admin/channels/reservations/import','window.confirm(t.confirm)']]
+  [channel,['styles.providers','styles.form','styles.list','onSubmit={submit}','/core/api/v1/admin/channels/reservations/import','window.confirm(t.confirm)']],
+  [nfc,['nfc-finance-shell','partner-finance-grid','partner-finance-card','transaction-table-wrap','finance-kpis']]
 ])for(const m of markers)assert(src.includes(m), 'existing handler missing: '+m);
 for(const [cssFile,name,markers] of [
   [groupCss,'group booking',['.shell','.head','.layout','.rooms','.commitCard',':global(html[data-marina-ui="future-luxury"])']],

@@ -567,3 +567,142 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .content-head h1{
   html[data-marina-ui="future-luxury"] .content-grid{grid-template-columns:1fr}
   html[data-marina-ui="future-luxury"] .content-head-actions{flex-wrap:wrap}
 }
+
+/* NFC partner finance: owner-visible, Core-calculated amounts unchanged. */
+html[data-marina-ui="future-luxury"] .nfc-finance-shell{
+  max-width:none;
+  padding:clamp(14px,2vw,27px);
+  color:var(--fl-guest-text);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell>.work-head{
+  display:flex;
+  gap:18px;
+  align-items:flex-start;
+  padding:clamp(17px,2vw,27px);
+  border:1px solid var(--fl-guest-line);
+  border-radius:21px;
+  background:linear-gradient(120deg,#0b3044,#10535d);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell>.work-head h1{
+  color:#f5fcff;
+  font-size:clamp(26px,2.6vw,36px);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell>.work-head .subtitle{
+  color:#bfdae4;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-kpis article,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-section{
+  border:1px solid var(--fl-guest-line);
+  border-radius:17px;
+  background:var(--fl-guest-surface);
+  color:var(--fl-guest-text);
+  box-shadow:0 12px 28px rgba(0,8,19,.09);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-kpis strong,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card dd,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .section-head h2{
+  color:var(--fl-guest-text);
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-kpis span,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-kpis small,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card dt,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card>div:first-child span,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .section-head>span{
+  color:var(--fl-guest-muted);
+  font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .section-head,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .transaction-table td{
+  border-color:var(--fl-guest-line);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card{
+  color:var(--fl-guest-text);
+  background:var(--fl-guest-panel);
+  border:1px solid var(--fl-guest-line);
+  border-radius:14px;
+  transition:background 160ms ease,border-color 160ms ease;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card:hover,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card.selected{
+  background:#165b64;
+  border-color:#35d5d9;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .transaction-table{
+  color:var(--fl-guest-text);
+  border-collapse:collapse;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .transaction-table th{
+  color:var(--fl-guest-muted);
+  background:var(--fl-guest-panel);
+  border-color:var(--fl-guest-line);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .transaction-table td small{
+  color:var(--fl-guest-muted);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .tx-status.COMPLETED{
+  color:#b6f8d6;
+  background:#175245;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .tx-status.REVERSED{
+  color:#ffe0b0;
+  background:#584329;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-filters input,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-filters select{
+  color:var(--fl-guest-text);
+  background:var(--fl-guest-panel);
+  border:1px solid var(--fl-guest-line);
+  min-height:44px;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-filters label span{
+  color:var(--fl-guest-muted);
+}
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card:focus-visible,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-filters input:focus-visible,
+html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-filters select:focus-visible{
+  outline:3px solid var(--fl-guest-focus);
+  outline-offset:2px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell>.work-head{
+  background:linear-gradient(110deg,#fff,#e4f3f7);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell>.work-head h1{
+  color:#12394d;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell>.work-head .subtitle{
+  color:#4d6d7e;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell .partner-finance-card:hover,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell .partner-finance-card.selected{
+  background:#dcf4f6;
+  border-color:#45b1bd;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell .tx-status.COMPLETED{
+  color:#176749;background:#def6e9;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell .tx-status.REVERSED{
+  color:#7a5819;background:#fff1d4;
+}
+@media(max-width:900px){
+  html[data-marina-ui="future-luxury"] .nfc-finance-shell>.work-head{
+    display:grid;grid-template-columns:1fr;gap:14px;
+  }
+  html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-grid{
+    grid-template-columns:repeat(auto-fit,minmax(225px,1fr));
+  }
+}
+@media(max-width:560px){
+  html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-grid{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .nfc-finance-shell .finance-kpis{
+    grid-template-columns:1fr;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .nfc-finance-shell .partner-finance-card{
+    transition:none!important;
+  }
+}
