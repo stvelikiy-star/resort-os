@@ -86,9 +86,9 @@
   min-height:44px;
   box-shadow:0 8px 21px rgba(0,181,191,.13);
 }
-:global(html[data-marina-ui="future-luxury"]) button:focus-visible,
-:global(html[data-marina-ui="future-luxury"]) input:focus-visible,
-:global(html[data-marina-ui="future-luxury"]) select:focus-visible{
+:global(html[data-marina-ui="future-luxury"]) .shell button:focus-visible,
+:global(html[data-marina-ui="future-luxury"]) .shell input:focus-visible,
+:global(html[data-marina-ui="future-luxury"]) .shell select:focus-visible{
   outline:3px solid #ebca89;
   outline-offset:2px;
 }
