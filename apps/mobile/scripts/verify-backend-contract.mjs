@@ -6,8 +6,8 @@ import { resolve } from 'node:path';
 /**
  * Static source contract — fails closed on changed/missing pinned server code,
  * proves ROUTE EXISTENCE only. DTO and runtime auth require dedicated E2E.
- * Reference snapshot: unified Core release candidate #428 at
- * 73725dc2fd11ad45a5d9bc23a2c21dd732bd61d7.
+ * Reference snapshot: MARINA integration release 8217602953ba637114e1b403dfc8d2fe7b02ddd2.
+ * Staff/store and kitchen/recipe additions reviewed against Core #428.
  * Recipe extension is pinned separately and covered by recipe DTO and API tests.
  */
 const src = resolve(process.cwd(), '../../services/api/app');
@@ -16,13 +16,13 @@ const pinned = {
   'operations.py': '888be1aad873765a49eb0c902c99dfbb38e3d8e2',
   'operations_assignment.py': '6571408a94257d803ddc75b4a66c1b55d792a3fe',
   'staff_task_reports.py': 'd63e9096abcd64115145d99de8f66b8c6bb775ef',
-  'staff_control.py': '281926a30c97f8037804b468531f0ea527b75fde',
+  'staff_control.py': '5f090f4a318458e3a67f2ee59dd302cbc31b43bc',
   'main.py': '2a01b9898fc3e6e4d2a680f31691ba7e00a768ed',
   'manager_dashboard.py': '135c6ec05c8cb16060936f57c218e213a1fa2eb2',
   'reception_reservations.py': 'a86688a3dc69cf639cb79bea8d7e243569f57e41',
   'pms_reservation_create.py': 'c5d7fb9fd6b5a36e6c7c9c0b46d8d83155fe306b',
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
-  'kitchen_menu_management.py': '4e2039ab8ebc6f2ac293269c6fbcaee9893d2f86',
+  'kitchen_menu_management.py': 'b1f4fc3ca06deba1b8b886c2aa797f4796a97979',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',
   'kitchen.py': 'af86e40323b16226f6f969e209bc03d64a85a285',
   'dining_production_snapshots.py': '717f2070a0924ab73456e364a5d4a8cf03c0c47e',
@@ -88,4 +88,4 @@ for (const [method, path] of [['get',''],['post',''],['delete','/{hold_id}']]) {
   routeCount++;
 }
 process.stdout.write('MARINA MOBILE PINNED_BACKEND_ROUTES: ' + routeCount + '/' + routeCount + ' VERIFIED\n');
-process.stdout.write('MARINA MOBILE PINNED_CORE_BASE_SHA: 73725dc2fd11ad45a5d9bc23a2c21dd732bd61d7\n');
+process.stdout.write('MARINA MOBILE PINNED_CORE_BASE_SHA: 8217602953ba637114e1b403dfc8d2fe7b02ddd2\n');
