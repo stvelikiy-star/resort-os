@@ -1,27 +1,44 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/ThemeProvider';
 import { elevation, font, motion, radius, space, TOUCH } from '../theme/tokens';
+import { useMotionPreference } from '../theme/motion';
 import { AlertTriangle, CheckCircle2, CircleDot, Info, XCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
+/** Motion is cosmetic: children stay visible while the OS accessibility
+ * preference resolves, when app is inactive and when motion is reduced.
+ * Only a finite, capped entrance is allowed; never hide essential actions. */
 export function FadeIn({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
-  const [v] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    let mounted = true;
-    let animation: Animated.CompositeAnimation | undefined;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
-      if (!mounted) return;
-      if (reduceMotion) { v.setValue(1); return; }
-      animation = Animated.timing(v, { toValue: 1, duration: motion.card, delay: Math.min(delay, motion.cardStagger * motion.maxStaggerCards), easing: Easing.out(Easing.cubic), useNativeDriver: true });
-      animation.start();
-    }).catch(() => { if (mounted) v.setValue(1); });
-    return () => { mounted = false; animation?.stop(); };
-  }, [v, delay]);
-  return <Animated.View style={[style, { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>{children}</Animated.View>;
+  const { allowed, ready } = useMotionPreference();
+  const [v] = useState(() => new Animated.Value(1));
+  const appeared = useRef(false);
+  useLayoutEffect(() => {
+    v.stopAnimation();
+    if (!ready || appeared.current || !allowed) {
+      if (ready) appeared.current = true;
+      v.setValue(1);
+      return;
+    }
+    appeared.current = true;
+    v.setValue(0);
+    const animation = Animated.timing(v, {
+      toValue: 1,
+      duration: motion.card,
+      delay: Number.isFinite(delay) ? Math.min(Math.max(0, delay), motion.cardStagger * motion.maxStaggerCards) : 0,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start(({ finished }) => { if (!finished) v.setValue(1); });
+    return () => { animation.stop(); v.setValue(1); };
+  }, [allowed, ready, delay, v]);
+  return <Animated.View style={[style, {
+    opacity: v,
+    transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+  }]}>{children}</Animated.View>;
 }
 
 const OUTER_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'width', 'alignSelf'] as const;
@@ -30,22 +47,31 @@ const OUTER_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'width', 'ali
 /** Animated progress with reduced-motion support and screen-reader value. */
 export function AnimatedProgressBar({ percent }: { percent: number }) {
   const { c } = useTheme();
+  const { allowed, ready } = useMotionPreference();
   const safePercent = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
-  const [progress] = useState(() => new Animated.Value(0));
+  // Start at the real progress rather than showing a false 0% before checking
+  // Reduced Motion. Animate only verified changes while the app is active.
+  const [progress] = useState(() => new Animated.Value(safePercent));
+  const previous = useRef(safePercent);
   useEffect(() => {
-    let active = true;
-    let animation: Animated.CompositeAnimation | undefined;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
-      if (!active) return;
-      if (reduceMotion) { progress.setValue(safePercent); return; }
-      animation = Animated.timing(progress, { toValue: safePercent, duration: motion.chart, easing: Easing.out(Easing.cubic), useNativeDriver: false });
-      animation.start();
-    }).catch(() => { if (active) progress.setValue(safePercent); });
-    return () => { active = false; animation?.stop(); };
-  }, [progress, safePercent]);
+    const from = previous.current;
+    previous.current = safePercent;
+    progress.stopAnimation();
+    if (!ready || !allowed || from === safePercent) {
+      progress.setValue(safePercent);
+      return;
+    }
+    progress.setValue(from);
+    const animation = Animated.timing(progress, {
+      toValue: safePercent, duration: motion.chart,
+      easing: Easing.out(Easing.cubic), useNativeDriver: false,
+    });
+    animation.start(({ finished }) => { if (!finished) progress.setValue(safePercent); });
+    return () => { animation.stop(); progress.setValue(safePercent); };
+  }, [allowed, ready, progress, safePercent]);
   return (
     <View accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: safePercent }}
-      style={{ height: 11, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.20)', overflow: 'hidden' }}>
+      style={{ height: 11, borderRadius: 8, backgroundColor: c.surfaceAlt, overflow: 'hidden' }}>
       <Animated.View style={{ width: progress.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }), height: 11, borderRadius: 8, backgroundColor: c.cyan }} />
     </View>
   );
@@ -53,12 +79,27 @@ export function AnimatedProgressBar({ percent }: { percent: number }) {
 
 export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel, dimWhenDisabled = true }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string; dimWhenDisabled?: boolean }) {
   const [s] = useState(() => new Animated.Value(1));
+  const pressSequence = useRef(0);
+  useEffect(() => {
+    if (disabled) {
+      pressSequence.current += 1;
+      s.stopAnimation();
+      s.setValue(1);
+    }
+    return () => {
+      pressSequence.current += 1;
+      s.stopAnimation();
+    };
+  }, [disabled, s]);
   const to = (x: number) => {
     if (disabled) return;
+    const sequence = ++pressSequence.current;
     void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
+      if (sequence !== pressSequence.current) return;
+      s.stopAnimation();
       if (reduceMotion) { s.setValue(1); return; }
       Animated.spring(s, { toValue: x, useNativeDriver: true, speed: motion.spring.speed, bounciness: motion.spring.bounciness }).start();
-    }).catch(() => s.setValue(1));
+    }).catch(() => { if (sequence === pressSequence.current) s.setValue(1); });
   };
   // Layout props belong to the touchable wrapper so flex rows (segmented controls, button pairs) share width.
   const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
