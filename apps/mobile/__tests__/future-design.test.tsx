@@ -5,8 +5,7 @@ import { ThemeProvider, useTheme, validTheme } from '../src/theme/ThemeProvider'
 import { colors, motion, TOUCH } from '../src/theme/tokens';
 import { cappedStagger } from '../src/theme/motion';
 import { setItem } from '../src/lib/storage';
-import { sectionLabelText } from '../src/components/ui';
-import { AnimatedProgressBar, FadeIn, PressScale } from '../src/components/ui';
+import { AnimatedProgressBar, FadeIn, PressScale, sectionLabelText } from '../src/components/ui';
 it('SectionLabel composes dates and counts without injecting commas into translated headings', () => {
   expect(sectionLabelText(['Сегодня', ' · ', '2026-11-05'])).toBe('СЕГОДНЯ · 2026-11-05');
   expect(sectionLabelText(['Expected arrivals', ' · ', 1])).toBe('EXPECTED ARRIVALS · 1');
