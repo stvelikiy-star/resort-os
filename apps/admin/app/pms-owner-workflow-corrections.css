@@ -4,13 +4,13 @@
 }
 
 /* Owner request: keep the room register readable while making the night grid materially denser. */
-.owner-grid-scroll[data-window-days="31"] .owner-grid-head,
-.owner-grid-scroll[data-window-days="31"] .owner-room-row{
+html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="31"] .owner-grid-head,
+html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="31"] .owner-room-row{
   grid-template-columns:300px 54px repeat(31,26px)!important;
 }
 
-.owner-grid-scroll[data-window-days="14"] .owner-grid-head,
-.owner-grid-scroll[data-window-days="14"] .owner-room-row{
+html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="14"] .owner-grid-head,
+html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="14"] .owner-room-row{
   grid-template-columns:300px 54px repeat(14,34px)!important;
 }
 
@@ -121,12 +121,12 @@
     max-height:68svh;
     min-height:420px;
   }
-  .owner-grid-scroll[data-window-days="31"] .owner-grid-head,
-  .owner-grid-scroll[data-window-days="31"] .owner-room-row{
+  html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="31"] .owner-grid-head,
+  html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="31"] .owner-room-row{
     grid-template-columns:270px 48px repeat(31,25px)!important;
   }
-  .owner-grid-scroll[data-window-days="14"] .owner-grid-head,
-  .owner-grid-scroll[data-window-days="14"] .owner-room-row{
+  html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="14"] .owner-grid-head,
+  html:not([data-marina-ui="future-luxury"]) .owner-grid-scroll[data-window-days="14"] .owner-room-row{
     grid-template-columns:270px 48px repeat(14,32px)!important;
   }
   .owner-room-head,
