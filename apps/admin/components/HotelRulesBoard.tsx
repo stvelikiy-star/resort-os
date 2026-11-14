@@ -172,8 +172,8 @@ export default function HotelRulesBoard() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [changed]);
 
-  if (!state || !rules) return <main className="work-shell management-shell"><h1>Правила и знания отеля для MARINA AI</h1><p>{error || (loading ? "Загружаем правила…" : "Нет данных")}</p><button className="btn" onClick={() => void load()}>Обновить</button></main>;
-  return <main className="work-shell management-shell">
+  if (!state || !rules) return <main className="work-shell management-shell fl2-hotel-rules"><h1>Правила и знания отеля для MARINA AI</h1><p>{error || (loading ? "Загружаем правила…" : "Нет данных")}</p><button className="btn" onClick={() => void load()}>Обновить</button></main>;
+  return <main className="work-shell management-shell fl2-hotel-rules">
     <div className="work-header"><div><p className="eyebrow">MARINA SMART · Настройки</p><h1>Правила и знания отеля для MARINA AI</h1>
       <p className="subtitle">База знаний гостиницы «{state.property_name}». MARINA AI читает сохранённые проверенные правила именно этого объекта. Оплаты и действующие брони не изменяются.</p></div></div>
     <div className="hotel-knowledge-status"><strong>Основные сведения: {filled} из {important.length}</strong><span>{changed ? "Есть несохранённые изменения" : "Изменения сохранены"} · версия {state.version}</span><progress max={important.length} value={filled} aria-label="Заполненность основных сведений" /><small>Это подсказка по заполнению, не гарантия правильности ответов AI.</small></div>

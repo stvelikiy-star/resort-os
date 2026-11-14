@@ -42,9 +42,10 @@ export default function AppTabs() {
     headerShown: false,
     tabBarActiveTintColor: c.navActive, tabBarInactiveTintColor: c.navInactive,
     tabBarStyle: {
-      backgroundColor: c.surface, borderTopColor: c.border, borderTopWidth: 1,
+      backgroundColor: c.glass, borderTopColor: c.glassBorder, borderTopWidth: 1,
+      borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 4,
       height: 76 + Math.max(insets.bottom, 8), paddingTop: 9, paddingBottom: Math.max(insets.bottom, 8),
-      elevation: 12, shadowColor: c.shadow, shadowOpacity: 0.13, shadowRadius: 24,
+      elevation: 12, shadowColor: c.shadow, shadowOpacity: 0.17, shadowRadius: 24,
     },
     tabBarLabelStyle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.1, marginTop: 3 },
   }}>
@@ -60,7 +61,8 @@ export default function AppTabs() {
           ? { flex: 1, minWidth: 0 }
           : { display: 'none', width: 0, flex: 0 },
         tabBarIcon: ({ color, focused }) =>
-          <View style={{ minWidth: 50, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}>
+          <View style={{ minWidth: 50, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent',
+            borderWidth: focused ? 1 : 0, borderColor: c.glassBorder }}>
             <Icon size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/>
           </View>,
         tabBarButtonTestID: 'tab-' + key,
@@ -69,7 +71,8 @@ export default function AppTabs() {
     <Tabs.Screen name="more" options={{
       title: copy.moreMenu, href: plan.showMore ? undefined : null,
       tabBarButtonTestID: 'tab-more',
-      tabBarIcon: ({ color, focused }) => <View style={{ minWidth: 50, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent' }}><Grid2X2 size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/></View>,
+      tabBarIcon: ({ color, focused }) => <View style={{ minWidth: 50, height: 38, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? c.primarySoft : 'transparent',
+            borderWidth: focused ? 1 : 0, borderColor: c.glassBorder }}><Grid2X2 size={iconography.nav} color={color} strokeWidth={focused ? iconography.strokeActive : iconography.stroke}/></View>,
     }}/>
   </Tabs>;
 }

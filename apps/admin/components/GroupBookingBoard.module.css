@@ -1,1 +1,120 @@
 .shell{max-width:1650px;margin:0 auto;padding:24px;color:#142943}.head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;padding:22px;border:1px solid #d9e5f2;border-radius:22px;background:linear-gradient(135deg,#f7fbff,#edf5fd)}.head p{margin:0 0 5px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;font-weight:900;color:#3e709e}.head h1{margin:0;font-size:32px}.head span{display:block;margin-top:6px;max-width:800px;color:#64788d}.head button,.searchFields input,.searchFields button,.filters input,.filters select,.filters button,.commitCard input,.commitCard textarea,.commitCard button,.price input{border:1px solid #cad8e6;border-radius:11px;background:#fff;min-height:40px;padding:0 11px}.head button,.filters button,.searchFields button,.commitCard button{font-weight:900;cursor:pointer}.primary{background:#174d82!important;border-color:#174d82!important;color:#fff}.searchCard,.roomsCard,.commitCard,.history{margin-top:13px;border:1px solid #dfe8f1;border-radius:18px;background:#fff;padding:14px}.searchFields{display:grid;grid-template-columns:1fr 1fr .7fr .7fr auto;gap:9px;align-items:flex-end}.searchFields label,.commitCard label{display:grid;gap:4px;font-size:10px;font-weight:900;color:#62778d}.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #edf2f6}.filters>input{min-width:230px;flex:1}.filters label{display:flex;gap:6px;align-items:center;font-size:10px;font-weight:800;color:#65798d}.filters label input{min-height:auto;width:17px;height:17px}.layout{display:grid;grid-template-columns:minmax(620px,1.5fr) minmax(330px,.65fr);gap:12px}.cardHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px}.cardHead small{font-size:9px;letter-spacing:.13em;text-transform:uppercase;font-weight:900;color:#6a8097}.cardHead h2{margin:3px 0 0;font-size:20px}.cardHead>strong{font-size:12px;color:#174d82}.rooms{display:grid;gap:8px;max-height:670px;overflow:auto}.rooms article{display:grid;grid-template-columns:1fr minmax(180px,.36fr);gap:12px;border:1px solid #e0e8f0;border-radius:14px;padding:11px;background:#fff}.rooms .selected{border-color:#2767a4;background:#f2f8fe}.roomMain{display:flex;gap:11px;align-items:center;cursor:pointer}.roomMain>input{width:19px;height:19px}.roomMain span{display:grid;gap:2px}.roomMain strong{font-size:17px;color:#153f6d}.roomMain b{font-size:12px}.roomMain small{font-size:10px;color:#758699}.price{display:grid;gap:5px;justify-items:end;align-content:center}.price span{font-size:9px;color:#738599;font-weight:800}.price strong{font-size:13px;color:#174d82}.price input{width:150px;min-height:34px}.commitCard{display:grid;gap:10px;align-content:start}.commitCard textarea{min-height:80px;padding:9px;resize:vertical}.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:10px;border-radius:12px;background:#f4f8fc}.summary span{display:grid;gap:2px;font-size:9px;color:#6d8195}.summary strong{font-size:14px;color:#173f6b}.commitCard>p{margin:0;font-size:9px;color:#77889a}.history{display:grid;gap:8px}.history>p{color:#788899}.history article{display:grid;grid-template-columns:1.3fr .8fr .8fr;gap:14px;align-items:center;padding:10px 0;border-top:1px solid #edf2f6}.history article div{display:grid;gap:3px}.history strong,.history b{font-size:12px}.history span{font-size:10px;color:#75869a}.error,.notice{margin:11px 0;padding:12px 14px;border-radius:11px;font-weight:800}.error{background:#fff0f0;color:#953737}.notice{background:#edf9f1;color:#29683f}@media(max-width:1100px){.layout{grid-template-columns:1fr}.searchFields{grid-template-columns:1fr 1fr 1fr 1fr}.searchFields button{grid-column:1/-1}.commitCard{margin-top:0}}@media(max-width:700px){.shell{padding:12px}.head{display:grid}.head h1{font-size:26px}.searchFields{grid-template-columns:1fr 1fr}.rooms article{grid-template-columns:1fr}.price{justify-items:start}.history article{grid-template-columns:1fr}.summary{grid-template-columns:1fr 1fr 1fr}}
+/* Future Luxury 2.0 — GROUP BOOKING: visual-only and opt-in.
+   API, filters, room selection, atomic commit and all role guards unchanged. */
+:global(html[data-marina-ui="future-luxury"]) .shell{
+  max-width:none;
+  padding:clamp(14px,2vw,28px);
+  color:var(--fl-guest-text,#e8f9ff);
+}
+:global(html[data-marina-ui="future-luxury"]) .head{
+  align-items:start;
+  background:linear-gradient(120deg,#0a2c3e,#105666);
+  border:1px solid rgba(81,201,212,.33);
+  box-shadow:0 17px 40px rgba(0,8,24,.14);
+}
+:global(html[data-marina-ui="future-luxury"]) .head h1{color:#f5fdff;font-size:clamp(27px,2.7vw,38px)}
+:global(html[data-marina-ui="future-luxury"]) .head p{color:#e9c887}
+:global(html[data-marina-ui="future-luxury"]) .head span{color:#bddde7}
+:global(html[data-marina-ui="future-luxury"]) .head button,
+:global(html[data-marina-ui="future-luxury"]) .searchFields input,
+:global(html[data-marina-ui="future-luxury"]) .searchFields button,
+:global(html[data-marina-ui="future-luxury"]) .filters input,
+:global(html[data-marina-ui="future-luxury"]) .filters select,
+:global(html[data-marina-ui="future-luxury"]) .filters button,
+:global(html[data-marina-ui="future-luxury"]) .commitCard input,
+:global(html[data-marina-ui="future-luxury"]) .commitCard textarea,
+:global(html[data-marina-ui="future-luxury"]) .commitCard button,
+:global(html[data-marina-ui="future-luxury"]) .price input{
+  min-height:43px;
+  background:var(--fl-guest-panel,#15394a);
+  border:1px solid var(--fl-guest-line,rgba(83,196,212,.29));
+  border-radius:10px;
+  color:var(--fl-guest-text,#f5fcff);
+}
+:global(html[data-marina-ui="future-luxury"]) .searchCard,
+:global(html[data-marina-ui="future-luxury"]) .roomsCard,
+:global(html[data-marina-ui="future-luxury"]) .commitCard,
+:global(html[data-marina-ui="future-luxury"]) .history{
+  color:var(--fl-guest-text,#e8faff);
+  background:var(--fl-guest-surface,#0e3041);
+  border:1px solid var(--fl-guest-line,rgba(83,196,212,.29));
+  border-radius:19px;
+  box-shadow:0 12px 28px rgba(0,10,23,.09);
+  padding:clamp(13px,1.5vw,20px);
+}
+:global(html[data-marina-ui="future-luxury"]) .searchFields label,
+:global(html[data-marina-ui="future-luxury"]) .commitCard label,
+:global(html[data-marina-ui="future-luxury"]) .filters label,
+:global(html[data-marina-ui="future-luxury"]) .cardHead small{
+  color:var(--fl-guest-muted,#bad3df);
+  font-size:11px;
+  line-height:1.45;
+}
+:global(html[data-marina-ui="future-luxury"]) .cardHead h2{color:var(--fl-guest-text,#f2fcff)}
+:global(html[data-marina-ui="future-luxury"]) .cardHead>strong{color:#70f0e7}
+:global(html[data-marina-ui="future-luxury"]) .filters{
+  border-color:var(--fl-guest-line,rgba(83,196,212,.29));
+  gap:10px;
+}
+:global(html[data-marina-ui="future-luxury"]) .layout{
+  grid-template-columns:minmax(0,1.6fr) minmax(290px,.7fr);
+  gap:14px;
+}
+:global(html[data-marina-ui="future-luxury"]) .rooms article{
+  color:var(--fl-guest-text,#f2fbff);
+  background:var(--fl-guest-panel,#173b4d);
+  border:1px solid var(--fl-guest-line,rgba(82,205,219,.27));
+  border-radius:14px;
+}
+:global(html[data-marina-ui="future-luxury"]) .rooms article.selected{
+  background:#145b60;
+  border-color:#37ddd6;
+  box-shadow:inset 3px 0 #36d4d4;
+}
+:global(html[data-marina-ui="future-luxury"]) .roomMain strong,
+:global(html[data-marina-ui="future-luxury"]) .rooms article strong{
+  color:var(--fl-guest-text,#f2fbff);
+}
+:global(html[data-marina-ui="future-luxury"]) .roomMain input,
+:global(html[data-marina-ui="future-luxury"]) .filters input[type="checkbox"]{
+  accent-color:#1bbac5;
+}
+:global(html[data-marina-ui="future-luxury"]) .primary{
+  background:linear-gradient(100deg,#13b6c1,#49dbd8)!important;
+  border-color:#2cccd1!important;
+  color:#052b37!important;
+  min-height:44px;
+  box-shadow:0 8px 21px rgba(0,181,191,.13);
+}
+:global(html[data-marina-ui="future-luxury"]) .shell button:focus-visible,
+:global(html[data-marina-ui="future-luxury"]) .shell input:focus-visible,
+:global(html[data-marina-ui="future-luxury"]) .shell select:focus-visible{
+  outline:3px solid #ebca89;
+  outline-offset:2px;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .head{
+  background:linear-gradient(115deg,#fff,#e7f5f9);
+  border-color:#c5e2e9;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .head h1{color:#0b3649}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .head p{color:#825c19}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .head span{color:#526d7c}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .rooms article.selected{
+  background:#def7f6;border-color:#46b9c1;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .cardHead>strong{color:#077d86}
+@media(max-width:1150px){
+  :global(html[data-marina-ui="future-luxury"]) .layout{grid-template-columns:1fr}
+  :global(html[data-marina-ui="future-luxury"]) .searchFields{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:620px){
+  :global(html[data-marina-ui="future-luxury"]) .head{display:grid;gap:12px}
+  :global(html[data-marina-ui="future-luxury"]) .searchFields{grid-template-columns:1fr}
+  :global(html[data-marina-ui="future-luxury"]) .rooms article{grid-template-columns:1fr}
+  :global(html[data-marina-ui="future-luxury"]) .filters>input{min-width:0;width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  :global(html[data-marina-ui="future-luxury"]) .rooms article{transition:none!important}
+}

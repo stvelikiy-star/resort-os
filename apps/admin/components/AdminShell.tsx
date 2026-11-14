@@ -29,6 +29,7 @@ import StaffBoard from "./StaffBoard";
 import MarinaAiAssistant from "./MarinaAiAssistant";
 import ChannelManagerBoard from "./ChannelManagerBoard";
 import { readMarinaUiPreference, writeMarinaUiPreference, type MarinaUiPreference } from "../lib/marina-ui-preference";
+import { readFl2Theme, writeFl2Theme, type Fl2Theme } from "../lib/fl2-appearance";
 
 type User = {
   id: string;
@@ -87,18 +88,22 @@ export default function AdminShell() {
   const [hotelName, setHotelName] = useState<string>("");
   const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
   const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
+  const [fl2Theme, setFl2Theme] = useState<Fl2Theme>("dark");
 
   useEffect(() => {
     setUiPreference(readMarinaUiPreference());
+    setFl2Theme(readFl2Theme());
   }, []);
 
   useEffect(() => {
     if (user && uiPreference === "future-luxury") {
       document.documentElement.dataset.marinaUi = "future-luxury";
+      document.documentElement.dataset.fl2Theme = fl2Theme;
     } else {
       document.documentElement.removeAttribute("data-marina-ui");
+      document.documentElement.removeAttribute("data-fl2-theme");
     }
-  }, [uiPreference, user]);
+  }, [uiPreference, user, fl2Theme]);
 
   useEffect(() => {
     let disposed = false;
@@ -279,6 +284,11 @@ export default function AdminShell() {
     writeMarinaUiPreference(nextPreference);
   }
 
+  function chooseFl2Theme(nextTheme: Fl2Theme) {
+    setFl2Theme(nextTheme);
+    writeFl2Theme(nextTheme);
+  }
+
   if (checking) {
     return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
@@ -360,6 +370,10 @@ export default function AdminShell() {
             <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
             <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
           </div>
+          {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
+            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
+            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
+          </div>}
           <button className="logout-button" onClick={logout}>Выйти</button>
         </div>
       </div>

@@ -134,7 +134,8 @@ export function Badge({ label, tone = 'neutral', icon: Icon }: { label: string; 
   const { c } = useTheme();
   const t = toneColors(c, tone);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.bg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, alignSelf: 'flex-start', maxWidth: '100%' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.bg, paddingHorizontal: 11, paddingVertical: 6, borderRadius: radius.pill,
+      borderWidth: 1, borderColor: c.glassBorder, alignSelf: 'flex-start', maxWidth: '100%' }}>
       {SemanticIcon ? <SemanticIcon size={13} color={t.fg} /> : null}
       <Text style={[font.label, { color: t.fg, flexShrink: 1 }]}>{label}</Text>
     </View>
