@@ -10,3 +10,160 @@
 .state{padding:24px;text-align:center;color:#8292a7}
 @media(max-width:1100px){.upload{grid-template-columns:1fr 1fr}.slots{grid-template-columns:1fr}}
 @media(max-width:700px){.shell{padding:16px;border-radius:18px}.head{display:block}.headStats{margin-top:14px}.upload{grid-template-columns:1fr}.library{grid-template-columns:1fr}.previewGrid{grid-template-columns:1fr}.previewGrid img,.noImage{height:170px}.actions{flex-direction:column}}
+
+/* Future Luxury 2.0 — site media, draft, publish and original photo sources.
+   Visual-only: file upload, archive, versioning and publish callbacks unchanged. */
+:global(html[data-marina-ui="future-luxury"]) .shell{
+  --fl2-media-ink:#effaff;
+  --fl2-media-muted:#bfd4df;
+  --fl2-media-panel:#15384b;
+  --fl2-media-edge:rgba(82,203,215,.28);
+  color:var(--fl2-media-ink);
+  background:linear-gradient(145deg,#0b273a,#123c50);
+  border:1px solid var(--fl2-media-edge);
+  border-radius:23px;
+  box-shadow:0 22px 55px rgba(0,9,23,.18);
+  padding:clamp(14px,1.8vw,28px);
+}
+:global(html[data-marina-ui="future-luxury"]) .head h2{
+  color:#f7fcff;
+  font-size:clamp(25px,2.6vw,36px);
+  letter-spacing:-.035em;
+}
+:global(html[data-marina-ui="future-luxury"]) .head p{color:#e5c187}
+:global(html[data-marina-ui="future-luxury"]) .head span{
+  color:var(--fl2-media-muted);
+  font-size:12px;
+}
+:global(html[data-marina-ui="future-luxury"]) .headStats article,
+:global(html[data-marina-ui="future-luxury"]) .upload,
+:global(html[data-marina-ui="future-luxury"]) .library article,
+:global(html[data-marina-ui="future-luxury"]) .slot{
+  color:var(--fl2-media-ink);
+  background:var(--fl2-media-panel);
+  border:1px solid var(--fl2-media-edge);
+  border-radius:17px;
+}
+:global(html[data-marina-ui="future-luxury"]) .headStats strong{
+  color:var(--fl2-media-ink);
+  font-variant-numeric:tabular-nums;
+}
+:global(html[data-marina-ui="future-luxury"]) .headStats span,
+:global(html[data-marina-ui="future-luxury"]) .assetBody span,
+:global(html[data-marina-ui="future-luxury"]) .assetBody small,
+:global(html[data-marina-ui="future-luxury"]) .slotHead small,
+:global(html[data-marina-ui="future-luxury"]) .field span{
+  color:var(--fl2-media-muted);
+}
+:global(html[data-marina-ui="future-luxury"]) .upload input,
+:global(html[data-marina-ui="future-luxury"]) .field input,
+:global(html[data-marina-ui="future-luxury"]) .field select{
+  background:#0e3043;
+  color:var(--fl2-media-ink);
+  border:1px solid var(--fl2-media-edge);
+  border-radius:11px;
+  min-height:44px;
+}
+:global(html[data-marina-ui="future-luxury"]) .groupTabs button,
+:global(html[data-marina-ui="future-luxury"]) .actions button,
+:global(html[data-marina-ui="future-luxury"]) .upload button,
+:global(html[data-marina-ui="future-luxury"]) .uploadButton{
+  min-height:44px;
+  color:var(--fl2-media-ink);
+  background:#204a5c;
+  border:1px solid var(--fl2-media-edge);
+  border-radius:11px;
+}
+:global(html[data-marina-ui="future-luxury"]) .groupTabs button.active{
+  background:#1e6771;
+  border-color:#40d0d6;
+  color:#fff;
+}
+:global(html[data-marina-ui="future-luxury"]) .actions .primary{
+  background:linear-gradient(105deg,#1ac0c8,#4fddd9)!important;
+  border-color:#3fd2d6!important;
+  color:#062a39!important;
+  font-weight:850;
+}
+:global(html[data-marina-ui="future-luxury"]) .thumb,
+:global(html[data-marina-ui="future-luxury"]) .noImage{
+  background:#0e3044;
+  color:var(--fl2-media-muted);
+}
+:global(html[data-marina-ui="future-luxury"]) .previewGrid>div{
+  min-width:0;
+  background:rgba(13,48,66,.5);
+  border:1px solid var(--fl2-media-edge);
+  border-radius:13px;
+  padding:10px;
+}
+:global(html[data-marina-ui="future-luxury"]) .previewGrid img{
+  width:100%;
+  max-width:100%;
+  object-fit:cover;
+  border-radius:10px;
+}
+:global(html[data-marina-ui="future-luxury"]) .state{
+  color:var(--fl2-media-muted);
+}
+:global(html[data-marina-ui="future-luxury"]) .shell button:focus-visible,
+:global(html[data-marina-ui="future-luxury"]) .shell input:focus-visible,
+:global(html[data-marina-ui="future-luxury"]) .shell select:focus-visible{
+  outline:3px solid #e7bd7a;
+  outline-offset:2px;
+}
+/* Real Light theme; retain image pixels unfiltered and the existing published/draft distinction. */
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .shell{
+  --fl2-media-ink:#12374b;
+  --fl2-media-muted:#4e6e7d;
+  --fl2-media-panel:#fff;
+  --fl2-media-edge:#c5dce5;
+  background:linear-gradient(145deg,#fff,#eaf5f9);
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .head h2{
+  color:#10384e;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .head p{
+  color:#875e20;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .upload input,
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .field input,
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .field select,
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .groupTabs button,
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .actions button,
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .upload button,
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .uploadButton{
+  color:#123b4f;
+  background:#e9f5f8;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .groupTabs button.active{
+  color:#fff;
+  background:#137d8d;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .previewGrid>div{
+  background:#eef8fa;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme="light"]) .noImage{
+  color:#537485;
+  background:#eaf1f4;
+}
+@media(max-width:950px){
+  :global(html[data-marina-ui="future-luxury"]) .upload{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  :global(html[data-marina-ui="future-luxury"]) .head{
+    flex-direction:column;
+    gap:14px;
+  }
+}
+@media(max-width:550px){
+  :global(html[data-marina-ui="future-luxury"]) .upload{
+    grid-template-columns:1fr;
+  }
+  :global(html[data-marina-ui="future-luxury"]) .headStats{
+    flex-wrap:wrap;
+  }
+  :global(html[data-marina-ui="future-luxury"]) .previewGrid{
+    grid-template-columns:1fr;
+  }
+}

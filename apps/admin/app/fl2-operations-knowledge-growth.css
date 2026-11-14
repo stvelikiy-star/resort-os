@@ -1,0 +1,507 @@
+/* MARINA SMART Future Luxury 2.0 — remaining operational Web.
+ * Scope: opt-in visual layer. API, RBAC, room state transitions, tasks,
+ * AI knowledge save rules and Growth/outbound restrictions are unchanged. */
+html[data-marina-ui="future-luxury"] .fl2-ops,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules {
+  --fl2-ops-surface:#102f41;
+  --fl2-ops-surface-raised:#194052;
+  --fl2-ops-edge:rgba(67,200,215,.30);
+  --fl2-ops-ink:#f1fbff;
+  --fl2-ops-muted:#b8d2de;
+  color:var(--fl2-ops-ink);
+  max-width:none;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops>.work-head,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules>.work-header {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;
+  gap:18px;
+  padding:clamp(18px,2vw,27px);
+  background:linear-gradient(116deg,#0b293b,#0f5262);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:20px;
+  box-shadow:0 18px 42px rgba(0,9,23,.13);
+}
+html[data-marina-ui="future-luxury"] .fl2-ops>.work-head h1,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules>.work-header h1{
+  color:#f5fcff;
+  font-size:clamp(26px,2.7vw,36px);
+  letter-spacing:-.035em;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops>.work-head .subtitle,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules>.work-header .subtitle{
+  color:#c1dce7;
+  line-height:1.5;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .summary{
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .summary-card{
+  display:grid;
+  gap:8px;
+  background:linear-gradient(150deg,#153b4e,#0d2e41);
+  border:1px solid var(--fl2-ops-edge);
+  border-top:3px solid #28c8ce;
+  border-radius:17px;
+  box-shadow:0 10px 26px rgba(0,8,23,.1);
+  padding:clamp(13px,1.4vw,18px);
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .summary-card strong{
+  color:var(--fl2-ops-ink);
+  font-size:clamp(22px,2vw,30px);
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .summary-card span{
+  color:var(--fl2-ops-muted);
+  font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .controls,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create{
+  gap:10px;
+  padding:15px;
+  background:var(--fl2-ops-surface);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:17px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .control label{
+  color:var(--fl2-ops-muted);
+  font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .control input,
+html[data-marina-ui="future-luxury"] .fl2-ops .control select,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create input,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create select,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-assignee-control select{
+  color:var(--fl2-ops-ink);
+  background:var(--fl2-ops-surface-raised);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:10px;
+  min-height:44px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .control input::placeholder,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create input::placeholder{
+  color:var(--fl2-ops-muted);
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-grid{
+  grid-template-columns:repeat(auto-fill,minmax(min(100%,310px),1fr));
+  gap:14px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-card{
+  min-width:0;
+  padding:clamp(14px,1.5vw,20px);
+  color:var(--fl2-ops-ink);
+  background:linear-gradient(160deg,#15384c,#102a3c);
+  border:1px solid var(--fl2-ops-edge);
+  border-left:4px solid #4ed9d8;
+  border-radius:18px;
+  box-shadow:0 14px 33px rgba(0,11,24,.12);
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-card.p-HIGH{
+  border-left-color:#f2bf73;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-card.p-URGENT{
+  border-left-color:#f18c98;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-card h3{
+  color:var(--fl2-ops-ink);
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-card p,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-assignee-control span{
+  color:var(--fl2-ops-muted);
+  font-size:12px;
+  line-height:1.5;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-meta span,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-meta b{
+  border-radius:999px;
+  padding:5px 9px;
+  background:#1a4c5b;
+  color:#c9f6f6;
+  border:1px solid rgba(72,209,216,.27);
+  font-size:10px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-actions .btn,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create .btn{
+  min-height:44px;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-history{
+  background:#0d3346;
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:13px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-history-row{
+  border-color:var(--fl2-ops-edge);
+  color:var(--fl2-ops-ink);
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-history-row time,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-history-row span{
+  color:var(--fl2-ops-muted);
+}
+/* Rules and MARINA AI knowledge editor — do not override save/dirty/version. */
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-status,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .management-form{
+  color:var(--fl2-ops-ink);
+  background:var(--fl2-ops-surface);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:18px;
+  padding:clamp(15px,1.8vw,24px);
+  box-shadow:0 12px 30px rgba(0,9,21,.1);
+  max-width:none;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-status strong{
+  color:var(--fl2-ops-ink);
+  font-size:16px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-status span,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-status small,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-topic>p,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-topic label small{
+  color:var(--fl2-ops-muted);
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-status progress{
+  accent-color:#26c9cc;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-tabs{
+  gap:8px;
+  border-bottom:1px solid var(--fl2-ops-edge);
+  margin-bottom:15px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-tabs button{
+  color:var(--fl2-ops-ink);
+  background:var(--fl2-ops-surface-raised);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:10px;
+  min-height:44px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-tabs button.selected{
+  color:#062d39;
+  background:#3ed0d1;
+  border-color:#3ed0d1;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-topic h2{
+  color:var(--fl2-ops-ink);
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-topic textarea,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-topic select,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-topic input{
+  color:var(--fl2-ops-ink);
+  background:var(--fl2-ops-surface-raised);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:11px;
+  min-height:44px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-payment{
+  background:var(--fl2-ops-surface-raised);
+  color:var(--fl2-ops-ink);
+  border:1px solid var(--fl2-ops-edge);
+  border-radius:14px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .management-modal-actions{
+  border-top:1px solid var(--fl2-ops-edge);
+  padding-top:16px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .management-modal-actions .btn{
+  min-height:44px;
+  border-radius:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules .management-modal-actions .btn.primary{
+  background:linear-gradient(105deg,#13b9c4,#49d7da);
+  color:#073240;
+  border-color:#40ced1;
+}
+/* Growth / feedback: distinct from outreach consent. Existing 'no auto-send'
+ * policy remains prominently visible, not recolored as a success message. */
+html[data-marina-ui="future-luxury"] .growth-shell{
+  background:radial-gradient(circle at 93% 4%,rgba(20,184,166,.13),transparent 35%),#081f2a;
+  color:#f2fbff;
+}
+html[data-marina-ui="future-luxury"] .growth-hero{
+  background:linear-gradient(120deg,#102e40,#105261);
+  border:1px solid rgba(62,209,215,.33);
+  border-radius:21px;
+  box-shadow:0 14px 38px rgba(0,12,26,.17);
+}
+html[data-marina-ui="future-luxury"] .growth-hero h1{
+  color:#f5fcff;
+  font-size:clamp(26px,2.7vw,36px);
+  letter-spacing:-.035em;
+}
+html[data-marina-ui="future-luxury"] .growth-hero>div>p:not(.eyebrow){
+  color:#c8e2e9;
+}
+html[data-marina-ui="future-luxury"] .growth-kpis article,
+html[data-marina-ui="future-luxury"] .growth-card,
+html[data-marina-ui="future-luxury"] .growth-policy,
+html[data-marina-ui="future-luxury"] .growth-segments>div{
+  background:#113347;
+  border:1px solid rgba(74,202,215,.27);
+  color:#f3fbff;
+  border-radius:17px;
+  box-shadow:0 12px 30px rgba(0,8,22,.09);
+}
+html[data-marina-ui="future-luxury"] .growth-kpis article strong,
+html[data-marina-ui="future-luxury"] .growth-card-head h2,
+html[data-marina-ui="future-luxury"] .growth-segments strong{
+  color:#f5fcff;
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .growth-kpis article span,
+html[data-marina-ui="future-luxury"] .growth-kpis article small,
+html[data-marina-ui="future-luxury"] .growth-card-head>span,
+html[data-marina-ui="future-luxury"] .growth-segments span{
+  color:#c1d6e0;
+}
+html[data-marina-ui="future-luxury"] .growth-policy{
+  background:#463b2a;
+  border-color:#ab8a57;
+}
+html[data-marina-ui="future-luxury"] .growth-policy strong{
+  color:#ffe6b6;
+}
+html[data-marina-ui="future-luxury"] .growth-policy span{
+  color:#ffeacc;
+}
+html[data-marina-ui="future-luxury"] .growth-row,
+html[data-marina-ui="future-luxury"] .growth-candidates article,
+html[data-marina-ui="future-luxury"] .growth-engagement-list>div{
+  color:#ebfaff;
+  background:#1a4153;
+  border:1px solid rgba(80,208,219,.22);
+  border-radius:13px;
+}
+html[data-marina-ui="future-luxury"] .growth-row strong,
+html[data-marina-ui="future-luxury"] .growth-candidates article strong{
+  color:#f6fcff;
+}
+html[data-marina-ui="future-luxury"] .growth-row small,
+html[data-marina-ui="future-luxury"] .growth-row span,
+html[data-marina-ui="future-luxury"] .growth-candidates article span{
+  color:#bfd6e1;
+}
+html[data-marina-ui="future-luxury"] .growth-modal{
+  background:#113245;
+  border:1px solid rgba(70,207,219,.39);
+  border-radius:22px;
+  color:#f2fbff;
+  box-shadow:0 25px 86px rgba(0,10,24,.45);
+}
+html[data-marina-ui="future-luxury"] .growth-modal input,
+html[data-marina-ui="future-luxury"] .growth-modal textarea,
+html[data-marina-ui="future-luxury"] .growth-filters input,
+html[data-marina-ui="future-luxury"] .growth-filters select{
+  background:#1b4456;
+  border:1px solid rgba(82,200,215,.36);
+  color:#f6fcff;
+  border-radius:10px;
+  min-height:42px;
+}
+html[data-marina-ui="future-luxury"] .growth-modal input:focus-visible,
+html[data-marina-ui="future-luxury"] .growth-modal textarea:focus-visible,
+html[data-marina-ui="future-luxury"] .growth-row button:focus-visible,
+html[data-marina-ui="future-luxury"] .fl2-ops button:focus-visible,
+html[data-marina-ui="future-luxury"] .fl2-hotel-rules button:focus-visible{
+  outline:3px solid #e7c486;
+  outline-offset:2px;
+}
+/* Ice Light: owner operational modules must remain legible in daylight. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-hotel-rules{
+  --fl2-ops-surface:#fff;
+  --fl2-ops-surface-raised:#edf7fa;
+  --fl2-ops-edge:#c6e0e9;
+  --fl2-ops-ink:#0e3549;
+  --fl2-ops-muted:#4d6d7e;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops>.work-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-hotel-rules>.work-header{
+  background:linear-gradient(116deg,#fff,#e9f5f8);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops>.work-head h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-hotel-rules>.work-header h1{
+  color:#103a4e;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops>.work-head .subtitle,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-hotel-rules>.work-header .subtitle{
+  color:#526f7e;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .summary-card,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-card{
+  color:#103a4e;
+  background:linear-gradient(160deg,#fff,#f1f9fb);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .summary-card strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-card h3{
+  color:#133b4d;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .summary-card span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-card p,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-assignee-control span{
+  color:#506e7f;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-meta span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-meta b{
+  color:#126375;
+  background:#dcf4f6;
+  border-color:#a8d6df;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-history{
+  background:#f3fafc;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-ops .task-history-row{
+  color:#173f51;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-hotel-rules .hotel-knowledge-tabs button.selected{
+  color:#fff;
+  background:#0b8292;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-shell{
+  background:#f0f7fa;
+  color:#11394e;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-hero,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-kpis article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-card,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-segments>div{
+  background:linear-gradient(160deg,#fff,#eff8fa);
+  color:#103a4e;
+  border-color:#c9e0e9;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-hero h1,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-card-head h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-kpis article strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-segments strong{
+  color:#113b4d;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-kpis article span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-kpis article small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-hero>div>p:not(.eyebrow){
+  color:#537080;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-policy{
+  background:#fff4de;
+  border-color:#ddbd79;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-policy strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-policy span{
+  color:#765317;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-row,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-candidates article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-engagement-list>div{
+  color:#143b4f;background:#eff8fa;border-color:#cadfe8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-row strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-candidates article strong{
+  color:#10384b;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-row small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-row span{
+  color:#547182;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-modal{
+  background:#fff;color:#12384b;border-color:#c6e1e9;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-modal input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-modal textarea,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-filters input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-filters select{
+  color:#123b50;background:#fff;border-color:#c9e0e9;
+}
+@media(max-width:900px){
+  html[data-marina-ui="future-luxury"] .fl2-ops>.work-head{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-grid{
+    grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));
+  }
+}
+@media(max-width:600px){
+  html[data-marina-ui="future-luxury"] .fl2-ops .summary{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .fl2-ops .controls,
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-create{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-tabs{
+    overflow-x:auto;
+    flex-wrap:nowrap;
+    padding-bottom:11px;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-hotel-rules .hotel-knowledge-tabs button{
+    white-space:nowrap;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-card,
+  html[data-marina-ui="future-luxury"] .growth-row{
+    animation:none!important;
+    transition:none!important;
+    transform:none!important;
+  }
+}
+
+/* Final touch interactions: consistent 44px controls, real form fields retained. */
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create{
+  display:grid;
+  grid-template-columns:minmax(160px,.8fr) minmax(165px,1fr) minmax(220px,1.5fr) minmax(140px,.7fr) auto;
+  align-items:stretch;
+  gap:10px;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create > *{
+  min-width:0;
+  box-sizing:border-box;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops>.work-head>.btn,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-create .btn.primary,
+html[data-marina-ui="future-luxury"] .fl2-ops .task-actions .btn.primary,
+html[data-marina-ui="future-luxury"] .growth-shell .btn.primary{
+  min-height:44px;
+  background:linear-gradient(105deg,#13bbc5,#51d9d6);
+  border:1px solid #30c8cf;
+  color:#062d39;
+  border-radius:11px;
+  font-weight:850;
+}
+html[data-marina-ui="future-luxury"] .fl2-ops .task-actions .btn,
+html[data-marina-ui="future-luxury"] .growth-shell .growth-row .btn{
+  min-height:44px;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .growth-shell .growth-row .btn{
+  padding:9px 12px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-shell .growth-row .btn{
+  border-color:#c0dbe3;
+  color:#123d50;
+  background:#fff;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-shell .growth-row .btn.primary{
+  color:#062d39;
+  background:linear-gradient(105deg,#13bbc5,#51d9d6);
+}
+@media(max-width:1250px){
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-create{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:620px){
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-create{
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-create .btn{
+    width:100%;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-ops .task-actions .btn{
+    flex:1 1 140px;
+  }
+}

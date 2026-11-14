@@ -225,7 +225,7 @@ export default function OperationsBoard({ user }: { user: User }) {
   const canSeeHistory = isManager;
 
   return (
-    <main className="work-shell">
+    <main className="work-shell fl2-ops">
       <div className="work-head">
         <div><p className="eyebrow">Операции · персонал</p><h1>Задачи пансионата</h1><p className="subtitle">Уборка, ремонт и запросы гостей с контролируемыми переходами статуса номера.</p></div>
         <button className="btn" onClick={load}>Обновить</button>
