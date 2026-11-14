@@ -154,3 +154,109 @@
     border-radius: 16px;
   }
 }
+
+/* Future Luxury 2.0 — existing Staff MARINA AI chat UI.
+ * AI availability and thinking states must come from the real chat lifecycle. */
+.launcher{
+  min-height:52px;
+  background:linear-gradient(113deg,#0c3046,#0b5260);
+  color:#f5fcff;
+  border:1px solid rgba(78,209,215,.45);
+  box-shadow:0 16px 35px rgba(0,13,28,.24);
+}
+.spark{background:linear-gradient(135deg,#25c7cc,#22a6c0);color:#082b3b}
+.panel{
+  --ai-ink:#123a4b;
+  --ai-muted:#547382;
+  --ai-raised:#eef7fa;
+  --ai-line:#c9e1e9;
+  color:var(--ai-ink);
+  background:#fff;
+  border:1px solid var(--ai-line);
+  border-radius:23px;
+  box-shadow:0 25px 76px rgba(0,15,32,.28);
+}
+.header{
+  background:linear-gradient(108deg,#0c2f43,#125968);
+  color:#f4fdff;
+  padding:17px 19px;
+}
+.header strong{font-size:17px;letter-spacing:-.01em}
+.header small{opacity:1;color:#c9e6ea}
+.header button{
+  min-height:44px;
+  min-width:44px;
+  border:1px solid rgba(124,222,228,.25);
+  border-radius:11px;
+}
+.quick{background:var(--ai-raised);border-color:var(--ai-line)}
+.quick button{
+  min-height:44px;
+  border:1px solid var(--ai-line);
+  background:#fff;
+  color:var(--ai-ink);
+  border-radius:999px;
+}
+.messages{
+  background:linear-gradient(180deg,#f4fafb,#ebf5f8);
+}
+.assistant span,.user span{color:var(--ai-muted)}
+.assistant p{
+  background:#fff;
+  color:var(--ai-ink);
+  border:1px solid var(--ai-line);
+  box-shadow:0 3px 10px rgba(10,71,93,.05);
+}
+.user p{background:#117f8b;color:#fff}
+.thinking{color:var(--ai-muted)}
+.form{
+  border-color:var(--ai-line);
+  background:#fff;
+}
+.form textarea{
+  min-width:0;
+  min-height:48px;
+  background:var(--ai-raised);
+  border:1px solid var(--ai-line);
+  color:var(--ai-ink);
+}
+.form button{
+  min-height:48px;
+  background:linear-gradient(105deg,#16bbc4,#4fdad8);
+  color:#062e39;
+  border:1px solid #35c8cf;
+}
+.footer{background:#fff;color:var(--ai-muted)}
+.panel :is(button,textarea):focus-visible,.launcher:focus-visible{
+  outline:3px solid #edc684;outline-offset:2px;
+}
+@media(prefers-color-scheme:dark){
+  .panel{
+    --ai-ink:#f1fbff;
+    --ai-muted:#c2d7e1;
+    --ai-raised:#1a4051;
+    --ai-line:rgba(79,200,216,.32);
+    background:#0d293b;
+    color:var(--ai-ink);
+  }
+  .quick{background:#113447}
+  .quick button{background:#1c4b5c;color:var(--ai-ink)}
+  .messages{background:linear-gradient(180deg,#0b2638,#143449)}
+  .assistant p{background:#1b4558;color:var(--ai-ink);box-shadow:none}
+  .user p{background:#0c7b88}
+  .form,.footer{background:#0f3042}
+  .form textarea{background:#183d51;color:var(--ai-ink)}
+}
+@media(max-width:640px){
+  .launcher{min-height:52px}
+  .panel{
+    height:min(76dvh,660px);
+    width:calc(100vw - 16px);
+    right:8px;
+    bottom:72px;
+  }
+  .form{grid-template-columns:minmax(0,1fr) auto}
+}
+@media(prefers-reduced-motion:reduce){
+  .launcher,.panel :is(button,.spark){animation:none!important;transition:none!important;transform:none!important}
+}
