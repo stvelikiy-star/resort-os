@@ -1,0 +1,368 @@
+/* MARINA SMART FUTURE LUXURY 2.0 — actual PMS chessboard presentation.
+ * All date-range selection, free/occupied checks, overlays, HOLD, booking
+ * preview/commit, reservation tooltips, rate, payment and RBAC stay intact.
+ * Only applied inside the opt-in authenticated Future Luxury shell.
+ */
+html[data-marina-ui="future-luxury"] .owner-pms-stack {
+  --fl2p-surface:#0b2637;
+  --fl2p-raised:#13394c;
+  --fl2p-line:rgba(76,193,209,.31);
+  --fl2p-ink:#effaff;
+  --fl2p-muted:#b8d2de;
+  --fl2p-turquoise:#37d5d6;
+  --fl2p-champagne:#e9c58a;
+  max-width:none;
+  box-sizing:border-box;
+  padding:clamp(11px,1.5vw,22px);
+  color:var(--fl2p-ink);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-shell{
+  box-sizing:border-box;
+  padding:clamp(15px,1.65vw,25px);
+  border:1px solid var(--fl2p-line);
+  border-radius:22px;
+  background:linear-gradient(160deg,#12384b 0%,#0b2637 50%,#092433 100%);
+  box-shadow:0 20px 52px rgba(0,8,23,.22);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title{
+  align-items:center;
+  gap:18px;
+  padding:0 2px 15px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title h1{
+  color:#f4fcff;
+  font-size:clamp(27px,2.7vw,39px);
+  letter-spacing:-.045em;
+  line-height:1.15;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title .eyebrow{
+  color:var(--fl2p-champagne);
+  font-size:10px;
+  font-weight:850;
+  letter-spacing:.14em;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title p{
+  color:var(--fl2p-muted);
+  line-height:1.55;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-live{
+  border:1px solid var(--fl2p-line);
+  border-radius:999px;
+  padding:8px 12px;
+  background:var(--fl2p-raised);
+  color:var(--fl2p-ink);
+  font-size:10px;
+  font-weight:800;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  min-width:0;
+  gap:9px;
+  padding:12px;
+  border:1px solid var(--fl2p-line);
+  border-radius:15px;
+  background:rgba(18,57,76,.88);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar :is(select,button,.owner-grid-search,.owner-month-picker,.owner-date-nav,.owner-window-switch){
+  border-color:var(--fl2p-line);
+  border-radius:10px;
+  color:var(--fl2p-ink);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar select,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-search,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-date-nav,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-window-switch{
+  min-height:44px;
+  background:#193e50;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-search input{
+  min-height:40px;
+  color:#f2fcff;
+  background:transparent;
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar :is(.owner-date-nav button,.owner-window-switch button,.owner-refresh){
+  min-height:39px;
+  color:var(--fl2p-ink);
+  font-size:12px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-window-switch button.active{
+  background:var(--fl2p-turquoise);
+  color:#062d3b;
+  font-weight:850;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-selection-help{
+  border:1px solid rgba(61,205,216,.23);
+  background:#153b4b;
+  color:var(--fl2p-muted);
+  border-radius:11px;
+  font-size:12px;
+  line-height:1.6;
+  padding:11px 14px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-scroll{
+  overflow:auto;
+  max-height:72vh;
+  border:1px solid var(--fl2p-line);
+  border-radius:17px;
+  background:#0a293b;
+  box-shadow:inset 0 1px 13px rgba(0,7,20,.14);
+  scrollbar-color:#367083 #0e3041;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-head{
+  position:sticky;
+  top:0;
+  z-index:30;
+  background:#184557;
+  border-color:var(--fl2p-line);
+  min-height:49px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack :is(.owner-room-head,.owner-state-head,.owner-day-head){
+  color:var(--fl2p-muted);
+  background:#184557;
+  border-color:var(--fl2p-line);
+  font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head{
+  min-height:49px;
+  padding:6px 0;
+  box-sizing:border-box;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head strong{
+  color:var(--fl2p-ink);
+  font-size:13px;
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head.today{
+  background:#0e6671;
+  box-shadow:inset 0 -3px #44e1dc;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head.weekend:not(.today){
+  background:#254053;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-group-label{
+  background:#194b5e;
+  border-color:var(--fl2p-line);
+  color:#f2fcff;
+  min-height:33px;
+  box-sizing:border-box;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-group-label span{
+  color:#d9fbff;
+  background:#286b78;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-row{
+  min-height:43px;
+  border-bottom:1px solid var(--fl2p-line);
+  background:#0b2a3a;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-row:nth-child(even){
+  background:#103344;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state{
+  height:43px;
+  background:#113548;
+  border-color:var(--fl2p-line);
+  color:var(--fl2p-ink);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label strong{color:var(--fl2p-ink);font-size:12px}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label span{color:var(--fl2p-muted)}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell{
+  height:43px;
+  background:rgba(24,66,84,.25);
+  border-color:rgba(81,166,190,.23);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.weekend{
+  background:rgba(152,118,56,.10);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.today{
+  box-shadow:inset 2px 0 #37d5d6,inset -1px 0 #37d5d6;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.free:hover{
+  background:rgba(38,209,207,.22);
+  box-shadow:inset 0 0 0 2px #4ce9e5;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.selected{
+  background:rgba(31,204,209,.40)!important;
+  box-shadow:inset 0 0 0 2px #48e5e1!important;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:2px;
+  overflow:hidden;
+  min-width:0;
+  min-height:32px;
+  height:35px;
+  margin:4px 2px;
+  border-radius:9px;
+  padding:4px 10px;
+  box-sizing:border-box;
+  box-shadow:0 4px 11px rgba(0,6,19,.18);
+  white-space:nowrap;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar :is(strong,span){
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  max-width:100%;
+  font-size:10px;
+  line-height:1.15;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar strong{
+  font-weight:850;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.payment-unpaid{
+  box-shadow:inset 0 0 0 1px rgba(255,199,143,.42),0 4px 11px rgba(0,6,19,.18);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.payment-partial{
+  border-style:dashed;
+  border-color:#f3c681;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-legend{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:10px 17px;
+  padding:15px 4px 5px;
+  border-top:1px solid var(--fl2p-line);
+  color:var(--fl2p-muted);
+  font-size:11px;
+  line-height:1.45;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-error{
+  border-left:4px solid #ee8fa1;
+  background:#4b2c3c;
+  color:#ffe7e9;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-notice{
+  border-left:4px solid #e1bd7b;
+  color:#ffe5bb;
+  background:#4a3d2a;
+  border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack :is(button,input,select):focus-visible{
+  outline:3px solid #edca8d;
+  outline-offset:2px;
+}
+/* Ice Light: same information hierarchy; actual day, room, booking states remain visible. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack{
+  --fl2p-surface:#fff;
+  --fl2p-raised:#eff8fa;
+  --fl2p-line:#c3dfe8;
+  --fl2p-ink:#10394b;
+  --fl2p-muted:#4d6d7e;
+  --fl2p-turquoise:#087e8f;
+  --fl2p-champagne:#80591a;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-shell{
+  background:linear-gradient(165deg,#fff,#f3fafc 65%,#fff);
+  border-color:var(--fl2p-line);
+  box-shadow:0 14px 34px rgba(21,91,109,.09);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-title h1{color:var(--fl2p-ink)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-title .eyebrow{color:var(--fl2p-champagne)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-title p{color:var(--fl2p-muted)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-live{
+  color:var(--fl2p-ink);background:#e8f6f8;border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-toolbar,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-selection-help{
+  color:var(--fl2p-ink);background:#edf7fa;border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-toolbar :is(select,button,.owner-grid-search,.owner-month-picker,.owner-date-nav,.owner-window-switch){
+  background:#fff;
+  color:var(--fl2p-ink);
+  border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-toolbar input{color:var(--fl2p-ink)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-window-switch button.active{
+  color:#fff;background:#087e8f;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-scroll{
+  color:var(--fl2p-ink);background:#fff;border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack :is(.owner-grid-head,.owner-room-head,.owner-state-head,.owner-day-head){
+  color:var(--fl2p-ink);
+  background:#e6f3f7;
+  border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head strong{color:#12394d}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head.today{
+  color:#fff;background:#0d8792;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head.today strong{color:#fff}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head.weekend:not(.today){background:#f5f3e8}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-group-label{
+  color:#0e4254;background:#dceef3;border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-group-label span{color:#146072;background:#bfe1e9}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-row{background:#fff;border-color:var(--fl2p-line)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-row:nth-child(even){background:#f2f9fb}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack :is(.owner-room-label,.owner-room-state){
+  color:var(--fl2p-ink);background:#f2f9fb;border-color:var(--fl2p-line);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-label strong{color:#113c50}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-label span{color:#526e7e}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell{
+  background:#fff;border-color:#d4e5ea;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.weekend{background:#faf8ee}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.today{
+  box-shadow:inset 2px 0 #18a0ae,inset -1px 0 #18a0ae;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.free:hover{background:#ddf4f4}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.selected{background:#b7ebec!important}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-legend{color:var(--fl2p-muted)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-error{
+  background:#fff1f3;color:#8c3047;border-left-color:#ae3d5c;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-notice{
+  background:#fff4de;color:#795716;border-left-color:#b38430;
+}
+@media(max-width:1024px){
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar{
+    align-items:stretch;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-search{
+    min-width:min(100%,280px);
+    max-width:none;
+  }
+}
+@media(max-width:620px){
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-title{
+    display:grid;grid-template-columns:minmax(0,1fr);gap:10px;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar > .owner-grid-search{
+    grid-column:1/-1;width:100%;min-width:0;max-width:none;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar > select{
+    max-width:100%;min-width:0;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-date-nav,
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-window-switch{
+    justify-content:space-around;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker{
+    grid-column:1/-1;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-scroll{
+    max-height:min(70vh,650px);
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar{
+    transform:none!important;animation:none!important;transition:none!important;
+  }
+}
