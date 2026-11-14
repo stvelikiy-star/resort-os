@@ -1,10 +1,10 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
-import { cappedStagger, motionPresets, useMotionAllowed, useMotionPreference } from '../theme/motion';
+import { cappedStagger, motionPresets, useAnimatedNumber, useMotionAllowed, useRevealProgress } from '../theme/motion';
 import { elevation, font, iconography, motion, radius, space } from '../theme/tokens';
 import { Badge, Card, PressScale, Screen, Title } from './ui';
 import { Logo } from './Brand';
@@ -82,36 +82,22 @@ export function MetricCard({ icon: Icon, label, value, detail, onPress, tone = '
     {detail ? <Text style={[font.small, { color: c.info }]}>{detail}</Text> : null}
   </GlassCard>;
 }
-/** Real, server-sourced numeric KPI. Motion is disabled until OS preference is known. */
+/** Real, server-sourced numeric KPI. Counts up once when verified data first appears and
+ * between later server values; Reduced Motion shows the exact value immediately. */
 export function AnimatedKpi({ value, suffix = '', style, testID }: { value: number; suffix?: string; style?: StyleProp<TextStyle>; testID?: string }) {
-  const allowed = useMotionAllowed();
   const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
-  const [shown, setShown] = useState(safe);
-  const [progress] = useState(() => new Animated.Value(safe));
-  const previous = useRef(safe);
-  useEffect(() => {
-    const from = previous.current;
-    previous.current = safe;
-    if (!allowed || from === safe) {
-      progress.setValue(safe);
-      setShown(safe);
-      return;
-    }
-    progress.setValue(from);
-    const subscription = progress.addListener(({ value: next }) => setShown(Math.round(next)));
-    const anim = Animated.timing(progress, { toValue: safe, duration: motion.chart, easing: Easing.out(Easing.cubic), useNativeDriver: false });
-    anim.start();
-    return () => { anim.stop(); progress.removeListener(subscription); };
-  }, [allowed, safe, progress]);
+  const shown = useAnimatedNumber(safe);
   return <Text testID={testID} accessibilityLabel={String(Math.round(safe)) + suffix} style={style}>{Math.round(shown)}{suffix}</Text>;
 }
 
-/** Chart showing only the confirmed platform occupancy percentage. Static numeric fallback. */
+/** Chart showing only the confirmed platform occupancy percentage. The arc sweeps once when the
+ * verified value first appears; accessibility always reports the exact server value. */
 export function OccupancyRing({ percent, label, size = 112 }: { percent: number; label: string; size?: number }) {
   const { c } = useTheme();
   const safe = Math.max(0, Math.min(100, Number.isFinite(percent) ? percent : 0));
+  const shown = Math.max(0, Math.min(100, useAnimatedNumber(safe)));
   const circumference = 2 * Math.PI * 42;
-  const length = circumference * safe / 100;
+  const length = circumference * shown / 100;
   return <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
     accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
     style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
@@ -121,7 +107,7 @@ export function OccupancyRing({ percent, label, size = 112 }: { percent: number;
         strokeLinecap="round" strokeDasharray={`${length} ${circumference}`} transform="rotate(-90 56 56)"/>
     </Svg>
     <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={[font.h2, { color: c.text, fontSize: 22 }]}>{Math.round(safe)}%</Text>
+      <Text style={[font.h2, { color: c.text, fontSize: 22 }]}>{Math.round(shown)}%</Text>
     </View>
   </View>;
 }
@@ -157,6 +143,8 @@ export function ErrorState({ text, retry, onRetry }: { text: string; retry: stri
     </PressScale>
   </GlassCard>;
 }
+/** Pulses a bounded number of times, then settles static: a request that hangs offline must not
+ * leave an endless decorative animation running. */
 export function LoadingShimmer({ count = 3 }: { count?: number }) {
   const { c } = useTheme();
   const allowed = useMotionAllowed();
@@ -166,9 +154,9 @@ export function LoadingShimmer({ count = 3 }: { count?: number }) {
     const animation = Animated.loop(Animated.sequence([
       Animated.timing(alpha, { toValue: 1, duration: 650, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
       Animated.timing(alpha, { toValue: 0.65, duration: 650, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
-    ]));
-    animation.start();
-    return () => animation.stop();
+    ]), { iterations: motion.maxShimmerPulses });
+    animation.start(({ finished }) => { if (finished) alpha.setValue(0.85); });
+    return () => { animation.stop(); alpha.setValue(0.85); };
   }, [allowed, alpha]);
   return <View accessibilityLabel="Loading" style={{ gap: space.md }}>
     {Array.from({ length: Math.min(count, 6) }, (_, i) => <Animated.View key={i} style={{ opacity: alpha, borderRadius: radius.lg, height: 84, backgroundColor: c.surfaceAlt, borderWidth: 1, borderColor: c.border }} />)}
@@ -182,8 +170,10 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
   const [progress] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!allowed || state !== 'processing') { progress.setValue(0); return; }
-    const loop = Animated.loop(Animated.timing(progress, { toValue: 1, duration: 1700, useNativeDriver: true }));
-    loop.start(); return () => loop.stop();
+    // Real request in flight only, and bounded: a hung request must not spin forever.
+    const loop = Animated.loop(Animated.timing(progress, { toValue: 1, duration: 1700, useNativeDriver: true }), { iterations: motion.maxOrbTurns });
+    loop.start(({ finished }) => { if (finished) progress.setValue(0); });
+    return () => loop.stop();
   }, [allowed, progress, state]);
   const ring = state === 'error' ? c.danger : state === 'offline' ? c.textMuted : c.cyan;
   return <PressScale disabled={!onPress} dimWhenDisabled={false} onPress={onPress} accessibilityLabel={label} style={{ width: size + 16, height: size + 16, justifyContent: 'center', alignItems: 'center' }}>
@@ -205,29 +195,7 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
 export function PremiumEntrance({ index = 0, children, distance = 12, scaleFrom = 1 }: {
   index?: number; children: React.ReactNode; distance?: number; scaleFrom?: number;
 }) {
-  const { allowed, ready } = useMotionPreference();
-  // Fail visible while the OS preference resolves and whenever the app is backgrounded.
-  const [progress] = useState(() => new Animated.Value(1));
-  const appeared = useRef(false);
-  useLayoutEffect(() => {
-    if (!ready || appeared.current || !allowed) {
-      if (ready) appeared.current = true;
-      progress.stopAnimation();
-      progress.setValue(1);
-      return;
-    }
-    appeared.current = true;
-    progress.setValue(0);
-    const animation = Animated.timing(progress, {
-      toValue: 1,
-      duration: motionPresets.entrance.duration,
-      easing: motionPresets.entrance.easing,
-      delay: cappedStagger(index),
-      useNativeDriver: true,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [allowed, ready, progress, index]);
+  const progress = useRevealProgress(cappedStagger(index), motionPresets.entrance.duration);
   return <Animated.View style={{
     opacity: progress,
     transform: [

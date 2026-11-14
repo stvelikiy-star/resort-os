@@ -1,5 +1,5 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
-import { Animated, Text, View, useWindowDimensions } from 'react-native';
+import React from 'react';
+import { Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ArrowUpRight, BedDouble, CalendarCheck2, CalendarClock, ClipboardCheck, DoorOpen, MessageSquareText, ShieldAlert, UsersRound, Wallet, Wrench, ChefHat } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
@@ -8,11 +8,10 @@ import { canReadFinance } from '../api/financeAccess';
 import type { AuthUser } from '../api/types';
 import { useMobileCopy } from '../i18n/mobileCopy';
 import { useTheme } from '../theme/ThemeProvider';
-import { font, radius, space } from '../theme/tokens';
-import { motionPresets, useMotionPreference } from '../theme/motion';
-import { Empty, SectionLabel } from './ui';
+import { font, space } from '../theme/tokens';
+import { AnimatedProgressBar, Empty, SectionLabel } from './ui';
 import { InventorySpectrum } from './InventorySpectrum';
-import { GlassCard, StaggerItem } from './Future';
+import { AnimatedKpi, GlassCard, StaggerItem } from './Future';
 
 type Copy = ReturnType<typeof useMobileCopy>;
 type OwnerTab = 'overview' | 'pms' | 'tasks' | 'inbox' | 'admin' | 'kitchen';
@@ -29,37 +28,11 @@ export function occupancyProgress(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
 }
 
+/** Verified occupancy only: the shared bar fills once on first appearance and between later server values. */
 function OccupancyProgress({ value, label, color, trackColor }: {
   value: number; label: string; color: string; trackColor: string;
 }) {
-  const safe = occupancyProgress(value);
-  const { allowed, ready } = useMotionPreference();
-  const [progress] = useState(() => new Animated.Value(1));
-  const appeared = useRef(false);
-  useLayoutEffect(() => {
-    progress.stopAnimation();
-    if (!ready || appeared.current || !allowed) {
-      if (ready) appeared.current = true;
-      progress.setValue(1);
-      return;
-    }
-    appeared.current = true;
-    progress.setValue(0);
-    const animation = Animated.timing(progress, {
-      toValue: 1,
-      duration: motionPresets.chart.duration,
-      easing: motionPresets.chart.easing,
-      useNativeDriver: false,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [allowed, ready, progress, safe]);
-  const width = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', `${safe}%`] });
-  return <View accessible accessibilityRole="progressbar" accessibilityLabel={label}
-    accessibilityValue={{ min: 0, max: 100, now: Math.round(safe) }}
-    style={{ height: 9, backgroundColor: trackColor, borderRadius: radius.pill, overflow: 'hidden' }}>
-    <Animated.View style={{ height: 9, width, backgroundColor: color, borderRadius: radius.pill }}/>
-  </View>;
+  return <AnimatedProgressBar percent={occupancyProgress(value)} label={label} color={color} trackColor={trackColor} height={9}/>;
 }
 
 /** Stable two-column executive grid. Only verified dashboard fields are displayed;
@@ -107,7 +80,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
     Number.isFinite(data.stays.occupancy_percent) && data.stays.occupancy_percent >= 0 && data.stays.occupancy_percent <= 100;
   const occupancy = occupancyKnown ? data.stays.occupancy_percent : 0;
   return <View testID="owner-control-dashboard" style={{ gap: space.lg }}>
-    <GlassCard style={{ padding: compact ? 17 : 20, backgroundColor: c.surface, gap: space.md }}>
+    <StaggerItem index={0}><GlassCard style={{ padding: compact ? 17 : 20, backgroundColor: c.surface, gap: space.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text numberOfLines={1} style={[font.label, { color: c.cyan }]}>{data.property.name.toUpperCase()}</Text>
@@ -116,46 +89,48 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
         <Text style={[font.label, { color: name === 'light' ? c.warning : c.gold }]}>{showroom ? copy.demoLabel : copy.livePmsLabel}</Text>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <Text style={[font.display, { color: c.text, fontSize: compact ? 38 : 44 }]}>{occupancyKnown ? count(occupancy) + "%" : "—"}</Text>
+        {occupancyKnown
+          ? <AnimatedKpi testID="owner-occupancy-value" value={occupancy} suffix="%" style={[font.display, { color: c.text, fontSize: compact ? 38 : 44 }]}/>
+          : <Text style={[font.display, { color: c.text, fontSize: compact ? 38 : 44 }]}>—</Text>}
         <Text style={[font.small, { color: c.textMuted, flexShrink: 1, textAlign: 'right' }]}>
           {copy.occupancy} · {count(data.stays.occupied_rooms)}/{count(data.rooms.total)}
         </Text>
       </View>
       {occupancyKnown ? <OccupancyProgress value={occupancy} label={copy.occupancy}
         color={c.cyan} trackColor={c.surfaceAlt}/> : null}
-    </GlassCard>
+    </GlassCard></StaggerItem>
 
-    <GlassCard style={{ padding: 15, gap: 12, borderLeftWidth: 3, borderLeftColor: c.cyan }}>
+    <StaggerItem index={1}><GlassCard style={{ padding: 15, gap: 12, borderLeftWidth: 3, borderLeftColor: c.cyan }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <Text style={[font.h2, { color: c.text, flex: 1 }]}>{copy.roomCondition}</Text>
         <Text style={[font.small, { color: c.textMuted }]}>{count(data.rooms.total)}</Text>
       </View>
       <InventorySpectrum totals={data.rooms} total={data.rooms.total}
         labels={{ clean: copy.clean, dirty: copy.dirty, inspection: copy.checking, blocked: copy.tech }}/>
-    </GlassCard>
+    </GlassCard></StaggerItem>
 
     <View style={{ gap: space.sm }}>
       <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
-      {row(0,
+      {row(2,
         metric(DoorOpen, copy.arrivals, count(data.stays.arrivals_today), c.cyan, canOpen('pms') ? open('/pms') : undefined),
         metric(CalendarClock, copy.departures, count(data.stays.departures_today), c.gold, canOpen('pms') ? open('/pms') : undefined),
       )}
-      {row(1,
+      {row(3,
         metric(MessageSquareText, copy.needsReply, count(data.communications.needs_reply), c.cyan, canOpenInbox ? open('/inbox') : undefined),
         metric(BedDouble, copy.dirty, count(data.rooms.dirty), c.warning, canOpen('pms') ? open('/pms') : undefined),
       )}
-      {row(2,
+      {row(4,
         metric(ClipboardCheck, copy.housekeepingOverview, count(data.tasks.housekeeping_active), c.success, canOpen('tasks') ? open('/tasks') : undefined),
         metric(Wrench, copy.maintenanceOverview, count(data.tasks.maintenance_active), c.warning, canOpen('tasks') ? open('/tasks') : undefined),
       )}
-      {canFinance ? row(3,
+      {canFinance ? row(5,
         metric(Wallet, copy.revenue, currency(data.finance.confirmed_payments_today_kgs), c.gold, open('/finance')),
         metric(ShieldAlert, copy.debt, currency(data.finance.active_reservations_remaining_kgs), c.warning, open('/finance')),
       ) : null}
       {canFinance ? <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text> : null}
     </View>
 
-    <View style={{ gap: space.sm }}>
+    <StaggerItem index={6}><View style={{ gap: space.sm }}>
       <SectionLabel>{copy.available}</SectionLabel>
       {nav.length ? <View style={{ gap: space.sm }}>{Array.from({length: Math.ceil(nav.length/2)},(_,i) =>
         <View key={i} style={{ flexDirection: 'row', gap: space.sm }}>
@@ -167,15 +142,15 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
           </GlassCard>)}
           {nav.length % 2 === 1 && i === Math.floor(nav.length/2) ? <View style={{ flex: 1 }}/> : null}
         </View>)}</View> : <Empty text={copy.empty}/>}
-    </View>
+    </View></StaggerItem>
     <View style={{ gap: space.sm }}>
       <SectionLabel>{copy.roomCondition}</SectionLabel>
-      {row(4,
+      {row(6,
         metric(BedDouble, copy.clean, count(data.rooms.clean), c.success),
         metric(ShieldAlert, copy.tech, count(data.rooms.tech_block), c.danger),
       )}
     </View>
-    {data.attention_tasks.length > 0 ? <View style={{ gap: space.sm }}>
+    {data.attention_tasks.length > 0 ? <StaggerItem index={6}><View style={{ gap: space.sm }}>
       <SectionLabel>{copy.urgent} · {count(data.tasks.urgent_active)}</SectionLabel>
       {data.attention_tasks.slice(0,3).map(task =>
         <GlassCard key={task.id} onPress={user.module_permissions?.includes('OPS')
@@ -188,6 +163,6 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
           </View>
           <ArrowUpRight color={c.primary} size={18}/>
         </GlassCard>)}
-    </View> : null}
+    </View></StaggerItem> : null}
   </View>;
 }
