@@ -1,0 +1,82 @@
+/* MARINA SMART Future Luxury 2.0 — shared live UI states.
+ * Presentation only. No UI state/role/data manipulation and no fake progress.
+ * All rules opt in through the authenticated Future Luxury preference.
+ */
+html[data-marina-ui="future-luxury"]{
+  --fl2-feedback-surface:#113347;
+  --fl2-feedback-edge:rgba(78,196,212,.29);
+  --fl2-feedback-text:#eaf9ff;
+  --fl2-feedback-muted:#bcd4e1;
+  --fl2-feedback-ring:#e4c385;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"]{
+  --fl2-feedback-surface:#f8fcfd;
+  --fl2-feedback-edge:#c9dfe8;
+  --fl2-feedback-text:#123b50;
+  --fl2-feedback-muted:#526d7f;
+  --fl2-feedback-ring:#986421;
+}
+html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) :is(.loading,.empty){
+  box-sizing:border-box;
+  color:var(--fl2-feedback-muted);
+  background:var(--fl2-feedback-surface);
+  border:1px dashed var(--fl2-feedback-edge);
+  border-radius:15px;
+  padding:clamp(18px,2vw,28px);
+  font-size:13px;
+  line-height:1.6;
+}
+html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) .error-box{
+  box-sizing:border-box;
+  border:1px solid #d38b9d;
+  border-left:4px solid #f099a5;
+  background:#4b273a;
+  color:#ffe2e7;
+  padding:15px 17px;
+  line-height:1.5;
+  border-radius:12px;
+  overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) .error-box{
+  background:#fff1f3;
+  border-color:#d994a1;
+  border-left-color:#b63f60;
+  color:#853047;
+}
+/* Disabled buttons remain visibly disabled. The state is still controlled
+ * solely by the pre-existing React/HTML disabled attribute. */
+html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) :is(button,.btn):disabled{
+  opacity:.52;
+  cursor:not-allowed;
+  filter:saturate(.64);
+  transform:none;
+  box-shadow:none;
+}
+html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) :is(button,input,textarea,select,a):focus-visible{
+  outline:3px solid var(--fl2-feedback-ring);
+  outline-offset:3px;
+}
+/* Long reservation IDs, names and prices can vary by hotel. */
+html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) :is(.summary-card,.task-card,.growth-card,.report-card,.guest-offer-editor){
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents,.owner-pms-stack) :is(.summary-card,.task-card,.growth-card,.report-card,.guest-offer-editor) strong{
+  overflow-wrap:anywhere;
+}
+/* Restrained tactile feedback only for available actions; visual feedback
+ * never implies a confirmed API success or changes a payment/booking state. */
+@media(hover:hover) and (prefers-reduced-motion:no-preference){
+  html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents) .btn:not(:disabled){
+    transition:background-color 160ms ease,border-color 160ms ease,box-shadow 160ms ease,filter 160ms ease;
+  }
+  html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents) .btn.primary:not(:disabled):hover{
+    filter:brightness(1.06);
+    box-shadow:0 8px 19px rgba(0,133,150,.17);
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents) .btn{
+    transition:none!important;
+    animation:none!important;
+  }
+}
