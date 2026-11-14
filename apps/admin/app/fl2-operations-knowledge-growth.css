@@ -505,3 +505,167 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .growth-shell .grow
     flex:1 1 140px;
   }
 }
+
+/* Agency CRM — real money/booking table and OWNER-only agent access kept intact. */
+html[data-marina-ui="future-luxury"] .fl2-agents{
+  --fl2-agent-text:#f2fbff;
+  --fl2-agent-muted:#b8d3de;
+  --fl2-agent-panel:#133548;
+  --fl2-agent-edge:rgba(82,203,215,.29);
+  color:var(--fl2-agent-text);
+  max-width:none;
+  padding:clamp(14px,2vw,28px);
+}
+html[data-marina-ui="future-luxury"] .fl2-agents>.topbar{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;
+  gap:16px;
+  padding:clamp(17px,2vw,27px);
+  background:linear-gradient(118deg,#0c2c40,#105461);
+  border:1px solid var(--fl2-agent-edge);
+  border-radius:21px;
+  box-shadow:0 17px 38px rgba(0,12,25,.13);
+}
+html[data-marina-ui="future-luxury"] .fl2-agents>.topbar h1{
+  font-size:clamp(26px,2.7vw,38px);
+  color:#f7fcff;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents>.topbar .subtitle{
+  color:#c4dce6;
+  line-height:1.5;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .summary{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,165px),1fr));
+  gap:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .summary-card,
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card,
+html[data-marina-ui="future-luxury"] .fl2-agents .controls{
+  color:var(--fl2-agent-text);
+  background:var(--fl2-agent-panel);
+  border:1px solid var(--fl2-agent-edge);
+  border-radius:17px;
+  box-shadow:0 12px 26px rgba(0,10,22,.08);
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .summary-card{
+  border-top:3px solid #2bd2d4;
+  padding:14px;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .summary-card strong{
+  color:var(--fl2-agent-text);
+  font-size:clamp(20px,2vw,28px);
+  overflow-wrap:anywhere;
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .summary-card span,
+html[data-marina-ui="future-luxury"] .fl2-agents .control label,
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card table small,
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card .subtitle{
+  color:var(--fl2-agent-muted);
+  font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .controls{
+  gap:10px;
+  padding:14px;
+  flex-wrap:wrap;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .control{
+  min-width:min(100%,150px);
+  flex:1 1 150px;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .control input,
+html[data-marina-ui="future-luxury"] .fl2-agents .control select{
+  min-height:44px;
+  border:1px solid var(--fl2-agent-edge);
+  border-radius:10px;
+  background:#194356;
+  color:var(--fl2-agent-text);
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card{
+  overflow:hidden;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card table{
+  width:100%;
+  min-width:760px;
+  font-variant-numeric:tabular-nums;
+  border-collapse:collapse;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card table th,
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card table td{
+  color:var(--fl2-agent-text);
+  border-bottom:1px solid var(--fl2-agent-edge);
+  padding:12px;
+  font-size:12px;
+  text-align:left;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card table th{
+  color:#cae6e9;
+  background:#1c4c5c;
+  white-space:nowrap;
+  font-size:10px;
+  font-weight:800;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .pms-v2-card table tr:hover td{
+  background:#1b4555;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .btn.primary{
+  min-height:44px;
+  background:linear-gradient(105deg,#15bdc6,#4edcd8);
+  color:#072e3c;
+  border-color:#38cdd1;
+  border-radius:11px;
+  font-weight:800;
+}
+html[data-marina-ui="future-luxury"] .fl2-agents .btn:focus-visible,
+html[data-marina-ui="future-luxury"] .fl2-agents input:focus-visible{
+  outline:3px solid #ecc887;
+  outline-offset:2px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents{
+  --fl2-agent-text:#11384b;
+  --fl2-agent-muted:#526e7f;
+  --fl2-agent-panel:#fff;
+  --fl2-agent-edge:#c9e0e8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents>.topbar{
+  background:linear-gradient(116deg,#fff,#e6f4f8);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents>.topbar h1{
+  color:#10394b;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents>.topbar .subtitle{
+  color:#537182;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents .control input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents .control select{
+  color:#13394b;
+  background:#f0f8fb;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents .pms-v2-card table th{
+  color:#28596a;
+  background:#e3f2f5;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-agents .pms-v2-card table tr:hover td{
+  background:#eef8fa;
+}
+@media(max-width:900px){
+  html[data-marina-ui="future-luxury"] .fl2-agents>.topbar{
+    grid-template-columns:1fr;
+  }
+}
+@media(max-width:550px){
+  html[data-marina-ui="future-luxury"] .fl2-agents .controls{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-agents .control{
+    min-width:0;
+    width:100%;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-agents .date-actions .btn{
+    min-height:44px;
+    width:100%;
+  }
+}

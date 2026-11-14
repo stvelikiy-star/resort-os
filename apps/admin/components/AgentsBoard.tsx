@@ -232,7 +232,7 @@ export default function AgentsBoard({ userRole }: { userRole: string }) {
     }
   }
 
-  return <main className="shell">
+  return <main className="shell fl2-agents">
     <div className="topbar">
       <div>
         <p className="eyebrow">CRM · B2B продажи</p>
