@@ -706,3 +706,13 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .nfc-finance-shell 
     transition:none!important;
   }
 }
+
+/* Keep QR registry horizontally scrollable, but allow its summary to shrink. */
+@media screen and (max-width:600px){
+ html[data-marina-ui="future-luxury"] .room-qr-stats{grid-template-columns:repeat(3,minmax(0,1fr));min-width:0}
+ html[data-marina-ui="future-luxury"] .room-qr-stats>div{min-width:0;padding:12px 8px}
+ html[data-marina-ui="future-luxury"] .room-qr-stats span{overflow-wrap:anywhere;font-size:11px;letter-spacing:.02em}
+ html[data-marina-ui="future-luxury"] .room-qr-security{grid-template-columns:minmax(0,1fr);gap:10px}
+ html[data-marina-ui="future-luxury"] .room-qr-actions input{min-width:0;flex-basis:100%;max-width:100%}
+ html[data-marina-ui="future-luxury"] .room-qr-actions .btn{min-height:44px;white-space:normal;max-width:100%}
+}
