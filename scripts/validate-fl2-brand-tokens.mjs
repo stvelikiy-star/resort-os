@@ -39,6 +39,6 @@ for(const theme of ['light','dark']){
 const light=bridge.theme.light;
 const navContrast=contrast(light.navInactive,light.background);
 const goldContrast=contrast(light.accent,light.surface);
-if(navContrast<4.5)console.warn(`PRE-ROLL-OUT WCAG BLOCKER: light inactive nav text/background ${navContrast.toFixed(2)}:1 <4.5:1`);
+if(navContrast<4.5) fail(`WCAG AA nav text/background ${navContrast.toFixed(2)}:1 <4.5:1`);
 if(goldContrast<4.5)console.warn(`USAGE RESTRICTION: light champagne on white ${goldContrast.toFixed(2)}:1; decoration only, never standard text`);
 console.log('FL2 brand tokens PASS: 29 colors x 2 themes; original SHA-256 master; 12 roles; Kyrgyz glyph checklist; no runtime deployment claim.');
