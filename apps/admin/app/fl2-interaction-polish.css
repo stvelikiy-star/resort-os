@@ -108,3 +108,19 @@ html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav {
   box-sizing: border-box;
   max-width: 100%;
 }
+
+/* Narrow authenticated shell: a min-content grid track must not widen the page.
+ * Controls wrap when needed; module navigation keeps its own horizontal scroll. */
+@media(max-width:600px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav > :is(.admin-identity, .admin-tabs, .admin-shell-actions) {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+  html[data-marina-ui="future-luxury"] .admin-shell-actions {
+    flex-wrap: wrap;
+  }
+}
