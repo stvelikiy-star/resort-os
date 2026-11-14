@@ -76,3 +76,13 @@ export function isTrustedHotelOrigin(
   if (!parsed.ok) return false;
   return approvedHotelOrigins(configured).includes(parsed.baseUrl);
 }
+
+/** A customer build with exactly one pinned trusted host belongs to that one hotel.
+ * Keep legacy demo/QR flow when none or multiple hosts are configured. */
+export function provisionedHotelConnection(configured?: string): HotelConnection | null {
+  const origins = approvedHotelOrigins(configured);
+  if (origins.length !== 1) return null;
+  const baseUrl = origins[0];
+  const name = new URL(baseUrl).hostname;
+  return { id: hotelConnectionId(baseUrl), name, city: '', baseUrl, demo: false, accent: '#245E9A' };
+}
