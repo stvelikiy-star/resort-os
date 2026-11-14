@@ -200,7 +200,14 @@ jobs:
           layout = Path("apps/admin/app/layout.tsx").read_text()
           setup = Path("apps/admin/components/HotelSetupBoard.tsx").read_text()
           assert "MARINA SMART · Hotel OS" in shell
-          assert "marina-smart-logo.webp" in shell
+          # Match the user-approved, byte-for-byte verified circular PNG brand.
+          # The previous webp assertion was superseded by PR #448 and was a false
+          # negative in every subsequent Future Luxury UI-only PR.
+          assert "marina-smart-approved.png" in shell
+          assert "marina-smart-logo.webp" not in shell
+          assert Path("apps/admin/public/marina-smart-approved.png").is_file()
+          assert Path("apps/staff/public/marina-smart-approved.png").is_file()
+          assert Path("apps/mobile/assets/marina-smart-approved.png").is_file()
           assert "Три Короны" not in shell
           assert "Three Crowns" not in shell
           for label in (
