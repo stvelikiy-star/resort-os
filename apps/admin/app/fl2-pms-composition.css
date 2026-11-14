@@ -366,3 +366,33 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .o
     transform:none!important;animation:none!important;transition:none!important;
   }
 }
+
+/* Authenticated 320px QA: month/year and filter labels must remain readable. */
+@media(max-width:380px) {
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar > select {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: 4px;
+    padding: 4px;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > select {
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > select:first-of-type { grid-row: 1; }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > select:last-of-type { grid-row: 2; }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > button {
+    grid-row: 1 / 3;
+    align-self: stretch;
+    min-width: 0;
+    padding-inline: 0;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > button:first-child { grid-column: 1; }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > button:last-child { grid-column: 3; }
+}

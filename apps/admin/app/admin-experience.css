@@ -13,7 +13,7 @@
 .dashboard-shell>.command-panel .attention-row,
 .dashboard-shell>.command-grid .command-money div,
 .dashboard-shell>.command-grid.two .stay-row,
-.dashboard-shell>.command-grid .room-state-grid>div:not(.state-clean):not(.state-dirty):not(.state-inspection):not(.state-tech){background:var(--tc-admin-blue)!important;border-color:rgba(255,255,255,.18)!important;color:var(--tc-admin-white)!important}
+html:not([data-marina-ui="future-luxury"]) .dashboard-shell>.command-grid .room-state-grid>div:not(.state-clean):not(.state-dirty):not(.state-inspection):not(.state-tech){background:var(--tc-admin-blue)!important;border-color:rgba(255,255,255,.18)!important;color:var(--tc-admin-white)!important}
 .dashboard-shell>.command-kpis article:nth-child(even),
 .dashboard-shell>.command-grid>.command-panel:nth-child(even),
 .dashboard-shell>.command-grid.two>.command-panel:nth-child(even){background:var(--tc-admin-blue-2)!important}

@@ -80,3 +80,31 @@ html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.receptio
     animation:none!important;
   }
 }
+
+/* Authenticated Web QA: summary/logout must not inherit the legacy white
+ * background under light text. Theme-aware pairs keep both actions readable. */
+html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav :is(.admin-more-menu > summary, .logout-button) {
+  box-sizing: border-box;
+  min-height: 44px;
+  background: var(--fl2-feedback-surface);
+  color: var(--fl2-feedback-text);
+  border: 1px solid var(--fl2-feedback-edge);
+}
+html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav .admin-more-menu > summary {
+  display: flex;
+  align-items: center;
+}
+html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav :is(.admin-more-menu > summary, .logout-button):focus-visible {
+  outline: 3px solid var(--fl2-feedback-ring);
+  outline-offset: 3px;
+}
+html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav :is(.admin-more-menu[open] > summary, .admin-more-menu > summary:hover, .logout-button:hover) {
+  background: var(--fl2-feedback-surface);
+  color: var(--fl2-feedback-text);
+  border-color: var(--fl2-feedback-ring);
+}
+
+html[data-marina-ui="future-luxury"] .auth-toolbar.admin-nav {
+  box-sizing: border-box;
+  max-width: 100%;
+}
