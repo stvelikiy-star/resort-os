@@ -68,11 +68,17 @@ html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .ro
   min-width: 0;
   padding: 12px 10px;
 }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid > div {
+  background: #163d50;
+  border-color: rgba(93, 211, 222, .28);
+}
 html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid strong {
+  color: #f2fbff;
   font-variant-numeric: tabular-nums;
 }
 html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid span {
-  color: #183b4b;
+  /* The previous dark-navy text on navy cards was unreadable in Dark mode. */
+  color: #c8e2ec;
 }
 /* Real PMS reservation bars: preserve existing status/payment classes and native tooltip. */
 html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar {
@@ -342,6 +348,13 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[da
 }
 html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring span{
   color:#527083;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid > div{
+  background:#eff8fa;
+  border-color:#c6e2eb;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid strong{
+  color:#113e52;
 }
 html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid span{
   color:#244c60;
