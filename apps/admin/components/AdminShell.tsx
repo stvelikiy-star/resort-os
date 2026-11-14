@@ -1,4 +1,5 @@
 "use client";
+import FutureLuxuryAppearance from "./FutureLuxuryAppearance";
 
 import { FormEvent, useEffect, useState } from "react";
 import AgentsBoard from "./AgentsBoard";
@@ -336,6 +337,7 @@ export default function AdminShell() {
             </div>
           </details>}
         </nav>
+        <FutureLuxuryAppearance />
         <button className="logout-button" onClick={logout}>Выйти</button>
       </div>
       {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}

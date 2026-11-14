@@ -1,0 +1,324 @@
+/* MARINA SMART Future Luxury 2.0 — guest CRM and finance visual layer.
+   Explicit opt-in; all Core-driven content and click handlers remain unchanged. */
+html[data-marina-ui="future-luxury"] .guest-history-shell{
+  --fl2-guest-ink:#effaff;--fl2-guest-muted:#b5d0dc;
+  min-height:100dvh;
+  padding:clamp(14px,2vw,28px);
+  background:transparent;
+  color:var(--fl2-guest-ink);
+}
+html[data-marina-ui="future-luxury"] .guest-history-head{
+  background:linear-gradient(115deg,#082638 4%,#0e5560 100%);
+  border:1px solid rgba(54,201,212,.31);
+  padding:clamp(19px,2vw,30px);
+  box-shadow:0 20px 48px rgba(0,9,24,.15);
+}
+html[data-marina-ui="future-luxury"] .guest-history-head h1{
+  font-size:clamp(26px,3vw,36px);
+  letter-spacing:-.034em;
+}
+html[data-marina-ui="future-luxury"] .guest-history-head p:last-child{
+  color:#c1dce6;
+  font-size:12px;
+}
+html[data-marina-ui="future-luxury"] .guest-history-kpis{
+  gap:11px;
+}
+html[data-marina-ui="future-luxury"] .guest-history-kpis article{
+  min-height:130px;
+  border:1px solid rgba(73,198,214,.27);
+  border-top:3px solid #1dd0d2;
+  background:linear-gradient(145deg,#14364b,#0c2839);
+  border-radius:16px;
+  box-shadow:0 10px 28px rgba(0,8,20,.13);
+}
+html[data-marina-ui="future-luxury"] .guest-history-kpis span,
+html[data-marina-ui="future-luxury"] .guest-history-kpis small{
+  font-size:11px;
+  line-height:1.45;
+  color:#b8d0df;
+}
+html[data-marina-ui="future-luxury"] .guest-history-kpis strong{
+  color:#f3fbff;
+  font-size:clamp(20px,2vw,28px);
+  font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .guest-history-kpis article.guest-warning-kpi{
+  background:linear-gradient(145deg,#44373c,#2b2d3b);
+  border-top-color:#e7bd72;
+}
+html[data-marina-ui="future-luxury"] .guest-history-layout{
+  grid-template-columns:minmax(290px,360px) minmax(0,1fr);
+  gap:15px;
+}
+html[data-marina-ui="future-luxury"] .guest-directory,
+html[data-marina-ui="future-luxury"] .guest-profile,
+html[data-marina-ui="future-luxury"] .guest-duplicate-panel{
+  background:linear-gradient(160deg,#113247,#092738);
+  color:#effaff;
+  border:1px solid rgba(70,206,220,.28);
+  border-radius:18px;
+  box-shadow:0 12px 32px rgba(0,7,20,.1);
+}
+html[data-marina-ui="future-luxury"] .guest-directory-title{
+  border-color:rgba(75,197,213,.26);
+}
+html[data-marina-ui="future-luxury"] .guest-directory-title strong,
+html[data-marina-ui="future-luxury"] .guest-profile-head h2{
+  color:#f4fbff;
+}
+html[data-marina-ui="future-luxury"] .guest-directory-title strong{font-size:14px}
+html[data-marina-ui="future-luxury"] .guest-directory-title span,
+html[data-marina-ui="future-luxury"] .guest-directory-list span,
+html[data-marina-ui="future-luxury"] .guest-profile-head p,
+html[data-marina-ui="future-luxury"] .guest-profile-head span,
+html[data-marina-ui="future-luxury"] .guest-section-title span{
+  color:#b5cedb;font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .guest-directory-list>button{
+  background:#173a4d;
+  color:#f0fbff;
+  border:1px solid rgba(69,182,201,.11);
+  min-height:66px;
+}
+html[data-marina-ui="future-luxury"] .guest-directory-list>button:hover{
+  background:#1c5160;
+  border-color:rgba(53,222,225,.47);
+}
+html[data-marina-ui="future-luxury"] .guest-directory-list>button.active{
+  background:#185c65;
+  border-color:#2fdae0;
+  box-shadow:inset 3px 0 #24cbd2;
+}
+html[data-marina-ui="future-luxury"] .guest-directory-list strong,
+html[data-marina-ui="future-luxury"] .guest-reservation-history article>header strong{
+  font-size:12px;
+}
+html[data-marina-ui="future-luxury"] .guest-directory-meta b,
+html[data-marina-ui="future-luxury"] .guest-directory-meta em{
+  font-size:10px;
+  color:#9cecf1;
+}
+html[data-marina-ui="future-luxury"] .guest-lifetime-grid article,
+html[data-marina-ui="future-luxury"] .guest-reservation-history>article,
+html[data-marina-ui="future-luxury"] .guest-conversation-list>div,
+html[data-marina-ui="future-luxury"] .guest-room-timeline>div,
+html[data-marina-ui="future-luxury"] .guest-payment-details>div{
+  background:#173a4c;
+  border:1px solid rgba(82,191,208,.2);
+  color:#eafaff;
+  border-radius:12px;
+}
+html[data-marina-ui="future-luxury"] .guest-lifetime-grid span,
+html[data-marina-ui="future-luxury"] .guest-reservation-facts span,
+html[data-marina-ui="future-luxury"] .guest-room-timeline span,
+html[data-marina-ui="future-luxury"] .guest-conversation-list span,
+html[data-marina-ui="future-luxury"] .guest-payment-details span,
+html[data-marina-ui="future-luxury"] .guest-conversation-list em,
+html[data-marina-ui="future-luxury"] .guest-muted{
+  color:#bad3df;font-size:11px;line-height:1.4;
+}
+html[data-marina-ui="future-luxury"] .guest-lifetime-grid strong{
+  color:#f5fcff;font-size:19px;font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .guest-reservation-facts span,
+html[data-marina-ui="future-luxury"] .guest-service-row span,
+html[data-marina-ui="future-luxury"] .guest-notes{
+  background:rgba(45,96,115,.42);color:#dceef7;
+  border:1px solid rgba(83,196,211,.18);
+}
+html[data-marina-ui="future-luxury"] .guest-section-title h3{
+  color:#f5fcff;font-size:18px;
+}
+html[data-marina-ui="future-luxury"] .guest-section-title>b{
+  background:#18606c;color:#e3fdff;
+}
+html[data-marina-ui="future-luxury"] .guest-truth-note{
+  background:#12394c;border-color:#2a8292;color:#c3e0eb;
+  font-size:11px;
+}
+html[data-marina-ui="future-luxury"] .guest-search input{
+  background:#17465a;border-color:rgba(78,212,223,.36);
+}
+html[data-marina-ui="future-luxury"] .guest-search input::placeholder{color:#bdd5e0}
+html[data-marina-ui="future-luxury"] .guest-search input:focus-visible,
+html[data-marina-ui="future-luxury"] .guest-directory-list>button:focus-visible{
+  outline:3px solid #e7bd72;outline-offset:2px;
+}
+/* OWNER hotel finance: all monetary figures remain the existing server values. */
+html[data-marina-ui="future-luxury"] .hotel-finance-shell{
+  color:#effaff;max-width:none;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head{
+  background:linear-gradient(120deg,#0d3244,#0f5060);
+  border:1px solid rgba(54,201,212,.26);
+  border-radius:21px;padding:clamp(16px,2vw,28px);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head h1{
+  color:#fff;font-size:clamp(26px,2.7vw,36px);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head .subtitle{
+  color:#c0dce5;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-notice,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-section,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis>article{
+  color:#edf9ff;
+  background:linear-gradient(155deg,#143347,#0c293b);
+  border:1px solid rgba(66,198,215,.25);
+  border-radius:17px;
+  box-shadow:0 10px 26px rgba(0,8,22,.08);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-notice span,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-footnote,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-filters>small,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid span,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-method-list span{
+  color:#b4cedc;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid>div,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-day-list>div{
+  color:#f5fcff;background:#194054;
+  border:1px solid rgba(67,200,214,.24);
+  border-radius:12px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid strong,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-day-list b,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-method-list b{
+  color:#f3fcff;font-variant-numeric:tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table-wrap{
+  border:1px solid rgba(78,198,214,.3);
+  border-radius:14px;overflow:auto;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table{
+  color:#eafaff;background:#102b3e;
+  border-collapse:collapse;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table th{
+  color:#dbfaff;background:#1c5060;
+  border-bottom:1px solid rgba(76,207,216,.32);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table td{
+  border-bottom:1px solid rgba(75,178,198,.17);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table tbody tr:hover{
+  background:#1a4757;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell input,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell select{
+  min-height:40px;background:#173c50;color:#f3fcff;
+  border:1px solid rgba(81,193,212,.38);border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell input:focus-visible,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell select:focus-visible{
+  outline:3px solid #e7bd72;outline-offset:2px;
+}
+@media(max-width:1120px){
+  html[data-marina-ui="future-luxury"] .guest-history-layout{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .guest-directory{position:static;max-height:400px}
+}
+@media(max-width:680px){
+  html[data-marina-ui="future-luxury"] .guest-history-kpis{grid-template-columns:1fr 1fr}
+  html[data-marina-ui="future-luxury"] .guest-history-layout{grid-template-columns:1fr}
+}
+/* Ice-white visual parity, still the very same real CRM/finance records. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-shell{
+  background:transparent;color:#123b51;
+  --fl2-guest-ink:#123b51;--fl2-guest-muted:#4d687b;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-head{
+  color:#0c3144;background:linear-gradient(115deg,#fff,#e6f5f9);
+  border-color:#bddce5;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-head h1{
+  color:#11384b;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-head p:last-child{color:#4c687b}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-kpis article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-directory,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-profile,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-duplicate-panel{
+  color:#0b3347;background:#fff;border-color:#c9e2ea;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-kpis span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-kpis small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-directory-list span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-profile-head p,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-profile-head span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-section-title span{
+  color:#536f80;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-kpis strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-directory-title strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-profile-head h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-section-title h3{
+  color:#0d3448;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-history-kpis article.guest-warning-kpi{
+  background:#fff9ed;border-top-color:#a57827;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-directory-list>button,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-lifetime-grid article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-reservation-history>article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-conversation-list>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-payment-details>div{
+  color:#10394d;background:#f0f8fb;border-color:#d6e6ed;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-directory-list>button.active{
+  background:#dff4f8;border-color:#54bbcb;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-lifetime-grid strong{color:#0c394f}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-lifetime-grid span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-conversation-list span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-room-timeline span{
+  color:#547083;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-truth-note{
+  color:#486979;background:#e7f3f8;border-color:#bddce8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-search input{
+  color:#0c354a;background:#fff;border-color:#c7dfe8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .guest-search input::placeholder{color:#6a8797}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell{
+  color:#0a3146;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-notice,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-section,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-kpis>article{
+  color:#0a3146;background:linear-gradient(155deg,#fff,#f2fafc);border-color:#c8e1e9;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head h1{color:#0b354b}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head .subtitle,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-notice span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-footnote,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-state-grid span{
+  color:#536e7f;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-state-grid>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-day-list>div{
+  color:#12374a;background:#eff8fa;border-color:#d0e5ed;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-state-grid strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-day-list b,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-method-list b{
+  color:#0f364a;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .transaction-table{
+  color:#11394e;background:#fff;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .transaction-table th{
+  color:#104054;background:#e1f1f5;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .transaction-table td{
+  border-bottom-color:#d5e6ed;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .transaction-table tbody tr:hover{
+  background:#ecf7f9;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell select{
+  color:#12394d;background:#fff;border-color:#c4dfe9;
+}
