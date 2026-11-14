@@ -12,6 +12,10 @@ const qr = read('apps/admin/components/RoomQrBoard.tsx');
 const offers = read('apps/admin/components/GuestOffersBoard.tsx');
 const serviceSettings = read('apps/admin/components/GuestServiceSettingsBoard.tsx');
 const siteContent = read('apps/admin/components/SiteContentBoard.tsx');
+const group = read('apps/admin/components/GroupBookingBoard.tsx');
+const channel = read('apps/admin/components/ChannelManagerBoard.tsx');
+const groupCss = read('apps/admin/components/GroupBookingBoard.module.css');
+const channelCss = read('apps/admin/components/ChannelManagerBoard.module.css');
 assert(layout.includes('import "./fl2-guest-touchpoints.css";'),'CSS import');
 for (const marker of ['.inbox-row','.inbox-detail','.outbound-reply-form','.service-point-payment-row','.service-point-svg','.room-qr-table-wrap','.guest-offer-editor','.guest-offer-list-panel','[data-fl2-theme="light"]','prefers-reduced-motion','.service-settings-card','.content-card','.content-savebar']) {
   assert(css.includes(marker), 'missing visual selector ' + marker);
@@ -23,6 +27,12 @@ for(const [src,markers] of [
   [qr,['room-qr-table-wrap','room-qr-print-pack','room-qr-print-grid']],
   [offers,['guest-offer-editor','guest-offer-card-actions','toggle(item)','submit','item.analytics']],
   [serviceSettings,['service-settings-save','service-settings-grid','room_delivery_enabled','save']],
-  [siteContent,['content-savebar','locale-tabs','content-field','publish']]
+  [siteContent,['content-savebar','locale-tabs','content-field','publish']],
+  [group,['styles.searchFields','styles.filters','styles.rooms','styles.commitCard','onSubmit={commit}','selectVisible','setSelected(new Set())']],
+  [channel,['styles.providers','styles.form','styles.list','onSubmit={submit}','/core/api/v1/admin/channels/reservations/import','window.confirm(t.confirm)']]
 ])for(const m of markers)assert(src.includes(m), 'existing handler missing: '+m);
+for(const [cssFile,name,markers] of [
+  [groupCss,'group booking',['.shell','.head','.layout','.rooms','.commitCard',':global(html[data-marina-ui="future-luxury"])']],
+  [channelCss,'channel manager',['.shell','.header','.providers','.form','.list',':global(html[data-marina-ui="future-luxury"])']]
+])for(const marker of markers)assert(cssFile.includes(marker), name+' visual selector lost: '+marker);
 console.log('FL2 guest touchpoints PASS: original channel actions, QR, payments, print and offers preserved; style scoped to Future Luxury.');
