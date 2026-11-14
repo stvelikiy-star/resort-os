@@ -217,3 +217,10 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .marketing-shell se
 @media(prefers-reduced-motion:reduce){
   html[data-marina-ui="future-luxury"] .request-card{animation:none!important;transform:none!important}
 }
+
+/* Requests toolbar must wrap real controls instead of widening the viewport. */
+html[data-marina-ui="future-luxury"] .requests-shell .work-actions{display:flex;flex-wrap:wrap;gap:8px;min-width:0;max-width:100%}
+html[data-marina-ui="future-luxury"] .requests-shell .work-actions select{min-width:0;max-width:100%;min-height:44px;flex:1 1 220px;background:var(--fl2-surface,#123342);color:var(--fl2-text,#f8fafc);border:1px solid #477385;border-radius:11px;padding:10px 12px}
+html[data-marina-ui="future-luxury"] .requests-shell .work-actions .btn{min-height:44px;white-space:normal}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .requests-shell .work-actions select{background:#fff;color:#16384a;border-color:#b7ced8}
+@media(max-width:600px){html[data-marina-ui="future-luxury"] .requests-shell .work-head{display:grid;grid-template-columns:minmax(0,1fr)}html[data-marina-ui="future-luxury"] .requests-shell .work-actions select{flex-basis:100%}html[data-marina-ui="future-luxury"] .requests-shell .work-actions .btn{flex:1 1 110px}}

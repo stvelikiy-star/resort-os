@@ -12,7 +12,7 @@ This is the visual-redesign plan following the Stage 1 source baseline in `docs/
 | Motion | Existing CSS/React Native motion and refresh behavior vary. | Short functional transitions: 120–180 ms press/focus, 180–240 ms panel/list state, 240–320 ms navigation/detail; opacity/transform only where possible; reduced-motion path. | No motion delays commits, masks polling, changes focus order, or implies success before server acknowledgement. |
 | Responsive | Admin/Staff web and Mobile support different viewport constraints. | Preserve information density while clarifying hierarchy; progressive disclosure only when all actions remain reachable. | 320/375/768/1440 px, keyboard, safe-area, font scaling and touch-target QA. |
 
-The approved logo state is **STYLE APPROVED; BINARY PROVENANCE DOCUMENTED; CROSS-APP INSTALLATION PENDING**. The approved 1024 PNG SHA-256 is `24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356`; the 512 PNG SHA-256 is `8b41fcf0ca7a6069b90331aa17a7f23e6650ad86d5c01c0f1aab4f5a5c22d739`. No current asset is an approved substitute.
+The approved logo state is **INSTALLED IN THE DESIGN CANDIDATE; PUBLIC DEPLOYMENT NOT CLAIMED**. PR #448 installed the exact approved 1024px RGBA PNG in Admin, Staff and Expo. `node scripts/install-approved-marina-logo.mjs --verify-installed` passed again on 2026-11-14 at candidate `b3bcf042`. The installed master SHA-256 is `24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356`; the approved 512px reference SHA-256 remains `8b41fcf0ca7a6069b90331aa17a7f23e6650ad86d5c01c0f1aab4f5a5c22d739`. Historical installation-pending notes describe the pre-#448 state; they are not the current candidate status.
 
 ## Delivery phases by module
 

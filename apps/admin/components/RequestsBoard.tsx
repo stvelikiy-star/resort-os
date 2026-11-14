@@ -266,7 +266,7 @@ export default function RequestsBoard() {
   }
 
   return (
-    <main className="work-shell">
+    <main className="work-shell requests-shell">
       <div className="work-head">
         <div>
           <p className="eyebrow">Продажи · бронирование</p>

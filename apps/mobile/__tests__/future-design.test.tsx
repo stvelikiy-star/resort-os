@@ -5,7 +5,7 @@ import { ThemeProvider, useTheme, validTheme } from '../src/theme/ThemeProvider'
 import { colors, motion, TOUCH } from '../src/theme/tokens';
 import { cappedStagger } from '../src/theme/motion';
 import { setItem } from '../src/lib/storage';
-import { sectionLabelText } from '../src/components/ui';
+import { AnimatedProgressBar, FadeIn, PressScale, sectionLabelText } from '../src/components/ui';
 it('SectionLabel composes dates and counts without injecting commas into translated headings', () => {
   expect(sectionLabelText(['Сегодня', ' · ', '2026-11-05'])).toBe('СЕГОДНЯ · 2026-11-05');
   expect(sectionLabelText(['Expected arrivals', ' · ', 1])).toBe('EXPECTED ARRIVALS · 1');
@@ -71,4 +71,25 @@ it('theme switches without remounting the route and persists preference', async 
   fireEvent.press(result.getByTestId('future-theme-toggle'));
   await waitFor(() => expect(result.getByTestId('future-theme').props.children).toEqual(['dark', ':', 'dark']));
   expect(setItem).toHaveBeenCalledWith('marina.theme', 'dark');
+});
+
+it('renders FadeIn content without withholding the screen from users', async () => {
+  const screen = await render(<FadeIn><Text>Список бронирований</Text></FadeIn>);
+  expect(screen.getByText('Список бронирований')).toBeTruthy();
+});
+
+it('progress keeps verified percentage available to screen readers', async () => {
+  const screen = await render(
+    <ThemeProvider initial="light"><AnimatedProgressBar percent={74.2}/></ThemeProvider>,
+  );
+  expect(screen.getByRole('progressbar').props.accessibilityValue).toEqual({
+    min: 0, max: 100, now: 74.2,
+  });
+});
+
+it('PressScale preserves its existing action callback', async () => {
+  const onPress = jest.fn();
+  const screen = await render(<PressScale testID="motion-action" onPress={onPress}><Text>Открыть</Text></PressScale>);
+  fireEvent.press(screen.getByTestId('motion-action'));
+  expect(onPress).toHaveBeenCalledTimes(1);
 });

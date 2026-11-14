@@ -208,12 +208,12 @@ export default function StaffRoleGateway() {
   }
 
   if (checking) {
-    return <main className="shift-center"><div className="shift-login"><div className="shift-crown">III</div><h1>Подключаю смену…</h1><p>Проверяю рабочую сессию и Telegram.</p></div></main>;
+    return <main className="shift-center"><div className="shift-login"><img className="shift-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" width={76} height={76} /><h1>Подключаю смену…</h1><p>Проверяю рабочую сессию и Telegram.</p></div></main>;
   }
 
   if (!user) {
     return <main className="shift-center"><form className="shift-login" onSubmit={login}>
-      <div className="shift-crown">III</div>
+      <img className="shift-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" width={76} height={76} />
       <p className="shift-eyebrow">MARINA SMART · Hotel OS</p>
       <h1>Моя смена</h1>
       <p>{telegramInitData ? "Первый вход — рабочий логин и пароль. После привязки Telegram вход будет автоматическим." : "Войдите под рабочей учётной записью."}</p>

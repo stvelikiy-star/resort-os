@@ -2,7 +2,7 @@
 
 The user strictly approved **only** the flat teal ring / ship / compass `MARINA_SMART_APPROVED_FLAT_1024.png` (SHA-256 `24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356`). This is the only admissible source binary, not an earlier mobile icon or WebP.
 
-The exact PNG is available in the user-approved conversation artifacts, **but is not yet present on Ubuntu/GitHub**; the desktop connector does not transfer conversation binary bytes into the remote machine. Do NOT fabricate or convert the existing images as a substitute.
+**Current candidate status (2026-11-14): INSTALLED AND VERIFIED.** PR #448 installed the exact approved PNG in Admin, Staff and Expo. The installation verifier passed again on candidate `b3bcf042`; the approved master hash above matches all three installed copies. This is source/candidate verification, not proof of production deployment or visual acceptance on a phone. Do NOT fabricate or convert other images as a substitute.
 
 ## Safe local installation after transferring the exact bytes
 
@@ -14,4 +14,4 @@ The exact PNG is available in the user-approved conversation artifacts, **but is
 6. Run `node scripts/install-approved-marina-logo.mjs --verify-installed` and inspect all three apps visually. Run TypeScript/Next builds, physical Android E2E, and functional parity CI before PR approval.
 7. Remove obsolete non-canonical assets only in a separately audited change, after no runtime references remain.
 
-**State:** installer READY, logo binary deployment PENDING. The installer performs no action unless explicitly given `--apply`; it does not merge, upload, or deploy.
+**State:** installer READY; exact logo installed in the design candidate. The instructions above remain available for clean installations and recovery. No repeated `--apply` is required for the verified current candidate. The installer does not merge, upload, or deploy.

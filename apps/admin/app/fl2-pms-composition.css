@@ -366,3 +366,139 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .o
     transform:none!important;animation:none!important;transition:none!important;
   }
 }
+
+/* Authenticated 320px QA: month/year and filter labels must remain readable. */
+@media(max-width:380px) {
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-toolbar > select {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: 4px;
+    padding: 4px;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > select {
+    grid-column: 2;
+    width: 100%;
+    min-width: 0;
+    padding-inline: 8px;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > select:first-of-type { grid-row: 1; }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > select:last-of-type { grid-row: 2; }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > button {
+    grid-row: 1 / 3;
+    align-self: stretch;
+    min-width: 0;
+    padding-inline: 0;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > button:first-child { grid-column: 1; }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-month-picker > button:last-child { grid-column: 3; }
+}
+
+/* Authenticated form QA: intrinsic input widths must not clip booking actions.
+ * Keep every existing field and Core-confirmed price, with local vertical scroll. */
+html[data-marina-ui="future-luxury"] .owner-booking-backdrop { box-sizing:border-box;padding:16px; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal {
+  box-sizing:border-box;width:min(960px,calc(100vw - 32px));max-width:calc(100vw - 32px);
+  max-height:calc(100dvh - 32px);min-width:0;overflow-y:auto;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal :is(form,label,.owner-booking-head,.owner-stay-facts,.owner-guest-grid,.owner-price-card,.owner-manager-price,.owner-booking-actions) { min-width:0;max-width:100%;box-sizing:border-box; }
+html[data-marina-ui="future-luxury"] .owner-booking-head { position:sticky;top:0;z-index:2;background:#132f43;padding-bottom:10px; }
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-head { background:#fff; }
+html[data-marina-ui="future-luxury"] .owner-booking-head > div { min-width:0;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .owner-booking-head > button { flex-shrink:0;min-height:44px; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-stay-facts { grid-template-columns:repeat(4,minmax(0,1fr)); }
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-stay-facts > div { min-width:0;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-guest-grid { grid-template-columns:minmax(0,2fr) minmax(0,1.5fr) minmax(0,.7fr) minmax(0,.7fr); }
+html[data-marina-ui="future-luxury"] .owner-booking-modal :is(input,select,textarea) { box-sizing:border-box;width:100%;min-width:0;max-width:100%;min-height:44px; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-manager-price { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); }
+html[data-marina-ui="future-luxury"] .owner-booking-actions { flex-wrap:wrap; }
+html[data-marina-ui="future-luxury"] .owner-booking-actions > span { flex:1 1 220px;min-width:0;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal :is(.owner-booking-actions,.owner-manager-price) button { min-height:44px;max-width:100%;white-space:normal;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-commercial-prices { display:flex;flex-wrap:wrap;gap:5px; }
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-commercial-prices span {
+  background:var(--fl2-feedback-surface);color:var(--fl2-feedback-text);border:1px solid var(--fl2-feedback-edge);border-radius:8px;padding:5px 7px;overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-commercial-prices b { color:inherit; }
+html[data-marina-ui="future-luxury"] :is(.v8-builder-head-actions,.reservation-detail > header) > button { min-height:44px;flex-shrink:0; }
+@media(max-width:900px) {
+  html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-stay-facts,
+  html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-guest-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-guest-grid :is(label:nth-child(5),.owner-notes) { grid-column:auto; }
+}
+@media(max-width:480px) {
+  html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-guest-grid,
+  html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-manager-price { grid-template-columns:minmax(0,1fr); }
+}
+
+/* Pinned labels must use the same widths as the actual CSS-variable grid.
+ * The Legacy workflow stylesheet still specifies 270/300px label widths. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack :is(.owner-room-head,.owner-room-label) {
+  box-sizing:border-box;width:var(--fl2-pms-room-width);max-width:var(--fl2-pms-room-width);min-width:0;
+}
+/* The real PMS opens ReservationScheduleBuilder V8, not the old chess dialog.
+ * Reuse existing FL2 semantic colors; preserve all segment/preview/commit controls. */
+html[data-marina-ui="future-luxury"] .v8-builder-backdrop { box-sizing:border-box;padding:16px; }
+html[data-marina-ui="future-luxury"] .v8-builder {
+  box-sizing:border-box;width:min(1180px,calc(100vw - 32px));max-width:calc(100vw - 32px);max-height:calc(100dvh - 32px);
+  color:var(--fl2-feedback-text);background:var(--fl2-panel,var(--fl2-feedback-surface));font-size:13px;border:1px solid var(--fl2-feedback-edge);
+}
+html[data-marina-ui="future-luxury"] .v8-builder :is(div,section,header,label,input,select,button) { box-sizing:border-box;min-width:0; }
+html[data-marina-ui="future-luxury"] .v8-builder-head {
+  background:var(--fl2-panel,var(--fl2-feedback-surface));border-color:var(--fl2-feedback-edge);align-items:center;flex-wrap:wrap;gap:12px;
+}
+html[data-marina-ui="future-luxury"] .v8-builder-head h2 { color:var(--fl2-feedback-text);font-size:clamp(20px,2vw,28px);overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .v8-builder-head-actions { flex-wrap:wrap; }
+html[data-marina-ui="future-luxury"] .v8-builder :is(.v8-builder-head > div > span,.v8-builder-summary span,.v8-builder-dates label span,.v8-segment-index span,.v8-segment-room label span,.v8-segment-room small,.v8-segment-range small,.v8-segment-cut > span,.v8-boundary span,.v8-builder-preview-actions span,.v8-preview span,.v8-preview p,.v8-preview-money span) {
+  color:var(--fl2-feedback-muted);font-size:12px;line-height:1.5;overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .v8-builder-summary { grid-template-columns:repeat(4,minmax(0,1fr));background:var(--fl2-feedback-edge);border-color:var(--fl2-feedback-edge); }
+html[data-marina-ui="future-luxury"] .v8-builder :is(.v8-builder-summary > div,.v8-builder-rules,.v8-segment-timeline,.v8-segment-card,.v8-boundary,.v8-preview,.v8-preview-money > div,.v8-builder-loading) {
+  background:var(--fl2-feedback-surface);color:var(--fl2-feedback-text);border-color:var(--fl2-feedback-edge);
+}
+html[data-marina-ui="future-luxury"] .v8-builder-summary strong { color:var(--fl2-feedback-text);overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .v8-builder-rules { font-size:12px;line-height:1.6; }
+html[data-marina-ui="future-luxury"] .v8-builder :is(input,select) {
+  min-height:44px;max-width:100%;width:100%;font-size:14px;color:var(--fl2-feedback-text);-webkit-text-fill-color:currentColor;
+  background:var(--fl2-feedback-surface);border:1px solid var(--fl2-feedback-edge);border-radius:9px;
+}
+html[data-marina-ui="future-luxury"] .v8-builder :is(input,select):disabled { opacity:.7; }
+html[data-marina-ui="future-luxury"] .v8-builder button { min-height:44px;height:auto;max-width:100%;white-space:normal;font-size:13px;line-height:1.4; }
+html[data-marina-ui="future-luxury"] .v8-builder :is(.v8-builder-head-actions,.v8-segment-cut,.v8-segment-merge) button {
+  background:var(--fl2-feedback-surface);color:var(--fl2-feedback-text);border:1px solid var(--fl2-feedback-edge);
+}
+html[data-marina-ui="future-luxury"] .v8-builder .btn.primary { color:#072832;background:#18bbc2;border-color:#18bbc2; }
+html[data-marina-ui="future-luxury"] .v8-builder :is(input,select,button):focus-visible { outline:3px solid var(--fl2-feedback-ring);outline-offset:2px; }
+html[data-marina-ui="future-luxury"] .v8-builder-dates { flex-wrap:wrap;gap:12px; }
+html[data-marina-ui="future-luxury"] .v8-builder-dates label { flex:1 1 160px; }
+html[data-marina-ui="future-luxury"] .v8-segment-timeline { overflow-x:auto; }
+html[data-marina-ui="future-luxury"] .v8-mini-segment { min-width:88px; }
+html[data-marina-ui="future-luxury"] .v8-mini-segment strong { font-size:13px;color:#fff; }
+html[data-marina-ui="future-luxury"] .v8-mini-segment span { font-size:12px;color:#e2f3ff; }
+html[data-marina-ui="future-luxury"] .v8-segment-card { grid-template-columns:48px minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);gap:12px; }
+html[data-marina-ui="future-luxury"] .v8-segment-card.crosses-today { border-color:var(--fl2-feedback-ring); }
+html[data-marina-ui="future-luxury"] .v8-segment-index b { color:#072832;background:#18bbc2; }
+html[data-marina-ui="future-luxury"] .v8-segment-range { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+html[data-marina-ui="future-luxury"] .v8-segment-range span { font-size:12px;color:var(--fl2-feedback-text);background:var(--fl2-panel,var(--fl2-feedback-surface));overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .v8-segment-cut { flex-wrap:wrap; }
+html[data-marina-ui="future-luxury"] .v8-segment-merge { grid-column:2 / -1; }
+html[data-marina-ui="future-luxury"] .v8-boundary { position:static;grid-column:2 / -1;transform:none;flex-wrap:wrap;max-width:100%;box-shadow:none; }
+html[data-marina-ui="future-luxury"] .v8-builder-preview-actions { flex-wrap:wrap;border-color:var(--fl2-feedback-edge); }
+html[data-marina-ui="future-luxury"] .v8-preview-money { grid-template-columns:repeat(3,minmax(0,1fr)); }
+html[data-marina-ui="future-luxury"] .v8-builder :is(.v8-builder-error,.v8-preview.bad,.v8-preview-conflicts > div) { color:#ffe8ec;background:#4c2533;border-color:#c5687c; }
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .v8-builder :is(.v8-builder-error,.v8-preview.bad,.v8-preview-conflicts > div) { color:#853047;background:#fff1f3;border-color:#d994a1; }
+@media(max-width:900px) {
+  html[data-marina-ui="future-luxury"] .v8-builder-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  html[data-marina-ui="future-luxury"] .v8-segment-card { grid-template-columns:44px minmax(0,1fr);align-items:start; }
+  html[data-marina-ui="future-luxury"] .v8-segment-card > :is(.v8-segment-room,.v8-segment-range,.v8-segment-cut,.v8-segment-merge,.v8-boundary) { grid-column:2; }
+}
+@media(max-width:480px) {
+  html[data-marina-ui="future-luxury"] .v8-builder-head { padding:14px; }
+  html[data-marina-ui="future-luxury"] .v8-builder :is(.v8-builder-summary,.v8-builder-rules,.v8-builder-dates,.v8-segment-timeline,.v8-segments,.v8-builder-preview-actions,.v8-preview) { margin-left:12px;margin-right:12px; }
+  html[data-marina-ui="future-luxury"] .v8-preview-money { grid-template-columns:minmax(0,1fr); }
+}
+
+html[data-marina-ui="future-luxury"] .v8-builder-head .eyebrow { color:var(--fl2-warm,#e7c187);font-size:11px; }
+html[data-marina-ui="future-luxury"] .v8-segment-index span { font-size:10px;overflow-wrap:normal; }

@@ -454,3 +454,13 @@ html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[da
     transition:none!important;
   }
 }
+
+/* Authenticated QA: keep the API occupancy value legible in both themes;
+ * legacy panel text colors must not turn it white on a white ring center. */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring > div {
+  background: var(--fl2o-surface);
+  color: var(--fl2o-text);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring strong {
+  color: var(--fl2o-text) !important;
+}
