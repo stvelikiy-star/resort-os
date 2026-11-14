@@ -322,7 +322,7 @@ export default function ReservationsBoard() {
   }
 
   return (
-    <main className="work-shell">
+    <main className="work-shell fl2-reservations">
       <div className="work-head">
         <div><p className="eyebrow">PMS · проживание</p><h1>Брони и заезды</h1><p className="subtitle">Гарантированные брони, проживающие гости, выезды и NFC-браслеты.</p></div>
         <div className="work-actions"><select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="ACTIVE">Активные</option><option value="GUARANTEED">Ожидают заезд</option><option value="CHECKED_IN">Проживают</option><option value="CHECKED_OUT">Выехали</option><option value="ALL">Все</option></select><button className="btn" onClick={load}>Обновить</button></div>
