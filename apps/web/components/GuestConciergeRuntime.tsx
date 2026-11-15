@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import GuestAiAssistant from "./GuestAiAssistant";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -508,7 +509,7 @@ export default function GuestConciergeRuntime({ token }: { token: string }) {
 
   return <main className="concierge-page">
     <header className="concierge-topbar">
-      <div className="concierge-brand"><span>III</span><div><strong>{propertyName}</strong><small>{copy.product}</small></div></div>
+      <div className="concierge-brand"><Image src="/marina-smart-approved.png" alt="MARINA SMART" width={42} height={42} priority /><div><strong>{propertyName}</strong><small>{copy.product}</small></div></div>
       <div className="concierge-langs" aria-label={copy.language}>{MARINA_GUEST_LOCALES.map((item) => <button key={item} onClick={() => chooseLocale(item)} aria-pressed={locale === item}>{item.toUpperCase()}</button>)}</div>
     </header>
 
