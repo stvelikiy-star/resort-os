@@ -608,3 +608,9 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] :is(.v8-segment-merge,.v8-b
 @media(max-width:600px) {
  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-booking-modal .owner-guest-grid { grid-template-columns:minmax(0,1fr); }
 }
+
+html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-segment-card > :is(.v8-segment-room,.v8-segment-range,.v8-segment-cut) { grid-column:auto;min-width:0; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-segment-index b { flex-shrink:0; }
+@media(max-width:760px) {
+ html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-segment-card > :is(.v8-segment-room,.v8-segment-range,.v8-segment-cut,.v8-segment-merge,.v8-boundary) { grid-column:1/-1; }
+}

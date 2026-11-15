@@ -25,7 +25,7 @@ try {
   await page.getByRole("button", { name: "Шахматка", exact: true }).click();
   await page.locator(".owner-grid-shell").waitFor({ state: "visible", timeout: 20000 });
   await page.locator(".owner-grid-loading").waitFor({ state: "hidden", timeout: 20000 });
-  await page.getByRole("heading", { name: "Номер × ночь" }).waitFor();
+  await page.getByRole("heading", { name: "Шахматка бронирований" }).waitFor();
   const cells = page.locator("[data-room-code]");
   if (await cells.count() === 0) throw new Error("No calendar cells for synthetic hotel");
   const month = page.getByRole("combobox", { name: "Месяц" });
