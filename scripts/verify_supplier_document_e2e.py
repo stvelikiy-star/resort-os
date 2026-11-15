@@ -96,16 +96,30 @@ async def main():
             for qty in ("2", "3"):
                 rid = str(uuid.uuid4())
                 receipt_ids.append(rid)
+                receive_payload={"receipt_id": rid, "quantity": qty}
+                if qty=="3":
+                    # Second partial arrival binds the invoice atomically.
+                    receive_payload["document_line_id"]=line_id
                 accepted = check(await store.post(
                     f"/api/v1/kitchen/procurement/requests/{request_id}/receive",
-                    json={"receipt_id": rid, "quantity": qty}), 201, "receive")
+                    json=receive_payload), 201, "receive")
                 assert accepted["payment_created"] is False
+                if qty=="3":
+                    assert accepted["document_line_id"]==line_id
+                    assert Decimal(accepted["cost_kgs"])==Decimal("370.3701")
+                    replay=check(await store.post(
+                        f"/api/v1/kitchen/procurement/requests/{request_id}/receive",
+                        json=receive_payload),201,"atomic receipt replay")
+                    assert replay["already_processed"] is True
+                    check(await store.post(
+                        f"/api/v1/kitchen/procurement/requests/{request_id}/receive",
+                        json={"receipt_id":rid,"quantity":qty}),409,"source cannot be removed on replay")
                 binding = {"receipt_id": rid, "document_line_id": line_id}
                 links = await asyncio.gather(*[
                     owner.post(f"/api/v1/admin/finance/owner/supplier-documents/{doc_id}/receipt-links",
                                json=binding) for _ in range(8)])
                 assert all(r.status_code == 201 for r in links), [r.text for r in links]
-                assert sum(not r.json()["already_processed"] for r in links) == 1
+                assert sum(not r.json()["already_processed"] for r in links) == (1 if qty=="2" else 0)
             allocated = await conn.fetchval(
                 'SELECT COALESCE(SUM(quantity),0) FROM kitchen_supplier_receipt_links '
                 'WHERE "propertyId"=$1 AND "documentLineId"=$2', pid, uuid.UUID(line_id))
