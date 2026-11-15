@@ -63,11 +63,12 @@ async def main():
                    VALUES ($1,$2,$3,$4,now(),'RESTAURANT_CI',now(),now())""",
                 assignment_id, pid, stay_id, room["id"])
 
-        async with httpx.AsyncClient(base_url=BASE, timeout=30) as owner, httpx.AsyncClient(base_url=BASE, timeout=30) as waiter, httpx.AsyncClient(base_url=BASE, timeout=30) as cook:
+        async with httpx.AsyncClient(base_url=BASE, timeout=30) as owner, httpx.AsyncClient(base_url=BASE, timeout=30) as waiter, httpx.AsyncClient(base_url=BASE, timeout=30) as cook, httpx.AsyncClient(base_url=BASE, timeout=30) as other_waiter:
             await sign_in(owner, os.environ["BOOTSTRAP_OWNER_USERNAME"], os.environ["BOOTSTRAP_OWNER_PASSWORD"], "OWNER")
             await sign_in(cook, os.environ["KITCHEN_MENU_DINING_USERNAME"], os.environ["KITCHEN_MENU_DINING_PASSWORD"], "COOK")
             waiter_user = await sign_in(waiter, os.environ["WAITER_SERVE_E2E_USERNAME"], os.environ["WAITER_SERVE_E2E_PASSWORD"], "WAITER")
             wid = waiter_user["id"]
+            await sign_in(other_waiter, os.environ["WAITER_OTHER_E2E_USERNAME"], os.environ["WAITER_OTHER_E2E_PASSWORD"], "WAITER")
             require(await owner.post("/api/v1/kitchen/menu/bootstrap-draft"), 200, "test menu")
             menu = require(await owner.get("/api/v1/kitchen/menu"), 200, "menu")["items"]
             assert len(menu) >= 2, "need two different dishes"
@@ -117,6 +118,13 @@ async def main():
                     {"menu_item_id": menu[1]["id"], "quantity": 3}
                 ]}), 201, "create multi-item order")
             oid = order["id"]
+            require(await other_waiter.post("/api/v1/kitchen/orders", json={
+                "source": "TABLE", "table_id": source["id"],
+                "items": [{"menu_item_id": menu[0]["id"], "quantity": 1}]}),
+                403, "other waiter cannot create order for assigned table")
+            require(await other_waiter.patch(f"/api/v1/kitchen/orders/{oid}/status",
+                                             json={"status": "SERVED"}), 403,
+                    "other waiter cannot serve another waiter's order")
             assert order["total_kgs"] == menu[0]["price_kgs"] * 2 + menu[1]["price_kgs"] * 3
             assigned = await db.fetchval('SELECT "waiterId" FROM kitchen_orders WHERE id=$1', uuid.UUID(oid))
             assert str(assigned) == wid, "waiter must own order from creation"
@@ -130,6 +138,8 @@ async def main():
             candidates = require(await waiter.get("/api/v1/dining/folio-orders"), 200, "folio candidate")
             match = next(x for x in candidates["items"] if x["id"] == oid)
             assert match["eligible_to_post"] and match["waiter_id"] == wid
+            require(await other_waiter.post(f"/api/v1/dining/orders/{oid}/folio"), 403,
+                    "other waiter cannot post another waiter's folio")
             charge = require(await waiter.post(f"/api/v1/dining/orders/{oid}/folio"), 201, "post folio")
             assert charge["payment_created"] is False and charge["idempotent_replay"] is False
             again = require(await waiter.post(f"/api/v1/dining/orders/{oid}/folio"), 201, "folio replay")
