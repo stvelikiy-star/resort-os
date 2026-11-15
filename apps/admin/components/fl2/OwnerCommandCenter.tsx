@@ -99,7 +99,7 @@ export default function OwnerCommandCenter({ data, onNavigate, onRefresh, childr
         <header className="mx-hero mx-reveal">
           <div>
             <p className="mx-eyebrow">{data.property.name} · управление</p>
-            <h1>Command Center</h1>
+            <h1>Добро пожаловать в MARINA SMART!</h1>
             <p>{data.property.local_date} · {data.property.timezone} · данные из Core в момент обновления</p>
           </div>
           <button className="mx-btn mx-btn--primary" onClick={onRefresh}><RefreshCw size={18} aria-hidden="true" />Обновить</button>

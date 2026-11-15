@@ -4,6 +4,10 @@ on:
     paths:
       - 'apps/admin/components/AdminShell.tsx'
       - 'apps/admin/app/fl2-shell.css'
+      - 'apps/admin/app/fl2-owner-composition.css'
+      - 'apps/admin/components/OwnerControlV2.tsx'
+      - 'apps/admin/components/fl2/OwnerCommandCenter.tsx'
+      - 'scripts/design/fl2-owner-theme-*.mjs'
       - 'apps/admin/app/layout.tsx'
       - 'scripts/design/fl2-shell-*.mjs'
       - '.github/workflows/marina-fl2-shell-ci.yml'
@@ -27,6 +31,7 @@ jobs:
       - name: Preserve navigation and access gates
         run: |
           node scripts/design/fl2-shell-contract.mjs
+          node scripts/design/fl2-owner-theme-contract.mjs
           npm run design:fl2:audit
           npm --prefix apps/admin run typecheck
       - name: Build production Admin against isolated QA Core
@@ -48,14 +53,17 @@ jobs:
             sleep 1
           done
           node scripts/design/fl2-shell-browser.mjs
+          node scripts/design/fl2-owner-theme-browser.mjs
       - name: Preserve QA server logs
         if: always()
         run: |
-          mkdir -p c1-evidence
+          mkdir -p c1-evidence c2-evidence
           cp /tmp/c1-core.log /tmp/c1-admin.log c1-evidence/ 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: marina-fl2-c1-evidence
-          path: c1-evidence/
+          name: marina-fl2-c2-evidence
+          path: |
+            c1-evidence/
+            c2-evidence/
           if-no-files-found: warn

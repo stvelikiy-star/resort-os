@@ -19,6 +19,7 @@ const STORAGE_KEY = "three-crowns-admin-locale";
 
 
 const KZ_EXACT: Record<string, string> = {
+  "Добро пожаловать в MARINA SMART!": "MARINA SMART жүйесіне қош келдіңіз!",
   // C1 navigation labels, consumed by the existing explicit Kazakh lookup.
   "Оформление": "Көрініс",
   "Гости": "Қонақтар",
@@ -225,6 +226,7 @@ const exact: Record<string, Phrase> = {
 };
 
 const common: Phrase[] = [
+  { ru: "Добро пожаловать в MARINA SMART!", kg: "MARINA SMART системасына кош келиңиз!", kz: "MARINA SMART жүйесіне қош келдіңіз!", en: "Welcome to MARINA SMART!" },
   { ru: "HOLD недоступен", kg: "HOLD жеткиликсиз", kz: "HOLD қолжетімсіз", en: "HOLD unavailable" },
   { ru: "Не удалось освободить номер", kg: "Бөлмөнү бошотуу мүмкүн болгон жок", kz: "Бөлмені босату мүмкін болмады", en: "Could not release the room" },
   { ru: "Не удалось удержать номер", kg: "Бөлмөнү убактылуу кармоо мүмкүн болгон жок", kz: "Бөлмені уақытша ұстап тұру мүмкін болмады", en: "Could not place the room on hold" },
