@@ -102,6 +102,33 @@ jobs:
           changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
           echo "$changed"
           web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
+          # C12 isolated Guest OS skin: allow only these explicit guest files on
+          # the named review branch; keep all public Three Crowns marketing paths frozen.
+          if [ "$branch" = 'design/marina-c12-guest-concierge-accessibility-20261115' ]; then
+            [ -n "$web_changed" ] || { echo 'BLOCKED: empty C12 guest change' >&2; exit 1; }
+            while IFS= read -r path; do
+              [ -z "$path" ] && continue
+              case "$path" in
+                'apps/web/app/guest-concierge.css'|\
+                'apps/web/app/guest-owner-corrections.css'|\
+                'apps/web/components/GuestConciergeRuntime.tsx'|\
+                'apps/web/public/marina-smart-approved.png')
+                  ;;
+                *)
+                  echo "BLOCKED: C12 permits guest-only files, not public site: $path" >&2
+                  exit 1
+                  ;;
+              esac
+            done <<< "$web_changed"
+            # The exact approved brand bytes and authenticated Guest OS contract
+            # remain mandatory, even when no public marketing file has changed.
+            printf '%s  %s\n' \
+              '24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356' \
+              'apps/web/public/marina-smart-approved.png' | sha256sum --check --status
+            node scripts/guest_concierge_v2_browser_contract.mjs
+            echo 'PASS: exact C12 Guest OS skin and original PNG; marketing site frozen.'
+            exit 0
+          fi
           if [ -n "$web_changed" ]; then
             if [ "$web_changed" = $'apps/web/package-lock.json\napps/web/package.json' ]; then
               node - <<'NODE'
