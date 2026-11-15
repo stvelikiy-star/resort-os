@@ -41,9 +41,18 @@ export function usePmsDialog(onClose: () => void, busy: boolean) {
       }
     };
     const focusin = (event: FocusEvent) => { if (top() && event.target instanceof Node && !root.contains(event.target)) focusFirst(); };
+    // A focused submit/preview button can become disabled without a focusin event.
+    // Recheck after async content/disabled changes instead of leaving focus on body.
+    const observer = new MutationObserver(() => {
+      if (!top() || !root.isConnected) return;
+      const active = document.activeElement;
+      if (!root.contains(active) || (active instanceof HTMLElement && active.matches(":disabled"))) focusFirst();
+    });
+    observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ["disabled", "hidden", "inert", "aria-hidden"] });
     document.addEventListener("keydown", keydown);
     document.addEventListener("focusin", focusin);
     return () => {
+      observer.disconnect();
       document.removeEventListener("keydown", keydown);
       document.removeEventListener("focusin", focusin);
       const index = dialogs.lastIndexOf(root);
