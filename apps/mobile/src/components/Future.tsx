@@ -42,7 +42,7 @@ export function PremiumHeader({ title, subtitle, eyebrow, right, inlineCompactRi
       <Logo size={width < 350 ? 42 : 50}/>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
         {eyebrow ? <Text style={[font.label, { color: c.cyan }]} numberOfLines={2}>{eyebrow.toUpperCase()}</Text> : null}
-        <Title sub={subtitle}>{title}</Title>
+        <Title sub={subtitle} titleSize={width < 350 && title.length > 18 ? 22 : undefined}>{title}</Title>
       </View>
     </View>
     {right ? <View style={{ alignSelf: stackRight ? 'flex-end' : 'center', flexShrink: 0 }}>{right}</View> : null}
