@@ -15,9 +15,12 @@ export function procurementOperation(value:unknown):PendingProcurement{
  const x=value as PendingProcurement;
  if(typeof x.quantity!=='string')throw new Error('Invalid procurement quantity');
  const quantity=receiptQuantity(x.quantity);
- if(x.kind==='RECEIVE'&&receiptUuid(x.requestId)&&receiptUuid(x.receipt_id))
+ if(x.kind==='RECEIVE'&&receiptUuid(x.requestId)&&receiptUuid(x.receipt_id)){
+  if(x.document_line_id!==undefined&&x.document_line_id!==null&&!receiptUuid(x.document_line_id))
+   throw new Error('Invalid supplier source ID');
   return {kind:x.kind,requestId:x.requestId,receipt_id:x.receipt_id,quantity,
-   document_line_id:x.document_line_id==null?null:(receiptUuid(x.document_line_id)?x.document_line_id:(()=>{throw new Error('Invalid supplier source ID');})())};
+   ...(x.document_line_id===undefined?{}:{document_line_id:x.document_line_id})};
+ }
  if(x.kind==='REQUEST'&&receiptUuid(x.request_id)&&receiptUuid(x.stock_item_id)&&
    (x.notes===null||(typeof x.notes==='string'&&x.notes.length<=500))&&
    (x.service_date===null||(typeof x.service_date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.service_date)&&
