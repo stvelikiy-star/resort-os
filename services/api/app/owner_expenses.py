@@ -81,6 +81,7 @@ async def list_expenses(request:Request,from_date:date=Query(),to_date:date=Quer
              COALESCE(SUM("amountKgs"-settled) FILTER(WHERE status='POSTED'),0)::bigint AS outstanding
             FROM expenses''',pid,from_date,to_date)
     return {"items":[view(x) for x in rows],"preview_limit":500,
+        "new_expense_id":str(uuid.uuid4()),"new_settlement_id":str(uuid.uuid4()),
         "preview_truncated":totals["count"]>500,
         "totals":{"posted_expenses_kgs":totals["posted"],
                   "settled_against_period_expenses_kgs":totals["settled"],
