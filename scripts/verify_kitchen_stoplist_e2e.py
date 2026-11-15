@@ -1,5 +1,6 @@
 """Isolated PostgreSQL E2E: cooked stop-list blocks new orders, not past financial truth."""
 import asyncio
+import json
 import os
 import uuid
 import asyncpg
@@ -34,6 +35,7 @@ async def main():
     try:
         pid = await db.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY)
         assert pid is not None
+        payments_before = await db.fetchval('SELECT count(*) FROM payments WHERE "propertyId"=$1', pid)
         async with httpx.AsyncClient(base_url=BASE, timeout=25) as owner, \
                 httpx.AsyncClient(base_url=BASE, timeout=25) as cook, \
                 httpx.AsyncClient(base_url=BASE, timeout=25) as waiter:
@@ -111,11 +113,11 @@ async def main():
             assert len(audit) == 2 and {x["action"] for x in audit} == {
                 "STOPLIST_MENU_ITEM", "RESTORE_MENU_AVAILABILITY"}
             assert all(x["actorId"] for x in audit)
-            assert {x["afterJson"]["reason"] for x in audit} == {
+            assert {(json.loads(x["afterJson"]) if isinstance(x["afterJson"], str) else x["afterJson"])["reason"] for x in audit} == {
                 "Ingredient unavailable", "Ingredient restocked"}
             assert await db.fetchval(
                 'SELECT count(*) FROM payments WHERE "propertyId"=$1', pid
-            ) == 0, "stop-list must never cause payment"
+            ) == payments_before, "stop-list must never cause payment"
             print("KITCHEN STOP-LIST POSTGRES E2E: PASS")
     finally:
         await db.close()
