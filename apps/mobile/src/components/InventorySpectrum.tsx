@@ -39,7 +39,7 @@ export function InventorySpectrum({ totals, total, labels }: { totals: Inventory
             <Icon color={colors[i]} size={compact ? 17 : 19} strokeWidth={1.9}/>
           </View>
           <View style={{ flex:1, minWidth:0 }}>
-            <Text style={[font.small,{color:c.textMuted}]} numberOfLines={2}>{label}</Text>
+            <Text testID={'inventory-state-'+i} style={[font.small,{color:c.textMuted}]} numberOfLines={2}>{label}</Text>
             <Text style={[font.h2,{color:c.text}]}>{values[i]}</Text>
           </View>
         </View>;
