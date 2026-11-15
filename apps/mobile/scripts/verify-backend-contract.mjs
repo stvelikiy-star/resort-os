@@ -29,7 +29,7 @@ const pinned = {
   'owner_expenses.py': '7a6835a7e7a5d0926d0a1f36d5dcb41f291d0ea2',
   'owner_kitchen_management.py': '49737685aabe87ca4b36ebee499c27b78f860eb2',
   'kitchen_procurement.py': '2718f40a9ee512f40dbd5cbe648f4a525f5b6b25',
-  'kitchen_stock.py': '8e652285b8b5544a528fa1ba8082839c2952af2f',
+  'kitchen_stock.py': '76002784ca9ba6a9341159426e4e04ab1b182168',
   'kitchen_menu_management.py': '3d8f8947e3a26cd40f77f718887c5f674fb4038c',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',
   'kitchen.py': '22c2faa257e4119d3d716acbfa8d499cb1b71bb5',
