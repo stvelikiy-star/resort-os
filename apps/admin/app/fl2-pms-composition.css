@@ -651,3 +651,20 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-status > span 
 html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-preview header b { background:var(--mx-accent-soft);color:var(--mx-ink);border:1px solid var(--mx-edge);font-size:13px;line-height:1.4; }
 html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-builder :is(.v8-preview.bad,.v8-preview-conflicts > div) { background:var(--mx-glass-strong);color:var(--mx-ink);border-color:var(--mx-danger); }
 html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-builder .v8-preview-conflicts :is(strong,span) { font-size:13px;line-height:1.5;color:var(--mx-ink); }
+
+/* C3: keep window controls available on narrow screens; scrolling stays inside the dialog. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-builder-head {
+  position:sticky;top:0;z-index:3;background:var(--mx-glass-strong);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-preview {
+  scroll-margin-block:16px;
+}
+@media(max-width:480px) {
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-booking-actions {
+    position:sticky;bottom:0;z-index:3;padding:12px;
+    background:var(--mx-glass-strong);border-top:1px solid var(--mx-edge);
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-booking-actions > span {
+    flex-basis:100%;
+  }
+}
