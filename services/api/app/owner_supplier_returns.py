@@ -28,10 +28,10 @@ class ReturnWrite(BaseModel):
 
     @field_validator("credit_reference","reason")
     @classmethod
-    def normalize(cls,value:str)->str:
+    def normalize(cls,value:str,info)->str:
         normalized=" ".join(value.split())
-        if not normalized:
-            raise ValueError("Empty credit reference or reason")
+        if len(normalized)<(3 if info.field_name=="reason" else 1):
+            raise ValueError("Credit reference or reason is too short")
         return normalized
 
 
