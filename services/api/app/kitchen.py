@@ -6,7 +6,6 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, s
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
-from .shared_dining_p0 import guard as shared_dining_staging_guard
 from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
 from .kitchen_recipes import read_recipe
 from .guest_os import GUEST_COOKIE
@@ -411,13 +410,16 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
 
 
 def enforce_waiter_service_request(user: dict[str, Any], target_status: str) -> None:
-    """WAITER cannot use kitchen mutations except served on staged dining."""
+    """WAITER may serve only an assigned READY order in canonical hotel mode.
+
+    Property, assigned waiter and READY -> SERVED transition are checked in
+    the same locked transaction by patch_order_status. The separate shared
+    staging preview admission middleware remains unchanged.
+    """
     if user["role"] != "WAITER":
         return
     if target_status != "SERVED":
         raise HTTPException(status_code=403, detail={"code": "WAITER_ONLY_SERVES"})
-    # This exception is never active in DEMO, production or legacy hotel mode.
-    shared_dining_staging_guard()
 
 
 def enforce_waiter_order_assignment(user: dict[str, Any], assigned_waiter_id: uuid.UUID | None) -> None:
