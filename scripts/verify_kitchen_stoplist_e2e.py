@@ -35,7 +35,7 @@ async def main():
     try:
         pid = await db.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY)
         assert pid is not None
-        payments_before = await db.fetchval('SELECT count(*) FROM payments WHERE "propertyId"=$1', pid)
+        payments_before = await db.fetchval('SELECT count(*) FROM payments')
         async with httpx.AsyncClient(base_url=BASE, timeout=25) as owner, \
                 httpx.AsyncClient(base_url=BASE, timeout=25) as cook, \
                 httpx.AsyncClient(base_url=BASE, timeout=25) as waiter:
@@ -116,7 +116,7 @@ async def main():
             assert {(json.loads(x["afterJson"]) if isinstance(x["afterJson"], str) else x["afterJson"])["reason"] for x in audit} == {
                 "Ingredient unavailable", "Ingredient restocked"}
             assert await db.fetchval(
-                'SELECT count(*) FROM payments WHERE "propertyId"=$1', pid
+                'SELECT count(*) FROM payments'
             ) == payments_before, "stop-list must never cause payment"
             print("KITCHEN STOP-LIST POSTGRES E2E: PASS")
     finally:
