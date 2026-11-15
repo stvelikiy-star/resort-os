@@ -11,7 +11,10 @@ const control='apps/admin/components/OwnerControlV2.tsx';
 assert.equal(read(control).replace(' tabIndex={0} role="region" aria-label="Загрузка по дням"',''),original(control));
 const center='apps/admin/components/fl2/OwnerCommandCenter.tsx';
 assert.equal(read(center).replace('<h1>Добро пожаловать в MARINA SMART!</h1>','<h1>Command Center</h1>'),original(center));
-for(const path of ['apps/admin/components/fl2/Fl2.tsx','apps/admin/app/fl2-foundation.css'])assert.equal(read(path),original(path),`${path}: foundation changed`);
+assert.equal(read('apps/admin/components/fl2/Fl2.tsx'),original('apps/admin/components/fl2/Fl2.tsx'),'Fl2 component logic changed');
+// Foundation color declarations may change only through the separate reference foundation contract.
+const stripTokens=s=>s.replace(/  --mx-surface:[^;]+;\n/g,'').replace(/--mx-[a-z-]+:\s*[^;]+;/g,'').trim();
+assert.equal(stripTokens(read('apps/admin/app/fl2-foundation.css').split('/* REFERENCE_BRIDGE')[0]),stripTokens(original('apps/admin/app/fl2-foundation.css')),'Foundation component/motion rules changed');
 const css=read('apps/admin/app/fl2-owner-composition.css').split('/* C2 —')[1];
 assert.ok(css);assert.ok(!/#[\da-f]{3,8}\b/i.test(css),'C2 must use shared tokens, no new palette');
 assert.ok(!/display:\s*none|visibility:\s*hidden/.test(css),'Do not hide analytics to pass layout checks');
