@@ -154,6 +154,11 @@ async def main():
             served = require(await waiter.patch(f"/api/v1/kitchen/orders/{oid}/status",
                                                 json={"status": "SERVED"}), 200, "waiter serves")
             assert served["status"] == "SERVED"
+            history = require(await owner.get("/api/v1/kitchen/orders?status=ALL"), 200, "Web served history")["items"]
+            served_web = next(x for x in history if x["id"] == oid)
+            assert served_web["status"] == "SERVED" and served_web["total_kgs"] == order["total_kgs"]
+            active_after = require(await cook.get("/api/v1/kitchen/orders?status=ACTIVE"), 200, "Web kitchen active after serve")["items"]
+            assert not any(x["id"] == oid for x in active_after)
             candidates = require(await waiter.get("/api/v1/dining/folio-orders"), 200, "folio candidate")
             match = next(x for x in candidates["items"] if x["id"] == oid)
             assert match["eligible_to_post"] and match["waiter_id"] == wid
