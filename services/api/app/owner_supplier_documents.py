@@ -213,6 +213,12 @@ async def link_existing_receipt(document_id: uuid.UUID, body: SupplierReceiptAll
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await trusted_property_id(conn, user)
+            # Serialize this receipt globally before taking a document-line lock.
+            # Competing requests using the same receipt against different lines
+            # must return deterministic 409, not a primary-key 500.
+            await conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                "supplier-receipt-link:" + str(body.receipt_id))
             # Serialize all allocations against this source line, including partials.
             line = await conn.fetchrow(
                 '''SELECT l.id,l."stockItemId",l.quantity,l."unitCostKgs"
