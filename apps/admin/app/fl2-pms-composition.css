@@ -642,3 +642,7 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] :is(.owner-booking-modal,.v
  html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
  html[data-marina-ui="future-luxury"][data-fl2-theme] .room-readiness-button { flex-basis:calc(50% - 10px); }
 }
+
+/* Inner fact tiles previously retained a white Legacy fill in Dark. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-facts > div { background:var(--mx-bg);border-color:var(--mx-edge); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(.room-detail-item b,.room-detail-status .badge) { font-size:13px;line-height:1.5; }

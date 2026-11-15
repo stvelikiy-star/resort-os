@@ -71,6 +71,15 @@ async function configure(t,mode='ready'){
  await page.route('**/core/api/v1/ops/rooms/*/state',async r=>{const body=r.request().postDataJSON();requests.push({method:r.request().method(),path:new URL(r.request().url()).pathname,body});await new Promise(resolve=>setTimeout(resolve,1200));state=body.state;return r.fulfill({json:{}});});
  return {start,end};
 }
+async function roomLegibility(page){return page.locator('.room-detail-modal').evaluate(root=>{
+ const nodes=[root,...root.querySelectorAll('*')].filter(e=>e.getClientRects().length&&[...e.childNodes].some(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim()));
+ const rgba=s=>{const a=s.match(/[\d.]+/g)?.map(Number);return a&&a.length>=3?[a[0],a[1],a[2],a[3]??1]:[0,0,0,0];};
+ const over=(a,b)=>a.slice(0,3).map((v,i)=>v*a[3]+b[i]*(1-a[3]));
+ const background=e=>{const chain=[];for(let p=e;p;p=p.parentElement)chain.unshift(p);let c=[255,255,255];for(const n of chain)c=over(rgba(getComputedStyle(n).backgroundColor),c);return c;};
+ const lum=a=>a.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
+ const ratios=nodes.map(e=>{const b=background(e),c=over(rgba(getComputedStyle(e).color),b),l=[lum(c),lum(b)].sort((a,b)=>a-b);return {text:e.textContent.slice(0,70),ratio:(l[1]+.05)/(l[0]+.05)};});
+ return {small:nodes.filter(e=>parseFloat(getComputedStyle(e).fontSize)<11.99).map(e=>({text:e.textContent.slice(0,70),size:getComputedStyle(e).fontSize})),failures:ratios.filter(r=>r.ratio<4.5),minimum:Math.min(...ratios.map(r=>r.ratio))};
+ });}
 async function checkFocus(page,selector){
  await page.waitForFunction(selector=>document.querySelector(selector)?.contains(document.activeElement),selector);
  assert.equal(await page.evaluate(()=>document.body.style.overflow),'hidden');
@@ -86,7 +95,7 @@ try {
  for(const width of [1440,768,390])for(const theme of ['dark','light']){
   const t=await open(width,theme),{page}=t;await configure(t);
   await newBooking(page,true);assert.equal(await page.locator('.owner-booking-head button').evaluate(e=>e===document.activeElement),true);await checkFocus(page,'.owner-booking-modal');await escapeAndReturn(page,'.owner-booking-modal','.owner-night-cell[data-room-code="305"]');
-  const room=page.locator('.owner-room-label').first();await room.scrollIntoViewIfNeeded();await room.focus();await page.keyboard.press('Enter');await page.locator('.room-detail-facts').waitFor();await checkFocus(page,'.room-detail-modal');const m=await metrics(page,'.room-detail-modal');assert.equal(m.overflow,0);assert.deepEqual(m.smallControls,[]);
+  const room=page.locator('.owner-room-label').first();await room.scrollIntoViewIfNeeded();await room.focus();await page.keyboard.press('Enter');await page.locator('.room-detail-facts').waitFor();await checkFocus(page,'.room-detail-modal');const m=await metrics(page,'.room-detail-modal');m.legibility=await roomLegibility(page);assert.deepEqual(m.legibility.small,[]);assert.deepEqual(m.legibility.failures,[]);assert.equal(m.overflow,0);assert.deepEqual(m.smallControls,[]);
   await page.locator('.room-detail-modal').evaluate(e=>{e.scrollTop=0;});await page.screenshot({path:`${out}/room-${width}-${theme}.png`});await page.getByRole('button',{name:/Брони и блоки/}).click();await page.locator('.room-detail-item').getByText('QA-100',{exact:false}).waitFor();await page.screenshot({path:`${out}/room-blocks-${width}-${theme}.png`});
   await escapeAndReturn(page,'.room-detail-modal','.owner-room-label');
   await schedule(t);const openerHandle=await page.locator('.owner-booking-bar').first().elementHandle();await checkFocus(page,'.v8-builder');await splitAndMove(page);assert.equal(await page.getByRole('button',{name:'Подтвердить и сохранить график',exact:true}).count(),0);
