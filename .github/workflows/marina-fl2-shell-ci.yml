@@ -73,10 +73,11 @@ jobs:
           node scripts/design/fl2-pms-browser.mjs
           node scripts/design/fl2-reference-browser.mjs
           node scripts/design/fl2-pms-dialog-browser.mjs
+          node scripts/design/fl2-pms-extended-browser.mjs
       - name: Preserve QA server logs
         if: always()
         run: |
-          mkdir -p c1-evidence c2-evidence c3-evidence foundation-evidence dialog-evidence
+          mkdir -p c1-evidence c2-evidence c3-evidence foundation-evidence dialog-evidence extended-pms-evidence
           cp /tmp/c1-core.log /tmp/c1-admin.log c1-evidence/ 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
@@ -88,4 +89,5 @@ jobs:
             c3-evidence/
             foundation-evidence/
             dialog-evidence/
+            extended-pms-evidence/
           if-no-files-found: warn
