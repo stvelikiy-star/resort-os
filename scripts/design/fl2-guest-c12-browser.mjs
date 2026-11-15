@@ -24,15 +24,26 @@ try {
   await page.locator('.concierge-auth input').waitFor({timeout:20000});
   const logo=page.locator('.concierge-brand img');assert.equal(await logo.count(),1);
   const logoOk=await logo.evaluate(e=>e.complete&&e.naturalWidth>0);assert.ok(logoOk,'Original approved PNG did not load');
+  if(width===320) {
+   const header=await page.locator('.concierge-topbar').evaluate(e=>{
+    const name=e.querySelector('.concierge-brand strong').getBoundingClientRect();
+    const langs=e.querySelector('.concierge-langs').getBoundingClientRect();
+    return {nameWidth:name.width,langTop:langs.top,nameBottom:name.bottom};
+   });
+   assert.ok(header.nameWidth>=190,'Hotel name is squeezed by locales: '+JSON.stringify(header));
+   assert.ok(header.langTop>=header.nameBottom-1,'320px locale controls must not compete with full hotel name');
+  }
   let overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   assert.ok(overflow<=1,'PIN page overflow '+width+': '+overflow);
   await page.screenshot({path:`${dir}/guest-pin-${width}.png`,fullPage:true});
+  await page.screenshot({path:`${dir}/guest-pin-${width}-viewport.png`});
   await page.locator('.concierge-auth input').fill('123456');
   await page.locator('.concierge-auth form button').click();
   await page.locator('.concierge-actions button').first().waitFor();
   overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   assert.ok(overflow<=1,'Logged-in Guest page overflow '+width+': '+overflow);
   await page.screenshot({path:`${dir}/guest-active-${width}.png`,fullPage:true});
+  await page.screenshot({path:`${dir}/guest-active-${width}-viewport.png`});
   await page.locator('.concierge-actions button').first().click();
   const modal=page.locator('.concierge-modal');await modal.waitFor();
   const m=await page.evaluate(()=>{
@@ -49,6 +60,7 @@ try {
   await modal.getByRole('button',{name:'Закрыть'}).focus();
   const focus=await modal.getByRole('button',{name:'Закрыть'}).evaluate(e=>getComputedStyle(e).outlineStyle);assert.notEqual(focus,'none');
   await page.screenshot({path:`${dir}/guest-request-dialog-${width}.png`,fullPage:true});
+  await page.screenshot({path:`${dir}/guest-request-dialog-${width}-viewport.png`});
   await modal.getByRole('button',{name:'Закрыть'}).click();assert.equal(await modal.count(),0);
   assert.deepEqual(errors,[],'No browser JS errors');
   records.push({width,logoOk,overflow,m,errors,syntheticAuthentication:true,noBusinessWrites:true});
