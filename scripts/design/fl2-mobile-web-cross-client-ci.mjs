@@ -102,7 +102,11 @@ async function main(){
   await form.getByLabel('Телефон гостя').fill('+996555000332');
   const previewResponse=a.page.waitForResponse(r=>r.url().endsWith('/core/api/v1/admin/pms/reservations/new/preview')&&r.request().method()==='POST');
   await form.getByRole('button',{name:'Проверить доступность и цену'}).click();
-  assert.equal((await previewResponse).status(),200);
+  const webPreview=await previewResponse;
+  assert.equal(webPreview.status(),200);
+  const webQuote=await webPreview.json();
+  console.log('WEB_PMS_PREVIEW',JSON.stringify({can_commit:webQuote.can_commit,conflicts:webQuote.conflicts,reason:webQuote.pricing?.reason,room:webQuote.room?.code,source:webQuote.pricing?.source,dates:second}));
+  assert.equal(webQuote.can_commit,true,'Web PMS quote rejected second non-overlapping booking');
   const confirm=form.getByRole('button',{name:'Подтвердить бронь'});
   await confirm.waitFor();
   const committedResponse=a.page.waitForResponse(r=>r.url().endsWith('/core/api/v1/admin/pms/reservations/new/commit')&&r.request().method()==='POST');
