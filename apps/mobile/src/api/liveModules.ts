@@ -550,9 +550,9 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     },
     reportKitchenLoss: async (loss:KitchenLossMutation):Promise<KitchenLossAcknowledgment> => {
       reviewGate();
-      const reason=loss.reason.trim().replace(/\\s+/g,' ');
+      const reason=loss.reason.trim().replace(/\s+/g,' ');
       const quantity=loss.quantity.replace(',','.');
-      if(reason.length<3||reason.length>500||!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(quantity)||Number(quantity)<=0 ||
+      if(reason.length<3||reason.length>500||!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0 ||
         !['WASTE','SPOILAGE'].includes(loss.kind))
         throw new ApiError('BAD_REQUEST','Invalid kitchen loss');
       const id=safeRouteId(loss.movement_id);
