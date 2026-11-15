@@ -28,7 +28,7 @@ const pinned = {
   'owner_cash_reconciliation.py': 'd35423df92c85d30c2a0023e76e01b373d6c9016',
   'owner_expenses.py': '7a6835a7e7a5d0926d0a1f36d5dcb41f291d0ea2',
   'owner_kitchen_management.py': '49737685aabe87ca4b36ebee499c27b78f860eb2',
-  'kitchen_procurement.py': '35024849f3697e6b1da928e4428f8e8f54c89453',
+  'kitchen_procurement.py': '41ca7eb977d57ece57eee3c175da390f4c4d00d3',
   'kitchen_stock.py': '06323d114115fe326caa0daaa6df6b20dac5c069',
   'kitchen_menu_management.py': '3d8f8947e3a26cd40f77f718887c5f674fb4038c',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',

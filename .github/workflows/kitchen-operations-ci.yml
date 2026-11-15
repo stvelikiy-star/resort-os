@@ -21,6 +21,10 @@ on:
       - 'scripts/verify_mobile_menu_publication_e2e.py'
       - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
       - 'scripts/verify_kitchen_procurement_e2e.py'
+      - 'scripts/verify_procurement_recovery_e2e.py'
+      - 'scripts/procurement_journal_process_e2e.cjs'
+      - 'apps/mobile/src/lib/pendingProcurement.ts'
+      - 'apps/mobile/src/components/KitchenProcurement.tsx'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
       - 'scripts/test_marina_kitchen_stock.py'
       - 'scripts/test_marina_stock_receipts.py'
@@ -243,6 +247,11 @@ jobs:
         env:
           ALLOW_KITCHEN_PROCUREMENT_TEST_WRITES: '1'
         run: python scripts/verify_kitchen_procurement_e2e.py
+
+      - name: Verify procurement concurrency and mobile journal process restart
+        env:
+          ALLOW_PROCUREMENT_RECOVERY_TEST_WRITES: '1'
+        run: python scripts/verify_procurement_recovery_e2e.py
 
       - name: Run owner expense obligations and manual settlements PostgreSQL E2E
         env:

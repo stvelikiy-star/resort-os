@@ -139,6 +139,8 @@ async def create_request(body: RequestWrite, request: Request, user=Depends(requ
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid=await trusted_property_id(conn,user)
+            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+                               'kitchen-procurement-request:'+str(body.request_id))
             item=await conn.fetchrow(
                 '''SELECT id FROM kitchen_stock_items WHERE id=$1 AND "propertyId"=$2
                    AND "isSample"=false FOR UPDATE''',
@@ -153,12 +155,14 @@ async def create_request(body: RequestWrite, request: Request, user=Depends(requ
                     or prior["notes"]!=body.notes):
                     raise HTTPException(409,detail={"code":"KITCHEN_PROC_REQUEST_ID_CONFLICT"})
                 return {"id":str(body.request_id),"status":"EXISTS","payment_created":False}
-            await conn.execute(
+            inserted=await conn.fetchval(
                 '''INSERT INTO kitchen_procurement_requests
                    (id,"propertyId","stockItemId","requestedQuantity","serviceDate",notes,"createdById")
-                   VALUES ($1,$2,$3,$4,$5,$6,$7)''',
+                   VALUES ($1,$2,$3,$4,$5,$6,$7)
+                   ON CONFLICT (id) DO NOTHING RETURNING id''',
                 body.request_id,pid,body.stock_item_id,body.quantity,body.service_date,
                 body.notes,uuid.UUID(user["id"]))
+            if not inserted:raise HTTPException(409,detail={"code":"KITCHEN_PROC_REQUEST_ID_CONFLICT"})
     return {"id":str(body.request_id),"status":"REQUESTED","payment_created":False}
 
 
@@ -189,6 +193,8 @@ async def receive_request(request_id: uuid.UUID, body: ReceiptWrite, request: Re
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid=await trusted_property_id(conn,user)
+            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+                               'kitchen-procurement-receipt:'+str(body.receipt_id))
             preliminary=await conn.fetchrow(
                 '''SELECT "stockItemId" FROM kitchen_procurement_requests
                    WHERE id=$1 AND "propertyId"=$2''',request_id,pid)
@@ -218,12 +224,14 @@ async def receive_request(request_id: uuid.UUID, body: ReceiptWrite, request: Re
             accumulated=row["receivedQuantity"]+body.quantity
             if accumulated>row["requestedQuantity"]:
                 raise HTTPException(409,detail={"code":"KITCHEN_PROC_OVER_RECEIPT"})
-            await conn.execute(
+            inserted=await conn.fetchval(
                 '''INSERT INTO kitchen_stock_movements
                    (id,"propertyId","stockItemId",kind,quantity,"unitCostKgs","createdById",notes)
-                   VALUES ($1,$2,$3,'RECEIPT',$4,$5,$6,$7)''',
+                   VALUES ($1,$2,$3,'RECEIPT',$4,$5,$6,$7)
+                   ON CONFLICT (id) DO NOTHING RETURNING id''',
                 body.receipt_id,pid,item["id"],body.quantity,item["costPerUnitKgs"],
                 uuid.UUID(user["id"]),f"Procurement receipt for {request_id}")
+            if not inserted:raise HTTPException(409,detail={"code":"KITCHEN_PROC_RECEIPT_ID_CONFLICT"})
             await conn.execute(
                 '''INSERT INTO kitchen_procurement_receipts
                    (id,"propertyId","requestId",quantity,"createdById")

@@ -1,7 +1,8 @@
-import React, {useCallback, useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {Alert, Text, View} from 'react-native';
 import type {createLiveModules, KitchenStockSnapshot} from '../api/liveModules';
 import {useAsync} from '../lib/useAsync';
+import {executeProcurement,readProcurement,PendingProcurement} from '../lib/pendingProcurement';
 import {useSession} from '../state/session';
 import {useTheme} from '../theme/ThemeProvider';
 import {ErrorState, GlassCard, LoadingShimmer} from './Future';
@@ -46,11 +47,6 @@ const COPY={
   warning:'Өтінім мен бекіту қойманы өзгертпейді және төлем жасамайды. Қалдық қабылдау кезінде өседі.'},
 } as const;
 
-type Pending=
- | {kind:'REQUEST';request_id:string;stock_item_id:string;quantity:string;
-    service_date:string|null;notes:string|null}
- | {kind:'RECEIVE';requestId:string;receipt_id:string;quantity:string};
-
 function localToday(){
   const now=new Date();
   return [now.getFullYear(),String(now.getMonth()+1).padStart(2,'0'),
@@ -58,12 +54,17 @@ function localToday(){
 }
 const validQuantity=(value:string)=>/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(value)&&Number(value)>0;
 
-export function KitchenProcurement({live,stock,reloadStock}:{
+type Props={live:ReturnType<typeof createLiveModules>;stock:KitchenStockSnapshot;reloadStock:()=>Promise<unknown>};
+export function KitchenProcurement(props:Props){
+ const {hotel,user}=useSession();
+ return <ProcurementForm key={[hotel?.id,user?.id,user?.role,user?.module_permissions?.join(',')].join('.')} {...props}/>;
+}
+function ProcurementForm({live,stock,reloadStock}:{
   live:ReturnType<typeof createLiveModules>;
   stock:KitchenStockSnapshot;
   reloadStock:()=>Promise<unknown>;
 }){
-  const {user,locale}=useSession();
+  const {user,hotel,locale}=useSession();
   const {c}=useTheme();
   const t=COPY[locale];
   const [serviceDate,setServiceDate]=useState(localToday);
@@ -73,42 +74,49 @@ export function KitchenProcurement({live,stock,reloadStock}:{
   const [notes,setNotes]=useState('');
   const [receiveQuantity,setReceiveQuantity]=useState('');
   const [busy,setBusy]=useState(false);
-  const [pending,setPending]=useState<Pending|null>(null);
+  const lock=useRef(false);
+  const journal=useAsync(()=>hotel&&user?readProcurement(hotel.id,user.id):Promise.resolve(null),[hotel?.id,user?.id]);
+  const pending=journal.data;
+  const ready=!!hotel&&!!user&&!journal.loading&&!journal.error;
   const list=useAsync(()=>live.procurementRequests(),[live,user?.id]);
   const needs=useAsync(()=>live.procurementNeeds(targetDate),[live,user?.id,targetDate]);
   const canRequest=['OWNER','MANAGER','COOK','STORE_STAFF'].includes(user?.role||'');
   const canApprove=['OWNER','MANAGER'].includes(user?.role||'');
   const canReceive=['OWNER','MANAGER','STORE_STAFF'].includes(user?.role||'');
 
-  const execute=useCallback(async(op:Pending)=>{
-    if(busy)return;
-    setBusy(true);setPending(op);
+  const execute=async(op:PendingProcurement|null)=>{
+    const action=op??pending;
+    if(lock.current||!ready||!hotel||!user||!action||
+       (action.kind==='REQUEST'?!canRequest:!canReceive))return;
+    lock.current=true;setBusy(true);
     try{
-      if(op.kind==='REQUEST'){
-        await live.requestKitchenProcurement({
-          request_id:op.request_id,stock_item_id:op.stock_item_id,
-          quantity:op.quantity,service_date:op.service_date,notes:op.notes,
-        });
-      }else{
-        await live.receiveKitchenProcurement(op.requestId,{
-          receipt_id:op.receipt_id,quantity:op.quantity,
-        });
-      }
-      await list.reload();await needs.reload();await reloadStock();
-      setPending(null);setQuantity('');setReceiveQuantity('');setNotes('');
+      await executeProcurement(hotel.id,user.id,op?async()=>{
+        // A new action gets a fresh server UUID; explicit replay retains the saved one.
+        const fresh=await live.procurementRequests();
+        return op.kind==='REQUEST'?{...op,request_id:fresh.new_request_id}:{...op,receipt_id:fresh.new_receipt_id};
+      }:null,async saved=>{
+        if(saved.kind==='REQUEST'){
+          if(!canRequest)throw new Error('Procurement request forbidden');
+          const {kind:_,...payload}=saved;
+          return live.requestKitchenProcurement(payload);
+        }
+        if(!canReceive)throw new Error('Procurement receipt forbidden');
+        return live.receiveKitchenProcurement(saved.requestId,{receipt_id:saved.receipt_id,quantity:saved.quantity});
+      });
+      setQuantity('');setReceiveQuantity('');setNotes('');
+      await Promise.all([list.reload(),needs.reload(),reloadStock()]);
       Alert.alert(t.done);
-    }catch(e){
-      Alert.alert(t.title,e instanceof Error?e.message:String(e));
-    }finally{setBusy(false);}
-  },[busy,live,list,needs,reloadStock,t]);
+    }catch(e){Alert.alert(t.title,e instanceof Error?e.message:String(e));}
+    finally{await journal.reload();lock.current=false;setBusy(false);}
+  };
 
   const requestProduct=()=>{
     const q=quantity.replace(',','.');
-    if(!canRequest||!list.data||pending||busy||!selected||!validQuantity(q)||
+    if(!canRequest||!ready||!list.data||pending||busy||!selected||!validQuantity(q)||
        !/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)){
       Alert.alert(t.invalid);return;
     }
-    const op:Pending={kind:'REQUEST',request_id:list.data.new_request_id,
+    const op:PendingProcurement={kind:'REQUEST',request_id:list.data.new_request_id,
       stock_item_id:selected,quantity:q,service_date:serviceDate,
       notes:notes.trim()||null};
     Alert.alert(t.confirm,stock.items.find(x=>x.id===selected)?.name||'',
@@ -117,20 +125,22 @@ export function KitchenProcurement({live,stock,reloadStock}:{
   };
   const receiveProduct=(id:string)=>{
     const q=receiveQuantity.replace(',','.');
-    if(!canReceive||!list.data||pending||busy||!validQuantity(q)){
+    if(!canReceive||!ready||!list.data||pending||busy||!validQuantity(q)){
       Alert.alert(t.invalid);return;
     }
-    const op:Pending={kind:'RECEIVE',requestId:id,receipt_id:list.data.new_receipt_id,quantity:q};
+    const op:PendingProcurement={kind:'RECEIVE',requestId:id,receipt_id:list.data.new_receipt_id,quantity:q};
     Alert.alert(t.confirm,q,[{text:locale==='en'?'Cancel':'Отмена',style:'cancel'},
       {text:t.receive,onPress:()=>void execute(op)}]);
   };
   const approve=async(id:string)=>{
-    if(!canApprove||busy||pending)return;
-    setBusy(true);
+    if(!canApprove||!ready||lock.current||busy||pending)return;
+    lock.current=true;setBusy(true);
     try{await live.approveKitchenProcurement(id);await list.reload();await needs.reload();Alert.alert(t.done);}
     catch(e){Alert.alert(t.title,e instanceof Error?e.message:String(e));}
-    finally{setBusy(false);}
+    finally{lock.current=false;setBusy(false);}
   };
+  const pendingItem=pending?.kind==='REQUEST'?stock.items.find(x=>x.id===pending.stock_item_id):list.data?.items.find(x=>x.id===pending?.requestId);
+  const pendingName=pendingItem?('stock_name' in pendingItem?pendingItem.stock_name:pendingItem.name):t.request;
   const statuses={REQUESTED:t.requested,APPROVED:t.approved,PARTIAL:t.partial,RECEIVED:t.received};
   return <GlassCard testID="kitchen-procurement" style={{gap:9}}>
     <SectionLabel>{t.title}</SectionLabel>
@@ -155,7 +165,9 @@ export function KitchenProcurement({live,stock,reloadStock}:{
     <SectionLabel>{t.request}</SectionLabel>
     {list.loading?<LoadingShimmer count={1}/>:null}
     {list.error?<ErrorState text={list.error.message} onRetry={list.reload} retry={t.retry}/>:null}
-    {canRequest&&!pending&&list.data?<View style={{gap:8}}>
+    {journal.loading?<LoadingShimmer count={1}/>:null}
+    {journal.error?<ErrorState text={journal.error.message} onRetry={journal.reload} retry={t.retry}/>:null}
+    {canRequest&&ready&&!pending&&list.data?<View style={{gap:8}}>
       {stock.items.filter(item=>!item.is_sample).map(item=><Button key={item.id}
         label={item.name+' · '+item.unit+(item.is_sample?' · ТЕСТ':'')}
         variant={selected===item.id?'primary':'secondary'} onPress={()=>setSelected(item.id)}/>)}
@@ -164,16 +176,19 @@ export function KitchenProcurement({live,stock,reloadStock}:{
       <Button disabled={busy||!selected||!quantity} testID="procurement-create"
         label={t.create} onPress={requestProduct}/>
     </View>:null}
-    {pending?<Button disabled={busy} label={t.retry} testID="procurement-retry"
-      variant="secondary" onPress={()=>void execute(pending)}/>:null}
+    {pending?<View testID="procurement-pending" style={{gap:6}}>
+      <Text style={{color:c.warning}}>{pending.kind==='REQUEST'?t.create:t.receive} · {pendingName} · {pending.quantity} {pendingItem?.unit}</Text>
+      <Button disabled={busy||!ready||(pending.kind==='REQUEST'?!canRequest:!canReceive)} label={t.retry} testID="procurement-retry"
+        variant="secondary" onPress={()=>void execute(null)}/>
+    </View>:null}
     <SectionLabel>{t.history}</SectionLabel>
     {list.data?.items.slice(0,20).map(row=><View key={row.id} style={{gap:6,paddingVertical:5}}>
       <Text style={{color:c.text}}>{row.stock_name} · {row.quantity} {row.unit}</Text>
       <Text style={{color:c.textMuted}}>{statuses[row.status]}
         {' · '+row.received_quantity+'/'+row.quantity+' '+row.unit}</Text>
-      {canApprove&&row.status==='REQUESTED'?<Button disabled={busy||!!pending}
+      {canApprove&&row.status==='REQUESTED'?<Button disabled={busy||!ready||!!pending}
         label={t.approve} onPress={()=>void approve(row.id)}/>:null}
-      {canReceive&&!pending&&['APPROVED','PARTIAL'].includes(row.status)?<View style={{gap:5}}>
+      {canReceive&&ready&&!pending&&['APPROVED','PARTIAL'].includes(row.status)?<View style={{gap:5}}>
         <Field label={t.receiveQuantity} keyboardType="decimal-pad"
           value={receiveQuantity} onChangeText={setReceiveQuantity}/>
         <Button disabled={busy||!receiveQuantity} label={t.receive}
