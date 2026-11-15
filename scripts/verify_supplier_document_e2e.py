@@ -40,6 +40,7 @@ async def main():
     conn = await asyncpg.connect(db_url)
     item_id = doc_id = request_id = None
     receipt_ids = []
+    mixed_receipt_id = loss_id = None
     try:
         async with httpx.AsyncClient(base_url=base, timeout=30) as owner, \
                    httpx.AsyncClient(base_url=base, timeout=30) as store:
@@ -165,6 +166,37 @@ async def main():
             row = next(x for x in final["items"] if x["id"] == doc_id)
             assert Decimal(row["outstanding_kgs"]) == 0
             assert Decimal(row["settled_kgs"]) == Decimal("617.2835")
+            # Test actual supplier price + an independent legacy-price receipt,
+            # then debit SPOILAGE at moving weighted-average cost, not catalog cost.
+            mixed_receipt_id=str(uuid.uuid4())
+            check(await owner.post("/api/v1/kitchen/stock/receipts",json={
+                "movement_id":mixed_receipt_id,"stock_item_id":item_id,
+                "quantity":"5","notes":"Synthetic weighted average stock"}),201,
+                "legacy receipt at catalog price")
+            loss_id=str(uuid.uuid4())
+            loss_payload={"movement_id":loss_id,"stock_item_id":item_id,
+                          "quantity":"2","kind":"SPOILAGE",
+                          "reason":"Synthetic weighted valuation loss"}
+            waste=check(await owner.post("/api/v1/kitchen/stock/losses",
+                                         json=loss_payload),201,"weighted loss")
+            assert Decimal(waste["cost_kgs"])==Decimal("223.4568"),waste
+            repeated=check(await owner.post("/api/v1/kitchen/stock/losses",
+                                            json=loss_payload),201,"same loss retry")
+            assert repeated["already_processed"] is True
+            stored=await conn.fetchrow(
+                'SELECT quantity,"unitCostKgs" FROM kitchen_stock_movements WHERE id=$1',
+                uuid.UUID(loss_id))
+            assert stored["quantity"]==Decimal("2")
+            assert stored["unitCostKgs"]==Decimal("111.7284"),stored
+            valued=await conn.fetchrow(
+                '''SELECT SUM(CASE WHEN kind='RECEIPT' THEN quantity ELSE -quantity END) AS balance,
+                          SUM(CASE WHEN kind='RECEIPT' THEN quantity*"unitCostKgs"
+                                   ELSE -quantity*"unitCostKgs" END) AS remaining_value
+                   FROM kitchen_stock_movements
+                   WHERE "propertyId"=$1 AND "stockItemId"=$2''',
+                pid,uuid.UUID(item_id))
+            assert valued["balance"]==Decimal("8")
+            assert valued["remaining_value"]==Decimal("893.8267")
             assert await conn.fetchval("SELECT COUNT(*) FROM payments") == payment_before
             assert await conn.fetchval(
                 'SELECT COUNT(*) FROM owner_expenses WHERE "propertyId"=$1',
@@ -193,6 +225,13 @@ async def main():
                     await conn.execute(
                         "DELETE FROM kitchen_supplier_documents WHERE id=$1",
                         uuid.UUID(doc_id))
+                # Remove only this test's debit and extra receipt before the stock item.
+                if loss_id:
+                    await conn.execute(
+                        "DELETE FROM kitchen_stock_movements WHERE id=$1",uuid.UUID(loss_id))
+                if mixed_receipt_id:
+                    await conn.execute(
+                        "DELETE FROM kitchen_stock_movements WHERE id=$1",uuid.UUID(mixed_receipt_id))
                 for rid in receipt_ids:
                     await conn.execute(
                         "DELETE FROM kitchen_procurement_receipts WHERE id=$1",
