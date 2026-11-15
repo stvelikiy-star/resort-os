@@ -51,6 +51,20 @@ async def main():
                 "unit":"KG","cost_per_unit_kgs":"140.50","is_sample":False,
             }),201,"stock item")
             iid=created["id"]
+            # The database must reject null loss reasons even if someone bypasses the API.
+            try:
+                async with db.transaction():
+                    await db.execute(
+                        '''INSERT INTO kitchen_stock_movements
+                           (id,"propertyId","stockItemId",kind,quantity,"unitCostKgs","createdById",notes)
+                           VALUES ($1,$2,$3,'WASTE',$4,$5,$6,NULL)''',
+                        uuid.uuid4(),pid,uuid.UUID(iid),Decimal("0.01"),
+                        Decimal("140.50"),uuid.UUID(cook_me["id"]),
+                    )
+            except asyncpg.CheckViolationError:
+                pass
+            else:
+                raise AssertionError("PostgreSQL must reject null WASTE reason")
             require(await owner.post("/api/v1/kitchen/stock/receipts",json={
                 "stock_item_id":iid,"quantity":"10","notes":"Isolated stock loss test",
             }),201,"stock receipt")
