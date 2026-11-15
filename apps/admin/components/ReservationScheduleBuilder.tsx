@@ -2,7 +2,7 @@
 
 import { usePmsDialog } from "./hooks/usePmsDialog";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type RoomOption = {
   id: string;
@@ -135,6 +135,7 @@ export default function ReservationScheduleBuilder({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const dialogRef = usePmsDialog(onClose, busy);
+  const previewResultRef = useRef<HTMLElement | null>(null);
   const [confirmCancellation, setConfirmCancellation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [splitInputs, setSplitInputs] = useState<Record<number, string>>({});
@@ -325,7 +326,7 @@ export default function ReservationScheduleBuilder({
         body: JSON.stringify({ segments: draft.map(({ room_id, start, end }) => ({ room_id, start, end })) }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(errorText(body, "Core отклонил предложенный график"));
+      if (!response.ok) throw new Error(errorText(body, "Не удалось проверить предложенный график"));
       setPreview(body as PreviewResponse);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка предварительной проверки");
@@ -333,6 +334,15 @@ export default function ReservationScheduleBuilder({
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!preview) return;
+    // Scroll only after explicit preview; preserve focus and form contents.
+    const frame = window.requestAnimationFrame(() => {
+      previewResultRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [preview]);
 
   async function commit() {
     if (!preview) return;
@@ -396,7 +406,7 @@ export default function ReservationScheduleBuilder({
           <div><span>Стоимость в брони</span><strong>{money(data.reservation.stored_total_kgs)}</strong></div>
         </div>
 
-        <div className="v8-builder-rules"><strong>Правило:</strong> одна бронь остаётся одной бронью. Сегменты обязаны непрерывно покрывать весь stay. Уже прожитые ночи CHECKED_IN не переписываются; для переселения текущий кусок разрезается с сегодняшней даты.</div>
+        <div className="v8-builder-rules"><strong>Правило:</strong> одна бронь остаётся одной бронью. Сегменты обязаны непрерывно покрывать весь период проживания. Уже прожитые ночи после заселения не переписываются; для переселения текущий кусок разрезается с сегодняшней даты.</div>
 
         <section className="v8-builder-dates">
           <label><span>Заезд</span><input type="date" value={draft[0]?.start || data.reservation.check_in} onChange={(event) => changeOuter("start", event.target.value)} /></label>
@@ -447,11 +457,11 @@ export default function ReservationScheduleBuilder({
 
         {error && <div className="v8-builder-error">{error}</div>}
 
-        <div className="v8-builder-preview-actions"><button className="btn primary" onClick={() => void runPreview()} disabled={busy || !draft.length}>{busy ? "Проверяю…" : "Проверить в MARINA SMART"}</button><span>Сначала preview: конфликты, категории, цена и версия брони. Только затем commit.</span></div>
+        <div className="v8-builder-preview-actions"><button className="btn primary" onClick={() => void runPreview()} disabled={busy || !draft.length}>{busy ? "Проверяю…" : "Проверить в MARINA SMART"}</button><span>Сначала проверьте конфликты, категорию, стоимость и актуальность брони. Затем подтвердите изменения.</span></div>
 
-        {preview && <section className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
-          <header><div><strong>{preview.can_commit ? "График можно сохранить" : "Core запретил сохранение"}</strong><span>{preview.proposed_check_in} → {preview.proposed_check_out} · {preview.proposed_schedule.length} сегм.</span></div><b>{preview.category_changed ? "Категория меняется" : "Категория без изменения"}</b></header>
-          <div className="v8-preview-money"><div><span>В брони</span><strong>{money(preview.pricing.stored_total_kgs)}</strong></div><div><span>Текущий тариф Core</span><strong>{preview.pricing.sellable ? money(preview.pricing.suggested_total_kgs) : "—"}</strong></div><div><span>Разница</span><strong>{preview.pricing.delta_kgs == null ? "—" : money(preview.pricing.delta_kgs)}</strong></div></div>
+        {preview && <section ref={previewResultRef} tabIndex={-1} role="status" aria-label="Результат проверки графика" className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
+          <header><div><strong>{preview.can_commit ? "График можно сохранить" : "Изменения пока нельзя сохранить"}</strong><span>{preview.proposed_check_in} → {preview.proposed_check_out} · {preview.proposed_schedule.length} сегм.</span></div><b>{preview.category_changed ? "Категория меняется" : "Категория без изменения"}</b></header>
+          <div className="v8-preview-money"><div><span>В брони</span><strong>{money(preview.pricing.stored_total_kgs)}</strong></div><div><span>Текущий тариф</span><strong>{preview.pricing.sellable ? money(preview.pricing.suggested_total_kgs) : "—"}</strong></div><div><span>Разница</span><strong>{preview.pricing.delta_kgs == null ? "—" : money(preview.pricing.delta_kgs)}</strong></div></div>
           {preview.conflicts.length > 0 && <div className="v8-preview-conflicts">{preview.conflicts.map((conflict, index) => <div key={`${conflict.room_code}-${conflict.start}-${index}`}><strong>№ {conflict.room_code}</strong><span>{conflict.start} → {conflict.end} · {conflict.booking_number || conflict.reason || conflict.block_type}</span></div>)}</div>}
           <p>Коммерческая сумма брони не меняется автоматически. Любая тарифная разница только показывается менеджеру.</p>
           <button className="btn primary" onClick={() => void commit()} disabled={busy || !preview.can_commit}>{busy ? "Сохраняю…" : "Подтвердить и сохранить график"}</button>
