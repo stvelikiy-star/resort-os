@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState,useCallback} from 'react';
 import DirectStockReceipt from './DirectStockReceipt';
+import ProcurementInvoiceReceipt from './ProcurementInvoiceReceipt';
 type StockItem={id:string;name:string;unit:string;balance:string;cost_per_unit_kgs:string;is_sample:boolean};
 export default function StoreStaffStock(){
  const [items,setItems]=useState<StockItem[]>([]);
@@ -16,6 +17,7 @@ export default function StoreStaffStock(){
  {items.map(i=><div key={i.id}><strong>{i.name}</strong> · {i.balance} {i.unit}{i.is_sample?' · ТЕСТ':''}</div>)}
  {!items.length?<p>Склад пуст. Добавление номенклатуры доступно владельцу или менеджеру.</p>:null}
  <DirectStockReceipt items={items} onSaved={load}/>
+ <ProcurementInvoiceReceipt onSaved={load}/>
  <button onClick={()=>void load()}>Обновить остатки</button>
  {message?<p role="status">{message}</p>:null}
  </section>;
