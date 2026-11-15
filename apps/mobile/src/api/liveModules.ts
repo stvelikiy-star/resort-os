@@ -587,7 +587,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const quantity=payload.quantity.replace(',','.');
       if(!uuid.test(payload.request_id)||!uuid.test(payload.stock_item_id)||
-        !/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(quantity)||Number(quantity)<=0||
+        !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0||
         (payload.notes!==null&&payload.notes.length>500))
         throw new ApiError('BAD_REQUEST','Invalid procurement request');
       const body={...payload,quantity,service_date:payload.service_date?safeIsoDate(payload.service_date):null};
@@ -609,7 +609,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const quantity=payload.quantity.replace(',','.');
       if(!uuid.test(payload.receipt_id)||!uuid.test(requestId)||
-        !/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(quantity)||Number(quantity)<=0)
+        !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0)
         throw new ApiError('BAD_REQUEST','Invalid procurement receipt');
       const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests/'+safeRouteId(requestId)+'/receive',
         {receipt_id:payload.receipt_id,quantity}),'procurement receipt');
