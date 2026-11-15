@@ -92,6 +92,19 @@ async function main(){
   assert.equal(webGridResponse.status(),200);
   const webGrid=await webGridResponse.json();
   assert.equal(blocksFor(webGrid,committed.reservation_id).length,1,'Web PMS did not see Mobile reservation');
+  // Mobile's real reservation-detail endpoint must read the same Core record.
+  // Compare it with the authenticated Web fetch, not a fabricated JS fixture.
+  const mobileDetail=await mobile.request('GET','/api/v1/admin/reception/reservations/'+committed.reservation_id);
+  assert.equal(mobileDetail.reservation.id,committed.reservation_id);
+  assert.equal(mobileDetail.reservation.status,'GUARANTEED');
+  assert.equal(mobileDetail.reservation.booking_number,committed.booking_number);
+  assert.equal(mobileDetail.reservation.total_kgs,quote.pricing.total_kgs);
+  assert.equal(mobileDetail.guest.first_name,'Synthetic Mobile Transport Guest');
+  const webDetailResponse=await a.context.request.get(API+'/admin/reception/reservations/'+committed.reservation_id);
+  assert.equal(webDetailResponse.status(),200);
+  const webDetail=await webDetailResponse.json();
+  assert.deepEqual(mobileDetail.reservation,webDetail.reservation,'Mobile and Web see different reservation details');
+  assert.deepEqual(mobileDetail.guest,webDetail.guest,'Mobile and Web see different guest details');
   // Real Web UI creates a SECOND booking for a nonoverlapping date interval.
   const second=dateRange(6,8);
   const form=a.page.getByRole('form',{name:'Форма бронирования'});
@@ -119,6 +132,11 @@ async function main(){
   assert.notEqual(webBooking.reservation_id,committed.reservation_id);
   const secondGrid=await mobile.request('GET',`/api/v1/pms/grid?start=${second.check_in}&end=${second.check_out}`);
   assert.equal(blocksFor(secondGrid,webBooking.reservation_id).length,1,'Mobile HTTP client did not see Web reservation');
+  const mobileWebDetail=await mobile.request('GET','/api/v1/admin/reception/reservations/'+webBooking.reservation_id);
+  assert.equal(mobileWebDetail.reservation.id,webBooking.reservation_id);
+  assert.equal(mobileWebDetail.reservation.status,'GUARANTEED');
+  assert.equal(mobileWebDetail.guest.first_name,'Synthetic Web PMS Guest');
+  assert.equal(mobileWebDetail.reservation.total_kgs,webQuote.pricing.total_kgs);
   // Preserve tenant isolation and no repeat commit after unknown ACK.
   const b=await signIn(browser,'HOTEL_B');
   const bClient=createHotelHttpClient(MOBILE_HTTPS,createMobileTransport(b.cookies));
@@ -127,6 +145,7 @@ async function main(){
   assert.equal(blocksFor(bGrid,committed.reservation_id).length,0);
   assert.equal(blocksFor(bGrid,webBooking.reservation_id).length,0);
   await assert.rejects(()=>bClient.request('GET','/api/v1/admin/reception/reservations/'+committed.reservation_id),{code:'NOT_FOUND'});
+  await assert.rejects(()=>bClient.request('GET','/api/v1/admin/reception/reservations/'+webBooking.reservation_id),{code:'NOT_FOUND'});
   const result={testOnly:true,nativeAndroidTested:false,syntheticTransportBridge:true,
    mobileToWeb:committed.reservation_id,webToMobile:webBooking.reservation_id,
    hotel:'HOTEL_A',otherHotel:'HOTEL_B',roomId:room.id,first,second};
