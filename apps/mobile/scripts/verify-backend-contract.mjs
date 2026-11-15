@@ -25,7 +25,7 @@ const pinned = {
   'reception_reservations.py': 'a86688a3dc69cf639cb79bea8d7e243569f57e41',
   'pms_reservation_create.py': 'c5d7fb9fd6b5a36e6c7c9c0b46d8d83155fe306b',
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
-  'kitchen_procurement.py': '8490d144848d44e0889c04745bd3cf6c1480e640',
+  'kitchen_procurement.py': '35024849f3697e6b1da928e4428f8e8f54c89453',
   'kitchen_stock.py': 'ea6f5e8013a967fc9a98c46b992e2d7cd3c0834d',
   'kitchen_menu_management.py': '3d8f8947e3a26cd40f77f718887c5f674fb4038c',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',
