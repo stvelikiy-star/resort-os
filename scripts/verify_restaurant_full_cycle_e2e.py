@@ -46,7 +46,7 @@ async def main():
                 """INSERT INTO reservations
                    (id,"propertyId","bookingNumber","primaryGuestId",status,"checkIn","checkOut",
                     adults,children,"totalKgs","createdAt","updatedAt")
-                   VALUES ($1,$2,$3,$4,'CHECKED_IN',$5,$5 + 2,2,0,8000,now(),now())""",
+                   VALUES ($1,$2,$3,$4,'CHECKED_IN',$5::date,$5::date + 2,2,0,8000,now(),now())""",
                 reservation_id, pid, "RCE-" + uuid.uuid4().hex[:10].upper(), guest_id, business_date)
             await db.execute(
                 """INSERT INTO stays
