@@ -19,9 +19,9 @@ class StockContracts(unittest.TestCase):
     def test_receipts_cannot_be_zero_or_negative(self):
         for val in ('0','-1'):
             with self.assertRaises(ValidationError):
-                ReceiptWrite(stock_item_id=uuid.uuid4(),quantity=val)
+                ReceiptWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),quantity=val)
     def test_fractional_quantity_is_exact(self):
-        x=ReceiptWrite(stock_item_id=uuid.uuid4(),quantity='0.125')
+        x=ReceiptWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),quantity='0.125')
         self.assertEqual(x.quantity,Decimal('0.125'))
     def test_exact_recipe_cost_math(self):
         eggs=Decimal(2)*Decimal(2)*Decimal(12)

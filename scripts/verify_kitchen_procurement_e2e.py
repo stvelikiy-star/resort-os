@@ -81,7 +81,7 @@ async def main():
                 "name":code+" ingredient","unit":"KG",
                 "cost_per_unit_kgs":"100","is_sample":False,
             }),201,"stock item")["id"]
-            verify(await owner.post("/api/v1/kitchen/stock/receipts",json={
+            verify(await owner.post("/api/v1/kitchen/stock/receipts",json={"movement_id":str(uuid.uuid4()),
                 "stock_item_id":item_id,"quantity":"1","notes":"CI initial stock",
             }),201,"initial receipt")
             needs=verify(await cook.get("/api/v1/kitchen/procurement/needs",

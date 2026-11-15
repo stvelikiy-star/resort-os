@@ -20,6 +20,13 @@ on:
       - 'scripts/verify_kitchen_procurement_e2e.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
       - 'scripts/test_marina_kitchen_stock.py'
+      - 'scripts/test_marina_stock_receipts.py'
+      - 'scripts/verify_stock_receipt_idempotency_e2e.py'
+      - 'scripts/stock_receipt_staff_browser_e2e.mjs'
+      - 'apps/staff/components/DirectStockReceipt.tsx'
+      - 'apps/staff/components/StoreStaffStock.tsx'
+      - 'apps/staff/components/KitchenStock.tsx'
+      - 'apps/staff/lib/directStockReceipt.ts'
       - 'scripts/verify_kitchen_losses_e2e.py'
       - 'packages/database/prisma/migrations/zz118_marina_kitchen_waste_spoilage_20261115/**'
       - 'packages/database/prisma/migrations/zz116_marina_kitchen_recipes_20261111/**'
@@ -203,7 +210,22 @@ jobs:
         run: python scripts/verify_kitchen_stoplist_e2e.py
 
       - name: Test kitchen stock contracts
-        run: PYTHONPATH=. python scripts/test_marina_kitchen_stock.py
+        run: |
+          PYTHONPATH=. python scripts/test_marina_kitchen_stock.py
+          python scripts/test_marina_stock_receipts.py
+
+      - name: Verify direct receipts with PostgreSQL, concurrency and API restart
+        env:
+          ALLOW_STOCK_RECEIPT_TEST_WRITES: '1'
+        run: python scripts/verify_stock_receipt_idempotency_e2e.py
+
+      - name: Verify Staff Web lost acknowledgement and browser reload
+        env:
+          ALLOW_STOCK_RECEIPT_TEST_WRITES: '1'
+        run: |
+          npm install --prefix /tmp/marina-receipt-browser playwright --no-audit --no-fund
+          node scripts/stock_receipt_staff_browser_e2e.mjs
+          python scripts/verify_stock_receipt_idempotency_e2e.py --verify-browser
 
       - name: Run kitchen loss and spoilage PostgreSQL E2E
         run: python scripts/verify_kitchen_losses_e2e.py

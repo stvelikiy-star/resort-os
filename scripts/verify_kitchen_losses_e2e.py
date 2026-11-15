@@ -65,7 +65,7 @@ async def main():
                 pass
             else:
                 raise AssertionError("PostgreSQL must reject null WASTE reason")
-            require(await owner.post("/api/v1/kitchen/stock/receipts",json={
+            require(await owner.post("/api/v1/kitchen/stock/receipts",json={"movement_id":str(uuid.uuid4()),
                 "stock_item_id":iid,"quantity":"10","notes":"Isolated stock loss test",
             }),201,"stock receipt")
             before=require(await owner.get("/api/v1/kitchen/stock"),200,"before snapshot")

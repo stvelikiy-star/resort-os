@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import DirectStockReceipt from "./DirectStockReceipt";
 import styles from "./ChefProduction.module.css";
 
 type Item = { id:string; name:string; unit:"KG"|"L"|"PCS"; balance:string; cost_per_unit_kgs:string; is_sample:boolean };
@@ -29,8 +30,6 @@ export default function KitchenStock({fromDate,throughDate,userRole}:{fromDate:s
   const [unit,setUnit] = useState<Item["unit"]>("KG");
   const [cost,setCost] = useState("0");
   const [sample,setSample] = useState(true);
-  const [selected,setSelected] = useState("");
-  const [quantity,setQuantity] = useState("1");
   const load = useCallback(async () => {
     try {
       const [stockResult,planResponse] = await Promise.all([
@@ -90,10 +89,8 @@ export default function KitchenStock({fromDate,throughDate,userRole}:{fromDate:s
         <label>Себестоимость за единицу, сом<input aria-label="Себестоимость за единицу" type="number" min="0" step="0.0001" value={cost} onChange={e=>setCost(e.target.value)}/></label>
         <label><input type="checkbox" checked={sample} onChange={e=>setSample(e.target.checked)}/>Учебный продукт</label>
         <button disabled={busy||!name.trim()||!cost||Number(cost)<0} onClick={()=>void mutate("/items",{name,unit,cost_per_unit_kgs:cost,is_sample:sample})}>Добавить продукт</button>
-        <h3>Приход продуктов</h3>
-        <label>Продукт<select aria-label="Продукт прихода" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Выберите продукт</option>{data.items.map(item=><option key={item.id} value={item.id}>{item.name} · {item.unit}{item.is_sample?" (тест)":""}</option>)}</select></label>
-        <label>Количество<input aria-label="Количество прихода" type="number" min="0.000001" step="0.000001" value={quantity} onChange={e=>setQuantity(e.target.value)}/></label>
-        <button disabled={busy||!selected||Number(quantity)<=0} onClick={()=>void mutate("/receipts",{stock_item_id:selected,quantity,notes:"Приход через кабинет склада"})}>Записать приход</button>
+        <DirectStockReceipt items={data.items} onSaved={load}/>
+
       </div>:null}
       {canConsume?<div className={styles.controls}><h3>Списание по приготовленным порциям</h3>
         {targets.map(t=><div key={t.id}>

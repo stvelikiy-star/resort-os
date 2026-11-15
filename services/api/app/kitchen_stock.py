@@ -10,7 +10,7 @@ from .kitchen_recipes import read_recipe
 router = APIRouter(prefix='/api/v1/kitchen/stock', tags=['kitchen-stock'])
 read_access = require_roles('OWNER', 'MANAGER', 'COOK', 'STORE_STAFF')
 manage_access = require_roles('OWNER', 'MANAGER')
-receipt_access = require_roles('OWNER', 'MANAGER', 'STORE_STAFF')
+receipt_access = require_roles('OWNER', 'MANAGER', 'STORE_STAFF', module_grant=False)
 consume_access = require_roles('MANAGER', 'COOK')
 loss_access = require_roles('OWNER', 'MANAGER', 'COOK', 'STORE_STAFF')
 
@@ -28,6 +28,7 @@ class ItemWrite(BaseModel):
         return v
 
 class ReceiptWrite(BaseModel):
+    movement_id: uuid.UUID
     stock_item_id: uuid.UUID
     quantity: Decimal = Field(gt=0, max_digits=16, decimal_places=6)
     notes: str | None = Field(default=None, max_length=500)
@@ -69,7 +70,8 @@ async def snapshot(conn, pid):
           'balance':str(r['balance'])} for r in rows],
           'production_cost_kgs':str(expense),'production_cost_is_payment':False,
           'inventory_deducted_only_on_explicit_consume':True,
-          'new_loss_movement_id':str(uuid.uuid4())}
+          'new_loss_movement_id':str(uuid.uuid4()),
+          'new_receipt_movement_id':str(uuid.uuid4())}
 
 @router.get('')
 async def read_stock(request: Request, user=Depends(read_access)):
@@ -92,15 +94,37 @@ async def create_receipt(body: ReceiptWrite, request: Request, user=Depends(rece
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid=await trusted_property_id(conn,user)
+            # Global operation lock, before item locking: the same key with
+            # different items/properties must yield a conflict, never a PK 500.
+            await conn.execute('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+                               'kitchen-direct-receipt:'+str(body.movement_id))
+            prior=await conn.fetchrow('''SELECT m."propertyId",m."stockItemId",m.kind,
+                m.quantity,m."unitCostKgs",m.notes,m."createdById",
+                EXISTS(SELECT 1 FROM kitchen_procurement_receipts p WHERE p.id=m.id) AS procurement
+                FROM kitchen_stock_movements m WHERE m.id=$1''',body.movement_id)
+            if prior:
+                if (prior['propertyId']!=pid or prior['stockItemId']!=body.stock_item_id
+                    or prior['kind']!='RECEIPT' or prior['procurement']
+                    or prior['quantity']!=body.quantity or prior['notes']!=body.notes
+                    or str(prior['createdById'])!=str(user['id'])):
+                    raise HTTPException(409,detail={'code':'KITCHEN_RECEIPT_IDEMPOTENCY_CONFLICT'})
+                return {'id':str(body.movement_id),'stock_item_id':str(body.stock_item_id),
+                        'quantity':str(prior['quantity']),'already_processed':True,
+                        'unit_cost_kgs':str(prior['unitCostKgs']),'payment_created':False}
             item=await conn.fetchrow('''SELECT id,"costPerUnitKgs" FROM kitchen_stock_items
               WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',body.stock_item_id,pid)
             if not item: raise HTTPException(404,'Stock item not found')
-            rid=uuid.uuid4()
-            await conn.execute('''INSERT INTO kitchen_stock_movements
+            rid=body.movement_id
+            inserted=await conn.fetchval('''INSERT INTO kitchen_stock_movements
               (id,"propertyId","stockItemId",kind,quantity,"unitCostKgs","createdById",notes)
-              VALUES ($1,$2,$3,'RECEIPT',$4,$5,$6,$7)''',
+              VALUES ($1,$2,$3,'RECEIPT',$4,$5,$6,$7)
+              ON CONFLICT (id) DO NOTHING RETURNING id''',
               rid,pid,item['id'],body.quantity,item['costPerUnitKgs'],user['id'],body.notes)
-            return {'id':str(rid),'quantity':str(body.quantity),'payment_created':False}
+            if not inserted:
+                raise HTTPException(409,detail={'code':'KITCHEN_RECEIPT_IDEMPOTENCY_CONFLICT'})
+            return {'id':str(rid),'stock_item_id':str(body.stock_item_id),
+                    'quantity':str(body.quantity),'already_processed':False,
+                    'unit_cost_kgs':str(item['costPerUnitKgs']),'payment_created':False}
 
 @router.get('/losses')
 async def list_losses(request: Request, user=Depends(loss_access)):

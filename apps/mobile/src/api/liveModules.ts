@@ -1,3 +1,4 @@
+import { StockReceipt, StockReceiptAck, stockReceipt, stockReceiptAck, receiptUuid } from './stockReceipt';
 import { AGENT_SERVICES, AgentServiceCode, AgentServiceDraft, agentServiceDraft, agentServiceList } from './agentServices';
 import { kitchenRecipe, ingredientRequirements } from './kitchenRecipes';
 import type { KitchenRecipe, IngredientRequirements, RecipeInput } from './kitchenRecipes';
@@ -92,6 +93,7 @@ export interface KitchenStockSnapshot {
   items:KitchenStockItem[]; production_cost_kgs:string;
   inventory_deducted_only_on_explicit_consume:true;
   new_loss_movement_id?:string;
+  new_receipt_movement_id?:string;
 }
 export interface KitchenProcurementNeed {
   stock_item_id:string|null; name:string; unit:'KG'|'L'|'PCS';
@@ -870,24 +872,21 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       });
       // Older LIVE servers have no loss mutation nonce. Keep read/receipt/consume working;
       // the loss form stays disabled until a valid server-issued UUID is available.
+      const receiptId=payload.new_receipt_movement_id;
+      if(receiptId!==undefined&&!receiptUuid(receiptId))throw new ApiError('UNKNOWN','Invalid stock receipt ID');
       const lossId=payload.new_loss_movement_id;
       if (lossId !== undefined && (typeof lossId !== 'string' ||
           !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lossId)))
         throw new ApiError('UNKNOWN','Invalid loss movement ID');
       return {items:rows,production_cost_kgs:payload.production_cost_kgs,
         inventory_deducted_only_on_explicit_consume:true,
+        ...(receiptId===undefined?{}:{new_receipt_movement_id:receiptId}),
         ...(lossId === undefined ? {} : {new_loss_movement_id:safeRouteId(lossId as string)})};
     },
-    receiveKitchenStock: async (stockItemId:string, quantity:string):Promise<{id:string;quantity:string;payment_created:false}> => {
+    receiveKitchenStock: async (input:StockReceipt):Promise<StockReceiptAck> => {
       reviewGate();
-      if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity) || Number(quantity)<=0)
-        throw new ApiError('BAD_REQUEST','Positive stock receipt quantity required');
-      const payload=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/receipts',{
-        stock_item_id:safeRouteId(stockItemId),quantity,notes:'Mobile inventory receipt',
-      }),'stock receipt');
-      if (typeof payload.id!=='string'||typeof payload.quantity!=='string'||payload.payment_created!==false)
-        throw new ApiError('UNKNOWN','Invalid stock receipt acknowledgment');
-      return {id:safeRouteId(payload.id),quantity:payload.quantity,payment_created:false};
+      const receipt=stockReceipt(input);
+      return stockReceiptAck(await request<unknown>('POST',p+'/kitchen/stock/receipts',receipt),receipt);
     },
     consumeKitchenStock: async (productionTargetId:string):Promise<KitchenStockConsumeAck> => {
       reviewGate();

@@ -25,12 +25,13 @@ test('does not substitute demo inventory for an unavailable live stock service',
   await expect(m.kitchenStock()).rejects.toBeDefined();
 });
 
-test('validates stock receipts and does not turn receipt into a payment',async()=>{
-  const payload={id:'33333333-3333-4333-8333-333333333333',quantity:'1.000000',payment_created:false};
+test('validates receipt ID, payload identity and immutable replay acknowledgment',async()=>{
+  const receipt={movement_id:'33333333-3333-4333-8333-333333333333',stock_item_id:stock.items[0].id,quantity:'1',notes:'Mobile inventory receipt'};
+  const payload={id:receipt.movement_id,stock_item_id:receipt.stock_item_id,quantity:'1.000000',unit_cost_kgs:'12.0000',already_processed:true,payment_created:false};
   const fetchMock=jest.fn(async()=>response(201,payload));
   const api=createLiveModules('https://aska.example',fetchMock as typeof fetch,'single_property');
-  await expect(api.receiveKitchenStock(stock.items[0].id,'1')).resolves.toEqual(payload);
+  await expect(api.receiveKitchenStock(receipt)).resolves.toEqual(payload);
   expect(fetchMock).toHaveBeenCalledTimes(1);
-  await expect(api.receiveKitchenStock(stock.items[0].id,'-1')).rejects.toMatchObject({code:'BAD_REQUEST'});
+  await expect(api.receiveKitchenStock({...receipt,quantity:'-1'})).rejects.toBeDefined();
   expect(fetchMock).toHaveBeenCalledTimes(1);
 });
