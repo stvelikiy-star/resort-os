@@ -42,3 +42,43 @@
   :global(html[data-marina-ui="future-luxury"]) .totals { grid-template-columns:repeat(2,minmax(0,1fr)); }
   :global(html[data-marina-ui="future-luxury"]) .two { grid-template-columns:minmax(0,1fr); }
 }
+
+/* C3 advanced PMS: match the approved shared FL2 palette in both themes.
+   Presentation only: no payment or folio operations are changed. */
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell {
+  color:var(--mx-ink);
+  width:100%;
+  min-width:0;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.totals>div,.card,.history section) {
+  background:var(--mx-glass);
+  color:var(--mx-ink);
+  border-color:var(--mx-edge);
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.head small,.cardHead small,.head p,.totals span,.totals small,.card label,.hint,.history small,.history em) {
+  color:var(--mx-muted);
+  font-size:12px;
+  line-height:1.5;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(input,select,button) {
+  background:var(--mx-bg);
+  color:var(--mx-ink);
+  border-color:var(--mx-edge);
+  min-height:44px;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .card .primary {
+  background:var(--mx-accent);
+  color:var(--mx-accent-ink);
+  border-color:var(--mx-accent);
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.history section>div,.rowActions) { min-width:0; }
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.history strong,.history b,.history em,.head h3,.cardHead h4) { overflow-wrap:anywhere; }
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(button,input,select):focus-visible { outline:3px solid var(--mx-focus);outline-offset:2px; }
+@media(max-width:600px) {
+  :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .history section>div {
+    grid-template-columns:minmax(0,1fr) auto;
+  }
+  :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .rowActions {
+    flex-wrap:wrap;
+  }
+}
