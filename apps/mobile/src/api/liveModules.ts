@@ -90,6 +90,28 @@ export interface KitchenStockSnapshot {
   inventory_deducted_only_on_explicit_consume:true;
   new_loss_movement_id?:string;
 }
+export interface KitchenProcurementNeed {
+  stock_item_id:string|null; name:string; unit:'KG'|'L'|'PCS';
+  remaining_needed:string; balance:string; shortage:string;
+  pending_requests:string; shortage_after_pipeline:string; estimated_unit_cost_kgs:string|null;
+}
+export interface KitchenProcurementNeeds {
+  service_date:string; basis:'APPROVED_NON_SAMPLE_REMAINING_PRODUCTION';
+  is_complete:boolean; missing_recipes:{menu_item_id:string;name_ru:string}[];
+  excluded_sample_targets:number; inventory_deducted:false; payment_created:false;
+  items:KitchenProcurementNeed[];
+}
+export type KitchenProcurementStatus='REQUESTED'|'APPROVED'|'PARTIAL'|'RECEIVED';
+export interface KitchenProcurementRow {
+  id:string;stock_item_id:string;stock_name:string;unit:'KG'|'L'|'PCS';
+  is_sample:boolean;quantity:string;received_quantity:string;status:KitchenProcurementStatus;
+  service_date:string|null;notes:string|null;requested_by_id:string|null;
+  approved_by_id:string|null;created_at:string;
+}
+export interface KitchenProcurementList {
+  items:KitchenProcurementRow[]; payment_created:false;
+  new_request_id:string;new_receipt_id:string;
+}
 export type KitchenLossKind = 'WASTE'|'SPOILAGE';
 export interface KitchenLossRecord {
   id:string;stock_item_id:string;stock_name:string;unit:'KG'|'L'|'PCS';
@@ -530,6 +552,72 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       if (row.id !== itemId || row.is_available !== false || typeof row.already_set !== 'boolean' ||
           row.reason !== clean) throw new ApiError('UNKNOWN', 'Invalid stoplist acknowledgment');
       return row as unknown as KitchenAvailabilityAck;
+    },
+    procurementNeeds: async (serviceDate:string):Promise<KitchenProcurementNeeds> => {
+      reviewGate();
+      const data=objectResponse(await request<unknown>('GET',p+'/kitchen/procurement/needs?service_date='+safeIsoDate(serviceDate)),'procurement needs');
+      if(data.basis!=='APPROVED_NON_SAMPLE_REMAINING_PRODUCTION'||
+        data.inventory_deducted!==false||data.payment_created!==false||
+        typeof data.is_complete!=='boolean'||!Array.isArray(data.items)||
+        !Array.isArray(data.missing_recipes)||typeof data.excluded_sample_targets!=='number')
+        throw new ApiError('UNKNOWN','Invalid procurement needs');
+      return data as unknown as KitchenProcurementNeeds;
+    },
+    procurementRequests: async ():Promise<KitchenProcurementList> => {
+      reviewGate();
+      const data=objectResponse(await request<unknown>('GET',p+'/kitchen/procurement/requests'),'procurement requests');
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(!Array.isArray(data.items)||data.payment_created!==false||
+        typeof data.new_request_id!=='string'||!uuid.test(data.new_request_id)||
+        typeof data.new_receipt_id!=='string'||!uuid.test(data.new_receipt_id))
+        throw new ApiError('UNKNOWN','Invalid procurement ledger');
+      for(const entry of data.items){
+        const row=objectResponse(entry,'procurement entry');
+        if(typeof row.id!=='string'||typeof row.stock_item_id!=='string'||
+          !['REQUESTED','APPROVED','PARTIAL','RECEIVED'].includes(String(row.status))||
+          typeof row.stock_name!=='string'||typeof row.quantity!=='string'||
+          typeof row.received_quantity!=='string'||typeof row.is_sample!=='boolean')
+          throw new ApiError('UNKNOWN','Invalid procurement entry');
+      }
+      return data as unknown as KitchenProcurementList;
+    },
+    requestKitchenProcurement: async (payload:{request_id:string;stock_item_id:string;quantity:string;
+      service_date:string|null;notes:string|null}) => {
+      reviewGate();
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const quantity=payload.quantity.replace(',','.');
+      if(!uuid.test(payload.request_id)||!uuid.test(payload.stock_item_id)||
+        !/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(quantity)||Number(quantity)<=0||
+        (payload.notes!==null&&payload.notes.length>500))
+        throw new ApiError('BAD_REQUEST','Invalid procurement request');
+      const body={...payload,quantity,service_date:payload.service_date?safeIsoDate(payload.service_date):null};
+      const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests',body),'procurement request ack');
+      if(reply.id!==payload.request_id||!['REQUESTED','EXISTS'].includes(String(reply.status))||
+         reply.payment_created!==false)throw new ApiError('UNKNOWN','Invalid procurement request acknowledgment');
+      return reply as {id:string;status:'REQUESTED'|'EXISTS';payment_created:false};
+    },
+    approveKitchenProcurement: async (requestId:string) => {
+      reviewGate();
+      const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests/'+safeRouteId(requestId)+'/approve'),'procurement approval');
+      if(reply.id!==requestId||!['APPROVED','PARTIAL','RECEIVED'].includes(String(reply.status))||
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid procurement approval');
+      return reply as {id:string;status:KitchenProcurementStatus;already_processed:boolean;payment_created:false};
+    },
+    receiveKitchenProcurement: async (requestId:string,payload:{receipt_id:string;quantity:string}) => {
+      reviewGate();
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const quantity=payload.quantity.replace(',','.');
+      if(!uuid.test(payload.receipt_id)||!uuid.test(requestId)||
+        !/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(quantity)||Number(quantity)<=0)
+        throw new ApiError('BAD_REQUEST','Invalid procurement receipt');
+      const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests/'+safeRouteId(requestId)+'/receive',
+        {receipt_id:payload.receipt_id,quantity}),'procurement receipt');
+      if(reply.id!==payload.receipt_id||reply.request_id!==requestId||
+        !['PARTIAL','RECEIVED'].includes(String(reply.status))||
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid procurement receipt acknowledgment');
+      return reply as {id:string;request_id:string;status:'PARTIAL'|'RECEIVED';already_processed:boolean;payment_created:false};
     },
     kitchenLosses: async (): Promise<KitchenLossRecord[]> => {
       reviewGate();
