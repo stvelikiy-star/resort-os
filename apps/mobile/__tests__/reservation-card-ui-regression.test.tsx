@@ -50,7 +50,7 @@ afterEach(()=>jest.restoreAllMocks());
 describe('Mobile real reservation card: locale/theme/role states (UI, not native screenshots)',()=>{
   it.each(['ru','kg','en'] as const)('%s presents canonical guest, booking, room, dates and semantic status',async locale=>{
     as('OWNER',['RESERVATIONS','PMS','FINANCE'],locale);
-    const view=render(screen());
+    const view=await render(screen());
     await waitFor(()=>expect(view.getByTestId('reservation-guest-summary')).toBeTruthy());
     expect(view.getByText('Synthetic Guest')).toBeTruthy();
     expect(view.getAllByText(/B-101/).length).toBeGreaterThan(0);
@@ -63,7 +63,7 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
     expect(mockLive.reservation).toHaveBeenCalledWith(reservationId);
   });
   it.each(['light','dark'] as const)('%s keeps the card/actions mounted in scrollable layout',async theme=>{
-    const view=render(screen(theme));
+    const view=await render(screen(theme));
     await waitFor(()=>expect(view.getByTestId('reservation-guest-summary')).toBeTruthy());
     expect(view.getByTestId('reservation-call-guest')).toBeTruthy();
     expect(view.getByTestId('reservation-edit-dates')).toBeTruthy();
@@ -71,7 +71,7 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
   });
   it('RECEPTION can view and check in but cannot see finance or owner-only schedule',async()=>{
     as('RECEPTION',['RESERVATIONS','PMS']);
-    const view=render(screen());
+    const view=await render(screen());
     await waitFor(()=>expect(view.getByTestId('reservation-checkin')).toBeTruthy());
     expect(view.queryByTestId('reservation-finance')).toBeNull();
     expect(view.queryByTestId('reservation-edit-dates')).toBeNull();
@@ -79,13 +79,13 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
   });
   it.each(['COOK','WAITER','MAID','TECHNICIAN','STORE_STAFF'] as Role[])('%s never requests reservation detail even when granted RESERVATIONS',async role=>{
     as(role,['RESERVATIONS','PMS','FINANCE']);
-    const view=render(screen());
+    const view=await render(screen());
     expect(view.queryByTestId('reservation-guest-summary')).toBeNull();
     await waitFor(()=>expect(mockLive.reservation).not.toHaveBeenCalled());
   });
   it('OWNER without RESERVATIONS cannot query the card or view finance',async()=>{
     as('OWNER',['PMS','FINANCE']);
-    const view=render(screen());
+    const view=await render(screen());
     expect(view.queryByTestId('reservation-finance')).toBeNull();
     expect(view.queryByTestId('reservation-guest-summary')).toBeNull();
     await waitFor(()=>expect(mockLive.reservation).not.toHaveBeenCalled());
@@ -93,7 +93,7 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
   it('unknown server write result never enables duplicate check-in',async()=>{
     mockLive.checkIn.mockRejectedValueOnce(new ApiError('OFFLINE','lost acknowledgement'));
     const alert=jest.spyOn(Alert,'alert');
-    const view=render(screen());
+    const view=await render(screen());
     await waitFor(()=>expect(view.getByTestId('reservation-checkin')).toBeTruthy());
     await fireEvent.press(view.getByTestId('reservation-checkin'));
     const items=alert.mock.calls.at(-1)?.[2]||[];
@@ -105,7 +105,7 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
   });
   it('loading failure shows retry and never pretends a confirmed reservation',async()=>{
     mockLive.reservation.mockRejectedValueOnce(new ApiError('OFFLINE','network unavailable'));
-    const view=render(screen());
+    const view=await render(screen());
     await waitFor(()=>expect(view.getByText(/network unavailable/)).toBeTruthy());
     expect(view.queryByTestId('reservation-guest-summary')).toBeNull();
     expect(view.queryByTestId('reservation-checkin')).toBeNull();
