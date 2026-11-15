@@ -31,7 +31,11 @@ async def main():
     try:
         pid = await db.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY)
         assert pid is not None
-        room = await db.fetchrow('SELECT id FROM rooms WHERE "propertyId"=$1 ORDER BY code LIMIT 1', pid)
+        room = await db.fetchrow(
+            """SELECT r.id FROM rooms r WHERE r."propertyId"=$1
+               AND NOT EXISTS (SELECT 1 FROM room_assignments ra
+                               WHERE ra."roomId"=r.id AND ra."endedAt" IS NULL)
+               ORDER BY r.code LIMIT 1""", pid)
         assert room, "no isolated hotel room"
         business_date = await db.fetchval(
             """SELECT (now() AT TIME ZONE COALESCE(timezone,'Asia/Bishkek'))::date
