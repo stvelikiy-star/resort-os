@@ -178,6 +178,22 @@ export interface OwnerKitchenManagementReport {
     payment_created:false;profit:'NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER';
     receipt:string;consumption:string;procurement:string;inventory:string};
 }
+export type OwnerExpenseCategory='SUPPLIES'|'UTILITIES'|'PAYROLL'|'MAINTENANCE'|'RENT'|'MARKETING'|'OTHER';
+export type OwnerExpenseMethod='CASH'|'BANK_TRANSFER'|'CARD'|'OTHER';
+export interface OwnerExpenseRow {
+ id:string;expense_date:string;category:OwnerExpenseCategory;title:string;amount_kgs:number;
+ settled_kgs:number;outstanding_kgs:number;status:'POSTED'|'VOID';
+ supplier_name:string|null;document_reference:string|null;notes:string|null;
+ created_by_id:string|null;void_reason:string|null;created_at:string;
+}
+export interface OwnerExpenseLedger {
+ items:OwnerExpenseRow[];preview_limit:500;preview_truncated:boolean;
+ new_expense_id:string;new_settlement_id:string;
+ totals:{posted_expenses_kgs:number;settled_against_period_expenses_kgs:number;
+   outstanding_kgs:number;posted_count:number};
+ scope:'OWNER_ONLY_PROPERTY_SCOPED';payment_created:false;
+ truth:'POSTED_OBLIGATION_NOT_AUTOMATIC_PAYMENT_OR_PROFIT';
+}
 export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
 export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
 export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
@@ -411,6 +427,68 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         !currency.test(stock.real_value_at_current_item_cost_kgs))
         throw new ApiError('UNKNOWN','Invalid owner procurement or inventory valuation');
       return value as unknown as OwnerKitchenManagementReport;
+    },
+    ownerExpenses: async (from:string,to:string):Promise<OwnerExpenseLedger> => {
+      const data=objectResponse(await request<unknown>('GET',p+'/admin/finance/owner/expenses?from_date='+
+        safeIsoDate(from)+'&to_date='+safeIsoDate(to)),'owner expenses');
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(data.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||data.payment_created!==false||
+        data.truth!=='POSTED_OBLIGATION_NOT_AUTOMATIC_PAYMENT_OR_PROFIT'||
+        !Array.isArray(data.items)||!uuid.test(String(data.new_expense_id))||
+        !uuid.test(String(data.new_settlement_id))||
+        typeof data.preview_truncated!=='boolean')
+        throw new ApiError('UNKNOWN','Invalid OWNER expense ledger');
+      const totals=objectResponse(data.totals,'owner expense totals');
+      for(const key of ['posted_expenses_kgs','settled_against_period_expenses_kgs','outstanding_kgs','posted_count']){
+        if(!Number.isSafeInteger(totals[key])||Number(totals[key])<0)
+          throw new ApiError('UNKNOWN','Invalid expense total');
+      }
+      for(const raw of data.items){
+        const row=objectResponse(raw,'owner expense row');
+        if(!uuid.test(String(row.id))||typeof row.title!=='string'||
+          !['POSTED','VOID'].includes(String(row.status))||
+          !Number.isSafeInteger(row.amount_kgs)||!Number.isSafeInteger(row.settled_kgs)||
+          !Number.isSafeInteger(row.outstanding_kgs)||
+          Number(row.amount_kgs)<=0||Number(row.settled_kgs)<0||
+          Number(row.outstanding_kgs)<0||
+          Number(row.amount_kgs)!==Number(row.settled_kgs)+Number(row.outstanding_kgs))
+          throw new ApiError('UNKNOWN','Invalid expense row amounts');
+      }
+      return data as unknown as OwnerExpenseLedger;
+    },
+    postOwnerExpense: async (payload:{id:string;expense_date:string;category:OwnerExpenseCategory;
+      title:string;amount_kgs:number;supplier_name:string|null;
+      document_reference:string|null;notes:string|null}) => {
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(!uuid.test(payload.id)||!Number.isSafeInteger(payload.amount_kgs)||
+        payload.amount_kgs<=0||payload.amount_kgs>2000000000||
+        !payload.title.trim()||payload.title.length>150||
+        !['SUPPLIES','UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING','OTHER'].includes(payload.category))
+        throw new ApiError('BAD_REQUEST','Invalid OWNER expense');
+      const reply=objectResponse(await request<unknown>('POST',p+'/admin/finance/owner/expenses',
+        {...payload,expense_date:safeIsoDate(payload.expense_date)}),'expense acknowledgment');
+      if(reply.id!==payload.id||typeof reply.already_processed!=='boolean'||
+        !['POSTED','VOID'].includes(String(reply.status))||reply.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid expense acknowledgement');
+      return reply as {id:string;already_processed:boolean;status:'POSTED'|'VOID';payment_created:false};
+    },
+    settleOwnerExpense: async (expenseId:string,payload:{id:string;amount_kgs:number;
+      paid_on:string;method:OwnerExpenseMethod;reference:string|null}) => {
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(!uuid.test(expenseId)||!uuid.test(payload.id)||
+        !Number.isSafeInteger(payload.amount_kgs)||payload.amount_kgs<=0||
+        payload.amount_kgs>2000000000||
+        !['CASH','BANK_TRANSFER','CARD','OTHER'].includes(payload.method))
+        throw new ApiError('BAD_REQUEST','Invalid manual expense payment');
+      const reply=objectResponse(await request<unknown>('POST',
+        p+'/admin/finance/owner/expenses/'+safeRouteId(expenseId)+'/settlements',
+        {...payload,paid_on:safeIsoDate(payload.paid_on)}),'manual settlement');
+      if(reply.id!==payload.id||reply.expense_id!==expenseId||
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false||
+        reply.source!=='MANUAL_EXPENSE_SETTLEMENT_FACT')
+        throw new ApiError('UNKNOWN','Invalid expense payment acknowledgment');
+      return reply as {id:string;expense_id:string;already_processed:boolean;payment_created:false;
+        source:'MANUAL_EXPENSE_SETTLEMENT_FACT'};
     },
     reception: async () => {
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
