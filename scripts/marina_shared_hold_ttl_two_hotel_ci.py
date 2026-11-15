@@ -221,6 +221,59 @@ def main():
         assert must(call(owner["A"], "GET", base), 200, "A still empty")["holds"] == []
         asyncio.run(verify_holds(hold_a, hold_b, data, expired_b=True))
     asyncio.run(verify_idempotent_second_sweep())
+
+    # Positive release path is distinct from expiry: another authorized
+    # management role can release an owned live HOLD without any reservation.
+    with TestClient(app, base_url="https://localhost:18000") as client:
+        def session(hotel, username):
+            client.cookies.clear()
+            data = must(client.post("/api/v1/auth/login", json={
+                "tenant_code": "tenant_" + hotel.lower(),
+                "property_code": "HOTEL_" + hotel,
+                "username": username, "password": PASSWORD,
+            }), 200, "role sign-in")
+            assert data["property_code"] == "HOTEL_" + hotel
+            return client.cookies.get(auth.SESSION_COOKIE)
+
+        owner_a = session("A", "owner")
+        manager_a = session("A", "manager")
+        owner_b = session("B", "owner")
+
+        def invoke(token, method, url, **kwargs):
+            client.cookies.clear()
+            client.cookies.set(auth.SESSION_COOKIE, token)
+            return client.request(method, url, **kwargs)
+
+        fresh = must(invoke(owner_a, "POST", base, json=payload("A")),
+                     201, "A fresh post-expiry hold")
+        hid = fresh["id"]
+        assert fresh["status"] == "HELD"
+        assert must(invoke(manager_a, "GET", base), 200,
+                    "manager sees own hotel hold")["holds"][0]["id"] == hid
+        must(invoke(owner_b, "DELETE", base + "/" + hid),
+             404, "foreign hotel cannot release A fresh hold")
+        released = must(invoke(manager_a, "DELETE", base + "/" + hid),
+                        200, "manager releases A hold")
+        assert released == {"id": hid, "status": "RELEASED"}
+        assert must(invoke(manager_a, "DELETE", base + "/" + hid),
+                    200, "release idempotent") == released
+        must(invoke(owner_a, "GET", base + "/" + hid), 404,
+             "released hold no longer readable")
+        assert must(invoke(owner_a, "GET", base), 200,
+                    "released room removed from active holds")["holds"] == []
+        async def check_released():
+            conn = await asyncpg.connect(dsn())
+            try:
+                row = await conn.fetchrow(
+                    '''SELECT h."releasedAt",ib.active FROM marina_reservation_holds h
+                       JOIN inventory_blocks ib ON ib.id=h."inventoryBlockId"
+                       WHERE h.id=$1''', uuid.UUID(hid))
+                assert row and row["releasedAt"] is not None and row["active"] is False
+                assert await conn.fetchval("SELECT count(*) FROM reservations") == 0
+                assert await conn.fetchval("SELECT count(*) FROM payments") == 0
+            finally:
+                await conn.close()
+        asyncio.run(check_released())
     print(
         "PASS: 2 hotel OWNER sessions and distinct HOLDs; 60m TTL, 401/403/404, "
         "foreign property cannot read/mutate, overlap 409, A expiry releases only A, "
