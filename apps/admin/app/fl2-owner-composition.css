@@ -567,3 +567,51 @@ html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .fl
   html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .mx-hero .mx-eyebrow { text-transform:none;letter-spacing:0;font-size:13px;overflow-wrap:anywhere; }
   html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive,.owner-v2) .error-box { padding:14px;border:1px solid var(--mx-danger);border-radius:var(--mx-radius-sm);background:var(--mx-glass);color:var(--mx-danger);font-size:13px;line-height:1.5; }
 }
+
+/* C4 OWNER: one clear hierarchy — primary command cards first, preserved
+ * secondary executive analytics compact underneath. Presentation-only. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive,.owner-v2) {
+  min-width:0;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] .owner-executive {
+  margin-top:16px;
+  padding-top:16px;
+  border-top:1px solid var(--mx-edge);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-grid,.owner-forward-kpis)>article {
+  box-shadow:none;
+}
+@media screen and (min-width:360px) and (max-width:480px) {
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-grid,.owner-forward-kpis) {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-grid,.owner-forward-kpis)>article {
+    min-width:0;
+    min-height:112px;
+    padding:12px;
+    gap:6px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-grid,.owner-forward-kpis)>article>strong {
+    font-size:clamp(19px,5vw,22px);
+    max-width:100%;
+    overflow-wrap:anywhere;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-bottom,.owner-v2-grid) {
+    gap:10px;
+    margin-top:10px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-actions-panel,.owner-executive-truth,.owner-v2-panel) {
+    padding:12px;
+  }
+}
+@media screen and (max-width:359px) {
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-grid,.owner-forward-kpis) {
+    grid-template-columns:minmax(0,1fr);
+    gap:8px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-executive-grid,.owner-forward-kpis)>article {
+    min-height:96px;
+    padding:12px;
+  }
+}
