@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   shell-browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -48,12 +48,14 @@ jobs:
             sleep 1
           done
           node scripts/design/fl2-shell-browser.mjs
+      - name: Preserve QA server logs
+        if: always()
+        run: |
+          mkdir -p c1-evidence
+          cp /tmp/c1-core.log /tmp/c1-admin.log c1-evidence/ 2>/dev/null || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: marina-fl2-c1-evidence
-          path: |
-            c1-evidence/
-            /tmp/c1-core.log
-            /tmp/c1-admin.log
+          path: c1-evidence/
           if-no-files-found: warn
