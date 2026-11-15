@@ -139,6 +139,9 @@ async def list_documents(request: Request, user=Depends(owner_only)):
                 COALESCE((SELECT SUM(s."amountKgs") FROM kitchen_supplier_settlements s
                   WHERE s."propertyId"=d."propertyId" AND s."documentId"=d.id),0)
                    AS settled,
+                COALESCE((SELECT SUM(r."creditAmountKgs") FROM kitchen_supplier_returns r
+                  WHERE r."propertyId"=d."propertyId" AND r."documentId"=d.id),0)
+                  AS credited,
                 ROUND(COALESCE((SELECT SUM(a.quantity*a."unitCostKgs")
                   FROM kitchen_supplier_receipt_links a
                   JOIN kitchen_supplier_document_lines l ON l.id=a."documentLineId"
@@ -153,7 +156,8 @@ async def list_documents(request: Request, user=Depends(owner_only)):
              "document_date": row["documentDate"].isoformat(),
              "amount_kgs": str(row["total"]),
              "settled_kgs": str(row["settled"]),
-             "outstanding_kgs": str(row["total"] - row["settled"]),
+             "credited_kgs": str(row["credited"]),
+             "outstanding_kgs": str(row["total"] - row["settled"] - row["credited"]),
              "confirmed_receipt_source_cost_kgs": str(row["linked_received_cost"])}
             for row in rows],
             "limit": 100, "payment_created": False,
@@ -191,7 +195,11 @@ async def settle_document(document_id: uuid.UUID, body: SupplierSettlementWrite,
                 'SELECT COALESCE(SUM("amountKgs"),0) '
                 'FROM kitchen_supplier_settlements '
                 'WHERE "propertyId"=$1 AND "documentId"=$2', pid, document_id)
-            if settled + body.amount_kgs > total:
+            credited = await conn.fetchval(
+                'SELECT COALESCE(SUM("creditAmountKgs"),0) '
+                'FROM kitchen_supplier_returns '
+                'WHERE "propertyId"=$1 AND "documentId"=$2', pid, document_id)
+            if settled + credited + body.amount_kgs > total:
                 raise HTTPException(409, detail={"code": "SUPPLIER_OVER_SETTLEMENT"})
             await conn.execute(
                 'INSERT INTO kitchen_supplier_settlements '
