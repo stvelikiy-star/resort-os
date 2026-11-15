@@ -508,7 +508,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     },
     stopKitchenItem: async (id: string, reason: string): Promise<KitchenAvailabilityAck> => {
       reviewGate();
-      const clean = reason.trim().replace(/\\s+/g, ' ');
+      const clean = reason.trim().replace(/\s+/g, ' ');
       if (clean.length < 3 || clean.length > 500)
         throw new ApiError('BAD_REQUEST', 'Reason must contain 3–500 characters');
       const itemId = safeRouteId(id);
