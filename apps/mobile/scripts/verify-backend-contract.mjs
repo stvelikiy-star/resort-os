@@ -27,7 +27,7 @@ const pinned = {
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
   'kitchen_menu_management.py': '1dfdda37782fc3858614c3f6965a195077a93dd2',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',
-  'kitchen.py': 'c61b0bf25720ad41697898ad81350a1f4b165534',
+  'kitchen.py': '7871e59d08f00109ab56dbff30d160896bce39bc',
   'dining_production_snapshots.py': '717f2070a0924ab73456e364a5d4a8cf03c0c47e',
   'dining_control.py': '196e847403dc9b45fd4fa8ac94c28556320478db',
   'dining_stays.py': '6978f0f430e82616d05ebbab08a135119304d828',
