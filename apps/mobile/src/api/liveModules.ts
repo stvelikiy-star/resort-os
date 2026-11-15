@@ -251,7 +251,7 @@ function seatingSession(value: unknown): DiningSeatingSession {
     reservation_id:safeRouteId(row.reservation_id), table_id:safeRouteId(row.table_id),
     table_code:row.table_code, guest_name:row.guest_name, room_code:row.room_code,
     service_date:safeIsoDate(row.service_date), status:row.status as DiningSeatingStatus,
-    party_size:row.party_size, waiter_id:row.waiter_id === null ? null : safeRouteId(row.waiter_id),
+    party_size:Number(row.party_size), waiter_id:row.waiter_id === null ? null : safeRouteId(row.waiter_id),
     booking_number:row.booking_number };
 }
 function folioOrder(value: unknown): DiningFolioOrder {
@@ -267,7 +267,7 @@ function folioOrder(value: unknown): DiningFolioOrder {
   }
   return { id:safeRouteId(row.id),order_number:row.order_number,
     guest_name:row.guest_name,table_code:row.table_code,room_code:row.room_code,
-    total_kgs:row.total_kgs,folio_charge_id:row.folio_charge_id,
+    total_kgs:Number(row.total_kgs),folio_charge_id:row.folio_charge_id,
     eligible_to_post:row.eligible_to_post,
     financial_truth:row.financial_truth as DiningFolioOrder['financial_truth'] };
 }
