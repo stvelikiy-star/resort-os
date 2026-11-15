@@ -591,8 +591,8 @@ def main() -> None:
     assert any(item["id"] == request_id for stay in crm["stays"] for item in stay["requests"])
 
     kitchen = login(KITCHEN_USERNAME, KITCHEN_PASSWORD)
-    kitchen_menu_denied = kitchen.get("/api/v1/kitchen/menu")
-    assert kitchen_menu_denied.status_code == 403, kitchen_menu_denied.text
+    kitchen_menu = expect(kitchen.get("/api/v1/kitchen/menu"), 200, "Cook menu read access")
+    assert isinstance(kitchen_menu.get("items"), list)
     kitchen_orders = expect(kitchen.get("/api/v1/kitchen/orders?status=ACTIVE"), 200, "Cook order access")
     assert isinstance(kitchen_orders.get("items"), list)
 
