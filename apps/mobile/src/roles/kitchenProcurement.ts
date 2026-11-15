@@ -11,17 +11,17 @@ export interface ProcurementGap {
 }
 
 function units(value: string): number {
-  if (!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(value)) throw new Error('Invalid inventory decimal');
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(value)) throw new Error('Invalid inventory decimal');
   const amount = Math.round(Number(value) * 1_000_000);
   if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Unsafe inventory decimal');
   return amount;
 }
 function display(value: number): string {
   const str = (value / 1_000_000).toFixed(6);
-  return str.replace(/\\.?0+$/, '');
+  return str.replace(/\.?0+$/, '');
 }
 function key(name: string, unit: string): string {
-  return name.trim().toLocaleLowerCase().replace(/\\s+/g, ' ') + '\\u0000' + unit;
+  return name.trim().toLocaleLowerCase().replace(/\s+/g, ' ') + '\u0000' + unit;
 }
 
 /** Read-only planning aid. No stock movement, reservation, or financial posting. */
