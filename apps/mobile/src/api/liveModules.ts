@@ -219,6 +219,59 @@ export interface DiningFloor {
   orders: { id: string; order_number: string; status: string; table_code: string | null;
     room_code: string | null; waiter_id: string | null; waiter_name: string | null }[];
 }
+export type DiningSeatingStatus = 'WAITING' | 'SEATED' | 'RELEASED' | 'CANCELLED';
+export interface DiningSeatingSession {
+  id: string; stay_id: string; reservation_id: string; table_id: string;
+  table_code: string; guest_name: string; room_code: string | null;
+  service_date: string; status: DiningSeatingStatus; party_size: number;
+  waiter_id: string | null; booking_number: string;
+}
+export interface DiningFolioOrder {
+  id: string; order_number: string; guest_name: string; table_code: string | null;
+  room_code: string | null; total_kgs: number; folio_charge_id: string | null;
+  eligible_to_post: boolean; financial_truth: 'FOLIO_CHARGE_NOT_PAYMENT' | 'NOT_POSTED';
+}
+export interface DiningFolioPostAck {
+  order_id: string; charge_id: string; idempotent_replay: boolean;
+  payment_created: false; financial_truth: 'OPEN_FOLIO_CHARGE_NOT_PAYMENT';
+}
+function seatingSession(value: unknown): DiningSeatingSession {
+  const row = objectResponse(value, 'dining seating session');
+  if (typeof row.id !== 'string' || typeof row.stay_id !== 'string' ||
+      typeof row.reservation_id !== 'string' || typeof row.table_id !== 'string' ||
+      typeof row.table_code !== 'string' || typeof row.guest_name !== 'string' ||
+      typeof row.booking_number !== 'string' || typeof row.service_date !== 'string' ||
+      !['WAITING','SEATED','RELEASED','CANCELLED'].includes(String(row.status)) ||
+      !Number.isSafeInteger(row.party_size) || Number(row.party_size) < 1 ||
+      !(row.waiter_id === null || typeof row.waiter_id === 'string') ||
+      !(row.room_code === null || typeof row.room_code === 'string')) {
+    throw new ApiError('UNKNOWN', 'Invalid dining seating response');
+  }
+  return { id:safeRouteId(row.id), stay_id:safeRouteId(row.stay_id),
+    reservation_id:safeRouteId(row.reservation_id), table_id:safeRouteId(row.table_id),
+    table_code:row.table_code, guest_name:row.guest_name, room_code:row.room_code,
+    service_date:safeIsoDate(row.service_date), status:row.status as DiningSeatingStatus,
+    party_size:row.party_size, waiter_id:row.waiter_id === null ? null : safeRouteId(row.waiter_id),
+    booking_number:row.booking_number };
+}
+function folioOrder(value: unknown): DiningFolioOrder {
+  const row = objectResponse(value, 'dining folio order');
+  if (typeof row.id !== 'string' || typeof row.order_number !== 'string' ||
+      typeof row.guest_name !== 'string' || !Number.isSafeInteger(row.total_kgs) ||
+      Number(row.total_kgs) < 0 || typeof row.eligible_to_post !== 'boolean' ||
+      !(row.table_code === null || typeof row.table_code === 'string') ||
+      !(row.room_code === null || typeof row.room_code === 'string') ||
+      !(row.folio_charge_id === null || typeof row.folio_charge_id === 'string') ||
+      !['FOLIO_CHARGE_NOT_PAYMENT','NOT_POSTED'].includes(String(row.financial_truth))) {
+    throw new ApiError('UNKNOWN','Invalid dining folio response');
+  }
+  return { id:safeRouteId(row.id),order_number:row.order_number,
+    guest_name:row.guest_name,table_code:row.table_code,room_code:row.room_code,
+    total_kgs:row.total_kgs,folio_charge_id:row.folio_charge_id,
+    eligible_to_post:row.eligible_to_post,
+    financial_truth:row.financial_truth as DiningFolioOrder['financial_truth'] };
+}
+
 export type ReceptionGuestRequest = {
   id: string;
   title: string;
@@ -580,6 +633,57 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     claimWaiterOrder: async (id: string, waiterId: string) => {
       reviewGate();
       return waiterClaimAck(await request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }), id, waiterId);
+    },
+    diningSeatingSessions: async (): Promise<DiningSeatingSession[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET',p+'/dining/sessions?status=ACTIVE'),'dining sessions');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN','Invalid dining sessions list');
+      return payload.items.map(seatingSession);
+    },
+    createDiningSeatingSession: async (stayId:string,tableId:string,serviceDate:string):Promise<DiningSeatingSession> => {
+      reviewGate();
+      const result=await request<unknown>('POST',p+'/dining/sessions',{
+        stay_id:safeRouteId(stayId),table_id:safeRouteId(tableId),
+        service_date:safeIsoDate(serviceDate),status:'SEATED',
+      });
+      const parsed=seatingSession(result);
+      if(parsed.stay_id!==stayId||parsed.table_id!==tableId||parsed.status!=='SEATED')
+        throw new ApiError('UNKNOWN','Dining seating acknowledgement mismatch');
+      return parsed;
+    },
+    setDiningSeatingStatus: async (sessionId:string,status:'SEATED'|'RELEASED'):Promise<DiningSeatingSession> => {
+      reviewGate();
+      const id=safeRouteId(sessionId);
+      const parsed=seatingSession(await request<unknown>('PATCH',p+'/dining/sessions/'+id+'/status',{status}));
+      if(parsed.id!==id||parsed.status!==status)throw new ApiError('UNKNOWN','Dining status acknowledgement mismatch');
+      return parsed;
+    },
+    moveDiningSeatingSession: async (sessionId:string,targetTableId:string):Promise<DiningSeatingSession> => {
+      reviewGate();
+      const id=safeRouteId(sessionId), table=safeRouteId(targetTableId);
+      const parsed=seatingSession(await request<unknown>('POST',p+'/dining/sessions/'+id+'/move',{
+        target_table_id:table,waiter_mode:'KEEP',
+      }));
+      if(parsed.id!==id||parsed.table_id!==table)throw new ApiError('UNKNOWN','Dining move acknowledgement mismatch');
+      return parsed;
+    },
+    diningFolioOrders: async ():Promise<DiningFolioOrder[]> => {
+      reviewGate();
+      const payload=objectResponse(await request<unknown>('GET',p+'/dining/folio-orders'),'dining folio list');
+      if (!Array.isArray(payload.items))throw new ApiError('UNKNOWN','Invalid dining folio list');
+      return payload.items.map(folioOrder);
+    },
+    postDiningFolioCharge: async (orderId:string):Promise<DiningFolioPostAck> => {
+      reviewGate();
+      const id=safeRouteId(orderId);
+      const row=objectResponse(await request<unknown>('POST',p+'/dining/orders/'+id+'/folio'),'dining folio charge');
+      if(row.order_id!==id||typeof row.charge_id!=='string'||
+        typeof row.idempotent_replay!=='boolean'||row.payment_created!==false||
+        row.financial_truth!=='OPEN_FOLIO_CHARGE_NOT_PAYMENT')
+        throw new ApiError('UNKNOWN','Invalid folio charge acknowledgement');
+      return {order_id:id,charge_id:safeRouteId(row.charge_id),
+        idempotent_replay:row.idempotent_replay,payment_created:false,
+        financial_truth:'OPEN_FOLIO_CHARGE_NOT_PAYMENT'};
     },
     assistantCapabilities: async () => {
       reviewGate();
