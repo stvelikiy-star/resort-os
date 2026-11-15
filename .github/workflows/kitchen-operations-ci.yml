@@ -10,6 +10,10 @@ on:
       - 'services/api/app/kitchen_stock.py'
       - 'services/api/app/kitchen_procurement.py'
       - 'services/api/app/owner_kitchen_management.py'
+      - 'services/api/app/owner_expenses.py'
+      - 'services/api/app/hotel_finance.py'
+      - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
+      - 'scripts/verify_owner_expenses_e2e.py'
       - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
       - 'scripts/verify_kitchen_procurement_e2e.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
@@ -209,6 +213,11 @@ jobs:
         env:
           ALLOW_KITCHEN_PROCUREMENT_TEST_WRITES: '1'
         run: python scripts/verify_kitchen_procurement_e2e.py
+
+      - name: Run owner expense obligations and manual settlements PostgreSQL E2E
+        env:
+          ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
+        run: python scripts/verify_owner_expenses_e2e.py
 
       - name: Show Core logs on failure
         if: failure()
