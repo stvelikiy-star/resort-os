@@ -226,6 +226,21 @@ async def link_existing_receipt(document_id: uuid.UUID, body: SupplierReceiptAll
             await conn.execute(
                 "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
                 "supplier-receipt-link:" + str(body.receipt_id))
+            previous = await conn.fetchrow(
+                '''SELECT a."propertyId",a."documentLineId",a."stockItemId",
+                          a.quantity,a."unitCostKgs",l."documentId"
+                   FROM kitchen_supplier_receipt_links a
+                   JOIN kitchen_supplier_document_lines l
+                     ON l.id=a."documentLineId" AND l."propertyId"=a."propertyId"
+                   WHERE a."receiptId"=$1''', body.receipt_id)
+            if previous:
+                if (previous["propertyId"] != pid or
+                    previous["documentId"] != document_id or
+                    previous["documentLineId"] != body.document_line_id):
+                    raise HTTPException(409, detail={"code": "SUPPLIER_RECEIPT_ALREADY_LINKED"})
+                return {"receipt_id": str(body.receipt_id),
+                        "already_processed": True, "payment_created": False,
+                        "recognized_profit": False}
             # Serialize all allocations against this source line, including partials.
             line = await conn.fetchrow(
                 '''SELECT l.id,l."stockItemId",l.quantity,l."unitCostKgs"
@@ -246,19 +261,6 @@ async def link_existing_receipt(document_id: uuid.UUID, body: SupplierReceiptAll
             if (receipt["stockItemId"] != line["stockItemId"] or
                 receipt["quantity"] != receipt["movement_quantity"]):
                 raise HTTPException(409, detail={"code": "SUPPLIER_RECEIPT_ITEM_OR_QUANTITY_MISMATCH"})
-            previous = await conn.fetchrow(
-                'SELECT * FROM kitchen_supplier_receipt_links WHERE "receiptId"=$1',
-                body.receipt_id)
-            if previous:
-                if (previous["propertyId"] != pid or
-                    previous["documentLineId"] != body.document_line_id or
-                    previous["stockItemId"] != line["stockItemId"] or
-                    previous["quantity"] != receipt["quantity"] or
-                    previous["unitCostKgs"] != line["unitCostKgs"]):
-                    raise HTTPException(409, detail={"code": "SUPPLIER_RECEIPT_ALREADY_LINKED"})
-                return {"receipt_id": str(body.receipt_id),
-                        "already_processed": True, "payment_created": False,
-                        "recognized_profit": False}
             allocated = await conn.fetchval(
                 '''SELECT COALESCE(SUM(quantity),0)
                    FROM kitchen_supplier_receipt_links
