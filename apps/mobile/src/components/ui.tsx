@@ -92,11 +92,11 @@ export function Screen({ children, scroll = true, padded = true }: { children: R
   );
 }
 
-export function Title({ children, sub }: { children: React.ReactNode; sub?: string }) {
+export function Title({ children, sub, titleSize }: { children: React.ReactNode; sub?: string; titleSize?: number }) {
   const { c } = useTheme();
   return (
     <View style={{ gap: 2 }}>
-      <Text accessibilityRole="header" style={[font.title, { color: c.text }]}>{children}</Text>
+      <Text accessibilityRole="header" style={[font.title, { color: c.text, ...(titleSize ? { fontSize: titleSize } : {}) }]}>{children}</Text>
       {sub ? <Text style={[font.small, { color: c.textMuted }]}>{sub}</Text> : null}
     </View>
   );
