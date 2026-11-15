@@ -69,6 +69,21 @@ async def main():
                 '/api/v1/kitchen/procurement/requests/'+request_id+'/receive',
                 json={'receipt_id':receipt_id,'quantity':'5','document_line_id':line_id}),
                 201,'atomic receipt')
+            report_url='/api/v1/admin/finance/owner/kitchen-operations'
+            report_params={'from_date':today,'to_date':today}
+            require(await store.get(report_url,params=report_params),403,
+                    'STORE denied OWNER kitchen financial reconciliation')
+            before_report=require(await owner.get(report_url,params=report_params),
+                                  200,'OWNER stock and supplier before credit')
+            before_sources=before_report['source_reconciliation']['supplier_documents']
+            before_stock=before_report['source_reconciliation']['inventory']
+            before_credited=Decimal(before_sources['credit_notes_kgs'])
+            before_outstanding=Decimal(before_sources['outstanding_payables_kgs'])
+            before_return_cost=Decimal(
+                before_report['real_supplier_return_stock_debit_kgs'])
+            before_book=before_stock['real_book_inventory_value_kgs']
+            assert before_report['source_reconciliation']['financial_truth']['recognized_profit_kgs'] is None
+            assert before_sources['gross_obligations_kgs'] is not None
             source=require(await store.get('/api/v1/kitchen/procurement/supplier-lines'),200,'source list')
             assert source['payment_created'] is False
             assert any(x['id']==line_id and Decimal(x['remaining_quantity'])==0
@@ -115,6 +130,26 @@ async def main():
             entry=next(x for x in stock['items'] if x['id']==item_id)
             assert Decimal(entry['balance'])==Decimal('3')
             assert Decimal(entry['inventory_value_kgs'])==Decimal('420')
+            after_report=require(await owner.get(report_url,params=report_params),
+                                 200,'OWNER stock and supplier after return')
+            after_sources=after_report['source_reconciliation']['supplier_documents']
+            after_stock=after_report['source_reconciliation']['inventory']
+            assert Decimal(after_sources['credit_notes_kgs'])-before_credited==Decimal('280')
+            assert before_outstanding-Decimal(after_sources['outstanding_payables_kgs'])==Decimal('280')
+            assert Decimal(after_report['real_supplier_return_stock_debit_kgs'])-before_return_cost==Decimal('280')
+            if before_book is not None and after_stock['real_book_inventory_value_kgs'] is not None:
+                assert Decimal(before_book)-Decimal(after_stock['real_book_inventory_value_kgs'])==Decimal('280')
+            else:
+                assert after_stock['valuation_status']=='RECONCILIATION_REQUIRED'
+            assert after_report['procurement_exposure']['outstanding_supplier_payables_kgs']==after_sources['outstanding_payables_kgs']
+            assert after_report['current_stock']['real_book_inventory_value_kgs']==after_stock['real_book_inventory_value_kgs']
+            assert after_sources['return_credit_minus_stock_cost_kgs'] is not None
+            assert after_report['source_reconciliation']['financial_truth']['recognized_profit_kgs'] is None
+            summary=require(await owner.get('/api/v1/admin/finance/summary',
+                                            params=report_params),200,'OWNER finance overview')
+            owner_summary=summary['owner_supplier_stock_snapshot']
+            assert owner_summary['supplier_documents']['outstanding_payables_kgs']==after_sources['outstanding_payables_kgs']
+            assert owner_summary['inventory']['real_book_inventory_value_kgs']==after_stock['real_book_inventory_value_kgs']
             settle={'id':str(uuid.uuid4()),'amount_kgs':'420','paid_on':today,
                     'method':'BANK_TRANSFER','reference':'E2E-SETTLE-'+token}
             require(await owner.post(
@@ -130,6 +165,11 @@ async def main():
             invoice=require(await owner.get('/api/v1/admin/finance/owner/supplier-documents'),
                             200,'final payable')
             assert Decimal(next(x for x in invoice['items'] if x['id']==doc_id)['outstanding_kgs'])==0
+            final_report=require(await owner.get(report_url,params=report_params),
+                                 200,'OWNER after supplier settlement')
+            final_balance=Decimal(final_report['source_reconciliation']['supplier_documents']['outstanding_payables_kgs'])
+            assert Decimal(after_sources['outstanding_payables_kgs'])-final_balance==Decimal('420')
+            assert final_report['source_reconciliation']['financial_truth']['is_recognized_profit_complete'] is False
             assert await db.fetchval('SELECT COUNT(*) FROM payments')==before_payments
             assert await db.fetchval(
                 'SELECT COUNT(*) FROM owner_expenses WHERE "propertyId"=$1',pid)==before_expenses
