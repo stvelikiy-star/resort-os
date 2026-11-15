@@ -24,6 +24,7 @@ on:
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'scripts/verify_kitchen_operations.py'
       - 'scripts/verify_waiter_serve_e2e.py'
+      - 'scripts/verify_restaurant_full_cycle_e2e.py'
       - 'scripts/verify_kitchen_menu_management.py'
       - 'scripts/test_kitchen_draft_authoring.py'
       - '.github/workflows/kitchen-operations-ci.yml'
@@ -150,6 +151,9 @@ jobs:
 
       - name: Run assigned waiter serve PostgreSQL E2E
         run: python scripts/verify_waiter_serve_e2e.py
+
+      - name: Run full restaurant seating-to-folio PostgreSQL E2E
+        run: python scripts/verify_restaurant_full_cycle_e2e.py
 
       - name: Run Kitchen Menu Management E2E
         run: python scripts/verify_kitchen_menu_management.py
