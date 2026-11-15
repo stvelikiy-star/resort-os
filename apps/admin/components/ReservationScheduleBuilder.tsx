@@ -326,7 +326,7 @@ export default function ReservationScheduleBuilder({
         body: JSON.stringify({ segments: draft.map(({ room_id, start, end }) => ({ room_id, start, end })) }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(errorText(body, "Не удалось проверить предложенный график"));
+      if (!response.ok) throw new Error(errorText(body, "Core отклонил предложенный график"));
       setPreview(body as PreviewResponse);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Ошибка предварительной проверки");
@@ -450,9 +450,9 @@ export default function ReservationScheduleBuilder({
 
         <div className="v8-builder-preview-actions"><button className="btn primary" onClick={() => void runPreview()} disabled={busy || !draft.length}>{busy ? "Проверяю…" : "Проверить в MARINA SMART"}</button><span>Сначала проверьте конфликты, категорию, стоимость и актуальность брони. Затем подтвердите изменения.</span></div>
 
-        {preview && <section tabIndex={-1} role="status" aria-label="Результат проверки графика" className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
+        {preview && <section tabIndex={-1} role="status" aria-label="График размещения" className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
           <PmsPreviewScrollAnchor />
-          <header><div><strong>{preview.can_commit ? "График можно сохранить" : "Изменения пока нельзя сохранить"}</strong><span>{preview.proposed_check_in} → {preview.proposed_check_out} · {preview.proposed_schedule.length} сегм.</span></div><b>{preview.category_changed ? "Категория меняется" : "Категория без изменения"}</b></header>
+          <header><div><strong>{preview.can_commit ? "График можно сохранить" : "Core запретил сохранение"}</strong><span>{preview.proposed_check_in} → {preview.proposed_check_out} · {preview.proposed_schedule.length} сегм.</span></div><b>{preview.category_changed ? "Категория меняется" : "Категория без изменения"}</b></header>
           <div className="v8-preview-money"><div><span>В брони</span><strong>{money(preview.pricing.stored_total_kgs)}</strong></div><div><span>Текущий тариф</span><strong>{preview.pricing.sellable ? money(preview.pricing.suggested_total_kgs) : "—"}</strong></div><div><span>Разница</span><strong>{preview.pricing.delta_kgs == null ? "—" : money(preview.pricing.delta_kgs)}</strong></div></div>
           {preview.conflicts.length > 0 && <div className="v8-preview-conflicts">{preview.conflicts.map((conflict, index) => <div key={`${conflict.room_code}-${conflict.start}-${index}`}><strong>№ {conflict.room_code}</strong><span>{conflict.start} → {conflict.end} · {conflict.booking_number || conflict.reason || conflict.block_type}</span></div>)}</div>}
           <p>Коммерческая сумма брони не меняется автоматически. Любая тарифная разница только показывается менеджеру.</p>
