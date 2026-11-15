@@ -11,9 +11,12 @@ on:
       - 'services/api/app/kitchen_procurement.py'
       - 'services/api/app/owner_kitchen_management.py'
       - 'services/api/app/owner_expenses.py'
+      - 'services/api/app/owner_supplier_documents.py'
       - 'services/api/app/owner_cash_reconciliation.py'
       - 'services/api/app/hotel_finance.py'
       - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
+      - 'packages/database/prisma/migrations/zz121_marina_supplier_documents_20261116/**'
+      - 'scripts/verify_supplier_document_e2e.py'
       - 'scripts/verify_owner_expenses_e2e.py'
       - 'scripts/test_marina_owner_finance_roles.py'
       - 'services/api/app/staff_task_reports.py'
@@ -257,6 +260,11 @@ jobs:
         env:
           ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
         run: python scripts/verify_owner_expenses_e2e.py
+
+      - name: Verify supplier invoice receipts and manual payable settlements PostgreSQL E2E
+        env:
+          ALLOW_SUPPLIER_DOCUMENT_TEST_WRITES: '1'
+        run: python scripts/verify_supplier_document_e2e.py
 
       - name: Verify mobile repair DTO through repair, cleaning and inspection
         env:
