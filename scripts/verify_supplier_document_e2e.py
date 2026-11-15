@@ -166,7 +166,8 @@ async def main():
             row = next(x for x in final["items"] if x["id"] == doc_id)
             assert Decimal(row["outstanding_kgs"]) == 0
             assert Decimal(row["settled_kgs"]) == Decimal("617.2835")
-            # Test actual supplier price + an independent legacy-price receipt,
+            # Test 2 legacy-priced units later linked to invoice (historical cost unchanged),
+            # 3 invoice-priced units and an independent 5-unit legacy receipt,
             # then debit SPOILAGE at moving weighted-average cost, not catalog cost.
             mixed_receipt_id=str(uuid.uuid4())
             check(await owner.post("/api/v1/kitchen/stock/receipts",json={
@@ -179,7 +180,7 @@ async def main():
                           "reason":"Synthetic weighted valuation loss"}
             waste=check(await owner.post("/api/v1/kitchen/stock/losses",
                                          json=loss_payload),201,"weighted loss")
-            assert Decimal(waste["cost_kgs"])==Decimal("223.4568"),waste
+            assert Decimal(waste["cost_kgs"])==Decimal("214.0740"),waste
             repeated=check(await owner.post("/api/v1/kitchen/stock/losses",
                                             json=loss_payload),201,"same loss retry")
             assert repeated["already_processed"] is True
@@ -187,7 +188,7 @@ async def main():
                 'SELECT quantity,"unitCostKgs" FROM kitchen_stock_movements WHERE id=$1',
                 uuid.UUID(loss_id))
             assert stored["quantity"]==Decimal("2")
-            assert stored["unitCostKgs"]==Decimal("111.7284"),stored
+            assert stored["unitCostKgs"]==Decimal("107.0370"),stored
             valued=await conn.fetchrow(
                 '''SELECT SUM(CASE WHEN kind='RECEIPT' THEN quantity ELSE -quantity END) AS balance,
                           SUM(CASE WHEN kind='RECEIPT' THEN quantity*"unitCostKgs"
@@ -196,12 +197,12 @@ async def main():
                    WHERE "propertyId"=$1 AND "stockItemId"=$2''',
                 pid,uuid.UUID(item_id))
             assert valued["balance"]==Decimal("8")
-            assert valued["remaining_value"]==Decimal("893.8267")
+            assert valued["remaining_value"]==Decimal("856.2961")
             reported=check(await owner.get("/api/v1/kitchen/stock"),200,"weighted inventory snapshot")
             current=next(row for row in reported["items"] if row["id"]==item_id)
             assert current["valuation_status"]=="MOVEMENT_BASED"
-            assert Decimal(current["inventory_value_kgs"])==Decimal("893.8267")
-            assert Decimal(current["weighted_unit_cost_kgs"])==Decimal("111.7283")
+            assert Decimal(current["inventory_value_kgs"])==Decimal("856.2961")
+            assert Decimal(current["weighted_unit_cost_kgs"])==Decimal("107.0370")
 
             assert await conn.fetchval("SELECT COUNT(*) FROM payments") == payment_before
             assert await conn.fetchval(
