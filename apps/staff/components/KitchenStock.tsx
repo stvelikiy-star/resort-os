@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import DirectStockReceipt from "./DirectStockReceipt";
+import ProcurementInvoiceReceipt from "./ProcurementInvoiceReceipt";
 import styles from "./ChefProduction.module.css";
 
 type Item = { id:string; name:string; unit:"KG"|"L"|"PCS"; balance:string; cost_per_unit_kgs:string; is_sample:boolean };
@@ -90,6 +91,7 @@ export default function KitchenStock({fromDate,throughDate,userRole}:{fromDate:s
         <label><input type="checkbox" checked={sample} onChange={e=>setSample(e.target.checked)}/>Учебный продукт</label>
         <button disabled={busy||!name.trim()||!cost||Number(cost)<0} onClick={()=>void mutate("/items",{name,unit,cost_per_unit_kgs:cost,is_sample:sample})}>Добавить продукт</button>
         <DirectStockReceipt items={data.items} onSaved={load}/>
+        <ProcurementInvoiceReceipt onSaved={load}/>
 
       </div>:null}
       {canConsume?<div className={styles.controls}><h3>Списание по приготовленным порциям</h3>
