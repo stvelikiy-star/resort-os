@@ -4,7 +4,7 @@ import DirectStockReceipt from "./DirectStockReceipt";
 import ProcurementInvoiceReceipt from "./ProcurementInvoiceReceipt";
 import styles from "./ChefProduction.module.css";
 
-type Item = { id:string; name:string; unit:"KG"|"L"|"PCS"; balance:string; cost_per_unit_kgs:string; is_sample:boolean };
+type Item = { id:string; name:string; unit:"KG"|"L"|"PCS"; balance:string; cost_per_unit_kgs:string; is_sample:boolean; inventory_value_kgs?:string|null; weighted_unit_cost_kgs?:string|null; valuation_status?:string };
 type Stock = { items:Item[]; production_cost_kgs:string; inventory_deducted_only_on_explicit_consume:boolean };
 type Target = { id:string; name_ru:string; menu_item_id:string; service_date:string; meal_type:"BREAKFAST"|"LUNCH"|"DINNER"|"OTHER"; planned_quantity:number; prepared_quantity:number; notes?:string|null };
 
@@ -81,7 +81,9 @@ export default function KitchenStock({fromDate,throughDate,userRole}:{fromDate:s
     {error?<p role="alert" className={styles.error}>{error}</p>:null}
     {notice?<p role="status" className={styles.notice}>{notice}</p>:null}
     {data?<>
-      {data.items.length ? data.items.map(item=><p key={item.id}><strong>{item.name}</strong> · {item.balance} {item.unit} · {item.cost_per_unit_kgs} сом/{item.unit}{item.is_sample?" · ТЕСТ":""}</p>) : <p>Продукты ещё не добавлены.</p>}
+      {data.items.length ? data.items.map(item=><p key={item.id}><strong>{item.name}</strong> · {item.balance} {item.unit} · справочная цена {item.cost_per_unit_kgs} сом/{item.unit}
+        {item.valuation_status==="MOVEMENT_BASED"? " · средневзвешенная "+(item.weighted_unit_cost_kgs??"—")+" сом/"+item.unit+" · стоимость остатка "+(item.inventory_value_kgs??"—")+" сом": " · требуется сверка стоимости"}
+        {item.is_sample?" · ТЕСТ":""}</p>) : <p>Продукты ещё не добавлены.</p>}
       <p className={styles.notice}>Учётная себестоимость списаний: {data.production_cost_kgs} сом. Это не полученная оплата и не прибыль.</p>
       {canReceive?<div className={styles.controls}>
         <h3>Добавить продукт</h3>
