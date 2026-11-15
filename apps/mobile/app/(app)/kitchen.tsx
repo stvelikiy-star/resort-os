@@ -29,7 +29,8 @@ import { font, radius, space } from '../../src/theme/tokens';
 export default function KitchenDashboard() {
   const { user, hotel, api, locale, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
-  const readOnly = user?.role === 'OWNER';
+  // MANAGER reviews kitchen and approves procurement, but COOK-only kitchen writes stay hidden.
+  const readOnly = user?.role === 'OWNER' || user?.role === 'MANAGER';
   const allowed = (user?.role === 'COOK' || readOnly) &&
     hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'kitchen', serverAuthMode);
   const live = useLiveModules();
