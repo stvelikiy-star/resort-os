@@ -97,7 +97,8 @@ async def main():
                 "service_date": business_date.isoformat(), "meal_type": "DINNER",
                 "status": "SEATED"}), 201, "seat guest")
             assert session["stay_id"] == str(stay_id) and session["waiter_id"] == wid
-            draft = next((item for item in menu if item["is_draft"]), None)
+            approved_ids = {item["id"] for item in menu[:2]}
+            draft = next((item for item in menu if item["is_draft"] and item["id"] not in approved_ids), None)
             assert draft is not None, "at least one draft must remain unapproved"
             require(await waiter.post("/api/v1/kitchen/orders", json={
                 "source": "TABLE", "table_id": source["id"],
