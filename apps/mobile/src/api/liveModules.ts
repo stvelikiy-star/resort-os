@@ -93,7 +93,7 @@ export interface KitchenStockSnapshot {
 export interface KitchenProcurementNeed {
   stock_item_id:string|null; name:string; unit:'KG'|'L'|'PCS';
   remaining_needed:string; balance:string; shortage:string;
-  pending_requests:string; shortage_after_pipeline:string; estimated_unit_cost_kgs:string|null;
+  pending_requests:string; approved_inbound:string; shortage_after_pipeline:string; estimated_unit_cost_kgs:string|null;
 }
 export interface KitchenProcurementNeeds {
   service_date:string; basis:'APPROVED_NON_SAMPLE_REMAINING_PRODUCTION';
@@ -561,6 +561,14 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         typeof data.is_complete!=='boolean'||!Array.isArray(data.items)||
         !Array.isArray(data.missing_recipes)||typeof data.excluded_sample_targets!=='number')
         throw new ApiError('UNKNOWN','Invalid procurement needs');
+      for(const entry of data.items){
+        const row=objectResponse(entry,'procurement need');
+        if(typeof row.name!=='string' || !['KG','L','PCS'].includes(String(row.unit)) ||
+          typeof row.approved_inbound!=='string' || typeof row.pending_requests!=='string' ||
+          typeof row.shortage_after_pipeline!=='string' ||
+          !/^\\d+(?:\\.\\d+)?$/.test(row.approved_inbound))
+          throw new ApiError('UNKNOWN','Invalid approved procurement supply');
+      }
       return data as unknown as KitchenProcurementNeeds;
     },
     procurementRequests: async ():Promise<KitchenProcurementList> => {
