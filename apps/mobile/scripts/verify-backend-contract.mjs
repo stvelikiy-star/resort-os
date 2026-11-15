@@ -83,8 +83,9 @@ for (const [filename, router, prefix, endpoints] of contracts) {
   for (const entry of endpoints) {
     const [method, ...rest] = entry.split(' ');
     const path = rest.join(' ');
-    const doubleRoute = '@' + router + '.' + method + '("' + path + '")';
-    const singleRoute = '@' + router + '.' + method + "('" + path + "')";
+    // Decorators may include status_code, response_model, etc. after the path.
+    const doubleRoute = '@' + router + '.' + method + '("' + path + '"';
+    const singleRoute = '@' + router + '.' + method + "('" + path + "'";
     if (!code.includes(doubleRoute) && !code.includes(singleRoute))
       throw new Error('Missing ' + method.toUpperCase() + ' ' + prefix + path + ' in ' + filename);
     routeCount++;
