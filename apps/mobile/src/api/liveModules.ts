@@ -578,11 +578,14 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
           throw new ApiError('UNKNOWN','Invalid stock item');
         return {...row,id:safeRouteId(String(row.id))} as KitchenStockItem;
       });
-      if (typeof payload.new_loss_movement_id !== 'string')
-        throw new ApiError('UNKNOWN','Missing server-issued loss movement ID');
+      // Older LIVE servers have no loss mutation nonce. Keep read/receipt/consume working;
+      // the loss form stays disabled until a valid server-issued UUID is available.
+      const lossId=payload.new_loss_movement_id;
+      if (lossId !== undefined && typeof lossId !== 'string')
+        throw new ApiError('UNKNOWN','Invalid loss movement ID');
       return {items:rows,production_cost_kgs:payload.production_cost_kgs,
         inventory_deducted_only_on_explicit_consume:true,
-        new_loss_movement_id:safeRouteId(payload.new_loss_movement_id)};
+        ...(lossId === undefined ? {} : {new_loss_movement_id:safeRouteId(lossId as string)})};
     },
     receiveKitchenStock: async (stockItemId:string, quantity:string):Promise<{id:string;quantity:string;payment_created:false}> => {
       reviewGate();
