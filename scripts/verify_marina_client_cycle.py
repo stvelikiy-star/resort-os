@@ -599,8 +599,12 @@ def main() -> None:
     waiter = login(WAITER_USERNAME, WAITER_PASSWORD)
     waiter_floor = expect(waiter.get("/api/v1/dining/floor"), 200, "Waiter dining floor access")
     assert isinstance(waiter_floor, dict)
-    waiter_menu_denied = waiter.get("/api/v1/kitchen/menu")
-    assert waiter_menu_denied.status_code == 403, waiter_menu_denied.text
+    waiter_menu = expect(waiter.get("/api/v1/kitchen/menu"), 200, "Waiter approved menu")
+    assert isinstance(waiter_menu.get("items"), list)
+    assert all(item["is_active"] and not item["is_draft"] and "recipe" not in item
+               for item in waiter_menu["items"])
+    waiter_kitchen_queue = waiter.get("/api/v1/kitchen/orders")
+    assert waiter_kitchen_queue.status_code == 403, waiter_kitchen_queue.text
 
     technician = login(TECHNICIAN_USERNAME, TECHNICIAN_PASSWORD)
     technician_tasks = expect(technician.get("/api/v1/ops/tasks", params={"limit": 50}), 200, "Technician tasks access")
