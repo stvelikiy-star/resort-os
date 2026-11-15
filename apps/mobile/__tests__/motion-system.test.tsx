@@ -3,11 +3,11 @@ import React from 'react';
 import fs from 'fs';
 import path from 'path';
 import { AccessibilityInfo, AppState, StyleSheet, Text, View } from 'react-native';
-import { act, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { getMotionSnapshot, primeMotionPreference, resetMotionPreferenceForTests } from '../src/theme/motion';
 import { AnimatedKpi, OccupancyRing, PremiumEntrance } from '../src/components/Future';
-import { AnimatedProgressBar } from '../src/components/ui';
+import { AnimatedProgressBar, PressScale } from '../src/components/ui';
 import { AnimatedSheet, ConfirmedChange, TabIcon } from '../src/components/Motion';
 import { Sparkles } from 'lucide-react-native';
 
@@ -220,5 +220,27 @@ describe('source contracts', () => {
     expect(layout).toContain('hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)');
     expect(layout).toContain('mobileTabPlan(workspace.tabs)');
     expect(layout).toContain("<Tabs.Screen name=\"more\"");
+  });
+});
+
+describe('PressScale (#468 fixes preserved on the shared motion store)', () => {
+  const scaleOf = (el: { props: { style?: unknown } }) => (StyleSheet.flatten(el.props.style as never).transform as { scale: number }[])[0].scale;
+  it('a disabled button never fires onPress and stays at scale 1', async () => {
+    await setOsReduceMotion(false);
+    const onPress = jest.fn();
+    const screen = await render(<PressScale testID="b" disabled onPress={onPress}><Text>Go</Text></PressScale>);
+    fireEvent(screen.getByTestId('b'), 'pressIn');
+    fireEvent.press(screen.getByTestId('b'));
+    expect(onPress).not.toHaveBeenCalled();
+    expect(scaleOf(screen.getByText('Go').parent as never)).toBe(1);
+  });
+  it('Reduce Motion keeps scale 1 on press and still runs the action', async () => {
+    await setOsReduceMotion(true);
+    const onPress = jest.fn();
+    const screen = await render(<PressScale testID="b" onPress={onPress}><Text>Go</Text></PressScale>);
+    fireEvent(screen.getByTestId('b'), 'pressIn');
+    expect(scaleOf(screen.getByText('Go').parent as never)).toBe(1);
+    fireEvent.press(screen.getByTestId('b'));
+    expect(onPress).toHaveBeenCalledTimes(1);
   });
 });
