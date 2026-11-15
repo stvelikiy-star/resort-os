@@ -1,8 +1,9 @@
 "use client";
 
 import { usePmsDialog } from "./hooks/usePmsDialog";
+import PmsPreviewScrollAnchor from "./PmsPreviewScrollAnchor";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type RoomOption = {
   id: string;
@@ -135,7 +136,6 @@ export default function ReservationScheduleBuilder({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const dialogRef = usePmsDialog(onClose, busy);
-  const previewResultRef = useRef<HTMLElement | null>(null);
   const [confirmCancellation, setConfirmCancellation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [splitInputs, setSplitInputs] = useState<Record<number, string>>({});
@@ -335,15 +335,6 @@ export default function ReservationScheduleBuilder({
     }
   }
 
-  useEffect(() => {
-    if (!preview) return;
-    // Scroll only after explicit preview; preserve focus and form contents.
-    const frame = window.requestAnimationFrame(() => {
-      previewResultRef.current?.scrollIntoView({ block: "nearest", behavior: "auto" });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [preview]);
-
   async function commit() {
     if (!preview) return;
     setBusy(true);
@@ -459,7 +450,8 @@ export default function ReservationScheduleBuilder({
 
         <div className="v8-builder-preview-actions"><button className="btn primary" onClick={() => void runPreview()} disabled={busy || !draft.length}>{busy ? "Проверяю…" : "Проверить в MARINA SMART"}</button><span>Сначала проверьте конфликты, категорию, стоимость и актуальность брони. Затем подтвердите изменения.</span></div>
 
-        {preview && <section ref={previewResultRef} tabIndex={-1} role="status" aria-label="Результат проверки графика" className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
+        {preview && <section tabIndex={-1} role="status" aria-label="Результат проверки графика" className={`v8-preview ${preview.can_commit ? "ok" : "bad"}`}>
+          <PmsPreviewScrollAnchor />
           <header><div><strong>{preview.can_commit ? "График можно сохранить" : "Изменения пока нельзя сохранить"}</strong><span>{preview.proposed_check_in} → {preview.proposed_check_out} · {preview.proposed_schedule.length} сегм.</span></div><b>{preview.category_changed ? "Категория меняется" : "Категория без изменения"}</b></header>
           <div className="v8-preview-money"><div><span>В брони</span><strong>{money(preview.pricing.stored_total_kgs)}</strong></div><div><span>Текущий тариф</span><strong>{preview.pricing.sellable ? money(preview.pricing.suggested_total_kgs) : "—"}</strong></div><div><span>Разница</span><strong>{preview.pricing.delta_kgs == null ? "—" : money(preview.pricing.delta_kgs)}</strong></div></div>
           {preview.conflicts.length > 0 && <div className="v8-preview-conflicts">{preview.conflicts.map((conflict, index) => <div key={`${conflict.room_code}-${conflict.start}-${index}`}><strong>№ {conflict.room_code}</strong><span>{conflict.start} → {conflict.end} · {conflict.booking_number || conflict.reason || conflict.block_type}</span></div>)}</div>}
