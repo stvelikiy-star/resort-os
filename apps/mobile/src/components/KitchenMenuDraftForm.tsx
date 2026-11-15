@@ -25,7 +25,9 @@ const categories = {
   kz: ['Таңғы ас', 'Сорпа', 'Салат', 'Негізгі тағам', 'Гарнир', 'Десерт', 'Сусын'],
 } as const;
 
-export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft) => Promise<string> }) {
+export function KitchenMenuDraftForm({ save, initial }: {
+  save: (draft: KitchenMenuDraft) => Promise<string>; initial?: KitchenMenuDraft;
+}) {
   const { locale, hotel, user } = useSession();
   const identity = hotel?.id && user?.id ? { hotelId: hotel.id, userId: user.id } : null;
   const pending = useAsync(() => identity ? readPendingDiningWrite(identity.hotelId, identity.userId) : Promise.reject(new Error('Missing hotel identity')),
@@ -34,8 +36,8 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
   const copy = useMobileCopy();
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
-  const [values, setValues] = useState(EMPTY);
-  const [category, setCategory] = useState<KitchenMenuDraft['category']>('MAIN');
+  const [values, setValues] = useState(initial ?? EMPTY);
+  const [category, setCategory] = useState<KitchenMenuDraft['category']>(initial?.category ?? 'MAIN');
   const [busy, setBusy] = useState(false);
   const [unknown, setUnknown] = useState(false);
   const [message, setMessage] = useState('');
@@ -63,7 +65,7 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
       });
       await clearPendingDiningWrite(identity.hotelId, identity.userId);
       await pending.reload();
-      setValues(EMPTY);
+      if (!initial) setValues(EMPTY);
       setMessage(saved);
     } catch (error) {
       const rejected = recorded && wasWriteRejected(error);
@@ -80,11 +82,11 @@ export function KitchenMenuDraftForm({ save }: { save: (draft: KitchenMenuDraft)
       setBusy(false);
     }
   };
-  if (!open) return <Button label={title} variant="secondary" onPress={() => setOpen(true)}/>;
+  if (!open) return <Button label={initial ? {ru:'Редактировать черновик',kg:'Долбоорду түзөтүү',en:'Edit draft',kz:'Нобайды өңдеу'}[locale] : title} variant="secondary" onPress={() => setOpen(true)}/>;
   return <GlassCard style={{ gap: 8 }}>
     <SectionLabel>{title}</SectionLabel>
     <Text style={{color:c.textMuted}}>Цена и публикация утверждаются менеджером · Price requires approval</Text>
-    <Field label={codeLabel} value={values.code} onChangeText={value => update('code', value)} maxLength={60}/>
+    <Field editable={!initial && !busy} label={codeLabel} value={values.code} onChangeText={value => update('code', value)} maxLength={60}/>
     {FIELDS.map(field => <Field key={field} label={field.slice(-2).toUpperCase()}
       value={values[field]} maxLength={160} onChangeText={value => update(field, value)}/>)}
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>

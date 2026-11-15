@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from .auth import require_roles, trusted_property_id
 from .shared_dining_p0 import guard as shared_dining_staging_guard
 from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
+from .kitchen_recipes import read_recipe
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
 
@@ -210,14 +211,18 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
 
 
 @admin_router.get("/menu")
-async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
+async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK"}:
+        raise HTTPException(status_code=403, detail="Menu author role required")
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user)
         rows = await conn.fetch(
-            '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
-               FROM kitchen_menu_items WHERE "propertyId"=$1 ORDER BY "sortOrder",category,"nameRu"''', pid,
+            '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder",recipe
+               FROM kitchen_menu_items WHERE "propertyId"=$1
+                 AND ($2::boolean OR ("isDraft"=true AND "isActive"=false))
+               ORDER BY "sortOrder",category,"nameRu"''', pid, user["role"] != "COOK",
         )
-    return {"items": [menu_item(row) for row in rows]}
+    return {"items": [{**menu_item(row), "recipe": read_recipe(row["recipe"])} for row in rows]}
 
 
 @admin_router.patch("/menu/{item_id}")

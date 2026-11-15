@@ -137,6 +137,10 @@ export type KitchenMenuDraft = {
   price_kgs: number;
 };
 
+export interface KitchenAuthorMenuItem extends KitchenMenuDraft {
+  id: string; is_active: boolean; is_draft: boolean; recipe: KitchenRecipe | null;
+}
+
 export interface KitchenProductionMenuItem {
   recipe?: KitchenRecipe | null;
   id: string; code: string; category: string;
@@ -517,6 +521,36 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         typeof payload.cost_kgs!=='string'||!/^\d+(?:\.\d+)?$/.test(payload.cost_kgs))
         throw new ApiError('UNKNOWN','Invalid stock consumption acknowledgment');
       return payload as unknown as KitchenStockConsumeAck;
+    },
+    kitchenAuthorMenu: async (): Promise<KitchenAuthorMenuItem[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/menu'), 'author menu');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN', 'Invalid author menu');
+      return payload.items.map(value => {
+        const row = objectResponse(value, 'author menu item');
+        if (typeof row.id !== 'string' || typeof row.is_active !== 'boolean' ||
+            typeof row.is_draft !== 'boolean' || !Number.isSafeInteger(row.price_kgs) || Number(row.price_kgs) < 0 ||
+            !KITCHEN_MENU_CATEGORIES.includes(row.category as KitchenMenuDraft['category'])) {
+          throw new ApiError('UNKNOWN', 'Invalid author menu item');
+        }
+        for (const field of ['code', 'name_ru', 'name_kg', 'name_kz', 'name_en']) {
+          if (typeof row[field] !== 'string') throw new ApiError('UNKNOWN', 'Invalid author menu name');
+        }
+        return { ...row, id: safeRouteId(row.id), recipe: kitchenRecipe(row.recipe) } as KitchenAuthorMenuItem;
+      });
+    },
+    updateKitchenMenuDraft: async (id: string, draft: KitchenMenuDraft): Promise<string> => {
+      reviewGate();
+      // Price, publication and activation are never part of a cook's edit.
+      const { category, name_ru, name_kg, name_en, name_kz } = draft;
+      const result = objectResponse(await request<unknown>('PATCH', p + '/kitchen/menu/' + safeRouteId(id),
+        { category, name_ru, name_kg, name_en, name_kz }), 'draft update');
+      if (result.id !== id || result.is_draft !== true || result.is_active !== false ||
+          result.category !== category || result.name_ru !== name_ru || result.name_kg !== name_kg ||
+          result.name_en !== name_en || result.name_kz !== name_kz) {
+        throw new ApiError('UNKNOWN', 'Draft update acknowledgement mismatch');
+      }
+      return id;
     },
     kitchenProductionMenu: async (): Promise<KitchenProductionMenuItem[]> => {
       reviewGate();

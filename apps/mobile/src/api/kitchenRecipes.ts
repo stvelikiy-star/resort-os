@@ -9,7 +9,7 @@ export interface KitchenRecipe {
 }
 export interface IngredientRequirements {
   basis: 'PRODUCTION_PORTIONS'; is_complete: boolean; contains_sample_data: boolean;
-  inventory_deducted: false;
+  inventory_deducted: boolean;
   items: { name: string; unit: RecipeUnit; planned_quantity: string; prepared_quantity: string; remaining_quantity: string }[];
   missing_recipes: { menu_item_id: string; name_ru: string; service_date: string }[];
 }
@@ -53,14 +53,14 @@ export function ingredientRequirements(value: unknown): IngredientRequirements |
   if (value === undefined) return undefined;
   const row = object(value);
   if (row.basis !== 'PRODUCTION_PORTIONS' || typeof row.is_complete !== 'boolean' ||
-      typeof row.contains_sample_data !== 'boolean' || row.inventory_deducted !== false ||
+      typeof row.contains_sample_data !== 'boolean' || typeof row.inventory_deducted !== 'boolean' ||
       !Array.isArray(row.items) || !Array.isArray(row.missing_recipes)) {
     throw new ApiError('UNKNOWN', 'Invalid ingredient requirements');
   }
   if (row.is_complete && row.missing_recipes.length) throw new ApiError('UNKNOWN', 'Incomplete recipe coverage');
   return {
     basis: 'PRODUCTION_PORTIONS', is_complete: row.is_complete,
-    contains_sample_data: row.contains_sample_data, inventory_deducted: false,
+    contains_sample_data: row.contains_sample_data, inventory_deducted: row.inventory_deducted,
     items: row.items.map(value => {
       const item = object(value);
       return { name: text(item.name), unit: unit(item.unit), planned_quantity: decimal(item.planned_quantity),

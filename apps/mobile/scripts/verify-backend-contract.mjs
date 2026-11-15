@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
  * proves ROUTE EXISTENCE only. DTO and runtime auth require dedicated E2E.
  * Reference snapshot: MARINA integration release 8217602953ba637114e1b403dfc8d2fe7b02ddd2.
  * Staff/store and kitchen/recipe additions reviewed against Core #428.
+ * Cook draft authoring reviewed with test_kitchen_draft_authoring.py and kitchen-author-menu.test.ts.
  * Recipe extension is pinned separately and covered by recipe DTO and API tests.
  */
 const src = resolve(process.cwd(), '../../services/api/app');
@@ -22,9 +23,9 @@ const pinned = {
   'reception_reservations.py': 'a86688a3dc69cf639cb79bea8d7e243569f57e41',
   'pms_reservation_create.py': 'c5d7fb9fd6b5a36e6c7c9c0b46d8d83155fe306b',
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
-  'kitchen_menu_management.py': 'b1f4fc3ca06deba1b8b886c2aa797f4796a97979',
+  'kitchen_menu_management.py': '1dfdda37782fc3858614c3f6965a195077a93dd2',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',
-  'kitchen.py': 'af86e40323b16226f6f969e209bc03d64a85a285',
+  'kitchen.py': 'a478d4f10e1bae5fd4d1c297d5ba8054fdf85e3a',
   'dining_production_snapshots.py': '717f2070a0924ab73456e364a5d4a8cf03c0c47e',
   'dining_control.py': '80c4defa448f0e82671f743215a307705f5dd002',
   'dining_stays.py': '6978f0f430e82616d05ebbab08a135119304d828',
@@ -46,7 +47,7 @@ const contracts = [
   ['main.py','app','',['get /api/v1/pms/grid']],
   ['pms_reservation_create.py','router','/api/v1/admin/pms/reservations',['post /new/preview','post /new/commit']],
   ['inbox.py','router','/api/v1/admin/inbox',['get /conversations','get /conversations/{conversation_id}','post /conversations/{conversation_id}/claim','patch /conversations/{conversation_id}/status','post /conversations/{conversation_id}/notes']],
-  ['kitchen_menu_management.py','router','/api/v1/kitchen',['post /menu','get /production-menu','get /production-targets','put /production-targets','get /menu/{item_id}/recipe','put /menu/{item_id}/recipe']],
+  ['kitchen_menu_management.py','router','/api/v1/kitchen',['post /menu','patch /menu/{item_id}','get /production-menu','get /production-targets','put /production-targets','get /menu/{item_id}/recipe','put /menu/{item_id}/recipe']],
   ['kitchen.py','admin_router','/api/v1/kitchen',['get /menu','post /tables','get /orders','post /orders','patch /orders/{order_id}/status']],
   ['dining_production_snapshots.py','router','/api/v1/dining',['get /production-snapshots','post /production-snapshots']],
   ['dining_control.py','router','/api/v1/dining',['get /floor','patch /orders/{order_id}/waiter']],

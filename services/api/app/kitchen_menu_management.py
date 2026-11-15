@@ -123,6 +123,7 @@ def validate_menu_create_permissions(payload: MenuCreate, user: dict[str, Any]) 
 
 @router.post("/menu", status_code=status.HTTP_201_CREATED)
 async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str, Any] = Depends(draft_create_access)):
+    enforce_menu_author(user)
     validate_menu_create_permissions(payload, user)
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
@@ -145,8 +146,24 @@ async def create_menu_item(payload: MenuCreate, request: Request, user: dict[str
     return result
 
 
+def enforce_menu_author(user: dict[str, Any]) -> None:
+    # Custom module grants must not turn another role into a menu author.
+    if user["role"] not in {"OWNER", "MANAGER", "COOK"}:
+        raise HTTPException(status_code=403, detail="Menu author role required")
+
+
+def validate_draft_edit(user: dict[str, Any], changes: dict[str, Any], row: Any) -> None:
+    enforce_menu_author(user)
+    if user["role"] == "COOK" and (
+        not row["isDraft"] or row["isActive"] or
+        set(changes) - {"category", "name_ru", "name_kg", "name_kz", "name_en"}
+    ):
+        raise HTTPException(status_code=403, detail="COOK may edit only inactive draft names and category")
+
+
 @router.patch("/menu/{item_id}")
-async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Request, user: dict[str, Any] = Depends(manager_access)):
+async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Request, user: dict[str, Any] = Depends(draft_create_access)):
+    enforce_menu_author(user)
     changes = payload.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(status_code=422, detail="No menu changes supplied")
@@ -161,6 +178,7 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
             )
             if not before_row:
                 raise HTTPException(status_code=404, detail="Menu item not found")
+            validate_draft_edit(user, changes, before_row)
             next_name_kz = payload.name_kz if payload.name_kz is not None else before_row["nameKz"]
             publishing = payload.is_draft is False or payload.is_active is True
             if publishing and not str(next_name_kz or "").strip():
@@ -356,18 +374,24 @@ async def save_menu_recipe(
     item_id: uuid.UUID,
     payload: RecipeWrite,
     request: Request,
-    user: dict[str, Any] = Depends(manager_access),
+    user: dict[str, Any] = Depends(draft_create_access),
 ):
+    enforce_menu_author(user)
+    if user["role"] == "COOK" and payload.status != "DRAFT":
+        raise HTTPException(status_code=403, detail="Only management may approve recipes")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await _property_id(conn, user)
             row = await conn.fetchrow(
-                'SELECT recipe FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
+                'SELECT recipe,"isDraft","isActive" FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
                 item_id, pid,
             )
             if row is None:
                 raise HTTPException(status_code=404, detail="Menu item not found")
+            validate_draft_edit(user, {}, row)
             before = read_recipe(row["recipe"])
+            if user["role"] == "COOK" and before and before["status"] == "APPROVED":
+                raise HTTPException(status_code=403, detail="COOK cannot replace an approved recipe")
             version = before["version"] if before else 0
             if payload.expected_version != version:
                 raise HTTPException(status_code=409, detail={"code": "KITCHEN_RECIPE_CONFLICT"})

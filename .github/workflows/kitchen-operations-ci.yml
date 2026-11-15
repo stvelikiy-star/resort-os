@@ -24,6 +24,7 @@ on:
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'scripts/verify_kitchen_operations.py'
       - 'scripts/verify_kitchen_menu_management.py'
+      - 'scripts/test_kitchen_draft_authoring.py'
       - '.github/workflows/kitchen-operations-ci.yml'
   workflow_dispatch:
 
@@ -92,6 +93,9 @@ jobs:
         run: |
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_kitchen_operations.py scripts/verify_kitchen_menu_management.py
+
+      - name: Test cook draft authoring and management authority
+        run: PYTHONPATH=. python scripts/test_kitchen_draft_authoring.py
 
       - name: Seed canonical hotel and owner
         run: |

@@ -35,3 +35,8 @@ describe('kitchen recipe contracts',()=>{
     expect(()=>ingredientRequirements({...requirements,items:[{...requirements.items[0],planned_quantity:2}]})).toThrow();
   });
 });
+
+it('accepts explicit completed stock consumption without discarding ingredient requirements', () => {
+  expect(ingredientRequirements({...requirements, inventory_deducted:true})?.inventory_deducted).toBe(true);
+  expect(() => ingredientRequirements({...requirements, inventory_deducted:'true'})).toThrow();
+});

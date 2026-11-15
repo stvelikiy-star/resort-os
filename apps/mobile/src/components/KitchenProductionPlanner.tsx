@@ -110,7 +110,7 @@ export function KitchenProductionPlanner({
     </> : null}
     {!readOnly ? <>
       {menu.length ? <>
-        <Field label={t[1]} value={date} onChangeText={setDate} maxLength={10}/>
+        <Field label={t[1]} value={date} onChangeText={value => { setDate(value); setDish(''); setPlanned(''); setPrepared('0'); }} maxLength={10}/>
         <View style={{flexDirection:'row',flexWrap:'wrap',gap:6}}>
           {meals.map(x => <Button key={x} label={x} variant={meal===x?'primary':'secondary'}
             onPress={() => { setMeal(x); setDish(''); }}/>)}

@@ -32,7 +32,8 @@ export function KitchenIngredients({ data }: { data: IngredientRequirements }) {
   </GlassCard>;
 }
 
-export function KitchenRecipeEditor({ recipe, save, reload }: {
+export function KitchenRecipeEditor({ recipe, save, reload, canApprove = true }: {
+  canApprove?: boolean;
   recipe: KitchenRecipe | null | undefined;
   save: (input: RecipeInput) => Promise<void>;
   reload: () => Promise<unknown>;
@@ -55,7 +56,7 @@ export function KitchenRecipeEditor({ recipe, save, reload }: {
     if (busy || !valid) return;
     setBusy(true); setError('');
     try {
-      await save({expected_version:recipe?.version ?? 0, status:approved?'APPROVED':'DRAFT',
+      await save({expected_version:recipe?.version ?? 0, status:canApprove && approved?'APPROVED':'DRAFT',
         is_sample:sample, ingredients});
     } catch (e) {
       setError(e instanceof Error ? e.message : t.error);
@@ -80,7 +81,8 @@ export function KitchenRecipeEditor({ recipe, save, reload }: {
     </View>)}
     <Button label={t.add} variant="secondary" disabled={busy||ingredients.length>=100}
       onPress={()=>setIngredients(rows=>[...rows,{name:'',unit:'KG',quantity_per_portion:''}])}/>
-    <Button disabled={busy} label={approved?t.approved:t.draft} variant="secondary" onPress={()=>setApproved(x=>!x)}/>
+    {canApprove ? <Button disabled={busy} label={approved?t.approved:t.draft} variant="secondary" onPress={()=>setApproved(x=>!x)}/> :
+      <Text style={{color:c.textMuted}}>{t.draft}</Text>}
     <Button disabled={busy} label={sample?t.sample:t.real} variant="secondary" onPress={()=>setSample(x=>!x)}/>
     <Button label={t.save} disabled={!valid||busy} onPress={()=>void submit()}/>
     {error ? <Text accessibilityRole="alert" style={{color:c.warning}}>{error}</Text> : null}
