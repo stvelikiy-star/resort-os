@@ -149,6 +149,8 @@ async def main():
                 result = require(await cook.patch(f"/api/v1/kitchen/orders/{oid}/status",
                                                    json={"status": state}), 200, state)
                 assert result["status"] == state
+            ready_feed = require(await cook.get("/api/v1/kitchen/orders?status=READY"), 200, "Web READY queue")["items"]
+            assert any(x["id"] == oid and x["status"] == "READY" for x in ready_feed)
             served = require(await waiter.patch(f"/api/v1/kitchen/orders/{oid}/status",
                                                 json={"status": "SERVED"}), 200, "waiter serves")
             assert served["status"] == "SERVED"
