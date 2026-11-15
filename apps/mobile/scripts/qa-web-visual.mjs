@@ -305,7 +305,7 @@ async function main() {
     await click('[data-testid="switch-demo-role"]', 'choose owner for visual matrix');
     await click('[data-testid="demo-owner"]', 'owner matrix role');
     const requestedMatrixRoutes = ['overview', 'reception', 'pms', 'new-booking', 'reservation', 'holds', 'inbox', 'conversation', 'ai', 'dining', 'scan'];
-    const reachableRoutes = ['overview', 'reception', 'pms', 'inbox', 'conversation', 'ai'];
+    const reachableRoutes = ['overview', 'reception', 'pms', 'new-booking', 'inbox', 'conversation', 'ai'];
     const matrixFiles = [];
     const localeBack = { ru: 'Закрыть', kg: 'Жабуу', en: 'Close' };
     const aiBack = { ru: 'Назад', kg: 'Артка', en: 'Back' };
@@ -319,6 +319,14 @@ async function main() {
         if (url !== expected) throw new Error('Visual matrix wrong route: expected ' + expected + ', got ' + url);
         const name = 'matrix_' + route + '_' + lang + '_' + theme + '_' + width;
         await screenshot(name);
+        // Narrow English status labels must remain complete on a single line:
+        // the approved two-column design was breaking "Maintenance" mid-word.
+        if (route === 'overview' && lang === 'en' && width === 320) {
+          const label = await evaluate('(() => { const el = document.querySelector(\'[data-testid="inventory-state-3"]\'); if (!el) return null; const s = getComputedStyle(el); return { text: el.textContent.trim(), height: el.getBoundingClientRect().height, lineHeight: parseFloat(s.lineHeight) }; })()');
+          if (!label || label.text !== 'Maintenance' || label.height > label.lineHeight * 1.3) {
+            throw new Error('320px EN room maintenance label wraps/clips: ' + JSON.stringify(label));
+          }
+        }
         matrixFiles.push(name + '.jpg');
       }
       await viewport(375, 812);
@@ -335,6 +343,30 @@ async function main() {
         await matrixCapture('reception', lang, theme);
         await click('[data-testid="tab-pms"]', 'owner pms');
         await matrixCapture('pms', lang, theme);
+        // Enter the REAL booking-preview route through a free DEMO PMS cell,
+        // exactly as a receptionist would. Do not deep-link around route guards
+        // or submit a fabricated reservation; DEMO has no live commit.
+        const opened = await evaluate(`(() => {
+          const cells=[...document.querySelectorAll('[data-testid^="pms-"]')];
+          const free=cells.find(el => el.textContent.trim()==='+' && el.getAttribute('aria-disabled')!=='true');
+          if (!free) return false;
+          free.scrollIntoView({block:'center',inline:'center'});
+          free.click();
+          return true;
+        })()`);
+        if (!opened || !await waitFor('[data-testid="booking-preview"]')) {
+          throw new Error('Owner free PMS cell did not open the actual booking preview');
+        }
+        await matrixCapture('new-booking', lang, theme);
+        // Empty DEMO preview must NEVER become a successful booking write.
+        const realCommitVisible=await evaluate('Boolean(document.querySelector(\'[data-testid="booking-commit"]\'))');
+        if (realCommitVisible) throw new Error('DEMO booking unexpectedly exposes live commit');
+        await evaluate('history.back()');
+        for (let check=0; check<30; check++) {
+          if (await evaluate('location.pathname')==='/pms') break;
+          await sleep(150);
+        }
+        if (await evaluate('location.pathname')!=='/pms') throw new Error('Booking preview did not return to PMS');
         await click('[data-testid="tab-inbox"]', 'owner inbox');
         await matrixCapture('inbox', lang, theme);
         await click('[data-testid="conversation-demo-chat-01"]', 'demo chat detail');

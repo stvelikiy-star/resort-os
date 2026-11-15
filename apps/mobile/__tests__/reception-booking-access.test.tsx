@@ -129,6 +129,22 @@ describe('RECEPTION booking access', () => {
     expect(view.queryByText(/B-1/)).toBeNull();
   });
 
+  it('keeps booking journal locked after lost server acknowledgement (no blind retry)', async () => {
+    mockModules.bookingCommit.mockRejectedValueOnce(new ApiError('OFFLINE', 'Connection dropped after commit'));
+    const alert = confirmAlert();
+    const view = await render(screen());
+    await fillAndPreview(view);
+    await fireEvent.press(view.getByTestId('booking-commit'));
+    await alert.press();
+    await waitFor(() => expect(view.getByTestId('booking-reconcile')).toBeTruthy());
+    expect(mockModules.bookingCommit).toHaveBeenCalledTimes(1);
+    expect([...mockRecords.keys()].some(key => key.includes('pending-booking'))).toBe(true);
+    expect(view.queryByTestId('booking-commit')).toBeNull();
+    await fireEvent.press(view.getByTestId('booking-preview'));
+    expect(mockModules.bookingCommit).toHaveBeenCalledTimes(1);
+    expect(mockModules.bookingPreview).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a 409 conflict and keeps the journal clear because the write was rejected', async () => {
     mockModules.bookingCommit.mockRejectedValueOnce(new ApiError('CONFLICT'));
     const alert = confirmAlert();

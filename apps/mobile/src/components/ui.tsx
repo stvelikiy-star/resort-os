@@ -1,11 +1,11 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Animated, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleProp, StyleSheet, Text, TextInput, TextInputProps, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../theme/ThemeProvider';
 import { elevation, font, motion, radius, space, TOUCH } from '../theme/tokens';
-import { useMotionPreference } from '../theme/motion';
+import { cappedStagger, getMotionSnapshot, motionPresets, useMotionPreference, useRevealProgress } from '../theme/motion';
 import { AlertTriangle, CheckCircle2, CircleDot, Info, XCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
@@ -13,93 +13,51 @@ import type { LucideIcon } from 'lucide-react-native';
  * preference resolves, when app is inactive and when motion is reduced.
  * Only a finite, capped entrance is allowed; never hide essential actions. */
 export function FadeIn({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: StyleProp<ViewStyle> }) {
-  const { allowed, ready } = useMotionPreference();
-  const [v] = useState(() => new Animated.Value(1));
-  const appeared = useRef(false);
-  useLayoutEffect(() => {
-    v.stopAnimation();
-    if (!ready || appeared.current || !allowed) {
-      if (ready) appeared.current = true;
-      v.setValue(1);
-      return;
-    }
-    appeared.current = true;
-    v.setValue(0);
-    const animation = Animated.timing(v, {
-      toValue: 1,
-      duration: motion.card,
-      delay: Number.isFinite(delay) ? Math.min(Math.max(0, delay), motion.cardStagger * motion.maxStaggerCards) : 0,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    });
-    animation.start(({ finished }) => { if (!finished) v.setValue(1); });
-    return () => { animation.stop(); v.setValue(1); };
-  }, [allowed, ready, delay, v]);
-  return <Animated.View style={[style, {
-    opacity: v,
-    transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
-  }]}>{children}</Animated.View>;
+  const v = useRevealProgress(cappedStagger(delay / motion.cardStagger), motionPresets.entrance.duration);
+  return <Animated.View style={[style, { opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>{children}</Animated.View>;
 }
 
 const OUTER_KEYS = ['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'width', 'alignSelf'] as const;
 
 
-/** Animated progress with reduced-motion support and screen-reader value. */
-export function AnimatedProgressBar({ percent }: { percent: number }) {
+/** Animated progress with reduced-motion support and screen-reader value.
+ * `percent` must be a verified value; the bar only ever moves toward it. */
+export function AnimatedProgressBar({ percent, color, trackColor, height = 11, label, testID }: {
+  percent: number; color?: string; trackColor?: string; height?: number; label?: string; testID?: string;
+}) {
   const { c } = useTheme();
   const { allowed, ready } = useMotionPreference();
   const safePercent = Math.min(100, Math.max(0, Number.isFinite(percent) ? percent : 0));
-  // Start at the real progress rather than showing a false 0% before checking
-  // Reduced Motion. Animate only verified changes while the app is active.
-  const [progress] = useState(() => new Animated.Value(safePercent));
-  const previous = useRef(safePercent);
+  // Exact verified value: starts at the real progress unless motion is already known to be allowed
+  // (then a one-time reveal). Unknown preference / Reduced Motion / background: value shown immediately.
+  const [progress] = useState(() => new Animated.Value(getMotionSnapshot().allowed ? 0 : safePercent));
   useEffect(() => {
-    const from = previous.current;
-    previous.current = safePercent;
     progress.stopAnimation();
-    if (!ready || !allowed || from === safePercent) {
-      progress.setValue(safePercent);
-      return;
-    }
-    progress.setValue(from);
-    const animation = Animated.timing(progress, {
-      toValue: safePercent, duration: motion.chart,
-      easing: Easing.out(Easing.cubic), useNativeDriver: false,
-    });
+    if (!ready || !allowed) { progress.setValue(safePercent); return; }
+    const animation = Animated.timing(progress, { toValue: safePercent, duration: motionPresets.chart.duration, easing: motionPresets.chart.easing, useNativeDriver: false });
     animation.start(({ finished }) => { if (!finished) progress.setValue(safePercent); });
     return () => { animation.stop(); progress.setValue(safePercent); };
-  }, [allowed, ready, progress, safePercent]);
+  }, [progress, safePercent, allowed, ready]);
   return (
-    <View accessible accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: safePercent }}
-      style={{ height: 11, borderRadius: 8, backgroundColor: c.surfaceAlt, overflow: 'hidden' }}>
-      <Animated.View style={{ width: progress.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }), height: 11, borderRadius: 8, backgroundColor: c.cyan }} />
+    <View testID={testID} accessible accessibilityRole="progressbar" accessibilityLabel={label} accessibilityValue={{ min: 0, max: 100, now: safePercent }}
+      style={{ height, borderRadius: radius.pill, backgroundColor: trackColor ?? c.surfaceAlt, overflow: 'hidden' }}>
+      <Animated.View style={{ width: progress.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }), height, borderRadius: radius.pill, backgroundColor: color ?? c.cyan }} />
     </View>
   );
 }
 
-export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel, dimWhenDisabled = true }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string; dimWhenDisabled?: boolean }) {
+export function PressScale({ children, onPress, style, disabled, testID, accessibilityLabel, dimWhenDisabled = true, pressedScale = 0.97 }: { children: React.ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; disabled?: boolean; testID?: string; accessibilityLabel?: string; dimWhenDisabled?: boolean; pressedScale?: number }) {
   const [s] = useState(() => new Animated.Value(1));
-  const pressSequence = useRef(0);
   useEffect(() => {
-    if (disabled) {
-      pressSequence.current += 1;
-      s.stopAnimation();
-      s.setValue(1);
-    }
-    return () => {
-      pressSequence.current += 1;
-      s.stopAnimation();
-    };
+    if (disabled) { s.stopAnimation(); s.setValue(1); }
+    return () => { s.stopAnimation(); };
   }, [disabled, s]);
   const to = (x: number) => {
     if (disabled) return;
-    const sequence = ++pressSequence.current;
-    void AccessibilityInfo.isReduceMotionEnabled().then((reduceMotion) => {
-      if (sequence !== pressSequence.current) return;
-      s.stopAnimation();
-      if (reduceMotion) { s.setValue(1); return; }
-      Animated.spring(s, { toValue: x, useNativeDriver: true, speed: motion.spring.speed, bounciness: motion.spring.bounciness }).start();
-    }).catch(() => { if (sequence === pressSequence.current) s.setValue(1); });
+    // Synchronous snapshot: feedback starts on the same frame as the touch; a new press cancels the previous spring.
+    s.stopAnimation();
+    if (!getMotionSnapshot().allowed) { s.setValue(1); return; }
+    Animated.spring(s, { toValue: x, useNativeDriver: true, speed: motion.spring.speed, bounciness: motion.spring.bounciness }).start();
   };
   // Layout props belong to the touchable wrapper so flex rows (segmented controls, button pairs) share width.
   const flat = (StyleSheet.flatten(style) ?? {}) as Record<string, unknown>;
@@ -112,7 +70,7 @@ export function PressScale({ children, onPress, style, disabled, testID, accessi
   const fill = outer.flex !== undefined || outer.flexGrow !== undefined;
   return (
     <Pressable testID={testID} accessibilityRole="button" accessibilityState={{ disabled: !!disabled }} accessibilityLabel={accessibilityLabel} disabled={disabled} style={outer as ViewStyle}
-      onPressIn={() => to(0.97)} onPressOut={() => to(1)}
+      onPressIn={() => to(pressedScale)} onPressOut={() => to(1)}
       onPress={() => { void Haptics.selectionAsync().catch(() => {}); onPress?.(); }}>
       <Animated.View style={[inner as ViewStyle, fill ? { flex: 1 } : null, { transform: [{ scale: s }], opacity: disabled && dimWhenDisabled ? 0.5 : 1 }]}>{children}</Animated.View>
     </Pressable>
@@ -134,11 +92,11 @@ export function Screen({ children, scroll = true, padded = true }: { children: R
   );
 }
 
-export function Title({ children, sub }: { children: React.ReactNode; sub?: string }) {
+export function Title({ children, sub, titleSize }: { children: React.ReactNode; sub?: string; titleSize?: number }) {
   const { c } = useTheme();
   return (
     <View style={{ gap: 2 }}>
-      <Text accessibilityRole="header" style={[font.title, { color: c.text }]}>{children}</Text>
+      <Text accessibilityRole="header" style={[font.title, { color: c.text, ...(titleSize ? { fontSize: titleSize } : {}) }]}>{children}</Text>
       {sub ? <Text style={[font.small, { color: c.textMuted }]}>{sub}</Text> : null}
     </View>
   );
@@ -147,7 +105,7 @@ export function Title({ children, sub }: { children: React.ReactNode; sub?: stri
 export function Card({ children, style, onPress, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; testID?: string }) {
   const { c } = useTheme();
   const base: ViewStyle = { backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, borderWidth: 1, borderColor: c.border, shadowColor: c.shadow, ...elevation.card };
-  return onPress ? <PressScale testID={testID} onPress={onPress} style={[base, style]}>{children}</PressScale> : <View testID={testID} style={[base, style]}>{children}</View>;
+  return onPress ? <PressScale testID={testID} onPress={onPress} pressedScale={0.985} style={[base, style]}>{children}</PressScale> : <View testID={testID} style={[base, style]}>{children}</View>;
 }
 
 type Tone = 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';

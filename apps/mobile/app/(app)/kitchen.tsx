@@ -3,7 +3,7 @@ import { Alert, Text, View, useWindowDimensions } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { ChefHat, CircleCheck, ClipboardList, CookingPot, ListChecks, UtensilsCrossed } from 'lucide-react-native';
 import { DemoBanner, Empty, SectionLabel, Button } from '../../src/components/ui';
-import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader } from '../../src/components/Future';
+import { ErrorState, FutureScreen, GlassCard, LoadingShimmer, PremiumHeader, StaggerItem } from '../../src/components/Future';
 import { DiningProductionSnapshotMeal, DiningProductionSnapshots, KitchenOrder, useLiveModules } from '../../src/api/liveModules';
 import { demoKitchenOrders } from '../../src/api/demoPresentation';
 import { kitchenWorkload } from '../../src/roles/kitchenSummary';
@@ -175,14 +175,14 @@ export default function KitchenDashboard() {
       </> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
+        <StaggerItem index={0}><View style={{ flexDirection: 'row', gap: space.sm }}>
           {tile(copy.kitchenNew,summary.newOrders,ClipboardList,c.warning)}
           {tile(copy.kitchenPreparing,summary.preparing,CookingPot,c.cyan)}
-        </View>
-        <View style={{ flexDirection: 'row', gap: space.sm }}>
+        </View></StaggerItem>
+        <StaggerItem index={1}><View style={{ flexDirection: 'row', gap: space.sm }}>
           {tile(copy.kitchenReady,summary.ready,CircleCheck,c.success)}
           {tile(copy.kitchenActive,summary.totalActive,UtensilsCrossed,c.primary)}
-        </View>
+        </View></StaggerItem>
       </View>
       <SectionLabel>{copy.kitchenByDish}</SectionLabel>
       {summary.dishesToPrepare.length ?

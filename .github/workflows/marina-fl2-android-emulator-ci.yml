@@ -1,0 +1,80 @@
+name: MARINA FL2 Native Android Emulator QA
+on:
+  pull_request:
+    paths:
+      - 'scripts/design/fl2-android-emulator-smoke.sh'
+      - 'scripts/design/fl2-android-owner-reception-demo.py'
+      - '.github/workflows/marina-fl2-android-emulator-ci.yml'
+      - 'apps/mobile/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: marina-fl2-emulator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  native-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS: ''
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build signed standalone PREVIEW APK from current source
+        working-directory: apps/mobile
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo prebuild --platform android --no-install --non-interactive
+          cd android
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Verify compiled bundle and app identity
+        run: |
+          set -euo pipefail
+          apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          unzip -Z1 "$apk" | grep -Fx 'assets/index.android.bundle'
+          aapt=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          "$aapt" dump badging "$apk" | grep -F "package: name='kg.go.ms.staff'"
+          if "$aapt" dump permissions "$apk" | grep -F 'android.permission.SYSTEM_ALERT_WINDOW'; then
+            echo 'BLOCKED: overlay permission is not allowed' >&2
+            exit 1
+          fi
+      - name: Enable hardware accelerated Android virtualization
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' |
+            sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Launch standalone APK on disposable Android 35 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: |
+            bash scripts/design/fl2-android-emulator-smoke.sh
+            python3 scripts/design/fl2-android-owner-reception-demo.py
+      - name: Upload real emulator screenshots and sanitized errors
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-fl2-native-android-emulator-evidence
+          path: android-emulator-evidence/
+          retention-days: 7
+          if-no-files-found: warn

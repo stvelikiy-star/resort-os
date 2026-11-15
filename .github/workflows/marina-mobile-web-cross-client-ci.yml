@@ -1,0 +1,114 @@
+name: MARINA Mobile ⇄ Web Single PostgreSQL Contract CI
+on:
+  pull_request:
+    paths:
+      - 'scripts/design/fl2-mobile-web-cross-client-ci.mjs'
+      - 'scripts/design/fl2-mobile-web-cross-client-db.py'
+      - '.github/workflows/marina-mobile-web-cross-client-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: marina-mobile-web-pg-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  cross-client:
+    name: Mobile transport ⇄ real Web PMS ⇄ isolated PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_shared_browser_ci
+          POSTGRES_USER: marina_ci
+          POSTGRES_PASSWORD: synthetic-ci-database-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U marina_ci -d marina_shared_browser_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://marina_ci:synthetic-ci-database-only@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      APP_ENV: staging
+      PROPERTY_CODE: MARINA_BROWSER_CI
+      RATE_PLAN_CODE: MARINA_BROWSER_CI
+      MARINA_TENANT_CONTEXT_ENABLED: 'true'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'true'
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_CROSS_CLIENT_CONFIRM: SYNTHETIC_MOBILE_TO_WEB_POSTGRES_ONLY
+      MARINA_SHARED_BROWSER_CI_PASSWORD: synthetic-ci-only-browser-two-hotels-2026
+      COOKIE_SECURE: 'true'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      CORE_API_URL: http://127.0.0.1:18000
+      NEXT_TELEMETRY_DISABLED: '1'
+      OPENAI_API_KEY: ''
+      MARINA_AI_API_KEY: ''
+    steps:
+      - name: Checkout exact Mobile candidate including test transport
+        uses: actions/checkout@v4
+      - name: Checkout exact accepted Web/Staff/Guest integration candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 1ab7e68a535e7ac03740ae9ad160682fa57669fe
+          path: web-candidate
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify immutable source pairing
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C web-candidate rev-parse HEAD)" = '1ab7e68a535e7ac03740ae9ad160682fa57669fe'
+          test -f apps/mobile/src/api/http.ts
+          test -f web-candidate/scripts/marina_shared_live_browser_db.py
+          echo 'Web candidate exact SHA + tested Mobile client source confirmed'
+      - name: Migrate and seed two isolated CI properties
+        working-directory: web-candidate
+        run: |
+          npm ci --prefix packages/database --no-audit --no-fund
+          (cd packages/database && npx prisma migrate deploy)
+          python -m pip install -r services/api/requirements.txt
+          python scripts/marina_shared_live_browser_db.py seed
+      - name: Compile actual Admin Web PMS and Mobile TypeScript HTTP client
+        run: |
+          npm ci --prefix web-candidate/apps/admin --no-audit --no-fund
+          npm --prefix web-candidate/apps/admin run typecheck
+          npm --prefix web-candidate/apps/admin run build
+          npm install --prefix /tmp/marina-fl2-mobile-build esbuild@0.25.12 --no-audit --no-fund
+          /tmp/marina-fl2-mobile-build/node_modules/.bin/esbuild apps/mobile/src/api/http.ts --bundle --platform=node --format=cjs --outfile=/tmp/marina-fl2-mobile-http-client.cjs
+      - name: Start real Core and real Web from identical test database
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd web-candidate && python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port 18000) >/tmp/marina-cross-core.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:18000/health/ready >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18000/health/ready >/dev/null
+          (cd web-candidate/apps/admin && npx next start -p 13001) >/tmp/marina-cross-admin.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:13001/ >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:13001/ >/dev/null
+      - name: Install isolated headless Chromium
+        run: |
+          npm install --prefix web-candidate/scripts --no-save --no-package-lock playwright@1.56.1
+          web-candidate/scripts/node_modules/.bin/playwright install --with-deps chromium
+      - name: Mobile transport commit to Web readback, Web UI commit to Mobile readback
+        run: node scripts/design/fl2-mobile-web-cross-client-ci.mjs
+      - name: Verify both reservations on the same disposable PostgreSQL
+        run: python scripts/design/fl2-mobile-web-cross-client-db.py
+      - name: Preserve diagnostics without credentials
+        if: failure()
+        run: |
+          tail -60 /tmp/marina-cross-core.log 2>/dev/null || true
+          tail -60 /tmp/marina-cross-admin.log 2>/dev/null || true

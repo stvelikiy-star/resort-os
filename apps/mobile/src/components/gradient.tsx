@@ -6,7 +6,10 @@ import { useTheme } from '../theme/ThemeProvider';
 /** Lightweight SVG gradient; no blur passes or external assets/native dependencies. */
 export function LinearGradientFallback({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const { c } = useTheme();
-  return <View style={style}>
+  // Android react-native-svg can rasterize a percentage-sized absolute SVG
+  // shorter than a content-sized hero. Paint the same approved gradient start
+  // color behind it so white subtitle text is never rendered over a light gap.
+  return <View style={[{ backgroundColor: c.heroFrom }, style]}>
     <Svg pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }} width="100%" height="100%" viewBox="0 0 380 220" preserveAspectRatio="xMidYMid slice">
       <Defs><LinearGradient id="marina_future_hero" x1="0" y1="0" x2="1" y2="1">
         <Stop offset="0" stopColor={c.heroFrom}/>
