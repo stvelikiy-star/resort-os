@@ -107,7 +107,7 @@ async function main(){
   const webQuote=await webPreview.json();
   console.log('WEB_PMS_PREVIEW',JSON.stringify({can_commit:webQuote.can_commit,conflicts:webQuote.conflicts,reason:webQuote.pricing?.reason,room:webQuote.room?.code,source:webQuote.pricing?.source,dates:second}));
   assert.equal(webQuote.can_commit,true,'Web PMS quote rejected second non-overlapping booking');
-  const confirm=form.getByRole('button',{name:'Подтвердить бронь'});
+  const confirm=a.page.getByRole('button',{name:'Подтвердить бронь',exact:true});
   await confirm.waitFor();
   const committedResponse=a.page.waitForResponse(r=>r.url().endsWith('/core/api/v1/admin/pms/reservations/new/commit')&&r.request().method()==='POST');
   await confirm.click();
