@@ -18,6 +18,7 @@ interface Props {
   canOpenDetails: boolean;
   onClose: () => void;
   onOpen: (reservationId: string) => void;
+  agentServices?: React.ReactNode;
 }
 function readObject(input: unknown): Record<string, unknown> {
   return input && typeof input === 'object' ? input as Record<string, unknown> : {};
@@ -27,7 +28,7 @@ function readValue(input: unknown): string | null {
 }
 /** Uses the existing server-authenticated reservation detail API only.
  * Never infers a guest phone or chat ID from PMS grid cells. */
-export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onClose, onOpen }: Props) {
+export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onClose, onOpen, agentServices }: Props) {
   const { c } = useTheme();
   const copy = useMobileCopy();
   const id = selected?.state === 'RESERVATION' ? selected.block.reservation_id : null;
@@ -108,6 +109,7 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
               icon={ChevronRight} disabled={details.loading || !!details.error} onPress={() => { onClose(); onOpen(id); }}/> : null}
           </> : <Empty text={copy.pmsUnavailableAction}/>}
           {showroom ? <Text style={[font.small,{color:c.textMuted}]}>{copy.demoOnlyCard}</Text> : null}
+          {isReservation ? agentServices : null}
         </ScrollView>
       </View>
     </View>

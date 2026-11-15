@@ -39,7 +39,7 @@ const pinned = {
   'dining_seating.py': '1dd098289a5ba5d45fa14512547f7ea1f1681122',
   'dining_folio.py': '1ee6b2c2893473bab2af7ce434045dd54bf0366e',
   'staff_guest_requests.py': 'a7497404b57972fda32e64f83aa4e3662cfc1d2e',
-  'guest_services.py': 'b9dadd9e7dcaa2ab1958853e77b9699b61207c71',
+  'guest_services.py': '463f57606140afda07b5cd98014e3e229fa53d25',
   'marina_assistant.py': '7b4e50bd9bd853cfeed438ac8fccb5e310a0f773',
   'stays.py': '7412700ee2801199ed518976039abe23c351c150',
 };

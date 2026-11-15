@@ -5,10 +5,28 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles, trusted_property_id
+from .auth import current_user, require_roles, trusted_property_id
+from .pms_reservation_create import linked_agent_id_for_user
 
 router = APIRouter(prefix="/api/v1/admin/guest-services", tags=["guest-services"])
-center_access = require_roles("OWNER", "MANAGER", "RECEPTION")
+center_roles = require_roles("OWNER", "MANAGER", "RECEPTION")
+AGENT_SERVICE_CODES = frozenset({"TRANSFER", "MEALS", "PARKING", "SAUNA", "BILLIARDS", "EXCURSIONS"})
+
+
+async def center_access(request: Request, user=Depends(current_user)):
+    # A legacy custom SERVICES grant must not reveal other agents' requests.
+    if user.get("role") == "AGENT":
+        raise HTTPException(403, detail={"code": "AGENT_SERVICE_QUEUE_FORBIDDEN"})
+    return await center_roles(request, user)
+
+
+async def create_access(request: Request, user=Depends(current_user)):
+    # Creation only: never grant AGENT access to the hotel's service queue.
+    if user.get("role") == "AGENT":
+        if "PMS" not in (user.get("module_permissions") or []):
+            raise HTTPException(403, detail={"code": "AGENT_PMS_REQUIRED"})
+        return user
+    return await center_access(request, user)
 
 SERVICE_LABELS: dict[str, str] = {
     "HOUSEKEEPING": "Уборка во время проживания",
@@ -204,14 +222,19 @@ async def list_guest_services(
 async def create_guest_service(
     payload: GuestServiceCreate,
     request: Request,
-    user: dict[str, Any] = Depends(center_access),
+    user: dict[str, Any] = Depends(create_access),
 ):
     code = service_code(payload.service_code)
+    if user.get("role") == "AGENT" and (code not in AGENT_SERVICE_CODES or payload.priority != "NORMAL"):
+        raise HTTPException(403, detail={"code": "AGENT_SERVICE_FORBIDDEN"})
     description = payload.description.strip() if payload.description and payload.description.strip() else None
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
+            # Re-read ACTIVE hotel-local membership on every write. The client
+            # cannot supply an agent ID or request services for another agent.
+            agent_id = await linked_agent_id_for_user(conn, pid, user)
             reservation = await conn.fetchrow(
                 '''
                 SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
@@ -219,10 +242,12 @@ async def create_guest_service(
                 FROM reservations r
                 LEFT JOIN guests g ON g.id=r."primaryGuestId"
                 WHERE r.id=$1 AND r."propertyId"=$2
+                  AND ($3::uuid IS NULL OR r."agentId"=$3)
                 FOR UPDATE OF r
                 ''',
                 payload.reservation_id,
                 pid,
+                agent_id,
             )
             if not reservation:
                 raise HTTPException(status_code=404, detail="Reservation not found")

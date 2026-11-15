@@ -674,6 +674,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
     },
     addAgentGuestService: async (reservation: string, serviceCode: AgentServiceCode) => {
       reviewGate();
+      if (!AGENT_SERVICES.includes(serviceCode)) throw new ApiError('BAD_REQUEST', 'Invalid agent service');
       const reservationId = safeRouteId(reservation);
       const task = objectResponse(await request<unknown>('POST', p + '/admin/guest-services', {
         reservation_id: reservationId, service_code: serviceCode,
