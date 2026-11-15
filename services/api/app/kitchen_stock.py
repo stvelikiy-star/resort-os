@@ -1,5 +1,5 @@
 """Explicit kitchen inventory. Planning is not consumption; consumption is atomic and idempotent."""
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Literal
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -61,14 +61,19 @@ def enforce_loss_staff(user):
 
 async def snapshot(conn, pid):
     rows = await conn.fetch('''SELECT i.id,i.name,i.unit,i."costPerUnitKgs",i."isSample",
-      COALESCE(SUM(CASE WHEN m.kind='RECEIPT' THEN m.quantity ELSE -m.quantity END),0) AS balance
+      COALESCE(SUM(CASE WHEN m.kind='RECEIPT' THEN m.quantity ELSE -m.quantity END),0) AS balance,
+      COALESCE(SUM(CASE WHEN m.kind='RECEIPT'
+         THEN m.quantity*m."unitCostKgs" ELSE -m.quantity*m."unitCostKgs" END),0) AS book_value
       FROM kitchen_stock_items i LEFT JOIN kitchen_stock_movements m ON m."stockItemId"=i.id AND m."propertyId"=i."propertyId"
       WHERE i."propertyId"=$1 GROUP BY i.id ORDER BY i.name,i.unit''',pid)
     expense = await conn.fetchval('''SELECT COALESCE(SUM(quantity*"unitCostKgs"),0) FROM kitchen_stock_movements
       WHERE "propertyId"=$1 AND kind='PRODUCTION' ''',pid)
     return {'items':[{'id':str(r['id']),'name':r['name'],'unit':r['unit'],
           'cost_per_unit_kgs':str(r['costPerUnitKgs']),'is_sample':r['isSample'],
-          'balance':str(r['balance'])} for r in rows],
+          'balance':str(r['balance']),
+          'inventory_value_kgs':str(r['book_value']) if r['balance']>=0 and r['book_value']>=0 else None,
+          'weighted_unit_cost_kgs':str((r['book_value']/r['balance']).quantize(Decimal('0.0001'),rounding=ROUND_HALF_UP)) if r['balance']>0 and r['book_value']>=0 else None,
+          'valuation_status':'MOVEMENT_BASED' if r['balance']>=0 and r['book_value']>=0 and (r['balance']>0 or abs(r['book_value'])<=Decimal('0.01')) else 'RECONCILIATION_REQUIRED'} for r in rows],
           'production_cost_kgs':str(expense),'production_cost_is_payment':False,
           'inventory_deducted_only_on_explicit_consume':True,
           'new_loss_movement_id':str(uuid.uuid4()),
