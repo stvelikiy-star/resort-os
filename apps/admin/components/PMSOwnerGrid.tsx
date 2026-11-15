@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PMSNewReservationModal from "./PMSNewReservationModal";
+import PmsBookingPreviewButton from "./PmsBookingPreviewButton";
+import { ChevronLeft, ChevronRight, RefreshCw, Search } from "lucide-react";
 import { pmsOwnerRoomDisplayLabel, pmsRoomDisplayNumber, pmsStaffBuildingLabel } from "./PMSRoomDisplayLabel";
 import ReservationScheduleBuilder, { ScheduleIntent } from "./ReservationScheduleBuilder";
 import RoomDetailModal from "./RoomDetailModal";
@@ -401,21 +403,21 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
   const dayWidth = windowDays >= 31 ? 26 : 34;
   // Pure layout preference: Legacy falls back to the original 300px / 58px.
   // Future Luxury can make the sticky columns narrower on mobile, retaining all dates/actions.
-  const template = `var(--fl2-pms-room-width, 300px) var(--fl2-pms-status-width, 58px) repeat(${windowDays}, ${dayWidth}px)`;
+  const template = `var(--fl2-pms-room-width, 300px) var(--fl2-pms-status-width, 58px) repeat(${windowDays}, var(--fl2-pms-day-width, ${dayWidth}px))`;
 
   return (
     <section className="owner-grid-shell">
       <header className="owner-grid-title">
         <div>
           <p className="eyebrow">PMS · рабочая шахматка</p>
-          <h1>Номер × ночь</h1>
+          <h1>Шахматка бронирований</h1>
           <p>{agentMode ? "Показываются свободные/занятые ночи. Чужие гости и финансы скрыты. Новая бронь создаётся только по открытому тарифу." : readOnlyMode ? "Режим администратора: шахматка доступна для просмотра. Создание и изменение брони выполняется в разделе «Ресепшен / Брони»." : "Выделите от одной до нужного количества свободных клеток. Цена и конфликты проверяются Resort Core до создания брони."}</p>
         </div>
         <div className={`owner-live ${realtime}`}><i />{realtime === "live" ? "LIVE" : realtime === "connecting" ? "CONNECT" : "HTTP"}</div>
       </header>
 
       <div className="owner-grid-toolbar">
-        <label className="owner-grid-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} data-i18n-skip placeholder={copy("Номер, гость, бронь…")} /></label>
+        <label className="owner-grid-search"><Search size={18} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} data-i18n-skip placeholder={copy("Номер, гость, бронь…")} /></label>
         <select value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="ALL">Все категории</option>
           {categories.map((item) => <option key={item} value={item}>{OWNER_GROUP[item] || item}</option>)}
@@ -428,32 +430,32 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
           <option value="ALL">{copy("Все номера")}</option><option value="FREE">{copy("Свободны весь период")}</option><option value="OCCUPIED">{copy("Есть занятые ночи")}</option><option value="BLOCKED">{copy("На ремонте")}</option>
         </select>
         <div className="owner-month-picker">
-          <button data-i18n-skip aria-label={copy("Предыдущий месяц")} onClick={() => jumpMonth(start.getFullYear(), start.getMonth() - 1)}>‹</button>
+          <button data-i18n-skip aria-label={copy("Предыдущий месяц")} onClick={() => jumpMonth(start.getFullYear(), start.getMonth() - 1)}><ChevronLeft size={18} aria-hidden="true" /></button>
           <select data-i18n-skip aria-label={copy("Месяц")} value={start.getMonth()} onChange={(event) => jumpMonth(start.getFullYear(), Number(event.target.value))}>
             {Array.from({ length: 12 }, (_, month) => <option key={month} value={month}>{new Date(2026, month, 1).toLocaleDateString(locale, { month: "long" })}</option>)}
           </select>
           <select data-i18n-skip aria-label={copy("Год")} value={start.getFullYear()} onChange={(event) => jumpMonth(Number(event.target.value), start.getMonth())}>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select>
-          <button data-i18n-skip aria-label={copy("Следующий месяц")} onClick={() => jumpMonth(start.getFullYear(), start.getMonth() + 1)}>›</button>
+          <button data-i18n-skip aria-label={copy("Следующий месяц")} onClick={() => jumpMonth(start.getFullYear(), start.getMonth() + 1)}><ChevronRight size={18} aria-hidden="true" /></button>
         </div>
         <div className="owner-date-nav">
-          <button onClick={() => setStart(addDays(start, -windowDays))}>‹</button>
+          <button onClick={() => setStart(addDays(start, -windowDays))}><ChevronLeft size={18} aria-hidden="true" /></button>
           <button onClick={() => setStart(new Date())}>Сегодня</button>
-          <button onClick={() => setStart(addDays(start, windowDays))}>›</button>
+          <button onClick={() => setStart(addDays(start, windowDays))}><ChevronRight size={18} aria-hidden="true" /></button>
         </div>
         <div className="owner-window-switch">
           {[14, 31].map((value) => <button key={value} aria-label={`Показать ${value} дней`} className={windowDays === value ? "active" : ""} onClick={() => setWindowDays(value)}>{value} дн.</button>)}
         </div>
         <button data-i18n-skip onClick={() => { setQuery(""); setCategory("ALL"); setBuilding("ALL"); setAvailability("ALL"); }}>{copy("Сбросить фильтры")}</button>
-        <button className="owner-refresh" onClick={() => void load()} aria-label="Обновить шахматку">↻</button>
+        <button className="owner-refresh" onClick={() => void load()} aria-label="Обновить шахматку"><RefreshCw size={18} aria-hidden="true" /></button>
       </div>
 
       <div className="owner-selection-help">
         <strong>Новая бронь:</strong> зажмите первую свободную клетку и проведите до последней ночи. Один клик = 1 ночь. День выезда — правая граница и не занимает клетку.
       </div>
       {notice && <div className="owner-grid-notice" onClick={() => setNotice(null)}>{notice}</div>}
-      {error && <div className="owner-grid-error">{error}</div>}
+      {error && <div className="owner-grid-error" role="alert">{error}</div>}
 
-      <div className="owner-grid-scroll" data-window-days={windowDays}>
+      <div className="owner-grid-scroll" data-window-days={windowDays} tabIndex={0} role="region" aria-label="Шахматка бронирований">
         <div className="owner-grid-head" style={{ gridTemplateColumns: template }}>
           <div className="owner-room-head">Номер / спальные места</div>
           <div className="owner-state-head">Статус</div>
@@ -463,7 +465,7 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
           })}
         </div>
 
-        {loading ? <div className="owner-grid-loading">Загрузка…</div> : grouped.map((group) => (
+        {loading ? <div className="owner-grid-loading" role="status" aria-busy="true">Загрузка…</div> : grouped.map((group) => (
           <div key={group.label} className="owner-grid-group">
             <div className="owner-group-label"><strong>{group.label}</strong><span>{group.rooms.length}</span></div>
             {group.rooms.map((room) => (
@@ -486,6 +488,13 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
                       data-free={free ? "true" : "false"}
                       className={`owner-night-cell ${key === today ? "today" : ""} ${[0, 6].includes(day.getDay()) ? "weekend" : ""} ${free ? "free" : "occupied"} ${isSelected(room.id, key) ? "selected" : ""}`}
                       style={{ gridColumn: `${3 + index} / ${4 + index}`, gridRow: 1 }}
+                      onKeyDown={(event) => {
+                        if (document.documentElement.dataset.marinaUi !== "future-luxury" || readOnlyMode || !free || !["Enter", " "].includes(event.key)) return;
+                        event.preventDefault();
+                        selectingRef.current = true;
+                        selectionRef.current = { roomId: room.id, anchor: key, focus: key };
+                        finishSelection();
+                      }}
                       onPointerDown={(event) => beginSelection(room, key, event)}
                       onPointerMove={moveSelection}
                       onPointerEnter={() => extendSelection(room, key)}
@@ -505,8 +514,9 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
                     ? ` · Оплачено ${compactMoney(financeItem.paidKgs)} сом · Остаток ${compactMoney(financeItem.remainingKgs)} сом`
                     : "";
                   return (
-                    <button
+                    <PmsBookingPreviewButton
                       key={block.id}
+                      bookingNumber={block.booking_number}
                       type="button"
                       className={`owner-booking-bar type-${block.type.toLowerCase()} status-${(block.reservation_status || "").toLowerCase()} payment-${payment}`}
                       data-paid-kgs={financeItem?.paidKgs}
@@ -518,7 +528,7 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
                     >
                       <strong>{["Booking.com", "Airbnb", "Ostrovok"].includes(block.channel_source || "") ? `${block.channel_source} · ` : ""}{agentMode && !block.guest_name && !block.booking_number ? "Занято" : (block.guest_name || block.booking_number || block.reason || block.type)}</strong>
                       {!agentMode && financeItem && <span>{financeItem.paidKgs > 0 ? `Опл. ${compactMoney(financeItem.paidKgs)}` : "Без оплаты"}</span>}
-                    </button>
+                    </PmsBookingPreviewButton>
                   );
                 })}
               </div>
@@ -526,6 +536,8 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
           </div>
         ))}
       </div>
+
+      {!loading && !error && grouped.length === 0 && <div className="owner-grid-empty" role="status">Номера не найдены.</div>}
 
       <footer className="owner-grid-legend">
         <span><i className="free" /> свободная ночь</span>
