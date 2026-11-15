@@ -12,6 +12,8 @@ read_access = require_roles('OWNER', 'MANAGER', 'COOK', 'STORE_STAFF')
 manage_access = require_roles('OWNER', 'MANAGER')
 receipt_access = require_roles('OWNER', 'MANAGER', 'STORE_STAFF')
 consume_access = require_roles('MANAGER', 'COOK')
+loss_access = require_roles('OWNER', 'MANAGER', 'COOK', 'STORE_STAFF')
+
 
 class ItemWrite(BaseModel):
     name: str = Field(min_length=1, max_length=120)
@@ -32,6 +34,28 @@ class ReceiptWrite(BaseModel):
 
 class ConsumeWrite(BaseModel):
     production_target_id: uuid.UUID
+
+class LossWrite(BaseModel):
+    # Client-generated UUID allows safe retries after an uncertain network result.
+    movement_id: uuid.UUID
+    stock_item_id: uuid.UUID
+    kind: Literal['WASTE', 'SPOILAGE']
+    quantity: Decimal = Field(gt=0, max_digits=16, decimal_places=6)
+    reason: str = Field(min_length=3, max_length=500)
+
+    @field_validator('reason')
+    @classmethod
+    def canonical_reason(cls, value: str) -> str:
+        normalized = ' '.join(value.split())
+        if len(normalized) < 3:
+            raise ValueError('A meaningful reason is required')
+        return normalized
+
+
+def enforce_loss_staff(user):
+    if user['role'] not in {'OWNER', 'MANAGER', 'COOK', 'STORE_STAFF'}:
+        raise HTTPException(403, detail={'code': 'KITCHEN_LOSS_ROLE_REQUIRED'})
+
 
 async def snapshot(conn, pid):
     rows = await conn.fetch('''SELECT i.id,i.name,i.unit,i."costPerUnitKgs",i."isSample",
@@ -76,6 +100,74 @@ async def create_receipt(body: ReceiptWrite, request: Request, user=Depends(rece
               VALUES ($1,$2,$3,'RECEIPT',$4,$5,$6,$7)''',
               rid,pid,item['id'],body.quantity,item['costPerUnitKgs'],user['id'],body.notes)
             return {'id':str(rid),'quantity':str(body.quantity),'payment_created':False}
+
+@router.get('/losses')
+async def list_losses(request: Request, user=Depends(loss_access)):
+    enforce_loss_staff(user)
+    async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
+        rows = await conn.fetch(
+            '''SELECT m.id,m."stockItemId",i.name,i.unit,i."isSample",
+                      m.kind,m.quantity,m."unitCostKgs",m.notes,m."createdById",m."createdAt"
+               FROM kitchen_stock_movements m
+               JOIN kitchen_stock_items i ON i.id=m."stockItemId" AND i."propertyId"=m."propertyId"
+               WHERE m."propertyId"=$1 AND m.kind IN ('WASTE','SPOILAGE')
+               ORDER BY m."createdAt" DESC,m.id DESC LIMIT 100''', pid)
+    return {'items': [
+        {'id':str(row['id']), 'stock_item_id':str(row['stockItemId']),
+         'stock_name':row['name'], 'unit':row['unit'], 'is_sample':row['isSample'],
+         'kind':row['kind'], 'quantity':str(row['quantity']),
+         'unit_cost_kgs':str(row['unitCostKgs']),
+         'cost_kgs':str(row['quantity']*row['unitCostKgs']),
+         'reason':row['notes'], 'created_by_id':str(row['createdById']) if row['createdById'] else None,
+         'created_at':row['createdAt'].isoformat()}
+        for row in rows
+    ], 'financial_truth':'INVENTORY_LOSS_NOT_PAYMENT'}
+
+
+@router.post('/losses',status_code=201)
+async def create_loss(body: LossWrite, request: Request, user=Depends(loss_access)):
+    enforce_loss_staff(user)
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid=await trusted_property_id(conn,user)
+            item=await conn.fetchrow(
+                '''SELECT id,"costPerUnitKgs","isSample" FROM kitchen_stock_items
+                   WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                body.stock_item_id,pid)
+            if not item:
+                raise HTTPException(404,detail={'code':'KITCHEN_STOCK_ITEM_NOT_FOUND'})
+            # Item lock serializes replay checks and independent concurrent deductions.
+            prior=await conn.fetchrow(
+                '''SELECT "propertyId","stockItemId",kind,quantity,"unitCostKgs",notes
+                   FROM kitchen_stock_movements WHERE id=$1''',body.movement_id)
+            if prior:
+                if (prior['propertyId'] != pid or prior['stockItemId'] != body.stock_item_id
+                    or prior['kind'] != body.kind or prior['quantity'] != body.quantity
+                    or prior['notes'] != body.reason):
+                    raise HTTPException(409,detail={'code':'KITCHEN_LOSS_IDEMPOTENCY_CONFLICT'})
+                return {'id':str(body.movement_id), 'already_processed':True,
+                        'quantity':str(prior['quantity']),
+                        'cost_kgs':str(prior['quantity']*prior['unitCostKgs']),
+                        'payment_created':False}
+            balance=await conn.fetchval(
+                '''SELECT COALESCE(SUM(CASE WHEN kind='RECEIPT' THEN quantity ELSE -quantity END),0)
+                   FROM kitchen_stock_movements
+                   WHERE "propertyId"=$1 AND "stockItemId"=$2''',pid,item['id'])
+            if balance < body.quantity:
+                raise HTTPException(409,detail={'code':'KITCHEN_LOSS_INSUFFICIENT_STOCK'})
+            await conn.execute(
+                '''INSERT INTO kitchen_stock_movements
+                   (id,"propertyId","stockItemId",kind,quantity,"unitCostKgs",
+                    "createdById",notes)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8)''',
+                body.movement_id,pid,item['id'],body.kind,body.quantity,
+                item['costPerUnitKgs'],uuid.UUID(user['id']),body.reason)
+            return {'id':str(body.movement_id),'already_processed':False,
+                    'quantity':str(body.quantity),
+                    'cost_kgs':str(body.quantity*item['costPerUnitKgs']),
+                    'payment_created':False}
+
 
 @router.post('/consume',status_code=200)
 async def consume_production(body: ConsumeWrite, request: Request, user=Depends(consume_access)):
