@@ -11,6 +11,7 @@ on:
       - 'services/api/app/kitchen_procurement.py'
       - 'services/api/app/owner_kitchen_management.py'
       - 'services/api/app/owner_expenses.py'
+      - 'services/api/app/owner_cash_reconciliation.py'
       - 'services/api/app/hotel_finance.py'
       - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
       - 'scripts/verify_owner_expenses_e2e.py'
