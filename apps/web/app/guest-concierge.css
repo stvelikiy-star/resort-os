@@ -43,7 +43,7 @@
   .concierge-brand { gap:8px; flex:1 1 0; }
   .concierge-brand strong { font-size:clamp(13px,4vw,17px);overflow-wrap:anywhere; }
   .concierge-langs { flex:0 0 auto;gap:1px;padding:2px; }
-  .concierge-langs button { padding:8px 6px;font-size:10px;min-width:40px;min-height:44px; }
+  .concierge-langs button { padding:8px 6px;font-size:10px;min-width:44px;min-height:44px; }
   .concierge-modal-backdrop { padding:12px; }
   .concierge-modal { padding:16px; }
   .concierge-modal-head { gap:10px; }
@@ -55,4 +55,17 @@
     transition-duration:0.01ms!important;
     animation-duration:0.01ms!important;
   }
+}
+
+/* The exact original brand asset replaces the temporary III mark. */
+.concierge-brand>img {
+  display:block;
+  flex:0 0 42px;
+  width:42px;
+  height:42px;
+  object-fit:contain;
+  border-radius:50%;
+}
+@media(max-width:800px) {
+  .concierge-brand>img { flex-basis:36px;width:36px;height:36px; }
 }
