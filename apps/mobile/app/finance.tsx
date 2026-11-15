@@ -13,12 +13,35 @@ import { useAsync } from '../src/lib/useAsync';
 import { useTheme } from '../src/theme/ThemeProvider';
 import { font, space } from '../src/theme/tokens';
 
+const KITCHEN_REPORT_COPY={
+ ru:{title:'Кухня — себестоимость и закупки',production:'Производственная себестоимость',
+  losses:'Порча и потери',waste:'Потери',spoilage:'Порча',stock:'Остаток склада, оценка',
+  approved:'Утверждённые поставки к приходу',unapproved:'Заявки без утверждения',
+  notice:'Себестоимость и заявки на поставку — не фактические платежи и не рассчитанная прибыль. Тестовый склад исключён.'},
+ kg:{title:'Ашкана — өздүк нарк жана сатып алуулар',production:'Өндүрүштүн өздүк наркы',
+  losses:'Бузулуу жана жоготуулар',waste:'Жоготуулар',spoilage:'Бузулуу',
+  stock:'Кампа калдыгынын баасы',approved:'Бекитилген, бирок келе элек товарлар',
+  unapproved:'Бекитиле элек өтүнмөлөр',
+  notice:'Өздүк нарк жана өтүнмөлөр төлөм же пайда эмес. Сыноо кампа эсепке алынган жок.'},
+ en:{title:'Kitchen — costs & procurement',production:'Production cost',
+  losses:'Spoilage and waste cost',waste:'Waste',spoilage:'Spoilage',
+  stock:'Remaining stock, estimated',approved:'Approved products not yet received',
+  unapproved:'Requests awaiting approval',
+  notice:'Cost and supply requests are not recorded payments or recognized profit. Sample stock is excluded.'},
+ kz:{title:'Асхана — өзіндік құн және сатып алу',production:'Өндіріс шығыны',
+  losses:'Бүліну және шығындар',waste:'Шығындар',spoilage:'Бүліну',
+  stock:'Қойма қалдығының бағасы',approved:'Бекітілген, бірақ келмеген өнімдер',
+  unapproved:'Бекітілмеген өтінімдер',
+  notice:'Өзіндік құн мен өтінімдер төлем немесе пайда емес. Сынақ қоймасы есептелмейді.'},
+} as const;
+
 /** Only amounts verified in the exact hotel Core report are displayed.
  * Incoming payments are not earnings; this is NOT a P&L or tax report. */
 export default function Finance() {
   const { user, hotel, api, locale } = useSession();
   const copy = useMobileCopy();
   const extra = OWNER_FINANCE_COPY[locale];
+  const kitchenCopy = KITCHEN_REPORT_COPY[locale];
   const { c } = useTheme();
   const router = useRouter();
   const modules = useLiveModules();
@@ -28,10 +51,16 @@ export default function Finance() {
     () => allowed && modules ? modules.financeSummary(from, to) : Promise.resolve(null),
     [modules, allowed, hotel?.id, user?.id, user?.module_permissions?.join(',')],
   );
+  const ownerKitchen=useAsync(
+    () => allowed && user?.role==='OWNER' && modules ?
+      modules.ownerKitchenManagement(from,to):Promise.resolve(null),
+    [modules,allowed,user?.role,user?.id,hotel?.id],
+  );
+  const reloadKitchen = ownerKitchen.reload;
   const focused = useRef(false);
   useFocusEffect(useCallback(() => {
-    if (focused.current) void reload(); else focused.current = true;
-  }, [reload]));
+    if (focused.current) { void reload(); void reloadKitchen(); } else focused.current = true;
+  }, [reload,reloadKitchen]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
   const line = (label: string, amount: string, caption?: string) =>
@@ -112,6 +141,31 @@ export default function Finance() {
             line(extra.sampleCost,data.kitchen_stock_cost.sample_production_cost_kgs+' '+data.range.currency) : null}
         </GlassCard>
       </> : null}
+      {user?.role==='OWNER'?<>
+        <SectionLabel>{kitchenCopy.title}</SectionLabel>
+        {ownerKitchen.loading?<LoadingShimmer count={1}/>:null}
+        {ownerKitchen.error?<ErrorState text={ownerKitchen.error.message} retry={copy.retry}
+          onRetry={ownerKitchen.reload}/>:null}
+        {ownerKitchen.data?<GlassCard style={{gap:space.sm}}>
+          {line(kitchenCopy.production,
+            ownerKitchen.data.real_production_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.losses,
+            ownerKitchen.data.real_loss_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.waste,
+            ownerKitchen.data.real_inventory_movements.WASTE.cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.spoilage,
+            ownerKitchen.data.real_inventory_movements.SPOILAGE.cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.stock,
+            ownerKitchen.data.current_stock.real_value_at_current_item_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.approved,
+            ownerKitchen.data.procurement_exposure.approved_unreceived_at_current_item_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.unapproved,
+            ownerKitchen.data.procurement_exposure.unapproved_requests_at_current_item_cost_kgs+' '+data.range.currency)}
+          <Text style={[font.small,{color:c.textMuted}]}>
+            {kitchenCopy.notice}
+          </Text>
+        </GlassCard>:null}
+      </>:null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>

@@ -152,6 +152,32 @@ export interface FinanceSummary {
   recent_payments?: { id: string; amount_kgs: number; method: string; status: string;
     booking_number?: string | null; guest_name?: string | null }[];
 }
+export type KitchenCostMovementKind='RECEIPT'|'PRODUCTION'|'WASTE'|'SPOILAGE';
+export interface OwnerKitchenCostSegment {cost_kgs:string;movement_count:number}
+export type OwnerKitchenCostKinds=Record<KitchenCostMovementKind,OwnerKitchenCostSegment>;
+export interface OwnerKitchenManagementReport {
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string};
+  real_inventory_movements:OwnerKitchenCostKinds;
+  sample_inventory_movements:OwnerKitchenCostKinds;
+  real_production_cost_kgs:string;
+  real_loss_cost_kgs:string;
+  real_total_consumption_and_loss_cost_kgs:string;
+  current_stock:{
+    real_value_at_current_item_cost_kgs:string;
+    sample_value_at_current_item_cost_kgs:string;
+    negative_balance_items:number;item_count:number;valuation_as_of:'CURRENT_NOT_PERIOD_END';
+  };
+  procurement_exposure:{
+    approved_unreceived_at_current_item_cost_kgs:string;
+    unapproved_requests_at_current_item_cost_kgs:string;
+    approved_open_request_count:number;pending_approval_count:number;
+    settled_supplier_payables_kgs:null;
+  };
+  truth:{report_type:'MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING';
+    payment_created:false;profit:'NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER';
+    receipt:string;consumption:string;procurement:string;inventory:string};
+}
 export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
 export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
 export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
@@ -345,6 +371,46 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       // Server OWNER/MANAGER + FINANCE permission guards remain authoritative;
       // shared_auth_preview explicitly allows this read. No 503 bypass.
       return financeSummaryResponse(await request<unknown>('GET', p + '/admin/finance/summary?from_date=' + safeIsoDate(from) + '&to_date=' + safeIsoDate(to)));
+    },
+    ownerKitchenManagement: async (from:string,to:string):Promise<OwnerKitchenManagementReport> => {
+      const value=objectResponse(await request<unknown>(
+        'GET',p+'/admin/finance/owner/kitchen-operations?from_date='+safeIsoDate(from)+
+        '&to_date='+safeIsoDate(to)),'owner kitchen management');
+      if(value.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||
+        !value.real_inventory_movements||!value.sample_inventory_movements||
+        value.truth===null||typeof value.truth!=='object'||
+        (value.truth as Record<string,unknown>).report_type!=='MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING'||
+        (value.truth as Record<string,unknown>).payment_created!==false||
+        (value.truth as Record<string,unknown>).profit!=='NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER')
+        throw new ApiError('UNKNOWN','Invalid owner kitchen finance truth');
+      const movements=['real_inventory_movements','sample_inventory_movements'];
+      const currency=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+      for(const field of movements){
+        const set=objectResponse(value[field],field);
+        for(const kind of ['RECEIPT','PRODUCTION','WASTE','SPOILAGE']){
+          const segment=objectResponse(set[kind],field+' '+kind);
+          if(typeof segment.cost_kgs!=='string'||!currency.test(segment.cost_kgs)||
+            typeof segment.movement_count!=='number')
+            throw new ApiError('UNKNOWN','Invalid kitchen cost row');
+        }
+      }
+      for(const field of ['real_production_cost_kgs','real_loss_cost_kgs',
+        'real_total_consumption_and_loss_cost_kgs']){
+        if(typeof value[field]!=='string'||!currency.test(String(value[field])))
+          throw new ApiError('UNKNOWN','Invalid kitchen cost total');
+      }
+      const exposure=objectResponse(value.procurement_exposure,'procurement exposure');
+      const stock=objectResponse(value.current_stock,'current inventory valuation');
+      if(exposure.settled_supplier_payables_kgs!==null||
+        stock.valuation_as_of!=='CURRENT_NOT_PERIOD_END'||
+        typeof exposure.approved_unreceived_at_current_item_cost_kgs!=='string'||
+        typeof exposure.unapproved_requests_at_current_item_cost_kgs!=='string'||
+        !currency.test(exposure.approved_unreceived_at_current_item_cost_kgs)||
+        !currency.test(exposure.unapproved_requests_at_current_item_cost_kgs)||
+        typeof stock.real_value_at_current_item_cost_kgs!=='string'||
+        !currency.test(stock.real_value_at_current_item_cost_kgs))
+        throw new ApiError('UNKNOWN','Invalid owner procurement or inventory valuation');
+      return value as unknown as OwnerKitchenManagementReport;
     },
     reception: async () => {
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
