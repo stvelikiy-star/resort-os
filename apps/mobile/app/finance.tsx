@@ -28,9 +28,14 @@ export default function Finance() {
     () => allowed && modules ? modules.financeSummary(from, to) : Promise.resolve(null),
     [modules, allowed, hotel?.id, user?.id, user?.module_permissions?.join(',')],
   );
+  const ownerKitchen=useAsync(
+    () => allowed && user?.role==='OWNER' && modules ?
+      modules.ownerKitchenManagement(from,to):Promise.resolve(null),
+    [modules,allowed,user?.role,user?.id,hotel?.id],
+  );
   const focused = useRef(false);
   useFocusEffect(useCallback(() => {
-    if (focused.current) void reload(); else focused.current = true;
+    if (focused.current) { void reload();void ownerKitchen.reload(); } else focused.current = true;
   }, [reload]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
@@ -112,6 +117,36 @@ export default function Finance() {
             line(extra.sampleCost,data.kitchen_stock_cost.sample_production_cost_kgs+' '+data.range.currency) : null}
         </GlassCard>
       </> : null}
+      {user?.role==='OWNER'?<>
+        <SectionLabel>{locale==='ru'?'Кухня — себестоимость и закупки':
+          locale==='en'?'Kitchen — costs & procurement':
+          locale==='kg'?'Ашкана — өздүк нарк жана сатып алуулар':
+          'Асхана — өзіндік құн және сатып алу'}</SectionLabel>
+        {ownerKitchen.loading?<LoadingShimmer count={1}/>:null}
+        {ownerKitchen.error?<ErrorState text={ownerKitchen.error.message} retry={copy.retry}
+          onRetry={ownerKitchen.reload}/>:null}
+        {ownerKitchen.data?<GlassCard style={{gap:space.sm}}>
+          {line(locale==='en'?'Production cost':'Производственная себестоимость',
+            ownerKitchen.data.real_production_cost_kgs+' '+data.range.currency)}
+          {line(locale==='en'?'Spoilage and waste cost':'Порча и потери',
+            ownerKitchen.data.real_loss_cost_kgs+' '+data.range.currency)}
+          {line(locale==='en'?'Waste':'Потери',
+            ownerKitchen.data.real_inventory_movements.WASTE.cost_kgs+' '+data.range.currency)}
+          {line(locale==='en'?'Spoilage':'Порча',
+            ownerKitchen.data.real_inventory_movements.SPOILAGE.cost_kgs+' '+data.range.currency)}
+          {line(locale==='en'?'Remaining stock, estimated':'Остаток склада, оценка',
+            ownerKitchen.data.current_stock.real_value_at_current_item_cost_kgs+' '+data.range.currency)}
+          {line(locale==='en'?'Approved products not yet received':'Утверждённые поставки к приходу',
+            ownerKitchen.data.procurement_exposure.approved_unreceived_at_current_item_cost_kgs+' '+data.range.currency)}
+          {line(locale==='en'?'Requests awaiting approval':'Заявки без утверждения',
+            ownerKitchen.data.procurement_exposure.unapproved_requests_at_current_item_cost_kgs+' '+data.range.currency)}
+          <Text style={[font.small,{color:c.textMuted}]}>
+            {locale==='en'
+              ?'Cost and supplier request estimates are not recorded payments or recognized profit. Sample stock is excluded.'
+              :'Себестоимость и заявки на поставку — не фактические платежи и не рассчитанная прибыль. Тестовый склад исключён.'}
+          </Text>
+        </GlassCard>:null}
+      </>:null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>
