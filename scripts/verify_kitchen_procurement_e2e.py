@@ -56,6 +56,14 @@ async def main():
             today=await db.fetchval(
                 "SELECT (now() AT TIME ZONE timezone)::date FROM properties WHERE id=$1",pid)
             payment_count=await db.fetchval("SELECT count(*) FROM payments")
+            owner_cost_before=verify(await owner.get(
+                "/api/v1/admin/finance/owner/kitchen-operations",
+                params={"from_date":today.isoformat(),"to_date":today.isoformat()}),
+                200,"owner kitchen report baseline")
+            for non_owner, label in ((cook,"COOK"),(store,"STORE_STAFF"),(waiter,"WAITER")):
+                verify(await non_owner.get("/api/v1/admin/finance/owner/kitchen-operations",
+                    params={"from_date":today.isoformat(),"to_date":today.isoformat()}),
+                    403,label+" denied owner finances")
             menu_id=verify(await owner.post("/api/v1/kitchen/menu",json={
                 "code":code,"category":"MAIN","name_ru":code,"name_kg":code,
                 "name_en":code,"name_kz":code,"price_kgs":0,"is_active":True,"is_draft":False,
@@ -194,6 +202,26 @@ async def main():
                        for r in movements)==Decimal("1.25")
             assert all(r["createdById"] is not None and r["propertyId"]==pid for r in movements)
             assert await db.fetchval("SELECT count(*) FROM payments")==payment_count
+            owner_cost_after=verify(await owner.get(
+                "/api/v1/admin/finance/owner/kitchen-operations",
+                params={"from_date":today.isoformat(),"to_date":today.isoformat()}),
+                200,"owner kitchen report final")
+            assert owner_cost_after["scope"]=="OWNER_ONLY_PROPERTY_SCOPED"
+            assert owner_cost_after["truth"]["payment_created"] is False
+            assert owner_cost_after["truth"]["report_type"]=="MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING"
+            for kind, expected in (("RECEIPT",Decimal("600")),
+                                   ("PRODUCTION",Decimal("400")),
+                                   ("SPOILAGE",Decimal("75"))):
+                before=Decimal(owner_cost_before["real_inventory_movements"][kind]["cost_kgs"])
+                after=Decimal(owner_cost_after["real_inventory_movements"][kind]["cost_kgs"])
+                assert after-before==expected,(kind,before,after)
+            assert (Decimal(owner_cost_after["real_loss_cost_kgs"])-
+                    Decimal(owner_cost_before["real_loss_cost_kgs"]))==Decimal("75")
+            assert await db.fetchval("SELECT count(*) FROM payments")==payment_count
+            verify(await owner.get("/api/v1/admin/finance/owner/kitchen-operations",
+                    params={"from_date":"2026-11-16","to_date":"2026-11-15"}),
+                   422,"reject invalid owner kitchen date range")
+            print("KITCHEN OWNER FINANCE POSTGRES E2E PASS: OWNER-only, actual receipt/production/spoilage costs, no supplier payments/profit")
             print("KITCHEN FULL INVENTORY CYCLE REAL POSTGRES E2E PASS: recipe -> demand -> approval -> 2 receipts -> production -> spoilage -> exact stock, cost, no double writes/payments")
     finally:
         # CI database is disposable; keep the procurement chain for post-test inspection.
