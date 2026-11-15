@@ -1,11 +1,5 @@
 export default function StaffShiftVisualFixture() {
   return <main className="shift-shell" data-staff-qa-fixture="true">
-    <nav className="staff-locale-switcher" aria-label="Язык">
-      <span>Язык</span>
-      <button aria-pressed="true">RU</button>
-      <button aria-pressed="false">KG</button>
-      <button aria-pressed="false">EN</button>
-    </nav>
     <header className="shift-head">
       <div><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>Очень длинное имя сотрудника для проверки переноса</h1><span>Ресепшен · Кыргызская Республика</span></div>
       <button className="shift-ghost">Выйти</button>
