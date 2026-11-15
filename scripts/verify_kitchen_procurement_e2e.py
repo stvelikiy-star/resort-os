@@ -152,10 +152,7 @@ async def main():
             assert all(str(r["createdById"])==store_me["id"] for r in receipts)
             print("KITCHEN PROCUREMENT REAL POSTGRES E2E PASS: needs -> COOK request -> OWNER approval -> STORE partial+final receipt, role denial, idempotency, inventory, no payment")
     finally:
-        if menu_id and pid:
-            # This isolated test uses a disposable database; leave no live-resource impact.
-            await db.execute('DELETE FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2',
-                             uuid.UUID(menu_id),pid) if False else None
+        # CI database is disposable; keep the procurement chain for post-test inspection.
         await db.close()
 
 
