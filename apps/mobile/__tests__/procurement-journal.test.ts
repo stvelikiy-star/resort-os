@@ -42,3 +42,21 @@ test('corrupt or impossible-date journals block sending',async()=>{
   await expect(executeProcurement('hotel.example','user',null,send)).rejects.toThrow();expect(send).not.toHaveBeenCalled();
  }
 });
+
+test('invoice-backed receive keeps immutable supplier source through lost acknowledgment and restart',async()=>{
+ const source='55555555-5555-4555-8555-555555555555';
+ const withInvoice:PendingProcurement={...receive,document_line_id:source};
+ await expect(executeProcurement('hotel.example','user',async()=>withInvoice,async()=>{throw new Error('lost ack');})).rejects.toThrow('lost ack');
+ expect(await readProcurement('hotel.example','user')).toEqual(withInvoice);
+ await expect(executeProcurement('hotel.example','user',null,async()=>({...ack(withInvoice),document_line_id:item})))
+  .rejects.toThrow('Unverified');
+ expect(await readProcurement('hotel.example','user')).toEqual(withInvoice);
+ await executeProcurement('hotel.example','user',null,async()=>({...ack(withInvoice),document_line_id:source}));
+ expect(await readProcurement('hotel.example','user')).toBeNull();
+});
+test('tampered invoice source in persisted receipt fails closed',async()=>{
+ mockRecords.set('marina.procurement.v1.hotel.example.user',JSON.stringify({...receive,document_line_id:'not-uuid'}));
+ const send=jest.fn();
+ await expect(executeProcurement('hotel.example','user',null,send)).rejects.toThrow('Invalid supplier');
+ expect(send).not.toHaveBeenCalled();
+});
