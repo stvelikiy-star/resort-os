@@ -6,13 +6,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
-from app import auth, owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents
+from app import auth, owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns
 
 
 class OwnerFinanceRoles(unittest.TestCase):
     def test_custom_finance_module_cannot_promote_any_other_staff_role(self):
         app = FastAPI()
-        for module in (owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents):
+        for module in (owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns):
             app.include_router(module.router)
         user = {'role': '', 'id': '00000000-0000-4000-8000-000000000001',
                 'module_permissions_custom': True, 'module_permissions': ['FINANCE']}
@@ -24,7 +24,7 @@ class OwnerFinanceRoles(unittest.TestCase):
         for role in ('MANAGER', 'RECEPTION', 'AGENT', 'MAID', 'TECHNICIAN', 'COOK',
                      'WAITER', 'STORE_STAFF', 'DINING_STAFF', 'CONTENT_MANAGER', 'BEACH_PARTNER'):
             user['role'] = role
-            for path in ('/expenses', '/recorded-cash-movements', '/kitchen-operations', '/supplier-documents'):
+            for path in ('/expenses', '/recorded-cash-movements', '/kitchen-operations', '/supplier-documents', '/supplier-returns'):
                 with self.subTest(role=role, path=path):
                     result = client.get(base + path, params={'from_date': '2026-11-15', 'to_date': '2026-11-15'})
                     self.assertEqual(result.status_code, 403, result.text)
@@ -34,6 +34,7 @@ class OwnerFinanceRoles(unittest.TestCase):
                 ('/expenses/00000000-0000-4000-8000-000000000002/void', {'reason':'Synthetic duplicate'}),
                 ('/supplier-documents', {'id':'00000000-0000-4000-8000-000000000005', 'supplier_name':'Synthetic supplier', 'document_reference':'SYNTHETIC', 'document_date':'2026-11-15', 'lines':[{'id':'00000000-0000-4000-8000-000000000006','stock_item_id':'00000000-0000-4000-8000-000000000007','quantity':'1','unit_cost_kgs':'100'}]}),
                 ('/supplier-documents/00000000-0000-4000-8000-000000000005/settlements', {'id':'00000000-0000-4000-8000-000000000008','amount_kgs':'100','paid_on':'2026-11-15','method':'CASH'}),
+                ('/supplier-returns', {'id':'00000000-0000-4000-8000-000000000010','document_id':'00000000-0000-4000-8000-000000000005','document_line_id':'00000000-0000-4000-8000-000000000006','quantity':'1','credit_reference':'SYNTHETIC-CREDIT','reason':'Synthetic return'}),
                 ('/supplier-documents/00000000-0000-4000-8000-000000000005/receipt-links', {'receipt_id':'00000000-0000-4000-8000-000000000009','document_line_id':'00000000-0000-4000-8000-000000000006'}),
             ]
             for path, body in writes:
