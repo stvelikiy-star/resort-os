@@ -105,7 +105,7 @@ def run_role(role):
     logout_labels=["Sign out","Log out","Выйти","Чыгуу"]
     visible=labels()
     display=adb("shell","wm","size")
-    size=re.search(r"(\\d+)x(\\d+)",display)
+    size=re.search(r"(\d+)x(\d+)",display)
     assert size, f"Cannot determine native Android size: {display}"
     width,height=map(int,size.groups())
     for attempt in range(8):
