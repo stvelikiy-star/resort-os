@@ -181,7 +181,9 @@ async def publish_menu_day(
     request: Request,
     user: dict[str, Any] = Depends(menu_management_access),
 ):
-    if user["role"] not in {"OWNER", "MANAGER"}:\n        raise HTTPException(status_code=403, detail="Menu publishing is restricted to hotel management")\n    async with request.app.state.db.acquire() as conn:
+    if user["role"] not in {"OWNER", "MANAGER"}:
+        raise HTTPException(status_code=403, detail="Menu publishing is restricted to hotel management")
+    async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
             if payload.menu_item_ids:
@@ -247,7 +249,9 @@ async def patch_menu_availability(
 ):
     if payload.is_available is None and payload.sold_out is None and payload.notes is None:
         raise HTTPException(status_code=422, detail="No change supplied")
-    if user["role"] not in {"OWNER", "MANAGER"}:\n        raise HTTPException(status_code=403, detail="Menu publishing is restricted to hotel management")\n    async with request.app.state.db.acquire() as conn:
+    if user["role"] not in {"OWNER", "MANAGER"}:
+        raise HTTPException(status_code=403, detail="Menu publishing is restricted to hotel management")
+    async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
             row = await conn.fetchrow(
