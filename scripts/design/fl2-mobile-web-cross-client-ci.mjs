@@ -110,6 +110,8 @@ async function main(){
   const confirm=a.page.getByRole('button',{name:'Подтвердить бронь',exact:true});
   await confirm.waitFor();
   const committedResponse=a.page.waitForResponse(r=>r.url().endsWith('/core/api/v1/admin/pms/reservations/new/commit')&&r.request().method()==='POST');
+  // Web SharedBookingForm uses a native window.confirm gate before submission.
+  a.page.once('dialog',dialog=>dialog.accept());
   await confirm.click();
   const webBookingResponse=await committedResponse;
   assert.equal(webBookingResponse.status(),201);
