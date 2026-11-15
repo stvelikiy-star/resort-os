@@ -75,3 +75,15 @@ test('missing journal cannot be manually acknowledged', async () => {
   })).resolves.toBe(false);
   expect(del).not.toHaveBeenCalled();
 });
+
+test('scheduled operation remains reviewable without persisting the guest note', async () => {
+  await beginPendingAgentService(HOTEL, USER, RESERVATION, 'TRANSFER', {
+    service_date:'2026-11-15',service_time:'10:30',description:'Private meeting note',
+  });
+  const raw = set.mock.calls[0][1];
+  expect(raw).toContain('"serviceDate":"2026-11-15"');
+  expect(raw).toContain('"serviceTime":"10:30"');
+  expect(raw).not.toContain('Private meeting note');
+  get.mockResolvedValue(raw);
+  expect((await readPendingAgentService(HOTEL, USER))?.serviceTime).toBe('10:30');
+});

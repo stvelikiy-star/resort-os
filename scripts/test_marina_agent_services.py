@@ -24,6 +24,16 @@ class Conn:
         self.duplicate = False
         self.writes = []
         self.reservation_args = None
+        self.list_args = None
+
+    async def fetchval(self, query, *args):
+        return RID if args == (RID, self.property, self.owner) else None
+
+    async def fetch(self, query, *args):
+        self.list_args = args
+        assert 'res."agentId"=$13' in query and 'ANY($14::text[])' in query
+        return [{'id': uuid.uuid4(), 'reservationId': RID, 'serviceCode': 'TRANSFER', 'status': 'DONE',
+                 'serviceDate': date(2027, 1, 1), 'serviceTime': '10:30', 'description': 'Meeting point'}]
 
     @asynccontextmanager
     async def transaction(self):
@@ -124,6 +134,40 @@ class AgentServices(unittest.TestCase):
         self.user.update(role='OWNER', module_permissions=['SERVICES'])
         self.assertEqual(self.post().status_code, 201)
         self.assertEqual(self.conn.reservation_args, (RID, PID, None))
+
+    def test_agent_reads_only_scoped_service_facts(self):
+        result = self.client.get('/api/v1/admin/guest-services', params={'reservation_id': str(RID), 'status': 'ALL'})
+        self.assertEqual(result.status_code, 200, result.text)
+        body = result.json()
+        self.assertEqual(body['reservation_id'], str(RID))
+        self.assertEqual(body['items'][0]['status'], 'DONE')
+        self.assertEqual(set(body['items'][0]), {'id', 'reservation_id', 'service_code', 'status', 'service_date', 'service_time', 'description'})
+        self.assertEqual(self.conn.list_args[12], AGENT)
+        self.assertEqual(set(self.conn.list_args[13]), services.AGENT_SERVICE_CODES)
+        self.assertEqual(self.conn.writes, [])
+
+    def test_agent_cannot_read_foreign_reservation_or_with_revoked_link(self):
+        for attribute, value, status in [('owner', OTHER, 404), ('property', OTHER, 404), ('active', False, 403)]:
+            old = getattr(self.conn, attribute)
+            with self.subTest(attribute=attribute):
+                setattr(self.conn, attribute, value)
+                result = self.client.get('/api/v1/admin/guest-services', params={'reservation_id': str(RID)})
+                self.assertEqual(result.status_code, status)
+                self.assertIsNone(self.conn.list_args)
+            setattr(self.conn, attribute, old)
+
+    def test_agent_read_requires_pms_and_reports_truncation(self):
+        self.user['module_permissions'] = []
+        self.assertEqual(self.client.get('/api/v1/admin/guest-services', params={'reservation_id': str(RID)}).status_code, 403)
+        self.user['module_permissions'] = ['PMS']
+        with patch.object(self.conn, 'fetch', return_value=[{
+            'id': uuid.uuid4(), 'reservationId': RID, 'serviceCode': 'TRANSFER', 'status': 'OPEN',
+            'serviceDate': None, 'serviceTime': None, 'description': None,
+        } for _ in range(2)]):
+            result = self.client.get('/api/v1/admin/guest-services', params={'reservation_id': str(RID), 'limit': 1})
+            self.assertEqual(result.status_code, 200)
+            self.assertTrue(result.json()['preview_truncated'])
+            self.assertEqual(len(result.json()['items']), 1)
 
 
 if __name__ == '__main__':

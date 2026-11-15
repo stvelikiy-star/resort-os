@@ -1,3 +1,4 @@
+import { AGENT_SERVICES, AgentServiceCode, AgentServiceDraft, agentServiceDraft, agentServiceList } from './agentServices';
 import { kitchenRecipe, ingredientRequirements } from './kitchenRecipes';
 import type { KitchenRecipe, IngredientRequirements, RecipeInput } from './kitchenRecipes';
 import { clientSessionGuard } from './unauthorizedSession';
@@ -10,6 +11,8 @@ import type { AuthMode } from './types';
 import { safeRouteId, safeIsoDate } from './routeId';
 import { diningStaysResponse, diningStayEntitlementsResponse, diningMealPlanAck, diningProductionSnapshotsResponse, stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
 import { CONFIRMED_BACKEND_FEATURES } from './features';
+export { AGENT_SERVICES } from './agentServices';
+export type { AgentServiceCode } from './agentServices';
 
 export type WhatsAppDeliveryStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ';
 export interface OutboundCapabilities { whatsapp: { configured: boolean; human_only: boolean; queued_only: boolean; max_text_length: number } }
@@ -303,8 +306,6 @@ export interface MealPlanAck {
   stay_id: string; updated_items: number; meals: MealType[];
   from_date: string; through_date: string; adult_portions: number; child_portions: number;
 }
-export const AGENT_SERVICES = ['TRANSFER', 'MEALS', 'PARKING', 'SAUNA', 'BILLIARDS', 'EXCURSIONS'] as const;
-export type AgentServiceCode = typeof AGENT_SERVICES[number];
 
 export interface WaiterMenuItem {
   id: string;
@@ -672,12 +673,17 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
       return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
     },
-    addAgentGuestService: async (reservation: string, serviceCode: AgentServiceCode) => {
+    agentGuestServices: async (reservation: string) => {
+      reviewGate();
+      const id = safeRouteId(reservation);
+      return agentServiceList(await request<unknown>('GET', p + '/admin/guest-services?reservation_id=' + id + '&status=ALL&limit=200'), id);
+    },
+    addAgentGuestService: async (reservation: string, serviceCode: AgentServiceCode, draft: AgentServiceDraft = {}) => {
       reviewGate();
       if (!AGENT_SERVICES.includes(serviceCode)) throw new ApiError('BAD_REQUEST', 'Invalid agent service');
       const reservationId = safeRouteId(reservation);
       const task = objectResponse(await request<unknown>('POST', p + '/admin/guest-services', {
-        reservation_id: reservationId, service_code: serviceCode,
+        reservation_id: reservationId, service_code: serviceCode, ...agentServiceDraft(draft),
       }), 'guest service');
       if (typeof task.id !== 'string' || task.reservation_id !== reservationId || task.service_code !== serviceCode) {
         throw new ApiError('UNKNOWN', 'Invalid guest service acknowledgement');

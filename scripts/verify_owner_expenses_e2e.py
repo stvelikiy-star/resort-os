@@ -39,8 +39,32 @@ async def main():
                    httpx.AsyncClient(base_url=base,timeout=30) as cook:
             me=await login(owner,os.environ["BOOTSTRAP_OWNER_USERNAME"],
                            os.environ["BOOTSTRAP_OWNER_PASSWORD"],"OWNER")
-            await login(cook,os.environ["KITCHEN_MENU_DINING_USERNAME"],
+            cook_me=await login(cook,os.environ["KITCHEN_MENU_DINING_USERNAME"],
                         os.environ["KITCHEN_MENU_DINING_PASSWORD"],"COOK")
+            # A legacy custom FINANCE grant used to bypass OWNER-only role
+            # dependencies. Exercise actual sessions + PostgreSQL permissions.
+            cook_id=uuid.UUID(cook_me["id"])
+            previous_permissions=await db.fetchval(
+                'SELECT "modulePermissions" FROM staff_users WHERE id=$1',cook_id)
+            try:
+                await db.execute('UPDATE staff_users SET "modulePermissions"=$1::jsonb WHERE id=$2',
+                                 '["FINANCE","DINING"]',cook_id)
+                await login(cook,os.environ["KITCHEN_MENU_DINING_USERNAME"],
+                            os.environ["KITCHEN_MENU_DINING_PASSWORD"],"COOK")
+                owner_base="/api/v1/admin/finance/owner"
+                for suffix in ("/expenses","/recorded-cash-movements","/kitchen-operations"):
+                    checked(await cook.get(owner_base+suffix,params={
+                        "from_date":"2026-11-15","to_date":"2026-11-15"}),403,
+                        "custom FINANCE must not promote COOK to OWNER")
+                checked(await cook.post(owner_base+"/expenses",json={
+                    "id":str(uuid.uuid4()),"expense_date":"2026-11-15",
+                    "category":"OTHER","title":"Denied custom grant","amount_kgs":1}),
+                    403,"custom FINANCE cannot create OWNER expense")
+            finally:
+                await db.execute('UPDATE staff_users SET "modulePermissions"=$1::jsonb WHERE id=$2',
+                                 previous_permissions,cook_id)
+                await login(cook,os.environ["KITCHEN_MENU_DINING_USERNAME"],
+                            os.environ["KITCHEN_MENU_DINING_PASSWORD"],"COOK")
             pid=await db.fetchval('SELECT id FROM properties WHERE code=$1',me["property_code"])
             assert pid is not None
             today=await db.fetchval(

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/finance/owner", tags=["owner-kitchen-management"])
-owner_only = require_roles("OWNER")
+owner_only = require_roles("OWNER", module_grant=False)
 
 
 @router.get("/kitchen-operations")

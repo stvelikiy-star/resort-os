@@ -54,7 +54,8 @@ async def main():
             client.headers['Cookie'] = '; '.join(f'{k}={v}' for k, v in login.cookies.items())
             me = checked(await client.get('/api/v1/auth/me'), 200)
             assert me['role'] == 'AGENT' and 'PMS' in me['module_permissions']
-            payload = {'reservation_id': str(own_rid), 'service_code': 'TRANSFER'}
+            payload = {'reservation_id': str(own_rid), 'service_code': 'TRANSFER',
+                       'service_date': today.isoformat(), 'service_time': '10:30', 'description': 'Meet at reception'}
             result = checked(await client.post(path, json=payload), 201)
             row = await conn.fetchrow('SELECT "propertyId","reservationId","serviceCode","createdById" FROM operational_tasks WHERE id=$1', uuid.UUID(result['id']))
             assert row['propertyId'] == pid and row['reservationId'] == own_rid
@@ -65,12 +66,38 @@ async def main():
             checked(await client.post(path, json={**payload, 'service_code': 'TOWELS'}), 403)
             checked(await client.post(path, json={**payload, 'priority': 'URGENT'}), 403)
             checked(await client.get(path), 403)
+            scoped = {'reservation_id': str(own_rid), 'status': 'ALL'}
+            first = checked(await client.get(path, params=scoped), 200)
+            assert first['items'][0]['id'] == result['id'] and first['items'][0]['status'] == 'OPEN'
+            assert first['items'][0]['service_date'] == today.isoformat()
+            assert first['items'][0]['service_time'] == '10:30'
+            assert first['items'][0]['description'] == 'Meet at reception'
+            assert 'guest_phone' not in first['items'][0] and 'assigned_to_id' not in first['items'][0]
+            checked(await client.get(path, params={'reservation_id': str(other_rid)}), 404)
+            checked(await client.post(path, json={**payload, 'service_date': (today + timedelta(days=3)).isoformat()}), 422)
+            # Staff processes the SAME canonical task through existing Web APIs;
+            # agent then reads back its actual status, without a local replica.
+            async with httpx.AsyncClient(base_url=base, timeout=30) as owner:
+                response = await owner.post('/api/v1/auth/login', json={
+                    'username': os.environ['BOOTSTRAP_OWNER_USERNAME'], 'password': os.environ['BOOTSTRAP_OWNER_PASSWORD']})
+                checked(response, 200)
+                owner.headers['Cookie'] = '; '.join(f'{k}={v}' for k, v in response.cookies.items())
+                ops = '/api/v1/ops/guest-requests/' + result['id']
+                checked(await owner.post(ops + '/claim'), 200)
+                middle = checked(await client.get(path, params=scoped), 200)
+                assert middle['items'][0]['status'] == 'IN_PROGRESS'
+                checked(await owner.post(ops + '/complete'), 200)
+                final = checked(await client.get(path, params=scoped), 200)
+                assert final['items'][0]['status'] == 'DONE'
+                assert await conn.fetchval('SELECT status::text FROM operational_tasks WHERE id=$1', uuid.UUID(result['id'])) == 'DONE'
+
             await conn.execute('UPDATE booking_agents SET status=\'INACTIVE\' WHERE id=$1', agent)
             checked(await client.post(path, json={**payload, 'service_code': 'MEALS'}), 403)
+            checked(await client.get(path, params=scoped), 403)
             assert await conn.fetchval('SELECT count(*) FROM operational_tasks WHERE "reservationId"=$1', other_rid) == 0
             assert await conn.fetchval('SELECT count(*) FROM operational_tasks WHERE "reservationId"=$1', own_rid) == 1
             assert await conn.fetchval('SELECT count(*) FROM payments') == payment_count
-        print('AGENT SERVICES POSTGRES PASS: own task persisted; duplicate 409; other agent 404; queue/priority/operational-service/revoked link 403; no Payment')
+        print('AGENT SERVICES POSTGRES PASS: own scheduled task persisted; staff claim/complete -> agent OPEN/IN_PROGRESS/DONE readback; duplicate 409; other agent 404; queue/priority/operational-service/revoked link 403; no Payment')
     finally:
         await conn.close()
 

@@ -15,6 +15,7 @@ on:
       - 'services/api/app/hotel_finance.py'
       - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
       - 'scripts/verify_owner_expenses_e2e.py'
+      - 'scripts/test_marina_owner_finance_roles.py'
       - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
       - 'scripts/verify_kitchen_procurement_e2e.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
@@ -108,6 +109,9 @@ jobs:
         run: |
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_kitchen_operations.py scripts/verify_kitchen_menu_management.py
+
+      - name: Test strict OWNER financial role boundaries
+        run: python scripts/test_marina_owner_finance_roles.py
 
       - name: Test cook draft authoring and management authority
         run: PYTHONPATH=. python scripts/test_kitchen_draft_authoring.py

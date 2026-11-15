@@ -28,6 +28,14 @@ async def create_access(request: Request, user=Depends(current_user)):
         return user
     return await center_access(request, user)
 
+
+async def list_access(request: Request, user=Depends(current_user)):
+    if user.get("role") == "AGENT":
+        if not request.query_params.get("reservation_id"):
+            raise HTTPException(403, detail={"code": "AGENT_SERVICE_QUEUE_FORBIDDEN"})
+        return await create_access(request, user)
+    return await center_access(request, user)
+
 SERVICE_LABELS: dict[str, str] = {
     "HOUSEKEEPING": "Уборка во время проживания",
     "TOWELS": "Полотенца",
@@ -154,7 +162,7 @@ async def list_guest_services(
     from_date: date | None = None,
     to_date: date | None = None,
     limit: int = Query(default=200, ge=1, le=500),
-    user: dict[str, Any] = Depends(center_access),
+    user: dict[str, Any] = Depends(list_access),
 ):
     if task_status not in {None, "ALL", "ACTIVE", *ALLOWED_TASK_STATUSES}:
         raise HTTPException(status_code=422, detail="Unknown guest-service status")
@@ -171,12 +179,22 @@ async def list_guest_services(
 
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user)
+        agent_id = await linked_agent_id_for_user(conn, pid, user)
+        if agent_id is not None:
+            owned = await conn.fetchval(
+                'SELECT id FROM reservations WHERE id=$1 AND "propertyId"=$2 AND "agentId"=$3',
+                reservation_id, pid, agent_id,
+            )
+            if not owned:
+                raise HTTPException(404, detail="Reservation not found")
         rows = await conn.fetch(
             BASE_SELECT
             + '''
             WHERE t."propertyId"=$1
               AND t.type='GUEST_REQUEST'
               AND t."serviceCode" IS NOT NULL
+              AND ($13::uuid IS NULL OR res."agentId"=$13)
+              AND ($14::text[] IS NULL OR t."serviceCode"=ANY($14::text[]))
               AND ($2::text IS NULL OR t."serviceCode"=$2)
               AND ($3::uuid IS NULL OR t."reservationId"=$3)
               AND ($4::uuid IS NULL OR t."stayId"=$4)
@@ -209,8 +227,23 @@ async def list_guest_services(
             from_date,
             to_date,
             task_status,
-            limit,
+            limit + 1 if agent_id is not None else limit,
+            agent_id,
+            sorted(AGENT_SERVICE_CODES) if agent_id is not None else None,
         )
+    if agent_id is not None:
+        # Return operational facts only; no guest phone, staff identity or
+        # internal assignment data from the hotel's full service center.
+        return {
+            "reservation_id": str(reservation_id),
+            "items": [{
+                "id": str(row["id"]), "reservation_id": str(row["reservationId"]),
+                "service_code": row["serviceCode"], "status": row["status"],
+                "service_date": row["serviceDate"], "service_time": row["serviceTime"],
+                "description": row["description"],
+            } for row in rows[:limit]],
+            "preview_limit": limit, "preview_truncated": len(rows) > limit,
+        }
     return {
         "items": [row_to_item(row) for row in rows],
         "service_codes": SERVICE_LABELS,
