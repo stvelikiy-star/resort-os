@@ -197,6 +197,12 @@ async def main():
                 pid,uuid.UUID(item_id))
             assert valued["balance"]==Decimal("8")
             assert valued["remaining_value"]==Decimal("893.8267")
+            reported=check(await owner.get("/api/v1/kitchen/stock"),200,"weighted inventory snapshot")
+            current=next(row for row in reported["items"] if row["id"]==item_id)
+            assert current["valuation_status"]=="MOVEMENT_BASED"
+            assert Decimal(current["inventory_value_kgs"])==Decimal("893.8267")
+            assert Decimal(current["weighted_unit_cost_kgs"])==Decimal("111.7283")
+
             assert await conn.fetchval("SELECT COUNT(*) FROM payments") == payment_before
             assert await conn.fetchval(
                 'SELECT COUNT(*) FROM owner_expenses WHERE "propertyId"=$1',
