@@ -32,9 +32,24 @@ async def kitchen_management_access(user: dict[str, Any] = Depends(_kitchen_mana
     if user["role"] not in {"OWNER", "MANAGER"}:
         raise HTTPException(status_code=403, detail="Kitchen management role required")
     return user
-waiter_menu_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER", module_grant=False)
-waiter_table_creation_access = require_roles("OWNER", "MANAGER", "WAITER", module_grant=False)
-waiter_order_creation_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER", module_grant=False)
+_waiter_menu_base = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
+_waiter_table_base = require_roles("OWNER", "MANAGER", "WAITER")
+_waiter_order_base = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
+
+async def waiter_menu_access(user: dict[str, Any] = Depends(_waiter_menu_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Dining menu role required")
+    return user
+
+async def waiter_table_creation_access(user: dict[str, Any] = Depends(_waiter_table_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Dining table creation role required")
+    return user
+
+async def waiter_order_creation_access(user: dict[str, Any] = Depends(_waiter_order_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Dining order role required")
+    return user
 # Legacy DINING_STAFF is intentionally not accepted: cook and waiter are server-separated.
 
 DRAFT_MENU = [
