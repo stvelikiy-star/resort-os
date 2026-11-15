@@ -54,6 +54,13 @@ async def main():
                 "from_date":date_str,"to_date":date_str}),200,"financial overview")
             assert "owner_expense_snapshot" in summary_base
             init=summary_base["owner_expense_snapshot"]
+            cash_url="/api/v1/admin/finance/owner/recorded-cash-movements"
+            before_cash=checked(await owner.get(cash_url,params={
+                "from_date":date_str,"to_date":date_str}),200,"cash movement baseline")
+            assert before_cash["truth"]["recognized_profit_kgs"] is None
+            assert before_cash["truth"]["completeness_verified"] is False
+            checked(await cook.get(cash_url,params={"from_date":date_str,
+                "to_date":date_str}),403,"cook denied owner cash movement reconciliation")
             checked(await cook.get(basepath,params={
                 "from_date":date_str,"to_date":date_str}),403,"cook read denied")
             expense_id=str(uuid.uuid4())
@@ -107,6 +114,20 @@ async def main():
             assert snap["all_time_outstanding_obligations_kgs"]-init["all_time_outstanding_obligations_kgs"]==700
             assert financial["scope"]["accounting_report"] is False
             assert await db.fetchval("SELECT count(*) FROM payments")==payment_count
+            after_cash=checked(await owner.get(cash_url,params={
+                "from_date":date_str,"to_date":date_str}),200,"cash movements after settlement")
+            assert (after_cash["owner_expense_manual_settlements_kgs"]-
+                    before_cash["owner_expense_manual_settlements_kgs"])==300
+            assert (after_cash["owner_expenses_posted_for_period_kgs"]-
+                    before_cash["owner_expenses_posted_for_period_kgs"])==1000
+            assert (after_cash["observed_recorded_difference_kgs"]-
+                    before_cash["observed_recorded_difference_kgs"])==-300
+            assert (after_cash["customer_payments_received_kgs"]==
+                    before_cash["customer_payments_received_kgs"])
+            assert after_cash["truth"]["recognized_profit_kgs"] is None
+            assert after_cash["truth"]["verified_bank_balance_kgs"] is None
+            assert after_cash["truth"]["refunds_reconciled"] is False
+            assert after_cash["truth"]["payment_created"] is False
             void_id=str(uuid.uuid4())
             voided=checked(await owner.post(basepath,json={**payload,"id":void_id,
                 "title":"Cancelled E2E supply expense"}),201,"create cancelable item")
@@ -121,6 +142,7 @@ async def main():
                 **settlement,"id":str(uuid.uuid4())}),409,"voided cannot settle")
             checked(await owner.get(basepath,params={
                 "from_date":"2026-11-16","to_date":"2026-11-15"}),422,"invalid date range")
+            print("OWNER CASH RECONCILIATION POSTGRES PASS: observed customer receipt unchanged, manual payout +300, difference -300, no profit or verified balance")
             print("OWNER EXPENSES REAL POSTGRES: PASS obligation 1000 -> manual 300 -> 700 payable, no customer Payment, OWNER gate, UUID replay, conflict, overpay and VOID")
     finally:
         await db.close()
