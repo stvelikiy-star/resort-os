@@ -24,4 +24,14 @@ require(runtime.includes('service_date: serviceDate || null'), 'Service date pay
 require(runtime.includes('service_time: serviceTime || null'), 'Service time payload missing');
 require(css.includes('@media(max-width:420px)'), 'Phone layout missing');
 require(css.includes('.concierge-langs'), 'Compact language control missing');
+// C12: enforce the original approved PNG and touch targets on the guest-only surface.
+const { createHash } = await import('node:crypto');
+const approved = fs.readFileSync('apps/web/public/marina-smart-approved.png');
+const fingerprint = createHash('sha256').update(approved).digest('hex');
+require(fingerprint === '24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356', 'Guest logo differs from exact approved source');
+require(runtime.includes('src="/marina-smart-approved.png"'), 'Guest concierge must render original approved PNG');
+require(!runtime.includes('<span>III</span>'), 'Guest concierge still renders placeholder logo');
+require(css.includes('.concierge-modal-head>button {\\n  width:44px;') || css.includes('.concierge-modal-head>button {\n  width:44px;'), 'Guest modal close touch target must be 44px');
+const housekeepingCss = fs.readFileSync('apps/web/app/guest-owner-corrections.css','utf8');
+require(housekeepingCss.includes('.guest-housekeeping-options button {\n  min-height:44px;'), 'Housekeeping service actions must be 44px');
 console.log('PASS: Guest Concierge source/browser contract');

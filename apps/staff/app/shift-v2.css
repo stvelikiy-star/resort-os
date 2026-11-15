@@ -33,3 +33,22 @@ body{background:var(--shift-bg);color:var(--shift-ink)}
 .shift-checklist input{accent-color:var(--shift-accent)}
 .shift-shell button:focus-visible,.shift-login :is(button,input):focus-visible,.shift-modal :is(button,input,textarea):focus-visible,.staff-locale-switcher button:focus-visible{outline:3px solid var(--shift-accent);outline-offset:3px}
 @media(max-width:420px){.shift-kpis span{font-size:12px}.shift-kpis button{padding:10px 7px}.shift-task-meta{align-items:flex-start}.shift-login{padding:22px 18px}}
+
+
+/* C11 Staff — final safe touch target and focus pass, using existing FL2 shift palette. */
+.staff-locale-switcher button { min-width:44px;min-height:44px; }
+.shift-modal-head .shift-ghost { min-width:44px;min-height:44px; }
+.shift-shell :is(button,a,[role="button"]):focus-visible,
+.shift-login :is(button,input):focus-visible,
+.shift-modal :is(button,input,textarea):focus-visible {
+  outline:3px solid var(--shift-accent);
+  outline-offset:3px;
+}
+.shift-modal { overscroll-behavior:contain;scroll-padding-top:12px; }
+.shift-head, .shift-task, .shift-room { min-width:0; }
+.shift-head :is(h1,span), .shift-task :is(h2,p) { overflow-wrap:anywhere; }
+@media(max-width:420px) {
+  .staff-locale-switcher { max-width:calc(100vw - 16px); }
+  .shift-modal-head { gap:8px; }
+  .shift-modal-head h2 { overflow-wrap:anywhere; }
+}
