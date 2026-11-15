@@ -16,24 +16,45 @@ import { font, space } from '../src/theme/tokens';
 
 const KITCHEN_REPORT_COPY={
  ru:{title:'Кухня — себестоимость и закупки',production:'Производственная себестоимость',
-  losses:'Порча и потери',waste:'Потери',spoilage:'Порча',stock:'Остаток склада, оценка',
+  losses:'Порча и потери',waste:'Потери',spoilage:'Порча',stock:'Стоимость остатков по движениям',
   approved:'Утверждённые поставки к приходу',unapproved:'Заявки без утверждения',
-  notice:'Себестоимость и заявки на поставку — не фактические платежи и не рассчитанная прибыль. Тестовый склад исключён.'},
+  returns:'Возврат поставщику — стоимость товара',gross:'Накладные поставщиков',
+  settled:'Оплаты поставщикам (зарегистрированные)',credits:'Кредитовые корректировки',
+  outstanding:'Долг поставщикам',legacyDifference:'Расхождение цен старых приходов и накладных',
+  returnDifference:'Разница кредита и складской стоимости возвратов',
+  reconciliation:'Требуется сверка складских движений или документов',
+  notice:'Склад оценён по сохранённым движениям; заявки — предварительные оценки. Накладные, оплаты и возвраты — отдельные записи. Это не подтверждённая прибыль.'},
  kg:{title:'Ашкана — өздүк нарк жана сатып алуулар',production:'Өндүрүштүн өздүк наркы',
   losses:'Бузулуу жана жоготуулар',waste:'Жоготуулар',spoilage:'Бузулуу',
-  stock:'Кампа калдыгынын баасы',approved:'Бекитилген, бирок келе элек товарлар',
+  stock:'Кампанын кыймылдар боюнча баасы',approved:'Бекитилген, бирок келе элек товарлар',
   unapproved:'Бекитиле элек өтүнмөлөр',
-  notice:'Өздүк нарк жана өтүнмөлөр төлөм же пайда эмес. Сыноо кампа эсепке алынган жок.'},
+  returns:'Жеткирүүчүгө кайтарылган товар баасы',gross:'Жеткирүүчүнүн накладнойлору',
+  settled:'Жеткирүүчүгө катталган төлөмдөр',credits:'Кредиттик түзөтүүлөр',
+  outstanding:'Жеткирүүчүлөргө карыз',legacyDifference:'Эски кириштер менен накладнойлордун баа айырмасы',
+  returnDifference:'Кредит менен кайтарылган товардын нарк айырмасы',
+  reconciliation:'Кампа кыймылдарын же документтерди салыштыруу керек',
+  notice:'Кампа кыймылдардын наркы менен бааланат, өтүнмөлөр болжолдуу. Бул текшерилген пайда эмес.'},
  en:{title:'Kitchen — costs & procurement',production:'Production cost',
   losses:'Spoilage and waste cost',waste:'Waste',spoilage:'Spoilage',
-  stock:'Remaining stock, estimated',approved:'Approved products not yet received',
+  stock:'Inventory value from recorded movements',approved:'Approved products not yet received',
   unapproved:'Requests awaiting approval',
-  notice:'Cost and supply requests are not recorded payments or recognized profit. Sample stock is excluded.'},
+  returns:'Supplier returns — stock carrying cost',gross:'Supplier invoice obligations',
+  settled:'Recorded supplier settlements',credits:'Supplier credit notes',
+  outstanding:'Supplier payables outstanding',
+  legacyDifference:'Legacy receipt vs invoice cost difference',
+  returnDifference:'Supplier credit vs stock return cost difference',
+  reconciliation:'Stock or document reconciliation required',
+  notice:'Inventory uses recorded movement values; open requests are estimates. Invoices, settlements and credits are separate facts. Recognized profit is unavailable.'},
  kz:{title:'Асхана — өзіндік құн және сатып алу',production:'Өндіріс шығыны',
   losses:'Бүліну және шығындар',waste:'Шығындар',spoilage:'Бүліну',
-  stock:'Қойма қалдығының бағасы',approved:'Бекітілген, бірақ келмеген өнімдер',
-  unapproved:'Бекітілмеген өтінімдер',
-  notice:'Өзіндік құн мен өтінімдер төлем немесе пайда емес. Сынақ қоймасы есептелмейді.'},
+  stock:'Қозғалыстар бойынша қойма құны',approved:'Бекітілген, бірақ келмеген өнімдер',
+  unapproved:'Бекітілмеген өтінімдер',returns:'Жеткізушіге қайтарылған тауар құны',
+  gross:'Жеткізушінің жүкқұжаттары',settled:'Тіркелген жеткізуші төлемдері',
+  credits:'Кредиттік түзетулер',outstanding:'Жеткізушілерге берешек',
+  legacyDifference:'Ескі кірістер мен жүкқұжат бағасының айырмасы',
+  returnDifference:'Кредит пен қайтарылған тауар құнының айырмасы',
+  reconciliation:'Қойма жазбаларын немесе құжаттарды салыстыру қажет',
+  notice:'Қойма құны тіркелген қозғалыстарға негізделген; өтінімдер бағалау ғана. Бұл расталған пайда емес.'},
 } as const;
 
 const CASH_RECONCILIATION_COPY={
@@ -182,8 +203,27 @@ export default function Finance() {
             ownerKitchen.data.real_inventory_movements.WASTE.cost_kgs+' '+data.range.currency)}
           {line(kitchenCopy.spoilage,
             ownerKitchen.data.real_inventory_movements.SPOILAGE.cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.returns,
+            ownerKitchen.data.real_supplier_return_stock_debit_kgs+' '+data.range.currency)}
           {line(kitchenCopy.stock,
-            ownerKitchen.data.current_stock.real_value_at_current_item_cost_kgs+' '+data.range.currency)}
+            ownerKitchen.data.current_stock.real_book_inventory_value_kgs===null
+              ? '—' : ownerKitchen.data.current_stock.real_book_inventory_value_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.gross,
+            ownerKitchen.data.procurement_exposure.gross_supplier_obligations_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.settled,
+            ownerKitchen.data.procurement_exposure.settled_supplier_payables_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.credits,
+            ownerKitchen.data.procurement_exposure.credited_supplier_payables_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.outstanding,
+            ownerKitchen.data.procurement_exposure.outstanding_supplier_payables_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.legacyDifference,
+            ownerKitchen.data.source_reconciliation.inventory.linked_source.legacy_invoice_vs_stock_cost_delta_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.returnDifference,
+            ownerKitchen.data.source_reconciliation.supplier_documents.return_credit_minus_stock_cost_kgs+' '+data.range.currency)}
+          {ownerKitchen.data.current_stock.valuation_status!=='MOVEMENT_BASED'||
+            ownerKitchen.data.source_reconciliation.inventory.linked_source.source_mismatch_count>0||
+            ownerKitchen.data.source_reconciliation.supplier_documents.payables_status!=='RECORDED_OBLIGATIONS_BALANCED'
+             ? <Text style={[font.small,{color:c.warning}]}>{kitchenCopy.reconciliation}</Text> : null}
           {line(kitchenCopy.approved,
             ownerKitchen.data.procurement_exposure.approved_unreceived_at_current_item_cost_kgs+' '+data.range.currency)}
           {line(kitchenCopy.unapproved,
