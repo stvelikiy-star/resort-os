@@ -55,6 +55,7 @@ EXPECTED_MIGRATIONS = (
     "zz118_marina_kitchen_waste_spoilage_20261115",
     "zz119_marina_kitchen_procurement_20261115",
     "zz120_marina_owner_expenses_20261115",
+    "zz121_marina_supplier_documents_20261116",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
