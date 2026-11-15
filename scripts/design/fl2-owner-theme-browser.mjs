@@ -44,6 +44,15 @@ async function inspect(page) {
 try {
  for(const width of [1440,768,390])for(const theme of ['dark','light']) {
   const {page,context,errors}=await open(width,theme);await page.locator('.owner-v2 .owner-forward-kpis').waitFor();await page.locator('.owner-executive-grid').first().waitFor();
+  if(width===390) {
+   const mobile=await page.locator('.owner-v2-head').evaluate(node=>{
+    const heading=node.querySelector(':scope > div:first-child'),actions=node.querySelector('.owner-v2-actions');
+    const h=heading?.getBoundingClientRect(),a=actions?.getBoundingClientRect();
+    return {gap:h&&a?a.top-h.bottom:Infinity,buttons:actions?.querySelectorAll('button').length};
+   });
+   assert.ok(mobile.gap>=0&&mobile.gap<=24,`Owner mobile header gap: ${JSON.stringify(mobile)}`);
+   assert.equal(mobile.buttons,2,'Snapshot and refresh controls must remain');
+  }
   const m=await inspect(page);assert.equal(m.blocks,3);assert.equal(m.overflow,0);assert.deepEqual(m.small,[]);assert.deepEqual(m.smallButtons,[]);assert.deepEqual(m.contrastFailures,[]);assert.equal(m.buttons,5);assert.deepEqual(errors,[]);
   await page.screenshot({path:`${out}/owner-${width}-${theme}-full.png`,fullPage:true});
   await page.screenshot({path:`${out}/owner-${width}-${theme}-fold.png`});
