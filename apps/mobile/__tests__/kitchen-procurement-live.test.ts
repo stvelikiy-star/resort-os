@@ -57,3 +57,20 @@ test('invalid new request or receipt cannot reach transport',async()=>{
   .rejects.toMatchObject({code:'BAD_REQUEST'});
  expect(transport).not.toHaveBeenCalled();
 });
+
+test('unapproved requests do not suppress shortage in mobile demand',async()=>{
+ const data={service_date:'2026-11-15',basis:'APPROVED_NON_SAMPLE_REMAINING_PRODUCTION',
+  is_complete:true,missing_recipes:[],excluded_sample_targets:0,
+  inventory_deducted:false,payment_created:false,
+  items:[{stock_item_id:stockId,name:'Rice',unit:'KG',remaining_needed:'6',
+   balance:'1',shortage:'5',pending_requests:'5',approved_inbound:'0',
+   shortage_after_pipeline:'5',estimated_unit_cost_kgs:'100'}]};
+ const live=createLiveModules('https://test.example',jest.fn(async()=>response(data)) as typeof fetch,'single_property');
+ const reply=await live.procurementNeeds('2026-11-15');
+ expect(reply.items[0].approved_inbound).toBe('0');
+ expect(reply.items[0].shortage_after_pipeline).toBe('5');
+ const invalid=createLiveModules('https://test.example',jest.fn(async()=>response({
+  ...data,items:[{...data.items[0],approved_inbound:'not-a-number'}],
+ })) as typeof fetch,'single_property');
+ await expect(invalid.procurementNeeds('2026-11-15')).rejects.toMatchObject({code:'UNKNOWN'});
+});
