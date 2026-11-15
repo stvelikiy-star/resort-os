@@ -202,6 +202,83 @@ async def update_menu_item(item_id: uuid.UUID, payload: MenuPatch, request: Requ
     return after
 
 
+# A stop-list controls orderability; it never changes publication, price, recipe,
+# existing orders, guest folios or payment data.
+stop_list_access = require_roles("OWNER", "MANAGER", "COOK")
+
+
+class MenuAvailabilityWrite(BaseModel):
+    available: bool
+    reason: str = Field(min_length=3, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        clean = " ".join(value.split())
+        if len(clean) < 3:
+            raise ValueError("Stop-list change requires a reason")
+        return clean
+
+
+@router.get("/menu/availability")
+async def list_menu_availability(request: Request, user: dict[str, Any] = Depends(stop_list_access)):
+    enforce_menu_author(user)
+    async with request.app.state.db.acquire() as conn:
+        pid = await _property_id(conn, user)
+        rows = await conn.fetch(
+            '''SELECT id,code,"nameRu","nameKg","nameKz","nameEn","isActive","isDraft"
+               FROM kitchen_menu_items WHERE "propertyId"=$1 AND "isDraft"=false
+               ORDER BY code''',
+            pid,
+        )
+    return {"items": [
+        {"id": str(r["id"]), "code": r["code"], "name_ru": r["nameRu"],
+         "name_kg": r["nameKg"], "name_kz": r["nameKz"], "name_en": r["nameEn"],
+         "is_available": r["isActive"]}
+        for r in rows
+    ]}
+
+
+@router.put("/menu/{item_id}/availability")
+async def set_menu_availability(
+    item_id: uuid.UUID, payload: MenuAvailabilityWrite, request: Request,
+    user: dict[str, Any] = Depends(stop_list_access),
+):
+    enforce_menu_author(user)
+    if payload.available and user["role"] == "COOK":
+        raise HTTPException(status_code=403, detail={"code": "KITCHEN_STOPLIST_RESTORE_MANAGER_ONLY"})
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await _property_id(conn, user)
+            before = await conn.fetchrow(
+                '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn",
+                          "priceKgs","isActive","isDraft","sortOrder"
+                   FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                item_id, pid,
+            )
+            if not before:
+                raise HTTPException(status_code=404, detail={"code": "KITCHEN_MENU_ITEM_NOT_FOUND"})
+            if before["isDraft"]:
+                raise HTTPException(status_code=409, detail={"code": "KITCHEN_STOPLIST_PUBLISHED_ONLY"})
+            if before["isActive"] == payload.available:
+                return {"id": str(item_id), "is_available": payload.available,
+                        "already_set": True, "reason": payload.reason}
+            after = await conn.fetchrow(
+                '''UPDATE kitchen_menu_items SET "isActive"=$3,"updatedAt"=now()
+                   WHERE id=$1 AND "propertyId"=$2 RETURNING
+                   id,code,category,"nameRu","nameKg","nameKz","nameEn",
+                   "priceKgs","isActive","isDraft","sortOrder"''',
+                item_id, pid, payload.available,
+            )
+            await _audit(
+                conn, pid, user, "RESTORE_MENU_AVAILABILITY" if payload.available else "STOPLIST_MENU_ITEM",
+                item_id, _item(before),
+                {**_item(after), "reason": payload.reason, "orderability_effect": "NEW_ORDERS_ONLY"},
+            )
+    return {"id": str(item_id), "is_available": payload.available,
+            "already_set": False, "reason": payload.reason}
+
+
 # A dated preparation target is neither a guest bill nor a menu stock quantity.
 # All queries require a validated property identity; composite FK in zz115
 # prevents cross-property references even if a caller bypasses API code.
