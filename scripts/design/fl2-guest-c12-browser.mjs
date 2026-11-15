@@ -44,6 +44,8 @@ try {
   assert.ok(m.overflow<=1,'Modal page overflow '+JSON.stringify(m));
   assert.ok(m.close.w>=43.9&&m.close.h>=43.9,'Modal close under 44 px');
   assert.ok(m.locale.every(v=>v.w>=43.9&&v.h>=43.9),'Locale under 44 px');
+  // :focus-visible is keyboard-modality sensitive; move to keyboard mode first.
+  await page.keyboard.press('Tab');
   await modal.getByRole('button',{name:'Закрыть'}).focus();
   const focus=await modal.getByRole('button',{name:'Закрыть'}).evaluate(e=>getComputedStyle(e).outlineStyle);assert.notEqual(focus,'none');
   await page.screenshot({path:`${dir}/guest-request-dialog-${width}.png`,fullPage:true});
