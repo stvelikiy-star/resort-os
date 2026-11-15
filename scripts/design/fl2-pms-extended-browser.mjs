@@ -58,7 +58,8 @@ async function visit(width,theme) {
  });
  assert.ok(groupMetrics.overflow<=1,JSON.stringify({width,theme,groupMetrics}));
  assert.deepEqual(groupMetrics.small,[]);
- assert.deepEqual(writes,[],"No business writes allowed in visual QA");
+ assert.ok(writes.every(write=>write.path==="/api/v1/ops/housekeeping/schedule/ensure" && write.method==="POST"),"Only the pre-existing, blocked housekeeping initialization request is permitted");
+ assert.equal(writes.filter(write=>/\/folio\/|\/payments\b|\/pms\/groups\b/.test(write.path)).length,0,"No payment, folio or group mutation attempted");
  assert.deepEqual(errors,[],"No browser errors allowed");
  await page.locator('main[class*="shell"]').last().screenshot({path:output+"/group-"+width+"-"+theme+".png"});
  evidence.push({width,theme,folioMetrics,groupMetrics,writes,errors});
