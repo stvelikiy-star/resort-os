@@ -89,17 +89,21 @@ async def procurement_needs(service_date: date, request: Request, user=Depends(r
         stock_lookup={(r["nameKey"],r["unit"]):r for r in stock}
         pipeline=await conn.fetch(
             '''SELECT i."nameKey",i.unit,
-                      COALESCE(SUM(p."requestedQuantity"-p."receivedQuantity"),0) AS pending
+                      COALESCE(SUM(p."requestedQuantity"-p."receivedQuantity"),0) AS pending,
+                      COALESCE(SUM(CASE WHEN p.status IN ('APPROVED','PARTIAL')
+                             THEN p."requestedQuantity"-p."receivedQuantity" ELSE 0 END),0) AS approved_inbound
                FROM kitchen_procurement_requests p JOIN kitchen_stock_items i
                  ON i.id=p."stockItemId" AND i."propertyId"=p."propertyId"
                WHERE p."propertyId"=$1 AND i."isSample"=false AND p.status IN ('REQUESTED','APPROVED','PARTIAL')
                GROUP BY i."nameKey",i.unit''',pid)
         pending={(r["nameKey"],r["unit"]):r["pending"] for r in pipeline}
+        approved_inbound={(r["nameKey"],r["unit"]):r["approved_inbound"] for r in pipeline}
     items=[]
     for key,entry in sorted(requirements.items()):
         item=stock_lookup.get(key)
         balance=item["balance"] if item else Decimal(0)
         already=pending.get(key,Decimal(0))
+        approved=approved_inbound.get(key,Decimal(0))
         required=entry["required"]
         items.append({
             "stock_item_id":str(item["id"]) if item else None,
@@ -107,7 +111,9 @@ async def procurement_needs(service_date: date, request: Request, user=Depends(r
             "remaining_needed":str(required),"balance":str(balance),
             "shortage":str(max(Decimal(0),required-balance)),
             "pending_requests":str(already),
-            "shortage_after_pipeline":str(max(Decimal(0),required-balance-already)),
+            "approved_inbound":str(approved),
+            # Unapproved requests are not a guaranteed delivery.
+            "shortage_after_pipeline":str(max(Decimal(0),required-balance-approved)),
             "estimated_unit_cost_kgs":str(item["costPerUnitKgs"]) if item else None,
         })
     return {"service_date":service_date.isoformat(),"basis":"APPROVED_NON_SAMPLE_REMAINING_PRODUCTION",
@@ -134,7 +140,8 @@ async def create_request(body: RequestWrite, request: Request, user=Depends(requ
         async with conn.transaction():
             pid=await trusted_property_id(conn,user)
             item=await conn.fetchrow(
-                '''SELECT id FROM kitchen_stock_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                '''SELECT id FROM kitchen_stock_items WHERE id=$1 AND "propertyId"=$2
+                   AND "isSample"=false FOR UPDATE''',
                 body.stock_item_id,pid)
             if not item:raise HTTPException(404,detail={"code":"KITCHEN_PROC_ITEM_MISSING"})
             prior=await conn.fetchrow(
@@ -189,7 +196,7 @@ async def receive_request(request_id: uuid.UUID, body: ReceiptWrite, request: Re
             # Item first, then request: serialize with regular receipts, loss and production debits.
             item=await conn.fetchrow(
                 '''SELECT id,"costPerUnitKgs" FROM kitchen_stock_items
-                   WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                   WHERE id=$1 AND "propertyId"=$2 AND "isSample"=false FOR UPDATE''',
                 preliminary["stockItemId"],pid)
             row=await conn.fetchrow(
                 '''SELECT "stockItemId","requestedQuantity","receivedQuantity",status
