@@ -10,6 +10,8 @@ on:
       - 'services/api/app/kitchen_stock.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
       - 'scripts/test_marina_kitchen_stock.py'
+      - 'scripts/verify_kitchen_losses_e2e.py'
+      - 'packages/database/prisma/migrations/zz118_marina_kitchen_waste_spoilage_20261115/**'
       - 'packages/database/prisma/migrations/zz116_marina_kitchen_recipes_20261111/**'
       - 'scripts/test_marina_kitchen_recipes.py'
       - 'scripts/verify_kitchen_recipes.py'
@@ -177,6 +179,9 @@ jobs:
 
       - name: Test kitchen stock contracts
         run: PYTHONPATH=. python scripts/test_marina_kitchen_stock.py
+
+      - name: Run kitchen loss and spoilage PostgreSQL E2E
+        run: python scripts/verify_kitchen_losses_e2e.py
 
       - name: Test recipe validation and exact ingredient totals
         run: PYTHONPATH=. python scripts/test_marina_kitchen_recipes.py
