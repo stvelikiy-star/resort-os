@@ -384,7 +384,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         (value.truth as Record<string,unknown>).profit!=='NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER')
         throw new ApiError('UNKNOWN','Invalid owner kitchen finance truth');
       const movements=['real_inventory_movements','sample_inventory_movements'];
-      const currency=/^(?:0|[1-9]\\d*)(?:\\.\\d+)?$/;
+      const currency=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
       for(const field of movements){
         const set=objectResponse(value[field],field);
         for(const kind of ['RECEIPT','PRODUCTION','WASTE','SPOILAGE']){
