@@ -16,6 +16,9 @@ on:
       - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
       - 'scripts/verify_owner_expenses_e2e.py'
       - 'scripts/test_marina_owner_finance_roles.py'
+      - 'services/api/app/staff_task_reports.py'
+      - 'scripts/verify_mobile_staff_reports_e2e.py'
+      - 'scripts/verify_mobile_menu_publication_e2e.py'
       - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
       - 'scripts/verify_kitchen_procurement_e2e.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
@@ -245,6 +248,16 @@ jobs:
         env:
           ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
         run: python scripts/verify_owner_expenses_e2e.py
+
+      - name: Verify mobile repair DTO through repair, cleaning and inspection
+        env:
+          ALLOW_STAFF_REPORT_TEST_WRITES: '1'
+        run: python scripts/verify_mobile_staff_reports_e2e.py
+
+      - name: Verify mobile OWNER/MANAGER publication DTO and cook restrictions
+        env:
+          ALLOW_MOBILE_MENU_TEST_WRITES: '1'
+        run: python scripts/verify_mobile_menu_publication_e2e.py
 
       - name: Show Core logs on failure
         if: failure()

@@ -929,6 +929,15 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       }
       return id;
     },
+    publishKitchenMenuDraft: async (id:string,priceKgs:number):Promise<void> => {
+      reviewGate();
+      if(!Number.isSafeInteger(priceKgs)||priceKgs<0||priceKgs>100000)throw new ApiError('BAD_REQUEST','Invalid menu price');
+      const item=objectResponse(await request<unknown>('PATCH',p+'/kitchen/menu/'+safeRouteId(id),{
+        price_kgs:priceKgs,is_draft:false,is_active:true,
+      }),'menu publication');
+      if(item.id!==id||item.price_kgs!==priceKgs||item.is_draft!==false||item.is_active!==true)
+        throw new ApiError('UNKNOWN','Menu publication not confirmed');
+    },
     kitchenProductionMenu: async (): Promise<KitchenProductionMenuItem[]> => {
       reviewGate();
       const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/production-menu'), 'production menu');

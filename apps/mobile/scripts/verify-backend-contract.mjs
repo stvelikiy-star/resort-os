@@ -18,7 +18,7 @@ const pinned = {
   'auth.py': '59bed47d5f1de5ec98457e6849ea541356cc1929',
   'operations.py': '888be1aad873765a49eb0c902c99dfbb38e3d8e2',
   'operations_assignment.py': '6571408a94257d803ddc75b4a66c1b55d792a3fe',
-  'staff_task_reports.py': 'd63e9096abcd64115145d99de8f66b8c6bb775ef',
+  'staff_task_reports.py': '3a874ddc986fd91a5537540ee808d192c4fd6144',
   'staff_control.py': '5f090f4a318458e3a67f2ee59dd302cbc31b43bc',
   'main.py': '2a01b9898fc3e6e4d2a680f31691ba7e00a768ed',
   'manager_dashboard.py': '135c6ec05c8cb16060936f57c218e213a1fa2eb2',

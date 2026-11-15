@@ -106,7 +106,7 @@ export default function KitchenDashboard() {
       right={<ChefHat color={c.primary} size={25}/>}/>
     {showroom ? <DemoBanner/> : null}
     {live && !showroom && !readOnly ? <KitchenStopList live={live}/> : null}
-    {live && !showroom && !readOnly ? <KitchenDrafts key={hotel?.id + ':' + user.id} live={live}/> : null}
+    {live && !showroom ? <KitchenDrafts key={hotel?.id + ':' + user.id} live={live} onPublished={async()=>{await Promise.all([reloadMenu(),reloadTargets()]);}}/> : null}
     {!showroom && !live ? <Empty text={copy.unavailable}/> : null}
     {loading ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}

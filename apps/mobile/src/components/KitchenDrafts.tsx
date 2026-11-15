@@ -8,6 +8,7 @@ import { useMobileCopy } from '../i18n/mobileCopy';
 import { GlassCard, ErrorState, LoadingShimmer } from './Future';
 import { SectionLabel } from './ui';
 import { KitchenMenuDraftForm } from './KitchenMenuDraftForm';
+import { KitchenDraftPublication } from './KitchenDraftPublication';
 import { KitchenRecipeEditor } from './KitchenIngredients';
 
 const labels = {
@@ -17,7 +18,7 @@ const labels = {
   kz: ['Бекітуге арналған нобайлар', 'Сақталған нобайлар иесіне және менеджерге қолжетімді. Бекіту мен жариялау бөлек орындалады.', 'Әзірге нобай жоқ'],
 } as const;
 
-export function KitchenDrafts({ live }: { live: ReturnType<typeof createLiveModules> }) {
+export function KitchenDrafts({ live, onPublished }: { live: ReturnType<typeof createLiveModules>; onPublished?:()=>Promise<unknown> }) {
   const { hotel, user, locale } = useSession();
   const { c } = useTheme();
   const copy = useMobileCopy();
@@ -43,7 +44,8 @@ export function KitchenDrafts({ live }: { live: ReturnType<typeof createLiveModu
             return id;
           }}/>
         {item.recipe?.status !== 'APPROVED' ? <KitchenRecipeEditor key={item.id+':'+(item.recipe?.version ?? 0)} recipe={item.recipe}
-          canApprove={false} save={input => live.saveKitchenRecipe(item.id,input)} reload={drafts.reload}/> : <Text style={{color:c.textMuted}}>{item.recipe.status}</Text>}
+          canApprove={user?.role === 'OWNER' || user?.role === 'MANAGER'} save={input => live.saveKitchenRecipe(item.id,input)} reload={drafts.reload}/> : <Text style={{color:c.textMuted}}>{item.recipe.status}</Text>}
+        <KitchenDraftPublication item={item} live={live} onPublished={async()=>{await drafts.reload();await onPublished?.();}}/>
       </View>)}
     {drafts.data?.length === 0 ? <Text style={{color:c.textMuted}}>{t[2]}</Text> : null}
   </GlassCard>;
