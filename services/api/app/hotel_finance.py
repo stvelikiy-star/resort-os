@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .owner_kitchen_reconciliation import owner_inventory_reconciliation
 
 router = APIRouter(prefix="/api/v1/admin/finance", tags=["admin-hotel-finance"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -448,6 +449,11 @@ async def finance_summary(
                 "all_time_outstanding_obligations_kgs": outstanding,
                 "truth": "OBLIGATION_DATE_AND_MANUAL_PAYMENT_DATE_SEPARATE_NOT_PROFIT",
             }
+        # OWNER receives supplier liabilities and movement-valued inventory
+        # in the same report as manual expense obligations. MANAGER never does.
+        owner_supplier_stock_snapshot = None
+        if user["role"] == "OWNER":
+            owner_supplier_stock_snapshot = await owner_inventory_reconciliation(conn, pid)
 
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
@@ -477,6 +483,7 @@ async def finance_summary(
             "basis": "EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT",
         },
         **({"owner_expense_snapshot": owner_expense_snapshot} if owner_expense_snapshot is not None else {}),
+        **({"owner_supplier_stock_snapshot": owner_supplier_stock_snapshot} if owner_supplier_stock_snapshot is not None else {}),
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],
         "received_by_day": [dict(row) for row in daily],
