@@ -96,6 +96,12 @@ async def main():
                 "service_date": business_date.isoformat(), "meal_type": "DINNER",
                 "status": "SEATED"}), 201, "seat guest")
             assert session["stay_id"] == str(stay_id) and session["waiter_id"] == wid
+            draft = next((item for item in menu if item["is_draft"]), None)
+            assert draft is not None, "at least one draft must remain unapproved"
+            require(await waiter.post("/api/v1/kitchen/orders", json={
+                "source": "TABLE", "table_id": source["id"],
+                "items": [{"menu_item_id": draft["id"], "quantity": 1}]}),
+                409, "waiter cannot order unapproved draft by UUID")
             require(await waiter.post("/api/v1/kitchen/orders", json={
                 "source": "ROOM", "table_id": source["id"],
                 "items": [{"menu_item_id": menu[0]["id"], "quantity": 1}]}),
