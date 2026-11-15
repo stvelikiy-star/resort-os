@@ -63,8 +63,9 @@ async def main():
                    VALUES ($1,$2,$3,$4,now(),'RESTAURANT_CI',now(),now())""",
                 assignment_id, pid, stay_id, room["id"])
 
-        async with httpx.AsyncClient(base_url=BASE, timeout=30) as owner, httpx.AsyncClient(base_url=BASE, timeout=30) as waiter:
+        async with httpx.AsyncClient(base_url=BASE, timeout=30) as owner, httpx.AsyncClient(base_url=BASE, timeout=30) as waiter, httpx.AsyncClient(base_url=BASE, timeout=30) as cook:
             await sign_in(owner, os.environ["BOOTSTRAP_OWNER_USERNAME"], os.environ["BOOTSTRAP_OWNER_PASSWORD"], "OWNER")
+            await sign_in(cook, os.environ["KITCHEN_MENU_DINING_USERNAME"], os.environ["KITCHEN_MENU_DINING_PASSWORD"], "COOK")
             waiter_user = await sign_in(waiter, os.environ["WAITER_SERVE_E2E_USERNAME"], os.environ["WAITER_SERVE_E2E_PASSWORD"], "WAITER")
             wid = waiter_user["id"]
             require(await owner.post("/api/v1/kitchen/menu/bootstrap-draft"), 200, "test menu")
@@ -73,30 +74,48 @@ async def main():
             for item in menu[:2]:
                 require(await owner.patch(f"/api/v1/kitchen/menu/{item['id']}",
                                           json={"is_active": True, "is_draft": False}), 200, "publish test dish")
+            # WAITER can read only approved menu without protected recipe data.
+            waiter_menu = require(await waiter.get("/api/v1/kitchen/menu"), 200, "waiter menu")["items"]
+            assert all(row["is_active"] and not row["is_draft"] and "recipe" not in row for row in waiter_menu)
+            assert {item["id"] for item in menu[:2]}.issubset({item["id"] for item in waiter_menu})
+            require(await waiter.patch(f"/api/v1/kitchen/menu/{menu[0]['id']}",
+                                       json={"is_active": False}), 403, "waiter cannot edit menu")
+            require(await waiter.post("/api/v1/kitchen/menu", json={}), 403, "waiter cannot create menu")
+            require(await waiter.get("/api/v1/kitchen/orders"), 403, "waiter cannot read cook queue")
             tables = []
             for suffix in ("A", "B"):
-                table = require(await owner.post("/api/v1/kitchen/tables", json={
+                table = require(await waiter.post("/api/v1/kitchen/tables", json={
                     "code": "RCE" + uuid.uuid4().hex[:7].upper() + suffix,
                     "name": "Restaurant E2E " + suffix, "seats": 4}), 201, "new table")
                 tables.append(table)
             source, target = tables
+            require(await waiter.patch(f"/api/v1/kitchen/tables/{source['id']}",
+                                       json={"status": "OUT_OF_SERVICE"}), 403, "waiter cannot change table status")
             session = require(await waiter.post("/api/v1/dining/sessions", json={
                 "stay_id": str(stay_id), "table_id": source["id"],
                 "service_date": business_date.isoformat(), "meal_type": "DINNER",
                 "status": "SEATED"}), 201, "seat guest")
             assert session["stay_id"] == str(stay_id) and session["waiter_id"] == wid
-            order = require(await owner.post("/api/v1/kitchen/orders", json={
+            require(await waiter.post("/api/v1/kitchen/orders", json={
+                "source": "ROOM", "table_id": source["id"],
+                "items": [{"menu_item_id": menu[0]["id"], "quantity": 1}]}),
+                403, "waiter cannot create room order")
+            require(await waiter.post("/api/v1/kitchen/orders", json={
                 "source": "TABLE", "table_id": source["id"], "stay_id": str(stay_id),
+                "items": [{"menu_item_id": menu[0]["id"], "quantity": 1}]}),
+                403, "waiter cannot inject guest/stay")
+            order = require(await waiter.post("/api/v1/kitchen/orders", json={
+                "source": "TABLE", "table_id": source["id"],
                 "guest_count": 2, "items": [
                     {"menu_item_id": menu[0]["id"], "quantity": 2},
                     {"menu_item_id": menu[1]["id"], "quantity": 3}
                 ]}), 201, "create multi-item order")
             oid = order["id"]
             assert order["total_kgs"] == menu[0]["price_kgs"] * 2 + menu[1]["price_kgs"] * 3
-            require(await owner.patch(f"/api/v1/dining/orders/{oid}/waiter",
-                                      json={"waiter_id": wid}), 200, "assign order waiter")
+            assigned = await db.fetchval('SELECT "waiterId" FROM kitchen_orders WHERE id=$1', uuid.UUID(oid))
+            assert str(assigned) == wid, "waiter must own order from creation"
             for state in ("ACCEPTED", "COOKING", "READY"):
-                result = require(await owner.patch(f"/api/v1/kitchen/orders/{oid}/status",
+                result = require(await cook.patch(f"/api/v1/kitchen/orders/{oid}/status",
                                                    json={"status": state}), 200, state)
                 assert result["status"] == state
             served = require(await waiter.patch(f"/api/v1/kitchen/orders/{oid}/status",
@@ -130,7 +149,7 @@ async def main():
             assert by_id[source["id"]]["status"] == "CLEANING"
             assert by_id[target["id"]]["status"] == "CLEANING"
             assert await db.fetchval("SELECT count(*) FROM payments") == payments_before
-            print("FULL RESTAURANT POSTGRES E2E: PASS")
+            print("WAITER-LED FULL RESTAURANT POSTGRES E2E: PASS")
     finally:
         await db.close()
 
