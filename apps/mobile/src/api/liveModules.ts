@@ -555,6 +555,8 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       if(reason.length<3||reason.length>500||!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0 ||
         !['WASTE','SPOILAGE'].includes(loss.kind))
         throw new ApiError('BAD_REQUEST','Invalid kitchen loss');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(loss.movement_id))
+        throw new ApiError('BAD_REQUEST','Invalid loss movement UUID');
       const id=safeRouteId(loss.movement_id);
       const body={movement_id:id,stock_item_id:safeRouteId(loss.stock_item_id),
         kind:loss.kind,quantity,reason};
@@ -581,7 +583,8 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       // Older LIVE servers have no loss mutation nonce. Keep read/receipt/consume working;
       // the loss form stays disabled until a valid server-issued UUID is available.
       const lossId=payload.new_loss_movement_id;
-      if (lossId !== undefined && typeof lossId !== 'string')
+      if (lossId !== undefined && (typeof lossId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lossId)))
         throw new ApiError('UNKNOWN','Invalid loss movement ID');
       return {items:rows,production_cost_kgs:payload.production_cost_kgs,
         inventory_deducted_only_on_explicit_consume:true,
