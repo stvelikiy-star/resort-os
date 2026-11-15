@@ -30,7 +30,7 @@ const report={
 const response=(value:unknown):Response=>({ok:true,status:200,json:async()=>value} as Response);
 
 test('OWNER kitchen finance shows exact operational facts and does not synthesize profit or payments',async()=>{
- const transport=jest.fn(async()=>response(report));
+ const transport=jest.fn(async(_url:RequestInfo|URL)=>response(report));
  const live=createLiveModules('https://test.example',transport as typeof fetch,'single_property');
  const data=await live.ownerKitchenManagement('2026-11-15','2026-11-15');
  expect(data.real_loss_cost_kgs).toBe('75');
