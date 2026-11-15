@@ -13,6 +13,8 @@ on:
       - 'apps/admin/components/PMSOwnerGrid.tsx'
       - 'apps/admin/components/PmsBookingPreviewButton.tsx'
       - 'apps/admin/app/fl2-pms-composition.css'
+      - 'apps/admin/components/ReservationFolioPanel.module.css'
+      - 'apps/admin/components/GroupBookingBoard.module.css'
       - 'scripts/design/fl2-pms-*.mjs'
       - 'apps/admin/app/fl2-shell.css'
       - 'apps/admin/app/fl2-owner-composition.css'
