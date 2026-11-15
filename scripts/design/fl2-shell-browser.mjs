@@ -27,6 +27,7 @@ try {
   await page.waitForSelector('[data-fl2-owner="true"]');
   assert.equal(await page.locator('.fl2-nav-group').count(),6);
   assert.equal(await page.locator('[data-section]').count(),26);
+  await page.locator('.fl2-style-options summary').click();const appearance=await metrics(page);assert.deepEqual(appearance.small,[]);await page.locator('.fl2-style-options summary').click();
   const closed=await metrics(page); assert.equal(closed.overflow,0); assert.deepEqual(closed.small,[]);
   assert.equal(await page.locator('.fl2-assistant-dock>button').evaluate(e=>getComputedStyle(e).position),'static');
   await page.screenshot({path:`${out}/owner-${width}-${theme}.png`});
@@ -62,10 +63,10 @@ try {
  }
  await languages.context.close();
  const empty=await open({permissions:[]});assert.equal(await empty.page.locator('[data-section]').count(),0);await empty.page.getByText('Доступ к разделам отключён.',{exact:true}).waitFor();await empty.context.close();
- const zoom=await open({width:1440});await zoom.page.evaluate(()=>document.body.style.zoom='200%');assert.equal((await metrics(zoom.page)).overflow,0);await zoom.page.screenshot({path:`${out}/owner-css-zoom-200.png`});await zoom.context.close();
+ const zoom=await open({width:720});await zoom.page.setViewportSize({width:720,height:512});assert.equal((await metrics(zoom.page)).overflow,0);await zoom.page.screenshot({path:`${out}/owner-reflow-720.png`});await zoom.context.close();
  const legacy=await open({legacy:true});assert.equal(await legacy.page.locator('.fl2-grouped-navigation').count(),0);assert.equal(await legacy.page.locator('.admin-tabs').count(),1);await legacy.page.screenshot({path:`${out}/legacy-1440.png`});await legacy.context.close();
- fs.writeFileSync(`${out}/results.json`,JSON.stringify({syntheticData:true,physicalAndroid:false,zoom:'CSS zoom 200%, not native browser zoom',evidence},null,2));
- console.log('C1_BROWSER_PASS: 6 theme/viewports; 9 explicit role grants; empty grants; keyboard Escape; selection; 44px targets; no horizontal overflow; CSS zoom; Legacy');
+ fs.writeFileSync(`${out}/results.json`,JSON.stringify({syntheticData:true,physicalAndroid:false,zoom:'720x512 CSS viewport: reflow equivalent of 1440x1024 at 200%; native browser zoom not tested',evidence},null,2));
+ console.log('C1_BROWSER_PASS: 6 theme/viewports; 9 explicit role grants; empty grants; keyboard Escape; selection; 44px targets; no horizontal overflow; 200% equivalent reflow; Legacy');
 } catch(error) {
  fs.writeFileSync(`${out}/failure.txt`,String(error.stack || error));
  for(const context of browser.contexts())for(const page of context.pages()) {

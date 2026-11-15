@@ -60,3 +60,12 @@ html[data-marina-ui="future-luxury"] .admin-locale-switcher button.active { back
 /* Keep the fixed assistant panel relative to the viewport (no backdrop-filter on its ancestor). */
 html[data-marina-ui="future-luxury"] .admin-locale-switcher { flex-wrap:wrap;gap:2px;width:228px;padding:6px; }
 html[data-marina-ui="future-luxury"] .admin-locale-switcher > span { display:block;flex-basis:100%;padding:0 4px 3px;color:var(--mx-muted); }
+/* Keep every mobile action visible; appearance controls open on demand. */
+html[data-marina-ui="future-luxury"] .fl2-style-options { position:relative;min-width:0; }
+html[data-marina-ui="future-luxury"] .fl2-style-options summary { display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 10px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-glass);color:var(--mx-ink);font-size:13px;cursor:pointer;list-style:none; }
+html[data-marina-ui="future-luxury"] .fl2-style-options summary::-webkit-details-marker { display:none; }
+html[data-marina-ui="future-luxury"] .fl2-style-options summary:focus-visible { outline:3px solid var(--mx-focus);outline-offset:2px; }
+html[data-marina-ui="future-luxury"] .fl2-style-panel { position:absolute;z-index:2;bottom:calc(100% + 8px);left:0;min-width:228px;display:grid;gap:8px;padding:10px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius);background:var(--mx-glass-strong);box-shadow:var(--mx-shadow); }
+@media(max-width:1100px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;overflow:visible; }
+}

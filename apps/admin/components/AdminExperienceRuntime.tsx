@@ -20,6 +20,7 @@ const STORAGE_KEY = "three-crowns-admin-locale";
 
 const KZ_EXACT: Record<string, string> = {
   // C1 navigation labels, consumed by the existing explicit Kazakh lookup.
+  "Оформление": "Көрініс",
   "Гости": "Қонақтар",
   "Команда": "Команда",
   "Развитие": "Даму",
@@ -277,6 +278,7 @@ const common: Phrase[] = [
   // Guest reviews, WhatsApp and staff access — explicit RU/KG/KZ/EN.
   { ru: "Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.", kg: "Тышкы шлюз кирүү өтүнүчүн өткөргөн жок. Cloudflare Access'ти текшериңиз же жергиликтүү даректи ачыңыз.", kz: "Сыртқы шлюз кіру сұрауын өткізбеді. Cloudflare Access-ті тексеріңіз немесе жергілікті мекенжайды ашыңыз.", en: "The external gateway rejected the sign-in request. Check Cloudflare Access or open the local address." },
   // C1 shell navigation — explicit RU/KG/KZ/EN using the existing locale runtime.
+  { ru: "Оформление", kg: "Көрүнүш", kz: "Көрініс", en: "Appearance" },
   { ru: "Гости", kg: "Коноктор", kz: "Қонақтар", en: "Guests" },
   { ru: "Команда", kg: "Команда", kz: "Команда", en: "Team" },
   { ru: "Развитие", kg: "Өнүгүү", kz: "Даму", en: "Growth" },

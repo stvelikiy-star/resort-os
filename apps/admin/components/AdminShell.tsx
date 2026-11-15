@@ -380,6 +380,17 @@ export default function AdminShell() {
   const currentItem = visibleGroups.flatMap(group => group.items).find(item => item.tab === tab);
   const currentLabel = currentItem ? (isAgent && tab === "PMS" ? "Шахматка / Брони" : currentItem.label) : "Раздел недоступен";
 
+  const appearanceControls = <>
+<div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
+            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
+            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
+          </div>
+          {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
+            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
+            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
+          </div>}
+  </>;
+
   return (
     <>
       <div className="auth-toolbar admin-nav" data-fl2-shell={uiPreference === "future-luxury" ? "true" : undefined}>
@@ -446,14 +457,12 @@ export default function AdminShell() {
           </details>}
         </nav>}
         <div className="admin-shell-actions">
-          <div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
-            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
-            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
-          </div>
-          {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
-            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
-            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
-          </div>}
+          {uiPreference === "future-luxury" ? <details className="fl2-style-options" onKeyDown={event => {
+            if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); }
+          }}>
+            <summary><SlidersHorizontal size={18} aria-hidden="true" /><span>Оформление</span></summary>
+            <div className="fl2-style-panel">{appearanceControls}</div>
+          </details> : appearanceControls}
           {uiPreference === "future-luxury" && <div className="fl2-assistant-dock"><MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => { setTab(destination as Tab); setNavigationOpen(false); }} /></div>}
           <button className="logout-button" onClick={logout}>Выйти</button>
         </div>
