@@ -15,8 +15,8 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 42
-    assert EXPECTED_MIGRATIONS[-22:] == (
+    assert len(EXPECTED_MIGRATIONS) == 43
+    assert EXPECTED_MIGRATIONS[-23:] == (
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
@@ -39,6 +39,7 @@ def main() -> int:
         "zz115_marina_chef_production_targets_20261110",
         "zz116_marina_kitchen_recipes_20261111",
         "zz117_marina_kitchen_stock_20261111",
+        "zz118_marina_kitchen_waste_spoilage_20261115",
     )
     assert len(CRITICAL_CONSTRAINTS) == 115
     assert {
