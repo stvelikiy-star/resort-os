@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator
 from .auth import require_roles, trusted_property_id
 
-router=APIRouter(prefix="/api/v1/admin/finance/owner/expenses", tags=["owner-expenses"])
+router = APIRouter(prefix="/api/v1/admin/finance/owner/expenses", tags=["owner-expenses"])
 owner= require_roles("OWNER")
 
 class ExpensePost(BaseModel):
