@@ -6,6 +6,7 @@ import { Button, Empty, Field, SectionLabel } from '../../src/components/ui';
 import { useSession } from '../../src/state/session';
 import { useLiveModules } from '../../src/api/liveModules';
 import { KitchenLosses } from '../../src/components/KitchenLosses';
+import { KitchenProcurement } from '../../src/components/KitchenProcurement';
 import { hasTabForSession } from '../../src/roles/registry';
 import { useAsync } from '../../src/lib/useAsync';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -37,6 +38,7 @@ export default function StoreWorkspace() {
  {data.items.map(i=><Button key={i.id} variant={selected===i.id?'primary':'secondary'} label={i.name+' ('+i.unit+')'} onPress={()=>setSelected(i.id)} />)}
  <Field label={t.quantity} keyboardType="decimal-pad" value={quantity} onChangeText={setQuantity}/>
  <Button disabled={busy||!selected||!quantity} label={t.save} onPress={save}/>
- </GlassCard>{live?<KitchenLosses live={live} stock={data} reload={reload}/>:null}</>:null}
+ </GlassCard>{live?<KitchenLosses live={live} stock={data} reload={reload}/>:null}
+ {live?<KitchenProcurement live={live} stock={data} reloadStock={reload}/>:null}</>:null}
  </FutureScreen>;
 }
