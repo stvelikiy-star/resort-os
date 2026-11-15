@@ -20,9 +20,14 @@ NEW_MIGRATIONS = {
     "zz119_marina_kitchen_procurement_20261115": "8d1c8afe955d729c7a46d1c360445f0001308007c4b75447fa33348c84cc36f1",
     "zz120_marina_owner_expenses_20261115": "bcf6e97009c49e1b7a9ec82cb2ea597109e510455b32f2cc00141df76d1bf0f2"
 }
+# Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
+# Keep the historical RC3 manifest immutable; pin this additive source exactly.
+TASK_REPORT_PATH = "services/api/app/staff_task_reports.py"
+TASK_REPORT_BLOB = "3a874ddc986fd91a5537540ee808d192c4fd6144"
 WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
+    "reviewed critical source changed: " + TASK_REPORT_PATH,
     "reviewed critical source changed: " + WORKFLOW_PATH,
     "reviewed critical source changed: services/api/app/hotel_finance.py",
     "reviewed critical source changed: apps/admin/app/shared-auth-preview/page.tsx",
@@ -52,6 +57,9 @@ def validate_additive() -> list[str]:
         if actual.get(name) != sha:
             errors.append("reviewed additive migration missing or changed: " + name)
 
+    if git_blob_sha((ROOT / TASK_REPORT_PATH).read_bytes()) != TASK_REPORT_BLOB:
+        errors.append("reviewed additive task report source changed")
+
     legacy_errors = validate(rc3, ROOT)
     for error in legacy_errors:
         if error not in ALLOWED_LEGACY_ERRORS:
@@ -59,7 +67,7 @@ def validate_additive() -> list[str]:
     # The historical source-gate file and the previous CI workflow remain
     # retrievable as pinned immutable Git blobs. The new workflow replaces
     # only how the current additive release is checked.
-    for path in ("scripts/marina_rc3_source_gate.py", WORKFLOW_PATH):
+    for path in ("scripts/marina_rc3_source_gate.py", WORKFLOW_PATH, TASK_REPORT_PATH):
         expected_sha = rc3.get("critical_git_blobs", {}).get(path)
         if not isinstance(expected_sha, str):
             errors.append("historical critical blob not pinned: " + path)
@@ -80,4 +88,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115+zz116+zz117+zz118+zz119, total=44, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz120, total=45, original source gate preserved, NO-GO")
