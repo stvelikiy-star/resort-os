@@ -126,6 +126,7 @@ async def main():
                 200, "list payables")
             row = next(x for x in invoice["items"] if x["id"] == doc_id)
             assert Decimal(row["outstanding_kgs"]) == Decimal("617.2835")
+            assert Decimal(row["confirmed_receipt_source_cost_kgs"]) == Decimal("617.2835")
             settle_id = str(uuid.uuid4())
             settle = {"id": settle_id, "amount_kgs": "200",
                       "paid_on": today.isoformat(), "method": "BANK_TRANSFER",
