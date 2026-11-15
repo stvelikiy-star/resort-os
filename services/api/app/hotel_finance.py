@@ -413,6 +413,42 @@ async def finance_summary(
                  AND m."createdAt">=$2 AND m."createdAt"<$3''',pid,from_ts,to_ts,
         )
 
+        # OWNER-only expense facts are distinct from customer Payments and stock costs.
+        # Expense date is the obligation period; paidOn is the separate cash-outflow date.
+        owner_expense_snapshot = None
+        if user["role"] == "OWNER":
+            expense_obligations = await conn.fetchrow(
+                '''SELECT COUNT(*)::int AS posted_count,
+                          COALESCE(SUM("amountKgs"),0)::bigint AS posted_kgs
+                   FROM owner_expenses WHERE "propertyId"=$1 AND status='POSTED'
+                     AND "expenseDate">=$2 AND "expenseDate"<=$3''',
+                pid, from_date, end_exclusive_date,
+            )
+            settlements = await conn.fetchrow(
+                '''SELECT COUNT(*)::int AS settlement_count,
+                          COALESCE(SUM(s."amountKgs"),0)::bigint AS recorded_paid_kgs
+                   FROM owner_expense_settlements s
+                   JOIN owner_expenses e ON e.id=s."expenseId"
+                     AND e."propertyId"=s."propertyId"
+                   WHERE s."propertyId"=$1 AND s."paidOn">=$2 AND s."paidOn"<$3
+                     AND e.status='POSTED' ''',
+                pid, from_date, end_exclusive_date,
+            )
+            outstanding = await conn.fetchval(
+                '''SELECT COALESCE(SUM(e."amountKgs" - COALESCE(
+                     (SELECT SUM(s."amountKgs") FROM owner_expense_settlements s
+                      WHERE s."propertyId"=e."propertyId" AND s."expenseId"=e.id),0)),0)::bigint
+                   FROM owner_expenses e WHERE e."propertyId"=$1 AND e.status='POSTED' ''',pid,
+            )
+            owner_expense_snapshot = {
+                "period_posted_obligations_kgs": expense_obligations["posted_kgs"],
+                "period_posted_count": expense_obligations["posted_count"],
+                "period_manually_recorded_settlements_kgs": settlements["recorded_paid_kgs"],
+                "period_settlement_count": settlements["settlement_count"],
+                "all_time_outstanding_obligations_kgs": outstanding,
+                "truth": "OBLIGATION_DATE_AND_MANUAL_PAYMENT_DATE_SEPARATE_NOT_PROFIT",
+            }
+
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
         return name or row["request_guest"] or None
@@ -440,6 +476,7 @@ async def finance_summary(
             "movement_count": stock_cost["movement_count"],
             "basis": "EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT",
         },
+        **({"owner_expense_snapshot": owner_expense_snapshot} if owner_expense_snapshot is not None else {}),
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],
         "received_by_day": [dict(row) for row in daily],
