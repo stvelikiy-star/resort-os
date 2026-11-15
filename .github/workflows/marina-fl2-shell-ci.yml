@@ -1,0 +1,59 @@
+name: MARINA FL2 Shell Visual QA
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/components/AdminShell.tsx'
+      - 'apps/admin/app/fl2-shell.css'
+      - 'apps/admin/app/layout.tsx'
+      - 'scripts/design/fl2-shell-*.mjs'
+      - '.github/workflows/marina-fl2-shell-ci.yml'
+permissions:
+  contents: read
+concurrency:
+  group: marina-fl2-shell-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  shell-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+      - run: npm ci --prefix apps/admin --no-audit --no-fund
+      - name: Preserve navigation and access gates
+        run: |
+          node scripts/design/fl2-shell-contract.mjs
+          npm run design:fl2:audit
+          npm --prefix apps/admin run typecheck
+      - name: Build production Admin against isolated QA Core
+        env:
+          CORE_API_URL: http://127.0.0.1:8000
+        run: npm --prefix apps/admin run build
+      - name: Install isolated browser tools
+        run: |
+          npm install --prefix /tmp/marina-fl2-browser playwright@1.58.2 --no-audit --no-fund
+          /tmp/marina-fl2-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Verify themes, navigation, permission sets and capture evidence
+        env:
+          PLAYWRIGHT_PACKAGE: /tmp/marina-fl2-browser/package.json
+        run: |
+          node scripts/design/fl2-owner-mock-core.mjs > /tmp/c1-core.log 2>&1 &
+          npm --prefix apps/admin run start > /tmp/c1-admin.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3001 > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/design/fl2-shell-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marina-fl2-c1-evidence
+          path: |
+            c1-evidence/
+            /tmp/c1-core.log
+            /tmp/c1-admin.log
+          if-no-files-found: warn
