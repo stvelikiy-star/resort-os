@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles, trusted_property_id
+from .owner_kitchen_reconciliation import owner_inventory_reconciliation
 
 router = APIRouter(prefix="/api/v1/admin/finance/owner", tags=["owner-kitchen-management"])
 owner_only = require_roles("OWNER", module_grant=False)
@@ -23,64 +24,66 @@ async def owner_kitchen_operations(
     if to_date < from_date or (to_date - from_date).days > 366:
         raise HTTPException(422, detail={"code": "INVALID_KITCHEN_REPORT_RANGE"})
     async with request.app.state.db.acquire() as conn:
-        pid = await trusted_property_id(conn, user)
-        tz = await conn.fetchval('SELECT timezone FROM properties WHERE id=$1', pid)
-        if not tz:
-            raise HTTPException(503, detail={"code": "PROPERTY_TIMEZONE_UNAVAILABLE"})
-        # kitchen_* timestamps are TIMESTAMPTZ; convert property dates to absolute instants.
-        bounds = await conn.fetchrow(
-            "SELECT ($1::date::timestamp AT TIME ZONE $3) AS start_at, "
-            "($2::date::timestamp AT TIME ZONE $3) AS end_at",
-            from_date, to_date + timedelta(days=1), tz,
-        )
-        movements = await conn.fetch(
-            '''SELECT m.kind, i."isSample" AS is_sample,
-                      COUNT(*)::int AS movement_count,
-                      COALESCE(SUM(m.quantity*m."unitCostKgs"),0) AS cost
-               FROM kitchen_stock_movements m
-               JOIN kitchen_stock_items i ON i."propertyId"=m."propertyId"
-                   AND i.id=m."stockItemId"
-               WHERE m."propertyId"=$1 AND m."createdAt">=$2 AND m."createdAt"<$3
-               GROUP BY m.kind, i."isSample"''',
-            pid, bounds["start_at"], bounds["end_at"],
-        )
-        valuation = await conn.fetchrow(
-            '''WITH item_balances AS (
-                 SELECT i.id, i."isSample", i."costPerUnitKgs",
-                        COALESCE(SUM(CASE WHEN m.kind='RECEIPT' THEN m.quantity
-                                          ELSE -m.quantity END),0) AS balance
-                 FROM kitchen_stock_items i
-                 LEFT JOIN kitchen_stock_movements m ON m."propertyId"=i."propertyId"
-                     AND m."stockItemId"=i.id
-                 WHERE i."propertyId"=$1
-                 GROUP BY i.id
-               )
-               SELECT COALESCE(SUM(balance*"costPerUnitKgs") FILTER (WHERE NOT "isSample"),0)
-                        AS real_inventory_value,
-                      COALESCE(SUM(balance*"costPerUnitKgs") FILTER (WHERE "isSample"),0)
-                        AS sample_inventory_value,
-                      COUNT(*) FILTER (WHERE balance<0)::int AS negative_balance_items,
-                      COUNT(*)::int AS item_count
-               FROM item_balances''', pid,
-        )
-        commitments = await conn.fetchrow(
-            '''SELECT COALESCE(SUM(
-                 (p."requestedQuantity"-p."receivedQuantity")*i."costPerUnitKgs")
-                   FILTER (WHERE p.status IN ('APPROVED','PARTIAL')
-                          AND NOT i."isSample"),0) AS approved_unreceived_estimate,
-                     COALESCE(SUM(
-                 (p."requestedQuantity"-p."receivedQuantity")*i."costPerUnitKgs")
-                   FILTER (WHERE p.status='REQUESTED' AND NOT i."isSample"),0)
-                          AS unapproved_estimate,
-                     COUNT(*) FILTER (WHERE p.status IN ('APPROVED','PARTIAL')
-                          AND NOT i."isSample")::int AS approved_open_request_count,
-                     COUNT(*) FILTER (WHERE p.status='REQUESTED'
-                          AND NOT i."isSample")::int AS pending_approval_count
-               FROM kitchen_procurement_requests p
-               JOIN kitchen_stock_items i ON i.id=p."stockItemId"
-                   AND i."propertyId"=p."propertyId"
-               WHERE p."propertyId"=$1''', pid,
-        )
+        async with conn.transaction(isolation="repeatable_read", readonly=True):
+            pid = await trusted_property_id(conn, user)
+            tz = await conn.fetchval('SELECT timezone FROM properties WHERE id=$1', pid)
+            if not tz:
+                raise HTTPException(503, detail={"code": "PROPERTY_TIMEZONE_UNAVAILABLE"})
+            # kitchen_* timestamps are TIMESTAMPTZ; convert property dates to absolute instants.
+            bounds = await conn.fetchrow(
+                "SELECT ($1::date::timestamp AT TIME ZONE $3) AS start_at, "
+                "($2::date::timestamp AT TIME ZONE $3) AS end_at",
+                from_date, to_date + timedelta(days=1), tz,
+            )
+            movements = await conn.fetch(
+                '''SELECT m.kind, i."isSample" AS is_sample,
+                          COUNT(*)::int AS movement_count,
+                          COALESCE(SUM(m.quantity*m."unitCostKgs"),0) AS cost
+                   FROM kitchen_stock_movements m
+                   JOIN kitchen_stock_items i ON i."propertyId"=m."propertyId"
+                       AND i.id=m."stockItemId"
+                   WHERE m."propertyId"=$1 AND m."createdAt">=$2 AND m."createdAt"<$3
+                   GROUP BY m.kind, i."isSample"''',
+                pid, bounds["start_at"], bounds["end_at"],
+            )
+            valuation = await conn.fetchrow(
+                '''WITH item_balances AS (
+                     SELECT i.id, i."isSample", i."costPerUnitKgs",
+                            COALESCE(SUM(CASE WHEN m.kind='RECEIPT' THEN m.quantity
+                                              ELSE -m.quantity END),0) AS balance
+                     FROM kitchen_stock_items i
+                     LEFT JOIN kitchen_stock_movements m ON m."propertyId"=i."propertyId"
+                         AND m."stockItemId"=i.id
+                     WHERE i."propertyId"=$1
+                     GROUP BY i.id
+                   )
+                   SELECT COALESCE(SUM(balance*"costPerUnitKgs") FILTER (WHERE NOT "isSample"),0)
+                            AS real_inventory_value,
+                          COALESCE(SUM(balance*"costPerUnitKgs") FILTER (WHERE "isSample"),0)
+                            AS sample_inventory_value,
+                          COUNT(*) FILTER (WHERE balance<0)::int AS negative_balance_items,
+                          COUNT(*)::int AS item_count
+                   FROM item_balances''', pid,
+            )
+            commitments = await conn.fetchrow(
+                '''SELECT COALESCE(SUM(
+                     (p."requestedQuantity"-p."receivedQuantity")*i."costPerUnitKgs")
+                       FILTER (WHERE p.status IN ('APPROVED','PARTIAL')
+                              AND NOT i."isSample"),0) AS approved_unreceived_estimate,
+                         COALESCE(SUM(
+                     (p."requestedQuantity"-p."receivedQuantity")*i."costPerUnitKgs")
+                       FILTER (WHERE p.status='REQUESTED' AND NOT i."isSample"),0)
+                              AS unapproved_estimate,
+                         COUNT(*) FILTER (WHERE p.status IN ('APPROVED','PARTIAL')
+                              AND NOT i."isSample")::int AS approved_open_request_count,
+                         COUNT(*) FILTER (WHERE p.status='REQUESTED'
+                              AND NOT i."isSample")::int AS pending_approval_count
+                   FROM kitchen_procurement_requests p
+                   JOIN kitchen_stock_items i ON i.id=p."stockItemId"
+                       AND i."propertyId"=p."propertyId"
+                   WHERE p."propertyId"=$1''', pid,
+            )
+            reconciliation = await owner_inventory_reconciliation(conn, pid)
     def segment(is_sample):
         return {
             kind: {
@@ -88,11 +91,12 @@ async def owner_kitchen_operations(
                                       if row["kind"]==kind and row["is_sample"]==is_sample), Decimal(0))),
                 "movement_count": sum(row["movement_count"] for row in movements
                                       if row["kind"]==kind and row["is_sample"]==is_sample),
-            } for kind in ("RECEIPT", "PRODUCTION", "WASTE", "SPOILAGE")
+            } for kind in ("RECEIPT", "PRODUCTION", "WASTE", "SPOILAGE", "SUPPLIER_RETURN")
         }
     real, sample = segment(False), segment(True)
     production_cost = Decimal(real["PRODUCTION"]["cost_kgs"])
     loss_cost = Decimal(real["WASTE"]["cost_kgs"]) + Decimal(real["SPOILAGE"]["cost_kgs"])
+    return_cost = Decimal(real["SUPPLIER_RETURN"]["cost_kgs"])
     return {
         "scope": "OWNER_ONLY_PROPERTY_SCOPED",
         "period": {"from": from_date.isoformat(), "to": to_date.isoformat(),
@@ -102,7 +106,11 @@ async def owner_kitchen_operations(
         "real_production_cost_kgs": str(production_cost),
         "real_loss_cost_kgs": str(loss_cost),
         "real_total_consumption_and_loss_cost_kgs": str(production_cost+loss_cost),
+        "real_supplier_return_stock_debit_kgs": str(return_cost),
+        "source_reconciliation": reconciliation,
+
         "current_stock": {
+            **reconciliation["inventory"],
             "real_value_at_current_item_cost_kgs": str(valuation["real_inventory_value"]),
             "sample_value_at_current_item_cost_kgs": str(valuation["sample_inventory_value"]),
             "negative_balance_items": valuation["negative_balance_items"],
@@ -114,14 +122,22 @@ async def owner_kitchen_operations(
             "unapproved_requests_at_current_item_cost_kgs": str(commitments["unapproved_estimate"]),
             "approved_open_request_count": commitments["approved_open_request_count"],
             "pending_approval_count": commitments["pending_approval_count"],
-            "settled_supplier_payables_kgs": None,
+            "settled_supplier_payables_kgs":
+                reconciliation["supplier_documents"]["manual_settlements_kgs"],
+            "gross_supplier_obligations_kgs":
+                reconciliation["supplier_documents"]["gross_obligations_kgs"],
+            "credited_supplier_payables_kgs":
+                reconciliation["supplier_documents"]["credit_notes_kgs"],
+            "outstanding_supplier_payables_kgs":
+                reconciliation["supplier_documents"]["outstanding_payables_kgs"],
         },
         "truth": {
             "report_type": "MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING",
             "receipt": "Stock receipt is inventory inflow, not a supplier payment or P&L expense.",
             "consumption": "PRODUCTION, WASTE and SPOILAGE values are cost snapshots from immutable stock movements.",
             "procurement": "Open requests are indicative commitments, not supplier invoices or recorded payments.",
-            "inventory": "Stock value is calculated using current item unit cost, not historical or period-end valuation.",
+            "inventory": "Legacy current-item-price fields are estimates. New book inventory values come from immutable movements, not recognized P&L or period-end accounting.",
+            "returns": "SUPPLIER_RETURN inventory outflow and supplier credit notes are separate facts; their difference is not recognized profit.",
             "profit": "NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER",
             "payment_created": False,
         },
