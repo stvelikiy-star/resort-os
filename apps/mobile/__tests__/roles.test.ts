@@ -102,7 +102,7 @@ describe('STORE_STAFF release gate', () => {
     const allGrants = ['OPS', 'PMS', 'FINANCE', 'STAFF', 'DINING', 'WHATSAPP', 'RESERVATIONS', 'DASHBOARD'];
     const expected: Record<string, readonly string[]> = {
       OWNER: ['overview', 'pms', 'inbox', 'kitchen', 'admin', 'tasks', 'rooms', 'requests', 'profile'],
-      MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'rooms', 'requests', 'admin', 'profile'],
+      MANAGER: ['overview', 'pms', 'inbox', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'],
       RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
       MAID: ['tasks', 'rooms', 'profile'],
       TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
