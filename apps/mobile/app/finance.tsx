@@ -11,6 +11,7 @@ import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { OWNER_FINANCE_COPY } from '../src/i18n/extendedOperations';
 import { useAsync } from '../src/lib/useAsync';
 import { useTheme } from '../src/theme/ThemeProvider';
+import { OwnerExpenses } from '../src/components/OwnerExpenses';
 import { font, space } from '../src/theme/tokens';
 
 const KITCHEN_REPORT_COPY={
@@ -166,6 +167,7 @@ export default function Finance() {
           </Text>
         </GlassCard>:null}
       </>:null}
+      {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to}/> : null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>
