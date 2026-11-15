@@ -15,7 +15,7 @@ ALTER TABLE kitchen_stock_movements
     (kind='PRODUCTION' AND "productionTargetId" IS NOT NULL AND "preparedFrom" >= 0 AND "preparedTo" > "preparedFrom")
     OR
     (kind IN ('WASTE','SPOILAGE') AND "productionTargetId" IS NULL AND "preparedFrom" IS NULL
-       AND "preparedTo" IS NULL AND char_length(btrim(notes)) BETWEEN 3 AND 500)
+       AND "preparedTo" IS NULL AND notes IS NOT NULL AND char_length(btrim(notes)) BETWEEN 3 AND 500)
   );
 
 CREATE INDEX kitchen_stock_movements_losses_idx
