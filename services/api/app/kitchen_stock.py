@@ -68,7 +68,8 @@ async def snapshot(conn, pid):
           'cost_per_unit_kgs':str(r['costPerUnitKgs']),'is_sample':r['isSample'],
           'balance':str(r['balance'])} for r in rows],
           'production_cost_kgs':str(expense),'production_cost_is_payment':False,
-          'inventory_deducted_only_on_explicit_consume':True}
+          'inventory_deducted_only_on_explicit_consume':True,
+          'new_loss_movement_id':str(uuid.uuid4())}
 
 @router.get('')
 async def read_stock(request: Request, user=Depends(read_access)):
