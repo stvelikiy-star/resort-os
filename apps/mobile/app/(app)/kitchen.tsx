@@ -15,6 +15,7 @@ import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { KitchenDrafts } from '../../src/components/KitchenDrafts';
+import { KitchenStopList } from '../../src/components/KitchenStopList';
 import { KitchenIngredients } from '../../src/components/KitchenIngredients';
 import { KitchenStockMobile } from '../../src/components/KitchenStockMobile';
 import { KitchenProductionPlanner } from '../../src/components/KitchenProductionPlanner';
@@ -101,6 +102,7 @@ export default function KitchenDashboard() {
     <PremiumHeader title={copy.kitchen} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={<ChefHat color={c.primary} size={25}/>}/>
     {showroom ? <DemoBanner/> : null}
+    {live && !showroom && !readOnly ? <KitchenStopList live={live}/> : null}
     {live && !showroom && !readOnly ? <KitchenDrafts key={hotel?.id + ':' + user.id} live={live}/> : null}
     {!showroom && !live ? <Empty text={copy.unavailable}/> : null}
     {loading ? <LoadingShimmer count={3}/> : null}
