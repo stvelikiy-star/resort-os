@@ -13,11 +13,25 @@ from .guest_requests import authorized_context
 
 admin_router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen"])
 guest_router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-kitchen"])
-kitchen_operations_access = require_roles("OWNER", "MANAGER", "COOK")
-# A WAITER may mark only an assigned READY order SERVED; all other kitchen
-# routes preserve the original COOK/management permissions.
-kitchen_status_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
-kitchen_management_access = require_roles("OWNER", "MANAGER")
+_kitchen_ops_base = require_roles("OWNER", "MANAGER", "COOK")
+_kitchen_status_base = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
+_kitchen_management_base = require_roles("OWNER", "MANAGER")
+
+async def kitchen_operations_access(user: dict[str, Any] = Depends(_kitchen_ops_base)):
+    # A custom DINING module grant is not a COOK/management role promotion.
+    if user["role"] not in {"OWNER", "MANAGER", "COOK"}:
+        raise HTTPException(status_code=403, detail="Kitchen operations role required")
+    return user
+
+async def kitchen_status_access(user: dict[str, Any] = Depends(_kitchen_status_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Kitchen status role required")
+    return user
+
+async def kitchen_management_access(user: dict[str, Any] = Depends(_kitchen_management_base)):
+    if user["role"] not in {"OWNER", "MANAGER"}:
+        raise HTTPException(status_code=403, detail="Kitchen management role required")
+    return user
 waiter_menu_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER", module_grant=False)
 waiter_table_creation_access = require_roles("OWNER", "MANAGER", "WAITER", module_grant=False)
 waiter_order_creation_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER", module_grant=False)
@@ -405,6 +419,14 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
 
             guest_count = int(live_session["partySize"]) if live_session else payload.guest_count
             meal_type = payload.meal_type if payload.meal_type is not None else (live_session["mealType"] if live_session else None)
+            if user["role"] == "WAITER":
+                # A known draft ID must not bypass the approved-menu response.
+                draft_ids = await conn.fetch(
+                    'SELECT id FROM kitchen_menu_items WHERE "propertyId"=$1 AND id=ANY($2::uuid[]) AND "isDraft"=true',
+                    pid, [item.menu_item_id for item in payload.items],
+                )
+                if draft_ids:
+                    raise HTTPException(status_code=409, detail={"code": "WAITER_MENU_DRAFT_NOT_ORDERABLE"})
             order_id, order_number, total = await insert_order(
                 conn, pid=pid, source=payload.source, table_id=table_id, stay_id=stay_id, reservation_id=reservation_id,
                 room_id=room_id, guest_task_id=None, guest_count=guest_count, meal_type=meal_type,
