@@ -615,3 +615,26 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-o
     padding:12px;
   }
 }
+
+/* C4 mobile header correction: the legacy flex min-width stretched a wrapped
+   action row away from the owner heading. Keep snapshot + refresh visible. */
+@media screen and (max-width:480px) {
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-v2-head,.owner-executive-head) {
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    gap:12px;
+    align-items:start;
+    min-height:0;
+    margin-bottom:12px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-v2-head,.owner-executive-head)>div:first-child {
+    min-width:0;
+    flex:none;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] :is(.owner-v2-actions,.owner-executive-actions) {
+    align-self:start;
+    margin:0;
+    padding:0;
+    min-height:0;
+  }
+}
