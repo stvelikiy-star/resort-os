@@ -8,6 +8,9 @@ on:
       - 'services/api/app/kitchen_menu_management.py'
       - 'services/api/app/kitchen_recipes.py'
       - 'services/api/app/kitchen_stock.py'
+      - 'services/api/app/kitchen_procurement.py'
+      - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
+      - 'scripts/verify_kitchen_procurement_e2e.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
       - 'scripts/test_marina_kitchen_stock.py'
       - 'scripts/verify_kitchen_losses_e2e.py'
@@ -144,6 +147,18 @@ jobs:
           echo "WAITER_OTHER_E2E_PASSWORD=$OTHER_PASSWORD" >> "$GITHUB_ENV"
           STAFF_USERNAME="$OTHER_USERNAME" STAFF_PASSWORD="$OTHER_PASSWORD" STAFF_DISPLAY_NAME="Other Waiter CI" STAFF_ROLE="WAITER" python scripts/upsert_staff_user.py
 
+      - name: Provision isolated STORE_STAFF for procurement E2E
+        run: |
+          STORE_USERNAME="kitchen-proc-store-ci"
+          STORE_PASSWORD="$(python - <<'PY'
+          import secrets
+          print('Ks-' + secrets.token_urlsafe(24))
+          PY
+          )"
+          echo "PROC_STORE_USERNAME=$STORE_USERNAME" >> "$GITHUB_ENV"
+          echo "PROC_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          STAFF_USERNAME="$STORE_USERNAME" STAFF_PASSWORD="$STORE_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Procurement Store CI" STAFF_ROLE="STORE_STAFF" python scripts/upsert_staff_user.py
+
       - name: Typecheck and build Kitchen Admin host app
         working-directory: apps/staff
         run: |
@@ -188,6 +203,11 @@ jobs:
 
       - name: Verify recipe storage, permissions and concurrent updates
         run: ALLOW_KITCHEN_RECIPE_TEST_WRITES=1 python scripts/verify_kitchen_recipes.py
+
+      - name: Run kitchen procurement real PostgreSQL E2E
+        env:
+          ALLOW_KITCHEN_PROCUREMENT_TEST_WRITES: '1'
+        run: python scripts/verify_kitchen_procurement_e2e.py
 
       - name: Show Core logs on failure
         if: failure()
