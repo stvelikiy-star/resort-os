@@ -110,10 +110,16 @@ async def main():
                                        params={"service_date":today.isoformat()}),200,"pipeline")
             line=next(r for r in needs["items"] if r["stock_item_id"]==item_id)
             assert Decimal(line["pending_requests"])==Decimal("5")
-            assert Decimal(line["shortage_after_pipeline"])==Decimal("0")
+            assert Decimal(line["approved_inbound"])==Decimal("0")
+            assert Decimal(line["shortage_after_pipeline"])==Decimal("5"), "Unapproved requests cannot reduce shortage"
             approved=verify(await owner.post(f"/api/v1/kitchen/procurement/requests/{req_id}/approve"),
                             200,"owner approval")
             assert approved["status"]=="APPROVED" and approved["payment_created"] is False
+            approved_needs=verify(await owner.get("/api/v1/kitchen/procurement/needs",
+                params={"service_date":today.isoformat()}),200,"approved inbound")
+            approved_line=next(r for r in approved_needs["items"] if r["stock_item_id"]==item_id)
+            assert Decimal(approved_line["approved_inbound"])==Decimal("5")
+            assert Decimal(approved_line["shortage_after_pipeline"])==Decimal("0")
             again=verify(await owner.post(f"/api/v1/kitchen/procurement/requests/{req_id}/approve"),
                          200,"approval replay")
             assert again["already_processed"] is True
@@ -150,7 +156,45 @@ async def main():
                 [uuid.UUID(first_id),uuid.UUID(second_id)])
             assert len(receipts)==2 and all(r["kind"]=="RECEIPT" for r in receipts)
             assert all(str(r["createdById"])==store_me["id"] for r in receipts)
-            print("KITCHEN PROCUREMENT REAL POSTGRES E2E PASS: needs -> COOK request -> OWNER approval -> STORE partial+final receipt, role denial, idempotency, inventory, no payment")
+            # One full warehouse cycle across recipe -> procurement -> stock -> production -> spoilage.
+            target_id=await db.fetchval(
+                '''SELECT id FROM kitchen_production_targets WHERE "propertyId"=$1
+                   AND "menuItemId"=$2''',pid,uuid.UUID(menu_id))
+            assert target_id is not None
+            consumed=verify(await cook.post("/api/v1/kitchen/stock/consume",
+                json={"production_target_id":str(target_id)}),200,"production deduction")
+            assert consumed["already_processed"] is False
+            assert consumed["consumed_portions"]==8 and Decimal(consumed["cost_kgs"])==400
+            again_consumed=verify(await cook.post("/api/v1/kitchen/stock/consume",
+                json={"production_target_id":str(target_id)}),200,"production replay")
+            assert again_consumed["already_processed"] is True
+            loss_id=str(uuid.uuid4())
+            loss_payload={"movement_id":loss_id,"stock_item_id":item_id,"kind":"SPOILAGE",
+                          "quantity":"0.75","reason":"Expired during warehouse cycle"}
+            loss=verify(await store.post("/api/v1/kitchen/stock/losses",json=loss_payload),
+                        201,"spoiled stock deduction")
+            assert loss["already_processed"] is False
+            assert Decimal(loss["cost_kgs"])==75
+            loss_replay=verify(await store.post("/api/v1/kitchen/stock/losses",json=loss_payload),
+                              201,"same spoilage replay")
+            assert loss_replay["already_processed"] is True
+            verify(await store.post("/api/v1/kitchen/stock/losses",json={
+                **loss_payload,"movement_id":str(uuid.uuid4()),"quantity":"2",
+            }),409,"spoilage overdraft")
+            verified=verify(await owner.get("/api/v1/kitchen/stock"),200,"full cycle final balance")
+            final_item=next(r for r in verified["items"] if r["id"]==item_id)
+            assert Decimal(final_item["balance"])==Decimal("1.25")
+            assert Decimal(verified["production_cost_kgs"])>=Decimal("400")
+            movements=await db.fetch(
+                '''SELECT kind,quantity,"unitCostKgs","createdById","propertyId" FROM kitchen_stock_movements
+                   WHERE "stockItemId"=$1 AND "propertyId"=$2''',uuid.UUID(item_id),pid)
+            assert len(movements)==5, movements
+            assert {r["kind"] for r in movements}=={"RECEIPT","PRODUCTION","SPOILAGE"}
+            assert sum((r["quantity"] if r["kind"]=="RECEIPT" else -r["quantity"])
+                       for r in movements)==Decimal("1.25")
+            assert all(r["createdById"] is not None and r["propertyId"]==pid for r in movements)
+            assert await db.fetchval("SELECT count(*) FROM payments")==payment_count
+            print("KITCHEN FULL INVENTORY CYCLE REAL POSTGRES E2E PASS: recipe -> demand -> approval -> 2 receipts -> production -> spoilage -> exact stock, cost, no double writes/payments")
     finally:
         # CI database is disposable; keep the procurement chain for post-test inspection.
         await db.close()
