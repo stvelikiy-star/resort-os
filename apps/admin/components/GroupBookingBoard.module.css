@@ -118,3 +118,42 @@
 @media(prefers-reduced-motion:reduce){
   :global(html[data-marina-ui="future-luxury"]) .rooms article{transition:none!important}
 }
+
+/* C3 advanced PMS: use one shared FL2 surface system for group booking.
+   No changes to selection, availability, rates, atomic commit or history. */
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell {
+  color:var(--mx-ink);min-width:0;max-width:100%;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.searchCard,.roomsCard,.commitCard,.history,.rooms article) {
+  background:var(--mx-glass);color:var(--mx-ink);
+  border-color:var(--mx-edge);
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.roomMain strong,.rooms article strong,.cardHead h2,.summary strong,.history strong,.history b) {
+  color:var(--mx-ink);overflow-wrap:anywhere;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.searchFields label,.commitCard label,.filters label,.cardHead small,.roomMain small,.price span,.history span,.commitCard>p,.summary span) {
+  color:var(--mx-muted);font-size:12px;line-height:1.5;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.head button,.searchFields input,.searchFields button,.filters input,.filters select,.filters button,.commitCard input,.commitCard textarea,.commitCard button,.price input) {
+  background:var(--mx-bg);color:var(--mx-ink);border-color:var(--mx-edge);min-height:44px;max-width:100%;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .primary {
+  background:var(--mx-accent)!important;color:var(--mx-accent-ink)!important;border-color:var(--mx-accent)!important;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .summary {
+  background:var(--mx-glass-strong);color:var(--mx-ink);
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .history article {
+  border-color:var(--mx-edge);min-width:0;
+}
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(input,select,textarea,button):focus-visible {
+  outline:3px solid var(--mx-focus);outline-offset:2px;
+}
+@media(max-width:1150px) {
+  :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .layout { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:620px) {
+  :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .searchFields { grid-template-columns:minmax(0,1fr); }
+  :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .history article { grid-template-columns:minmax(0,1fr); }
+  :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .rooms article { grid-template-columns:minmax(0,1fr); }
+}
