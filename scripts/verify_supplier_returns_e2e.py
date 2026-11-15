@@ -71,7 +71,7 @@ async def main():
                 201,'atomic receipt')
             source=require(await store.get('/api/v1/kitchen/procurement/supplier-lines'),200,'source list')
             assert source['payment_created'] is False
-            assert any(x['id']==line_id and x['remaining_quantity']=='0'
+            assert any(x['id']==line_id and Decimal(x['remaining_quantity'])==0
                        for x in source['items'])
             deny=await store.post('/api/v1/admin/finance/owner/supplier-returns',
                 json={'id':str(uuid.uuid4()),'document_id':doc_id,
