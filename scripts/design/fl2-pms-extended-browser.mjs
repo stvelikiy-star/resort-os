@@ -42,7 +42,7 @@ async function visit(width,theme) {
  const folioMetrics=await page.evaluate(()=>{
   const root=[...document.querySelectorAll("section")].find(e=>e.textContent?.includes("Финансы гостя")&&e.querySelector('input[type="number"]'));
   const modal=document.querySelector(".reservation-detail");
-  return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,modalOverflow:modal?.scrollWidth-modal?.clientWidth,small:[...(root?.querySelectorAll("button,input,select")||[])].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height<43.9).map(e=>({label:e.textContent,height:e.getBoundingClientRect().height})),modalWidth:modal?.getBoundingClientRect().width};
+  return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,modalOverflow:modal?.scrollWidth-modal?.clientWidth,small:[...(root?.querySelectorAll("button,input,select")||[])].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height<43.9&&!(e.matches('input[type="checkbox"]')&&e.closest("label")?.getBoundingClientRect().height>=43.9)).map(e=>({label:e.textContent,height:e.getBoundingClientRect().height})),modalWidth:modal?.getBoundingClientRect().width};
  });
  assert.ok(folioMetrics.overflow<=1,JSON.stringify({width,theme,folioMetrics}));
  assert.deepEqual(folioMetrics.small,[]);
@@ -54,7 +54,7 @@ async function visit(width,theme) {
  await page.getByText("Свободные номера · 2").waitFor();
  const groupMetrics=await page.evaluate(()=>{
   const root=document.querySelector('main[class*="shell"]');
-  return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,cardOverflow:root?.scrollWidth-root?.clientWidth,small:[...(root?.querySelectorAll("button,input,select,textarea")||[])].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height<43.9).map(e=>({label:e.textContent,height:e.getBoundingClientRect().height}))};
+  return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,cardOverflow:root?.scrollWidth-root?.clientWidth,small:[...(root?.querySelectorAll("button,input,select,textarea")||[])].filter(e=>e.getClientRects().length&&e.getBoundingClientRect().height<43.9&&!(e.matches('input[type="checkbox"]')&&e.closest("label")?.getBoundingClientRect().height>=43.9)).map(e=>({label:e.textContent,height:e.getBoundingClientRect().height}))};
  });
  assert.ok(groupMetrics.overflow<=1,JSON.stringify({width,theme,groupMetrics}));
  assert.deepEqual(groupMetrics.small,[]);
