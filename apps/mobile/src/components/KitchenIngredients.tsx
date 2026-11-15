@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import type { IngredientRequirements, KitchenRecipe, RecipeIngredient, RecipeInput, RecipeUnit } from '../api/kitchenRecipes';
+import type { KitchenStockSnapshot } from '../api/liveModules';
+import { procurementGaps } from '../roles/kitchenProcurement';
 import { useSession } from '../state/session';
 import { useTheme } from '../theme/ThemeProvider';
 import { GlassCard } from './Future';
@@ -13,10 +15,25 @@ export const RECIPE_COPY = {
   kz: { title:'Рецепт бойынша өнімдер', sample:'Оқу нормалары — өзіңіздікіне ауыстырыңыз', missing:'Бекітілген рецепт жоқ', plan:'Толық жоспарға', prepared:'Дайын порцияларға', remaining:'Қалған порцияларға', stock:'Қойма қалдықтары шегерілген жоқ.', empty:'Бұл кезеңге қажеттілік жоқ', recipe:'Бір порцияға нормалар', name:'Өнім', norm:'Бір порцияға мөлшер', add:'Өнім қосу', remove:'Өнімді алып тастау', approved:'Есептеуге қолдану', draft:'Жоба', real:'Өз нормалары', save:'Рецептті сақтау', error:'Рецепт сақталмады', choose:'Рецепт үшін тағам таңдаңыз' },
 } as const;
 
-export function KitchenIngredients({ data }: { data: IngredientRequirements }) {
+export function KitchenIngredients({ data, stock }: { data: IngredientRequirements; stock?: KitchenStockSnapshot | null }) {
   const { locale } = useSession();
   const { c } = useTheme();
   const t = RECIPE_COPY[locale];
+  const gaps = stock ? procurementGaps(data, stock) : null;
+  const gapCopy = {
+    ru: {title:'Расчёт недостающих продуктов', required:'Нужно', available:'На складе', buy:'Недостаёт',
+      complete:'По доступным рецептурам недостатка нет', sample:'Учебный расчёт — не использовать для закупки',
+      incomplete:'Расчёт неполный: отсутствуют утверждённые рецептуры'},
+    kg: {title:'Жетишпеген азыктар', required:'Керек', available:'Кампада', buy:'Жетишпейт',
+      complete:'Жеткиликтүү рецепттер боюнча тартыштык жок', sample:'Сыноо эсеби — сатып алууга колдонбоңуз',
+      incomplete:'Эсеп толук эмес: бекитилген рецепттер жетишпейт'},
+    en: {title:'Ingredients to purchase (estimate)', required:'Required', available:'In stock', buy:'Shortfall',
+      complete:'No shortage for the available recipes', sample:'Sample calculation — do not use to purchase',
+      incomplete:'Incomplete estimate: some approved recipes are missing'},
+    kz: {title:'Жетпейтін өнімдер', required:'Қажет', available:'Қоймада', buy:'Жетіспейді',
+      complete:'Бар рецепттер бойынша тапшылық жоқ', sample:'Оқу есебі — сатып алуға қолданбаңыз',
+      incomplete:'Есеп толық емес: бекітілген рецепттер жетіспейді'},
+  }[locale];
   return <GlassCard testID="kitchen-ingredient-requirements" style={{gap:10}}>
     <SectionLabel>{t.title}</SectionLabel>
     {data.contains_sample_data ? <Text style={{color:c.warning}}>{t.sample}</Text> : null}
@@ -28,7 +45,16 @@ export function KitchenIngredients({ data }: { data: IngredientRequirements }) {
       <Text style={{color:c.text}}>{t.plan}: {item.planned_quantity} · {t.prepared}: {item.prepared_quantity} · {t.remaining}: {item.remaining_quantity}</Text>
     </View>)}
     {!data.items.length && data.is_complete ? <Text style={{color:c.textMuted}}>{t.empty}</Text> : null}
-    <Text style={{color:c.textMuted}}>{t.stock}</Text>
+    {gaps ? <View testID="kitchen-procurement-gap" style={{gap:6}}>
+      <SectionLabel>{gapCopy.title}</SectionLabel>
+      {!data.is_complete ? <Text accessibilityRole="alert" style={{color:c.warning}}>{gapCopy.incomplete}</Text> : null}
+      {data.contains_sample_data ? <Text accessibilityRole="alert" style={{color:c.warning}}>{gapCopy.sample}</Text> : null}
+      {gaps.length ? gaps.map(row=><View key={row.name+row.unit} style={{gap:3}}>
+        <Text style={{color:c.text,fontWeight:'700'}}>{row.name} · {row.unit}</Text>
+        <Text style={{color:c.textMuted}}>{gapCopy.required}: {row.required} · {gapCopy.available}: {row.available}</Text>
+        <Text style={{color:c.warning}}>{gapCopy.buy}: {row.shortage} {row.unit}</Text>
+      </View>) : <Text style={{color:c.textMuted}}>{gapCopy.complete}</Text>}
+    </View> : <Text style={{color:c.textMuted}}>{t.stock}</Text>}
   </GlassCard>;
 }
 
