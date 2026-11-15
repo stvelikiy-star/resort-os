@@ -83,9 +83,10 @@ export function DiningServiceMobile({ live, tables, reloadFloor }: {
   const [movingSession, setMovingSession] = useState<DiningSeatingSession | null>(null);
   const [targetTable, setTargetTable] = useState('');
   const blocked = busy || journal.loading || !!journal.error || !!journal.data;
+  const reloadSessions = sessions.reload, reloadStays = stays.reload, reloadFolio = folio.reload;
   const refresh = useCallback(async () => {
-    await Promise.all([sessions.reload(),stays.reload(),folio.reload(),reloadFloor()]);
-  },[sessions.reload,stays.reload,folio.reload,reloadFloor]);
+    await Promise.all([reloadSessions(),reloadStays(),reloadFolio(),reloadFloor()]);
+  },[reloadSessions,reloadStays,reloadFolio,reloadFloor]);
   useFocusEffect(useCallback(() => { void refresh(); },[refresh]));
   const day = stays.data?.local_date ?? '';
   const eligibleStays = (stays.data?.items ?? []).filter(s => s.check_in <= day && day <= s.check_out);
