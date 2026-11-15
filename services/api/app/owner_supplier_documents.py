@@ -4,7 +4,7 @@ A supplier document is an obligation, not an owner operating expense, customer
 Payment, cash transfer, recognized COGS, or proven stock receipt.
 """
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -52,7 +52,7 @@ class SupplierSettlementWrite(BaseModel):
 
 
 def total_value(lines):
-    return sum((line["quantity"] * line["unitCostKgs"] for line in lines), Decimal(0))
+    return sum((line["quantity"] * line["unitCostKgs"] for line in lines), Decimal(0)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
 
 def line_key(line):
@@ -120,7 +120,7 @@ async def register_document(body: SupplierDocumentWrite, request: Request,
                     line.id, pid, body.id, line.stock_item_id, line.quantity,
                     line.unit_cost_kgs)
     value = sum((line.quantity * line.unit_cost_kgs for line in body.lines),
-                Decimal(0))
+                Decimal(0)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     return {"id": str(body.id), "already_processed": False,
             "amount_kgs": str(value), "payment_created": False,
             "recognized_profit": False}
@@ -132,13 +132,19 @@ async def list_documents(request: Request, user=Depends(owner_only)):
         pid = await trusted_property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT d.id,d."supplierName",d."documentReference",d."documentDate",
-                COALESCE((SELECT SUM(l.quantity*l."unitCostKgs")
+                ROUND(COALESCE((SELECT SUM(l.quantity*l."unitCostKgs")
                   FROM kitchen_supplier_document_lines l
-                  WHERE l."propertyId"=d."propertyId" AND l."documentId"=d.id),0)
+                  WHERE l."propertyId"=d."propertyId" AND l."documentId"=d.id),0),4)
                    AS total,
                 COALESCE((SELECT SUM(s."amountKgs") FROM kitchen_supplier_settlements s
                   WHERE s."propertyId"=d."propertyId" AND s."documentId"=d.id),0)
-                   AS settled
+                   AS settled,
+                ROUND(COALESCE((SELECT SUM(a.quantity*a."unitCostKgs")
+                  FROM kitchen_supplier_receipt_links a
+                  JOIN kitchen_supplier_document_lines l ON l.id=a."documentLineId"
+                       AND l."propertyId"=a."propertyId"
+                  WHERE l."propertyId"=d."propertyId" AND l."documentId"=d.id),0),4)
+                  AS linked_received_cost
                FROM kitchen_supplier_documents d WHERE d."propertyId"=$1
                ORDER BY d."documentDate" DESC,d.id DESC LIMIT 100''', pid)
         return {"items": [
@@ -147,7 +153,8 @@ async def list_documents(request: Request, user=Depends(owner_only)):
              "document_date": row["documentDate"].isoformat(),
              "amount_kgs": str(row["total"]),
              "settled_kgs": str(row["settled"]),
-             "outstanding_kgs": str(row["total"] - row["settled"])}
+             "outstanding_kgs": str(row["total"] - row["settled"]),
+             "confirmed_receipt_source_cost_kgs": str(row["linked_received_cost"])}
             for row in rows],
             "limit": 100, "payment_created": False,
             "recognized_profit": False, "scope": "OWNER_ONLY_PROPERTY_SCOPED"}
@@ -177,7 +184,7 @@ async def settle_document(document_id: uuid.UUID, body: SupplierSettlementWrite,
                 return {"id": str(body.id), "already_processed": True,
                         "customer_payment_created": False}
             total = await conn.fetchval(
-                'SELECT COALESCE(SUM(quantity*"unitCostKgs"),0) '
+                'SELECT ROUND(COALESCE(SUM(quantity*"unitCostKgs"),0),4) '
                 'FROM kitchen_supplier_document_lines '
                 'WHERE "propertyId"=$1 AND "documentId"=$2', pid, document_id)
             settled = await conn.fetchval(
