@@ -32,7 +32,8 @@ jobs:
         run: |
           mkdir -p apps/staff/app/qa-staff-shift
           cp scripts/fixtures/fl2-staff-shift-qa-page.tsx apps/staff/app/qa-staff-shift/page.tsx
-          (cd apps/staff && ./node_modules/.bin/next dev -p 3002 --hostname 127.0.0.1) > /tmp/staff-qa-next.log 2>&1 &
+          (cd apps/staff && NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next build) > /tmp/staff-qa-build.log 2>&1 || { tail -100 /tmp/staff-qa-build.log; exit 1; }
+          (cd apps/staff && NEXT_TELEMETRY_DISABLED=1 ./node_modules/.bin/next start -p 3002 --hostname 127.0.0.1) > /tmp/staff-qa-next.log 2>&1 &
           for i in $(seq 1 60); do
             if curl -fsS http://127.0.0.1:3002/qa-staff-shift >/dev/null; then exit 0; fi
             sleep 2
@@ -50,6 +51,7 @@ jobs:
           name: marina-staff-shift-dark-light-evidence
           path: |
             staff-shift-evidence/
+            /tmp/staff-qa-build.log
             /tmp/staff-qa-next.log
           if-no-files-found: warn
       - name: Remove ephemeral QA route
