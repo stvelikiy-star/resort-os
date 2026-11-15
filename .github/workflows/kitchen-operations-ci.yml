@@ -128,6 +128,18 @@ jobs:
           echo "WAITER_SERVE_E2E_PASSWORD=$WAITER_PASSWORD" >> "$GITHUB_ENV"
           STAFF_USERNAME="$WAITER_USERNAME" STAFF_PASSWORD="$WAITER_PASSWORD" STAFF_DISPLAY_NAME="Serve Waiter CI" STAFF_ROLE="WAITER" python scripts/upsert_staff_user.py
 
+      - name: Provision second isolated WAITER for assignment denial E2E
+        run: |
+          OTHER_USERNAME="kitchen-other-waiter-ci"
+          OTHER_PASSWORD="$(python - <<'PY'
+          import secrets
+          print('Wo-' + secrets.token_urlsafe(24))
+          PY
+          )"
+          echo "WAITER_OTHER_E2E_USERNAME=$OTHER_USERNAME" >> "$GITHUB_ENV"
+          echo "WAITER_OTHER_E2E_PASSWORD=$OTHER_PASSWORD" >> "$GITHUB_ENV"
+          STAFF_USERNAME="$OTHER_USERNAME" STAFF_PASSWORD="$OTHER_PASSWORD" STAFF_DISPLAY_NAME="Other Waiter CI" STAFF_ROLE="WAITER" python scripts/upsert_staff_user.py
+
       - name: Typecheck and build Kitchen Admin host app
         working-directory: apps/staff
         run: |
