@@ -75,11 +75,18 @@ for (const [filename, sha] of Object.entries(pinned)) {
 }
 for (const [filename, router, prefix, endpoints] of contracts) {
   const code = readFileSync(resolve(src, filename), 'utf8');
-  if (prefix && !code.includes(router + ' = APIRouter(prefix="' + prefix + '"')) throw new Error('API prefix mismatch: ' + filename);
+  // Python uses both quotation styles. Keep exact route/method assertions.
+  const doublePrefix = router + ' = APIRouter(prefix="' + prefix + '"';
+  const singlePrefix = router + " = APIRouter(prefix='" + prefix + "'";
+  if (prefix && !code.includes(doublePrefix) && !code.includes(singlePrefix))
+    throw new Error('API prefix mismatch: ' + filename);
   for (const entry of endpoints) {
     const [method, ...rest] = entry.split(' ');
     const path = rest.join(' ');
-    if (!code.includes('@' + router + '.' + method + '("' + path + '"')) throw new Error('Missing ' + method.toUpperCase() + ' ' + prefix + path + ' in ' + filename);
+    const doubleRoute = '@' + router + '.' + method + '("' + path + '")';
+    const singleRoute = '@' + router + '.' + method + "('" + path + "')";
+    if (!code.includes(doubleRoute) && !code.includes(singleRoute))
+      throw new Error('Missing ' + method.toUpperCase() + ' ' + prefix + path + ' in ' + filename);
     routeCount++;
   }
 }
