@@ -358,7 +358,7 @@ export default function AdminShell() {
       {tab === "ROOM_QR" && canAccess("ROOM_QR") && moduleEnabled("ROOM_QR") && <RoomQrBoard />}
       {tab === "POINT_QR" && canAccess("POINT_QR") && moduleEnabled("POINT_QR") && <ServicePointsBoard />}
       {tab === "GROWTH" && canAccess("GROWTH") && moduleEnabled("GROWTH") && <GrowthControlBoard />}
-      {tab === "FINANCE" && canAccess("FINANCE") && <HotelFinanceBoard />}
+      {tab === "FINANCE" && canAccess("FINANCE") && <HotelFinanceBoard isOwner={user.role === "OWNER"} />}
       {tab === "REPORTS" && canAccess("REPORTS") && <ReportsBoard />}
       {tab === "CONTENT" && canAccess("CONTENT") && moduleEnabled("CONTENT") && <SiteContentBoard />}
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
