@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from .auth import require_roles, trusted_property_id
 from .kitchen_recipes import read_recipe
+from .kitchen_inventory_valuation import locked_stock_valuation, debit_cost
 
 router = APIRouter(prefix='/api/v1/kitchen/stock', tags=['kitchen-stock'])
 read_access = require_roles('OWNER', 'MANAGER', 'COOK', 'STORE_STAFF')
@@ -175,22 +176,20 @@ async def create_loss(body: LossWrite, request: Request, user=Depends(loss_acces
                         'quantity':str(prior['quantity']),
                         'cost_kgs':str(prior['quantity']*prior['unitCostKgs']),
                         'payment_created':False}
-            balance=await conn.fetchval(
-                '''SELECT COALESCE(SUM(CASE WHEN kind='RECEIPT' THEN quantity ELSE -quantity END),0)
-                   FROM kitchen_stock_movements
-                   WHERE "propertyId"=$1 AND "stockItemId"=$2''',pid,item['id'])
+            balance,stock_value=await locked_stock_valuation(conn,pid,item['id'])
             if balance < body.quantity:
                 raise HTTPException(409,detail={'code':'KITCHEN_LOSS_INSUFFICIENT_STOCK'})
+            weighted_cost=debit_cost(balance,stock_value,body.quantity)
             await conn.execute(
                 '''INSERT INTO kitchen_stock_movements
                    (id,"propertyId","stockItemId",kind,quantity,"unitCostKgs",
                     "createdById",notes)
                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8)''',
                 body.movement_id,pid,item['id'],body.kind,body.quantity,
-                item['costPerUnitKgs'],uuid.UUID(user['id']),body.reason)
+                weighted_cost,uuid.UUID(user['id']),body.reason)
             return {'id':str(body.movement_id),'already_processed':False,
                     'quantity':str(body.quantity),
-                    'cost_kgs':str(body.quantity*item['costPerUnitKgs']),
+                    'cost_kgs':str(body.quantity*weighted_cost),
                     'payment_created':False}
 
 
@@ -231,15 +230,15 @@ async def consume_production(body: ConsumeWrite, request: Request, user=Depends(
                 if not item:raise HTTPException(409,f'Missing stock item: {name} ({unit})')
                 if sample_only != item['isSample']:
                     raise HTTPException(409,'Sample and real inventory cannot be mixed')
-                balance=await conn.fetchval('''SELECT COALESCE(SUM(CASE WHEN kind='RECEIPT' THEN quantity ELSE -quantity END),0)
-                  FROM kitchen_stock_movements WHERE "propertyId"=$1 AND "stockItemId"=$2''',pid,item['id'])
+                balance,stock_value=await locked_stock_valuation(conn,pid,item['id'])
                 if balance<quantity:raise HTTPException(409,f'Insufficient stock: {name}')
+                weighted_cost=debit_cost(balance,stock_value,quantity)
                 await conn.execute('''INSERT INTO kitchen_stock_movements
                   (id,"propertyId","stockItemId",kind,quantity,"unitCostKgs","productionTargetId",
                    "preparedFrom","preparedTo","createdById",notes)
                   VALUES ($1,$2,$3,'PRODUCTION',$4,$5,$6,$7,$8,$9,'Explicit production consumption')''',
-                  uuid.uuid4(),pid,item['id'],quantity,item['costPerUnitKgs'],target['id'],previous,prepared,user['id'])
-                total+=quantity*item['costPerUnitKgs']
+                  uuid.uuid4(),pid,item['id'],quantity,weighted_cost,target['id'],previous,prepared,user['id'])
+                total+=quantity*weighted_cost
             await conn.execute('''INSERT INTO kitchen_stock_production_progress
               ("propertyId","productionTargetId","deductedPortions") VALUES ($1,$2,$3)
               ON CONFLICT ("productionTargetId") DO UPDATE SET "deductedPortions"=EXCLUDED."deductedPortions", "updatedAt"=now()''',
