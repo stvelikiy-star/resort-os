@@ -15,7 +15,7 @@ async function inspect(page){return page.evaluate(()=>{
 });}
 try{
  for(const width of [1440,768,390])for(const theme of ['dark','light']){
-  const c=await browser.newContext({viewport:{width,height:width===390?844:1024},reducedMotion:'reduce'});await c.addInitScript(theme=>{localStorage.setItem('marina-admin-ui','future-luxury');localStorage.setItem('marina-fl2-theme',theme);},theme);
+  const c=await browser.newContext({viewport:{width,height:width===390?844:1024},reducedMotion:'reduce'});await c.addInitScript(theme=>{localStorage.setItem('marina-admin-ui','future-luxury');if(!localStorage.getItem('marina-fl2-theme'))localStorage.setItem('marina-fl2-theme',theme);},theme);
   const p=await c.newPage(),errors=[];p.on('pageerror',e=>errors.push(String(e)));await p.goto(process.env.ADMIN_URL||'http://127.0.0.1:3001',{waitUntil:'networkidle'});await p.locator('.owner-v2 .owner-forward-kpis').waitFor();
   const m=await inspect(p);for(const [key,value]of Object.entries(m.vars))assert.equal(value,spec[theme][key],`${theme}/${key}`);assert.equal(m.overflow,0);assert.equal(m.scheme,theme);assert.equal(m.bodyColor,rgb(spec[theme].ink));assert.equal(m.bodyBackground,rgb(spec[theme].bg));assert.equal(m.bridge['--fl2-bg'],rgb(spec[theme].bg));assert.equal(m.bridge['--fl2-accent'],rgb(spec[theme].accent));assert.equal(m.button.color,rgb(spec[theme]['accent-ink']));assert.equal(m.button.background,rgb(spec[theme].accent));assert.deepEqual(errors,[]);
   await p.screenshot({path:`${out}/owner-reference-${width}-${theme}.png`,fullPage:true});
