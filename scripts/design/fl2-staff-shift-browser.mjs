@@ -15,6 +15,7 @@ try {
   const res=await page.goto(process.env.STAFF_QA_URL||'http://127.0.0.1:3002/qa-staff-shift',{waitUntil:'networkidle'});
   assert.equal(res?.status(),200);
   await page.locator('[data-staff-qa-fixture="true"]').waitFor();
+  assert.equal(await page.locator('nextjs-portal').count(),0,'Visual acceptance must run without Next.js dev overlay');
   const m=await page.evaluate(()=>{
    const buttons=[...document.querySelectorAll('.staff-locale-switcher button,.shift-modal-head button')];
    const rects=buttons.map(x=>({text:x.getAttribute('aria-label')||x.textContent,width:x.getBoundingClientRect().width,height:x.getBoundingClientRect().height}));
