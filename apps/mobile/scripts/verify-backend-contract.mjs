@@ -10,6 +10,8 @@ import { resolve } from 'node:path';
  * Staff/store and kitchen/recipe additions reviewed against Core #428.
  * Cook draft authoring reviewed with test_kitchen_draft_authoring.py and kitchen-author-menu.test.ts.
  * Recipe extension is pinned separately and covered by recipe DTO and API tests.
+ * Dining manager-only menu writes (#477) and assigned WAITER READY->SERVED (#483)
+ * verified by PostgreSQL Kitchen Operations E2E on the stacked integration tree.
  */
 const src = resolve(process.cwd(), '../../services/api/app');
 const pinned = {
@@ -25,9 +27,9 @@ const pinned = {
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
   'kitchen_menu_management.py': '1dfdda37782fc3858614c3f6965a195077a93dd2',
   'kitchen_recipes.py': 'd6a920886721a3a9bf8fc6d5c681f42b7f22eca5',
-  'kitchen.py': 'a478d4f10e1bae5fd4d1c297d5ba8054fdf85e3a',
+  'kitchen.py': '267c1dfa2eb3659e3f32db2de72aa8959ba56d79',
   'dining_production_snapshots.py': '717f2070a0924ab73456e364a5d4a8cf03c0c47e',
-  'dining_control.py': '80c4defa448f0e82671f743215a307705f5dd002',
+  'dining_control.py': '196e847403dc9b45fd4fa8ac94c28556320478db',
   'dining_stays.py': '6978f0f430e82616d05ebbab08a135119304d828',
   'dining_seating.py': '1dd098289a5ba5d45fa14512547f7ea1f1681122',
   'dining_folio.py': '1ee6b2c2893473bab2af7ce434045dd54bf0366e',
