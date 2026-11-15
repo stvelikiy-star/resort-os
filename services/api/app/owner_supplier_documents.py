@@ -195,3 +195,70 @@ async def settle_document(document_id: uuid.UUID, body: SupplierSettlementWrite,
                 body.method, body.reference, uuid.UUID(str(user["id"])))
     return {"id": str(body.id), "already_processed": False,
             "customer_payment_created": False, "recognized_profit": False}
+
+
+class SupplierReceiptAllocation(BaseModel):
+    receipt_id: uuid.UUID
+    document_line_id: uuid.UUID
+
+
+@router.post("/{document_id}/receipt-links", status_code=201)
+async def link_existing_receipt(document_id: uuid.UUID, body: SupplierReceiptAllocation,
+                                request: Request, user=Depends(owner_only)):
+    """Bind a confirmed procurement receipt to its immutable source invoice line.
+
+    Does not rewrite historical stock-cost snapshots. OWNER recognized COGS remains
+    unavailable until costing and consumption accounting have been reconciled.
+    """
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await trusted_property_id(conn, user)
+            # Serialize all allocations against this source line, including partials.
+            line = await conn.fetchrow(
+                '''SELECT l.id,l."stockItemId",l.quantity,l."unitCostKgs"
+                   FROM kitchen_supplier_document_lines l
+                   WHERE l."propertyId"=$1 AND l."documentId"=$2 AND l.id=$3
+                   FOR UPDATE''', pid, document_id, body.document_line_id)
+            if not line:
+                raise HTTPException(404, detail={"code": "SUPPLIER_DOCUMENT_LINE_MISSING"})
+            receipt = await conn.fetchrow(
+                '''SELECT p.id,p.quantity,p."propertyId",m."stockItemId",
+                          m.quantity AS movement_quantity
+                   FROM kitchen_procurement_receipts p
+                   JOIN kitchen_stock_movements m ON m.id=p.id
+                   WHERE p.id=$1 AND p."propertyId"=$2 AND m."propertyId"=$2
+                         AND m.kind='RECEIPT' ''', body.receipt_id, pid)
+            if not receipt:
+                raise HTTPException(404, detail={"code": "SUPPLIER_PROC_RECEIPT_MISSING"})
+            if (receipt["stockItemId"] != line["stockItemId"] or
+                receipt["quantity"] != receipt["movement_quantity"]):
+                raise HTTPException(409, detail={"code": "SUPPLIER_RECEIPT_ITEM_OR_QUANTITY_MISMATCH"})
+            previous = await conn.fetchrow(
+                'SELECT * FROM kitchen_supplier_receipt_links WHERE "receiptId"=$1',
+                body.receipt_id)
+            if previous:
+                if (previous["propertyId"] != pid or
+                    previous["documentLineId"] != body.document_line_id or
+                    previous["stockItemId"] != line["stockItemId"] or
+                    previous["quantity"] != receipt["quantity"] or
+                    previous["unitCostKgs"] != line["unitCostKgs"]):
+                    raise HTTPException(409, detail={"code": "SUPPLIER_RECEIPT_ALREADY_LINKED"})
+                return {"receipt_id": str(body.receipt_id),
+                        "already_processed": True, "payment_created": False,
+                        "recognized_profit": False}
+            allocated = await conn.fetchval(
+                '''SELECT COALESCE(SUM(quantity),0)
+                   FROM kitchen_supplier_receipt_links
+                   WHERE "propertyId"=$1 AND "documentLineId"=$2''',
+                pid, body.document_line_id)
+            if allocated + receipt["quantity"] > line["quantity"]:
+                raise HTTPException(409, detail={"code": "SUPPLIER_INVOICE_LINE_OVER_ALLOCATED"})
+            await conn.execute(
+                '''INSERT INTO kitchen_supplier_receipt_links
+                   ("receiptId","propertyId","documentLineId","stockItemId",
+                    quantity,"unitCostKgs") VALUES($1,$2,$3,$4,$5,$6)''',
+                body.receipt_id, pid, body.document_line_id,
+                line["stockItemId"], receipt["quantity"], line["unitCostKgs"])
+    return {"receipt_id": str(body.receipt_id), "already_processed": False,
+            "actual_document_cost_kgs": str(receipt["quantity"] * line["unitCostKgs"]),
+            "payment_created": False, "recognized_profit": False}
