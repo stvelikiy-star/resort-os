@@ -13,7 +13,7 @@ const COPY={
   check:'Рассчитать',shortage:'Нехватка',pipeline:'Всего в заявках',approvedInbound:'Утверждено к приходу',remaining:'После утверждённых поставок',
   noRecipe:'Не все рецептуры утверждены. Потребность неполная.',sample:'Тестовые рецептуры исключены.',
   request:'Новая заявка',select:'Продукт',quantity:'Количество',note:'Примечание',create:'Отправить заявку',
-  approve:'Утвердить',receive:'Принять на склад',receiveQuantity:'Количество прихода',
+  approve:'Утвердить',receive:'Принять на склад',receiveQuantity:'Количество прихода',supplierSource:'Накладная поставщика',sourceMissing:'Сначала оформите накладную у владельца',
   requested:'Ожидает утверждения',approved:'Утверждена',partial:'Частичный приход',received:'Получена',
   history:'Заявки',retry:'Повторить ту же операцию',done:'Данные сохранены',
   invalid:'Укажите продукт, положительное количество и правильную дату.',
@@ -22,7 +22,7 @@ const COPY={
   check:'Эсептөө',shortage:'Жетишсиз',pipeline:'Өтүнмөлөрдө',approvedInbound:'Бекитилген жеткирүү',remaining:'Бекитилгенден кийин',
   noRecipe:'Бардык рецепттер бекитилген эмес.',sample:'Сыноо рецепттери кошулган жок.',
   request:'Жаңы өтүнмө',select:'Азык',quantity:'Саны',note:'Эскертүү',create:'Өтүнмө берүү',
-  approve:'Бекитүү',receive:'Кампага кабыл алуу',receiveQuantity:'Кабыл алуу саны',
+  approve:'Бекитүү',receive:'Кампага кабыл алуу',receiveQuantity:'Кабыл алуу саны',supplierSource:'Жеткирүүчүнүн накладнойу',sourceMissing:'Адегенде ээси накладнойду каттасын',
   requested:'Бекитүүнү күтөт',approved:'Бекитилди',partial:'Жарым-жартылай алынды',received:'Алынды',
   history:'Өтүнмөлөр',retry:'Ошол эле операцияны кайталоо',done:'Сакталды',
   invalid:'Азык, оң сан жана туура күн керек.',confirm:'Операцияны ырастайсызбы?',
@@ -31,7 +31,7 @@ const COPY={
   check:'Calculate',shortage:'Shortage',pipeline:'All requested',approvedInbound:'Approved inbound',remaining:'After approved inbound',
   noRecipe:'Some recipes are not approved; the forecast is incomplete.',sample:'Sample recipes are excluded.',
   request:'New request',select:'Ingredient',quantity:'Quantity',note:'Notes',create:'Submit request',
-  approve:'Approve',receive:'Receive stock',receiveQuantity:'Received quantity',
+  approve:'Approve',receive:'Receive stock',receiveQuantity:'Received quantity',supplierSource:'Supplier invoice',sourceMissing:'OWNER must register the invoice first',
   requested:'Awaiting approval',approved:'Approved',partial:'Partially received',received:'Received',
   history:'Requests',retry:'Retry same operation',done:'Recorded',
   invalid:'Select a product, positive quantity and valid date.',confirm:'Confirm operation?',
@@ -40,7 +40,7 @@ const COPY={
   check:'Есептеу',shortage:'Тапшылық',pipeline:'Барлық өтінімдер',approvedInbound:'Бекітілген жеткізу',remaining:'Бекітілгеннен кейін',
   noRecipe:'Барлық рецепттер бекітілмеген.',sample:'Сынақ рецепттері есептелмейді.',
   request:'Жаңа өтінім',select:'Өнім',quantity:'Саны',note:'Ескерту',create:'Өтінім беру',
-  approve:'Бекіту',receive:'Қоймаға қабылдау',receiveQuantity:'Қабылдау саны',
+  approve:'Бекіту',receive:'Қоймаға қабылдау',receiveQuantity:'Қабылдау саны',supplierSource:'Жеткізушінің жүкқұжаты',sourceMissing:'Алдымен иесі жүкқұжатты тіркеуі керек',
   requested:'Бекітуді күтеді',approved:'Бекітілді',partial:'Ішінара қабылданды',received:'Қабылданды',
   history:'Өтінімдер',retry:'Сол операцияны қайталау',done:'Сақталды',
   invalid:'Өнім, оң сан және дұрыс күн керек.',confirm:'Операцияны растау?',
@@ -73,6 +73,7 @@ function ProcurementForm({live,stock,reloadStock}:{
   const [quantity,setQuantity]=useState('');
   const [notes,setNotes]=useState('');
   const [receiveQuantity,setReceiveQuantity]=useState('');
+  const [selectedSource,setSelectedSource]=useState('');
   const [busy,setBusy]=useState(false);
   const lock=useRef(false);
   const journal=useAsync(()=>hotel&&user?readProcurement(hotel.id,user.id):Promise.resolve(null),[hotel?.id,user?.id]);
@@ -83,6 +84,8 @@ function ProcurementForm({live,stock,reloadStock}:{
   const canRequest=['OWNER','MANAGER','COOK','STORE_STAFF'].includes(user?.role||'');
   const canApprove=['OWNER','MANAGER'].includes(user?.role||'');
   const canReceive=['OWNER','MANAGER','STORE_STAFF'].includes(user?.role||'');
+  const sourceEnabled=typeof live.procurementSupplierLines==='function';
+  const sources=useAsync(()=>sourceEnabled?live.procurementSupplierLines():Promise.resolve([]),[live,user?.id]);
 
   const execute=async(op:PendingProcurement|null)=>{
     const action=op??pending;
@@ -101,9 +104,10 @@ function ProcurementForm({live,stock,reloadStock}:{
           return live.requestKitchenProcurement(payload);
         }
         if(!canReceive)throw new Error('Procurement receipt forbidden');
-        return live.receiveKitchenProcurement(saved.requestId,{receipt_id:saved.receipt_id,quantity:saved.quantity});
+        return live.receiveKitchenProcurement(saved.requestId,{receipt_id:saved.receipt_id,quantity:saved.quantity,
+          ...(saved.document_line_id?{document_line_id:saved.document_line_id}:{})});
       });
-      setQuantity('');setReceiveQuantity('');setNotes('');
+      setQuantity('');setReceiveQuantity('');setNotes('');setSelectedSource('');
       await Promise.all([list.reload(),needs.reload(),reloadStock()]);
       Alert.alert(t.done);
     }catch(e){Alert.alert(t.title,e instanceof Error?e.message:String(e));}
@@ -125,10 +129,14 @@ function ProcurementForm({live,stock,reloadStock}:{
   };
   const receiveProduct=(id:string)=>{
     const q=receiveQuantity.replace(',','.');
-    if(!canReceive||!ready||!list.data||pending||busy||!validQuantity(q)){
+    const row=list.data?.items.find(x=>x.id===id);
+    const source=sources.data?.find(x=>x.id===selectedSource&&x.stock_item_id===row?.stock_item_id);
+    if(!canReceive||!ready||!list.data||pending||busy||!validQuantity(q)||
+       (sourceEnabled&&(!source||sources.loading||!!sources.error||Number(source.remaining_quantity)<Number(q)))){
       Alert.alert(t.invalid);return;
     }
-    const op:PendingProcurement={kind:'RECEIVE',requestId:id,receipt_id:list.data.new_receipt_id,quantity:q};
+    const op:PendingProcurement={kind:'RECEIVE',requestId:id,receipt_id:list.data.new_receipt_id,quantity:q,
+      ...(sourceEnabled?{document_line_id:source!.id}:{})};
     Alert.alert(t.confirm,q,[{text:locale==='en'?'Cancel':'Отмена',style:'cancel'},
       {text:t.receive,onPress:()=>void execute(op)}]);
   };
@@ -189,9 +197,19 @@ function ProcurementForm({live,stock,reloadStock}:{
       {canApprove&&row.status==='REQUESTED'?<Button disabled={busy||!ready||!!pending}
         label={t.approve} onPress={()=>void approve(row.id)}/>:null}
       {canReceive&&ready&&!pending&&['APPROVED','PARTIAL'].includes(row.status)?<View style={{gap:5}}>
+        {sourceEnabled?<View style={{gap:4}}>
+          <Text style={{color:c.textMuted}}>{t.supplierSource}</Text>
+          {sources.error?<ErrorState text={sources.error.message} onRetry={sources.reload} retry={t.retry}/>:null}
+          {sources.data?.filter(x=>x.stock_item_id===row.stock_item_id&&Number(x.remaining_quantity)>0).map(x=><Button
+            key={x.id} variant={selectedSource===x.id?'primary':'secondary'}
+            label={x.supplier_name+' · '+x.document_reference+' · '+x.remaining_quantity+' '+row.unit}
+            onPress={()=>setSelectedSource(x.id)}/>)}
+          {sources.data&&!sources.data.some(x=>x.stock_item_id===row.stock_item_id&&Number(x.remaining_quantity)>0)?
+            <Text style={{color:c.warning}}>{t.sourceMissing}</Text>:null}
+        </View>:null}
         <Field label={t.receiveQuantity} keyboardType="decimal-pad"
           value={receiveQuantity} onChangeText={setReceiveQuantity}/>
-        <Button disabled={busy||!receiveQuantity} label={t.receive}
+        <Button disabled={busy||!receiveQuantity||(sourceEnabled&&(!selectedSource||sources.loading||!!sources.error))} label={t.receive}
           onPress={()=>receiveProduct(row.id)}/>
       </View>:null}
     </View>)}
