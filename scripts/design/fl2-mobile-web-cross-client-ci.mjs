@@ -48,7 +48,7 @@ function createMobileTransport(cookies) {
  return async (expectedUrl,init={})=>{
    assert.equal(typeof expectedUrl,'string');
    assert.ok(expectedUrl.startsWith(MOBILE_HTTPS+'/api/v1/'),'Mobile HTTP client left trusted HTTPS API prefix');
-   const realUrl = WEB + expectedUrl.slice(MOBILE_HTTPS.length);
+   const realUrl = WEB + '/core' + expectedUrl.slice(MOBILE_HTTPS.length);
    const response = await fetch(realUrl,{
      ...init,
      headers:{...init.headers, Cookie:header},
