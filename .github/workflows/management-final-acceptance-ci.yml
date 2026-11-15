@@ -102,9 +102,12 @@ jobs:
           changed="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
           echo "$changed"
           web_changed="$(printf '%s\n' "$changed" | grep '^apps/web/' || true)"
-          # C12 isolated Guest OS skin: allow only these explicit guest files on
-          # the named review branch; keep all public Three Crowns marketing paths frozen.
-          if [ "$branch" = 'design/marina-c12-guest-concierge-accessibility-20261115' ]; then
+          # C12 Guest OS: allow only four exact guest files on explicit review
+          # branches. Public Three Crowns marketing paths remain frozen.
+          # The integration review branch must meet the same hash and guest
+          # source-contract requirements as the source C12 branch.
+          if [ "$branch" = 'design/marina-c12-guest-concierge-accessibility-20261115' ] || \
+             [ "$branch" = 'integration/marina-fl2-web-staff-guest-c12-20261115' ]; then
             [ -n "$web_changed" ] || { echo 'BLOCKED: empty C12 guest change' >&2; exit 1; }
             while IFS= read -r path; do
               [ -z "$path" ] && continue
