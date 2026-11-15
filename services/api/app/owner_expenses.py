@@ -132,7 +132,8 @@ async def record_settlement(expense_id:uuid.UUID,payload:SettlementPost,
                     prior["reference"]!=payload.reference):
                     raise HTTPException(409,detail={"code":"OWNER_SETTLEMENT_ID_CONFLICT"})
                 return {"id":str(payload.id),"already_processed":True,
-                        "expense_id":str(expense_id),"payment_created":False}
+                        "expense_id":str(expense_id),"payment_created":False,
+                        "source":"MANUAL_EXPENSE_SETTLEMENT_FACT"}
             if expense["status"]!="POSTED":
                 raise HTTPException(409,detail={"code":"OWNER_EXPENSE_VOID"})
             received=await conn.fetchval('''SELECT COALESCE(SUM("amountKgs"),0)::bigint
