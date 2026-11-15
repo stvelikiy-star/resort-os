@@ -53,6 +53,12 @@ try {
   assert.deepEqual((await page.locator('[data-section]').evaluateAll(es=>es.map(e=>e.dataset.section))).sort(),['DASHBOARD','DINING','FINANCE','PMS']);
   evidence.push({role,grants:permissions,enabled:['DINING'],visible:['DASHBOARD','DINING','FINANCE','PMS']});await context.close();
  }
+ const languages=await open();
+ for(const [code,heading] of [['EN','Operations'],['KG','Операциялар'],['KZ','Операциялар'],['RU','Операции']]) {
+  await languages.page.locator('.admin-locale-switcher').getByRole('button',{name:code,exact:true}).click();
+  await languages.page.locator('.fl2-nav-group h2').filter({hasText:heading}).first().waitFor();
+ }
+ await languages.context.close();
  const empty=await open({permissions:[]});assert.equal(await empty.page.locator('[data-section]').count(),0);await empty.page.getByText('Доступ к разделам отключён.',{exact:true}).waitFor();await empty.context.close();
  const zoom=await open({width:1440});await zoom.page.evaluate(()=>document.body.style.zoom='200%');assert.equal((await metrics(zoom.page)).overflow,0);await zoom.page.screenshot({path:`${out}/owner-css-zoom-200.png`});await zoom.context.close();
  const legacy=await open({legacy:true});assert.equal(await legacy.page.locator('.fl2-grouped-navigation').count(),0);assert.equal(await legacy.page.locator('.admin-tabs').count(),1);await legacy.page.screenshot({path:`${out}/legacy-1440.png`});await legacy.context.close();

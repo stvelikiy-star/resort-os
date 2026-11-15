@@ -63,6 +63,13 @@ const MODULE_TABS: Record<string, Tab> = {
   SETTINGS: "SETTINGS", HOTEL_RULES: "HOTEL_RULES", CHANNELS: "CHANNELS",
 };
 
+const SHELL_COPY = {
+  ru: { groups: ["Операции", "Гости", "Финансы", "Команда", "Развитие", "Настройки"], sections: "Разделы", open: "Открыть разделы", close: "Закрыть разделы", unavailable: "Раздел недоступен" },
+  ky: { groups: ["Операциялар", "Коноктор", "Каржы", "Команда", "Өнүгүү", "Жөндөөлөр"], sections: "Бөлүмдөр", open: "Бөлүмдөрдү ачуу", close: "Бөлүмдөрдү жабуу", unavailable: "Бөлүм жеткиликсиз" },
+  kk: { groups: ["Операциялар", "Қонақтар", "Қаржы", "Команда", "Даму", "Баптаулар"], sections: "Бөлімдер", open: "Бөлімдерді ашу", close: "Бөлімдерді жабу", unavailable: "Бөлім қолжетімсіз" },
+  en: { groups: ["Operations", "Guests", "Finance", "Team", "Growth", "Settings"], sections: "Sections", open: "Open sections", close: "Close sections", unavailable: "Section unavailable" },
+} as const;
+
 // Presentation only. module gates mirror the unchanged Legacy navigation below.
 const FL2_NAV_GROUPS: { title: string; items: { tab: Tab; label: string; icon: LucideIcon; module?: string }[] }[] = [
   { title: "Операции", items: [
@@ -134,6 +141,15 @@ export default function AdminShell() {
   const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
   const [fl2Theme, setFl2Theme] = useState<Fl2Theme>("dark");
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [shellLanguage, setShellLanguage] = useState<keyof typeof SHELL_COPY>("ru");
+  const shellCopy = SHELL_COPY[shellLanguage];
+  useEffect(() => {
+    const sync = () => { const language = document.documentElement.lang; setShellLanguage(language in SHELL_COPY ? language as keyof typeof SHELL_COPY : "ru"); };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["lang"] });
+    return () => observer.disconnect();
+  }, []);
   const navigationRef = useRef<HTMLElement>(null);
   const navigationToggleRef = useRef<HTMLButtonElement>(null);
 
@@ -376,9 +392,9 @@ export default function AdminShell() {
   const canUseOps = canAccess("OPS");
   const moduleEnabled = (module: string) => enabledModules.includes(module);
 
-  const visibleGroups = FL2_NAV_GROUPS.map(group => ({ ...group, items: group.items.filter(item => canAccess(item.tab) && (!item.module || moduleEnabled(item.module))) })).filter(group => group.items.length);
+  const visibleGroups = FL2_NAV_GROUPS.map((group, index) => ({ ...group, title: shellCopy.groups[index], items: group.items.filter(item => canAccess(item.tab) && (!item.module || moduleEnabled(item.module))) })).filter(group => group.items.length);
   const currentItem = visibleGroups.flatMap(group => group.items).find(item => item.tab === tab);
-  const currentLabel = currentItem ? (isAgent && tab === "PMS" ? "Шахматка / Брони" : currentItem.label) : "Раздел недоступен";
+  const currentLabel = currentItem ? (isAgent && tab === "PMS" ? "Шахматка / Брони" : currentItem.label) : shellCopy.unavailable;
 
   return (
     <>
@@ -391,15 +407,15 @@ export default function AdminShell() {
         {uiPreference === "future-luxury" ? <>
           <div className="fl2-current-section">
             <span className="fl2-current-label"><Activity size={18} aria-hidden="true" /><strong>{currentLabel}</strong></span>
-            <button ref={navigationToggleRef} className="fl2-navigation-toggle" type="button" aria-label={navigationOpen ? "Закрыть разделы" : "Открыть разделы"} aria-expanded={navigationOpen} aria-controls="fl2-section-navigation" onClick={() => setNavigationOpen(value => !value)}>
-              {navigationOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}<span>Разделы</span>
+            <button ref={navigationToggleRef} className="fl2-navigation-toggle" type="button" aria-label={navigationOpen ? shellCopy.close : shellCopy.open} aria-expanded={navigationOpen} aria-controls="fl2-section-navigation" onClick={() => setNavigationOpen(value => !value)}>
+              {navigationOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}<span data-i18n-skip>{shellCopy.sections}</span>
             </button>
           </div>
           <nav id="fl2-section-navigation" className="fl2-grouped-navigation" ref={navigationRef} data-open={navigationOpen} aria-label="Разделы MARINA SMART" onKeyDown={event => {
             if (event.key === "Escape") { setNavigationOpen(false); navigationToggleRef.current?.focus(); }
           }}>
             {visibleGroups.map((group, index) => <section className="fl2-nav-group" key={group.title} aria-labelledby={`fl2-nav-group-${index}`}>
-              <h2 id={`fl2-nav-group-${index}`}>{group.title}</h2>
+              <h2 data-i18n-skip id={`fl2-nav-group-${index}`}>{group.title}</h2>
               {group.items.map(({ tab: destination, label, icon: Icon }) => <button key={destination} type="button" data-section={destination} aria-current={tab === destination ? "page" : undefined} onClick={() => { setTab(destination); setNavigationOpen(false); if (window.matchMedia("(max-width: 1100px)").matches) navigationToggleRef.current?.focus(); }}>
                 <Icon size={19} strokeWidth={1.7} aria-hidden="true" /><span>{isAgent && destination === "PMS" ? "Шахматка / Брони" : label}</span>
               </button>)}
