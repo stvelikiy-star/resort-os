@@ -4,7 +4,7 @@ import {getDurableItem,setDurableItem,removeDurableItem} from './storage';
 
 export type PendingProcurement =
  | {kind:'REQUEST';request_id:string;stock_item_id:string;quantity:string;service_date:string|null;notes:string|null}
- | {kind:'RECEIVE';requestId:string;receipt_id:string;quantity:string};
+ | {kind:'RECEIVE';requestId:string;receipt_id:string;quantity:string;document_line_id?:string|null};
 const active=new Set<string>();
 function key(hotel:string,user:string){
  if(hotel.length>263||!/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(hotel)||!/^[A-Za-z0-9_-]{1,100}$/.test(user))throw new Error('Invalid procurement identity');
@@ -16,7 +16,8 @@ export function procurementOperation(value:unknown):PendingProcurement{
  if(typeof x.quantity!=='string')throw new Error('Invalid procurement quantity');
  const quantity=receiptQuantity(x.quantity);
  if(x.kind==='RECEIVE'&&receiptUuid(x.requestId)&&receiptUuid(x.receipt_id))
-  return {kind:x.kind,requestId:x.requestId,receipt_id:x.receipt_id,quantity};
+  return {kind:x.kind,requestId:x.requestId,receipt_id:x.receipt_id,quantity,
+   document_line_id:x.document_line_id==null?null:(receiptUuid(x.document_line_id)?x.document_line_id:(()=>{throw new Error('Invalid supplier source ID');})())};
  if(x.kind==='REQUEST'&&receiptUuid(x.request_id)&&receiptUuid(x.stock_item_id)&&
    (x.notes===null||(typeof x.notes==='string'&&x.notes.length<=500))&&
    (x.service_date===null||(typeof x.service_date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.service_date)&&
@@ -33,7 +34,8 @@ function confirmed(value:unknown,op:PendingProcurement){
  if(x.payment_created!==false)throw new Error('Unverified procurement acknowledgment');
  if(op.kind==='REQUEST'&&x.id===op.request_id&&['REQUESTED','EXISTS'].includes(String(x.status)))return;
  if(op.kind==='RECEIVE'&&x.id===op.receipt_id&&x.request_id===op.requestId&&
-    ['PARTIAL','RECEIVED'].includes(String(x.status))&&typeof x.already_processed==='boolean')return;
+    ['PARTIAL','RECEIVED'].includes(String(x.status))&&typeof x.already_processed==='boolean'&&
+    (op.document_line_id==null||x.document_line_id===op.document_line_id))return;
  throw new Error('Unverified procurement acknowledgment');
 }
 /** Save the complete operation before POST; only explicit replay may send it again. */
