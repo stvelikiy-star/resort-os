@@ -440,13 +440,16 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         throw new ApiError('UNKNOWN','Invalid OWNER expense ledger');
       const totals=objectResponse(data.totals,'owner expense totals');
       for(const key of ['posted_expenses_kgs','settled_against_period_expenses_kgs','outstanding_kgs','posted_count']){
-        if(!Number.isSafeInteger(totals[key])||Number(totals[key])<0)
+        const amount=totals[key];
+        if(typeof amount!=='number'||!Number.isSafeInteger(amount)||amount<0)
           throw new ApiError('UNKNOWN','Invalid expense total');
       }
       for(const raw of data.items){
         const row=objectResponse(raw,'owner expense row');
         if(!uuid.test(String(row.id))||typeof row.title!=='string'||
           !['POSTED','VOID'].includes(String(row.status))||
+          typeof row.amount_kgs!=='number'||typeof row.settled_kgs!=='number'||
+          typeof row.outstanding_kgs!=='number'||
           !Number.isSafeInteger(row.amount_kgs)||!Number.isSafeInteger(row.settled_kgs)||
           !Number.isSafeInteger(row.outstanding_kgs)||
           Number(row.amount_kgs)<=0||Number(row.settled_kgs)<0||
