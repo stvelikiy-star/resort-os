@@ -88,6 +88,19 @@ export interface KitchenStockItem {
 export interface KitchenStockSnapshot {
   items:KitchenStockItem[]; production_cost_kgs:string;
   inventory_deducted_only_on_explicit_consume:true;
+  new_loss_movement_id?:string;
+}
+export type KitchenLossKind = 'WASTE'|'SPOILAGE';
+export interface KitchenLossRecord {
+  id:string;stock_item_id:string;stock_name:string;unit:'KG'|'L'|'PCS';
+  is_sample:boolean;kind:KitchenLossKind;quantity:string;unit_cost_kgs:string;
+  cost_kgs:string;reason:string;created_by_id:string|null;created_at:string;
+}
+export interface KitchenLossMutation {
+  movement_id:string;stock_item_id:string;kind:KitchenLossKind;quantity:string;reason:string;
+}
+export interface KitchenLossAcknowledgment {
+  id:string;already_processed:boolean;quantity:string;cost_kgs:string;payment_created:false;
 }
 export interface KitchenStockConsumeAck {
   consumed_portions:number; already_processed:boolean; cost_kgs:string; payment_created:false;
@@ -518,6 +531,39 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
           row.reason !== clean) throw new ApiError('UNKNOWN', 'Invalid stoplist acknowledgment');
       return row as unknown as KitchenAvailabilityAck;
     },
+    kitchenLosses: async (): Promise<KitchenLossRecord[]> => {
+      reviewGate();
+      const result=objectResponse(await request<unknown>('GET',p+'/kitchen/stock/losses'),'stock losses');
+      if(!Array.isArray(result.items)||result.financial_truth!=='INVENTORY_LOSS_NOT_PAYMENT')
+        throw new ApiError('UNKNOWN','Invalid stock loss journal');
+      return result.items.map(entry=>{
+        const row=objectResponse(entry,'loss entry');
+        if(!['WASTE','SPOILAGE'].includes(String(row.kind)) ||
+          !['KG','L','PCS'].includes(String(row.unit)) ||
+          typeof row.reason!=='string'||typeof row.stock_name!=='string' ||
+          typeof row.is_sample!=='boolean'||typeof row.cost_kgs!=='string' ||
+          typeof row.quantity!=='string'||typeof row.created_at!=='string')
+          throw new ApiError('UNKNOWN','Invalid loss entry');
+        return {...row,id:safeRouteId(String(row.id)),
+          stock_item_id:safeRouteId(String(row.stock_item_id))} as KitchenLossRecord;
+      });
+    },
+    reportKitchenLoss: async (loss:KitchenLossMutation):Promise<KitchenLossAcknowledgment> => {
+      reviewGate();
+      const reason=loss.reason.trim().replace(/\\s+/g,' ');
+      const quantity=loss.quantity.replace(',','.');
+      if(reason.length<3||reason.length>500||!/^(?:0|[1-9]\\d*)(?:\\.\\d{1,6})?$/.test(quantity)||Number(quantity)<=0 ||
+        !['WASTE','SPOILAGE'].includes(loss.kind))
+        throw new ApiError('BAD_REQUEST','Invalid kitchen loss');
+      const id=safeRouteId(loss.movement_id);
+      const body={movement_id:id,stock_item_id:safeRouteId(loss.stock_item_id),
+        kind:loss.kind,quantity,reason};
+      const response=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/losses',body),'loss acknowledgment');
+      if(response.id!==id||typeof response.already_processed!=='boolean'||response.payment_created!==false||
+        typeof response.cost_kgs!=='string'||typeof response.quantity!=='string')
+        throw new ApiError('UNKNOWN','Invalid loss acknowledgment');
+      return response as unknown as KitchenLossAcknowledgment;
+    },
     kitchenStock: async (): Promise<KitchenStockSnapshot> => {
       reviewGate();
       const payload=objectResponse(await request<unknown>('GET',p+'/kitchen/stock'),'stock');
@@ -532,8 +578,11 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
           throw new ApiError('UNKNOWN','Invalid stock item');
         return {...row,id:safeRouteId(String(row.id))} as KitchenStockItem;
       });
+      if (typeof payload.new_loss_movement_id !== 'string')
+        throw new ApiError('UNKNOWN','Missing server-issued loss movement ID');
       return {items:rows,production_cost_kgs:payload.production_cost_kgs,
-        inventory_deducted_only_on_explicit_consume:true};
+        inventory_deducted_only_on_explicit_consume:true,
+        new_loss_movement_id:safeRouteId(payload.new_loss_movement_id)};
     },
     receiveKitchenStock: async (stockItemId:string, quantity:string):Promise<{id:string;quantity:string;payment_created:false}> => {
       reviewGate();
