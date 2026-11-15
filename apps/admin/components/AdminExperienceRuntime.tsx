@@ -386,6 +386,20 @@ const common: Phrase[] = [
 ];
 
 
+/* C3 PMS presentation-only labels; server statuses and financial operations unchanged. */
+common.push(
+  { ru: "Счёт гостя · MARINA SMART", kg: "Коноктун эсеби · MARINA SMART", kz: "Қонақ шоты · MARINA SMART", en: "Guest account · MARINA SMART" },
+  { ru: "Оплата фиксируется только после фактического получения денег.", kg: "Төлөм акча иш жүзүндө алынгандан кийин гана катталат.", kz: "Төлем ақша нақты алынғаннан кейін ғана тіркеледі.", en: "Payments are recorded only after funds are actually received." },
+  { ru: "Списано", kg: "Эсептен чыгарылды", kz: "Есептен шығарылды", en: "Waived" },
+  { ru: "Аннулировано", kg: "Жокко чыгарылды", kz: "Күші жойылды", en: "Voided" },
+  { ru: "Оплачено", kg: "Төлөндү", kz: "Төленді", en: "Paid" },
+  { ru: "Ожидает", kg: "Күтүлүүдө", kz: "Күтілуде", en: "Pending" },
+  { ru: "Ошибка", kg: "Ката", kz: "Қате", en: "Failed" },
+  { ru: "Возвращено", kg: "Кайтарылды", kz: "Қайтарылды", en: "Refunded" },
+  { ru: "PMS · Групповая бронь", kg: "PMS · Топтук бронь", kz: "PMS · Топтық бронь", en: "PMS · Group booking" },
+  { ru: "Тариф гостиницы", kg: "Мейманкананын тарифи", kz: "Қонақүй тарифі", en: "Hotel rate" },
+);
+
 /* MARINA_I18N_EXTENDED_V1 */
 common.push(
   { ru: "Запрос новой оплаты недоступен для текущего состояния брони.", kg: "Брондун учурдагы абалында жаңы төлөм сурамын жөнөтүү мүмкүн эмес.", kz: "Брондаудың ағымдағы күйінде жаңа төлем сұрауын жіберу мүмкін емес.", en: "A new payment request is unavailable for this reservation status." },
