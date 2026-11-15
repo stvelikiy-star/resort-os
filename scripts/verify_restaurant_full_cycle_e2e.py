@@ -119,6 +119,22 @@ async def main():
                     {"menu_item_id": menu[1]["id"], "quantity": 3}
                 ]}), 201, "create multi-item order")
             oid = order["id"]
+            # Staff Web uses this exact kitchen orders API via the /core proxy.
+            owner_orders = require(await owner.get("/api/v1/kitchen/orders?status=ACTIVE"), 200, "Web-owner order feed")["items"]
+            cook_orders = require(await cook.get("/api/v1/kitchen/orders?status=ACTIVE"), 200, "Web-cook order feed")["items"]
+            owner_view = next(row for row in owner_orders if row["id"] == oid)
+            cook_view = next(row for row in cook_orders if row["id"] == oid)
+            for view in (owner_view, cook_view):
+                assert view["order_number"] == order["order_number"]
+                assert view["status"] == "NEW" and view["total_kgs"] == order["total_kgs"]
+                assert view["table_code"] == source["code"]
+                assert sorted(x["quantity"] for x in view["items"]) == [2, 3]
+                assert sum(x["line_total_kgs"] for x in view["items"]) == order["total_kgs"]
+            db_lines = await db.fetch(
+                'SELECT quantity,"lineTotalKgs" FROM kitchen_order_items WHERE "orderId"=$1 ORDER BY quantity',
+                uuid.UUID(oid))
+            assert [line["quantity"] for line in db_lines] == [2, 3]
+            assert sum(line["lineTotalKgs"] for line in db_lines) == order["total_kgs"]
             require(await other_waiter.post("/api/v1/kitchen/orders", json={
                 "source": "TABLE", "table_id": source["id"],
                 "items": [{"menu_item_id": menu[0]["id"], "quantity": 1}]}),
