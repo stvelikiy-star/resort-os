@@ -47,6 +47,11 @@ async function visit(width,theme) {
  assert.ok(folioMetrics.overflow<=1,JSON.stringify({width,theme,folioMetrics}));
  assert.deepEqual(folioMetrics.small,[]);
  await page.locator(".reservation-detail").screenshot({path:output+"/folio-"+width+"-"+theme+".png"});
+ await page.getByRole("heading",{name:/История оплат/}).waitFor();
+ await page.getByRole("heading",{name:/История оплат/}).scrollIntoViewIfNeeded();
+ await page.locator(".reservation-detail").screenshot({path:output+"/folio-payments-"+width+"-"+theme+".png"});
+ await page.getByRole("heading",{name:/Начисления/}).scrollIntoViewIfNeeded();
+ await page.locator(".reservation-detail").screenshot({path:output+"/folio-charges-"+width+"-"+theme+".png"});
  await page.locator(".reservation-detail").getByRole("button",{name:"Закрыть"}).click();
  await go("GROUPS");
  await page.getByRole("heading",{name:"Групповая бронь"}).waitFor();
