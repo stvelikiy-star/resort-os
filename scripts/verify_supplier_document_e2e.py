@@ -117,7 +117,7 @@ async def main():
             check(await owner.post(
                 f"/api/v1/admin/finance/owner/supplier-documents/{doc_id}/receipt-links",
                 json={"receipt_id": receipt_ids[0],
-                      "document_line_id": str(uuid.uuid4())}), 404, "unknown line")
+                      "document_line_id": str(uuid.uuid4())}), 409, "changed receipt ID rejected")
             check(await store.get(
                 "/api/v1/admin/finance/owner/supplier-documents"),
                 403, "STORE denied OWNER invoice totals")
