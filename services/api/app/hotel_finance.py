@@ -453,7 +453,8 @@ async def finance_summary(
         # in the same report as manual expense obligations. MANAGER never does.
         owner_supplier_stock_snapshot = None
         if user["role"] == "OWNER":
-            owner_supplier_stock_snapshot = await owner_inventory_reconciliation(conn, pid)
+            async with conn.transaction(isolation="repeatable_read", readonly=True):
+                owner_supplier_stock_snapshot = await owner_inventory_reconciliation(conn, pid)
 
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
