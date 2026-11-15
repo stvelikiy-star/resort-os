@@ -3,6 +3,8 @@ import unittest
 import uuid
 from decimal import Decimal
 from pydantic import ValidationError
+from fastapi import HTTPException
+from services.api.app.kitchen_inventory_valuation import weighted_unit_cost,debit_cost
 from services.api.app.kitchen_stock import ItemWrite, ReceiptWrite, ConsumeWrite, LossWrite
 
 class StockContracts(unittest.TestCase):
@@ -44,6 +46,24 @@ class StockContracts(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 LossWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),
                           kind="WASTE",quantity="1",reason=reason)
+
+    def test_weighted_average_uses_stock_receipt_cost_not_catalog(self):
+        # 5 units at invoice 123.4567 and 5 at a historic receipt price 100:
+        # 1117.2835 / 10 = 111.72835 => 111.7284 per unit (4dp).
+        inventory_value=Decimal("5")*Decimal("123.4567")+Decimal("5")*Decimal("100")
+        cost=debit_cost(Decimal("10"),inventory_value,Decimal("2"))
+        self.assertEqual(cost,Decimal("111.7284"))
+        self.assertEqual(cost*Decimal("2"),Decimal("223.4568"))
+        remainder=inventory_value-cost*Decimal("2")
+        self.assertEqual(weighted_unit_cost(Decimal("8"),remainder),Decimal("111.7283"))
+
+    def test_valuation_fails_closed_on_inconsistent_historical_opening(self):
+        for qty,value in (("0","0"),("2","-1"),("-1","100")):
+            with self.subTest(qty=qty,value=value),self.assertRaises(HTTPException) as exc:
+                weighted_unit_cost(Decimal(qty),Decimal(value))
+            self.assertEqual(exc.exception.status_code,409)
+        with self.assertRaises(HTTPException):
+            debit_cost(Decimal("2"),Decimal("100"),Decimal("3"))
 
     def test_bad_target_id(self):
         with self.assertRaises(ValidationError):ConsumeWrite(production_target_id='not-a-uuid')
