@@ -9,6 +9,7 @@ on:
       - 'services/api/app/kitchen_recipes.py'
       - 'services/api/app/kitchen_stock.py'
       - 'services/api/app/kitchen_procurement.py'
+      - 'services/api/app/owner_kitchen_management.py'
       - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
       - 'scripts/verify_kitchen_procurement_e2e.py'
       - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
