@@ -266,6 +266,16 @@ const common: Phrase[] = [
   { ru: "Устаревшая роль · питание", kg: "Эскирген роль · тамактануу", kz: "Ескірген рөл · тамақтану", en: "Legacy role · dining" },
   // Guest reviews, WhatsApp and staff access — explicit RU/KG/KZ/EN.
   { ru: "Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.", kg: "Тышкы шлюз кирүү өтүнүчүн өткөргөн жок. Cloudflare Access'ти текшериңиз же жергиликтүү даректи ачыңыз.", kz: "Сыртқы шлюз кіру сұрауын өткізбеді. Cloudflare Access-ті тексеріңіз немесе жергілікті мекенжайды ашыңыз.", en: "The external gateway rejected the sign-in request. Check Cloudflare Access or open the local address." },
+  // C1 shell navigation — explicit RU/KG/KZ/EN using the existing locale runtime.
+  { ru: "Гости", kg: "Коноктор", kz: "Қонақтар", en: "Guests" },
+  { ru: "Команда", kg: "Команда", kz: "Команда", en: "Team" },
+  { ru: "Развитие", kg: "Өнүгүү", kz: "Даму", en: "Growth" },
+  { ru: "Разделы", kg: "Бөлүмдөр", kz: "Бөлімдер", en: "Sections" },
+  { ru: "Открыть разделы", kg: "Бөлүмдөрдү ачуу", kz: "Бөлімдерді ашу", en: "Open sections" },
+  { ru: "Закрыть разделы", kg: "Бөлүмдөрдү жабуу", kz: "Бөлімдерді жабу", en: "Close sections" },
+  { ru: "Раздел недоступен", kg: "Бөлүм жеткиликсиз", kz: "Бөлім қолжетімсіз", en: "Section unavailable" },
+  { ru: "Booking / Каналы продаж", kg: "Booking / Сатуу каналдары", kz: "Booking / Сату арналары", en: "Booking / Sales channels" },
+  { ru: "Отзывы / Рост", kg: "Пикирлер / Өсүү", kz: "Пікірлер / Өсу", en: "Reviews / Growth" },
   { ru: "Разделы MARINA SMART", kg: "MARINA SMART бөлүмдөрү", kz: "MARINA SMART бөлімдері", en: "MARINA SMART sections" },
   { ru: "Внешний вид интерфейса", kg: "Интерфейстин көрүнүшү", kz: "Интерфейс көрінісі", en: "Interface appearance" },
   { ru: "Цветовая тема Future Luxury", kg: "Future Luxury түс темасы", kz: "Future Luxury түс тақырыбы", en: "Future Luxury color theme" },

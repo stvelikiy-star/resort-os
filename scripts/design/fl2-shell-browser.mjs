@@ -42,7 +42,8 @@ try {
   assert.deepEqual(errors,[]);
   await page.locator('[data-section="REPORTS"]').click();
   assert.equal(await page.locator('[aria-current="page"]').getAttribute('data-section'),'REPORTS');
-  await page.locator('.fl2-current-label').getByText('Отчёты / Аналитика',{exact:true}).waitFor();
+  await page.waitForFunction(() => document.querySelector('.fl2-current-label strong')?.textContent === document.querySelector('[aria-current="page"] span')?.textContent);
+  assert.equal(await page.locator('.fl2-current-label strong').innerText(),await page.locator('[aria-current="page"] span').innerText());
   if(width<1101)assert.equal(await page.locator('.fl2-navigation-toggle').getAttribute('aria-expanded'),'false');
   evidence.push({width,theme,closed,groups:6,tabs:26,selection:'REPORTS',errors});await context.close();
  }
@@ -64,4 +65,10 @@ try {
  const legacy=await open({legacy:true});assert.equal(await legacy.page.locator('.fl2-grouped-navigation').count(),0);assert.equal(await legacy.page.locator('.admin-tabs').count(),1);await legacy.page.screenshot({path:`${out}/legacy-1440.png`});await legacy.context.close();
  fs.writeFileSync(`${out}/results.json`,JSON.stringify({syntheticData:true,physicalAndroid:false,zoom:'CSS zoom 200%, not native browser zoom',evidence},null,2));
  console.log('C1_BROWSER_PASS: 6 theme/viewports; 9 explicit role grants; empty grants; keyboard Escape; selection; 44px targets; no horizontal overflow; CSS zoom; Legacy');
+} catch(error) {
+ fs.writeFileSync(`${out}/failure.txt`,String(error.stack || error));
+ for(const context of browser.contexts())for(const page of context.pages()) {
+  await page.screenshot({path:`${out}/failure-${page.viewportSize()?.width || 'unknown'}.png`,fullPage:true}).catch(()=>{});
+ }
+ throw error;
 } finally { await browser.close(); }
