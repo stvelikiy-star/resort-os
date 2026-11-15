@@ -82,7 +82,13 @@ export default function Dining() {
       {'notes' in o && o.notes ? <Text style={[font.small, { color: c.text }]}>{o.notes}</Text> : null}
       {!showroom && cook && NEXT[o.status as KitchenStatus] ? <Button testID={'order-next-' + o.id} label={orderStatusLabel(NEXT[o.status as KitchenStatus]!, copy)} disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, NEXT[o.status as KitchenStatus]!))}/> : null}
       {!showroom && waiter && !('waiter_id' in o && o.waiter_id) ? <Button testID={'waiter-claim-' + o.id} label={copy.take} disabled={busy || unknownResult} onPress={() => change(() => live!.claimWaiterOrder(o.id, user.id))}/> : null}
-      {waiter && o.status === 'READY' ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: {orderStatusLabel('READY', copy)} · {copy.readOnly}</Text> : null}
+      {!showroom && waiter && o.status === 'READY' && 'waiter_id' in o && o.waiter_id === user?.id
+        ? <Button testID={'waiter-serve-' + o.id} label={orderStatusLabel('SERVED', copy)}
+            disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, 'SERVED'))}/>
+        : null}
+      {waiter && o.status === 'READY' && (!('waiter_id' in o) || o.waiter_id !== user?.id)
+        ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: {orderStatusLabel('READY', copy)} · {copy.readOnly}</Text>
+        : null}
     </GlassCard></StaggerItem>)}
     {!loading && !error && orders.length === 0 ? <Empty text={copy.empty}/> : null}
   </FutureScreen>;
