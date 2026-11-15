@@ -56,10 +56,11 @@ export default function Finance() {
       modules.ownerKitchenManagement(from,to):Promise.resolve(null),
     [modules,allowed,user?.role,user?.id,hotel?.id],
   );
+  const reloadKitchen = ownerKitchen.reload;
   const focused = useRef(false);
   useFocusEffect(useCallback(() => {
-    if (focused.current) { void reload();void ownerKitchen.reload(); } else focused.current = true;
-  }, [reload,ownerKitchen.reload]));
+    if (focused.current) { void reload(); void reloadKitchen(); } else focused.current = true;
+  }, [reload,reloadKitchen]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
   const line = (label: string, amount: string, caption?: string) =>
