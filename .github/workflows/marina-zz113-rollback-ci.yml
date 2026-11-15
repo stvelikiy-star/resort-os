@@ -67,6 +67,7 @@ jobs:
           rm -rf "$baseline/migrations/zz117_marina_kitchen_stock_20261111"
           rm -rf "$baseline/migrations/zz118_marina_kitchen_waste_spoilage_20261115"
           rm -rf "$baseline/migrations/zz119_marina_kitchen_procurement_20261115"
+          rm -rf "$baseline/migrations/zz120_marina_owner_expenses_20261115"
           (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
           test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 37
           test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from information_schema.columns where table_name='operational_tasks' and column_name='scheduledFor'")" = 0
