@@ -1,7 +1,7 @@
 import { getDurableItem, removeDurableItem, setDurableItem } from './storage';
 
 /** A pending POST is not evidence of failure. Keep the lock across app restarts. */
-export type PendingDiningWrite = { operation: 'CREATE_TABLE' | 'CREATE_ORDER' | 'CREATE_MENU_DRAFT' | 'PRODUCTION_TARGET'; startedAt: string };
+export type PendingDiningWrite = { operation: 'CREATE_TABLE' | 'CREATE_ORDER' | 'CREATE_MENU_DRAFT' | 'PRODUCTION_TARGET' | 'SEAT_GUEST' | 'MOVE_GUEST' | 'RELEASE_TABLE' | 'POST_FOLIO'; startedAt: string };
 
 function key(hotelId: string, userId: string): string {
   // Live connection IDs contain the approved DNS hostname, including its dots.
@@ -18,7 +18,7 @@ export async function readPendingDiningWrite(hotelId: string, userId: string): P
   const value: unknown = JSON.parse(raw);
   if (!value || typeof value !== 'object') throw new Error('Invalid pending dining write');
   const record = value as Record<string, unknown>;
-  if (!['CREATE_TABLE', 'CREATE_ORDER', 'CREATE_MENU_DRAFT', 'PRODUCTION_TARGET'].includes(String(record.operation)) ||
+  if (!['CREATE_TABLE', 'CREATE_ORDER', 'CREATE_MENU_DRAFT', 'PRODUCTION_TARGET', 'SEAT_GUEST', 'MOVE_GUEST', 'RELEASE_TABLE', 'POST_FOLIO'].includes(String(record.operation)) ||
       typeof record.startedAt !== 'string') throw new Error('Invalid pending dining write');
   return record as PendingDiningWrite;
 }
