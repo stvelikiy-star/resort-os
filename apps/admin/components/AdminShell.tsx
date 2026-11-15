@@ -378,7 +378,7 @@ export default function AdminShell() {
         </div>
       </div>
       {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}
-      {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} onNavigate={(destination) => setTab(destination as Tab)} />}
+      {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} fl2={uiPreference === "future-luxury"} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && canAccess("PMS") && <PMSGrid agentMode={isAgent} readOnlyMode={isReception} />}
       {tab === "RATES" && canAccess("RATES") && <RateManagementBoard />}
       {tab === "GROUPS" && canAccess("GROUPS") && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
