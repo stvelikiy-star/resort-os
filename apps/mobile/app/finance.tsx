@@ -36,6 +36,25 @@ const KITCHEN_REPORT_COPY={
   notice:'Өзіндік құн мен өтінімдер төлем немесе пайда емес. Сынақ қоймасы есептелмейді.'},
 } as const;
 
+const CASH_RECONCILIATION_COPY={
+ ru:{title:'Сверка зарегистрированных денежных операций',
+  received:'Поступления от гостей (записанные)',paid:'Ручные оплаты расходов',
+  difference:'Разница зарегистрированных операций',open:'Неоплаченные расходы',
+  notice:'Это не прибыль, банковский остаток и не полный денежный поток. Возвраты, незарегистрированные операции и начисления не сверены.'},
+ kg:{title:'Катталган акча операцияларын салыштыруу',
+  received:'Коноктордон түшкөн төлөмдөр',paid:'Чыгымдар боюнча кол менен төлөмдөр',
+  difference:'Катталган операциялардын айырмасы',open:'Төлөнө элек чыгымдар',
+  notice:'Бул пайда, банктагы калдык же толук акча агымы эмес. Кайтаруулар жана башка операциялар салыштырылган жок.'},
+ en:{title:'Recorded cash movement comparison',
+  received:'Recorded guest receipts',paid:'Manually recorded expense payments',
+  difference:'Difference in recorded movements',open:'Unsettled expenses',
+  notice:'Not profit, verified bank balance or complete cash flow. Refunds, missing movements and recognition differences are not reconciled.'},
+ kz:{title:'Тіркелген ақша қозғалысын салыстыру',
+  received:'Қонақтардан тіркелген түсімдер',paid:'Қолмен тіркелген шығыс төлемдері',
+  difference:'Тіркелген қозғалыс айырмасы',open:'Төленбеген шығыстар',
+  notice:'Бұл пайда, банк қалдығы немесе толық ақша ағымы емес. Қайтарымдар және басқа операциялар салыстырылмаған.'},
+} as const;
+
 /** Only amounts verified in the exact hotel Core report are displayed.
  * Incoming payments are not earnings; this is NOT a P&L or tax report. */
 export default function Finance() {
@@ -43,6 +62,7 @@ export default function Finance() {
   const copy = useMobileCopy();
   const extra = OWNER_FINANCE_COPY[locale];
   const kitchenCopy = KITCHEN_REPORT_COPY[locale];
+  const cashCopy = CASH_RECONCILIATION_COPY[locale];
   const { c } = useTheme();
   const router = useRouter();
   const modules = useLiveModules();
@@ -57,11 +77,17 @@ export default function Finance() {
       modules.ownerKitchenManagement(from,to):Promise.resolve(null),
     [modules,allowed,user?.role,user?.id,hotel?.id],
   );
+  const recordedCash=useAsync(
+    () => allowed && user?.role==='OWNER' && modules ?
+      modules.ownerRecordedCashMovements(from,to):Promise.resolve(null),
+    [modules,allowed,user?.role,user?.id,hotel?.id],
+  );
+  const reloadCash = recordedCash.reload;
   const reloadKitchen = ownerKitchen.reload;
   const focused = useRef(false);
   useFocusEffect(useCallback(() => {
-    if (focused.current) { void reload(); void reloadKitchen(); } else focused.current = true;
-  }, [reload,reloadKitchen]));
+    if (focused.current) { void reload(); void reloadKitchen(); void reloadCash(); } else focused.current = true;
+  }, [reload,reloadKitchen,reloadCash]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
   const line = (label: string, amount: string, caption?: string) =>
@@ -165,6 +191,19 @@ export default function Finance() {
           <Text style={[font.small,{color:c.textMuted}]}>
             {kitchenCopy.notice}
           </Text>
+        </GlassCard>:null}
+      </>:null}
+      {user?.role==='OWNER'?<>
+        <SectionLabel>{cashCopy.title}</SectionLabel>
+        {recordedCash.loading?<LoadingShimmer count={1}/>:null}
+        {recordedCash.error?<ErrorState text={recordedCash.error.message}
+          retry={copy.retry} onRetry={recordedCash.reload}/>:null}
+        {recordedCash.data?<GlassCard style={{gap:space.sm}}>
+          {line(cashCopy.received,money(recordedCash.data.customer_payments_received_kgs))}
+          {line(cashCopy.paid,money(recordedCash.data.owner_expense_manual_settlements_kgs))}
+          {line(cashCopy.difference,money(recordedCash.data.observed_recorded_difference_kgs))}
+          {line(cashCopy.open,money(recordedCash.data.all_time_unsettled_expenses_kgs))}
+          <Text style={[font.small,{color:c.textMuted}]}>{cashCopy.notice}</Text>
         </GlassCard>:null}
       </>:null}
       {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to}/> : null}
