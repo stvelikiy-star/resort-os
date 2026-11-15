@@ -174,7 +174,7 @@ export default function KitchenDashboard() {
       {!showroom && production ? <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealsNotOrders}</Text> : null}
       {!showroom ? <>
         <SectionLabel>{chefCopy.procurement}</SectionLabel>
-        {targets?.ingredient_requirements ? <KitchenIngredients data={targets.ingredient_requirements}/> :
+        {targets?.ingredient_requirements ? <KitchenIngredients data={targets.ingredient_requirements} stock={stock}/> :
         <GlassCard testID="kitchen-procurement-data-pending" style={{gap:space.sm,borderLeftWidth:4,borderLeftColor:c.warning}}>
           <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.procurementUnavailable}</Text>
         </GlassCard>}
