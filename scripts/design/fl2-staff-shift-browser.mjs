@@ -25,7 +25,7 @@ try {
   });
   assert.ok(m.overflow<=1,'Page overflow '+JSON.stringify({width,theme,m}));
   assert.ok(m.headerOverflow<=1,'Staff header overflow '+JSON.stringify({width,theme,m}));
-  assert.equal(m.rects.length,4,'Expected 3 locale buttons and 1 dialog close');
+  assert.equal(m.rects.length,5,'Expected 4 authentic locale buttons and 1 dialog close');
   assert.ok(m.rects.every(x=>x.width>=43.9&&x.height>=43.9),'Staff target smaller than 44px '+JSON.stringify({width,theme,m}));
   await page.locator('.shift-modal-head button').focus();
   const focus=await page.locator('.shift-modal-head button').evaluate(e=>({outline:getComputedStyle(e).outlineStyle,width:getComputedStyle(e).outlineWidth}));
@@ -41,6 +41,6 @@ try {
   assert.notEqual(light.bg,dark.bg,'Dark/Light backgrounds not distinguished');
  }
  fs.writeFileSync(out+'/results.json',JSON.stringify({visualFixture:true,authenticatedRoleE2E:false,results},null,2));
- console.log('STAFF_SHIFT_VISUAL_PASS: 4 sizes x Dark/Light, >=44px 4 controls, no overflow, focus');
+ console.log('STAFF_SHIFT_VISUAL_PASS: 4 sizes x Dark/Light, >=44px 5 controls, no overflow, focus');
 }catch(error){fs.writeFileSync(out+'/failure.txt',String(error.stack||error));throw error;}
 finally{await browser.close();}
