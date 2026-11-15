@@ -161,9 +161,38 @@ export interface FinanceSummary {
   recent_payments?: { id: string; amount_kgs: number; method: string; status: string;
     booking_number?: string | null; guest_name?: string | null }[];
 }
-export type KitchenCostMovementKind='RECEIPT'|'PRODUCTION'|'WASTE'|'SPOILAGE';
+export type KitchenCostMovementKind='RECEIPT'|'PRODUCTION'|'WASTE'|'SPOILAGE'|'SUPPLIER_RETURN';
 export interface OwnerKitchenCostSegment {cost_kgs:string;movement_count:number}
 export type OwnerKitchenCostKinds=Record<KitchenCostMovementKind,OwnerKitchenCostSegment>;
+export interface OwnerKitchenSourceReconciliation {
+  inventory:{
+    real_book_inventory_value_kgs:string|null;
+    sample_book_inventory_value_kgs:string|null;
+    real_catalog_estimate_kgs:string;
+    sample_catalog_estimate_kgs:string;
+    valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    invalid_item_count:number;item_count:number;as_of:'CURRENT_SNAPSHOT_NOT_PERIOD_END';
+    linked_source:{
+      receipt_count:number;original_stock_cost_kgs:string;invoice_source_cost_kgs:string;
+      legacy_invoice_vs_stock_cost_delta_kgs:string;source_mismatch_count:number;
+      source_status:'REVIEW_LEGACY_LINKED_RECEIPT_COST'|'LINKED_MOVEMENTS_MATCH_INVOICE';
+    };
+  };
+  supplier_documents:{
+    document_count:number;gross_obligations_kgs:string;manual_settlements_kgs:string;
+    credit_notes_kgs:string;outstanding_payables_kgs:string;
+    return_count:number;return_stock_carrying_cost_kgs:string;
+    return_credit_minus_stock_cost_kgs:string;
+    payables_status:'RECONCILIATION_REQUIRED'|'RECORDED_OBLIGATIONS_BALANCED';
+  };
+  financial_truth:{
+    recognized_revenue_kgs:null;recognized_profit_kgs:null;
+    is_recognized_profit_complete:false;
+    supplier_settlements_are_customer_payments:false;stock_receipts_are_expenses:false;
+    stock_return_credit_difference_recognized:false;
+    scope:'CURRENT_PROPERTY_POSTED_FACTS_NOT_PERIOD_END';
+  };
+}
 export interface OwnerKitchenManagementReport {
   scope:'OWNER_ONLY_PROPERTY_SCOPED';
   period:{from:string;to:string;timezone:string};
@@ -172,20 +201,29 @@ export interface OwnerKitchenManagementReport {
   real_production_cost_kgs:string;
   real_loss_cost_kgs:string;
   real_total_consumption_and_loss_cost_kgs:string;
+  real_supplier_return_stock_debit_kgs:string;
+  source_reconciliation:OwnerKitchenSourceReconciliation;
   current_stock:{
     real_value_at_current_item_cost_kgs:string;
     sample_value_at_current_item_cost_kgs:string;
+    real_book_inventory_value_kgs:string|null;
+    sample_book_inventory_value_kgs:string|null;
+    valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    invalid_item_count:number;
     negative_balance_items:number;item_count:number;valuation_as_of:'CURRENT_NOT_PERIOD_END';
   };
   procurement_exposure:{
     approved_unreceived_at_current_item_cost_kgs:string;
     unapproved_requests_at_current_item_cost_kgs:string;
     approved_open_request_count:number;pending_approval_count:number;
-    settled_supplier_payables_kgs:null;
+    settled_supplier_payables_kgs:string;
+    gross_supplier_obligations_kgs:string;
+    credited_supplier_payables_kgs:string;
+    outstanding_supplier_payables_kgs:string;
   };
   truth:{report_type:'MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING';
     payment_created:false;profit:'NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER';
-    receipt:string;consumption:string;procurement:string;inventory:string};
+    receipt:string;consumption:string;procurement:string;inventory:string;returns:string};
 }
 export type OwnerExpenseCategory='SUPPLIES'|'UTILITIES'|'PAYROLL'|'MAINTENANCE'|'RENT'|'MARKETING'|'OTHER';
 export type OwnerExpenseMethod='CASH'|'BANK_TRANSFER'|'CARD'|'OTHER';
