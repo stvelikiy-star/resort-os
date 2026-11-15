@@ -99,8 +99,25 @@ def run_role(role):
     else:
         # Some roles expose their profile as a primary tab.
         tap("Profile",exact=False)
-    visible=await_labels(["Sign out","Log out","Выйти","Чыгуу"],"Sign-out action")
-    for option in ["Sign out","Log out","Выйти","Чыгуу"]:
+    # Profile's logout is intentionally BELOW the fold on 320-430dp phones.
+    # Native UIAutomator only exposes currently laid-out/visible nodes.
+    # Scroll the actual Android ScrollView rather than accepting a web/mock result.
+    logout_labels=["Sign out","Log out","Выйти","Чыгуу"]
+    visible=labels()
+    display=adb("shell","wm","size")
+    size=re.search(r"(\\d+)x(\\d+)",display)
+    assert size, f"Cannot determine native Android size: {display}"
+    width,height=map(int,size.groups())
+    for attempt in range(8):
+        if any(any(option.casefold()==item.casefold() for item in visible) for option in logout_labels):
+            break
+        adb("shell","input","swipe",str(width//2),str(int(height*.75)),str(width//2),str(int(height*.28)),"380")
+        time.sleep(1.3)
+        visible=labels()
+    else:
+        capture(role.lower()+"-missing-signout.png")
+        raise AssertionError(f"Native Profile logout remains unreachable after 8 real swipes: {visible[-45:]}")
+    for option in logout_labels:
         if any(option.casefold()==x.casefold() for x in visible):
             tap(option);break
     await_labels(["Connect to a hotel","Connect","Sign in","Войти"],"Signed-out screen")
