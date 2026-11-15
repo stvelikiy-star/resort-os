@@ -449,40 +449,112 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
       const value=objectResponse(await request<unknown>(
         'GET',p+'/admin/finance/owner/kitchen-operations?from_date='+safeIsoDate(from)+
         '&to_date='+safeIsoDate(to)),'owner kitchen management');
+      const money=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+      const signed=/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+      const validAmount=(v:unknown,allowNegative=false):v is string=>
+        typeof v==='string'&&(allowNegative?signed:money).test(v)&&Number.isFinite(Number(v));
+      const count=(v:unknown):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
       if(value.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||
-        !value.real_inventory_movements||!value.sample_inventory_movements||
-        value.truth===null||typeof value.truth!=='object'||
-        (value.truth as Record<string,unknown>).report_type!=='MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING'||
-        (value.truth as Record<string,unknown>).payment_created!==false||
-        (value.truth as Record<string,unknown>).profit!=='NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER')
-        throw new ApiError('UNKNOWN','Invalid owner kitchen finance truth');
-      const movements=['real_inventory_movements','sample_inventory_movements'];
-      const currency=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
-      for(const field of movements){
+         !value.real_inventory_movements||!value.sample_inventory_movements||
+         value.truth===null||typeof value.truth!=='object'||
+         (value.truth as Record<string,unknown>).report_type!=='MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING'||
+         (value.truth as Record<string,unknown>).payment_created!==false||
+         (value.truth as Record<string,unknown>).profit!=='NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER')
+         throw new ApiError('UNKNOWN','Invalid owner kitchen finance truth');
+      for(const field of ['real_inventory_movements','sample_inventory_movements']){
         const set=objectResponse(value[field],field);
-        for(const kind of ['RECEIPT','PRODUCTION','WASTE','SPOILAGE']){
+        for(const kind of ['RECEIPT','PRODUCTION','WASTE','SPOILAGE','SUPPLIER_RETURN']){
           const segment=objectResponse(set[kind],field+' '+kind);
-          if(typeof segment.cost_kgs!=='string'||!currency.test(segment.cost_kgs)||
-            typeof segment.movement_count!=='number')
+          if(!validAmount(segment.cost_kgs)||!count(segment.movement_count))
             throw new ApiError('UNKNOWN','Invalid kitchen cost row');
         }
       }
       for(const field of ['real_production_cost_kgs','real_loss_cost_kgs',
-        'real_total_consumption_and_loss_cost_kgs']){
-        if(typeof value[field]!=='string'||!currency.test(String(value[field])))
+        'real_total_consumption_and_loss_cost_kgs','real_supplier_return_stock_debit_kgs']){
+        if(!validAmount(value[field]))
           throw new ApiError('UNKNOWN','Invalid kitchen cost total');
       }
       const exposure=objectResponse(value.procurement_exposure,'procurement exposure');
-      const stock=objectResponse(value.current_stock,'current inventory valuation');
-      if(exposure.settled_supplier_payables_kgs!==null||
-        stock.valuation_as_of!=='CURRENT_NOT_PERIOD_END'||
-        typeof exposure.approved_unreceived_at_current_item_cost_kgs!=='string'||
-        typeof exposure.unapproved_requests_at_current_item_cost_kgs!=='string'||
-        !currency.test(exposure.approved_unreceived_at_current_item_cost_kgs)||
-        !currency.test(exposure.unapproved_requests_at_current_item_cost_kgs)||
-        typeof stock.real_value_at_current_item_cost_kgs!=='string'||
-        !currency.test(stock.real_value_at_current_item_cost_kgs))
-        throw new ApiError('UNKNOWN','Invalid owner procurement or inventory valuation');
+      const stock=objectResponse(value.current_stock,'current inventory');
+      const reconciliation=objectResponse(value.source_reconciliation,'owner stock reconciliation');
+      const inventory=objectResponse(reconciliation.inventory,'movement valued inventory');
+      const linked=objectResponse(inventory.linked_source,'invoice source links');
+      const suppliers=objectResponse(reconciliation.supplier_documents,'supplier obligations');
+      const truth=objectResponse(reconciliation.financial_truth,'owner reconciliation truth');
+      if(stock.valuation_as_of!=='CURRENT_NOT_PERIOD_END'||
+         inventory.as_of!=='CURRENT_SNAPSHOT_NOT_PERIOD_END'||
+         !['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(inventory.valuation_status))||
+         stock.valuation_status!==inventory.valuation_status||
+         !count(inventory.invalid_item_count)||!count(inventory.item_count)||
+         inventory.invalid_item_count>inventory.item_count||
+         !count(stock.invalid_item_count)||stock.invalid_item_count!==inventory.invalid_item_count||
+         !count(stock.negative_balance_items)||!count(stock.item_count)||
+         stock.item_count!==inventory.item_count)
+         throw new ApiError('UNKNOWN','Invalid owner inventory valuation status');
+      for(const field of ['real_value_at_current_item_cost_kgs',
+        'sample_value_at_current_item_cost_kgs']){
+        if(!validAmount(stock[field],true))
+          throw new ApiError('UNKNOWN','Invalid legacy stock estimate');
+      }
+      for(const field of ['real_catalog_estimate_kgs','sample_catalog_estimate_kgs'])
+        if(!validAmount(inventory[field],true))
+          throw new ApiError('UNKNOWN','Invalid catalog estimate');
+      for(const field of ['real_book_inventory_value_kgs','sample_book_inventory_value_kgs']){
+        const valueAt=inventory[field];
+        if((valueAt!==null&&!validAmount(valueAt))||
+           stock[field]!==valueAt||
+           (inventory.valuation_status==='MOVEMENT_BASED'&&valueAt===null)||
+           (inventory.valuation_status==='RECONCILIATION_REQUIRED'&&valueAt!==null))
+          throw new ApiError('UNKNOWN','Invalid movement stock value');
+      }
+      if(!count(linked.receipt_count)||!count(linked.source_mismatch_count)||
+         linked.source_mismatch_count>linked.receipt_count||
+         !validAmount(linked.original_stock_cost_kgs)||
+         !validAmount(linked.invoice_source_cost_kgs)||
+         !validAmount(linked.legacy_invoice_vs_stock_cost_delta_kgs,true)||
+         !['REVIEW_LEGACY_LINKED_RECEIPT_COST','LINKED_MOVEMENTS_MATCH_INVOICE'].includes(String(linked.source_status))||
+         ((linked.source_mismatch_count>0)!==(linked.source_status==='REVIEW_LEGACY_LINKED_RECEIPT_COST')))
+         throw new ApiError('UNKNOWN','Invalid invoice source reconciliation');
+      for(const field of ['approved_unreceived_at_current_item_cost_kgs',
+        'unapproved_requests_at_current_item_cost_kgs',
+        'settled_supplier_payables_kgs','gross_supplier_obligations_kgs',
+        'credited_supplier_payables_kgs']){
+        if(!validAmount(exposure[field]))
+          throw new ApiError('UNKNOWN','Invalid owner procurement exposure');
+      }
+      if(!validAmount(exposure.outstanding_supplier_payables_kgs,true)||
+         !count(exposure.approved_open_request_count)||!count(exposure.pending_approval_count))
+         throw new ApiError('UNKNOWN','Invalid procurement outstanding balance');
+      for(const field of ['document_count','return_count'])
+        if(!count(suppliers[field]))
+          throw new ApiError('UNKNOWN','Invalid supplier ledger count');
+      for(const field of ['gross_obligations_kgs','manual_settlements_kgs','credit_notes_kgs',
+        'return_stock_carrying_cost_kgs']){
+        if(!validAmount(suppliers[field]))
+          throw new ApiError('UNKNOWN','Invalid supplier ledger amount');
+      }
+      if(!validAmount(suppliers.outstanding_payables_kgs,true)||
+         !validAmount(suppliers.return_credit_minus_stock_cost_kgs,true)||
+         !['RECONCILIATION_REQUIRED','RECORDED_OBLIGATIONS_BALANCED'].includes(String(suppliers.payables_status))||
+         suppliers.outstanding_payables_kgs!==exposure.outstanding_supplier_payables_kgs||
+         suppliers.manual_settlements_kgs!==exposure.settled_supplier_payables_kgs||
+         suppliers.credit_notes_kgs!==exposure.credited_supplier_payables_kgs||
+         suppliers.gross_obligations_kgs!==exposure.gross_supplier_obligations_kgs||
+         ((Number(suppliers.outstanding_payables_kgs)<0)!==
+          (suppliers.payables_status==='RECONCILIATION_REQUIRED')))
+         throw new ApiError('UNKNOWN','Invalid supplier payable reconciliation');
+      const difference=Number(suppliers.gross_obligations_kgs)-
+        Number(suppliers.manual_settlements_kgs)-Number(suppliers.credit_notes_kgs);
+      if(!Number.isFinite(difference)||
+         Math.abs(difference-Number(suppliers.outstanding_payables_kgs))>0.00011)
+         throw new ApiError('UNKNOWN','Supplier payable ledger does not reconcile');
+      if(truth.recognized_revenue_kgs!==null||truth.recognized_profit_kgs!==null||
+         truth.is_recognized_profit_complete!==false||
+         truth.supplier_settlements_are_customer_payments!==false||
+         truth.stock_receipts_are_expenses!==false||
+         truth.stock_return_credit_difference_recognized!==false||
+         truth.scope!=='CURRENT_PROPERTY_POSTED_FACTS_NOT_PERIOD_END')
+         throw new ApiError('UNKNOWN','Incomplete OWNER profit may not be claimed');
       return value as unknown as OwnerKitchenManagementReport;
     },
     ownerExpenses: async (from:string,to:string):Promise<OwnerExpenseLedger> => {
