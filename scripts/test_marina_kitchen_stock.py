@@ -3,7 +3,7 @@ import unittest
 import uuid
 from decimal import Decimal
 from pydantic import ValidationError
-from services.api.app.kitchen_stock import ItemWrite, ReceiptWrite, ConsumeWrite
+from services.api.app.kitchen_stock import ItemWrite, ReceiptWrite, ConsumeWrite, LossWrite
 
 class StockContracts(unittest.TestCase):
     def test_item_name_is_canonical_and_sample_is_explicit(self):
@@ -27,6 +27,24 @@ class StockContracts(unittest.TestCase):
         eggs=Decimal(2)*Decimal(2)*Decimal(12)
         bread=Decimal('0.1')*Decimal(2)*Decimal(100)
         self.assertEqual(eggs+bread,Decimal(68))
+    def test_stock_losses_require_reason_and_positive_quantity(self):
+        x=LossWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),
+                    kind="SPOILAGE",quantity="0.250000",reason="  Expired   stock  ")
+        self.assertEqual(x.reason,"Expired stock")
+        self.assertEqual(x.quantity,Decimal("0.250000"))
+        for kind in ("RECEIPT","PRODUCTION","OTHER"):
+            with self.assertRaises(ValidationError):
+                LossWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),
+                          kind=kind,quantity="1",reason="Expired stock")
+        for quantity in ("0","-0.1"):
+            with self.assertRaises(ValidationError):
+                LossWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),
+                          kind="WASTE",quantity=quantity,reason="Unusable stock")
+        for reason in ("", "x", "   "):
+            with self.assertRaises(ValidationError):
+                LossWrite(movement_id=uuid.uuid4(),stock_item_id=uuid.uuid4(),
+                          kind="WASTE",quantity="1",reason=reason)
+
     def test_bad_target_id(self):
         with self.assertRaises(ValidationError):ConsumeWrite(production_target_id='not-a-uuid')
 if __name__=='__main__':unittest.main()
