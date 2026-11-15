@@ -28,7 +28,7 @@ class DraftAuthoringTests(unittest.TestCase):
         app.state.db = SimpleNamespace(acquire=context)
         app.include_router(menu.router)
         app.include_router(kitchen.admin_router)
-        for dependency in (menu.draft_create_access, kitchen.kitchen_operations_access):
+        for dependency in (menu.draft_create_access, kitchen._waiter_menu_base):
             app.dependency_overrides[dependency] = lambda: self.user
         self.client = TestClient(app)
         self.patchers = [patch.object(menu, '_property_id', AsyncMock(return_value=self.pid)),
@@ -60,7 +60,7 @@ class DraftAuthoringTests(unittest.TestCase):
             self.user['role'] = role
             self.assertEqual(self.client.patch(self.path, json={"name_ru": "Changed"}).status_code, 403)
             self.assertEqual(self.client.put(self.path+'/recipe', json=self.recipe).status_code, 403)
-            self.assertEqual(self.client.get('/api/v1/kitchen/menu').status_code, 403)
+            self.assertEqual(self.client.get('/api/v1/kitchen/menu').status_code, 200 if role == 'WAITER' else 403)
         self.conn.fetchrow.assert_not_called()
 
     def test_cook_draft_recipe_version_conflict_and_approval_denial(self):
@@ -80,14 +80,21 @@ class DraftAuthoringTests(unittest.TestCase):
             self.assertEqual(self.client.patch(self.path, json={'is_active':True,'is_draft':False}).status_code, 200)
             self.assertEqual(self.client.put(self.path+'/recipe', json={**self.recipe,'status':'APPROVED'}).status_code, 200)
 
-    def test_list_scopes_cook_to_inactive_drafts_and_management_to_property(self):
-        for role in ('COOK', 'OWNER'):
+    def test_list_scopes_cook_drafts_waiter_approved_only_and_owner_all(self):
+        for role in ('COOK', 'OWNER', 'WAITER'):
             self.user['role'] = role
-            self.assertEqual(self.client.get('/api/v1/kitchen/menu').status_code, 200)
-            sql, pid, management = self.conn.fetch.call_args.args
+            result = self.client.get('/api/v1/kitchen/menu')
+            self.assertEqual(result.status_code, 200, result.text)
+            sql, pid, cook_draft_bypass, waiter_approved_bypass = self.conn.fetch.call_args.args
             self.assertEqual(pid, self.pid)
-            self.assertEqual(management, role == 'OWNER')
+            self.assertEqual(cook_draft_bypass, role != 'COOK')
+            self.assertEqual(waiter_approved_bypass, role != 'WAITER')
             self.assertIn('"isDraft"=true AND "isActive"=false', sql)
+            self.assertIn('"isActive"=true AND "isDraft"=false', sql)
+            if role == 'WAITER':
+                self.assertNotIn('recipe', result.json()['items'][0])
+            else:
+                self.assertIn('recipe', result.json()['items'][0])
 
 
 if __name__ == '__main__':
