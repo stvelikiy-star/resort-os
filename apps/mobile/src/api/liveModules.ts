@@ -75,6 +75,13 @@ export interface BookingCommit extends BookingDraft {
 export interface Hold {
   id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
 }
+export interface KitchenAvailabilityItem {
+  id: string; code: string; name_ru: string; name_kg: string; name_kz: string;
+  name_en: string; is_available: boolean;
+}
+export interface KitchenAvailabilityAck {
+  id: string; is_available: boolean; already_set: boolean; reason: string;
+}
 export interface KitchenStockItem {
   id:string; name:string; unit:'KG'|'L'|'PCS'; cost_per_unit_kgs:string; is_sample:boolean; balance:string;
 }
@@ -482,6 +489,34 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         source: 'TABLE', table_id: safeRouteId(table), items,
       }), 'table order');
       if (typeof result.id !== 'string' || result.status !== 'NEW') throw new ApiError('UNKNOWN', 'Invalid order acknowledgement');
+    },
+    kitchenAvailability: async (): Promise<KitchenAvailabilityItem[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p+'/kitchen/menu/availability'), 'availability');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN', 'Invalid availability list');
+      return payload.items.map(value => {
+        const row = objectResponse(value, 'availability item');
+        for (const field of ['id','code','name_ru','name_kg','name_kz','name_en']) {
+          if (typeof row[field] !== 'string') throw new ApiError('UNKNOWN', 'Invalid availability field');
+        }
+        if (typeof row.is_available !== 'boolean') throw new ApiError('UNKNOWN', 'Invalid availability status');
+        return {id:safeRouteId(row.id as string),code:row.code as string,
+          name_ru:row.name_ru as string,name_kg:row.name_kg as string,
+          name_kz:row.name_kz as string,name_en:row.name_en as string,
+          is_available:row.is_available} satisfies KitchenAvailabilityItem;
+      });
+    },
+    stopKitchenItem: async (id: string, reason: string): Promise<KitchenAvailabilityAck> => {
+      reviewGate();
+      const clean = reason.trim().replace(/\\s+/g, ' ');
+      if (clean.length < 3 || clean.length > 500)
+        throw new ApiError('BAD_REQUEST', 'Reason must contain 3–500 characters');
+      const itemId = safeRouteId(id);
+      const row = objectResponse(await request<unknown>('PUT',
+        p+'/kitchen/menu/'+itemId+'/availability', {available:false,reason:clean}), 'stoplist acknowledgment');
+      if (row.id !== itemId || row.is_available !== false || typeof row.already_set !== 'boolean' ||
+          row.reason !== clean) throw new ApiError('UNKNOWN', 'Invalid stoplist acknowledgment');
+      return row as unknown as KitchenAvailabilityAck;
     },
     kitchenStock: async (): Promise<KitchenStockSnapshot> => {
       reviewGate();
