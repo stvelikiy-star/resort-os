@@ -19,6 +19,23 @@ const STORAGE_KEY = "three-crowns-admin-locale";
 
 
 const KZ_EXACT: Record<string, string> = {
+  "Карточка номера": "Бөлме карточкасы",
+  "Новая бронь": "Жаңа бронь",
+  "Шахматка бронирований": "Брондау шахматкасы",
+  "Номера не найдены.": "Бөлмелер табылмады.",
+
+  "Добро пожаловать в MARINA SMART!": "MARINA SMART жүйесіне қош келдіңіз!",
+  // C1 navigation labels, consumed by the existing explicit Kazakh lookup.
+  "Оформление": "Көрініс",
+  "Гости": "Қонақтар",
+  "Команда": "Команда",
+  "Развитие": "Даму",
+  "Разделы": "Бөлімдер",
+  "Открыть разделы": "Бөлімдерді ашу",
+  "Закрыть разделы": "Бөлімдерді жабу",
+  "Раздел недоступен": "Бөлім қолжетімсіз",
+  "Booking / Каналы продаж": "Booking / Сату арналары",
+  "Отзывы / Рост": "Пікірлер / Өсу",
   "WhatsApp принял сообщение в очередь. Доставку подтвердит отдельный webhook GREEN-API.": "WhatsApp хабарламаны кезекке қабылдады. Жеткізуді GREEN-API webhook арқылы растау қажет.",
   "Обрабатываю…": "Өңделуде…",
   "Отправка наружу выключена, пока реальный адаптер канала не настроен.": "Нақты арна адаптері бапталмайынша сыртқа жіберу өшірулі.",
@@ -214,6 +231,12 @@ const exact: Record<string, Phrase> = {
 };
 
 const common: Phrase[] = [
+  { ru: "Карточка номера", kg: "Бөлмөнүн карточкасы", en: "Room details" },
+  { ru: "Новая бронь", kg: "Жаңы бронь", en: "New reservation" },
+  { ru: "Шахматка бронирований", kg: "Брондоо шахматкасы", kz: "Брондау шахматкасы", en: "Booking calendar" },
+  { ru: "Номера не найдены.", kg: "Бөлмөлөр табылган жок.", kz: "Бөлмелер табылмады.", en: "No rooms found." },
+
+  { ru: "Добро пожаловать в MARINA SMART!", kg: "MARINA SMART системасына кош келиңиз!", kz: "MARINA SMART жүйесіне қош келдіңіз!", en: "Welcome to MARINA SMART!" },
   { ru: "HOLD недоступен", kg: "HOLD жеткиликсиз", kz: "HOLD қолжетімсіз", en: "HOLD unavailable" },
   { ru: "Не удалось освободить номер", kg: "Бөлмөнү бошотуу мүмкүн болгон жок", kz: "Бөлмені босату мүмкін болмады", en: "Could not release the room" },
   { ru: "Не удалось удержать номер", kg: "Бөлмөнү убактылуу кармоо мүмкүн болгон жок", kz: "Бөлмені уақытша ұстап тұру мүмкін болмады", en: "Could not place the room on hold" },
@@ -266,6 +289,17 @@ const common: Phrase[] = [
   { ru: "Устаревшая роль · питание", kg: "Эскирген роль · тамактануу", kz: "Ескірген рөл · тамақтану", en: "Legacy role · dining" },
   // Guest reviews, WhatsApp and staff access — explicit RU/KG/KZ/EN.
   { ru: "Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.", kg: "Тышкы шлюз кирүү өтүнүчүн өткөргөн жок. Cloudflare Access'ти текшериңиз же жергиликтүү даректи ачыңыз.", kz: "Сыртқы шлюз кіру сұрауын өткізбеді. Cloudflare Access-ті тексеріңіз немесе жергілікті мекенжайды ашыңыз.", en: "The external gateway rejected the sign-in request. Check Cloudflare Access or open the local address." },
+  // C1 shell navigation — explicit RU/KG/KZ/EN using the existing locale runtime.
+  { ru: "Оформление", kg: "Көрүнүш", kz: "Көрініс", en: "Appearance" },
+  { ru: "Гости", kg: "Коноктор", kz: "Қонақтар", en: "Guests" },
+  { ru: "Команда", kg: "Команда", kz: "Команда", en: "Team" },
+  { ru: "Развитие", kg: "Өнүгүү", kz: "Даму", en: "Growth" },
+  { ru: "Разделы", kg: "Бөлүмдөр", kz: "Бөлімдер", en: "Sections" },
+  { ru: "Открыть разделы", kg: "Бөлүмдөрдү ачуу", kz: "Бөлімдерді ашу", en: "Open sections" },
+  { ru: "Закрыть разделы", kg: "Бөлүмдөрдү жабуу", kz: "Бөлімдерді жабу", en: "Close sections" },
+  { ru: "Раздел недоступен", kg: "Бөлүм жеткиликсиз", kz: "Бөлім қолжетімсіз", en: "Section unavailable" },
+  { ru: "Booking / Каналы продаж", kg: "Booking / Сатуу каналдары", kz: "Booking / Сату арналары", en: "Booking / Sales channels" },
+  { ru: "Отзывы / Рост", kg: "Пикирлер / Өсүү", kz: "Пікірлер / Өсу", en: "Reviews / Growth" },
   { ru: "Разделы MARINA SMART", kg: "MARINA SMART бөлүмдөрү", kz: "MARINA SMART бөлімдері", en: "MARINA SMART sections" },
   { ru: "Внешний вид интерфейса", kg: "Интерфейстин көрүнүшү", kz: "Интерфейс көрінісі", en: "Interface appearance" },
   { ru: "Цветовая тема Future Luxury", kg: "Future Luxury түс темасы", kz: "Future Luxury түс тақырыбы", en: "Future Luxury color theme" },
@@ -351,6 +385,20 @@ const common: Phrase[] = [
   { ru: "Не указан", kg: "Көрсөтүлгөн эмес", en: "Not specified" },
 ];
 
+
+/* C3 PMS presentation-only labels; server statuses and financial operations unchanged. */
+common.push(
+  { ru: "Счёт гостя · MARINA SMART", kg: "Коноктун эсеби · MARINA SMART", kz: "Қонақ шоты · MARINA SMART", en: "Guest account · MARINA SMART" },
+  { ru: "Оплата фиксируется только после фактического получения денег.", kg: "Төлөм акча иш жүзүндө алынгандан кийин гана катталат.", kz: "Төлем ақша нақты алынғаннан кейін ғана тіркеледі.", en: "Payments are recorded only after funds are actually received." },
+  { ru: "Списано", kg: "Эсептен чыгарылды", kz: "Есептен шығарылды", en: "Waived" },
+  { ru: "Аннулировано", kg: "Жокко чыгарылды", kz: "Күші жойылды", en: "Voided" },
+  { ru: "Оплачено", kg: "Төлөндү", kz: "Төленді", en: "Paid" },
+  { ru: "Ожидает", kg: "Күтүлүүдө", kz: "Күтілуде", en: "Pending" },
+  { ru: "Ошибка", kg: "Ката", kz: "Қате", en: "Failed" },
+  { ru: "Возвращено", kg: "Кайтарылды", kz: "Қайтарылды", en: "Refunded" },
+  { ru: "PMS · Групповая бронь", kg: "PMS · Топтук бронь", kz: "PMS · Топтық бронь", en: "PMS · Group booking" },
+  { ru: "Тариф гостиницы", kg: "Мейманкананын тарифи", kz: "Қонақүй тарифі", en: "Hotel rate" },
+);
 
 /* MARINA_I18N_EXTENDED_V1 */
 common.push(

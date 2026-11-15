@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import AgentsBoard from "./AgentsBoard";
 import DashboardBoard from "./DashboardBoard";
 import DiningManagementBoard from "./DiningManagementBoard";
@@ -30,6 +30,8 @@ import MarinaAiAssistant from "./MarinaAiAssistant";
 import ChannelManagerBoard from "./ChannelManagerBoard";
 import { readMarinaUiPreference, writeMarinaUiPreference, type MarinaUiPreference } from "../lib/marina-ui-preference";
 import { readFl2Theme, writeFl2Theme, type Fl2Theme } from "../lib/fl2-appearance";
+
+import { Activity, BedDouble, CalendarDays, ChartNoAxesCombined, CircleDollarSign, ClipboardList, ContactRound, DoorOpen, FileChartColumn, Globe, Handshake, House, Inbox, LayoutGrid, Megaphone, Menu, MessageCircle, NotebookText, QrCode, Settings, SlidersHorizontal, Sparkles, Tags, Users, Utensils, Wrench, X, type LucideIcon } from "lucide-react";
 
 type User = {
   id: string;
@@ -61,6 +63,48 @@ const MODULE_TABS: Record<string, Tab> = {
   SETTINGS: "SETTINGS", HOTEL_RULES: "HOTEL_RULES", CHANNELS: "CHANNELS",
 };
 
+// Presentation only. module gates mirror the unchanged Legacy navigation below.
+const FL2_NAV_GROUPS: { title: string; items: { tab: Tab; label: string; icon: LucideIcon; module?: string }[] }[] = [
+  { title: "Операции", items: [
+    { tab: "DASHBOARD", label: "Главная", icon: House },
+    { tab: "PMS", label: "Шахматка", icon: LayoutGrid },
+    { tab: "RESERVATIONS", label: "Ресепшен", icon: DoorOpen },
+    { tab: "REQUESTS", label: "Заявки", icon: ClipboardList },
+    { tab: "RATES", label: "Цены / Сезоны", icon: CalendarDays },
+    { tab: "GROUPS", label: "Групповая бронь", icon: BedDouble, module: "GROUPS" },
+    { tab: "CHANNELS", label: "Booking / Каналы продаж", icon: Globe },
+    { tab: "DINING", label: "Питание / Ресторан", icon: Utensils, module: "DINING" },
+  ] },
+  { title: "Гости", items: [
+    { tab: "GUESTS", label: "Гости / История", icon: ContactRound },
+    { tab: "SERVICES", label: "Сервис гостя", icon: Sparkles },
+    { tab: "INBOX", label: "Все сообщения", icon: Inbox, module: "INBOX" },
+    { tab: "WHATSAPP", label: "WhatsApp / AI", icon: MessageCircle },
+  ] },
+  { title: "Финансы", items: [
+    { tab: "FINANCE", label: "Финансы", icon: CircleDollarSign },
+    { tab: "REPORTS", label: "Отчёты / Аналитика", icon: FileChartColumn },
+  ] },
+  { title: "Команда", items: [
+    { tab: "OPS", label: "Уборка / Ремонт", icon: Wrench },
+    { tab: "STAFF", label: "Персонал", icon: Users },
+  ] },
+  { title: "Развитие", items: [
+    { tab: "AGENTS", label: "Агентства", icon: Handshake, module: "AGENTS" },
+    { tab: "MARKETING", label: "Маркетинг", icon: Megaphone, module: "MARKETING" },
+    { tab: "OFFERS", label: "Предложения гостям", icon: Tags, module: "OFFERS" },
+    { tab: "GROWTH", label: "Отзывы / Рост", icon: ChartNoAxesCombined, module: "GROWTH" },
+    { tab: "CONTENT", label: "Сайт / Контент", icon: Globe, module: "CONTENT" },
+  ] },
+  { title: "Настройки", items: [
+    { tab: "SETTINGS", label: "Настройки гостиницы", icon: Settings },
+    { tab: "HOTEL_RULES", label: "Знания отеля / MARINA AI", icon: NotebookText },
+    { tab: "SERVICE_SETTINGS", label: "Настройки услуг", icon: SlidersHorizontal },
+    { tab: "ROOM_QR", label: "QR номеров", icon: QrCode, module: "ROOM_QR" },
+    { tab: "POINT_QR", label: "QR зон", icon: QrCode, module: "POINT_QR" },
+  ] },
+];
+
 function initialTab(role?: string | null, permissions: string[] = []): Tab {
   const preferred: Tab = ["OWNER", "MANAGER"].includes(role || "") ? "DASHBOARD" : role === "RECEPTION" ? "RESERVATIONS" : role === "AGENT" ? "PMS" : ["MAID", "TECHNICIAN"].includes(role || "") ? "OPS" : "DASHBOARD";
   return permissions.includes(preferred) ? preferred : (permissions.map((item) => MODULE_TABS[item]).find(Boolean) || preferred);
@@ -89,6 +133,21 @@ export default function AdminShell() {
   const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
   const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
   const [fl2Theme, setFl2Theme] = useState<Fl2Theme>("dark");
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationRef = useRef<HTMLElement>(null);
+  const navigationToggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (uiPreference !== "future-luxury") return;
+    const nav = navigationRef.current;
+    const current = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !current) return;
+    // Scroll only the navigation, never jump the working page on a data refresh.
+    const outer = nav.getBoundingClientRect();
+    const inner = current.getBoundingClientRect();
+    if (inner.top < outer.top) nav.scrollTop += inner.top - outer.top;
+    else if (inner.bottom > outer.bottom) nav.scrollTop += inner.bottom - outer.bottom;
+  }, [tab, uiPreference, navigationOpen]);
 
   useEffect(() => {
     setUiPreference(readMarinaUiPreference());
@@ -317,15 +376,47 @@ export default function AdminShell() {
   const canUseOps = canAccess("OPS");
   const moduleEnabled = (module: string) => enabledModules.includes(module);
 
+  const visibleGroups = FL2_NAV_GROUPS.map(group => ({ ...group, items: group.items.filter(item => canAccess(item.tab) && (!item.module || moduleEnabled(item.module))) })).filter(group => group.items.length);
+  const currentItem = visibleGroups.flatMap(group => group.items).find(item => item.tab === tab);
+  const currentLabel = currentItem ? (isAgent && tab === "PMS" ? "Шахматка / Брони" : currentItem.label) : "Раздел недоступен";
+
+  const appearanceControls = <>
+<div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
+            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
+            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
+          </div>
+          {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
+            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
+            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
+          </div>}
+  </>;
+
   return (
     <>
-      <div className="auth-toolbar admin-nav">
+      <div className="auth-toolbar admin-nav" data-fl2-shell={uiPreference === "future-luxury" ? "true" : undefined}>
         <div className="admin-identity">
           <img className="marina-brand-logo-small" src="/marina-smart-approved.png" alt="MARINA SMART" />
           {hotelLogoUrl && <img className="hotel-brand-logo-small" src={hotelLogoUrl} alt={hotelName || "Логотип отеля"} />}
           <div><strong>MARINA SMART · Hotel OS</strong><span>{hotelName ? `${hotelName} · ` : ""}{user.display_name} · {user.role}</span></div>
         </div>
-        <nav className="admin-tabs" aria-label="Разделы MARINA SMART">
+        {uiPreference === "future-luxury" ? <>
+          <div className="fl2-current-section">
+            <span className="fl2-current-label"><Activity size={18} aria-hidden="true" /><strong>{currentLabel}</strong></span>
+            <button ref={navigationToggleRef} className="fl2-navigation-toggle" type="button" aria-label={navigationOpen ? "Закрыть разделы" : "Открыть разделы"} aria-expanded={navigationOpen} aria-controls="fl2-section-navigation" onClick={() => setNavigationOpen(value => !value)}>
+              {navigationOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}<span>Разделы</span>
+            </button>
+          </div>
+          <nav id="fl2-section-navigation" className="fl2-grouped-navigation" ref={navigationRef} data-open={navigationOpen} aria-label="Разделы MARINA SMART" onKeyDown={event => {
+            if (event.key === "Escape") { setNavigationOpen(false); navigationToggleRef.current?.focus(); }
+          }}>
+            {visibleGroups.map((group, index) => <section className="fl2-nav-group" key={group.title} aria-labelledby={`fl2-nav-group-${index}`}>
+              <h2 id={`fl2-nav-group-${index}`}>{group.title}</h2>
+              {group.items.map(({ tab: destination, label, icon: Icon }) => <button key={destination} type="button" data-section={destination} aria-current={tab === destination ? "page" : undefined} onClick={() => { setTab(destination); setNavigationOpen(false); if (window.matchMedia("(max-width: 1100px)").matches) navigationToggleRef.current?.focus(); }}>
+                <Icon size={19} strokeWidth={1.7} aria-hidden="true" /><span>{isAgent && destination === "PMS" ? "Шахматка / Брони" : label}</span>
+              </button>)}
+            </section>)}
+          </nav>
+        </> : <nav className="admin-tabs" aria-label="Разделы MARINA SMART">
           {canAccess("WHATSAPP") && <button className={tab === "WHATSAPP" ? "active" : ""} onClick={() => setTab("WHATSAPP")}>WhatsApp / AI</button>}
           {canAccess("PMS") && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Шахматка"}</button>}
           {canAccess("RESERVATIONS") && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен</button>}
@@ -364,21 +455,20 @@ export default function AdminShell() {
               {canAccess("SETTINGS") && <button className={tab === "SETTINGS" ? "active" : ""} onClick={() => setTab("SETTINGS")}>Настройки гостиницы</button>}
             </div>
           </details>}
-        </nav>
+        </nav>}
         <div className="admin-shell-actions">
-          <div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
-            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
-            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
-          </div>
-          {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
-            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
-            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
-          </div>}
+          {uiPreference === "future-luxury" ? <details className="fl2-style-options" onKeyDown={event => {
+            if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); }
+          }}>
+            <summary><SlidersHorizontal size={18} aria-hidden="true" /><span>Оформление</span></summary>
+            <div className="fl2-style-panel">{appearanceControls}</div>
+          </details> : appearanceControls}
+          {uiPreference === "future-luxury" && <div className="fl2-assistant-dock"><MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => { setTab(destination as Tab); setNavigationOpen(false); }} /></div>}
           <button className="logout-button" onClick={logout}>Выйти</button>
         </div>
       </div>
       {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}
-      {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} onNavigate={(destination) => setTab(destination as Tab)} />}
+      {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} fl2={uiPreference === "future-luxury"} onNavigate={(destination) => setTab(destination as Tab)} />}
       {tab === "PMS" && canAccess("PMS") && <PMSGrid agentMode={isAgent} readOnlyMode={isReception} />}
       {tab === "RATES" && canAccess("RATES") && <RateManagementBoard />}
       {tab === "GROUPS" && canAccess("GROUPS") && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
@@ -408,7 +498,7 @@ export default function AdminShell() {
         onNavigate={(destination) => setTab(destination)}
         onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
       />}
-      <MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => setTab(destination as Tab)} />
+      {uiPreference === "legacy" && <MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
     </>
   );
 }

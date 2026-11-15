@@ -9,6 +9,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
+from .auth import _client_ip
 from .main import check_availability, get_property_id
 
 router = APIRouter(prefix="/api/v1/public/ai-admin", tags=["public-ai-admin"])
@@ -61,10 +62,10 @@ class PublicAiAdminRequest(BaseModel):
 
 
 def _client_key(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-    if forwarded:
-        return forwarded[:120]
-    return request.client.host if request.client else "unknown"
+    # Reuse Core auth's trusted-proxy policy; untrusted X-Forwarded-For is
+    # attacker-controlled and must never select a fresh AI rate-limit bucket.
+    # AUTH_TRUST_PROXY_HEADERS is safe only behind an enforced trusted proxy.
+    return _client_ip(request)
 
 
 def _enforce_rate_limit(request: Request) -> None:

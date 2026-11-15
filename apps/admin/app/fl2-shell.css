@@ -1,0 +1,71 @@
+/* C1: shell only. Shared --mx-* tokens; Legacy and board surfaces unchanged. */
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] { background:var(--mx-glass-strong);color:var(--mx-ink);border-color:var(--mx-edge);box-shadow:var(--mx-shadow);backdrop-filter:none;gap:12px; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] * { box-sizing:border-box; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-identity { min-height:0;padding:0 4px 14px;gap:10px;text-align:left;flex-wrap:nowrap;justify-content:flex-start; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .marina-brand-logo-small { width:48px;height:48px;flex:0 0 48px;object-fit:contain; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-identity>div { flex:1;min-width:0;gap:5px; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-identity strong { font-size:12px;line-height:1.4;letter-spacing:.02em;color:var(--mx-ink);white-space:normal; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-identity span { color:var(--mx-muted);font-size:12px;line-height:1.4;overflow-wrap:anywhere;white-space:normal;max-width:none; }
+html[data-marina-ui="future-luxury"] .fl2-current-section { display:flex;align-items:center;gap:10px;flex:0 0 auto;min-width:0;padding:10px 8px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-accent-soft); }
+html[data-marina-ui="future-luxury"] .fl2-current-label { display:flex;align-items:center;gap:9px;min-width:0;color:var(--mx-ink);font-size:13px;line-height:1.4; }
+html[data-marina-ui="future-luxury"] .fl2-current-label>svg { flex-shrink:0;color:var(--mx-accent); }
+html[data-marina-ui="future-luxury"] .fl2-current-label strong { overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .fl2-navigation-toggle { display:none; }
+html[data-marina-ui="future-luxury"] .fl2-grouped-navigation { min-width:0;min-height:0;flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:var(--mx-edge-strong) transparent;padding:2px 6px 6px 2px; }
+html[data-marina-ui="future-luxury"] .fl2-nav-group+.fl2-nav-group { margin-top:18px; }
+html[data-marina-ui="future-luxury"] .fl2-nav-group h2 { margin:0 0 7px;padding:0 12px;font-size:11px;font-weight:700;line-height:1.5;letter-spacing:.08em;text-transform:uppercase;color:var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .fl2-nav-group button { display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:2px 0;padding:10px 12px;border:1px solid transparent;border-radius:var(--mx-radius-sm);background:transparent;color:var(--mx-ink);text-align:left;font-family:inherit;font-size:13px;font-weight:500;line-height:1.4;cursor:pointer;transition:background-color 160ms ease,border-color 160ms ease; }
+html[data-marina-ui="future-luxury"] .fl2-nav-group button svg { flex:0 0 19px;color:var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .fl2-nav-group button span { min-width:0;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"] .fl2-nav-group button:hover { background:var(--mx-accent-soft);border-color:var(--mx-edge); }
+html[data-marina-ui="future-luxury"] .fl2-nav-group button[aria-current="page"] { background:var(--mx-accent);color:var(--mx-accent-ink);font-weight:700;border-color:var(--mx-accent);box-shadow:var(--mx-glow); }
+html[data-marina-ui="future-luxury"] .fl2-nav-group button[aria-current="page"] svg { color:currentColor; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions { gap:8px;border-color:var(--mx-edge); }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] :is(.shell-theme-toggle,.fl2-theme-switch) { display:flex;gap:2px;border:1px solid var(--mx-edge);background:var(--mx-bg);padding:2px;border-radius:var(--mx-radius-sm); }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] :is(.shell-theme-toggle,.fl2-theme-switch) button { flex:1;min-height:44px;padding:6px 10px;background:transparent;color:var(--mx-muted);border:0;border-radius:8px;font-size:12px;line-height:1.3;cursor:pointer;white-space:nowrap; }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] :is(.shell-theme-toggle,.fl2-theme-switch) button[aria-pressed="true"] { color:var(--mx-accent-ink);background:var(--mx-accent); }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .logout-button { position:static;min-height:44px;width:100%;padding:8px 12px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-glass);color:var(--mx-ink);box-shadow:none;font-size:13px; }
+html[data-marina-ui="future-luxury"] .fl2-assistant-dock>button { position:static;min-height:44px;width:100%;justify-content:center;padding:8px 12px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-glass);color:var(--mx-ink);box-shadow:none;font-size:13px; }
+html[data-marina-ui="future-luxury"] .fl2-assistant-dock:empty { display:none; }
+html[data-marina-ui="future-luxury"] .fl2-assistant-dock>button>span:first-child { width:26px;height:26px;background:var(--mx-accent-soft);color:var(--mx-accent); }
+html[data-marina-ui="future-luxury"] .fl2-assistant-dock>section { z-index:2600;bottom:max(16px,env(safe-area-inset-bottom));height:min(650px,calc(100dvh - 32px)); }
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] :is(button,a):focus-visible { outline:3px solid var(--mx-focus);outline-offset:2px; }
+html[data-marina-ui="future-luxury"] .admin-locale-switcher { left:16px;right:auto;bottom:max(12px,env(safe-area-inset-bottom));max-width:228px;box-sizing:border-box;background:var(--mx-glass-strong);color:var(--mx-ink);border-color:var(--mx-edge);box-shadow:none;z-index:1500; }
+html[data-marina-ui="future-luxury"] .admin-locale-switcher button { min-width:44px;min-height:44px;color:var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .admin-locale-switcher button.active { background:var(--mx-accent);color:var(--mx-accent-ink); }
+@media (min-width:1101px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] { width:260px;padding:18px 12px 104px; }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions { flex-direction:column;align-items:stretch;flex-shrink:0; }
+}
+@media (max-width:1100px) {
+  html[data-marina-ui="future-luxury"] body { padding-left:0; }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] { position:sticky;top:0;z-index:1400;display:flex;flex-direction:column;align-items:stretch;padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));gap:8px;width:100%;max-height:100dvh; }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-identity { border:0;padding:0; }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-identity>div { display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px; }
+  html[data-marina-ui="future-luxury"] .fl2-current-section { justify-content:space-between;padding:2px 6px 2px 10px; }
+  html[data-marina-ui="future-luxury"] .fl2-navigation-toggle { display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:100px;min-height:44px;flex-shrink:0;border:0;border-radius:8px;background:transparent;color:var(--mx-ink);font-size:13px;cursor:pointer; }
+  html[data-marina-ui="future-luxury"] .fl2-grouped-navigation { display:none;order:4;max-height:48dvh;flex-shrink:1; }
+  html[data-marina-ui="future-luxury"] .fl2-grouped-navigation[data-open="true"] { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px; }
+  html[data-marina-ui="future-luxury"] .fl2-nav-group+.fl2-nav-group { margin-top:0; }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions { flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:flex-start;overflow-x:auto;width:100%;padding:0 2px 2px;border:0; }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions>* { flex:0 0 auto; }
+  html[data-marina-ui="future-luxury"] .admin-locale-switcher { position:relative;inset:auto;margin:8px 12px;width:fit-content;max-width:calc(100% - 24px); }
+}
+@media (max-width:540px) {
+  html[data-marina-ui="future-luxury"] .fl2-grouped-navigation[data-open="true"] { grid-template-columns:minmax(0,1fr); }
+}
+@media (prefers-reduced-motion:reduce) {
+  html[data-marina-ui="future-luxury"] .fl2-nav-group button { transition:none; }
+}
+/* Keep the fixed assistant panel relative to the viewport (no backdrop-filter on its ancestor). */
+html[data-marina-ui="future-luxury"] .admin-locale-switcher { flex-wrap:wrap;gap:2px;width:228px;padding:6px; }
+html[data-marina-ui="future-luxury"] .admin-locale-switcher > span { display:block;flex-basis:100%;padding:0 4px 3px;color:var(--mx-muted); }
+/* Keep every mobile action visible; appearance controls open on demand. */
+html[data-marina-ui="future-luxury"] .fl2-style-options { position:relative;min-width:0; }
+html[data-marina-ui="future-luxury"] .fl2-style-options summary { display:flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 10px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-glass);color:var(--mx-ink);font-size:13px;cursor:pointer;list-style:none; }
+html[data-marina-ui="future-luxury"] .fl2-style-options summary::-webkit-details-marker { display:none; }
+html[data-marina-ui="future-luxury"] .fl2-style-options summary:focus-visible { outline:3px solid var(--mx-focus);outline-offset:2px; }
+html[data-marina-ui="future-luxury"] .fl2-style-panel { position:absolute;z-index:2;bottom:calc(100% + 8px);left:0;min-width:228px;display:grid;gap:8px;padding:10px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius);background:var(--mx-glass-strong);box-shadow:var(--mx-shadow); }
+@media(max-width:1100px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;overflow:visible; }
+}

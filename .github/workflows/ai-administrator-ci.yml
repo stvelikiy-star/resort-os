@@ -5,6 +5,7 @@ on:
     paths:
       - 'apps/web/**'
       - 'services/api/app/public_ai_admin.py'
+      - 'scripts/verify_public_ai_trusted_proxy.py'
       - 'services/api/app/app_entry.py'
       - 'automation/n8n/whatsapp-green-ai-admin.json'
       - 'compose.production.yaml'
@@ -17,6 +18,7 @@ on:
     paths:
       - 'apps/web/**'
       - 'services/api/app/public_ai_admin.py'
+      - 'scripts/verify_public_ai_trusted_proxy.py'
       - 'services/api/app/app_entry.py'
       - 'automation/n8n/whatsapp-green-ai-admin.json'
       - 'compose.production.yaml'
@@ -52,6 +54,10 @@ jobs:
 
       - name: Compile public AI administrator Core module
         run: python -m compileall -q services/api/app/public_ai_admin.py services/api/app/app_entry.py
+      - name: Verify public AI forwarding spoof resistance against real FastAPI module
+        run: |
+          python -m pip install -r services/api/requirements.txt
+          python scripts/verify_public_ai_trusted_proxy.py
 
       - name: Validate WhatsApp n8n JSON and authority boundary
         run: |

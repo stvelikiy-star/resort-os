@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - integration/site-pms-cms-20260827
+      - integration/marina-fl2-web-c1-c4-20261115
     paths:
       - 'apps/web/app/g/**'
       - 'apps/web/app/guest-concierge.css'

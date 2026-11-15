@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import OwnerControlV2 from "./OwnerControlV2";
 import OwnerExecutivePack from "./OwnerExecutivePack";
 import OwnerOperationsPerformance from "./OwnerOperationsPerformance";
+import OwnerCommandCenter, { OwnerCommandCenterError, OwnerCommandCenterSkeleton } from "./fl2/OwnerCommandCenter";
 
 type StayItem = {
   id: string;
@@ -26,7 +27,7 @@ type AttentionTask = {
   created_at: string;
 };
 
-type Dashboard = {
+export type Dashboard = {
   property: { name: string; code: string; timezone: string; currency: string; local_date: string };
   rooms: { total: number; clean: number; dirty: number; in_inspection: number; tech_block: number; unknown: number };
   stays: { arrivals_today: number; departures_today: number; in_house: number; guaranteed: number; occupied_rooms: number; occupancy_percent: number };
@@ -38,7 +39,7 @@ type Dashboard = {
   attention_tasks: AttentionTask[];
 };
 
-type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX" | "WHATSAPP";
+export type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX" | "WHATSAPP";
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const taskType: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
@@ -57,7 +58,9 @@ function Drill({ children, to, onNavigate }: { children: React.ReactNode; to: Da
   return <button className="command-drill" onClick={() => onNavigate(to)}>{children}<span aria-hidden="true">→</span></button>;
 }
 
-export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavigate?: (tab: DashboardDestination) => void; isOwner?: boolean }) {
+export default function DashboardBoard({ onNavigate, isOwner = false, fl2 = false }: { onNavigate?: (tab: DashboardDestination) => void; isOwner?: boolean; fl2?: boolean }) {
+  // Future Luxury 2.0 OWNER composition; Legacy mode and every non-owner role keep the original layout below.
+  const fl2Owner = isOwner && fl2;
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +82,13 @@ export default function DashboardBoard({ onNavigate, isOwner = false }: { onNavi
 
   useEffect(() => { void load(); }, [load]);
 
+  if (fl2Owner && loading && !data) return <OwnerCommandCenterSkeleton />;
+  if (fl2Owner && error && !data) return <OwnerCommandCenterError message={error} onRetry={load} />;
+  if (fl2Owner && data) return <OwnerCommandCenter data={data} onNavigate={onNavigate} onRefresh={load}>
+    <OwnerExecutivePack />
+    <OwnerControlV2 />
+    <OwnerOperationsPerformance />
+  </OwnerCommandCenter>;
   if (loading) return <main className="work-shell"><div className="loading">Загрузка Command Center…</div></main>;
   if (error) return <main className="work-shell"><div className="error-box">{error}</div><button className="btn" onClick={load}>Повторить</button></main>;
   if (!data) return null;
