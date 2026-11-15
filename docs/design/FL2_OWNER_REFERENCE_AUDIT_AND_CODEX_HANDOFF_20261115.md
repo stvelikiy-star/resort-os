@@ -11,7 +11,7 @@
 | Staff (`apps/staff`) | НЕ рендерился; смотрел только список файлов #468 |
 | Mobile | Код и тесты; визуально и на устройстве/эмуляторе НЕ проверено (см. #471) |
 | Физический Android, TalkBack, реальный экран | НЕ проверено |
-| Предложения Gemini и «генеральный план» | **Не поступили** в приложениях к задаче — не учтены |
+| Исходный генплан Future Luxury 2.0 и текст предложений Gemini | **Нет среди доступных материалов** (репозиторий, вложения). Не восстанавливались по догадкам; используется только порядок этапов, названный владельцем продукта (§5.0), и перечень требований Gemini из его сообщения (§5.1) |
 | Реальные данные отеля | Не использовались. Все числа на скриншотах синтетические (`QA Resort (synthetic)`) |
 
 Технические проверки (tsc, build, guard-скрипты) не равны визуальной готовности.
@@ -67,10 +67,8 @@ ZIP: 74 файла = 70 SVG (52 Web = 26 разделов × Dark/Light; 18 Mobi
 
 Доступность: график `role=img` + управление стрелками (readout), кольцо/индикатор `progressbar` с точным значением, цели ≥ 44 px в новом блоке, фокус `outline` 3 px, Reduced Motion.
 
-### Новые UX-функции (отдельно от переработки, требуют решения владельца продукта)
-1. Панель «Быстрые переходы» (только навигация к существующим вкладкам).
-2. 30-дневный график on-books с readout по наведению/клавиатуре (данные уже были в Control V2, визуализация новая).
-3. Skeleton-загрузка.
+### Новые элементы эталона (уже входят в согласованный дизайн)
+Повторного утверждения не требуют: панель «Быстрые переходы» (навигация только к существующим вкладкам), существующий 30-дневный график on-books (данные уже были в Control V2) и skeleton-загрузка. Не вошло и **не реализовано**: см. §5.1 (требования Gemini).
 
 ## 3. Проверки
 
@@ -95,66 +93,59 @@ ZIP: 74 файла = 70 SVG (52 Web = 26 разделов × Dark/Light; 18 Mobi
 
 ## 5. Задания Codex
 
-Правило владения: каждый файл имеет одного владельца. `fl2-foundation.css` и `components/fl2/Fl2.tsx` — **только владелец основы** (этот PR); Codex меняет их лишь отдельным мини-PR с пометкой `foundation`. Порядок подключения CSS в `layout.tsx` — только C1. Все задания делаются **после** мержа этого PR; параллельно допустимы задания с непересекающимися файлами.
+Правило владения: у каждого файла один владелец. `fl2-foundation.css` и `components/fl2/Fl2.tsx` — только владелец основы; Codex меняет их лишь отдельным мини-PR `foundation`. Порядок CSS в `layout.tsx` — только C1. Все задания — после merge #472. **Пересечения выполняются строго последовательно**, непересекающиеся — допустимо параллельно.
 
-### C1. Web-оболочка и навигация (6 групп)
-- Файлы: `AdminShell.tsx`, `admin-nav-polish.css`, `fl2-premium-visual.css`, новый `fl2-shell.css`, `layout.tsx`.
-- Зависимости: этот PR.
-- Результат: группы Операции / Гости / Деньги / Команда / Рост / Настройки без потери 26 вкладок, RBAC и прав модулей; закрепление активного раздела; исправить D3 (смещение «Помощника» и безопасная область).
-- Проверки: `design:fl2:audit` (26 вкладок), tsc, build, снимки по `fl2-owner-capture.mjs` для всех ролей, клавиатурная навигация.
+Неизменные ограничения для всех заданий: логотип — только утверждённый круглый PNG (`apps/admin/public/marina-smart-approved.png`, SHA-256 `24678424…f15356`), не перерисовывать; все существующие функции и RBAC (`canAccess`, `moduleEnabled`, роли) сохраняются; Backend/БД/интеграции WhatsApp/AI не менять; **генерацию PIN не добавлять**; на экранах только данные существующих API.
 
-### C2. Тема Light для старых Owner-блоков
-- Файлы: `OwnerExecutivePack.tsx`, `OwnerControlV2.tsx`, `OwnerOperationsPerformance.tsx` и их CSS (`owner-*.css`, `fl2-owner-*.css`).
-- Зависимости: этот PR; не пересекается с C1.
-- Результат: единый Dark/Light на `--mx-*` и `.mx-*`; цели ≥ 44 px (D2); данные и правдивые подписи не менять.
-- Проверки: guard `design:fl2:owner`, контраст ≥ 4.5, снимки Dark/Light/phone.
+### 5.0 Сопоставление с генпланом Future Luxury 2.0
+Исходный генплан недоступен; ниже — этапы в порядке, названном владельцем.
 
-### C3. PMS: шахматка и карточка брони
-- Файлы: `PMSChessboard*`, `PmsBookingModal*`, их CSS.
-- Результат: основа и состояния (loading/empty/error); сохранить HOLD, оплаты, назначение номера. Hover-превью брони — отдельный PR как новая функция.
-- Проверки: `design:fl2:owner-pms-skin`, e2e действий брони.
+| Этап генплана | Задания | Статус |
+|---|---|---|
+| 1. Единые токены/компоненты Dark/Light | основа (#472, готово); C1; C2 | основа готова, C1–C2 не начаты |
+| 2. Эталоны OWNER / PMS / Mobile | OWNER — #472 (готово); C3 (PMS); C9a (Mobile: #471 + #468) | OWNER готов, остальное не начато |
+| 3. Остальные Web / Staff / Guest | C4, C5, C6, C7, C8; **C12 Guest (`apps/web`) — пробел, добавлен** | не начато |
+| 4. Mobile всех ролей | C9b | не начато, после C9a |
+| 5. Motion | Web — в основе; Mobile — C9a (#471) и C9b | Mobile Motion в #471 (не перенесён) |
+| 6. Визуальная и функциональная приёмка | C11, затем ручная проверка владельцем на устройствах | не начато |
+| вне этапов | C10 (⌘K) — после C1 и решения владельца | не начато |
 
-### C4. Reception / Requests / Groups / Rates
-- Файлы: `Reception*`, `Requests*`, `Groups*`, `Rates*`, их CSS. Не пересекается с C3/C5.
-- Проверки: `design:fl2:reception`, все действия сохранены.
+### 5.1 Требования Gemini (пропущенные ранее)
+Статус всех строк: **НЕ РЕАЛИЗОВАНО** (в этом PR не делается). Данные — только из существующих API; выдуманных значений нет.
 
-### C5. Guests / Services / Marketing / Growth
-- Файлы: `Guests*`, `Services*`, `Offers*`, `Marketing*`, `Growth*`.
-- Проверки: `design:fl2:guest-touchpoints`.
+| Требование | Задание | Зависимости | Критерий готовности |
+|---|---|---|---|
+| Превью брони (hover на desktop, касание/Bottom Sheet на телефоне) | C3 (Web), C9b (Mobile) | C3 после C1; Mobile после C9a; поля — из ответа шахматки/брони | Гость, даты, номер, статус, оплата — без новых запросов, где данные уже есть; не открывает действия сверх прав роли; клавиатура и Esc |
+| Поиск ⌘K | C10 | C1 (AdminShell); существующие эндпоинты поиска гостя/брони/номера — наличие проверить до старта | Результаты только из API и только разрешённые RBAC; «ничего не найдено» честно; фокус-ловушка, Esc |
+| Реальные статусы AI | C7 (Web), C9b (Mobile) | Существующий статус-ответ Core/WhatsApp; если его нет — показывать только «нет данных», backend не менять | Только «подключено / нет данных / ошибка / отключено» из ответа; без «онлайн»-декора |
+| Контраст графиков | foundation-мини-PR (`Fl2.tsx` AreaChart, `fl2-foundation.css`), затем C6 | Предшествует C6 | Линии/области ≥ 3:1 к фону, подписи ≥ 4.5:1, не только цветом; Dark и Light |
+| Ролевая навигация | C1 (Web), C9b (Mobile) | RBAC неизменен; C1 до C2–C7 | 6 групп без потери 26 вкладок; каждая роль видит только свои разделы, как сейчас |
+| FAB / Bottom Sheet | C9b (Mobile), C1 (Web на телефоне) | C9a; действия только существующие | Действия FAB = существующие маршруты/права; цели ≥ 44 px; Reduced Motion |
 
-### C6. Finance / Reports
-- Файлы: `Finance*`, `Reports*`, их CSS.
-- Правила: график только на подтверждённых рядах; денежные цифры не пересчитывать.
-- Проверки: `design:fl2:operations`, сверка сумм с API.
+### 5.2 Реальные пути и порядок выполнения C1–C11
+Порядок (сверху вниз; пересечения — последовательно):
 
-### C7. Content / Inbox / WhatsApp-AI / Settings
-- Файлы: `Content*`, `Inbox*`, `WhatsApp*`, `Settings*`.
-- Правила: AI показывает только достоверное состояние (подключено / нет данных / ошибка); интеграции не менять; PIN TTHotel не добавлять.
+1. **C1** Web-оболочка. Файлы: `apps/admin/components/AdminShell.tsx` (MODULE_TABS ~стр. 55, навигация ~стр. 328–364), `apps/admin/app/admin-nav-polish.css`, `fl2-premium-visual.css`, новый `fl2-shell.css`, `apps/admin/app/layout.tsx`.
+2. **C2** Light для Owner-блоков. `OwnerExecutivePack.tsx`, `OwnerControlV2.tsx`, `OwnerOperationsPerformance.tsx`, `OwnerOccupancyMatrix.tsx`; CSS `owner-executive.css`, `owner-control-v2.css`, `owner-intelligence.css`, `owner-corrections.css`, `fl2-owner-composition.css`, `fl2-owner-dashboard.css`. Общий `fl2-owner-pms-finish.css` с C3 → C2 раньше C3.
+3. **C3** PMS. `PMSGrid.tsx`, `PMSGridV2.tsx`, `PMSGridV9.tsx`, `PMSOwnerGrid.tsx`, `PMSUniversalBoard.tsx`, `PMSOperationsCockpitV9.tsx`, `PMSControlSnapshotV9.tsx`, `PMSBulkGuardV9.tsx`, `PMSIntegrationRailV10.tsx`, `PMSNewReservationModal.tsx`, `ChessboardReservationModal.tsx`, `ReservationFolioPanel.tsx`, `RoomDetailModal.tsx`, `RoomBlocksPanel.tsx`; CSS `chessboard*.css`, `fl2-pms-composition.css`, `fl2-owner-pms-finish.css`, `room-detail.css`, `pms-owner-workflow-corrections.css`. Сохранить HOLD, оплаты, назначение номера.
+4. **C4** Reception / Requests / Groups / Rates. `ReceptionWorkspace.tsx`, `ReceptionBoard.tsx`, `ReservationsBoard.tsx`, `RequestsBoard.tsx`, `GroupBookingBoard.tsx`, `RateManagementBoard.tsx`, `ChannelManagerBoard.tsx`, `AgentsBoard.tsx`; CSS `reception*.css`, `fl2-reception-visual.css`, `fl2-bookings-reception-composition.css` (общий с C3 → после C3).
+5. **C5** Guests / Services / Marketing / Growth. `GuestHistoryBoard.tsx`, `GuestCrmEnrichmentPanel.tsx`, `GuestServicesCenter.tsx`, `GuestServiceSettingsBoard.tsx`, `GuestOffersBoard.tsx`, `MarketingBoard.tsx`, `GrowthControlBoard.tsx`; CSS `guest-*.css`, `marketing.css`, `growth-control.css`, `fl2-guest-touchpoints.css`, `fl2-guest-finance.css` (общий с C6 → C5 раньше C6).
+6. **C6** Finance / Reports. `HotelFinanceBoard.tsx`, `NfcFinanceBoard.tsx`, `ReportsBoard.tsx`; CSS `finance.css`, `hotel-finance.css`, `nfc.css`, `reports.css`, `fl2-finance-owner-composition.css`. Предшествует foundation-мини-PR по контрасту графиков.
+7. **C7** Content / Inbox / WhatsApp-AI / Settings / Dining / QR. `SiteContentBoard.tsx`, `SiteMediaBoard.tsx`, `InboxBoard.tsx`, `WhatsAppWorkspace.tsx`, `WhatsAppConnection.tsx`, `MarinaAiAssistant.tsx`, `HotelRulesBoard.tsx`, `HotelSetupBoard.tsx`, `DiningManagementBoard.tsx`, `RoomQrBoard.tsx`, `ServicePointsBoard.tsx`, `OperationsBoard.tsx`, `StaffBoard.tsx`; CSS `inbox.css`, `hotel-setup.css`, `room-qr.css`, `service-points.css`, `fl2-operations-knowledge-growth.css`, `fl2-operational-web.css`.
+8. **C8** Staff. `apps/staff/app/{globals.css,shift-v2.css,page.tsx}`, `apps/staff/app/waiter/page.tsx`, `apps/staff/app/kitchen/**`, `apps/staff/components/*` (Waiter*, Kitchen*, Chef*, Dining*, StaffShiftV2, BeachTerminal, MarinaAiAssistant).
+9. **C12** Guest (`apps/web`). `apps/web/app/{guest,g/[token],p/[token]}`, `guest-*.css`, `home-v2.css`, `luxury-director.css`, `mobile-hardening.css`. Пробел в исходном списке C1–C11; номер C12, чтобы не менять существующие.
+10. **C9a** Mobile: совместить #471 с #468 **без потери исправлений** (отдельное задание). Ветка #471 `design/marina-fl2-mobile-premium-20261111`, rebase на `f6868b4`. Конфликт: `apps/mobile/src/components/ui.tsx` (`FadeIn`, `AnimatedProgressBar`, `PressScale` — сохранить логику #468 и добавить Motion-снимок #471). Затронуты также `Future.tsx`, `src/theme/{motion,tokens}.ts`, `components/Motion.tsx`, `__tests__/motion-system.test.tsx`. Критерии: tsc, eslint, jest (53 набора), `expo export --platform android`; diff функций #468 не потерян. Может выполняться параллельно с C1–C8 (только `apps/mobile`), но строго до C9b.
+11. **C9b** Mobile всех ролей и Motion. `apps/mobile/app/(app)/*` (overview, pms, reception, requests, rooms, tasks, dining, kitchen, inbox, admin, more, profile), `apps/mobile/app/{ai,finance,holds,meal-plans,new-booking,new-request,scan}.tsx`, `src/components/{OwnerControlDashboard,PmsBookingSheet,RoleProfileWorkspaces,WaiterOperations,KitchenProductionPlanner,...}.tsx`. После C9a. Не выдавать unit-тесты за проверку на устройстве.
+12. **C10** ⌘K: новый `apps/admin/components/fl2/CommandPalette.tsx` + подключение в `AdminShell.tsx` — после C1 и после решения владельца по поиску.
+13. **C11** QA-харнесс: `scripts/design/**` — расширить `fl2-owner-capture.mjs` на все разделы/роли, loading/empty/error, 200% zoom, Reduced Motion; шаг CI со снимками. После C1–C9b; вместе с ручной приёмкой владельцем.
 
-### C8. Staff
-- Файлы: `apps/staff/**`.
-- Результат: основа в рабочих кабинетах; состояния; Reduced Motion.
-- Проверки: tests Staff, снимки (в этой сессии Staff не рендерился).
+Совпадение файлов проверяется по именам; перед стартом каждого задания выполнить `grep` по импортам CSS в `layout.tsx` и компонентах, чтобы убедиться в отсутствии пересечений с активным заданием.
 
-### C9a. Mobile: перенос #471 на вершину #468 (первым в Mobile)
-- Файлы: ветка #471; `apps/mobile/src/components/ui.tsx`, `Future.tsx`, `theme/motion.ts`.
-- Результат: rebase на `f6868b4`, при конфликте в `ui.tsx` сохранить логику #468 (PressScale и пр.) и добавить синхронный Motion-снимок #471; 53 набора jest проходят.
-- Проверки: tsc, eslint, jest, `expo export --platform android`.
-
-### C9b. Mobile: кабинеты и Motion
-- Файлы: `apps/mobile/app/**`, `src/components/**` (кроме C9a).
-- Зависимость: C9a.
-- Результат: основа во всех ролях (OWNER…AGENT), единый TabIcon/BottomSheet; завершение Motion; проверка на устройстве/эмуляторе Android (не выдавать unit-тесты за визуальную проверку).
-
-### C10. Поиск ⌘K (новая функция)
-- Файлы: новые `components/fl2/CommandPalette.tsx`, подключение в `AdminShell.tsx` (после C1).
-- Результат: поиск только по существующим API (гость/бронь/номер/задача); без выдуманных результатов.
-
-### C11. QA-харнесс и состояния
-- Файлы: `scripts/design/**`.
-- Результат: расширить `fl2-owner-capture.mjs` на все разделы/роли, состояния loading/empty/error, 200% zoom, Reduced Motion; CI-шаг со снимками как артефактом.
-
-Матрица владения: C1 {AdminShell, shell/nav CSS, layout.tsx} · C2 {Owner*} · C3 {PMS*} · C4 {Reception/Requests/Groups/Rates} · C5 {Guests…Growth} · C6 {Finance/Reports} · C7 {Content/Inbox/WhatsApp/Settings} · C8 {apps/staff} · C9 {apps/mobile} · C10 {CommandPalette} · C11 {scripts/design}. Пересечений нет; общий код основы — только через отдельный `foundation` PR.
+### 5.3 Первое задание Codex — C1
+- Файлы: см. п.1 выше.
+- Сделать: 6 групп навигации (Операции / Гости / Деньги / Команда / Рост / Настройки) поверх существующих 26 вкладок и `canAccess/moduleEnabled`; активный раздел закреплён; исправить D3 (смещение «Помощника», безопасная область); ролевая навигация без изменения RBAC.
+- Приёмка: все вкладки доступны тем же ролям, что и до изменений (сверка таблицей роль × вкладка); `npm run design:fl2:audit` (26 вкладок), tsc, `next build`; `npm test` в корне (Control Center contract) — зелёный; снимки `fl2-owner-capture.mjs` Dark/Light × 1440/768/390: overflow 0, консоль 0; клавиатурная навигация; Legacy-режим без изменений.
+- Нельзя: менять `Fl2.tsx`/`fl2-foundation.css`, логотип, backend, добавлять PIN. Если изменяется `apps/admin/package.json`, обновить доверенный blob в `control-center-verify.mjs` штатно (`git hash-object apps/admin/package.json`), не отключая проверку.
 
 ## 6. Воспроизвести снимки
 ```
