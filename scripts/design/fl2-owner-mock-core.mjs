@@ -48,7 +48,7 @@ const routes = {
   }),
   "/api/v1/admin/intelligence/pickup": () => ({ status: "INSUFFICIENT_HISTORY", local_date: today, snapshot_count: 0, days: [], truth: "" }),
   "/api/v1/admin/growth/summary": () => ({ queue: { active: 6, overdue: 1, feedback_open: 2, return_open: 3 }, feedback: { scored: 18, average_score: 4.6, promoters: 12, passives: 4, detractors: 2, recovery_open: 1, nps: 55, nps_sample_size: 18 }, candidates: { post_stay_14d: 9, reactivation: 22, reactivation_min_days: 30 } }),
-  "/api/v1/admin/reports/overview": (q) => ({ range: range(q.get("from_date") === "2026-11-01" ? 14 : 14), kpi: kpi(q.get("from_date") === "2026-11-01" ? 1 : 0.93), crm: { conversion_percent: 18.5, leads: 54, converted: 10 } }),
+  "/api/v1/admin/reports/overview": (q) => ({ property: { name: "QA Resort (synthetic)", local_date: today, currency: "KGS" }, rooms_now: { total: 60, occupied: 43, clean: 31, dirty: 9 }, payments: { received_kgs: 1600000, received_count: 64, refunded_status_amount_kgs: 0, failed_count: 0 }, room_types: [], channels: [], operations: [], debtors: [], daily: [], truth: {}, range: range(q.get("from_date") === "2026-11-01" ? 14 : 14), kpi: kpi(q.get("from_date") === "2026-11-01" ? 1 : 0.93), crm: { conversion_percent: 18.5, leads: 54, converted: 10, new: 20, quoted: 12, awaiting_prepayment: 7, lost: 5, channels: [] } }),
   "/api/v1/admin/finance/summary": (q) => ({ period_payments: { received_kgs: q.get("from_date") === "2026-11-01" ? 1600000 : 1450000, received_count: 64 }, receivables_snapshot: { outstanding_kgs: 340000, debtor_count: 7 } }),
   "/api/v1/admin/intelligence/operations-performance": () => ({
     property: { local_date: today, timezone: "Asia/Bishkek" }, range: range(14),

@@ -45,6 +45,7 @@ try {
   await page.waitForFunction(() => document.querySelector('.fl2-current-label strong')?.textContent === document.querySelector('[aria-current="page"] span')?.textContent);
   assert.equal(await page.locator('.fl2-current-label strong').innerText(),await page.locator('[aria-current="page"] span').innerText());
   if(width<1101)assert.equal(await page.locator('.fl2-navigation-toggle').getAttribute('aria-expanded'),'false');
+  await page.waitForTimeout(200);assert.deepEqual(errors,[]);
   evidence.push({width,theme,closed,groups:6,tabs:26,selection:'REPORTS',errors});await context.close();
  }
  // Exact server-granted sets, including staff/custom roles; no role-to-permission inference in the shell.
@@ -55,7 +56,7 @@ try {
   evidence.push({role,grants:permissions,enabled:['DINING'],visible:['DASHBOARD','DINING','FINANCE','PMS']});await context.close();
  }
  const languages=await open();
- for(const [code,heading] of [['EN','Operations'],['KG','Операциялар'],['KZ','Операциялар'],['RU','Операции']]) {
+ for(const [code,heading] of [['EN','Growth'],['KG','Өнүгүү'],['KZ','Даму'],['RU','Развитие']]) {
   await languages.page.locator('.admin-locale-switcher').getByRole('button',{name:code,exact:true}).click();
   await languages.page.locator('.fl2-nav-group h2').filter({hasText:heading}).first().waitFor();
  }
@@ -68,6 +69,7 @@ try {
 } catch(error) {
  fs.writeFileSync(`${out}/failure.txt`,String(error.stack || error));
  for(const context of browser.contexts())for(const page of context.pages()) {
+  fs.writeFileSync(`${out}/failure-dom-${page.viewportSize()?.width || 'unknown'}.json`,JSON.stringify(await page.evaluate(()=>({lang:document.documentElement.lang,current:document.querySelector('.fl2-current-label')?.textContent,selected:document.querySelector('[aria-current="page"]')?.textContent,body:document.body.innerText.slice(0,2500)})).catch(()=>null),null,2));
   await page.screenshot({path:`${out}/failure-${page.viewportSize()?.width || 'unknown'}.png`,fullPage:true}).catch(()=>{});
  }
  throw error;
