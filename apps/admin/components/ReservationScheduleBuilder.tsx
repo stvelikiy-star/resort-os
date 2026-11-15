@@ -1,5 +1,7 @@
 "use client";
 
+import { usePmsDialog } from "./hooks/usePmsDialog";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type RoomOption = {
@@ -132,6 +134,7 @@ export default function ReservationScheduleBuilder({
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const dialogRef = usePmsDialog(onClose, busy);
   const [confirmCancellation, setConfirmCancellation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [splitInputs, setSplitInputs] = useState<Record<number, string>>({});
@@ -378,10 +381,10 @@ export default function ReservationScheduleBuilder({
 
   const totalNights = draft.length ? daysBetween(draft[0].start, draft[draft.length - 1].end) : 0;
 
-  return <div className="v8-builder-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="v8-builder">
+  return <div className="v8-builder-backdrop" role="dialog" aria-modal="true" aria-label="График размещения" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section ref={dialogRef} tabIndex={-1} className="v8-builder">
       <header className="v8-builder-head">
-        <div><p className="eyebrow">Universal Stay Builder · V8</p><h2>{data?.reservation.booking_number || "График размещения"}</h2><span>{data?.guest.name || "Гость"}{data?.guest.phone ? ` · ${data.guest.phone}` : ""}</span></div>
+        <div><p className="eyebrow">График размещения</p><h2>{data?.reservation.booking_number || "График размещения"}</h2><span>{data?.guest.name || "Гость"}{data?.guest.phone ? ` · ${data.guest.phone}` : ""}</span></div>
         <div className="v8-builder-head-actions"><button className="btn" onClick={resetDraft} disabled={!data || busy}>Сбросить</button><button className="btn" onClick={onClose}>Закрыть</button></div>
       </header>
 

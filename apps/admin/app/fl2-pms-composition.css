@@ -614,3 +614,31 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-segment-index b { flex-
 @media(max-width:760px) {
  html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-segment-card > :is(.v8-segment-room,.v8-segment-range,.v8-segment-cut,.v8-segment-merge,.v8-boundary) { grid-column:1/-1; }
 }
+
+/* C3 dialogs — shared reference palette and readable room details; no operation is hidden. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal { width:min(1000px,calc(100vw - 24px));padding:20px; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-head { position:sticky;top:0;z-index:2;padding:0 0 14px;margin-bottom:14px;background:var(--mx-glass-strong); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-head > div { min-width:0;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-head button { flex-shrink:0; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(.room-detail-status,.room-detail-tabs,.room-readiness-actions) { display:flex;flex-wrap:wrap;gap:10px; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(.room-detail-status,.room-readiness-control,.room-detail-facts,.room-detail-item,.room-detail-note) { padding:14px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-glass); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-facts { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-facts > div { min-width:0;display:grid;gap:4px;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-readiness-button { flex:1 1 160px;min-height:70px;padding:10px;text-align:left; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-readiness-button.active { border-color:var(--mx-accent);background:var(--mx-accent-soft); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(.room-detail-tabs button,.room-detail-status .badge) { background:var(--mx-glass);color:var(--mx-ink);border:1px solid var(--mx-edge); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-tabs button.active { background:var(--mx-accent-soft);border-color:var(--mx-accent); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(.loading,.empty,.error-box,.content-message) { padding:14px;border:1px solid var(--mx-edge);border-radius:var(--mx-radius-sm);background:var(--mx-glass);color:var(--mx-muted);font-size:14px;line-height:1.5; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal .error-box { color:var(--mx-danger);border-color:var(--mx-danger); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal .content-message.success { color:var(--mx-success);border-color:var(--mx-success); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(input,select,textarea) { width:100%;min-width:0;max-width:100%; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal label { display:grid;gap:6px;min-width:0;font-size:13px; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-list { display:grid;gap:12px; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-item h3 { font-size:16px;line-height:1.5;overflow-wrap:anywhere; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal :is(a,small) { color:var(--mx-muted);font-size:13px;line-height:1.5; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] :is(.owner-booking-modal,.v8-builder,.room-detail-modal):focus-visible { outline:3px solid var(--mx-focus);outline-offset:-3px; }
+@media(max-width:760px) {
+ html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-modal { padding:14px; }
+ html[data-marina-ui="future-luxury"][data-fl2-theme] .room-detail-facts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ html[data-marina-ui="future-luxury"][data-fl2-theme] .room-readiness-button { flex-basis:calc(50% - 10px); }
+}

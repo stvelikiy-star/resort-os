@@ -1,5 +1,7 @@
 "use client";
 
+import { usePmsDialog } from "./hooks/usePmsDialog";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Agent = { id: string; name: string; status: string };
@@ -110,6 +112,7 @@ export default function PMSNewReservationModal({
   const [preview, setPreview] = useState<Preview | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const dialogRef = usePmsDialog(onClose, busy);
   const [hold, setHold] = useState<{ id: string; expires_at: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ booking_number: string; total_kgs: number } | null>(null);
@@ -301,8 +304,8 @@ export default function PMSNewReservationModal({
   const maxExtraBedCount = preview?.room.max_extra_bed_count ?? 10;
 
   return (
-    <div className="owner-booking-backdrop" role="dialog" aria-modal="true" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section className="owner-booking-modal">
+    <div className="owner-booking-backdrop" role="dialog" aria-modal="true" aria-label="Новая бронь" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section ref={dialogRef} tabIndex={-1} className="owner-booking-modal">
         <header className="owner-booking-head">
           <div>
             <p className="eyebrow">Новая бронь · выбранные клетки</p>

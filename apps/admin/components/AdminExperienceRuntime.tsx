@@ -19,6 +19,8 @@ const STORAGE_KEY = "three-crowns-admin-locale";
 
 
 const KZ_EXACT: Record<string, string> = {
+  "Карточка номера": "Бөлме карточкасы",
+  "Новая бронь": "Жаңа бронь",
   "Шахматка бронирований": "Брондау шахматкасы",
   "Номера не найдены.": "Бөлмелер табылмады.",
 
@@ -229,6 +231,8 @@ const exact: Record<string, Phrase> = {
 };
 
 const common: Phrase[] = [
+  { ru: "Карточка номера", kg: "Бөлмөнүн карточкасы", en: "Room details" },
+  { ru: "Новая бронь", kg: "Жаңы бронь", en: "New reservation" },
   { ru: "Шахматка бронирований", kg: "Брондоо шахматкасы", kz: "Брондау шахматкасы", en: "Booking calendar" },
   { ru: "Номера не найдены.", kg: "Бөлмөлөр табылган жок.", kz: "Бөлмелер табылмады.", en: "No rooms found." },
 
