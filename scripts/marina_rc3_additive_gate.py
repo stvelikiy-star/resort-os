@@ -16,7 +16,7 @@ NEW_MIGRATIONS = {
     "zz115_marina_chef_production_targets_20261110": "239d49674b3709b66619705264e6a1e996ab12b4fc5c93cf5a7b3a0ca423c5f1",
     "zz116_marina_kitchen_recipes_20261111": "b72d41027c2a25125c3bbb3fd92796c1a0538ef44c59d6db0561129da4fdc061",
     "zz117_marina_kitchen_stock_20261111": "3cf125cb7b28d4961f0ca991f1685f2bc012628742d2e108ff868b520c825879",
-    "zz118_marina_kitchen_waste_spoilage_20261115": "7fb2b697731f92833ea8b402ef119c506f5f93ea3de5e587f4cd8f19e5ffebdb"
+    "zz118_marina_kitchen_waste_spoilage_20261115": "b7416f6882a1e438214c3dfe4340e29709f59a0f9fe89cc31828bcfbe5782061"
 }
 WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 ALLOWED_LEGACY_ERRORS = frozenset({
