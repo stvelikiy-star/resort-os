@@ -566,7 +566,7 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         if(typeof row.name!=='string' || !['KG','L','PCS'].includes(String(row.unit)) ||
           typeof row.approved_inbound!=='string' || typeof row.pending_requests!=='string' ||
           typeof row.shortage_after_pipeline!=='string' ||
-          !/^\\d+(?:\\.\\d+)?$/.test(row.approved_inbound))
+          !/^\d+(?:\.\d+)?$/.test(row.approved_inbound))
           throw new ApiError('UNKNOWN','Invalid approved procurement supply');
       }
       return data as unknown as KitchenProcurementNeeds;
