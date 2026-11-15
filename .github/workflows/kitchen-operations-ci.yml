@@ -23,6 +23,7 @@ on:
       - 'apps/staff/components/KitchenAdmin.module.css'
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'scripts/verify_kitchen_operations.py'
+      - 'scripts/verify_waiter_serve_e2e.py'
       - 'scripts/verify_kitchen_menu_management.py'
       - 'scripts/test_kitchen_draft_authoring.py'
       - '.github/workflows/kitchen-operations-ci.yml'
@@ -114,6 +115,18 @@ jobs:
           echo "KITCHEN_MENU_DINING_PASSWORD=$DINING_PASSWORD" >> "$GITHUB_ENV"
           STAFF_USERNAME="$DINING_USERNAME" STAFF_PASSWORD="$DINING_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Menu Cook CI" STAFF_ROLE="COOK" python scripts/upsert_staff_user.py
 
+      - name: Provision isolated WAITER credential for serve E2E
+        run: |
+          WAITER_USERNAME="kitchen-serve-waiter-ci"
+          WAITER_PASSWORD="$(python - <<'PY'
+          import secrets
+          print('Ws-' + secrets.token_urlsafe(24))
+          PY
+          )"
+          echo "WAITER_SERVE_E2E_USERNAME=$WAITER_USERNAME" >> "$GITHUB_ENV"
+          echo "WAITER_SERVE_E2E_PASSWORD=$WAITER_PASSWORD" >> "$GITHUB_ENV"
+          STAFF_USERNAME="$WAITER_USERNAME" STAFF_PASSWORD="$WAITER_PASSWORD" STAFF_DISPLAY_NAME="Serve Waiter CI" STAFF_ROLE="WAITER" python scripts/upsert_staff_user.py
+
       - name: Typecheck and build Kitchen Admin host app
         working-directory: apps/staff
         run: |
@@ -134,6 +147,9 @@ jobs:
 
       - name: Run Kitchen Operations E2E
         run: python scripts/verify_kitchen_operations.py
+
+      - name: Run assigned waiter serve PostgreSQL E2E
+        run: python scripts/verify_waiter_serve_e2e.py
 
       - name: Run Kitchen Menu Management E2E
         run: python scripts/verify_kitchen_menu_management.py
