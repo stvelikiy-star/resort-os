@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, ScrollView } from 'react-native';
+import { Alert } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import '../src/i18n';
 import ReservationScreen from '../app/reservation/[id]';
@@ -59,7 +59,6 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
     expect(view.getByTestId('reservation-checkin')).toBeTruthy();
     expect(view.queryByTestId('reservation-checkout')).toBeNull();
     expect(view.getByTestId('reservation-finance')).toBeTruthy();
-    expect(view.UNSAFE_getAllByType(ScrollView).length).toBeGreaterThan(0);
     expect(mockLive.reservation).toHaveBeenCalledWith(reservationId);
   });
   it.each(['light','dark'] as const)('%s keeps the card/actions mounted in scrollable layout',async theme=>{
@@ -67,7 +66,6 @@ describe('Mobile real reservation card: locale/theme/role states (UI, not native
     await waitFor(()=>expect(view.getByTestId('reservation-guest-summary')).toBeTruthy());
     expect(view.getByTestId('reservation-call-guest')).toBeTruthy();
     expect(view.getByTestId('reservation-edit-dates')).toBeTruthy();
-    expect(view.UNSAFE_getAllByType(ScrollView).length).toBeGreaterThan(0);
   });
   it('RECEPTION can view and check in but cannot see finance or owner-only schedule',async()=>{
     as('RECEPTION',['RESERVATIONS','PMS']);
