@@ -106,6 +106,10 @@ export interface KitchenProcurementNeeds {
   excluded_sample_targets:number; inventory_deducted:false; payment_created:false;
   items:KitchenProcurementNeed[];
 }
+export interface KitchenSupplierSource {
+  id:string;stock_item_id:string;document_id:string;
+  supplier_name:string;document_reference:string;unit_cost_kgs:string;remaining_quantity:string;
+}
 export type KitchenProcurementStatus='REQUESTED'|'APPROVED'|'PARTIAL'|'RECEIVED';
 export interface KitchenProcurementRow {
   id:string;stock_item_id:string;stock_name:string;unit:'KG'|'L'|'PCS';
@@ -806,20 +810,37 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         throw new ApiError('UNKNOWN','Invalid procurement approval');
       return reply as {id:string;status:KitchenProcurementStatus;already_processed:boolean;payment_created:false};
     },
-    receiveKitchenProcurement: async (requestId:string,payload:{receipt_id:string;quantity:string}) => {
+    procurementSupplierLines: async ():Promise<KitchenSupplierSource[]> => {
+      reviewGate();
+      const result=objectResponse(await request<unknown>('GET',p+'/kitchen/procurement/supplier-lines'),'supplier sources');
+      if(!Array.isArray(result.items)||result.payment_created!==false||
+         result.scope!=='CURRENT_HOTEL_RECEIPT_SOURCES')throw new ApiError('UNKNOWN','Invalid supplier sources');
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return result.items.map(entry=>{
+        const row=objectResponse(entry,'supplier source');
+        if(!['id','stock_item_id','document_id'].every(key=>uuid.test(String(row[key])))||
+           !['supplier_name','document_reference','unit_cost_kgs','remaining_quantity']
+             .every(key=>typeof row[key]==='string'))
+          throw new ApiError('UNKNOWN','Invalid supplier source row');
+        return row as unknown as KitchenSupplierSource;
+      });
+    },
+    receiveKitchenProcurement: async (requestId:string,payload:{receipt_id:string;quantity:string;document_line_id?:string|null}) => {
       reviewGate();
       const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const quantity=payload.quantity.replace(',','.');
       if(!uuid.test(payload.receipt_id)||!uuid.test(requestId)||
-        !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0)
+        !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0||
+        (payload.document_line_id!=null&&!uuid.test(payload.document_line_id)))
         throw new ApiError('BAD_REQUEST','Invalid procurement receipt');
       const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests/'+safeRouteId(requestId)+'/receive',
-        {receipt_id:payload.receipt_id,quantity}),'procurement receipt');
+        {receipt_id:payload.receipt_id,quantity,...(payload.document_line_id?{document_line_id:payload.document_line_id}:{})}),'procurement receipt');
       if(reply.id!==payload.receipt_id||reply.request_id!==requestId||
         !['PARTIAL','RECEIVED'].includes(String(reply.status))||
-        typeof reply.already_processed!=='boolean'||reply.payment_created!==false)
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false||
+        (payload.document_line_id!=null&&reply.document_line_id!==payload.document_line_id))
         throw new ApiError('UNKNOWN','Invalid procurement receipt acknowledgment');
-      return reply as {id:string;request_id:string;status:'PARTIAL'|'RECEIVED';already_processed:boolean;payment_created:false};
+      return reply as {id:string;request_id:string;status:'PARTIAL'|'RECEIVED';already_processed:boolean;payment_created:false;document_line_id?:string|null};
     },
     kitchenLosses: async (): Promise<KitchenLossRecord[]> => {
       reviewGate();
