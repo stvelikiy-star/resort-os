@@ -194,6 +194,18 @@ export interface OwnerExpenseLedger {
  scope:'OWNER_ONLY_PROPERTY_SCOPED';payment_created:false;
  truth:'POSTED_OBLIGATION_NOT_AUTOMATIC_PAYMENT_OR_PROFIT';
 }
+export interface OwnerRecordedCashMovements {
+ scope:'OWNER_ONLY_PROPERTY_SCOPED';
+ period:{from:string;to:string;currency:string;timezone:string};
+ customer_payments_received_kgs:number;customer_payments_received_count:number;
+ owner_expense_manual_settlements_kgs:number;owner_expense_manual_settlements_count:number;
+ observed_recorded_difference_kgs:number;
+ owner_expenses_posted_for_period_kgs:number;owner_expenses_posted_count:number;
+ all_time_unsettled_expenses_kgs:number;
+ truth:{report_type:'OBSERVED_CASH_RECORDS_NOT_RECOGNIZED_PROFIT';
+  recognized_profit_kgs:null;verified_bank_balance_kgs:null;
+  refunds_reconciled:false;completeness_verified:false;payment_created:false;reason:string};
+}
 export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
 export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
 export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
@@ -492,6 +504,32 @@ export function createLiveModules(baseUrl: string, transport: typeof fetch = fet
         throw new ApiError('UNKNOWN','Invalid expense payment acknowledgment');
       return reply as {id:string;expense_id:string;already_processed:boolean;payment_created:false;
         source:'MANUAL_EXPENSE_SETTLEMENT_FACT'};
+    },
+    ownerRecordedCashMovements: async (from:string,to:string):Promise<OwnerRecordedCashMovements> => {
+      const response=objectResponse(await request<unknown>(
+        'GET',p+'/admin/finance/owner/recorded-cash-movements?from_date='+
+          safeIsoDate(from)+'&to_date='+safeIsoDate(to)),'owner recorded cash movements');
+      const truth=objectResponse(response.truth,'cash movements truth');
+      if(response.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||
+        truth.report_type!=='OBSERVED_CASH_RECORDS_NOT_RECOGNIZED_PROFIT'||
+        truth.recognized_profit_kgs!==null||truth.verified_bank_balance_kgs!==null||
+        truth.refunds_reconciled!==false||truth.completeness_verified!==false||
+        truth.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid owner cash reconciliation truth');
+      for(const field of [
+        'customer_payments_received_kgs','customer_payments_received_count',
+        'owner_expense_manual_settlements_kgs','owner_expense_manual_settlements_count',
+        'owner_expenses_posted_for_period_kgs','owner_expenses_posted_count',
+        'all_time_unsettled_expenses_kgs']){
+        if(!Number.isSafeInteger(response[field])||Number(response[field])<0)
+          throw new ApiError('UNKNOWN','Invalid owner cash amount');
+      }
+      if(!Number.isSafeInteger(response.observed_recorded_difference_kgs)||
+         Number(response.observed_recorded_difference_kgs)!==
+          Number(response.customer_payments_received_kgs)-
+          Number(response.owner_expense_manual_settlements_kgs))
+        throw new ApiError('UNKNOWN','Invalid observed cash difference');
+      return response as unknown as OwnerRecordedCashMovements;
     },
     reception: async () => {
       const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
