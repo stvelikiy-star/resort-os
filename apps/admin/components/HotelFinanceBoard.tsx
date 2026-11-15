@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import OwnerExpensesPanel from "./OwnerExpensesPanel";
 
 type ReservationLedgerItem = {
   reservation_id: string;
@@ -119,7 +120,7 @@ const reservationStatusLabel: Record<string, string> = {
   CANCELLED: "CANCELLED",
 };
 
-export default function HotelFinanceBoard() {
+export default function HotelFinanceBoard({isOwner}:{isOwner:boolean}) {
   const now = useMemo(() => new Date(), []);
   const [fromDate, setFromDate] = useState(() => dateOnly(monthStart(now)));
   const [toDate, setToDate] = useState(() => dateOnly(now));
@@ -281,5 +282,6 @@ export default function HotelFinanceBoard() {
         </div>
       </section>
     </>}
+    {isOwner?<OwnerExpensesPanel fromDate={fromDate} toDate={toDate}/>:null}
   </main>;
 }
