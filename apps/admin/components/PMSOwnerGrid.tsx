@@ -517,6 +517,7 @@ export default function PMSOwnerGrid({ agentMode = false, readOnlyMode = false }
                     <PmsBookingPreviewButton
                       key={block.id}
                       bookingNumber={block.booking_number}
+                      bookingStatus={block.reservation_status}
                       type="button"
                       className={`owner-booking-bar type-${block.type.toLowerCase()} status-${(block.reservation_status || "").toLowerCase()} payment-${payment}`}
                       data-paid-kgs={financeItem?.paidKgs}

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 
 /** Read-only presentation of data already shown by the grid's native title.
  * No requests, writes or role decisions live in this component. Legacy keeps its native title. */
-export default function PmsBookingPreviewButton({ bookingNumber, title, children, onClick, onFocus, onBlur, onMouseEnter, onMouseLeave, onKeyDown, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { bookingNumber?: string | null }) {
+export default function PmsBookingPreviewButton({ bookingNumber, bookingStatus, title, children, onClick, onFocus, onBlur, onMouseEnter, onMouseLeave, onKeyDown, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { bookingNumber?: string | null; bookingStatus?: string | null }) {
   const id = useId();
   const tooltip = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
@@ -39,6 +39,7 @@ export default function PmsBookingPreviewButton({ bookingNumber, title, children
     </button>
     {anchor && createPortal(<div ref={tooltip} id={id} role="tooltip" className="fl2-booking-preview" style={anchor}>
       {bookingNumber && <strong>{bookingNumber}</strong>}
+      {bookingStatus === "CHECKED_IN" ? <span>Проживает</span> : bookingStatus === "GUARANTEED" ? <span>Гарантирована</span> : null}
       <p>{title}</p>
     </div>, document.body)}
   </>;
