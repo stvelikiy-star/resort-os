@@ -250,7 +250,7 @@ async def list_menu(request: Request, user: dict[str, Any] = Depends(waiter_menu
                FROM kitchen_menu_items WHERE "propertyId"=$1
                  AND ($2::boolean OR ("isDraft"=true AND "isActive"=false))
                  AND ($3::boolean OR ("isActive"=true AND "isDraft"=false))
-               ORDER BY "sortOrder",category,"nameRu"''', pid, user["role"] not in {"COOK", "WAITER"}, user["role"] != "WAITER",
+               ORDER BY "sortOrder",category,"nameRu"''', pid, user["role"] != "COOK", user["role"] != "WAITER",
         )
     return {"items": [menu_item(row) if user["role"] == "WAITER" else {**menu_item(row), "recipe": read_recipe(row["recipe"])} for row in rows]}
 
