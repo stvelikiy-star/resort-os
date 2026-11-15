@@ -69,3 +69,20 @@
 @media(max-width:800px) {
   .concierge-brand>img { flex-basis:36px;width:36px;height:36px; }
 }
+
+/* C12 final 320px audit: keep full long property names legible without
+   squeezing the approved logo or locale buttons into a narrow label column. */
+@media(max-width:359px) {
+  .concierge-topbar {
+    display:grid;
+    grid-template-columns:minmax(0,1fr);
+    gap:10px;
+    align-items:start;
+    padding:12px 0;
+  }
+  .concierge-brand { width:100%;min-width:0;align-items:flex-start; }
+  .concierge-brand>div { min-width:0;flex:1 1 0; }
+  .concierge-brand strong { font-size:15px;line-height:1.25;overflow-wrap:anywhere; }
+  .concierge-brand>img { flex:0 0 36px; }
+  .concierge-langs { justify-self:start;max-width:100%; }
+}
