@@ -1,0 +1,57 @@
+name: MARINA FL2 Staff Shift Visual QA
+on:
+  pull_request:
+    paths:
+      - 'apps/staff/app/shift-v2.css'
+      - 'scripts/design/fl2-staff-shift-browser.mjs'
+      - 'scripts/fixtures/fl2-staff-shift-qa-page.tsx'
+      - '.github/workflows/marina-fl2-staff-visual-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: marina-fl2-staff-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  staff-shift-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/staff/package-lock.json
+      - name: Install staff and browser dependencies
+        run: |
+          npm ci --prefix apps/staff --no-audit --no-fund
+          npm install --prefix /tmp/marina-staff-browser playwright@1.58.2 --no-audit --no-fund
+          /tmp/marina-staff-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Serve isolated QA page with genuine Staff CSS
+        run: |
+          mkdir -p apps/staff/app/qa-staff-shift
+          cp scripts/fixtures/fl2-staff-shift-qa-page.tsx apps/staff/app/qa-staff-shift/page.tsx
+          (cd apps/staff && ./node_modules/.bin/next dev -p 3002 --hostname 127.0.0.1) > /tmp/staff-qa-next.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3002/qa-staff-shift >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          tail -80 /tmp/staff-qa-next.log
+          exit 1
+      - name: Chromium Dark Light and mobile accessibility
+        env:
+          PLAYWRIGHT_PACKAGE: /tmp/marina-staff-browser/package.json
+        run: node scripts/design/fl2-staff-shift-browser.mjs
+      - name: Upload screenshots and metrics
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marina-staff-shift-dark-light-evidence
+          path: |
+            staff-shift-evidence/
+            /tmp/staff-qa-next.log
+          if-no-files-found: warn
+      - name: Remove ephemeral QA route
+        if: always()
+        run: rm -rf apps/staff/app/qa-staff-shift
