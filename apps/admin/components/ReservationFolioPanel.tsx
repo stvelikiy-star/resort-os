@@ -24,6 +24,9 @@ type RuntimeCapabilities = {
   };
 };
 
+const CHARGE_STATUS_LABELS: Record<string, string> = { OPEN: "Открыто", WAIVED: "Списано", VOID: "Аннулировано" };
+const PAYMENT_STATUS_LABELS: Record<string, string> = { PAID: "Оплачено", PENDING: "Ожидает", FAILED: "Ошибка", REFUNDED: "Возвращено" };
+
 const METHODS = [
   ["CASH", "Наличные"],
   ["CARD_POS", "Карта / POS"],
@@ -203,7 +206,7 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
   }
 
   return <section className={styles.shell}>
-    <div className={styles.head}><div><small>Guest folio · MARINA SMART</small><h3>Финансы гостя</h3><p>Проживание + дополнительные услуги = общий счёт. Payment появляется только когда деньги реально приняты.</p></div><button onClick={() => void load()} disabled={loading}>↻ Обновить</button></div>
+    <div className={styles.head}><div><small>Счёт гостя · MARINA SMART</small><h3>Финансы гостя</h3><p>Проживание + дополнительные услуги = общий счёт. Оплата фиксируется только после фактического получения денег.</p></div><button onClick={() => void load()} disabled={loading}>↻ Обновить</button></div>
     {error && <div className={styles.error}>{error}</div>}{notice && <div className={styles.notice}>{notice}</div>}
 
     <div className={styles.totals}>
@@ -253,8 +256,8 @@ export default function ReservationFolioPanel({ reservationId, onChanged }: { re
     </div>
 
     <div className={styles.history}>
-      <section><h4>Начисления · {folio?.charges.length ?? 0}</h4>{!folio?.charges.length ? <p>Дополнительных начислений нет.</p> : folio.charges.map((charge) => <div key={charge.id} data-status={charge.status}><span><strong>{charge.description}</strong><small>{charge.code} · {charge.source_type} · {charge.service_date || charge.created_at}</small></span><b>{money(charge.amount_kgs)}</b><em>{charge.status}</em>{charge.status === "OPEN" && canCloseCharges && <span className={styles.rowActions}><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "WAIVED")}>Списать</button><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "VOID")}>Аннулировать</button></span>}</div>)}</section>
-      <section><h4>История оплат · {folio?.payments.length ?? 0}</h4>{!folio?.payments.length ? <p>Оплат пока нет.</p> : [...folio.payments].reverse().map((payment) => <div key={payment.id}><span><strong>{METHODS.find(([value]) => value === payment.method)?.[1] || payment.method}</strong><small>Оплачено: {payment.paid_at || "—"}<br />Внесено в PMS: {payment.recorded_at}</small></span><b>{money(payment.amount_kgs)}</b><em>{payment.status}</em></div>)}</section>
+      <section><h4>Начисления · {folio?.charges.length ?? 0}</h4>{!folio?.charges.length ? <p>Дополнительных начислений нет.</p> : folio.charges.map((charge) => <div key={charge.id} data-status={charge.status}><span><strong>{charge.description}</strong><small>{charge.code} · {charge.source_type} · {charge.service_date || charge.created_at}</small></span><b>{money(charge.amount_kgs)}</b><em>{CHARGE_STATUS_LABELS[charge.status] || charge.status}</em>{charge.status === "OPEN" && canCloseCharges && <span className={styles.rowActions}><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "WAIVED")}>Списать</button><button disabled={busy === charge.id} onClick={() => void closeCharge(charge, "VOID")}>Аннулировать</button></span>}</div>)}</section>
+      <section><h4>История оплат · {folio?.payments.length ?? 0}</h4>{!folio?.payments.length ? <p>Оплат пока нет.</p> : [...folio.payments].reverse().map((payment) => <div key={payment.id}><span><strong>{METHODS.find(([value]) => value === payment.method)?.[1] || payment.method}</strong><small>Оплачено: {payment.paid_at || "—"}<br />Внесено в PMS: {payment.recorded_at}</small></span><b>{money(payment.amount_kgs)}</b><em>{PAYMENT_STATUS_LABELS[payment.status] || payment.status}</em></div>)}</section>
     </div>
   </section>;
 }
