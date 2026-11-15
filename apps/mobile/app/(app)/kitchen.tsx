@@ -19,6 +19,7 @@ import { KitchenStopList } from '../../src/components/KitchenStopList';
 import { KitchenIngredients } from '../../src/components/KitchenIngredients';
 import { KitchenStockMobile } from '../../src/components/KitchenStockMobile';
 import { KitchenLosses } from '../../src/components/KitchenLosses';
+import { KitchenProcurement } from '../../src/components/KitchenProcurement';
 import { KitchenProductionPlanner } from '../../src/components/KitchenProductionPlanner';
 import { font, radius, space } from '../../src/theme/tokens';
 
@@ -186,6 +187,7 @@ export default function KitchenDashboard() {
       {!showroom && live && stock && targets ? <KitchenStockMobile stock={stock} targets={targets}
         consume={live.consumeKitchenStock} reload={async()=>{await reloadStock();await reloadTargets();}} readOnly={readOnly}/> : null}
       {!showroom && live && stock ? <KitchenLosses live={live} stock={stock} reload={reloadStock}/> : null}
+      {!showroom && live && stock ? <KitchenProcurement live={live} stock={stock} reloadStock={reloadStock}/> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
