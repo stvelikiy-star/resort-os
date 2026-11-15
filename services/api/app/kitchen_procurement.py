@@ -124,7 +124,8 @@ async def list_requests(request: Request, user=Depends(read_access)):
             '''SELECT p.*,i.name,i.unit,i."isSample" FROM kitchen_procurement_requests p
                JOIN kitchen_stock_items i ON i.id=p."stockItemId" AND i."propertyId"=p."propertyId"
                WHERE p."propertyId"=$1 ORDER BY p."createdAt" DESC,p.id DESC LIMIT 100''',pid)
-    return {"items":[serialize_request(r) for r in rows],"payment_created":False}
+    return {"items":[serialize_request(r) for r in rows],"payment_created":False,
+            "new_request_id":str(uuid.uuid4()),"new_receipt_id":str(uuid.uuid4())}
 
 
 @router.post("/requests",status_code=201)
