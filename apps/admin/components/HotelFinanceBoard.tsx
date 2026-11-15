@@ -133,9 +133,9 @@ const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(Number
 /** Do not coerce missing/invalid reconciliation values to zero, and avoid float rounding. */
 const exactSom = (value: string | null | undefined) => {
   if (value === null) return "Требуется сверка";
-  const m = typeof value === "string" ? /^(-?)(\\d+)(?:\\.(\\d{1,4}))?$/.exec(value) : null;
+  const m = typeof value === "string" ? /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value) : null;
   if (!m) return "Нет подтверждённых данных";
-  const whole = m[2].replace(/\\B(?=(\\d{3})+(?!\\d))/g, " ");
+  const whole = m[2].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const fraction = (m[3] || "").replace(/0+$/, "");
   return (m[1] === "-" ? "−" : "") + whole + (fraction ? "," + fraction : "") + " сом";
 };
