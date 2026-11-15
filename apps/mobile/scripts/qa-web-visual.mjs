@@ -319,6 +319,14 @@ async function main() {
         if (url !== expected) throw new Error('Visual matrix wrong route: expected ' + expected + ', got ' + url);
         const name = 'matrix_' + route + '_' + lang + '_' + theme + '_' + width;
         await screenshot(name);
+        // Narrow English status labels must remain complete on a single line:
+        // the approved two-column design was breaking "Maintenance" mid-word.
+        if (route === 'overview' && lang === 'en' && width === 320) {
+          const label = await evaluate('(() => { const el = document.querySelector(\'[data-testid="inventory-state-3"]\'); if (!el) return null; const s = getComputedStyle(el); return { text: el.textContent.trim(), height: el.getBoundingClientRect().height, lineHeight: parseFloat(s.lineHeight) }; })()');
+          if (!label || label.text !== 'Maintenance' || label.height > label.lineHeight * 1.3) {
+            throw new Error('320px EN room maintenance label wraps/clips: ' + JSON.stringify(label));
+          }
+        }
         matrixFiles.push(name + '.jpg');
       }
       await viewport(375, 812);
