@@ -157,3 +157,6 @@
   :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .history article { grid-template-columns:minmax(0,1fr); }
   :global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell .rooms article { grid-template-columns:minmax(0,1fr); }
 }
+
+/* Checkbox hit targets are their full native labels, not the 19px visual indicator. */
+:global(html[data-marina-ui="future-luxury"][data-fl2-theme]) .shell :is(.roomMain,.filters label) { min-height:44px; }
