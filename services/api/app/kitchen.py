@@ -18,6 +18,9 @@ kitchen_operations_access = require_roles("OWNER", "MANAGER", "COOK")
 # routes preserve the original COOK/management permissions.
 kitchen_status_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
 kitchen_management_access = require_roles("OWNER", "MANAGER")
+waiter_menu_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER", module_grant=False)
+waiter_table_creation_access = require_roles("OWNER", "MANAGER", "WAITER", module_grant=False)
+waiter_order_creation_access = require_roles("OWNER", "MANAGER", "COOK", "WAITER", module_grant=False)
 # Legacy DINING_STAFF is intentionally not accepted: cook and waiter are server-separated.
 
 DRAFT_MENU = [
@@ -210,18 +213,17 @@ async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(
 
 
 @admin_router.get("/menu")
-async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
-    if user["role"] not in {"OWNER", "MANAGER", "COOK"}:
-        raise HTTPException(status_code=403, detail="Menu author role required")
+async def list_menu(request: Request, user: dict[str, Any] = Depends(waiter_menu_access)):
     async with request.app.state.db.acquire() as conn:
         pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder",recipe
                FROM kitchen_menu_items WHERE "propertyId"=$1
                  AND ($2::boolean OR ("isDraft"=true AND "isActive"=false))
-               ORDER BY "sortOrder",category,"nameRu"''', pid, user["role"] != "COOK",
+                 AND ($3::boolean OR ("isActive"=true AND "isDraft"=false))
+               ORDER BY "sortOrder",category,"nameRu"''', pid, user["role"] not in {"COOK", "WAITER"}, user["role"] != "WAITER",
         )
-    return {"items": [{**menu_item(row), "recipe": read_recipe(row["recipe"])} for row in rows]}
+    return {"items": [menu_item(row) if user["role"] == "WAITER" else {**menu_item(row), "recipe": read_recipe(row["recipe"])} for row in rows]}
 
 
 @admin_router.patch("/menu/{item_id}")
@@ -272,7 +274,7 @@ async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_m
 
 
 @admin_router.post("/tables", status_code=status.HTTP_201_CREATED)
-async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
+async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(waiter_table_creation_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
@@ -347,7 +349,13 @@ async def list_orders(request: Request, order_status: str = Query(default="ACTIV
 
 
 @admin_router.post("/orders", status_code=status.HTTP_201_CREATED)
-async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(kitchen_operations_access)):
+async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(waiter_order_creation_access)):
+    # WAITER cannot submit management or room orders or inject guest identity.
+    if user["role"] == "WAITER" and (
+        payload.source != "TABLE" or payload.table_id is None
+        or payload.stay_id is not None or payload.room_code is not None
+    ):
+        raise HTTPException(status_code=403, detail={"code": "WAITER_TABLE_ORDER_ONLY"})
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
@@ -355,11 +363,19 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
             live_session = None
             if table_id:
                 await lock_dining_tables(conn, table_id)
-                exists = await conn.fetchval('SELECT 1 FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true', table_id, pid)
-                if not exists:
+                table = await conn.fetchrow(
+                    'SELECT id,status FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
+                    table_id, pid,
+                )
+                if not table:
                     raise HTTPException(status_code=422, detail="Active table not found")
                 if payload.source == "TABLE":
                     live_session = await active_session_for_table(conn, table_id)
+                if user["role"] == "WAITER":
+                    if live_session and live_session["waiterId"] not in (None, uuid.UUID(user["id"])):
+                        raise HTTPException(status_code=403, detail={"code": "WAITER_TABLE_NOT_ASSIGNED"})
+                    if not live_session and table["status"] != "AVAILABLE":
+                        raise HTTPException(status_code=409, detail={"code": "WAITER_TABLE_NOT_AVAILABLE"})
 
             stay_id = payload.stay_id
             if live_session:
@@ -394,6 +410,11 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
                 room_id=room_id, guest_task_id=None, guest_count=guest_count, meal_type=meal_type,
                 notes=payload.notes, opened_by_id=uuid.UUID(user["id"]), items=payload.items,
             )
+            if user["role"] == "WAITER":
+                await conn.execute(
+                    'UPDATE kitchen_orders SET "waiterId"=$2 WHERE id=$1 AND "propertyId"=$3',
+                    order_id, uuid.UUID(user["id"]), pid,
+                )
             await audit(
                 conn, pid, "STAFF", user["id"], "CREATE_KITCHEN_ORDER", str(order_id),
                 {
