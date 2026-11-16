@@ -70,6 +70,17 @@ async def main():
                 **body, "id": str(uuid.uuid4()),
                 "source_id": str(uuid.uuid4())
             }), 409, "unknown evidence blocked")
+            reversed_source = await db.fetchval(
+                """SELECT e.id FROM owner_revenue_source_events e
+                   WHERE e."propertyId"=$1 AND e.action='APPROVE_SOURCE'
+                     AND EXISTS(SELECT 1 FROM owner_revenue_source_events rev
+                       WHERE rev."propertyId"=e."propertyId"
+                         AND rev."reversesId"=e.id)
+                   LIMIT 1""", pid)
+            assert reversed_source, "Synthetic source E2E must include a reversal"
+            expect(await owner.post(url, json={**body,
+                "id": str(uuid.uuid4()), "source_id": str(reversed_source)}),
+                409, "reversed source cannot be proposed")
             unbalanced = {**body, "lines": [body["lines"][0], {
                 "account_code": "4000", "side": "CREDIT", "amount_kgs": "333.3332"
             }]}
@@ -110,6 +121,10 @@ async def main():
                  ("Overwritten", operation), "header rewrite"),
                 ('DELETE FROM owner_accounting_journal_proposal_lines WHERE "proposalId"=$1',
                  (operation,), "line deletion"),
+                ('DELETE FROM owner_accounting_journal_proposals WHERE id=$1',
+                 (operation,), "header deletion"),
+                ('UPDATE owner_accounting_journal_proposal_lines SET "amountKgs"=$1 WHERE "proposalId"=$2',
+                 (Decimal("1"), operation), "line rewrite"),
                 ('INSERT INTO owner_accounting_journal_proposal_lines ("proposalId","propertyId","lineNo","accountCode","side","amountKgs") VALUES($1,$2,3,$3,$4,$5)',
                  (operation, pid, "1000", "DEBIT", Decimal("1")), "late line append"),
             ]:
