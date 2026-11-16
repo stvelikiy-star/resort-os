@@ -176,7 +176,116 @@ async def main():
                 raise AssertionError('DELETE must fail on immutable journal')
             except asyncpg.PostgresError as exc:
                 assert 'OWNER_REVENUE_SOURCE_IMMUTABLE' in str(exc)
+            # Append documented corrections to the still-active SECOND night;
+            # no Revenue/Payment creation, and source evidence remains immutable.
+            correction_url='/api/v1/admin/finance/owner/revenue-corrections'
+            proof='a'*64
+            base_correction={
+                'approval_id':second['id'],
+                'kind':'DISCOUNT',
+                'component':'LODGING',
+                'amount_kgs':'30.0000',
+                'document_reference':'DISCOUNT-'+marker,
+                'document_date':today.isoformat(),
+                'document_sha256':proof,
+                'evidence_reference':'CI-ONLY-SYNTHETIC-DOCUMENT-'+marker,
+                'reason':'Synthetic documented customer discount under review',
+            }
+            await_role=await cook.post(correction_url,json={
+                **base_correction,'id':str(uuid.uuid4())})
+            accept(await_role,403,'cook cannot post correction')
+            corr_id=uuid.uuid4()
+            correction={**base_correction,'id':str(corr_id)}
+            repeated=await asyncio.gather(
+                *[owner.post(correction_url,json=correction) for _ in range(8)])
+            assert all(r.status_code==201 for r in repeated),[
+                (r.status_code,r.text) for r in repeated]
+            assert sum(not r.json()['already_processed'] for r in repeated)==1
+            assert all(r.json()['document_authenticity_verified'] is False for r in repeated)
+            accept(await owner.post(correction_url,json={
+                **correction,'amount_kgs':'31.0000'}),409,'changed correction ID denied')
+            accept(await owner.post(correction_url,json={
+                **correction,'id':str(uuid.uuid4())}),409,
+                'same document and correction type denied under different ID')
+            accept(await owner.post(correction_url,json={
+                **correction,'id':str(uuid.uuid4()),
+                'document_reference':'OVER-LIMIT-'+marker,
+                'amount_kgs':'999.0000'}),409,'correction exceeds face')
+            accept(await owner.post(correction_url,json={
+                **correction,'id':str(uuid.uuid4()),
+                'document_reference':'INVALID-HASH-'+marker,
+                'document_sha256':'not-sha'}),422,'invalid fingerprint rejected')
+            accept(await owner.post(correction_url,json={
+                **correction,'id':str(uuid.uuid4()),
+                'document_reference':'REVERSED-SOURCE-'+marker,
+                'approval_id':str(r1)}),409,'reversed source disallows new correction')
+            # A package allocation and tax are classifications; refunds must
+            # NOT be counted as a second sales reduction or Payment.
+            kinds=[
+                ('PACKAGE_SPLIT','DINING','200.0000'),
+                ('TAX_COMPONENT','LODGING','20.0000'),
+                ('REFUND','UNALLOCATED','10.0000'),
+                ('CANCELLATION','LODGING','30.0000'),
+            ]
+            for kind,component,amount in kinds:
+                res=accept(await owner.post(correction_url,json={
+                    **correction,'id':str(uuid.uuid4()),
+                    'kind':kind,'component':component,'amount_kgs':amount,
+                    'document_reference':kind+'-'+marker,
+                    'reason':'Synthetic documentary '+kind.lower()+' for review'
+                }),201,kind)
+                assert res['recognized_net_revenue_kgs'] is None
+                assert res['payment_created'] is False
+            # Reversal is itself immutable, idempotent and documented.
+            reversal={'id':str(uuid.uuid4()),
+                      'reason':'Synthetic reversal of incorrect discount evidence'}
+            reverse_url=correction_url+'/'+str(corr_id)+'/reverse'
+            revs=await asyncio.gather(
+                *[owner.post(reverse_url,json=reversal) for _ in range(8)])
+            assert all(r.status_code==201 for r in revs),[
+                (r.status_code,r.text) for r in revs]
+            assert sum(not r.json()['already_processed'] for r in revs)==1
+            accept(await owner.post(reverse_url,json={
+                **reversal,'reason':'Modified reversal reason'}),409,
+                'changed reversal ID denied')
+            accept(await owner.post(reverse_url,json={
+                'id':str(uuid.uuid4()),'reason':'Second reverse disallowed'}),409,
+                'second correction reversal denied')
+            # Query /finance summary returns only unrecognized documentary
+            # categories and exposes that sha+reference are NOT verified bytes.
+            summary=accept(await owner.get(accrual_url,params=accrual_period),
+                           200,'documented correction summary')
+            changes=summary['documented_source_corrections']
+            assert changes['recorded_corrections_count']>=5
+            assert changes['reversed_corrections_count']>=1
+            assert changes['active_by_kind_kgs']['DISCOUNT']=='0.0000'
+            assert changes['active_by_kind_kgs']['CANCELLATION']=='30.0000'
+            assert changes['active_by_kind_kgs']['PACKAGE_SPLIT']=='200.0000'
+            assert changes['active_by_kind_kgs']['TAX_COMPONENT']=='20.0000'
+            assert changes['active_by_kind_kgs']['REFUND']=='10.0000'
+            assert changes['metadata_only_documents_not_independently_verified'] is True
+            assert changes['recognized_revenue_kgs'] is None
+            assert summary['recognition']['recognized_profit_kgs'] is None
+            list_data=accept(await owner.get(correction_url,params=accrual_period),
+                            200,'documentary correction history')
+            assert list_data['history_append_only'] is True
+            assert list_data['document_authenticity_verified'] is False
+            try:
+                await db.execute('UPDATE owner_revenue_correction_events '
+                                 'SET reason=$1 WHERE id=$2','Forged edit',corr_id)
+                raise AssertionError('CORRECTION UPDATE must be rejected')
+            except asyncpg.PostgresError as exc:
+                assert 'OWNER_REVENUE_CORRECTION_IMMUTABLE' in str(exc)
+            try:
+                await db.execute('DELETE FROM owner_revenue_correction_events WHERE id=$1',
+                                 corr_id)
+                raise AssertionError('CORRECTION DELETE must be rejected')
+            except asyncpg.PostgresError as exc:
+                assert 'OWNER_REVENUE_CORRECTION_IMMUTABLE' in str(exc)
             assert await db.fetchval('SELECT COUNT(*) FROM payments')==before_payments
+            print('REVENUE_CORRECTIONS_POSTGRES_PASS: documented discounts, '
+                  'package/tax classification, refund/cancel evidence, 8-way '
+                  'idempotency and reversal, immutable history and no Payment')
             print('REVENUE_SOURCE_JOURNAL_POSTGRES_PASS: 8-way same ID approval '
                   'and reversal, source/date unique, 334+333 nights, served folio, '
                   'non-owner 403, immutable UPDATE/DELETE denied, no Payment')
