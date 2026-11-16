@@ -84,7 +84,43 @@ async def main() -> None:
         check(published.json()["is_draft"] is False and published.json()["price_kgs"] == 333, "publish/price not persisted")
 
         menu = await cook.get("/api/v1/kitchen/menu")
-        check(menu.status_code == 403, f"COOK must not access menu management: {menu.text}")
+        check(menu.status_code == 200, f"COOK draft list failed: {menu.text}")
+        check(all(row["is_draft"] and not row["is_active"] for row in menu.json()["items"]),
+              "COOK author list must contain inactive drafts only")
+
+        draft_code = code + "_COOK"
+        draft = await cook.post("/api/v1/kitchen/menu", json={
+            "code": draft_code, "category": "MAIN", "name_ru": "Черновик", "name_kg": "Долбоор",
+            "name_kz": "Нобай", "name_en": "Draft", "price_kgs": 0,
+            "is_active": False, "is_draft": True,
+        })
+        check(draft.status_code == 201, draft.text)
+        draft_id = draft.json()["id"]
+        path = f"/api/v1/kitchen/menu/{draft_id}"
+        edited = await cook.patch(path, json={"name_ru": "Исправленный черновик"})
+        check(edited.status_code == 200, edited.text)
+        for change in ({"price_kgs": 5}, {"is_active": True}, {"is_draft": False}):
+            check((await cook.patch(path, json=change)).status_code == 403, "COOK publication/price bypass")
+        recipe = {"expected_version": 0, "status": "DRAFT", "is_sample": True,
+                  "ingredients": [{"name": "Тестовый рис", "unit": "KG", "quantity_per_portion": "0.1"}]}
+        recipe_saved = await cook.put(path + "/recipe", json=recipe)
+        check(recipe_saved.status_code == 200, recipe_saved.text)
+        check((await cook.put(path + "/recipe", json=recipe)).status_code == 409, "Stale recipe must conflict")
+        check((await cook.put(path + "/recipe", json={**recipe, "expected_version": 1, "status": "APPROVED"})).status_code == 403,
+              "COOK must not approve recipe")
+        stored = await conn.fetchrow('SELECT "nameRu",recipe FROM kitchen_menu_items WHERE id=$1::uuid', draft_id)
+        check(stored["nameRu"] == "Исправленный черновик" and stored["recipe"] is not None,
+              "Draft name/recipe not stored in PostgreSQL")
+        owner_menu = await owner.get("/api/v1/kitchen/menu")
+        check(any(row["id"] == draft_id for row in owner_menu.json()["items"]), "Management cannot see draft")
+        approved_recipe = await owner.put(path + "/recipe", json={**recipe, "expected_version": 1, "status": "APPROVED"})
+        check(approved_recipe.status_code == 200, approved_recipe.text)
+        check((await owner.patch(path, json={"is_active": True, "is_draft": False, "price_kgs": 222})).status_code == 200,
+              "Owner publication failed")
+        check((await cook.patch(path, json={"name_ru": "Forbidden"})).status_code == 403,
+              "COOK must not edit published dish")
+        check((await cook.put(path + "/recipe", json={**recipe, "expected_version": 2})).status_code == 403,
+              "COOK must not change published recipe")
 
         audit_count = await conn.fetchval(
             '''SELECT count(*) FROM audit_logs WHERE resource='KitchenMenuItem' AND "resourceId"=$1
@@ -96,7 +132,7 @@ async def main() -> None:
     finally:
         await owner.aclose()
         await cook.aclose()
-        await conn.execute('DELETE FROM kitchen_menu_items WHERE code=$1', code)
+        await conn.execute('DELETE FROM kitchen_menu_items WHERE code=ANY($1::text[])', [code, code + '_COOK'])
         await conn.close()
 
 

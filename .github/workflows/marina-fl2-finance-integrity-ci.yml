@@ -1,0 +1,22 @@
+name: MARINA FL2 Finance Integrated Preservation CI
+on:
+  push:
+    branches:
+      - integration/marina-fl2-finance-merged-rc-20261116
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - 'apps/admin/**'
+      - 'apps/staff/**'
+      - 'scripts/design/fl2-finance-integrated-contract.mjs'
+      - 'services/api/app/owner_kitchen_reconciliation.py'
+permissions:
+  contents: read
+jobs:
+  integrated-preservation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify integrated brand, rights, source valuations, i18n and motion invariants
+        run: node scripts/design/fl2-finance-integrated-contract.mjs

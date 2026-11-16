@@ -1,4 +1,5 @@
 "use client";
+import FutureLuxuryAppearance from "./FutureLuxuryAppearance";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 import AgentsBoard from "./AgentsBoard";

@@ -47,6 +47,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -61,8 +62,8 @@ jobs:
           pwd="synthetic-ci-only-$(openssl rand -hex 24)"
           echo "::add-mask::$pwd"
           echo "MARINA_SHARED_BROWSER_CI_PASSWORD=$pwd" >> "$GITHUB_ENV"
-      - name: Verify immutable RC3 source and historical migrations
-        run: python scripts/marina_rc3_source_gate.py
+      - name: Verify immutable historical RC3 and reviewed additive migrations
+        run: python scripts/marina_rc3_additive_gate.py
       - name: Apply existing Prisma migrations to disposable empty PostgreSQL
         working-directory: packages/database
         run: |

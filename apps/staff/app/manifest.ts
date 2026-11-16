@@ -7,12 +7,13 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Housekeeping and maintenance operations for MARINA SMART Hotel OS",
     start_url: "/",
     display: "standalone",
-    background_color: "#f4f6f3",
-    theme_color: "#173f31",
+    background_color: "#0B1F2A",
+    theme_color: "#0B1F2A",
     lang: "ru",
     icons: [
-      { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-      { src: "/icon-maskable.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" }
+      // Use the exact approved MARINA SMART PNG, shared with Web/Admin/Mobile.
+      // Do not declare it maskable until a safe-zone-compliant branded asset is verified.
+      { src: "/marina-smart-approved.png", type: "image/png", purpose: "any" }
     ],
   };
 }

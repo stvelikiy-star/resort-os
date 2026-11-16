@@ -1,0 +1,11 @@
+[Unit]
+Description=MARINA RC441 service, loopback HTTPS and verified backup monitor
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/marina-release-candidates/rc441-browser-acceptance
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 %h/marina-release-candidates/marina-rc441-scheduled-monitor/scripts/marina_rc441_monitor.py --rc-dir %h/marina-release-candidates/rc441-browser-acceptance --state-file %h/marina-release-candidates/rc441-browser-acceptance/monitoring/status.json --notify-desktop
+TimeoutStartSec=180
+Nice=10
+NoNewPrivileges=true

@@ -11,7 +11,70 @@ import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { OWNER_FINANCE_COPY } from '../src/i18n/extendedOperations';
 import { useAsync } from '../src/lib/useAsync';
 import { useTheme } from '../src/theme/ThemeProvider';
+import { OwnerExpenses } from '../src/components/OwnerExpenses';
 import { font, space } from '../src/theme/tokens';
+
+const KITCHEN_REPORT_COPY={
+ ru:{title:'Кухня — себестоимость и закупки',production:'Производственная себестоимость',
+  losses:'Порча и потери',waste:'Потери',spoilage:'Порча',stock:'Стоимость остатков по движениям',
+  approved:'Утверждённые поставки к приходу',unapproved:'Заявки без утверждения',
+  returns:'Возврат поставщику — стоимость товара',gross:'Накладные поставщиков',
+  settled:'Оплаты поставщикам (зарегистрированные)',credits:'Кредитовые корректировки',
+  outstanding:'Долг поставщикам',legacyDifference:'Расхождение цен старых приходов и накладных',
+  returnDifference:'Разница кредита и складской стоимости возвратов',
+  reconciliation:'Требуется сверка складских движений или документов',
+  notice:'Склад оценён по сохранённым движениям; заявки — предварительные оценки. Накладные, оплаты и возвраты — отдельные записи. Это не подтверждённая прибыль.'},
+ kg:{title:'Ашкана — өздүк нарк жана сатып алуулар',production:'Өндүрүштүн өздүк наркы',
+  losses:'Бузулуу жана жоготуулар',waste:'Жоготуулар',spoilage:'Бузулуу',
+  stock:'Кампанын кыймылдар боюнча баасы',approved:'Бекитилген, бирок келе элек товарлар',
+  unapproved:'Бекитиле элек өтүнмөлөр',
+  returns:'Жеткирүүчүгө кайтарылган товар баасы',gross:'Жеткирүүчүнүн накладнойлору',
+  settled:'Жеткирүүчүгө катталган төлөмдөр',credits:'Кредиттик түзөтүүлөр',
+  outstanding:'Жеткирүүчүлөргө карыз',legacyDifference:'Эски кириштер менен накладнойлордун баа айырмасы',
+  returnDifference:'Кредит менен кайтарылган товардын нарк айырмасы',
+  reconciliation:'Кампа кыймылдарын же документтерди салыштыруу керек',
+  notice:'Кампа кыймылдардын наркы менен бааланат, өтүнмөлөр болжолдуу. Бул текшерилген пайда эмес.'},
+ en:{title:'Kitchen — costs & procurement',production:'Production cost',
+  losses:'Spoilage and waste cost',waste:'Waste',spoilage:'Spoilage',
+  stock:'Inventory value from recorded movements',approved:'Approved products not yet received',
+  unapproved:'Requests awaiting approval',
+  returns:'Supplier returns — stock carrying cost',gross:'Supplier invoice obligations',
+  settled:'Recorded supplier settlements',credits:'Supplier credit notes',
+  outstanding:'Supplier payables outstanding',
+  legacyDifference:'Legacy receipt vs invoice cost difference',
+  returnDifference:'Supplier credit vs stock return cost difference',
+  reconciliation:'Stock or document reconciliation required',
+  notice:'Inventory uses recorded movement values; open requests are estimates. Invoices, settlements and credits are separate facts. Recognized profit is unavailable.'},
+ kz:{title:'Асхана — өзіндік құн және сатып алу',production:'Өндіріс шығыны',
+  losses:'Бүліну және шығындар',waste:'Шығындар',spoilage:'Бүліну',
+  stock:'Қозғалыстар бойынша қойма құны',approved:'Бекітілген, бірақ келмеген өнімдер',
+  unapproved:'Бекітілмеген өтінімдер',returns:'Жеткізушіге қайтарылған тауар құны',
+  gross:'Жеткізушінің жүкқұжаттары',settled:'Тіркелген жеткізуші төлемдері',
+  credits:'Кредиттік түзетулер',outstanding:'Жеткізушілерге берешек',
+  legacyDifference:'Ескі кірістер мен жүкқұжат бағасының айырмасы',
+  returnDifference:'Кредит пен қайтарылған тауар құнының айырмасы',
+  reconciliation:'Қойма жазбаларын немесе құжаттарды салыстыру қажет',
+  notice:'Қойма құны тіркелген қозғалыстарға негізделген; өтінімдер бағалау ғана. Бұл расталған пайда емес.'},
+} as const;
+
+const CASH_RECONCILIATION_COPY={
+ ru:{title:'Сверка зарегистрированных денежных операций',
+  received:'Поступления от гостей (записанные)',paid:'Ручные оплаты расходов',
+  difference:'Разница зарегистрированных операций',open:'Неоплаченные расходы',
+  notice:'Это не прибыль, банковский остаток и не полный денежный поток. Возвраты, незарегистрированные операции и начисления не сверены.'},
+ kg:{title:'Катталган акча операцияларын салыштыруу',
+  received:'Коноктордон түшкөн төлөмдөр',paid:'Чыгымдар боюнча кол менен төлөмдөр',
+  difference:'Катталган операциялардын айырмасы',open:'Төлөнө элек чыгымдар',
+  notice:'Бул пайда, банктагы калдык же толук акча агымы эмес. Кайтаруулар жана башка операциялар салыштырылган жок.'},
+ en:{title:'Recorded cash movement comparison',
+  received:'Recorded guest receipts',paid:'Manually recorded expense payments',
+  difference:'Difference in recorded movements',open:'Unsettled expenses',
+  notice:'Not profit, verified bank balance or complete cash flow. Refunds, missing movements and recognition differences are not reconciled.'},
+ kz:{title:'Тіркелген ақша қозғалысын салыстыру',
+  received:'Қонақтардан тіркелген түсімдер',paid:'Қолмен тіркелген шығыс төлемдері',
+  difference:'Тіркелген қозғалыс айырмасы',open:'Төленбеген шығыстар',
+  notice:'Бұл пайда, банк қалдығы немесе толық ақша ағымы емес. Қайтарымдар және басқа операциялар салыстырылмаған.'},
+} as const;
 
 /** Only amounts verified in the exact hotel Core report are displayed.
  * Incoming payments are not earnings; this is NOT a P&L or tax report. */
@@ -19,6 +82,8 @@ export default function Finance() {
   const { user, hotel, api, locale } = useSession();
   const copy = useMobileCopy();
   const extra = OWNER_FINANCE_COPY[locale];
+  const kitchenCopy = KITCHEN_REPORT_COPY[locale];
+  const cashCopy = CASH_RECONCILIATION_COPY[locale];
   const { c } = useTheme();
   const router = useRouter();
   const modules = useLiveModules();
@@ -28,10 +93,25 @@ export default function Finance() {
     () => allowed && modules ? modules.financeSummary(from, to) : Promise.resolve(null),
     [modules, allowed, hotel?.id, user?.id, user?.module_permissions?.join(',')],
   );
+  const ownerKitchen=useAsync(
+    () => allowed && user?.role==='OWNER' && modules ?
+      modules.ownerKitchenManagement(from,to):Promise.resolve(null),
+    [modules,allowed,user?.role,user?.id,hotel?.id],
+  );
+  const recordedCash=useAsync(
+    () => allowed && user?.role==='OWNER' && modules ?
+      modules.ownerRecordedCashMovements(from,to):Promise.resolve(null),
+    [modules,allowed,user?.role,user?.id,hotel?.id],
+  );
+  const reloadCash = recordedCash.reload;
+  const reloadKitchen = ownerKitchen.reload;
+  const refreshFinancialSnapshots=useCallback(async()=>{
+    await Promise.all([reload(), reloadKitchen(), reloadCash()]);
+  },[reload,reloadKitchen,reloadCash]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => {
-    if (focused.current) void reload(); else focused.current = true;
-  }, [reload]));
+    if (focused.current) void refreshFinancialSnapshots(); else focused.current = true;
+  }, [refreshFinancialSnapshots]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
   const line = (label: string, amount: string, caption?: string) =>
@@ -41,7 +121,7 @@ export default function Finance() {
         <Text style={[font.body,{color:c.text}]}>{label}</Text>
         {caption ? <Text style={[font.small,{color:c.textMuted}]}>{caption}</Text> : null}
       </View>
-      <Text style={[font.body,{color:c.text,fontWeight:'700',textAlign:'right'}]}>{amount}</Text>
+      <Text style={[font.body,{color:c.text,fontWeight:'700',textAlign:'right',flexShrink:1,maxWidth:'52%'}]}>{amount}</Text>
     </View>;
   return <FutureScreen>
     <PressScale accessibilityLabel={copy.close} onPress={() => router.back()}
@@ -104,6 +184,72 @@ export default function Finance() {
               String(data.refunded_snapshot_all_time.payment_count)) : null}
         </GlassCard>
       </> : null}
+      {data.kitchen_stock_cost ? <>
+        <SectionLabel>{extra.stockCost}</SectionLabel>
+        <GlassCard style={{gap:space.sm}}>
+          {line(extra.stockCost,data.kitchen_stock_cost.real_production_cost_kgs+' '+data.range.currency,extra.stockNotice)}
+          {Number(data.kitchen_stock_cost.sample_production_cost_kgs) > 0 ?
+            line(extra.sampleCost,data.kitchen_stock_cost.sample_production_cost_kgs+' '+data.range.currency) : null}
+        </GlassCard>
+      </> : null}
+      {user?.role==='OWNER'?<>
+        <SectionLabel>{kitchenCopy.title}</SectionLabel>
+        {ownerKitchen.loading?<LoadingShimmer count={1}/>:null}
+        {ownerKitchen.error?<ErrorState text={ownerKitchen.error.message} retry={copy.retry}
+          onRetry={ownerKitchen.reload}/>:null}
+        {ownerKitchen.data?<GlassCard style={{gap:space.sm}}>
+          {line(kitchenCopy.production,
+            ownerKitchen.data.real_production_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.losses,
+            ownerKitchen.data.real_loss_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.waste,
+            ownerKitchen.data.real_inventory_movements.WASTE.cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.spoilage,
+            ownerKitchen.data.real_inventory_movements.SPOILAGE.cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.returns,
+            ownerKitchen.data.real_supplier_return_stock_debit_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.stock,
+            ownerKitchen.data.current_stock.real_book_inventory_value_kgs===null
+              ? '—' : ownerKitchen.data.current_stock.real_book_inventory_value_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.gross,
+            ownerKitchen.data.procurement_exposure.gross_supplier_obligations_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.settled,
+            ownerKitchen.data.procurement_exposure.settled_supplier_payables_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.credits,
+            ownerKitchen.data.procurement_exposure.credited_supplier_payables_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.outstanding,
+            ownerKitchen.data.procurement_exposure.outstanding_supplier_payables_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.legacyDifference,
+            ownerKitchen.data.source_reconciliation.inventory.linked_source.legacy_invoice_vs_stock_cost_delta_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.returnDifference,
+            ownerKitchen.data.source_reconciliation.supplier_documents.return_credit_minus_stock_cost_kgs+' '+data.range.currency)}
+          {ownerKitchen.data.current_stock.valuation_status!=='MOVEMENT_BASED'||
+            ownerKitchen.data.source_reconciliation.inventory.linked_source.source_mismatch_count>0||
+            ownerKitchen.data.source_reconciliation.supplier_documents.payables_status!=='RECORDED_OBLIGATIONS_BALANCED'
+             ? <Text style={[font.small,{color:c.warning}]}>{kitchenCopy.reconciliation}</Text> : null}
+          {line(kitchenCopy.approved,
+            ownerKitchen.data.procurement_exposure.approved_unreceived_at_current_item_cost_kgs+' '+data.range.currency)}
+          {line(kitchenCopy.unapproved,
+            ownerKitchen.data.procurement_exposure.unapproved_requests_at_current_item_cost_kgs+' '+data.range.currency)}
+          <Text style={[font.small,{color:c.textMuted}]}>
+            {kitchenCopy.notice}
+          </Text>
+        </GlassCard>:null}
+      </>:null}
+      {user?.role==='OWNER'?<>
+        <SectionLabel>{cashCopy.title}</SectionLabel>
+        {recordedCash.loading?<LoadingShimmer count={1}/>:null}
+        {recordedCash.error?<ErrorState text={recordedCash.error.message}
+          retry={copy.retry} onRetry={recordedCash.reload}/>:null}
+        {recordedCash.data?<GlassCard style={{gap:space.sm}}>
+          {line(cashCopy.received,money(recordedCash.data.customer_payments_received_kgs))}
+          {line(cashCopy.paid,money(recordedCash.data.owner_expense_manual_settlements_kgs))}
+          {line(cashCopy.difference,money(recordedCash.data.observed_recorded_difference_kgs))}
+          {line(cashCopy.open,money(recordedCash.data.all_time_unsettled_expenses_kgs))}
+          <Text style={[font.small,{color:c.textMuted}]}>{cashCopy.notice}</Text>
+        </GlassCard>:null}
+      </>:null}
+      {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to} onCommitted={refreshFinancialSnapshots}/> : null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>

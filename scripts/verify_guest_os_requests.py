@@ -48,6 +48,19 @@ async def payment_count() -> int:
         await conn.close()
 
 
+async def prove_folio_charge(task_id: str, amount_kgs: int, status: str):
+    conn = await asyncpg.connect(DATABASE_URL)
+    try:
+        rows = await conn.fetch(
+            """SELECT "amountKgs",status::text FROM guest_folio_charges
+               WHERE "sourceType"='GUEST_SERVICE' AND "sourceId"=$1""",
+            uuid.UUID(task_id),
+        )
+        assert [tuple(row) for row in rows] == [(amount_kgs, status)], rows
+    finally:
+        await conn.close()
+
+
 async def ensure_staff(username: str, role: str):
     conn = await asyncpg.connect(DATABASE_URL)
     try:
@@ -190,6 +203,30 @@ def main():
     payments_before = asyncio.run(payment_count())
     initial_room_state = asyncio.run(room_state(chosen['id']))
     assert initial_room_state == 'CLEAN'
+
+    settings_path = '/api/v1/admin/guest-service-settings'
+    price_key = 'on_demand_housekeeping_price_kgs'
+    settings = owner.get(settings_path)
+    settings.raise_for_status()
+    original_price = settings.json()[price_key]
+    requests_path = f'/api/v1/guest-os/rooms/{token}/requests'
+    try:
+        owner.patch(settings_path, json={price_key: 100}).raise_for_status()
+        payload = {"request_code": "HOUSEKEEPING", "description": "Paid housekeeping CI"}
+        paid = owner.post(requests_path, json=payload)
+        assert paid.status_code == 201, paid.text
+        task = paid.json()
+        assert (task['charge_kgs'], task['charge_status'], task['charge_source']) == (100, 'POSTED', 'FOLIO')
+        duplicate_paid = owner.post(requests_path, json=payload)
+        assert duplicate_paid.status_code == 409, duplicate_paid.text
+        assert duplicate_paid.json()['detail']['task_id'] == task['id']
+        asyncio.run(prove_folio_charge(task['id'], 100, 'OPEN'))
+        cancelled = owner.post(f"{requests_path}/{task['id']}/cancel")
+        cancelled.raise_for_status()
+        assert cancelled.json()['charge_status'] == 'CANCELLED'
+        asyncio.run(prove_folio_charge(task['id'], 100, 'VOID'))
+    finally:
+        owner.patch(settings_path, json={price_key: original_price}).raise_for_status()
 
     towels = owner.post(f'/api/v1/guest-os/rooms/{token}/requests', json={
         "request_code": "TOWELS", "description": "2 больших полотенца",

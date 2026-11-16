@@ -18,6 +18,7 @@ from .dining_coordination import (
 
 router = APIRouter(prefix="/api/v1/dining", tags=["dining-control"])
 dining_access = require_roles("OWNER", "MANAGER", "WAITER")
+menu_management_access = require_roles("OWNER", "MANAGER")  # WAITER may read menu but must not publish or alter availability.
 
 MEAL_TYPES = {"BREAKFAST", "LUNCH", "DINNER", "OTHER"}
 ACTIVE_ORDER_STATUSES = ("NEW", "ACCEPTED", "COOKING", "READY")
@@ -178,8 +179,10 @@ async def get_menu_day(
 async def publish_menu_day(
     payload: MenuDayPublish,
     request: Request,
-    user: dict[str, Any] = Depends(dining_access),
+    user: dict[str, Any] = Depends(menu_management_access),
 ):
+    if user["role"] not in {"OWNER", "MANAGER"}:
+        raise HTTPException(status_code=403, detail="Menu publishing is restricted to hotel management")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
             pid = await property_id(conn, user)
@@ -242,8 +245,10 @@ async def patch_menu_availability(
     availability_id: uuid.UUID,
     payload: MenuAvailabilityPatch,
     request: Request,
-    user: dict[str, Any] = Depends(dining_access),
+    user: dict[str, Any] = Depends(menu_management_access),
 ):
+    if user["role"] not in {"OWNER", "MANAGER"}:
+        raise HTTPException(status_code=403, detail="Menu publishing is restricted to hotel management")
     if payload.is_available is None and payload.sold_out is None and payload.notes is None:
         raise HTTPException(status_code=422, detail="No change supplied")
     async with request.app.state.db.acquire() as conn:

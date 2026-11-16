@@ -181,7 +181,9 @@ describe('booking access boundary', () => {
   it('keeps cancellation blocked while schedule is a separate manager-only UI operation', () => {
     const actual = jest.requireActual<typeof import('../src/api/liveModules')>('../src/api/liveModules');
     const names = Object.keys(actual.createLiveModules('https://hotel.example', jest.fn() as unknown as typeof fetch));
-    expect(names.filter(name => /cancel|reschedul|move/i.test(name))).toEqual([]);
+    // Moving a DINING table is not a reservation reschedule/cancel operation.
+    expect(names.filter(name => /cancel|reschedul|moveReservation|moveBooking|bookingMove|reservationMove/i.test(name))).toEqual([]);
+    expect(names).toContain('moveDiningSeatingSession');
     expect(names).toEqual(expect.arrayContaining(['bookingPreview', 'bookingCommit', 'schedulePreview', 'scheduleCommit']));
   });
 });

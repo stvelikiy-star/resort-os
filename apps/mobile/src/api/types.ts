@@ -26,6 +26,7 @@ export interface Room {
 export interface StaffMember { id: string; display_name: string; role: Role; open_tasks: number; active?: boolean }
 export interface DaySummary { occupancy_pct: number; dirty: number; blocked: number; overdue: number }
 export interface NewMaintenance { room_id: string | null; category: string; priority: Priority; description: string }
+export interface MaintenanceReport { summary: string }
 export interface HousekeepingReport { checklist: Record<string, boolean>; comment?: string }
 
 export class ApiError extends Error {
@@ -46,6 +47,7 @@ export interface StaffApi {
   claimTask(id: string): Promise<Task>;
   setTaskStatus(id: string, status: TaskStatus): Promise<Task>;
   completeHousekeeping(id: string, report: HousekeepingReport): Promise<Task>;
+  completeMaintenance(id: string, report: MaintenanceReport): Promise<Task>;
   createMaintenance(req: NewMaintenance): Promise<Task>;
   listRooms(): Promise<Room[]>;
   setRoomState(roomId: string, state: RoomState): Promise<Room>;

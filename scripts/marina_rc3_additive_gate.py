@@ -2,7 +2,7 @@
 """Source gate for a NEW additive release without rewriting immutable RC3 evidence.
 
 RC2/RC3 manifests remain 39-migration history. The current release must
-preserve all 39 original SQL hashes AND include exactly the new zz115 SQL.
+preserve all 39 original SQL hashes and include pinned zz115 through zz122 SQL.
 """
 from __future__ import annotations
 import hashlib
@@ -12,11 +12,28 @@ from pathlib import Path
 from marina_rc3_source_gate import ROOT, RC2_FILE, RC3_FILE, validate, git_blob_sha
 from release_contract import EXPECTED_MIGRATIONS
 
-NEW_MIGRATION = "zz115_marina_chef_production_targets_20261110"
+NEW_MIGRATIONS = {
+    "zz115_marina_chef_production_targets_20261110": "239d49674b3709b66619705264e6a1e996ab12b4fc5c93cf5a7b3a0ca423c5f1",
+    "zz116_marina_kitchen_recipes_20261111": "b72d41027c2a25125c3bbb3fd92796c1a0538ef44c59d6db0561129da4fdc061",
+    "zz117_marina_kitchen_stock_20261111": "3cf125cb7b28d4961f0ca991f1685f2bc012628742d2e108ff868b520c825879",
+    "zz118_marina_kitchen_waste_spoilage_20261115": "b7416f6882a1e438214c3dfe4340e29709f59a0f9fe89cc31828bcfbe5782061",
+    "zz119_marina_kitchen_procurement_20261115": "8d1c8afe955d729c7a46d1c360445f0001308007c4b75447fa33348c84cc36f1",
+    "zz120_marina_owner_expenses_20261115": "bcf6e97009c49e1b7a9ec82cb2ea597109e510455b32f2cc00141df76d1bf0f2",
+    "zz121_marina_supplier_documents_20261116": "4fc7366e2979a5ef50abfc004c1efeb5da911f2d8db484e0b2795834b52e9f60",
+    "zz122_marina_supplier_returns_20261116": "ae2c7b46a2acaa1e463805eee4aa5ef3554fa349414c12b9b570508757234f5d"
+}
+# Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
+# Keep the historical RC3 manifest immutable; pin this additive source exactly.
+TASK_REPORT_PATH = "services/api/app/staff_task_reports.py"
+TASK_REPORT_BLOB = "3a874ddc986fd91a5537540ee808d192c4fd6144"
 WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
+    "reviewed critical source changed: " + TASK_REPORT_PATH,
     "reviewed critical source changed: " + WORKFLOW_PATH,
+    "reviewed critical source changed: services/api/app/hotel_finance.py",
+    "reviewed critical source changed: apps/admin/app/shared-auth-preview/page.tsx",
+    "reviewed critical source changed: services/api/app/section_permissions.py",
 })
 
 def validate_additive() -> list[str]:
@@ -26,20 +43,24 @@ def validate_additive() -> list[str]:
     pinned = rc2.get("migration_sha256")
     if not isinstance(pinned, dict) or len(pinned) != 39:
         return ["historical RC2 expected 39 pinned migration hashes"]
-    if len(EXPECTED_MIGRATIONS) != 40 or EXPECTED_MIGRATIONS[-1] != NEW_MIGRATION:
-        errors.append("current release must contain exactly 39 historical + zz115 migrations")
-    expected = set(pinned) | {NEW_MIGRATION}
+    if len(EXPECTED_MIGRATIONS) != 47 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
+        errors.append("current release must contain exactly 39 historical + zz115 through zz122 migrations")
+    expected = set(pinned) | set(NEW_MIGRATIONS)
     actual = {
         p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
     }
     if set(actual) != expected or set(EXPECTED_MIGRATIONS) != expected:
-        errors.append("new release migration set is not the approved additive 40")
+        errors.append("new release migration set is not the approved additive 47")
     for name, sha in pinned.items():
         if actual.get(name) != sha:
             errors.append("historical RC2 migration drift: " + name)
-    if NEW_MIGRATION not in actual:
-        errors.append("new production migration missing")
+    for name, sha in NEW_MIGRATIONS.items():
+        if actual.get(name) != sha:
+            errors.append("reviewed additive migration missing or changed: " + name)
+
+    if git_blob_sha((ROOT / TASK_REPORT_PATH).read_bytes()) != TASK_REPORT_BLOB:
+        errors.append("reviewed additive task report source changed")
 
     legacy_errors = validate(rc3, ROOT)
     for error in legacy_errors:
@@ -48,7 +69,7 @@ def validate_additive() -> list[str]:
     # The historical source-gate file and the previous CI workflow remain
     # retrievable as pinned immutable Git blobs. The new workflow replaces
     # only how the current additive release is checked.
-    for path in ("scripts/marina_rc3_source_gate.py", WORKFLOW_PATH):
+    for path in ("scripts/marina_rc3_source_gate.py", WORKFLOW_PATH, TASK_REPORT_PATH):
         expected_sha = rc3.get("critical_git_blobs", {}).get(path)
         if not isinstance(expected_sha, str):
             errors.append("historical critical blob not pinned: " + path)
@@ -69,4 +90,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115, total=40, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz122, total=47, original source gate preserved, NO-GO")
