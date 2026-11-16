@@ -31,7 +31,7 @@ const pinned = {
   'owner_kitchen_reconciliation.py': 'cf1a944b5b88ce10347dac5bb33fc7681a94885f',
   'owner_accrual_readiness.py': 'dcd4eb5cdd43aa3cc0606cd5053344225d4d3c27',
   'owner_revenue_source_journal.py': 'ab9a8e111ef856c332bc214c0d5f1092d10ef1c6',
-  'owner_revenue_corrections.py': 'fa5a2bd59e8de8d40bb0c22873ba199c47198252',
+  'owner_revenue_corrections.py': '3521841781c1e751cefe0dd7b9924cbbb3b39bc3',
   'owner_delivered_revenue.py': '42e3a9f37877fa083c77c39bdb2b52a138e0b246',
   'hotel_finance.py': 'c493047538ab4a2866bf3b16e3994cab4a2e5ffb',
   'kitchen_procurement.py': '2718f40a9ee512f40dbd5cbe648f4a525f5b6b25',
