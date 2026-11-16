@@ -136,7 +136,103 @@ export interface KitchenLossAcknowledgment {
 export interface KitchenStockConsumeAck {
   consumed_portions:number; already_processed:boolean; cost_kgs:string; payment_created:false;
 }
+export interface OwnerDeliveredRevenueSources {
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string;currency:'KGS'};
+  accommodation:{
+    qualified_reservations:number;delivered_booked_nights_count:number;
+    allocated_booking_face_value_kgs:string;night_preview_limit:number;
+    night_preview_truncated:boolean;
+    night_preview:{reservation_id:string;service_date:string;allocated_booking_face_value_kgs:string}[];
+    excluded_reservations_count:number;
+    exclusion_reasons:Record<string,number>;
+    qualified_source:'CHECKED_OUT_RESERVATION_WITH_MATCHED_ACTUAL_STAY';
+    rate_quality:'BOOKING_TOTAL_DISTRIBUTED_EVENLY_NOT_APPROVED_NIGHTLY_RATE';
+  };
+  dining:{
+    served_orders_count:number;served_orders_face_value_kgs:string;
+    served_with_matching_folio_count:number;single_source_folio_linked_candidate_kgs:string;
+    excluded_orders_count:number;exclusion_reasons:Record<string,number>;
+    non_dining_active_folio_charges:number;non_dining_folio_face_value_kgs:string;
+    non_dining_undated_folio_count:number;
+    kitchen_and_folio_double_counted:false;
+  };
+  recognition:{
+    recognized_lodging_revenue_kgs:null;recognized_dining_revenue_kgs:null;
+    recognized_other_services_revenue_kgs:null;recognized_total_revenue_kgs:null;
+    status:'SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS';
+    requires_rate_package_tax_discount_and_refund_reconciliation:true;
+    requires_approved_immutable_revenue_journal:true;
+    cash_received_as_revenue:false;
+    automatic_posting:false;
+  };
+}
+export interface OwnerAccrualReadiness {
+  documented_source_corrections:{
+    recorded_corrections_count:number;
+    reversed_corrections_count:number;
+    active_by_kind_kgs:Record<'DISCOUNT'|'PACKAGE_SPLIT'|'CANCELLATION'|'REFUND'|'TAX_COMPONENT',string>;
+    metadata_only_documents_not_independently_verified:true;
+    server_verified_document_bytes_count:number;
+    missing_document_bytes_count:number;
+    all_recorded_document_bytes_available:boolean;
+    document_issuer_authenticity_independently_verified:false;
+    refunds_are_cash_evidence_not_recognized_revenue:true;
+    tax_and_packages_are_classifications_not_expenses:true;
+    recognized_revenue_kgs:null;recognized_profit_kgs:null;
+    status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS';
+  };
+  source_approval_journal:{
+    approval_events_count:number;
+    reversal_events_count:number;
+    active_room_nights_count:number;
+    active_served_dining_count:number;
+    active_source_face_value_kgs:string;
+    status:'SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION';
+    recognized_revenue_kgs:null;
+    recognized_profit_kgs:null;
+  };
+  delivered_revenue_sources:OwnerDeliveredRevenueSources;
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string;currency:'KGS'};
+  posted_owner_obligations:{
+    posted_total_kgs:string;non_stock_obligations_candidate_kgs:string;
+    stock_overlap_review_kgs:string;posted_count:number;
+    categories_kgs:Record<string,string>;
+    status:'CLASSIFICATION_REQUIRED'|'POSTED_NOT_RECOGNIZED';
+    matching_supplier_invoice_count:number;matching_supplier_invoice_kgs:string;
+  };
+  kitchen_cost_movements:{
+    production_cost_candidate_kgs:string;loss_cost_candidate_kgs:string;
+    receipt_inventory_inflow_kgs:string;supplier_return_inventory_debit_kgs:string;
+    sample_movement_gross_kgs:string;costs_are_reconciled_to_revenue:false;
+  };
+  revenue_source_candidates:{
+    served_dining_orders_count:number;served_dining_face_value_kgs:string;
+    served_without_linked_folio_count:number;served_without_linked_folio_kgs:string;
+    served_with_active_folio_count:number;served_with_active_folio_kgs:string;
+    disputed_dining_folio_count:number;
+    manual_folio_active_count:number;manual_folio_face_value_kgs:string;
+    manual_folio_without_service_date_count:number;
+    checked_out_reservations_count:number;checked_out_booked_total_kgs:string;
+    amounts_are_not_additive_or_recognized:true;
+  };
+  source_valuation:{
+    inventory_valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    source_mismatch_count:number;supplier_return_credit_minus_stock_cost_kgs:string;
+    supplier_payables_outstanding_kgs:string;
+  };
+  recognition:{
+    status:'REQUIRES_APPROVED_RECOGNITION_LEDGER';
+    blockers:string[];
+    recognized_revenue_kgs:null;recognized_expenses_kgs:null;recognized_profit_kgs:null;
+    completeness_verified:false;customer_payments_are_revenue:false;
+    supplier_settlements_are_expenses:false;receipts_are_expenses:false;
+    source_candidates_are_recognized:false;
+  };
+}
 export interface FinanceSummary {
+  owner_accrual_readiness_snapshot?:OwnerAccrualReadiness;
   kitchen_stock_cost?: {real_production_cost_kgs: string; sample_production_cost_kgs: string;
     movement_count: number; basis: 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'};
   range: { from: string; to: string; currency: string };

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
 from .owner_kitchen_reconciliation import owner_inventory_reconciliation
+from .owner_accrual_readiness import accrual_source_snapshot
 
 router = APIRouter(prefix="/api/v1/admin/finance", tags=["admin-hotel-finance"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -455,6 +456,7 @@ async def finance_summary(
         if user["role"] == "OWNER":
             async with conn.transaction(isolation="repeatable_read", readonly=True):
                 owner_supplier_stock_snapshot = await owner_inventory_reconciliation(conn, pid)
+                owner_accrual_readiness_snapshot = await accrual_source_snapshot(conn, pid, from_date, to_date, prop["timezone"])
 
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
@@ -485,6 +487,7 @@ async def finance_summary(
         },
         **({"owner_expense_snapshot": owner_expense_snapshot} if owner_expense_snapshot is not None else {}),
         **({"owner_supplier_stock_snapshot": owner_supplier_stock_snapshot} if owner_supplier_stock_snapshot is not None else {}),
+        **({"owner_accrual_readiness_snapshot": owner_accrual_readiness_snapshot} if owner_supplier_stock_snapshot is not None else {}),
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],
         "received_by_day": [dict(row) for row in daily],

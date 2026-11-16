@@ -5,6 +5,7 @@ Run only with explicit CI opt-in, localhost DB and localhost API.
 import asyncio
 import os
 import uuid
+from decimal import Decimal
 
 import asyncpg
 import httpx
@@ -77,7 +78,21 @@ async def main():
             summary_base=checked(await owner.get("/api/v1/admin/finance/summary",params={
                 "from_date":date_str,"to_date":date_str}),200,"financial overview")
             assert "owner_expense_snapshot" in summary_base
+            assert "owner_accrual_readiness_snapshot" in summary_base
+            assert summary_base["owner_accrual_readiness_snapshot"]["recognition"]["recognized_profit_kgs"] is None
             init=summary_base["owner_expense_snapshot"]
+            accrual_url="/api/v1/admin/finance/owner/accrual-readiness"
+            accrual_range={"from_date":date_str,"to_date":date_str}
+            checked(await cook.get(accrual_url,params=accrual_range),403,
+                    "COOK cannot access accrual readiness")
+            before_accrual=checked(await owner.get(accrual_url,params=accrual_range),
+                                   200,"OWNER accrual baseline")
+            initial_posted=Decimal(before_accrual["posted_owner_obligations"]["posted_total_kgs"])
+            assert before_accrual["recognition"]["recognized_revenue_kgs"] is None
+            assert before_accrual["recognition"]["recognized_expenses_kgs"] is None
+            assert before_accrual["recognition"]["recognized_profit_kgs"] is None
+            assert before_accrual["recognition"]["completeness_verified"] is False
+            assert before_accrual["recognition"]["source_candidates_are_recognized"] is False
             cash_url="/api/v1/admin/finance/owner/recorded-cash-movements"
             before_cash=checked(await owner.get(cash_url,params={
                 "from_date":date_str,"to_date":date_str}),200,"cash movement baseline")
@@ -106,6 +121,10 @@ async def main():
             current=next(x for x in row["items"] if x["id"]==expense_id)
             assert current["amount_kgs"]==1000 and current["outstanding_kgs"]==1000
             assert row["totals"]["posted_expenses_kgs"]-initial["totals"]["posted_expenses_kgs"]==1000
+            after_post_accrual=checked(await owner.get(accrual_url,params=accrual_range),
+                                       200,"OWNER after obligation")
+            assert Decimal(after_post_accrual["posted_owner_obligations"]["posted_total_kgs"])-initial_posted==Decimal("1000")
+            assert after_post_accrual["recognition"]["recognized_profit_kgs"] is None
             assert await db.fetchval("SELECT count(*) FROM payments")==payment_count
             settle_id=str(uuid.uuid4())
             settlement={"id":settle_id,"amount_kgs":300,"paid_on":date_str,
@@ -130,12 +149,18 @@ async def main():
                 "from_date":date_str,"to_date":date_str}),200,"final ledger")
             item=next(x for x in final["items"] if x["id"]==expense_id)
             assert item["settled_kgs"]==300 and item["outstanding_kgs"]==700
+            after_settlement_accrual=checked(await owner.get(accrual_url,params=accrual_range),
+                                             200,"OWNER after settlement")
+            assert after_settlement_accrual["posted_owner_obligations"]==after_post_accrual["posted_owner_obligations"], "settlement must not change posted cost"
+            assert after_settlement_accrual["recognition"]["recognized_profit_kgs"] is None
             financial=checked(await owner.get("/api/v1/admin/finance/summary",params={
                 "from_date":date_str,"to_date":date_str}),200,"finance integration")
             snap=financial["owner_expense_snapshot"]
             assert snap["period_posted_obligations_kgs"]-init["period_posted_obligations_kgs"]==1000
             assert snap["period_manually_recorded_settlements_kgs"]-init["period_manually_recorded_settlements_kgs"]==300
             assert snap["all_time_outstanding_obligations_kgs"]-init["all_time_outstanding_obligations_kgs"]==700
+            assert financial["owner_accrual_readiness_snapshot"]["posted_owner_obligations"]==after_settlement_accrual["posted_owner_obligations"]
+            assert financial["owner_accrual_readiness_snapshot"]["recognition"]["recognized_profit_kgs"] is None
             assert financial["scope"]["accounting_report"] is False
             assert await db.fetchval("SELECT count(*) FROM payments")==payment_count
             after_cash=checked(await owner.get(cash_url,params={
