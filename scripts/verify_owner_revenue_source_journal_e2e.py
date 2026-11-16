@@ -209,6 +209,10 @@ async def main():
                 'same document and correction type denied under different ID')
             accept(await owner.post(correction_url,json={
                 **correction,'id':str(uuid.uuid4()),
+                'document_reference':'DIFFERENT-REF-'+marker}),409,
+                'same SHA fingerprint cannot duplicate source correction')
+            accept(await owner.post(correction_url,json={
+                **correction,'id':str(uuid.uuid4()),
                 'document_reference':'OVER-LIMIT-'+marker,
                 'amount_kgs':'999.0000'}),409,'correction exceeds face')
             accept(await owner.post(correction_url,json={
