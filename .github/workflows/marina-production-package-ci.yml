@@ -174,7 +174,21 @@ jobs:
             -v "$PWD/deploy/marina/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
       - name: Build the one-shot provisioner image
-        run: docker build --file deploy/marina-provisioner.Dockerfile --tag marina-provisioner-ci:local .
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Retry once for transient pip/network stream failures; deterministic build errors remain red.
+          for attempt in 1 2; do
+            if docker build --file deploy/marina-provisioner.Dockerfile --tag marina-provisioner-ci:local .; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              echo 'MARINA_PROVISIONER_IMAGE_BUILD_FAIL after 2 attempts' >&2
+              exit 1
+            fi
+            echo 'Build attempt 1 failed; retrying once after short delay' >&2
+            sleep 5
+          done
       - name: Verify customer site editor is initially enabled only for own hotel
         run: |
           docker run --rm --network none -v "$PWD/scripts:/work/scripts:ro" -w /work -e PYTHONPATH=/work/scripts \
