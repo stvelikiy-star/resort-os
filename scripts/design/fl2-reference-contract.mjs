@@ -11,7 +11,12 @@ const spec=JSON.parse(read('docs/design/FL2_WEB_REFERENCE_PALETTE.json'));
 assert.deepEqual(spec.base,{navy:'#0B1F2A',teal:'#14B8A6',sky:'#0EA5E9',surface:'#1E293B',text:'#F8FAFC'});
 const blocks=[...css.matchAll(/html\[data-marina-ui="future-luxury"\](?:\[data-fl2-theme="light"\])? \{([^}]+)\}/g)].slice(0,2).map(m=>m[1]);
 for(const [i,theme] of ['dark','light'].entries())for(const [key,value] of Object.entries(spec[theme]))assert.equal(blocks[i].match(new RegExp(`--mx-${key}:\\s*([^;]+);`))?.[1],value,`${theme}/${key}`);
-for(const name of ['AdminShell','DashboardBoard','OwnerControlV2','PMSOwnerGrid','PMSNewReservationModal','ReservationScheduleBuilder','RoomDetailModal','fl2/Fl2','fl2/OwnerCommandCenter']){const p=`apps/admin/components/${name}.tsx`;if(dialogNames.includes(name))assertDialogBehavior(read(p),original(p),name);else assert.equal(read(p),original(p),`${name} product logic changed`);}
+for(const name of ['DashboardBoard','OwnerControlV2','PMSOwnerGrid','PMSNewReservationModal','ReservationScheduleBuilder','RoomDetailModal','fl2/Fl2','fl2/OwnerCommandCenter']){const p=`apps/admin/components/${name}.tsx`;if(dialogNames.includes(name))assertDialogBehavior(read(p),original(p),name);else assert.equal(read(p),original(p),`${name} product logic changed`);}
+const shellPath='apps/admin/components/AdminShell.tsx';
+const appearanceImport='import FutureLuxuryAppearance from "./FutureLuxuryAppearance";\n';
+const shell=read(shellPath);
+assert.ok(shell.includes(appearanceImport),'Reference: approved appearance import absent');
+assert.equal(shell.replace(appearanceImport,''),original(shellPath),'Reference: AdminShell protected behavior changed');
 const unchangedRules=s=>s.split('/* REFERENCE_BRIDGE')[0].replace(/  --mx-surface:[^;]+;\n/g,'').replace(/--mx-[a-z-]+:\s*[^;]+;/g,'').trim();
 assert.equal(unchangedRules(css),unchangedRules(original('apps/admin/app/fl2-foundation.css')),'Original component sizing/motion changed');
 assert.ok(!/!important|display:\s*none|visibility:\s*hidden/.test(css.split('/* REFERENCE_BRIDGE')[1]),'Do not hide or force components');
