@@ -23,6 +23,9 @@ for(const [path,expected] of Object.entries(approvedBlobs)) {
 }
 has('apps/mobile/src/theme/moduleIcons.ts',['store: Package','overview: LayoutDashboard','reception: ConciergeBell']);
 has('apps/mobile/src/roles/registry.ts',["STORE_STAFF: ['store', 'profile']","store: 'DINING'"]);
+// Verify that Expo Router registers the warehouse screen used by STORE_STAFF.
+has('apps/mobile/app/(app)/_layout.tsx',["'kitchen', 'store', 'tasks'", "ORDER.includes(selected as TabKey)", 'mobileTabPlan(workspace.tabs)']);
+has('apps/mobile/app/(app)/store.tsx',['export default']);
 has('apps/mobile/src/components/OwnerExpenses.tsx',['postOwnerExpense','settleOwnerExpense','onCommitted?.()',"cancel:'Жокко чыгаруу'","cancel:'Cancel'"]);
 has('apps/mobile/app/finance.tsx',['ownerKitchenManagement','ownerRecordedCashMovements','onCommitted={refreshFinancialSnapshots}','reloadKitchen()','reloadCash()']);
 has('apps/mobile/src/api/liveModules.ts',['ownerKitchenManagement','ownerRecordedCashMovements','postOwnerExpense','settleOwnerExpense']);
