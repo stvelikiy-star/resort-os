@@ -31,6 +31,17 @@ const delivered={
  },
 };
 const accrual={
+ documented_source_corrections:{
+  recorded_corrections_count:5,reversed_corrections_count:1,
+  active_by_kind_kgs:{DISCOUNT:'0.0000',PACKAGE_SPLIT:'200.0000',
+    CANCELLATION:'30.0000',REFUND:'10.0000',TAX_COMPONENT:'20.0000'},
+  metadata_only_documents_not_independently_verified:true,
+  refunds_are_cash_evidence_not_recognized_revenue:true,
+  tax_and_packages_are_classifications_not_expenses:true,
+  recognized_revenue_kgs:null,recognized_profit_kgs:null,
+  status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS',
+ },
+
  source_approval_journal:{
   approval_events_count:3,reversal_events_count:1,
   active_room_nights_count:1,active_served_dining_count:1,
@@ -103,6 +114,20 @@ test('fail closed: fabricated recognized profit, double-counting, invalid blocke
   {...accrual,recognition:{...accrual.recognition,completeness_verified:true}},
   {...accrual,source_approval_journal:{...accrual.source_approval_journal,
     recognized_revenue_kgs:'683.0000'}},
+  {...accrual,documented_source_corrections:{
+    ...accrual.documented_source_corrections,
+    recognized_revenue_kgs:'100.0000'}},
+  {...accrual,documented_source_corrections:{
+    ...accrual.documented_source_corrections,
+    metadata_only_documents_not_independently_verified:false}},
+  {...accrual,documented_source_corrections:{
+    ...accrual.documented_source_corrections,
+    refunds_are_cash_evidence_not_recognized_revenue:false}},
+  {...accrual,documented_source_corrections:{
+    ...accrual.documented_source_corrections,
+    active_by_kind_kgs:{...accrual.documented_source_corrections.active_by_kind_kgs,
+      DISCOUNT:'-1.0000'}}},
+
   {...accrual,source_approval_journal:{...accrual.source_approval_journal,
     reversal_events_count:4}},
   {...accrual,source_approval_journal:{...accrual.source_approval_journal,
