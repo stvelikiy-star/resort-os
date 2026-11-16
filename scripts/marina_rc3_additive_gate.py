@@ -2,7 +2,7 @@
 """Source gate for a NEW additive release without rewriting immutable RC3 evidence.
 
 RC2/RC3 manifests remain 39-migration history. The current release must
-preserve all 39 original SQL hashes and include pinned zz115 through zz125 SQL.
+preserve all 39 original SQL hashes and include pinned zz115 through zz126 SQL.
 """
 from __future__ import annotations
 import hashlib
@@ -23,7 +23,8 @@ NEW_MIGRATIONS = {
     "zz122_marina_supplier_returns_20261116": "ae2c7b46a2acaa1e463805eee4aa5ef3554fa349414c12b9b570508757234f5d",
     "zz123_marina_owner_revenue_source_events_20261116": "0be3f00ad48d352f4edfae00f3ba6b41e793f20c45032ff94a914b566a36fe17",
     "zz124_marina_owner_revenue_corrections_20261116": "4741659b4f047682b8a87b8b475ec8c395ca0823b24481cac7d3081545b78621",
-    "zz125_marina_owner_revenue_evidence_bytes_20261116": "37f7b3e12f8c10e0defcd8acb2fbc3d0cea63f55c008e19622b2bb363e5fd285"
+    "zz125_marina_owner_revenue_evidence_bytes_20261116": "37f7b3e12f8c10e0defcd8acb2fbc3d0cea63f55c008e19622b2bb363e5fd285",
+    "zz126_marina_owner_accounting_journal_proposals_20261116": "43179369e8713bdd28d3bbe93c720e2bac826a78c79e32bbd3864ff0473af062"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -46,15 +47,15 @@ def validate_additive() -> list[str]:
     pinned = rc2.get("migration_sha256")
     if not isinstance(pinned, dict) or len(pinned) != 39:
         return ["historical RC2 expected 39 pinned migration hashes"]
-    if len(EXPECTED_MIGRATIONS) != 50 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
-        errors.append("current release must contain exactly 39 historical + zz115 through zz125 migrations")
+    if len(EXPECTED_MIGRATIONS) != 51 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
+        errors.append("current release must contain exactly 39 historical + zz115 through zz126 migrations")
     expected = set(pinned) | set(NEW_MIGRATIONS)
     actual = {
         p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
     }
     if set(actual) != expected or set(EXPECTED_MIGRATIONS) != expected:
-        errors.append("new release migration set is not the approved additive 50")
+        errors.append("new release migration set is not the approved additive 51")
     for name, sha in pinned.items():
         if actual.get(name) != sha:
             errors.append("historical RC2 migration drift: " + name)
@@ -93,4 +94,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz123, total=48, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz126, total=51, original source gate preserved, NO-GO")
