@@ -57,6 +57,43 @@ const KITCHEN_REPORT_COPY={
   notice:'Қойма құны тіркелген қозғалыстарға негізделген; өтінімдер бағалау ғана. Бұл расталған пайда емес.'},
 } as const;
 
+const ACCRUAL_READINESS_COPY={
+ ru:{title:'OWNER · сверка доходов и расходов',
+  posted:'Проведённые обязательства',nonstock:'Расходы к классификации (не склад)',
+  stockreview:'Расходы с риском дублирования склада',
+  kitchen:'Кухня — стоимость приготовления',loss:'Порча и потери по движениям',
+  served:'Обслуженные заказы — стоимость продаж (не выручка)',
+  lodging:'Выехавшие брони — стоимость проживания (не выручка)',
+  missing:'Заказы без связанной записи folio',
+  status:'Признанная прибыль недоступна',notice:'Это показатели для сверки, не отчёт о прибыли. Платежи, накладные, продажи и расходы не складываются автоматически.'},
+ kg:{title:'ЭЭСИ · киреше жана чыгаша салыштыруусу',
+  posted:'Катталган милдеттенмелер',nonstock:'Кампага кирбеген чыгаша талапкерлери',
+  stockreview:'Кампа менен кош эсептелүү коркунучу',
+  kitchen:'Ашкана — даярдоонун наркы',loss:'Жоготуу жана бузулуу',
+  served:'Тейленген буйрутмалар — баа (киреше эмес)',
+  lodging:'Чыккан коноктордун брондору — баа (киреше эмес)',
+  missing:'Folio жазуусу жок буйрутмалар',
+  status:'Таанылган пайда жеткиликсиз',notice:'Бул пайда эмес, салыштыруу үчүн маалымат. Төлөмдөр, накладнойлор жана чыгашалар автоматтык кошулбайт.'},
+ en:{title:'OWNER · revenue and expense reconciliation',
+  posted:'Posted obligations',nonstock:'Non-stock expense candidates',
+  stockreview:'Expense amounts requiring stock-overlap review',
+  kitchen:'Kitchen production carrying cost',loss:'Spoilage and waste movement cost',
+  served:'Served order face value (not recognized revenue)',
+  lodging:'Checked-out booking face value (not recognized revenue)',
+  missing:'Served orders with no linked folio',
+  status:'Recognized profit unavailable',
+  notice:'Operational candidates only, not a profit report. Payments, supplier invoices, sales and expenses must not be added automatically.'},
+ kz:{title:'ИЕСІ · табыс пен шығынды салыстыру',
+  posted:'Тіркелген міндеттемелер',nonstock:'Қоймадан тыс шығын үміткерлері',
+  stockreview:'Қоймамен қайталану қаупі бар шығындар',
+  kitchen:'Асхана — дайындау құны',loss:'Бүліну мен шығын құны',
+  served:'Берілген тапсырыстар құны (табыс емес)',
+  lodging:'Шыққан қонақ броньдары құны (табыс емес)',
+  missing:'Folio жазбасыз тапсырыстар',
+  status:'Танылған пайда қолжетімсіз',
+  notice:'Бұл пайда есебі емес, салыстыру көрсеткіштері. Төлем, жүкқұжат, сату және шығын автоматты түрде қосылмайды.'},
+} as const;
+
 const CASH_RECONCILIATION_COPY={
  ru:{title:'Сверка зарегистрированных денежных операций',
   received:'Поступления от гостей (записанные)',paid:'Ручные оплаты расходов',
@@ -83,6 +120,7 @@ export default function Finance() {
   const copy = useMobileCopy();
   const extra = OWNER_FINANCE_COPY[locale];
   const kitchenCopy = KITCHEN_REPORT_COPY[locale];
+  const accrualCopy = ACCRUAL_READINESS_COPY[locale];
   const cashCopy = CASH_RECONCILIATION_COPY[locale];
   const { c } = useTheme();
   const router = useRouter();
@@ -233,6 +271,29 @@ export default function Finance() {
           </Text>
         </GlassCard>:null}
       </>:null}
+      {user?.role==='OWNER' && data.owner_accrual_readiness_snapshot ? <>
+        <SectionLabel>{accrualCopy.title}</SectionLabel>
+        <GlassCard style={{gap:space.sm}}>
+          {line(accrualCopy.posted,
+            data.owner_accrual_readiness_snapshot.posted_owner_obligations.posted_total_kgs+' '+data.range.currency)}
+          {line(accrualCopy.nonstock,
+            data.owner_accrual_readiness_snapshot.posted_owner_obligations.non_stock_obligations_candidate_kgs+' '+data.range.currency)}
+          {line(accrualCopy.stockreview,
+            data.owner_accrual_readiness_snapshot.posted_owner_obligations.stock_overlap_review_kgs+' '+data.range.currency)}
+          {line(accrualCopy.kitchen,
+            data.owner_accrual_readiness_snapshot.kitchen_cost_movements.production_cost_candidate_kgs+' '+data.range.currency)}
+          {line(accrualCopy.loss,
+            data.owner_accrual_readiness_snapshot.kitchen_cost_movements.loss_cost_candidate_kgs+' '+data.range.currency)}
+          {line(accrualCopy.served,
+            data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_dining_face_value_kgs+' '+data.range.currency)}
+          {line(accrualCopy.lodging,
+            data.owner_accrual_readiness_snapshot.revenue_source_candidates.checked_out_booked_total_kgs+' '+data.range.currency)}
+          {line(accrualCopy.missing,
+            String(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_without_linked_folio_count))}
+          <Text style={[font.body,{color:c.warning,fontWeight:'700'}]}>{accrualCopy.status}</Text>
+          <Text style={[font.small,{color:c.textMuted}]}>{accrualCopy.notice}</Text>
+        </GlassCard>
+      </> : null}
       {user?.role==='OWNER'?<>
         <SectionLabel>{cashCopy.title}</SectionLabel>
         {recordedCash.loading?<LoadingShimmer count={1}/>:null}
