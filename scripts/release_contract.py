@@ -60,6 +60,7 @@ EXPECTED_MIGRATIONS = (
     "zz123_marina_owner_revenue_source_events_20261116",
     "zz124_marina_owner_revenue_corrections_20261116",
     "zz125_marina_owner_revenue_evidence_bytes_20261116",
+    "zz126_marina_owner_accounting_journal_proposals_20261116",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
