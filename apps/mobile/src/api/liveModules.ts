@@ -173,6 +173,10 @@ export interface OwnerAccrualReadiness {
     reversed_corrections_count:number;
     active_by_kind_kgs:Record<'DISCOUNT'|'PACKAGE_SPLIT'|'CANCELLATION'|'REFUND'|'TAX_COMPONENT',string>;
     metadata_only_documents_not_independently_verified:true;
+    server_verified_document_bytes_count:number;
+    missing_document_bytes_count:number;
+    all_recorded_document_bytes_available:boolean;
+    document_issuer_authenticity_independently_verified:false;
     refunds_are_cash_evidence_not_recognized_revenue:true;
     tax_and_packages_are_classifications_not_expenses:true;
     recognized_revenue_kgs:null;recognized_profit_kgs:null;
