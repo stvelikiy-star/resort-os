@@ -14,6 +14,7 @@ on:
       - 'services/api/app/owner_accrual_readiness.py'
       - 'services/api/app/owner_delivered_revenue.py'
       - 'services/api/app/owner_revenue_source_journal.py'
+      - 'services/api/app/owner_revenue_corrections.py'
       - 'services/api/app/owner_expenses.py'
       - 'services/api/app/owner_supplier_documents.py'
       - 'services/api/app/owner_supplier_returns.py'
@@ -23,6 +24,7 @@ on:
       - 'packages/database/prisma/migrations/zz121_marina_supplier_documents_20261116/**'
       - 'packages/database/prisma/migrations/zz122_marina_supplier_returns_20261116/**'
       - 'packages/database/prisma/migrations/zz123_marina_owner_revenue_source_events_20261116/**'
+      - 'packages/database/prisma/migrations/zz124_marina_owner_revenue_corrections_20261116/**'
       - 'scripts/verify_supplier_document_e2e.py'
       - 'scripts/verify_supplier_returns_e2e.py'
       - 'scripts/verify_owner_expenses_e2e.py'
@@ -32,6 +34,7 @@ on:
       - 'scripts/test_owner_delivered_revenue.py'
       - 'scripts/verify_owner_delivered_revenue_e2e.py'
       - 'scripts/verify_owner_revenue_source_journal_e2e.py'
+      - 'scripts/test_owner_revenue_corrections.py'
       - 'services/api/app/staff_task_reports.py'
       - 'scripts/verify_mobile_staff_reports_e2e.py'
       - 'scripts/verify_mobile_menu_publication_e2e.py'
@@ -151,6 +154,9 @@ jobs:
 
       - name: Test nightly revenue candidate allocation and folio source dedup
         run: PYTHONPATH=. python scripts/test_owner_delivered_revenue.py
+
+      - name: Test documented OWNER correction and package/tax/refund boundaries
+        run: PYTHONPATH=. python scripts/test_owner_revenue_corrections.py
 
       - name: Test cook draft authoring and management authority
         run: PYTHONPATH=. python scripts/test_kitchen_draft_authoring.py
