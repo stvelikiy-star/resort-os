@@ -88,9 +88,15 @@ export function PmsBookingSheet({ selected, showroom, live, canOpenDetails, onCl
             {copy.roomCondition}: {reservationRoomStateLabel(room.operational_state, copy)}
           </Text> : null}
           {details.loading ? <Text style={[font.small,{color:c.textMuted}]}>{copy.loading}</Text> : null}
-          {details.error ? <Text accessibilityRole="alert" style={[font.small,{color:c.danger}]}>
-            {details.error.message} · {copy.retry}
-          </Text> : null}
+          {details.error ? <View style={{gap:space.sm}}>
+            <Text accessibilityRole="alert" style={[font.small,{color:c.danger}]}>{details.error.message}</Text>
+            <Pressable testID="pms-sheet-retry" accessibilityRole="button" accessibilityLabel={copy.retry}
+              onPress={() => void details.reload()}
+              style={{alignSelf:'flex-start',minHeight:44,minWidth:88,justifyContent:'center',
+                paddingHorizontal:space.md,borderRadius:radius.md,backgroundColor:c.primarySoft}}>
+              <Text style={[font.body,{color:c.primary,fontWeight:'700'}]}>{copy.retry}</Text>
+            </Pressable>
+          </View> : null}
           {isReservation ? <>
             <View style={{backgroundColor:c.surfaceAlt,borderRadius:radius.md,padding:space.md,gap:space.sm}}>
               <Text style={[font.small,{color:c.textMuted}]}>{copy.guestName}</Text>
