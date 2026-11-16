@@ -194,8 +194,7 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
             "checked_out_booked_total_kgs":amount(lodging["booked_total"]),
             "amounts_are_not_additive_or_recognized":True,
         },
-        "delivered_revenue_sources":{**delivered,
-            "accommodation":{**delivered["accommodation"],"night_preview":[]}},
+        "delivered_revenue_sources":delivered,
         "source_valuation":{
             "inventory_valuation_status":stock["valuation_status"],
             "source_mismatch_count":stock["linked_source"]["source_mismatch_count"],
