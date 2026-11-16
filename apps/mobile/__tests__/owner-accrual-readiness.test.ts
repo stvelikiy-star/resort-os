@@ -31,6 +31,14 @@ const delivered={
  },
 };
 const accrual={
+ source_approval_journal:{
+  approval_events_count:3,reversal_events_count:1,
+  active_room_nights_count:1,active_served_dining_count:1,
+  active_source_face_value_kgs:'683.0000',
+  status:'SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION',
+  recognized_revenue_kgs:null,recognized_profit_kgs:null,
+ },
+
  delivered_revenue_sources:delivered,
  scope:'OWNER_ONLY_PROPERTY_SCOPED',
  period:{from:'2026-11-16',to:'2026-11-16',timezone:'Asia/Bishkek',currency:'KGS'},
@@ -93,6 +101,12 @@ test('fail closed: fabricated recognized profit, double-counting, invalid blocke
  const bad=[
   {...accrual,recognition:{...accrual.recognition,recognized_profit_kgs:'123.0000'}},
   {...accrual,recognition:{...accrual.recognition,completeness_verified:true}},
+  {...accrual,source_approval_journal:{...accrual.source_approval_journal,
+    recognized_revenue_kgs:'683.0000'}},
+  {...accrual,source_approval_journal:{...accrual.source_approval_journal,
+    reversal_events_count:4}},
+  {...accrual,source_approval_journal:{...accrual.source_approval_journal,
+    status:'ACCOUNTING_RECOGNIZED'}},
   {...accrual,recognition:{...accrual.recognition,customer_payments_are_revenue:true}},
   {...accrual,recognition:{...accrual.recognition,source_candidates_are_recognized:true}},
   {...accrual,delivered_revenue_sources:{...delivered,recognition:{
