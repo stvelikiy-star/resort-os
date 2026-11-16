@@ -33,9 +33,8 @@ export function Hero({ children, height }: { children: React.ReactNode; height?:
   </LinearGradientFallback>;
 }
 export function Wordmark({ color }: { color: string }) {
-  const { c } = useTheme();
   return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
     <Text style={[font.h2, { color, letterSpacing: 1.3 }]}>MARINA</Text>
-    <Text style={[font.h2, { color: c.primary, letterSpacing: 1.3 }]}>SMART</Text>
+    <Text style={[font.h2, { color, letterSpacing: 1.3 }]}>SMART</Text>
   </View>;
 }

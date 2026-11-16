@@ -21,6 +21,11 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - name: Validate canonical palette and shared motion safety
+        run: |
+          node scripts/validate-fl2-brand-tokens.mjs
+          node scripts/validate-fl2-accessibility.mjs
+          node scripts/validate-motion-safety.mjs
       - name: Mount genuine operational components in isolated fixture
         run: cp apps/mobile/scripts/fixtures/operational-qa.tsx.txt apps/mobile/app/qa-operational.tsx
       - name: Typecheck fixture and export without modifying production routes
