@@ -77,6 +77,18 @@ type FinanceResponse = {
   /** Present for OWNER only; never returned by Core to MANAGER. */
   /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
   owner_accrual_readiness_snapshot?: {
+    documented_source_corrections:{
+      recorded_corrections_count:number;
+      reversed_corrections_count:number;
+      active_by_kind_kgs:{
+        DISCOUNT:string;PACKAGE_SPLIT:string;CANCELLATION:string;
+        REFUND:string;TAX_COMPONENT:string;
+      };
+      metadata_only_documents_not_independently_verified:true;
+      refunds_are_cash_evidence_not_recognized_revenue:true;
+      recognized_revenue_kgs:null;recognized_profit_kgs:null;
+      status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS';
+    };
     source_approval_journal:{
       approval_events_count:number;
       reversal_events_count:number;
@@ -353,6 +365,16 @@ export default function HotelFinanceBoard() {
               <div><span>Действующие подтверждённые источники</span>
                 <strong>{data.owner_accrual_readiness_snapshot.source_approval_journal.active_room_nights_count} ночей · {data.owner_accrual_readiness_snapshot.source_approval_journal.active_served_dining_count} заказов</strong>
                 <small>Это журнал подтверждений, а не проводки признанной выручки.</small></div>
+
+              <div><span>Документальные корректировки (без признания выручки)</span>
+                <strong>{data.owner_accrual_readiness_snapshot.documented_source_corrections.recorded_corrections_count} записей</strong>
+                <small>{data.owner_accrual_readiness_snapshot.documented_source_corrections.reversed_corrections_count} отмен; документы не проверены независимо</small></div>
+              <div><span>Скидки · отмены</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.DISCOUNT)} · {exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.CANCELLATION)}</strong></div>
+              <div><span>Пакеты · налоговая составляющая</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.PACKAGE_SPLIT)} · {exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.TAX_COMPONENT)}</strong></div>
+              <div><span>Возвраты (денежные документы, не выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.REFUND)}</strong></div>
 
             </div>
             <p className="finance-footnote">Прибыль недоступна: нет принятого журнала признания доходов и всех затрат.</p>
