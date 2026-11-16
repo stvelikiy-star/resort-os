@@ -41,6 +41,7 @@ on:
       - 'scripts/test_owner_revenue_corrections.py'
       - 'scripts/test_owner_revenue_evidence_bytes.py'
       - 'scripts/test_owner_accounting_journal_proposals.py'
+      - 'scripts/verify_owner_accounting_journal_e2e.py'
       - 'services/api/app/staff_task_reports.py'
       - 'scripts/verify_mobile_staff_reports_e2e.py'
       - 'scripts/verify_mobile_menu_publication_e2e.py'
@@ -330,6 +331,11 @@ jobs:
         env:
           ALLOW_REVENUE_JOURNAL_SYNTHETIC_CI: '1'
         run: python scripts/verify_owner_revenue_source_journal_e2e.py
+
+      - name: Verify balanced immutable OWNER accounting proposals on real PostgreSQL
+        env:
+          ALLOW_REVENUE_JOURNAL_SYNTHETIC_CI: '1'
+        run: python scripts/verify_owner_accounting_journal_e2e.py
 
       - name: Show Core logs on failure
         if: failure()
