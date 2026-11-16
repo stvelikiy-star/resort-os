@@ -136,7 +136,39 @@ export interface KitchenLossAcknowledgment {
 export interface KitchenStockConsumeAck {
   consumed_portions:number; already_processed:boolean; cost_kgs:string; payment_created:false;
 }
+export interface OwnerDeliveredRevenueSources {
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string;currency:'KGS'};
+  accommodation:{
+    qualified_reservations:number;delivered_booked_nights_count:number;
+    allocated_booking_face_value_kgs:string;night_preview_limit:number;
+    night_preview_truncated:boolean;
+    night_preview:Array<{reservation_id:string;service_date:string;allocated_booking_face_value_kgs:string}>;
+    excluded_reservations_count:number;
+    exclusion_reasons:Record<string,number>;
+    qualified_source:'CHECKED_OUT_RESERVATION_WITH_MATCHED_ACTUAL_STAY';
+    rate_quality:'BOOKING_TOTAL_DISTRIBUTED_EVENLY_NOT_APPROVED_NIGHTLY_RATE';
+  };
+  dining:{
+    served_orders_count:number;served_orders_face_value_kgs:string;
+    served_with_matching_folio_count:number;single_source_folio_linked_candidate_kgs:string;
+    excluded_orders_count:number;exclusion_reasons:Record<string,number>;
+    non_dining_active_folio_charges:number;non_dining_folio_face_value_kgs:string;
+    non_dining_undated_folio_count:number;
+    kitchen_and_folio_double_counted:false;
+  };
+  recognition:{
+    recognized_lodging_revenue_kgs:null;recognized_dining_revenue_kgs:null;
+    recognized_other_services_revenue_kgs:null;recognized_total_revenue_kgs:null;
+    status:'SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS';
+    requires_rate_package_tax_discount_and_refund_reconciliation:true;
+    requires_approved_immutable_revenue_journal:true;
+    cash_received_as_revenue:false;
+    automatic_posting:false;
+  };
+}
 export interface OwnerAccrualReadiness {
+  delivered_revenue_sources:OwnerDeliveredRevenueSources;
   scope:'OWNER_ONLY_PROPERTY_SCOPED';
   period:{from:string;to:string;timezone:string;currency:'KGS'};
   posted_owner_obligations:{
