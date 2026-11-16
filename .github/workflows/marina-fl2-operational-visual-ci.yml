@@ -1,0 +1,47 @@
+name: MARINA FL2 Operational Component Visual QA
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+      - '.github/workflows/marina-fl2-operational-visual-ci.yml'
+permissions:
+  contents: read
+concurrency:
+  group: marina-operational-visual-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  operational-browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - name: Mount genuine operational components in isolated fixture
+        run: cp apps/mobile/scripts/fixtures/operational-qa.tsx.txt apps/mobile/app/qa-operational.tsx
+      - name: Typecheck fixture and export without modifying production routes
+        working-directory: apps/mobile
+        run: |
+          npm run typecheck
+          npx expo export --platform web
+          rm app/qa-operational.tsx
+      - name: Install isolated browser tools
+        run: |
+          npm install --prefix /tmp/marina-operational-browser playwright@1.58.2 --no-audit --no-fund
+          /tmp/marina-operational-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Check new forms across languages, themes and roles
+        working-directory: apps/mobile
+        env:
+          PLAYWRIGHT_PACKAGE: /tmp/marina-operational-browser/package.json
+        run: node scripts/qa-operational-visual.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: marina-operational-components-visual-evidence
+          path: apps/mobile/operational-visual-evidence/
+          retention-days: 14
+          if-no-files-found: warn

@@ -30,6 +30,8 @@ class CustomerWebPublicationGuard(unittest.TestCase):
         guest_web = compose.split("\n  guest-web:\n", 1)[1].split("\n  web:\n", 1)[0]
         self.assertIn("deploy/marina/guest-web.Dockerfile", guest_web)
         self.assertNotIn("ports:", guest_web)
+        self.assertIn("healthcheck:", guest_web)
+        self.assertIn("http://127.0.0.1:3000/g/health-check", guest_web)
         dockerfile = (ROOT / "deploy/marina/guest-web.Dockerfile").read_text()
         self.assertIn("COPY apps/web/app/g ./app/g", dockerfile)
         self.assertNotIn("COPY apps/web ./", dockerfile)

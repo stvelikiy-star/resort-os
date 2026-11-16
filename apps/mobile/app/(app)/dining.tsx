@@ -15,6 +15,7 @@ import { useAsync } from '../../src/lib/useAsync';
 import { wasWriteRejected } from '../../src/lib/writeOutcome';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { WaiterOperations } from '../../src/components/WaiterOperations';
+import { DiningServiceMobile } from '../../src/components/DiningServiceMobile';
 import { font, space } from '../../src/theme/tokens';
 
 const NEXT: Partial<Record<KitchenStatus, KitchenStatus>> = { NEW: 'ACCEPTED', ACCEPTED: 'COOKING', COOKING: 'READY' };
@@ -58,6 +59,7 @@ export default function Dining() {
     <PremiumHeader title={copy.dining} subtitle={hotel?.name} eyebrow="MARINA SMART" right={cook ? <ChefHat size={27} color={c.primary}/> : <UtensilsCrossed size={27} color={c.primary}/>}/>
     {showroom ? <DemoBanner/> : null}
     {waiter && live && !showroom && floor ? <WaiterOperations key={hotel?.id + ':' + user.id} live={live} tables={floor.tables} reload={reload}/> : null}
+    {waiter && live && !showroom && floor ? <DiningServiceMobile key={'seating:'+hotel?.id+':'+user.id} live={live} tables={floor.tables} reloadFloor={reload}/> : null}
     {!live && !showroom ? <Empty text={copy.unavailable}/> : null}
     {unknownResult ? <GlassCard testID="dining-unknown-result"><Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.resultUnknown}</Text></GlassCard> : null}
     {loading && (live || showroom) ? <LoadingShimmer count={3}/> : null}
@@ -80,7 +82,13 @@ export default function Dining() {
       {'notes' in o && o.notes ? <Text style={[font.small, { color: c.text }]}>{o.notes}</Text> : null}
       {!showroom && cook && NEXT[o.status as KitchenStatus] ? <Button testID={'order-next-' + o.id} label={orderStatusLabel(NEXT[o.status as KitchenStatus]!, copy)} disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, NEXT[o.status as KitchenStatus]!))}/> : null}
       {!showroom && waiter && !('waiter_id' in o && o.waiter_id) ? <Button testID={'waiter-claim-' + o.id} label={copy.take} disabled={busy || unknownResult} onPress={() => change(() => live!.claimWaiterOrder(o.id, user.id))}/> : null}
-      {waiter && o.status === 'READY' ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: {orderStatusLabel('READY', copy)} · {copy.readOnly}</Text> : null}
+      {!showroom && waiter && o.status === 'READY' && 'waiter_id' in o && o.waiter_id === user?.id
+        ? <Button testID={'waiter-serve-' + o.id} label={orderStatusLabel('SERVED', copy)}
+            disabled={busy || unknownResult} onPress={() => change(() => live!.kitchenStatus(o.id, 'SERVED'))}/>
+        : null}
+      {waiter && o.status === 'READY' && (!('waiter_id' in o) || o.waiter_id !== user?.id)
+        ? <Text style={[font.small, { color: c.warning }]}>{copy.status}: {orderStatusLabel('READY', copy)} · {copy.readOnly}</Text>
+        : null}
     </GlassCard></StaggerItem>)}
     {!loading && !error && orders.length === 0 ? <Empty text={copy.empty}/> : null}
   </FutureScreen>;

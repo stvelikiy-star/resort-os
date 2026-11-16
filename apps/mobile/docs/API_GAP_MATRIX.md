@@ -1,22 +1,21 @@
-# Confirmed mobile API surface & blockers (read-only contract audit)
+# API gap register — 15 November 2026
 
-Backend comparison snapshot: `34d705d2f126a60bd44c2fd17375d97f17dd9025` from `stvelikiy-star/resort-os`. Mobile transport uses HTTPS, native cookie credentials and server tenant binding. Below are routes **verified in backend source**; availability in a particular deployed hotel has not been proven.
+Current source inventory: [ROLE_SCREEN_MATRIX.md](ROLE_SCREEN_MATRIX.md). Green baseline #519: `7c6b10753cca9651a7bb9a0e161ea23af11d285a` (34/34 workflow runs SUCCESS). The former snapshot `34d705d2` is historical and must not be used to describe current implementation.
 
-| Screen / role | Method / endpoint | Behaviour | Error contract | Status |
-|---|---|---|---|---|
-| Owner/manager dashboard | GET `/api/v1/admin/dashboard` | live occupancy, receipts, tasks | 401/403/503 | PARTIAL live E2E |
-| Reception | GET `/api/v1/admin/reception/reservations` | today's authorized bookings | 401/403/503 | PARTIAL |
-| Reception detail | GET `/api/v1/admin/reception/reservations/{id}` | guest, schedule, payments and room status | 401/403/404 | PARTIAL |
-| Reception check-in/out | POST `/api/v1/admin/stays/reservations/{id}/check-in` and `check-out` | trusted session and room checks | 401/403/409 | PARTIAL live E2E |
-| PMS | GET `/api/v1/pms/grid?start=&end=` | one physical room per row, [start,end) | 401/403/422 | READ |
-| Booking preview/commit | POST `/api/v1/admin/pms/reservations/new/preview` and `new/commit` | server-priced two-step write; no client booking ledger | 401/403/409/422 | PARTIAL recovery after timeout |
-| HOLD | GET/POST/DELETE `/api/v1/admin/pms/holds` | 60min server-controlled inventory hold | 401/403/409/422 | PARTIAL |
-| Inbox | GET `/api/v1/admin/inbox/conversations`, GET `/{id}` | server-filtered conversations and history | 401/403/404 | READ |
-| Inbox status/claim/note | PATCH `/{id}/status`, POST `/{id}/claim`, POST `/{id}/notes` | staff authorization; internal note, not guest message | 401/403/409 | PARTIAL |
-| Kitchen | GET `/api/v1/kitchen/orders`, PATCH `/{id}/status` | cook queue and transitions | 401/403/409 | PARTIAL |
-| Waiter | GET `/api/v1/dining/floor`, PATCH `/dining/orders/{id}/waiter` | live table and waiter assignment | 401/403/409 | PARTIAL |
-| Assistant | GET `/api/v1/assistant/capabilities`, POST `/api/v1/assistant/chat` | OWNER/MANAGER/RECEPTION, read-only, rate-limited | 401/403/422/429 | UI implemented; live E2E BLOCKED |
+| Priority | Confirmed issue | Required resolution / evidence |
+|---|---|---|
+| P0 | AGENT service UI calls an endpoint whose baseline role dependency excludes ordinary AGENT | This branch narrows POST permission to PMS-enabled ACTIVE linked agents and their own reservation; keep GET queue denied, including custom SERVICES grants. Verify real PostgreSQL persistence and denial cases in Guest Services CI. |
+| P0 | AGENT can add services only before leaving new-booking result | This branch reuses the durable service panel in the own-reservation PMS preview. Backend remains authoritative on deep-link/tampered IDs. |
+| P0 follow-up implemented | AGENT own service status/date/time/note gap | This branch adds reservation-bound GET readback, PMS/ACTIVE membership/ownership checks, response minimization, date/time/note fields and backward-compatible pending schedule journal. New PostgreSQL/API and mobile CI acceptance still required on its SHA. Ambiguous writes stay blocked until explicit review. |
+| P0 security fixed in source | OWNER financial endpoints could accept legacy custom FINANCE grants on another role | All three OWNER dependencies now use module_grant=False. Tests deny 11 non-owner roles on reads, expense creation, settlement and VOID. Existing OWNER positive PostgreSQL E2E must remain green. |
+| P0 fixed in #522 | Direct stock receipt duplicated after timeout/restart | API movement_id and persistent Mobile/Staff Web journals added. Real PostgreSQL concurrency, timeout after commit, API restart and browser reload/replay PASS on 86758c54. Final overall CI/Android remains an independent gate. |
+| P0 follow-up | Mobile technician completed repairs without a work report | This branch uses the existing complete-report route, validates report proof/status, shows confirmed room handoff and rejects blank summaries. Repair -> cleaning -> inspection PostgreSQL E2E is added. |
+| P0 follow-up | Mobile OWNER/MANAGER lacked draft dish publication | Explicit price and confirmation use existing menu PATCH; strict role UI, validated acknowledgement and translation checks. PostgreSQL COOK draft -> OWNER/MANAGER publish -> WAITER menu and COOK production test added. |
+| P0 follow-up | Procurement retries lost their operation ID on app restart | Durable per-identity journal saves before POST, explicit replay preserves payload, fresh actions fetch new nonces. API returns 409 for conflicting same-ID races. Dedicated PostgreSQL/process CI acceptance pending. |
+| P0 | OWNER reports record movements but do not recognize revenue/expenses for profit | Define and implement accrual periods, refunds, service delivery and inventory cost attribution; never rename received-payments difference to profit. |
+| P0 | Role inventory was stale (STORE blocked despite implementation, kitchen/finance omitted; DINING_STAFF absent) | Replaced with source operation inventory. Physical acceptance remains open. |
+| P0 | Wider Web operations not all available on mobile | See each explicit role gap in the inventory; prioritize operational roles, retain existing functionality. |
+| P0 | Single candidate runtime and database evidence incomplete | Re-run Mobile/Web/API/PostgreSQL checks on the final integration SHA after functional fixes. |
+| Final | Expo Go / physical Android not yet verified | Device execution, network/restart/revocation and visual acceptance on final candidate. APK build is not device acceptance. |
 
-**Change requests to backend (not performed here):** WhatsApp outbound with GREEN-API provider receipts/dedup; guest session contract; cookie-to-native token/device refresh/revocation where required; idempotent booking-write query after lost acknowledgement; photo/attachments; push registry; live multi-property scope and aggregate owner API; accurate property-local current date for agent/reception if needed.
-
-**Security:** the mobile code does not expose GREEN-API secrets, use 3rd-party direct-send endpoints, write to local PMS replicas or claim a 200 response without server confirmation.
+No new hotel picker, no deployment to Ubuntu/Aska Tash, no AI or WhatsApp activation. Existing endpoints and canonical OperationalTask storage are reused.

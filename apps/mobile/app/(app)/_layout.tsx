@@ -13,7 +13,7 @@ import { useMotionAllowed } from '../../src/theme/motion';
 import { TabIcon } from '../../src/components/Motion';
 import { moduleIcons } from '../../src/theme/moduleIcons';
 
-const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
+const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'store', 'tasks', 'rooms', 'requests', 'admin', 'profile'];
 export default function AppTabs() {
   const { user, api, serverAuthMode, locale } = useSession();
   const pathname = usePathname();

@@ -15,7 +15,20 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { font, radius, space, TOUCH } from '../../src/theme/tokens';
 import { ApiError, canTransition, HOUSEKEEPING_CHECKLIST, Task } from '../../src/api/types';
 
+const REPAIR_COPY = {
+  ru: {summary:'Что сделано',required:'Опишите выполненную работу (от 2 символов).',saved:'Отчёт о ремонте сохранён',dirty:'Номер передан на уборку',blocked:'Номер остаётся заблокированным для ремонта'},
+  kg: {summary:'Аткарылган иштер',required:'Аткарылган ишти сүрөттөңүз (кеминде 2 белги).',saved:'Оңдоо отчёту сакталды',dirty:'Бөлмө тазалоого жөнөтүлдү',blocked:'Бөлмө оңдоо үчүн бөгөттөлгөн бойдон калды'},
+  en: {summary:'Work completed',required:'Describe the completed work (at least 2 characters).',saved:'Maintenance report saved',dirty:'Room sent for cleaning',blocked:'Room remains blocked for repairs'},
+  kz: {summary:'Атқарылған жұмыс',required:'Атқарылған жұмысты сипаттаңыз (кемінде 2 таңба).',saved:'Жөндеу есебі сақталды',dirty:'Бөлме тазалауға жіберілді',blocked:'Бөлме жөндеу үшін бұғатталған күйде қалды'},
+} as const;
+
 export default function TaskDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user, hotel } = useSession();
+  return <TaskDetailContent key={[hotel?.id,user?.id,user?.role,user?.module_permissions?.join(','),id].join('.')}/>;
+}
+
+function TaskDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const { c } = useTheme();
@@ -57,6 +70,10 @@ export default function TaskDetail() {
   if (loading && !task) return <FutureScreen><LoadingShimmer count={3}/></FutureScreen>;
   if (error) return <FutureScreen><ErrorState text={error.message} retry={t('common.retry')} onRetry={reload}/></FutureScreen>;
   if (!task) return <FutureScreen><Empty text={t('errors.notFound')} /></FutureScreen>;
+  if (!ws.taskTypes.includes(task.type)) return <FutureScreen><Empty text={t('errors.forbidden')} /></FutureScreen>;
+  const repairCopy = REPAIR_COPY[locale];
+  const isRepairReport = user.role === 'TECHNICIAN' && task.type === 'MAINTENANCE';
+  const summaryValid = comment.trim().length >= 2 && comment.trim().length <= 2000;
   const isHk = task.type === 'HOUSEKEEPING';
   const allChecked = HOUSEKEEPING_CHECKLIST.every((k) => checks[k]);
   const checkedCount = HOUSEKEEPING_CHECKLIST.filter(k => checks[k]).length;
@@ -109,7 +126,15 @@ export default function TaskDetail() {
       ) : null}
 
       {task.status === 'OPEN' ? <Button testID="task-start" label={t('tasks.start')} icon={Play} disabled={busy || unknownResult} onPress={() => run(() => api!.claimTask(task.id))} /> : null}
-      {!isHk && task.status === 'IN_PROGRESS' && canTransition(task.type, 'IN_PROGRESS', 'DONE') ? <Button testID="task-finish" label={t('tasks.finish')} icon={Check} disabled={busy || unknownResult} onPress={() => run(() => api!.setTaskStatus(task.id, 'DONE'))} /> : null}
+      {isRepairReport && task.status === 'IN_PROGRESS' ? <GlassCard style={{gap:space.sm}}>
+        <Field testID="repair-summary" label={repairCopy.summary} value={comment} onChangeText={setComment} multiline maxLength={2000} editable={!busy && !unknownResult}/>
+        {!summaryValid ? <Text style={[font.small,{color:c.textMuted}]}>{repairCopy.required}</Text> : null}
+        <Button testID="task-finish" label={t('tasks.finish')} icon={Check} disabled={busy || unknownResult || !summaryValid}
+          onPress={() => run(() => api.completeMaintenance(task.id,{summary:comment}),repairCopy.saved)}/>
+      </GlassCard> : !isHk && task.status === 'IN_PROGRESS' && canTransition(task.type, 'IN_PROGRESS', 'DONE') ?
+        <Button testID="task-finish" label={t('tasks.finish')} icon={Check} disabled={busy || unknownResult} onPress={() => run(() => api.setTaskStatus(task.id, 'DONE'))}/> : null}
+      {isRepairReport && task.status === 'DONE' && ['DIRTY','TECH_BLOCK'].includes(task.room_state ?? '') ?
+        <Text testID="repair-room-state" style={[font.body,{color:c.warning}]}>{task.room_state === 'DIRTY' ? repairCopy.dirty : repairCopy.blocked}</Text> : null}
       {isHk && task.status === 'IN_INSPECTION' && canInspect ? (
         <View style={{ gap: space.sm }}>
           <Button testID="task-approve" label={t('tasks.approve')} icon={Check} disabled={busy || unknownResult} onPress={() => run(() => api!.setTaskStatus(task.id, 'DONE'))} />

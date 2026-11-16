@@ -131,6 +131,12 @@ jobs:
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts
 
+      - name: Verify dining day-menu management role boundary
+        run: python scripts/test_marina_dining_menu_rbac.py
+
+      - name: Verify assigned waiter service role boundary
+        run: python scripts/test_waiter_serve_contract.py
+
       - name: Apply constraints and seed Three Crowns
         run: |
           python scripts/apply_core_constraints.py

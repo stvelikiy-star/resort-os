@@ -1,0 +1,219 @@
+{
+  "repository": "stvelikiy-star/resort-os",
+  "pr": 521,
+  "head_sha": "b3bd4a9cf47a83392549612889566c497146aef6",
+  "head": "feature/agent-service-readback-audit-20261115",
+  "runs": [
+    {
+      "id": 43741127232,
+      "name": "Hotel Business Date CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127382,
+      "name": "Database Dependency Security CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127287,
+      "name": "Owner Ops Corrections CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127338,
+      "name": "Three Crowns Dependency Security Inspection",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127280,
+      "name": "NFC Deferred Scope CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127201,
+      "name": "PostgreSQL Backup Restore CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127348,
+      "name": "MARINA SMART API Image CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127443,
+      "name": "Automation Contract CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127398,
+      "name": "Data Intake Integrity CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127329,
+      "name": "Staff Voice CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127366,
+      "name": "Realtime PMS and Dining CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127225,
+      "name": "n8n Resort Core Contract CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127373,
+      "name": "Kitchen Operations CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127264,
+      "name": "MARINA SMART Hotel Setup CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127380,
+      "name": "MARINA SMART Isolated PostgreSQL API Smoke",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127465,
+      "name": "MARINA Shared RC3 Source Integrity CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127214,
+      "name": "Control Center Monorepo Contract CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127344,
+      "name": "PMS Chessboard Mutation CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127388,
+      "name": "Guest Services Center CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127466,
+      "name": "MARINA Two-Property Isolation and Restore CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127397,
+      "name": "Unified Inbox CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127455,
+      "name": "Three Crowns Full Staging Gate",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127383,
+      "name": "Hotel Operations CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127340,
+      "name": "MARINA Shared Live Browser PostgreSQL CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127387,
+      "name": "Telegram Sales CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127457,
+      "name": "Three Crowns Single Server Production Package CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127291,
+      "name": "Resort Core CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127479,
+      "name": "Management Final Acceptance CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127188,
+      "name": "PMS Owner Grid CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127440,
+      "name": "AI Sales Draft CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127452,
+      "name": "MARINA SMART AK BERMET CI",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127370,
+      "name": "Resort OS Release Gate",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127298,
+      "name": "MARINA SMART Full Stack Synthetic Smoke",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127363,
+      "name": "MARINA Mobile Dependency Audit",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 43741127367,
+      "name": "MARINA STAFF Mobile Checks",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "scope": "GitHub workflow evidence only; not physical device acceptance; independent Claude script provenance not verified"
+}

@@ -6,6 +6,7 @@ import "./shift-v2.css";
 
 export const metadata: Metadata = {
   title: "MARINA SMART · Моя смена",
+  icons: { icon: "/marina-smart-approved.png", apple: "/marina-smart-approved.png" },
   description: "Мобильный операционный интерфейс Hotel OS для персонала",
   manifest: "/manifest.webmanifest",
 };
@@ -14,7 +15,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#0A1128",
+  themeColor: "#0B1F2A",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

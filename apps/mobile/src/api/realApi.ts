@@ -2,7 +2,7 @@ import { createHotelHttpClient, HttpMethod } from './http';
 import { authUserResponse, itemsEnvelope } from './contractValidation';
 import { safeRouteId } from './routeId';
 import { checkedHotelSelector } from './sharedHotelAuth';
-import { ApiError, DaySummary, HousekeepingReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
+import { ApiError, DaySummary, HousekeepingReport, MaintenanceReport, NewMaintenance, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 type Fetch = typeof fetch;
 
@@ -98,6 +98,22 @@ export function createRealApi(baseUrl: string, fetchImpl: Fetch = fetch, session
         // Optional evidence_urls omitted: no attachment API or fake evidence upload.
       });
       return committedTask(key, ack);
+    },
+    async completeMaintenance(id, report: MaintenanceReport) {
+      const key = safeRouteId(id);
+      const summary = report.summary.trim();
+      if (summary.length < 2 || summary.length > 2000) throw new ApiError('BAD_REQUEST', 'Maintenance report summary required');
+      const ack = await call<unknown>('POST', `/api/v1/ops/tasks/${key}/complete-report`, {
+        summary, checklist: [], evidence_urls: [],
+      });
+      if (!ack || typeof ack !== 'object') throw new ApiError('UNKNOWN', 'Unverified maintenance report');
+      const value = ack as Record<string, unknown>;
+      if (value.task_id !== key || value.status !== 'DONE' || value.report_recorded !== true ||
+          ![null, 'DIRTY', 'TECH_BLOCK'].includes(value.room_state as string | null))
+        throw new ApiError('UNKNOWN', 'Unverified maintenance report');
+      const result = await committedTask(key, ack);
+      if (result.type !== 'MAINTENANCE' || result.status !== 'DONE') throw new ApiError('UNKNOWN', 'Maintenance report readback mismatch');
+      return result;
     },
     async createMaintenance(req: NewMaintenance) {
       const created = await call<any>('POST', '/api/v1/ops/tasks', {

@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .owner_kitchen_reconciliation import owner_inventory_reconciliation
+from .owner_accrual_readiness import accrual_source_snapshot
 
 router = APIRouter(prefix="/api/v1/admin/finance", tags=["admin-hotel-finance"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -17,7 +19,9 @@ class PaymentRequirementPayload(BaseModel):
 
 
 def reservation_ledger_item(row) -> dict[str, Any]:
-    total = int(row["totalKgs"] or 0)
+    accommodation = int(row["totalKgs"] or 0)
+    extras = int(row.get("extras_kgs", 0) or 0)
+    total = (0 if row["status"] == "CANCELLED" else accommodation) + extras
     received = int(row["received_kgs"] or 0)
     remaining = max(total - received, 0)
     overpaid = max(received - total, 0)
@@ -41,6 +45,8 @@ def reservation_ledger_item(row) -> dict[str, Any]:
         "guest_phone": row["phone"],
         "room_code": row["room_code"],
         "total_kgs": total,
+        "accommodation_kgs": 0 if status == "CANCELLED" else accommodation,
+        "extras_kgs": extras,
         "received_kgs": received,
         "remaining_kgs": remaining,
         "overpaid_kgs": overpaid,
@@ -240,13 +246,19 @@ async def finance_summary(
               FROM payments
               WHERE status='RECEIVED' AND "reservationId" IS NOT NULL
               GROUP BY "reservationId"
+            ), extras AS (
+              SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS extras_kgs
+              FROM guest_folio_charges
+              WHERE status NOT IN ('WAIVED','VOID') AND "reservationId" IS NOT NULL
+              GROUP BY "reservationId"
             )
             SELECT COUNT(*)::int AS reservation_count,
-                   COALESCE(SUM(r."totalKgs"),0)::bigint AS booked_total_kgs,
+                   COALESCE(SUM(r."totalKgs"+COALESCE(e.extras_kgs,0)),0)::bigint AS booked_total_kgs,
                    COALESCE(SUM(COALESCE(x.received_kgs,0)),0)::bigint AS received_kgs,
-                   COALESCE(SUM(GREATEST(r."totalKgs"-COALESCE(x.received_kgs,0),0)),0)::bigint AS outstanding_kgs
+                   COALESCE(SUM(GREATEST(r."totalKgs"+COALESCE(e.extras_kgs,0)-COALESCE(x.received_kgs,0),0)),0)::bigint AS outstanding_kgs
             FROM reservations r
             LEFT JOIN received x ON x."reservationId"=r.id
+            LEFT JOIN extras e ON e."reservationId"=r.id
             WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
             ''',
             pid,
@@ -294,8 +306,14 @@ async def finance_summary(
               FROM payments
               WHERE "reservationId" IS NOT NULL
               GROUP BY "reservationId"
+            ), extras AS (
+              SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS extras_kgs
+              FROM guest_folio_charges
+              WHERE status NOT IN ('WAIVED','VOID') AND "reservationId" IS NOT NULL
+              GROUP BY "reservationId"
             )
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r."totalKgs",
+                   COALESCE(ex.extras_kgs,0)::bigint AS extras_kgs,
                    g."firstName",g."lastName",g.phone,
                    COALESCE(ps.received_kgs,0)::bigint AS received_kgs,
                    COALESCE(ps.received_count,0)::int AS received_count,
@@ -304,6 +322,7 @@ async def finance_summary(
             FROM reservations r
             LEFT JOIN guests g ON g.id=r."primaryGuestId"
             LEFT JOIN payment_stats ps ON ps."reservationId"=r.id
+            LEFT JOIN extras ex ON ex."reservationId"=r.id
             LEFT JOIN stays s ON s."reservationId"=r.id
             LEFT JOIN LATERAL (
               SELECT room.code
@@ -386,6 +405,59 @@ async def finance_summary(
             pid,
         )
 
+        stock_cost = await conn.fetchrow(
+            '''SELECT COALESCE(SUM(m.quantity*m."unitCostKgs") FILTER (WHERE NOT i."isSample"),0) AS real_cost,
+                      COALESCE(SUM(m.quantity*m."unitCostKgs") FILTER (WHERE i."isSample"),0) AS sample_cost,
+                      COUNT(*)::int AS movement_count
+               FROM kitchen_stock_movements m JOIN kitchen_stock_items i
+                 ON i.id=m."stockItemId" AND i."propertyId"=m."propertyId"
+               WHERE m."propertyId"=$1 AND m.kind='PRODUCTION'
+                 AND m."createdAt">=$2 AND m."createdAt"<$3''',pid,from_ts,to_ts,
+        )
+
+        # OWNER-only expense facts are distinct from customer Payments and stock costs.
+        # Expense date is the obligation period; paidOn is the separate cash-outflow date.
+        owner_expense_snapshot = None
+        if user["role"] == "OWNER":
+            expense_obligations = await conn.fetchrow(
+                '''SELECT COUNT(*)::int AS posted_count,
+                          COALESCE(SUM("amountKgs"),0)::bigint AS posted_kgs
+                   FROM owner_expenses WHERE "propertyId"=$1 AND status='POSTED'
+                     AND "expenseDate">=$2 AND "expenseDate"<=$3''',
+                pid, from_date, end_exclusive_date,
+            )
+            settlements = await conn.fetchrow(
+                '''SELECT COUNT(*)::int AS settlement_count,
+                          COALESCE(SUM(s."amountKgs"),0)::bigint AS recorded_paid_kgs
+                   FROM owner_expense_settlements s
+                   JOIN owner_expenses e ON e.id=s."expenseId"
+                     AND e."propertyId"=s."propertyId"
+                   WHERE s."propertyId"=$1 AND s."paidOn">=$2 AND s."paidOn"<$3
+                     AND e.status='POSTED' ''',
+                pid, from_date, end_exclusive_date,
+            )
+            outstanding = await conn.fetchval(
+                '''SELECT COALESCE(SUM(e."amountKgs" - COALESCE(
+                     (SELECT SUM(s."amountKgs") FROM owner_expense_settlements s
+                      WHERE s."propertyId"=e."propertyId" AND s."expenseId"=e.id),0)),0)::bigint
+                   FROM owner_expenses e WHERE e."propertyId"=$1 AND e.status='POSTED' ''',pid,
+            )
+            owner_expense_snapshot = {
+                "period_posted_obligations_kgs": expense_obligations["posted_kgs"],
+                "period_posted_count": expense_obligations["posted_count"],
+                "period_manually_recorded_settlements_kgs": settlements["recorded_paid_kgs"],
+                "period_settlement_count": settlements["settlement_count"],
+                "all_time_outstanding_obligations_kgs": outstanding,
+                "truth": "OBLIGATION_DATE_AND_MANUAL_PAYMENT_DATE_SEPARATE_NOT_PROFIT",
+            }
+        # OWNER receives supplier liabilities and movement-valued inventory
+        # in the same report as manual expense obligations. MANAGER never does.
+        owner_supplier_stock_snapshot = None
+        if user["role"] == "OWNER":
+            async with conn.transaction(isolation="repeatable_read", readonly=True):
+                owner_supplier_stock_snapshot = await owner_inventory_reconciliation(conn, pid)
+                owner_accrual_readiness_snapshot = await accrual_source_snapshot(conn, pid, from_date, to_date, prop["timezone"])
+
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
         return name or row["request_guest"] or None
@@ -407,6 +479,15 @@ async def finance_summary(
             "from_timestamp": from_ts,
             "to_timestamp_exclusive": to_ts,
         },
+        "kitchen_stock_cost": {
+            "real_production_cost_kgs": str(stock_cost["real_cost"]),
+            "sample_production_cost_kgs": str(stock_cost["sample_cost"]),
+            "movement_count": stock_cost["movement_count"],
+            "basis": "EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT",
+        },
+        **({"owner_expense_snapshot": owner_expense_snapshot} if owner_expense_snapshot is not None else {}),
+        **({"owner_supplier_stock_snapshot": owner_supplier_stock_snapshot} if owner_supplier_stock_snapshot is not None else {}),
+        **({"owner_accrual_readiness_snapshot": owner_accrual_readiness_snapshot} if owner_supplier_stock_snapshot is not None else {}),
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],
         "received_by_day": [dict(row) for row in daily],
@@ -444,7 +525,7 @@ async def finance_summary(
         "truth": {
             "received": "Period received totals include only stored Payment.status=RECEIVED facts. Property-local calendar boundaries are converted to UTC-naive timestamps because the committed PostgreSQL baseline stores Prisma DateTime values as TIMESTAMP(3) without timezone.",
             "pending": "Pending total is an internal payment-record snapshot; it is not recognized revenue and does not mean automation is collecting payment.",
-            "active_reservations": "Active reservation totals are a current internal snapshot of GUARANTEED/CHECKED_IN reservation values and stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
+            "active_reservations": "Active reservation totals include accommodation and non-waived/non-void folio extras, less stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
             "receivables": "Debtor counts and amounts are calculated over the complete GUARANTEED/CHECKED_IN/CHECKED_OUT reservation ledger. A CHECKED_OUT balance remains visible for operational follow-up regardless of historical ledger size.",
             "ledger": "The reservation_ledger response is a newest-first preview capped for payload size; reservation_ledger_meta declares truncation. Receivable and exception snapshots are calculated before that preview cap.",
             "exceptions": "Overpayment and cancelled-reservation-with-received-payment flags are complete operational reconciliation exceptions, not automatic refund decisions.",

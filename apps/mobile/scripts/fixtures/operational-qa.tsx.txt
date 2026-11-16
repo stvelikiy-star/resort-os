@@ -1,0 +1,58 @@
+// CI copies this text fixture into app/qa-operational.tsx before its isolated export.
+// Never copied by a normal app build. Genuine operational components, synthetic data.
+import React from 'react';
+import { Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { SessionProvider } from '../src/state/session';
+import { ThemeProvider } from '../src/theme/ThemeProvider';
+import { FutureScreen, PremiumHeader } from '../src/components/Future';
+import { OwnerExpenses } from '../src/components/OwnerExpenses';
+import { KitchenProcurement } from '../src/components/KitchenProcurement';
+import { KitchenStockMobile } from '../src/components/KitchenStockMobile';
+import type { AuthUser } from '../src/api/types';
+import type { createLiveModules, KitchenStockSnapshot, KitchenProductionTargets } from '../src/api/liveModules';
+import type { Locale } from '../src/i18n';
+
+const stock = {
+  items: [{ id:'33333333-3333-4333-8333-333333333333',name:'Рис · күрүч · rice — длинное наименование продукта',unit:'KG',cost_per_unit_kgs:'123456.7890',is_sample:false,balance:'99999.123456' }],
+  production_cost_kgs:'1234567890.1234',inventory_deducted_only_on_explicit_consume:true,
+} as KitchenStockSnapshot;
+const targets = { items:[] } as unknown as KitchenProductionTargets;
+const ids = { expense:'11111111-1111-4111-8111-111111111111', receipt:'22222222-2222-4222-8222-222222222222' };
+const noWrite = async () => { throw new Error('QA fixture: writes disabled'); };
+
+export default function OperationalQA() {
+  const params = useLocalSearchParams<{locale?:string;theme?:string;role?:string;state?:string}>();
+  const locale = (['ru','kg','en'].includes(params.locale||'')?params.locale:'ru') as Locale;
+  const role = (['OWNER','MANAGER','COOK','STORE_STAFF'].includes(params.role||'')?params.role:'OWNER') as AuthUser['role'];
+  const theme = params.theme==='light'?'light':'dark';
+  const state = params.state || 'ready';
+  const user = { id:'qa-owner',role,display_name:'QA',module_permissions:['FINANCE','DINING','STORE'] } as AuthUser;
+  const read = async <T,>(value:T):Promise<T> => {
+    if(state==='loading') return new Promise<T>(()=>{});
+    if(state==='error') throw new Error('QA · test connection unavailable');
+    return value;
+  };
+  const live = {
+    ownerExpenses:()=>read({new_expense_id:ids.expense,new_settlement_id:ids.receipt,items:state==='empty'?[]:[{
+      id:ids.expense,title:'Ремонт оборудования · жабдууларды оңдоо · equipment maintenance',category:'MAINTENANCE',expense_date:'2026-11-16',amount_kgs:1234567890,settled_kgs:100,outstanding_kgs:1234567790,status:'POSTED',
+    }],totals:{posted_expenses_kgs:1234567890,settled_against_period_expenses_kgs:100,outstanding_kgs:1234567790}}),
+    procurementRequests:()=>read({new_request_id:ids.expense,new_receipt_id:ids.receipt,items:state==='empty'?[]:[{
+      id:ids.expense,stock_name:stock.items[0].name,stock_item_id:stock.items[0].id,quantity:'100.123456',received_quantity:'25.123456',status:'PARTIAL',unit:'KG',
+    }]}),
+    procurementNeeds:()=>read({items:[],is_complete:true,missing_recipes:[],excluded_sample_targets:0}),
+    procurementSupplierLines:()=>read([{id:ids.receipt,stock_item_id:stock.items[0].id,remaining_quantity:'75',supplier_name:'QA supplier',document_reference:'QA-2026-001',unit_cost_kgs:'123456.7890'}]),
+    postOwnerExpense:noWrite,settleOwnerExpense:noWrite,requestKitchenProcurement:noWrite,receiveKitchenProcurement:noWrite,approveKitchenProcurement:noWrite,
+  } as unknown as ReturnType<typeof createLiveModules>;
+  return <SessionProvider initialLocale={locale} initialHotelId="demo-marina-issykkul" initialUser={user}>
+    <ThemeProvider initial={theme}>
+      <FutureScreen>
+        <Text testID="operational-qa-label" style={{color:theme==='dark'?'#F8FAFC':'#0B1F2A'}}>QA · SYNTHETIC DATA · NOT A LIVE HOTEL</Text>
+        <PremiumHeader title="MARINA SMART" subtitle="Operational component acceptance"/>
+        <View testID="qa-expenses"><OwnerExpenses live={live} from="2026-11-01" to="2026-11-16"/></View>
+        <View testID="qa-stock"><KitchenStockMobile stock={state==='empty'?{...stock,items:[]}:stock} targets={targets} consume={noWrite} reload={async()=>{}} readOnly/></View>
+        <View testID="qa-procurement"><KitchenProcurement live={live} stock={stock} reloadStock={async()=>{}}/></View>
+      </FutureScreen>
+    </ThemeProvider>
+  </SessionProvider>;
+}

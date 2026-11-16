@@ -38,7 +38,7 @@ type StaffOverview = {
   can_manage_access: boolean;
   managed_roles: string[];
 };
-const MANAGED_ROLES = ["MANAGER", "RECEPTION", "MAID", "TECHNICIAN", "COOK", "WAITER"] as const;
+const MANAGED_ROLES = ["MANAGER", "RECEPTION", "MAID", "TECHNICIAN", "COOK", "WAITER", "STORE_STAFF"] as const;
 
 function availableSections(user: Identity): Section[] {
   const grants = user.module_permissions || [];

@@ -104,9 +104,35 @@ COMPOSE_FILE=/srv/marina-smart/<slug>/compose.marina-production.yaml \
 bash /srv/marina-smart/<slug>/scripts/production_backup.sh
 ```
 
-The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. With the required S3 configuration, the shared script uploads each artifact beneath the Marina-specific prefix and verifies each object with a HEAD request. Before production acceptance, perform a clean restore rehearsal from the off-host copy on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
+The backup contains the PostgreSQL dump and available media/n8n archives, a checksum manifest, and a success receipt. For MARINA, configure the public recovery key fingerprint with the S3 settings. The script encrypts one archive, uploads it beneath the instance prefix, downloads it again and compares the encrypted bytes before advancing the success receipt. Keep the recovery private key separately. Before production acceptance, perform a clean restore rehearsal from the off-host copy on a separate disposable MARINA database. Application rollback and database restore are separate decisions; do not reverse migrations by improvising SQL.
 
 The backup script has been tested synthetically, but off-host retention policy, Ubuntu systemd scheduling, disk/health alerts, and an observed restore on the actual target still require explicit verification before go-live.
+
+
+## Monitoring the MARINA service set
+
+Pass the enabled services explicitly to the existing monitoring checker. For the
+standard MARINA stack with PostgreSQL and Guest Web, use:
+
+```bash
+python3 scripts/production_monitoring_check.py \
+  --compose-file compose.marina-production.yaml \
+  --env-file .env.marina-production \
+  --backup-dir /srv/marina-smart/<slug>/backups \
+  --disk-path /srv/marina-smart/<slug> \
+  --required-service caddy --required-service api \
+  --required-service web --required-service admin --required-service staff \
+  --required-service guest-web --required-service postgres \
+  --require-offsite
+```
+
+Include `--required-service n8n` when that service is enabled. Add the actual
+external `--endpoint NAME=URL` and `--tls-host HOST` arguments with
+`--require-network` for HTTPS acceptance. The checker requests HTML as a
+browser does, so the customer publication placeholder can be distinguished
+from an unavailable HTTP endpoint. HTTP success alone does not accept the
+hotel's website content. Scheduling and notification delivery still require
+a tested result on the target host.
 
 
 ## Application update and rollback boundary
@@ -179,3 +205,43 @@ This repository package is not production acceptance by itself. Before live use,
 - no payment or OTA action is presented as connected until its official provider integration is configured and tested.
 
 No deployment, DNS update, production migration, customer data import, or live booking was performed while preparing this package.
+
+
+## Isolated RC441 monitoring schedule
+
+The RC441-only runner reuses the reviewed production service, structured-log and
+backup checks. It uses the RC441 Compose wrapper and pins HTTPS probes to the
+loopback port with the RC CA and hostname verification. It never restarts an
+application. Its template paths are specific to the isolated Ubuntu RC441.
+
+Install the user units from this reviewed checkout:
+
+```bash
+install -m 644 deploy/marina/marina-rc441-monitor.service ~/.config/systemd/user/
+install -m 644 deploy/marina/marina-rc441-monitor.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now marina-rc441-monitor.timer
+```
+
+The first run is scheduled after 30 seconds, then every five minutes. The user
+manager must have lingering enabled to continue without an interactive login.
+The service writes a private atomic state file under the RC441
+`monitoring/status.json` and logs the same non-secret result to the user journal.
+Desktop notifications require a working notification service in that user's
+session. Changed error conditions and recovery trigger a notification.
+Repeating errors are deduplicated, including changing backup-age values.
+Notification rejection keeps the run RED and is retried on the next run.
+Acceptance of a notification by the local desktop daemon does not confirm
+delivery to a phone or human acknowledgement.
+
+Inspect the actual target and result:
+
+```bash
+systemctl --user show marina-rc441-monitor.timer -p LastTriggerUSec -p ActiveState
+journalctl --user -u marina-rc441-monitor.service -n 10 --no-pager
+```
+
+A missing verified backup or disk usage above 85% of user-available capacity
+keeps the overall result RED even while every application is healthy.
+A RED run exits with status 2, so the oneshot service reports failure while the
+timer remains active. External HTTPS acceptance remains a separate gate.

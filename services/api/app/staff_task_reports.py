@@ -3,7 +3,7 @@ import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .auth import current_user, trusted_property_id, MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .section_permissions import user_has_section
@@ -26,6 +26,14 @@ class TaskCompletionReport(BaseModel):
     summary: str = Field(min_length=2, max_length=2000)
     checklist: list[ChecklistItem] = Field(default_factory=list, max_length=20)
     evidence_urls: list[str] = Field(default_factory=list, max_length=8)
+
+    @field_validator("summary")
+    @classmethod
+    def meaningful_summary(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("A meaningful completion summary is required")
+        return normalized
 
     @model_validator(mode="after")
     def validate_evidence(self):
