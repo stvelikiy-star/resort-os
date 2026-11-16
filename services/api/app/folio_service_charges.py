@@ -9,7 +9,7 @@ async def ensure_guest_service_charge(conn, task_id: uuid.UUID, *, actor_type: s
                   t."serviceDate",s."guestId"
            FROM operational_tasks t
            LEFT JOIN stays s ON s.id=t."stayId"
-           WHERE t.id=$1 FOR UPDATE''', task_id,
+           WHERE t.id=$1 FOR UPDATE OF t''', task_id,
     )
     if not task or not task["reservationId"] or task["chargeKgs"] is None or int(task["chargeKgs"]) <= 0:
         return None

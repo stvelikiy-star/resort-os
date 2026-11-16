@@ -78,11 +78,11 @@ describe('LIVE backend section permissions vs mobile tab policy', () => {
 
 
 describe('STORE_STAFF release gate', () => {
-  it('never exposes inventory or another operational workspace even with unrelated grants', () => {
+  it('only exposes stock receipt workspace even with unrelated grants', () => {
     const allGrants = ['OPS', 'PMS', 'FINANCE', 'STAFF', 'DINING', 'WHATSAPP', 'RESERVATIONS', 'DASHBOARD'];
     const store = workspaceForSession('STORE_STAFF', allGrants, 'LIVE');
-    expect(store.tabs).toEqual(['profile']);
-    expect(store.mobileReady).toBe(false);
+    expect(store.tabs).toEqual(['store', 'profile']);
+    expect(store.mobileReady).toBe(true);
     expect(store.canManage).toBe(false);
     expect(store.canSetRoomState).toBe(false);
     expect(store.canCreateMaintenance).toBe(false);
@@ -102,13 +102,13 @@ describe('STORE_STAFF release gate', () => {
     const allGrants = ['OPS', 'PMS', 'FINANCE', 'STAFF', 'DINING', 'WHATSAPP', 'RESERVATIONS', 'DASHBOARD'];
     const expected: Record<string, readonly string[]> = {
       OWNER: ['overview', 'pms', 'inbox', 'kitchen', 'admin', 'tasks', 'rooms', 'requests', 'profile'],
-      MANAGER: ['overview', 'pms', 'inbox', 'tasks', 'rooms', 'requests', 'admin', 'profile'],
+      MANAGER: ['overview', 'pms', 'inbox', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'],
       RECEPTION: ['reception', 'pms', 'inbox', 'profile'],
       MAID: ['tasks', 'rooms', 'profile'],
       TECHNICIAN: ['tasks', 'requests', 'rooms', 'profile'],
       COOK: ['kitchen', 'dining', 'profile'],
       WAITER: ['dining', 'profile'],
-      STORE_STAFF: ['profile'],
+      STORE_STAFF: ['store', 'profile'],
     };
     for (const [role, tabs] of Object.entries(expected)) {
       expect(workspaceForSession(role as Role, allGrants, 'LIVE').tabs).toEqual(tabs);
@@ -132,5 +132,7 @@ describe('Reception and Dining network-read role boundaries', () => {
     expect(hasTabForSession('WAITER', ['DINING'], 'LIVE', 'kitchen')).toBe(false);
     expect(hasTabForSession('RECEPTION', ['DINING'], 'LIVE', 'dining')).toBe(false);
     expect(hasTabForSession('STORE_STAFF', ['DINING'], 'LIVE', 'dining')).toBe(false);
+    expect(hasTabForSession('STORE_STAFF', ['DINING'], 'LIVE', 'store')).toBe(true);
+    expect(hasTabForSession('STORE_STAFF', [], 'LIVE', 'store')).toBe(false);
   });
 });

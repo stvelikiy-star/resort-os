@@ -74,6 +74,32 @@ type FinanceResponse = {
     remaining_kgs: number;
   };
   refunded_snapshot_all_time: { amount_kgs: number; payment_count: number };
+  /** Present for OWNER only; never returned by Core to MANAGER. */
+  owner_supplier_stock_snapshot?: {
+    inventory: {
+      real_book_inventory_value_kgs: string | null;
+      sample_book_inventory_value_kgs: string | null;
+      valuation_status: "MOVEMENT_BASED" | "RECONCILIATION_REQUIRED";
+      linked_source: {
+        legacy_invoice_vs_stock_cost_delta_kgs: string;
+        source_mismatch_count: number;
+      };
+    };
+    supplier_documents: {
+      gross_obligations_kgs: string;
+      manual_settlements_kgs: string;
+      credit_notes_kgs: string;
+      outstanding_payables_kgs: string;
+      return_stock_carrying_cost_kgs: string;
+      return_credit_minus_stock_cost_kgs: string;
+      payables_status: "RECORDED_OBLIGATIONS_BALANCED" | "RECONCILIATION_REQUIRED";
+    };
+    financial_truth: {
+      recognized_profit_kgs: null;
+      is_recognized_profit_complete: false;
+      stock_receipts_are_expenses: false;
+    };
+  };
   recent_payments: Array<{
     id: string;
     amount_kgs: number;
@@ -104,6 +130,15 @@ function monthStart(value: Date) {
 }
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(Number(value || 0))} сом`;
+/** Do not coerce missing/invalid reconciliation values to zero, and avoid float rounding. */
+const exactSom = (value: string | null | undefined) => {
+  if (value === null) return "Требуется сверка";
+  const m = typeof value === "string" ? /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value) : null;
+  if (!m) return "Нет подтверждённых данных";
+  const whole = m[2].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const fraction = (m[3] || "").replace(/0+$/, "");
+  return (m[1] === "-" ? "−" : "") + whole + (fraction ? "," + fraction : "") + " сом";
+};
 
 const balanceLabel: Record<string, string> = {
   PRE_ARRIVAL: "До заезда",
@@ -175,6 +210,48 @@ export default function HotelFinanceBoard() {
         <article><span>Долг после выезда</span><strong>{money(data.receivables_snapshot.checked_out_kgs)}</strong><small>{data.receivables_snapshot.checked_out_count} CHECKED_OUT</small></article>
         <article><span>Стоимость активных броней</span><strong>{money(data.active_reservations_snapshot.booked_total_kgs)}</strong><small>{data.active_reservations_snapshot.reservation_count} GUARANTEED / CHECKED_IN</small></article>
       </section>
+
+      {data.owner_supplier_stock_snapshot &&
+        data.owner_supplier_stock_snapshot.financial_truth.recognized_profit_kgs === null &&
+        data.owner_supplier_stock_snapshot.financial_truth.is_recognized_profit_complete === false &&
+        data.owner_supplier_stock_snapshot.financial_truth.stock_receipts_are_expenses === false &&
+        <section className="finance-split-grid" data-testid="owner-supplier-stock-reconciliation">
+          <article className="finance-section">
+            <div className="section-head">
+              <h2>OWNER · склад и себестоимость</h2>
+              <span>Снимок движений, не прибыль</span>
+            </div>
+            <div className="finance-state-grid">
+              <div><span>Стоимость запасов</span>
+                <strong>{exactSom(data.owner_supplier_stock_snapshot.inventory.real_book_inventory_value_kgs)}</strong>
+                <small>По сохранённым поступлениям и списаниям</small></div>
+              <div><span>Возвраты поставщикам</span>
+                <strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.return_stock_carrying_cost_kgs)}</strong>
+                <small>Складская стоимость выбытия</small></div>
+              <div><span>Старые приходы — разница с накладными</span>
+                <strong>{exactSom(data.owner_supplier_stock_snapshot.inventory.linked_source.legacy_invoice_vs_stock_cost_delta_kgs)}</strong>
+                <small>Не исправляется и не списывается автоматически</small></div>
+              <div><span>Состояние оценки</span><strong>
+                {data.owner_supplier_stock_snapshot.inventory.valuation_status === "MOVEMENT_BASED"
+                  ? "По движениям" : "Требуется сверка"}</strong></div>
+            </div>
+          </article>
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · поставщики</h2>
+              <span>Не клиентские платежи и не прибыль</span></div>
+            <div className="finance-state-grid">
+              <div><span>Накладные</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.gross_obligations_kgs)}</strong></div>
+              <div><span>Зарегистрированные оплаты</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.manual_settlements_kgs)}</strong></div>
+              <div><span>Кредитовые корректировки</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.credit_notes_kgs)}</strong></div>
+              <div><span>Неоплаченная задолженность</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.outstanding_payables_kgs)}</strong></div>
+              <div><span>Разница кредита и стоимости возврата</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.return_credit_minus_stock_cost_kgs)}</strong></div>
+            </div>
+            <p className="finance-footnote">
+              Прибыль не рассчитана. Сначала нужна сверка признанной выручки,
+              хозяйственных расходов и корректировок себестоимости.
+            </p>
+          </article>
+        </section>}
 
       <section className="finance-split-grid">
         <article className="finance-section">

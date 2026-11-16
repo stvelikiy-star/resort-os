@@ -1,4 +1,4 @@
-import { ApiError, AuthUser, canTransition, DaySummary, HousekeepingReport, NewMaintenance, Role, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
+import { ApiError, AuthUser, canTransition, DaySummary, HousekeepingReport, MaintenanceReport, NewMaintenance, Role, Room, RoomState, StaffApi, StaffMember, Task, TaskStatus, TaskType, HOUSEKEEPING_CHECKLIST } from './types';
 
 export const DEMO_USERS: Record<string, { user: AuthUser; password: string }> = {
   owner: { password: 'demo', user: { id: 'u-owner', username: 'owner', display_name: 'MARINA DEMO', role: 'OWNER', property_code: 'DEMO', module_permissions: ['*'] } },
@@ -103,6 +103,23 @@ export function createDemoApi(hotelId: string, latency = 120): StaffApi {
       if (t.status !== 'IN_PROGRESS') throw new ApiError('CONFLICT');
       if (!HOUSEKEEPING_CHECKLIST.every((c) => report.checklist[c])) throw new ApiError('BAD_REQUEST');
       t.status = 'IN_INSPECTION'; return out(t);
+    },
+    async completeMaintenance(id, report: MaintenanceReport) {
+      await delay(latency); const u = need(); const task = find(id);
+      if (u.role !== 'TECHNICIAN' || task.type !== 'MAINTENANCE' || task.assigned_to_id !== u.id) throw new ApiError('FORBIDDEN');
+      if (task.status !== 'IN_PROGRESS') throw new ApiError('CONFLICT');
+      if (report.summary.trim().length < 2 || report.summary.trim().length > 2000) throw new ApiError('BAD_REQUEST');
+      task.status = 'DONE';
+      const room = data.rooms.find(item => item.id === task.room_id);
+      if (room) {
+        const otherRepair = data.tasks.some(item => item.id !== id && item.room_id === room.id && item.type === 'MAINTENANCE' && ['OPEN', 'IN_PROGRESS', 'IN_INSPECTION'].includes(item.status));
+        room.state = otherRepair ? 'TECH_BLOCK' : 'DIRTY';
+        task.room_state = room.state;
+        if (!otherRepair && !data.tasks.some(item => item.room_id === room.id && item.type === 'HOUSEKEEPING' && ['OPEN', 'IN_PROGRESS', 'IN_INSPECTION'].includes(item.status))) {
+          data.tasks.unshift({id:`t${data.tasks.length + 1}`,type:'HOUSEKEEPING',status:'OPEN',priority:'HIGH',title:'Уборка после ремонта',room_code:room.code,room_id:room.id,assigned_to_id:null});
+        }
+      }
+      return out(task);
     },
     async createMaintenance(req: NewMaintenance) {
       await delay(latency); const u = need();

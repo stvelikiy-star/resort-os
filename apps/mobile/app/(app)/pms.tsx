@@ -9,6 +9,7 @@ import { CONFIRMED_BACKEND_FEATURES } from '../../src/api/features';
 import { pmsCellState } from '../../src/roles/pmsPresentation';
 import { isPmsDateFree, shortPmsGuestLabel } from '../../src/roles/pmsSelection';
 import { PmsBookingSheet, type PmsSelectedBlock } from '../../src/components/PmsBookingSheet';
+import { AgentGuestServices } from '../../src/components/AgentGuestServices';
 import { useMobileCopy, pmsWeekdayLabels } from '../../src/i18n/mobileCopy';
 import { demoGrid } from '../../src/api/demoPresentation';
 import { useAsync } from '../../src/lib/useAsync';
@@ -57,7 +58,7 @@ export default function Pms() {
     const semantic = state === 'RESERVATION' ? copy.bookings : state === 'HOLD' ? copy.holds
       : state === 'BLOCKED' ? copy.blocked : state === 'CONFLICT' ? copy.conflict : copy.available;
     const free = isPmsDateFree(room, day, localDate()) && (!!showroom || canCreateBooking(user));
-    const openBlock = !!block && (showroom || user?.role !== 'AGENT' || state !== 'RESERVATION');
+    const openBlock = !!block && (showroom || user?.role !== 'AGENT' || state !== 'RESERVATION' || !!block.reservation_id);
     return <PressScale key={day} testID={'pms-' + room.id + '-' + day}
       accessibilityLabel={room.code + ' · ' + (room.name?.trim() || room.room_type_name) + ' · ' + day + ' · ' + semantic + (block?.guest_name ? ' · ' + block.guest_name : '')}
       disabled={!free && !openBlock} dimWhenDisabled={false}
@@ -170,6 +171,8 @@ export default function Pms() {
 
     </> : null}
     <PmsBookingSheet selected={selectedBlock} showroom={showroom} live={live}
+      agentServices={user?.role === 'AGENT' && selectedBlock?.block.reservation_id ?
+        <AgentGuestServices key={selectedBlock.block.reservation_id} reservationId={selectedBlock.block.reservation_id}/> : null}
       canOpenDetails={!!user && user.role !== 'AGENT' && allowed}
       onClose={() => setSelectedBlock(null)}
       onOpen={reservationId => router.push({ pathname: '/reservation/[id]', params: { id: reservationId } })}/>

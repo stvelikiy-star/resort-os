@@ -46,6 +46,13 @@ from .whatsapp_connection import router as whatsapp_connection_router
 from .kitchen import admin_router as kitchen_admin_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
 from .kitchen_menu_management import router as kitchen_menu_management_router
+from .kitchen_stock import router as kitchen_stock_router
+from .kitchen_procurement import router as kitchen_procurement_router
+from .owner_kitchen_management import router as owner_kitchen_management_router
+from .owner_expenses import router as owner_expenses_router
+from .owner_supplier_documents import router as owner_supplier_documents_router
+from .owner_supplier_returns import router as owner_supplier_returns_router
+from .owner_cash_reconciliation import router as owner_cash_reconciliation_router
 from .main import app
 from .channel_reservations import router as channel_reservations_router
 from .channel_mappings import router as channel_mappings_router
@@ -244,6 +251,13 @@ app.include_router(staff_guest_requests_router)
 # stripped of its historical duplicate menu mutations before composition, so
 # authorization no longer depends on include_router order.
 app.include_router(kitchen_menu_management_router)
+app.include_router(kitchen_stock_router)
+app.include_router(kitchen_procurement_router)
+app.include_router(owner_kitchen_management_router)
+app.include_router(owner_expenses_router)
+app.include_router(owner_supplier_documents_router)
+app.include_router(owner_supplier_returns_router)
+app.include_router(owner_cash_reconciliation_router)
 app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
 app.include_router(dining_control_router)

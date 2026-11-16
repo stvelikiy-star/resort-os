@@ -14,7 +14,12 @@ import { useAsync } from '../../src/lib/useAsync';
 import { useMobileCopy } from '../../src/i18n/mobileCopy';
 import { useSession } from '../../src/state/session';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { KitchenMenuDraftForm } from '../../src/components/KitchenMenuDraftForm';
+import { KitchenDrafts } from '../../src/components/KitchenDrafts';
+import { KitchenStopList } from '../../src/components/KitchenStopList';
+import { KitchenIngredients } from '../../src/components/KitchenIngredients';
+import { KitchenStockMobile } from '../../src/components/KitchenStockMobile';
+import { KitchenLosses } from '../../src/components/KitchenLosses';
+import { KitchenProcurement } from '../../src/components/KitchenProcurement';
 import { KitchenProductionPlanner } from '../../src/components/KitchenProductionPlanner';
 import { font, radius, space } from '../../src/theme/tokens';
 
@@ -24,7 +29,8 @@ import { font, radius, space } from '../../src/theme/tokens';
 export default function KitchenDashboard() {
   const { user, hotel, api, locale, serverAuthMode } = useSession();
   const showroom = api?.mode === 'DEMO';
-  const readOnly = user?.role === 'OWNER';
+  // MANAGER reviews kitchen and approves procurement, but COOK-only kitchen writes stay hidden.
+  const readOnly = user?.role === 'OWNER' || user?.role === 'MANAGER';
   const allowed = (user?.role === 'COOK' || readOnly) &&
     hasTabForSession(user.role, user.module_permissions, api?.mode ?? 'LIVE', 'kitchen', serverAuthMode);
   const live = useLiveModules();
@@ -50,11 +56,14 @@ export default function KitchenDashboard() {
   const { data: targets, loading: targetLoading, error: targetError, reload: reloadTargets } =
     useAsync(() => !allowed || showroom || !live ? Promise.resolve(null) : live.kitchenProductionTargets(),
       [live, showroom, hotel?.id, user?.id, allowed]);
+  const { data: stock, error: stockError, reload: reloadStock } =
+    useAsync(() => !allowed || showroom || !live ? Promise.resolve(null) : live.kitchenStock(),
+      [live, showroom, hotel?.id, user?.id, allowed]);
   useFocusEffect(useCallback(() => {
     if(focused.current) {
-      void reload(); void reloadProduction(); void reloadTargets(); void reloadMenu();
+      void reload(); void reloadProduction(); void reloadTargets(); void reloadMenu(); void reloadStock();
     } else focused.current = true;
-  }, [reload, reloadProduction, reloadTargets, reloadMenu]));
+  }, [reload, reloadProduction, reloadTargets, reloadMenu, reloadStock]));
   const captureLock = useRef(false);
   const [capturing, setCapturing] = useState(false);
   const captureLabel = {
@@ -96,7 +105,8 @@ export default function KitchenDashboard() {
     <PremiumHeader title={copy.kitchen} subtitle={hotel?.name} eyebrow="MARINA SMART"
       right={<ChefHat color={c.primary} size={25}/>}/>
     {showroom ? <DemoBanner/> : null}
-    {live && !showroom && !readOnly ? <KitchenMenuDraftForm key={hotel?.id + ':' + user.id} save={live.createKitchenMenuDraft}/> : null}
+    {live && !showroom && !readOnly ? <KitchenStopList live={live}/> : null}
+    {live && !showroom ? <KitchenDrafts key={hotel?.id + ':' + user.id} live={live} onPublished={async()=>{await Promise.all([reloadMenu(),reloadTargets()]);}}/> : null}
     {!showroom && !live ? <Empty text={copy.unavailable}/> : null}
     {loading ? <LoadingShimmer count={3}/> : null}
     {error ? <ErrorState text={error.message} retry={copy.retry} onRetry={reload}/> : null}
@@ -106,7 +116,7 @@ export default function KitchenDashboard() {
       {!showroom && menuError ? <ErrorState text={menuError.message} retry={copy.retry} onRetry={reloadMenu}/> : null}
       {!showroom && targetError ? <ErrorState text={targetError.message} retry={copy.retry} onRetry={reloadTargets}/> : null}
       {!showroom && live && targets && productionMenu ? <KitchenProductionPlanner
-        live={live} menu={productionMenu} targets={targets} reload={reloadTargets} readOnly={readOnly}/> : null}
+        live={live} menu={productionMenu} targets={targets} reload={reloadTargets} reloadMenu={reloadMenu} readOnly={readOnly}/> : null}
       {showroom ? <GlassCard testID="kitchen-demo-meals-not-live" style={{gap:7}}>
         <Text style={[font.body,{color:c.text}]}>{copy.kitchenMealPlanDemo}</Text>
         <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealPlanExplanation}</Text>
@@ -169,10 +179,16 @@ export default function KitchenDashboard() {
       {!showroom && production ? <Text style={[font.small,{color:c.textMuted}]}>{copy.kitchenMealsNotOrders}</Text> : null}
       {!showroom ? <>
         <SectionLabel>{chefCopy.procurement}</SectionLabel>
+        {targets?.ingredient_requirements ? <KitchenIngredients data={targets.ingredient_requirements} stock={stock}/> :
         <GlassCard testID="kitchen-procurement-data-pending" style={{gap:space.sm,borderLeftWidth:4,borderLeftColor:c.warning}}>
           <Text style={[font.small,{color:c.textMuted}]}>{chefCopy.procurementUnavailable}</Text>
-        </GlassCard>
+        </GlassCard>}
       </> : null}
+      {!showroom && stockError ? <ErrorState text={stockError.message} retry={copy.retry} onRetry={reloadStock}/> : null}
+      {!showroom && live && stock && targets ? <KitchenStockMobile stock={stock} targets={targets}
+        consume={live.consumeKitchenStock} reload={async()=>{await reloadStock();await reloadTargets();}} readOnly={readOnly}/> : null}
+      {!showroom && live && stock ? <KitchenLosses live={live} stock={stock} reload={reloadStock}/> : null}
+      {!showroom && live && stock ? <KitchenProcurement live={live} stock={stock} reloadStock={reloadStock}/> : null}
       <SectionLabel>{copy.kitchenActiveNow}</SectionLabel>
       <View style={{ gap: space.sm }}>
         <StaggerItem index={0}><View style={{ flexDirection: 'row', gap: space.sm }}>

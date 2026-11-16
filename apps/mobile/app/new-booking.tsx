@@ -3,11 +3,11 @@ import { Alert, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { Badge, Button, Empty, Field, PressScale, SectionLabel } from '../src/components/ui';
-import { AGENT_SERVICES, AgentServiceCode, BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
+import { BookingDraft, BookingPreview, localDate, useLiveModules } from '../src/api/liveModules';
 import { ApiError } from '../src/api/types';
 import { acknowledgePendingBooking, clearPendingBooking, finishPendingBooking, readPendingBooking, recordPendingBooking } from '../src/lib/pendingBooking';
 import { wasWriteRejected } from '../src/lib/writeOutcome';
-import { acknowledgePendingAgentService, beginPendingAgentService, clearPendingAgentService, readPendingAgentService } from '../src/lib/pendingAgentService';
+import { AgentGuestServices } from '../src/components/AgentGuestServices';
 import { useMobileCopy } from '../src/i18n/mobileCopy';
 import { useSession } from '../src/state/session';
 import { canCreateBooking } from '../src/roles/bookingAccess';
@@ -25,20 +25,6 @@ const reviewCopy = {
   kz: { review: 'Шахматкадан тексеру', missing: 'Бөлме немесе жазба қолжетімсіз.', storage: 'Бронь журналы қолжетімсіз. Қайта тексеріңіз.', candidate: 'Ықтимал бронь: ', unconfirmed: 'Сәйкестік расталмады. Платформадан тексеріңіз.', ack: 'Платформадан тексердім', manual: 'Нәтижені платформадан тексеріп, жаңа бронь қажет пе екенін шешкеніңізді растаңыз.' },
 };
 
-const agentReconcileCopy = {
-  ru: { action: 'Я сверил заявку с менеджером', warning: 'Проверьте в платформе бронь, код услуги и статус заявки с менеджером. Подтверждение только снимает локальную блокировку и НЕ создаёт новую заявку.', confirm: 'Я проверил результат заявки в платформе и понимаю, что повторная отправка может создать дубль.' },
-  en: { action: 'I verified with the manager', warning: 'Verify the reservation, service code and request status with the manager in the platform. This only clears the local lock; it does NOT create another request.', confirm: 'I checked the request outcome in the platform and understand that a new submission could create a duplicate.' },
-  kg: { action: 'Арызды менеджер менен текшердим', warning: 'Платформадан бронду, кызмат кодун жана арыздын абалын менеджер менен текшериңиз. Бул аракет жергиликтүү бөгөттү гана алып салат, жаңы арыз түзбөйт.', confirm: 'Арыздын жыйынтыгын платформадан текшердим. Кайра жөнөтүү кайталанган арыз түзүшү мүмкүн экенин түшүнөм.' },
-  kz: { action: 'Өтінімді менеджермен тексердім', warning: 'Платформада брондауды, қызмет кодын және өтінім күйін менеджермен тексеріңіз. Бұл әрекет тек жергілікті бұғаттауды алып тастайды, жаңа өтінім жасамайды.', confirm: 'Өтінім нәтижесін платформада тексердім. Қайта жіберу қайталанған өтінім жасауы мүмкін екенін түсінемін.' },
-} as const;
-
-const agentServiceLabels = {
-  ru: ['Добавить услугу', 'Трансфер', 'Питание', 'Парковка', 'Сауна', 'Бильярд', 'Экскурсия'],
-  en: ['Add service', 'Transfer', 'Meals', 'Parking', 'Sauna', 'Billiards', 'Excursion'],
-  kg: ['Кызмат кошуу', 'Трансфер', 'Тамактануу', 'Унаа токтотуучу жай', 'Сауна', 'Бильярд', 'Экскурсия'],
-  kz: ['Қызмет қосу', 'Трансфер', 'Тамақтану', 'Автотұрақ', 'Сауна', 'Бильярд', 'Экскурсия'],
-} as const;
-
 function dateValid(value: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value + 'T12:00:00')); }
 export default function NewBooking() {
   const { user, hotel } = useSession();
@@ -50,7 +36,7 @@ export default function NewBooking() {
 
 function BookingForm({ journalKey }: { journalKey: string | null }) {
   const live = useLiveModules();
-  const { user, locale, hotel, api, serverAuthMode } = useSession();
+  const { user, locale, hotel, api } = useSession();
   const showroom = api?.mode === 'DEMO';
   const allowed = showroom ? !!user && hasTabForSession(user.role, user.module_permissions, 'DEMO', 'pms') : canCreateBooking(user);
   const copy = useMobileCopy();
@@ -74,15 +60,6 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
   const [preview, setPreview] = useState<BookingPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reservationId, setReservationId] = useState<string | null>(null);
-  const [serviceOpen, setServiceOpen] = useState(false);
-  const [serviceMessage, setServiceMessage] = useState('');
-  const [serviceUnknown, setServiceUnknown] = useState(false);
-  const agentIdentity = user?.role === 'AGENT' && hotel?.id && user.id
-    ? { hotelId: hotel.id, userId: user.id } : null;
-  const agentPending = useAsync(() => agentIdentity
-    ? readPendingAgentService(agentIdentity.hotelId, agentIdentity.userId) : Promise.resolve(null),
-    [agentIdentity?.hotelId, agentIdentity?.userId]);
-  const serviceLocked = serviceUnknown || agentPending.loading || !!agentPending.error || !!agentPending.data;
   const [result, setResult] = useState<string | null>(null);
   const journal = useAsync(() => journalKey ? readPendingBooking(journalKey) : Promise.resolve(null), [journalKey]);
   const [readback, setReadback] = useState<string | null>(null);
@@ -101,7 +78,7 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
     adults: Number(adults), children: Number(children), guest_phone: phone.trim() });
   const resetPreview = () => { setPreview(null); setError(null); };
   const resetForm = () => {
-    setReservationId(null); setServiceOpen(false); setServiceMessage(''); setServiceUnknown(false);
+    setReservationId(null);
     setCompleted(false); setUnknown(false); setResult(null); setError(null); setPreview(null);
     setStart(localDate(1)); setEnd(localDate(2)); setRoomId(''); setName(''); setPhone(''); setAdults('2'); setChildren('0');
   };
@@ -152,56 +129,6 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       busyLock.current = false; setBusy(false);
     }
   }}]);
-  const addService = (service: AgentServiceCode, label: string) => Alert.alert(agentServiceLabels[locale][0], label, [
-    { text: copy.close, style: 'cancel' },
-    { text: copy.confirm, onPress: async () => {
-      if (!live || !reservationId || !allowed || user?.role !== 'AGENT' ||
-        showroom || serverAuthMode === 'shared_auth_preview' || busyLock.current || serviceLocked || !agentIdentity) return;
-      busyLock.current = true;
-      setBusy(true);
-      setServiceMessage('');
-      let recorded = false;
-      try {
-        await beginPendingAgentService(agentIdentity.hotelId, agentIdentity.userId, reservationId, service);
-        recorded = true;
-        await agentPending.reload();
-        await live.addAgentGuestService(reservationId, service);
-        await clearPendingAgentService(agentIdentity.hotelId, agentIdentity.userId);
-        await agentPending.reload();
-        setServiceMessage(copy.confirmed + ' · ' + label);
-      } catch (error) {
-        // 409 may mean the service already exists (GUEST_SERVICE_DUPLICATE_ACTIVE).
-        // Never clear the journal on 409 without manual server reconciliation.
-        const rejected = recorded && error instanceof ApiError && error.code !== 'CONFLICT' && wasWriteRejected(error);
-        if (rejected) {
-          try { await clearPendingAgentService(agentIdentity.hotelId, agentIdentity.userId); }
-          catch { setServiceUnknown(true); }
-        } else {
-          setServiceUnknown(true);
-        }
-        await agentPending.reload().catch(() => {});
-        setServiceMessage(rejected && error instanceof Error ? error.message : copy.resultUnknown);
-      } finally {
-        busyLock.current = false;
-        setBusy(false);
-      }
-    } },
-  ]);
-  const acknowledgeAgentService = () => Alert.alert(agentReconcileCopy[locale].action,
-    agentReconcileCopy[locale].confirm, [
-      { text: copy.close, style: 'cancel' },
-      { text: copy.confirm, onPress: async () => {
-        const inspected = agentPending.data;
-        if (!agentIdentity || !inspected || busyLock.current || busy) return;
-        busyLock.current = true; setBusy(true);
-        try {
-          if (await acknowledgePendingAgentService(agentIdentity.hotelId, agentIdentity.userId, inspected)) {
-            setServiceUnknown(false); setServiceMessage('');
-          }
-        } catch { setServiceMessage(copy.resultUnknown); }
-        finally { await agentPending.reload(); busyLock.current = false; setBusy(false); }
-      } },
-    ]);
   const reconcile = async () => {
     const pending = journal.data;
     if (!live || !pending || busyLock.current) return;
@@ -267,23 +194,8 @@ function BookingForm({ journalKey }: { journalKey: string | null }) {
       {!preview.can_commit ? <Text style={[font.body,{color:c.danger}]}>{copy.conflict} · {preview.pricing.reason || ''}</Text> : null}
       <Button testID="booking-commit" label={copy.commit} disabled={!preview.can_commit || busy || lockedForReview || completed} onPress={doCommit}/>
     </GlassCard> : null}
-    {user?.role === 'AGENT' && serviceLocked && !showroom ? <GlassCard testID="agent-service-pending" style={{gap:8,borderLeftWidth:4,borderLeftColor:c.warning}}>
-      <Text accessibilityRole="alert" style={[font.body,{color:c.warning}]}>{copy.resultUnknown}</Text>
-      {agentPending.data ? <Text style={[font.small,{color:c.text}]}>{agentPending.data.serviceCode} · {agentPending.data.reservationId}</Text> : null}
-      <Text style={[font.small,{color:c.text}]}>{agentReconcileCopy[locale].warning}</Text>
-      <Button label={copy.retry} disabled={busy} variant="secondary" onPress={() => void agentPending.reload()}/>
-      {agentPending.data ? <Button testID="agent-service-acknowledge" label={agentReconcileCopy[locale].action}
-        disabled={busy} variant="secondary" onPress={acknowledgeAgentService}/> : null}
-    </GlassCard> : null}
+    <AgentGuestServices reservationId={reservationId}/>
     {result ? <GlassCard style={{gap:8,borderLeftWidth:4,borderLeftColor:c.success}}><Text style={[font.h2,{color:c.success}]}>{copy.confirmed}: {result}</Text>
-      {user?.role === 'AGENT' && live && reservationId && serverAuthMode !== 'shared_auth_preview' ? <>
-        <Button label={agentServiceLabels[locale][0]} variant="secondary" disabled={busy || serviceLocked} onPress={() => setServiceOpen(!serviceOpen)}/>
-        {serviceOpen ? AGENT_SERVICES.map((service, index) => <Button key={service}
-          label={agentServiceLabels[locale][index + 1]} variant="secondary" disabled={busy || serviceLocked}
-          onPress={() => addService(service, agentServiceLabels[locale][index + 1])}/>) : null}
-        {serviceLocked ? <Text accessibilityRole="alert" style={[font.body, { color: c.warning }]}>{copy.resultUnknown} · {reviewCopy[locale].manual}</Text> : null}
-        {serviceMessage ? <Text accessibilityRole="alert" style={[font.body, { color: c.text }]}>{serviceMessage}</Text> : null}
-      </> : null}
       <Button testID="booking-create-another" label={copy.anotherBooking} variant="secondary" disabled={busy} onPress={resetForm}/>
     </GlassCard> : null}
     {error ? <GlassCard><Text accessibilityRole="alert" style={[font.body,{color:c.danger}]}>{error}</Text></GlassCard> : null}

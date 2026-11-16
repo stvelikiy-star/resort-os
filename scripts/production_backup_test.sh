@@ -35,6 +35,14 @@ if [[ "\${1:-}" == "--help" ]]; then
   exit 0
 fi
 printf '%s\n' "\$*" >> "$TMP/curl.log"
+if [[ "\${5:-}" == */backup.tar.gpg ]]; then
+  case "\${3:-}" in
+    --upload-file) cp "\$4" "$TMP/mock-s3.gpg" ;;
+    --output)
+      if [[ "\${S3_TEST_CORRUPT:-}" == 1 ]]; then printf 'corrupt' > "\$4"
+      else cp "$TMP/mock-s3.gpg" "\$4"; fi ;;
+  esac
+fi
 exit 0
 EOF
 chmod +x "$TMP/bin/curl"
@@ -77,7 +85,14 @@ fi
 
 # MARINA must supply its own prefix so the shared script's Three Crowns default
 # can never receive a MARINA backup accidentally.
-cat > "$TMP/root/.env.marina-production" <<'EOF'
+export GNUPGHOME="$TMP/gnupg"
+mkdir -m 700 "$GNUPGHOME"
+gpg --batch --pinentry-mode loopback --passphrase '' --quick-generate-key \
+  'MARINA Backup CI <backup-ci@example.invalid>' default default 1d
+RECIPIENT="$(gpg --batch --with-colons --list-keys | awk -F: '$1=="fpr" && !found {print $10; found=1}')"
+cat > "$TMP/root/.env.marina-production" <<EOF
+MARINA_INSTANCE_SLUG=ak-bermet-ci
+S3_BACKUP_ENCRYPTION_RECIPIENT=$RECIPIENT
 DB_BACKUP_MODE=url
 PG_DUMP_DATABASE_URL=postgresql://marina:secret@db.example.invalid:5432/marina_ci?sslmode=require
 OFFSITE_BACKUP_REQUIRED=true
@@ -95,6 +110,30 @@ BACKUP_DIR="$TMP/backups-marina" \
 bash "$ROOT/scripts/production_backup.sh" > "$TMP/marina-output.txt"
 grep -q 's3.example.invalid/marina-backups/marina/ak-bermet-ci/' "$TMP/curl.log"
 grep -q '^OFFSITE_STATUS=VERIFIED_UPLOAD$' "$TMP/backups-marina/last-success.env"
+mkdir "$TMP/decrypted"
+gpg --batch --output "$TMP/decrypted.tar" --decrypt "$TMP/mock-s3.gpg"
+tar -C "$TMP/decrypted" -xf "$TMP/decrypted.tar"
+(cd "$TMP/decrypted"; sha256sum -c SHA256SUMS)
+cmp "$TMP/decrypted/postgres.dump" "$(find "$TMP/backups-marina" -name postgres.dump -print -quit)"
+test "$(grep -- '--upload-file .*marina-backups/' "$TMP/curl.log" | wc -l)" -eq 1
+grep -q -- '--output .*marina-backups/.*/backup.tar.gpg' "$TMP/curl.log"
+
+if PATH="$TMP/bin:$PATH" ROOT_DIR="$TMP/root" ENV_FILE="$TMP/root/.env.marina-production" \
+  BACKUP_DIR="$TMP/backups-corrupt" S3_TEST_CORRUPT=1 bash "$ROOT/scripts/production_backup.sh" > "$TMP/corrupt.log" 2>&1; then
+  echo "A different S3 download must fail the backup" >&2
+  exit 1
+fi
+test ! -e "$TMP/backups-corrupt/last-success.env"
+
+sed '/^S3_BACKUP_ENCRYPTION_RECIPIENT=/d' "$TMP/root/.env.marina-production" > "$TMP/root/.env.marina-missing-key"
+if PATH="$TMP/bin:$PATH" ROOT_DIR="$TMP/root" ENV_FILE="$TMP/root/.env.marina-missing-key" \
+  BACKUP_DIR="$TMP/backups-missing-key" bash "$ROOT/scripts/production_backup.sh" > "$TMP/missing-key.log" 2>&1; then
+  echo "MARINA off-site backup requires a recovery key" >&2
+  exit 1
+fi
+grep -q 'requires GPG and S3_BACKUP_ENCRYPTION_RECIPIENT' "$TMP/missing-key.log"
+test ! -e "$TMP/backups-missing-key/last-success.env"
+
 
 # The pre-existing single-server Compose mode must remain functional and must
 # record LOCAL_ONLY rather than pretending an off-site copy exists.

@@ -32,6 +32,7 @@ function fakeApi(key: 'A' | 'B'): StaffApi {
     listTasks:async()=>[],claimTask:async()=>{throw new ApiError('FORBIDDEN');},
     setTaskStatus:async()=>{throw new ApiError('FORBIDDEN');},
     completeHousekeeping:async()=>{throw new ApiError('FORBIDDEN');},
+    completeMaintenance:async()=>{throw new ApiError('FORBIDDEN');},
     createMaintenance:async()=>{throw new ApiError('FORBIDDEN');},
     listRooms:async()=>[{id:'room-'+key,code:key+'-101',floor:1,state:'CLEAN'}],
     setRoomState:async()=>{throw new ApiError('FORBIDDEN');},

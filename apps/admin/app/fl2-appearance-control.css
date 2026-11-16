@@ -1,0 +1,6 @@
+/* Opt-in visual preference only; no changes to workflow routes, booking actions or permissions. */
+.marina-appearance-control{display:flex;align-items:center;gap:3px;flex-wrap:wrap;max-width:330px;padding:4px;border-radius:13px;background:rgba(13,44,67,.08);border:1px solid rgba(40,100,120,.18)}
+.marina-appearance-control button{border-radius:10px;border:1px solid transparent;background:transparent;color:#153b57;font:600 11px/1.2 system-ui;padding:8px;min-height:34px;cursor:pointer}
+.marina-appearance-control button[aria-pressed="true"]{background:#0d5268;color:#fff}
+.marina-appearance-control button:focus-visible{outline:3px solid #167a8d;outline-offset:2px}
+@media(max-width:850px){.marina-appearance-control{max-width:100%;order:3;width:100%;justify-content:center}}

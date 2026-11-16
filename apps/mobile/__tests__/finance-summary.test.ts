@@ -52,3 +52,18 @@ it('hides dashboard financial KPI values from DASHBOARD-only roles and grants', 
   expect(dashboardFinanceForUser(user('OWNER', ['DASHBOARD', 'FINANCE']), finance)).toEqual(finance);
   expect(dashboardFinanceForUser(user('MANAGER', ['DASHBOARD', 'FINANCE']), finance)).toEqual(finance);
 });
+
+test('accepts actual kitchen stock costs, isolates sample costs and never calls them payments', () => {
+  const payload = {...summary, kitchen_stock_cost:{
+    real_production_cost_kgs:'0', sample_production_cost_kgs:'68.0000', movement_count:2,
+    basis:'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'
+  }};
+  expect(financeSummaryResponse(payload).kitchen_stock_cost?.sample_production_cost_kgs).toBe('68.0000');
+  expect(financeSummaryResponse(payload).period_payments.received_kgs).toBe(4700);
+  expect(() => financeSummaryResponse({...summary, kitchen_stock_cost:{
+    ...payload.kitchen_stock_cost, real_production_cost_kgs:'-1',
+  }})).toThrow();
+  expect(() => financeSummaryResponse({...summary, kitchen_stock_cost:{
+    ...payload.kitchen_stock_cost, basis:'PAYMENT'
+  }})).toThrow();
+});
