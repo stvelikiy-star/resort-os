@@ -24,7 +24,7 @@ export function dashboardResponse(v:unknown):Dashboard {
   return v as Dashboard;
 }
 /** Only render confirmed finance aggregates, never a guessed payment or profit. */
-function verifyOwnerAccrualReadiness(v:unknown):void {
+export function verifyOwnerAccrualReadiness(v:unknown):void {
   const r=obj(v,'owner.accrual'),period=obj(r.period,'owner.accrual.period');
   if(r.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||period.currency!=='KGS')
     invalid('owner.accrual.scope');
