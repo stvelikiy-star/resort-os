@@ -84,6 +84,8 @@ def validate_correction(kind,component,amount,face,totals):
         raise ValueError("Package allocation exceeds remaining face value")
     if kind in REDUCERS and totals["PACKAGE_SPLIT"]+totals["DISCOUNT"]+totals["CANCELLATION"]+amount>face:
         raise ValueError("Remaining face cannot cover classified package")
+    if kind in REDUCERS and totals["TAX_COMPONENT"]+totals["DISCOUNT"]+totals["CANCELLATION"]+amount>face:
+        raise ValueError("Remaining face cannot cover classified tax component")
     if kind=="TAX_COMPONENT" and totals["DISCOUNT"]+totals["CANCELLATION"]+totals["TAX_COMPONENT"]+amount>face:
         raise ValueError("Tax component exceeds remaining face value")
     return True
@@ -163,8 +165,11 @@ async def record_correction(body:CorrectionWrite,request:Request,user=Depends(ow
             duplicate=await conn.fetchval(
                 '''SELECT id FROM owner_revenue_correction_events
                    WHERE "propertyId"=$1 AND "approvalId"=$2 AND kind=$3
-                     AND component=$4 AND "documentReference"=$5 AND action='RECORD' ''',
-                pid,body.approval_id,body.kind,body.component,body.document_reference)
+                     AND component=$4 AND
+                     ("documentReference"=$5 OR "documentSha256"=$6)
+                     AND action='RECORD' ''',
+                pid,body.approval_id,body.kind,body.component,
+                body.document_reference,body.document_sha256)
             if duplicate:
                 raise HTTPException(409,detail={"code":"REVENUE_CORRECTION_DOCUMENT_ALREADY_USED"})
             totals=await totals_for_approval(conn,pid,body.approval_id)
