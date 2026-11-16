@@ -71,6 +71,18 @@ export function verifyOwnerAccrualReadiness(v:unknown):void {
     ['supplier_return_credit_minus_stock_cost_kgs','supplier_payables_outstanding_kgs']);
   if(!['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(stock.inventory_valuation_status)))
     invalid('owner.accrual.valuation.status');
+  const journal=obj(r.source_approval_journal,'owner.accrual.journal');
+  counts(journal,['approval_events_count','reversal_events_count',
+    'active_room_nights_count','active_served_dining_count'],'owner.accrual.journal');
+  amounts(journal,['active_source_face_value_kgs'],'owner.accrual.journal');
+  if(journal.status!=='SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION'||
+     journal.recognized_revenue_kgs!==null||
+     journal.recognized_profit_kgs!==null||
+     (journal.reversal_events_count as number)>(journal.approval_events_count as number)||
+     (journal.active_room_nights_count as number)+
+       (journal.active_served_dining_count as number)>
+       (journal.approval_events_count as number))
+    invalid('owner.accrual.journal.truth');
   const delivered=obj(r.delivered_revenue_sources,'owner.accrual.delivered');
   if(delivered.scope!=='OWNER_ONLY_PROPERTY_SCOPED')
     invalid('owner.accrual.delivery.scope');
