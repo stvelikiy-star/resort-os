@@ -71,6 +71,21 @@ export function verifyOwnerAccrualReadiness(v:unknown):void {
     ['supplier_return_credit_minus_stock_cost_kgs','supplier_payables_outstanding_kgs']);
   if(!['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(stock.inventory_valuation_status)))
     invalid('owner.accrual.valuation.status');
+  const corrections=obj(r.documented_source_corrections,'owner.accrual.corrections');
+  counts(corrections,['recorded_corrections_count','reversed_corrections_count'],
+    'owner.accrual.corrections');
+  if((corrections.reversed_corrections_count as number)>
+       (corrections.recorded_corrections_count as number)||
+     corrections.metadata_only_documents_not_independently_verified!==true||
+     corrections.refunds_are_cash_evidence_not_recognized_revenue!==true||
+     corrections.tax_and_packages_are_classifications_not_expenses!==true||
+     corrections.recognized_revenue_kgs!==null||
+     corrections.recognized_profit_kgs!==null||
+     corrections.status!=='SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS')
+    invalid('owner.accrual.corrections.not_posted');
+  const kinds=obj(corrections.active_by_kind_kgs,'owner.accrual.correction.kinds');
+  amounts(kinds,['DISCOUNT','PACKAGE_SPLIT','CANCELLATION','REFUND',
+    'TAX_COMPONENT'],'owner.accrual.correction.kinds');
   const journal=obj(r.source_approval_journal,'owner.accrual.journal');
   counts(journal,['approval_events_count','reversal_events_count',
     'active_room_nights_count','active_served_dining_count'],'owner.accrual.journal');
