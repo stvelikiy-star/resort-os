@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles, trusted_property_id
 from .owner_kitchen_reconciliation import owner_inventory_reconciliation
 from .owner_delivered_revenue import delivered_sources
+from .owner_revenue_source_journal import source_approval_snapshot
 
 router = APIRouter(prefix="/api/v1/admin/finance/owner",
                  tags=["owner-accrual-readiness"])
@@ -140,6 +141,7 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
     # are warnings; neither supplier settlement nor invoice is kitchen COGS.
     reconciliation=await owner_inventory_reconciliation(conn,pid)
     delivered=await delivered_sources(conn,pid,from_date,to_date,tz)
+    approvals=await source_approval_snapshot(conn,pid,from_date,to_date)
     stock=reconciliation["inventory"]
     supplier=reconciliation["supplier_documents"]
     blockers=[
@@ -195,6 +197,7 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
             "amounts_are_not_additive_or_recognized":True,
         },
         "delivered_revenue_sources":delivered,
+        "source_approval_journal":approvals,
         "source_valuation":{
             "inventory_valuation_status":stock["valuation_status"],
             "source_mismatch_count":stock["linked_source"]["source_mismatch_count"],
