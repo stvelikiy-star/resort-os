@@ -24,6 +24,67 @@ export function dashboardResponse(v:unknown):Dashboard {
   return v as Dashboard;
 }
 /** Only render confirmed finance aggregates, never a guessed payment or profit. */
+function verifyOwnerAccrualReadiness(v:unknown):void {
+  const r=obj(v,'owner.accrual'),period=obj(r.period,'owner.accrual.period');
+  if(r.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||period.currency!=='KGS')
+    invalid('owner.accrual.scope');
+  str(period.from,'owner.accrual.from');
+  str(period.to,'owner.accrual.to');
+  str(period.timezone,'owner.accrual.timezone');
+  const amountOk=(x:unknown,signed=false)=>
+    typeof x==='string'&&
+    (signed?/^-?(?:0|[1-9]\d*)(?:\.\d{1,4})?$/:/^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/).test(x);
+  const amounts=(source:Record<string,unknown>,fields:string[],where:string,signed:string[]=[])=>
+    fields.forEach(k=>{if(!amountOk(source[k],signed.includes(k)))invalid(where+'.'+k);});
+  const counts=(source:Record<string,unknown>,fields:string[],where:string)=>
+    fields.forEach(k=>{if(typeof source[k]!=='number'||!Number.isSafeInteger(source[k])||
+      (source[k] as number)<0)invalid(where+'.'+k);});
+  const expense=obj(r.posted_owner_obligations,'owner.accrual.expenses');
+  amounts(expense,['posted_total_kgs','non_stock_obligations_candidate_kgs',
+    'stock_overlap_review_kgs','matching_supplier_invoice_kgs'],'owner.accrual.expenses');
+  counts(expense,['posted_count','matching_supplier_invoice_count'],'owner.accrual.expenses');
+  if(!['CLASSIFICATION_REQUIRED','POSTED_NOT_RECOGNIZED'].includes(String(expense.status)))
+    invalid('owner.accrual.expense.classification');
+  const categories=obj(expense.categories_kgs,'owner.accrual.categories');
+  amounts(categories,['SUPPLIES','UTILITIES','PAYROLL','MAINTENANCE','RENT',
+    'MARKETING','OTHER'],'owner.accrual.categories');
+  const costs=obj(r.kitchen_cost_movements,'owner.accrual.cost');
+  amounts(costs,['production_cost_candidate_kgs','loss_cost_candidate_kgs',
+    'receipt_inventory_inflow_kgs','supplier_return_inventory_debit_kgs',
+    'sample_movement_gross_kgs'],'owner.accrual.cost');
+  if(costs.costs_are_reconciled_to_revenue!==false)
+    invalid('owner.accrual.cost.not_reconciled');
+  const sales=obj(r.revenue_source_candidates,'owner.accrual.sales');
+  amounts(sales,['served_dining_face_value_kgs','served_without_linked_folio_kgs',
+    'served_with_active_folio_kgs','manual_folio_face_value_kgs',
+    'checked_out_booked_total_kgs'],'owner.accrual.sales');
+  counts(sales,['served_dining_orders_count','served_without_linked_folio_count',
+    'served_with_active_folio_count','disputed_dining_folio_count',
+    'manual_folio_active_count','manual_folio_without_service_date_count',
+    'checked_out_reservations_count'],'owner.accrual.sales');
+  if(sales.amounts_are_not_additive_or_recognized!==true)
+    invalid('owner.accrual.sales.not_recognized');
+  const stock=obj(r.source_valuation,'owner.accrual.valuation');
+  counts(stock,['source_mismatch_count'],'owner.accrual.valuation');
+  amounts(stock,['supplier_return_credit_minus_stock_cost_kgs',
+    'supplier_payables_outstanding_kgs'],'owner.accrual.valuation',
+    ['supplier_return_credit_minus_stock_cost_kgs','supplier_payables_outstanding_kgs']);
+  if(!['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(stock.inventory_valuation_status)))
+    invalid('owner.accrual.valuation.status');
+  const truth=obj(r.recognition,'owner.accrual.recognition');
+  if(truth.status!=='REQUIRES_APPROVED_RECOGNITION_LEDGER'||
+     truth.recognized_revenue_kgs!==null||truth.recognized_expenses_kgs!==null||
+     truth.recognized_profit_kgs!==null||truth.completeness_verified!==false||
+     truth.customer_payments_are_revenue!==false||
+     truth.supplier_settlements_are_expenses!==false||
+     truth.receipts_are_expenses!==false||
+     truth.source_candidates_are_recognized!==false)
+    invalid('owner.accrual.recognition.truth');
+  const blockers=arr(truth.blockers,'owner.accrual.blockers');
+  if(!blockers.length||blockers.some(b=>typeof b!=='string'||!b))
+    invalid('owner.accrual.blockers.incomplete');
+}
+
 export function financeSummaryResponse(v:unknown):FinanceSummary {
   const x=obj(v,'finance.summary'),range=obj(x.range,'finance.range');
   str(range.from,'finance.from');str(range.to,'finance.to');str(range.currency,'finance.currency');
@@ -97,6 +158,8 @@ export function financeSummaryResponse(v:unknown):FinanceSummary {
     str(row.id,'finance.recent.id');str(row.method,'finance.recent.method');
     str(row.status,'finance.recent.status');nonnegative(row.amount_kgs,'finance.recent.amount');
   });
+  if(x.owner_accrual_readiness_snapshot!==undefined)
+    verifyOwnerAccrualReadiness(x.owner_accrual_readiness_snapshot);
   return v as FinanceSummary;
 }
 export function gridResponse(v:unknown):Grid {
