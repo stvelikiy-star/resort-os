@@ -1,5 +1,5 @@
 const CACHE = "marina-smart-staff-fl2-approved-brand-v2";
-const SHELL = ["/", "/manifest.webmanifest", "/marina-smart-approved.png"];
+const SHELL = ["/", "/manifest.webmanifest", "/marina-smart-approved.png", "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()));
