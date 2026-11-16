@@ -41,7 +41,7 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
   const { c, name } = useTheme();
   const router = useRouter();
   const { width, fontScale } = useWindowDimensions();
-  const compact = width < 350 || fontScale > 1.3;
+  const compact = width < 390 || fontScale > 1.3;
   const count = (n: number) => Number.isFinite(n) && n >= 0 ? String(Math.round(n)) : '—';
   const currency = (n: number) => Number.isFinite(n) && n >= 0
     ? Math.round(n).toLocaleString('ru-RU') + ' KGS' : '—';
@@ -49,23 +49,23 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
   const metric = (icon: LucideIcon, title: string, value: string, tint: string, action?: () => void) => {
     const Icon = icon;
     return <GlassCard key={title} onPress={action} style={{
-      flex: 1, flexBasis: compact ? '100%' : '46%', minWidth: 0, minHeight: compact ? 112 : 136, padding: compact ? 12 : 14,
-      gap: 8, justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: tint,
+      flex: 1, flexBasis: '46%', minWidth: 0, minHeight: compact ? 104 : 136, padding: compact ? 10 : 14,
+      gap: compact ? 5 : 8, justifyContent: 'space-between', borderTopWidth: 2, borderTopColor: tint,
     }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: c.surfaceAlt,
+        <View style={{ width: compact ? 30 : 36, height: compact ? 30 : 36, borderRadius: 11, backgroundColor: c.surfaceAlt,
           alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={20} color={tint} strokeWidth={2}/>
+          <Icon size={compact ? 18 : 20} color={tint} strokeWidth={2}/>
         </View>
         {action ? <ArrowUpRight color={tint} size={17}/> : null}
       </View>
-      <Text adjustsFontSizeToFit minimumFontScale={0.55} numberOfLines={1}
-        style={[font.metric, { fontSize: compact ? 23 : 27, color: c.text, minWidth: 0 }]}>{value}</Text>
+      <Text adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={value.includes('KGS') ? 2 : 1}
+        style={[font.metric, { fontSize: compact ? (value.includes('KGS') ? 18 : 23) : 27, color: c.text, minWidth: 0, flexShrink: 1 }]}>{value}</Text>
       <Text numberOfLines={2} style={[font.small, { color: c.textMuted, fontWeight: '600', lineHeight: 17 }]}>{title}</Text>
     </GlassCard>;
   };
   const row = (index: number, ...items: React.ReactNode[]) => <StaggerItem index={index}>
-    <View style={{ flexDirection: 'row', flexWrap: compact ? 'wrap' : 'nowrap', alignItems: 'stretch', gap: space.sm }}>{items}</View>
+    <View style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'stretch', gap: space.sm }}>{items}</View>
   </StaggerItem>;
   const canFinance = !showroom && canReadFinance(user);
   const nav = [
@@ -100,21 +100,17 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
         color={c.cyan} trackColor={c.surfaceAlt}/> : null}
     </GlassCard></StaggerItem>
 
-    <StaggerItem index={1}><GlassCard style={{ padding: 15, gap: 12, borderLeftWidth: 3, borderLeftColor: c.cyan }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-        <Text style={[font.h2, { color: c.text, flex: 1 }]}>{copy.roomCondition}</Text>
-        <Text style={[font.small, { color: c.textMuted }]}>{count(data.rooms.total)}</Text>
-      </View>
-      <InventorySpectrum totals={data.rooms} total={data.rooms.total}
-        labels={{ clean: copy.clean, dirty: copy.dirty, inspection: copy.checking, blocked: copy.tech }}/>
-    </GlassCard></StaggerItem>
-
     <View style={{ gap: space.sm }}>
       <SectionLabel>{copy.today} · {data.property.local_date}</SectionLabel>
       {row(2,
         metric(DoorOpen, copy.arrivals, count(data.stays.arrivals_today), c.cyan, canOpen('pms') ? open('/pms') : undefined),
         metric(CalendarClock, copy.departures, count(data.stays.departures_today), c.gold, canOpen('pms') ? open('/pms') : undefined),
       )}
+      {canFinance ? row(5,
+        metric(Wallet, copy.revenue, currency(data.finance.confirmed_payments_today_kgs), c.gold, open('/finance')),
+        metric(ShieldAlert, copy.debt, currency(data.finance.active_reservations_remaining_kgs), c.warning, open('/finance')),
+      ) : null}
+      {canFinance ? <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text> : null}
       {row(3,
         metric(MessageSquareText, copy.needsReply, count(data.communications.needs_reply), c.cyan, canOpenInbox ? open('/inbox') : undefined),
         metric(BedDouble, copy.dirty, count(data.rooms.dirty), c.warning, canOpen('pms') ? open('/pms') : undefined),
@@ -123,12 +119,16 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
         metric(ClipboardCheck, copy.housekeepingOverview, count(data.tasks.housekeeping_active), c.success, canOpen('tasks') ? open('/tasks') : undefined),
         metric(Wrench, copy.maintenanceOverview, count(data.tasks.maintenance_active), c.warning, canOpen('tasks') ? open('/tasks') : undefined),
       )}
-      {canFinance ? row(5,
-        metric(Wallet, copy.revenue, currency(data.finance.confirmed_payments_today_kgs), c.gold, open('/finance')),
-        metric(ShieldAlert, copy.debt, currency(data.finance.active_reservations_remaining_kgs), c.warning, open('/finance')),
-      ) : null}
-      {canFinance ? <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text> : null}
     </View>
+
+    <StaggerItem index={1}><GlassCard style={{ padding: 15, gap: 12, borderLeftWidth: 3, borderLeftColor: c.cyan }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+        <Text style={[font.h2, { color: c.text, flex: 1 }]}>{copy.roomCondition}</Text>
+        <Text style={[font.small, { color: c.textMuted }]}>{count(data.rooms.total)}</Text>
+      </View>
+      <InventorySpectrum totals={data.rooms} total={data.rooms.total}
+        labels={{ clean: copy.clean, dirty: copy.dirty, inspection: copy.checking, blocked: copy.tech }}/>
+    </GlassCard></StaggerItem>
 
     <StaggerItem index={6}><View style={{ gap: space.sm }}>
       <SectionLabel>{copy.available}</SectionLabel>
