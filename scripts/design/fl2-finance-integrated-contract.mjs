@@ -18,7 +18,7 @@ const approvedBlobs = {
 };
 for(const [path,expected] of Object.entries(approvedBlobs)) {
   const contents=fs.readFileSync(path);
-  const sha=createHash('sha1').update(Buffer.from(`blob ${contents.length}\\0`)).update(contents).digest('hex');
+  const sha=createHash('sha1').update(Buffer.from('blob '+contents.length+String.fromCharCode(0))).update(contents).digest('hex');
   assert.equal(sha,expected,`Brand asset changed unexpectedly: ${path}`);
 }
 has('apps/mobile/src/theme/moduleIcons.ts',['store: Package','overview: LayoutDashboard','reception: ConciergeBell']);
