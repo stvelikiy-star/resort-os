@@ -12,6 +12,7 @@ on:
       - 'services/api/app/owner_kitchen_management.py'
       - 'services/api/app/owner_kitchen_reconciliation.py'
       - 'services/api/app/owner_accrual_readiness.py'
+      - 'services/api/app/owner_delivered_revenue.py'
       - 'services/api/app/owner_expenses.py'
       - 'services/api/app/owner_supplier_documents.py'
       - 'services/api/app/owner_supplier_returns.py'
@@ -26,6 +27,8 @@ on:
       - 'scripts/test_marina_owner_finance_roles.py'
       - 'scripts/test_marina_owner_inventory_reconciliation.py'
       - 'scripts/test_owner_accrual_readiness.py'
+      - 'scripts/test_owner_delivered_revenue.py'
+      - 'scripts/verify_owner_delivered_revenue_e2e.py'
       - 'services/api/app/staff_task_reports.py'
       - 'scripts/verify_mobile_staff_reports_e2e.py'
       - 'scripts/verify_mobile_menu_publication_e2e.py'
@@ -142,6 +145,9 @@ jobs:
 
       - name: Test OWNER accrual-readiness classification and no fabricated profit
         run: PYTHONPATH=. python scripts/test_owner_accrual_readiness.py
+
+      - name: Test nightly revenue candidate allocation and folio source dedup
+        run: PYTHONPATH=. python scripts/test_owner_delivered_revenue.py
 
       - name: Test cook draft authoring and management authority
         run: PYTHONPATH=. python scripts/test_kitchen_draft_authoring.py
@@ -273,6 +279,11 @@ jobs:
         env:
           ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
         run: python scripts/verify_owner_expenses_e2e.py
+
+      - name: Verify delivered stay nights and served folio sources PostgreSQL E2E
+        env:
+          ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
+        run: python scripts/verify_owner_delivered_revenue_e2e.py
 
       - name: Verify supplier invoice receipts and manual payable settlements PostgreSQL E2E
         env:
