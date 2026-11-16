@@ -173,6 +173,8 @@ async def main():
             print("OWNER_ACCOUNTING_JOURNAL_PG_E2E_PASS: roles, immutable SQL, balance,"
                   " 8-way replay, 409, tenant source, no Payment or posted P&L")
 
+    finally:
+        await db.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
