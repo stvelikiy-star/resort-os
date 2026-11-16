@@ -242,7 +242,8 @@ async def reverse_source(approval_id:uuid.UUID,body:SourceReversal,
                    VALUES ($1,$2,$3,$4,$5,'REVERSE_SOURCE',$6,$7::jsonb,$8,$9,$10)
                    RETURNING *''',body.id,pid,approved["sourceType"],
                 approved["sourceId"],approved["serviceDate"],
-                approved["faceValueKgs"],json.dumps(approved["sourceSnapshot"]),
+                approved["faceValueKgs"],(approved["sourceSnapshot"] if isinstance(approved["sourceSnapshot"],str)
+                 else json.dumps(approved["sourceSnapshot"])),
                 approval_id,body.reason,owner_id)
             return event_view(row)
 
