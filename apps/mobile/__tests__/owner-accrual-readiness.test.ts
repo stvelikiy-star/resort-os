@@ -1,6 +1,37 @@
 import {financeSummaryResponse,verifyOwnerAccrualReadiness} from '../src/api/contractValidation';
 
+const delivered={
+ scope:'OWNER_ONLY_PROPERTY_SCOPED',
+ period:{from:'2026-11-16',to:'2026-11-16',timezone:'Asia/Bishkek',currency:'KGS'},
+ accommodation:{
+  qualified_reservations:1,delivered_booked_nights_count:1,
+  allocated_booking_face_value_kgs:'334',
+  night_preview_limit:500,night_preview_truncated:false,
+  night_preview:[{reservation_id:'abc',service_date:'2026-11-16',
+    allocated_booking_face_value_kgs:'334'}],
+  excluded_reservations_count:0,exclusion_reasons:{},
+  qualified_source:'CHECKED_OUT_RESERVATION_WITH_MATCHED_ACTUAL_STAY',
+  rate_quality:'BOOKING_TOTAL_DISTRIBUTED_EVENLY_NOT_APPROVED_NIGHTLY_RATE',
+ },
+ dining:{
+  served_orders_count:1,served_orders_face_value_kgs:'350',
+  served_with_matching_folio_count:1,
+  single_source_folio_linked_candidate_kgs:'350',
+  excluded_orders_count:0,exclusion_reasons:{},
+  non_dining_active_folio_charges:0,non_dining_folio_face_value_kgs:'0',
+  non_dining_undated_folio_count:0,kitchen_and_folio_double_counted:false,
+ },
+ recognition:{
+  recognized_lodging_revenue_kgs:null,recognized_dining_revenue_kgs:null,
+  recognized_other_services_revenue_kgs:null,recognized_total_revenue_kgs:null,
+  status:'SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS',
+  requires_rate_package_tax_discount_and_refund_reconciliation:true,
+  requires_approved_immutable_revenue_journal:true,
+  cash_received_as_revenue:false,automatic_posting:false,
+ },
+};
 const accrual={
+ delivered_revenue_sources:delivered,
  scope:'OWNER_ONLY_PROPERTY_SCOPED',
  period:{from:'2026-11-16',to:'2026-11-16',timezone:'Asia/Bishkek',currency:'KGS'},
  posted_owner_obligations:{
@@ -64,6 +95,12 @@ test('fail closed: fabricated recognized profit, double-counting, invalid blocke
   {...accrual,recognition:{...accrual.recognition,completeness_verified:true}},
   {...accrual,recognition:{...accrual.recognition,customer_payments_are_revenue:true}},
   {...accrual,recognition:{...accrual.recognition,source_candidates_are_recognized:true}},
+  {...accrual,delivered_revenue_sources:{...delivered,recognition:{
+    ...delivered.recognition,recognized_total_revenue_kgs:'684.0000'}}},
+  {...accrual,delivered_revenue_sources:{...delivered,dining:{
+    ...delivered.dining,kitchen_and_folio_double_counted:true}}},
+  {...accrual,delivered_revenue_sources:{...delivered,accommodation:{
+    ...delivered.accommodation,allocated_booking_face_value_kgs:'-334'}}},
   {...accrual,revenue_source_candidates:{...accrual.revenue_source_candidates,amounts_are_not_additive_or_recognized:false}},
   {...accrual,kitchen_cost_movements:{...accrual.kitchen_cost_movements,receipt_inventory_inflow_kgs:'not-money'}},
   {...accrual,posted_owner_obligations:{...accrual.posted_owner_obligations,non_stock_obligations_candidate_kgs:'-100.0000'}},
