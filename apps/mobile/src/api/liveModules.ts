@@ -143,7 +143,7 @@ export interface OwnerDeliveredRevenueSources {
     qualified_reservations:number;delivered_booked_nights_count:number;
     allocated_booking_face_value_kgs:string;night_preview_limit:number;
     night_preview_truncated:boolean;
-    night_preview:Array<{reservation_id:string;service_date:string;allocated_booking_face_value_kgs:string}>;
+    night_preview:{reservation_id:string;service_date:string;allocated_booking_face_value_kgs:string}[];
     excluded_reservations_count:number;
     exclusion_reasons:Record<string,number>;
     qualified_source:'CHECKED_OUT_RESERVATION_WITH_MATCHED_ACTUAL_STAY';
