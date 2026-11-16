@@ -77,6 +77,25 @@ type FinanceResponse = {
   /** Present for OWNER only; never returned by Core to MANAGER. */
   /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
   owner_accrual_readiness_snapshot?: {
+    delivered_revenue_sources:{
+      accommodation:{
+        qualified_reservations:number;
+        delivered_booked_nights_count:number;
+        allocated_booking_face_value_kgs:string;
+        excluded_reservations_count:number;
+      };
+      dining:{
+        served_orders_count:number;
+        single_source_folio_linked_candidate_kgs:string;
+        excluded_orders_count:number;
+      };
+      recognition:{
+        recognized_total_revenue_kgs:null;
+        status:'SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS';
+        cash_received_as_revenue:false;
+        automatic_posting:false;
+      };
+    };
     posted_owner_obligations:{
       posted_total_kgs:string;
       non_stock_obligations_candidate_kgs:string;
@@ -311,6 +330,12 @@ export default function HotelFinanceBoard() {
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_dining_face_value_kgs)}</strong></div>
               <div><span>Брони после выезда (не выручка)</span>
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.checked_out_booked_total_kgs)}</strong></div>
+              <div><span>Подтверждённые ночи проживания (оценка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.allocated_booking_face_value_kgs)}</strong>
+                <small>{data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.delivered_booked_nights_count} ночей; {data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.excluded_reservations_count} броней требуют сверки</small></div>
+              <div><span>Обслуженные ресторанные заказы со сверенным folio</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.single_source_folio_linked_candidate_kgs)}</strong>
+                <small>{data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.excluded_orders_count} заказов требуют сверки; folio не суммируется повторно</small></div>
             </div>
             <p className="finance-footnote">Прибыль недоступна: нет принятого журнала признания доходов и всех затрат.</p>
           </article>
