@@ -72,11 +72,19 @@ export function verifyOwnerAccrualReadiness(v:unknown):void {
   if(!['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(stock.inventory_valuation_status)))
     invalid('owner.accrual.valuation.status');
   const corrections=obj(r.documented_source_corrections,'owner.accrual.corrections');
-  counts(corrections,['recorded_corrections_count','reversed_corrections_count'],
+  counts(corrections,['recorded_corrections_count','reversed_corrections_count',
+    'server_verified_document_bytes_count','missing_document_bytes_count'],
     'owner.accrual.corrections');
   if((corrections.reversed_corrections_count as number)>
        (corrections.recorded_corrections_count as number)||
      corrections.metadata_only_documents_not_independently_verified!==true||
+     corrections.document_issuer_authenticity_independently_verified!==false||
+     typeof corrections.all_recorded_document_bytes_available!=='boolean'||
+     (corrections.all_recorded_document_bytes_available as boolean)!==
+       (corrections.missing_document_bytes_count===0)||
+     (corrections.server_verified_document_bytes_count as number)+
+       (corrections.missing_document_bytes_count as number)!==
+       (corrections.recorded_corrections_count as number)||
      corrections.refunds_are_cash_evidence_not_recognized_revenue!==true||
      corrections.tax_and_packages_are_classifications_not_expenses!==true||
      corrections.recognized_revenue_kgs!==null||
