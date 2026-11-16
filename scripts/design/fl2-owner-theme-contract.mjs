@@ -11,7 +11,7 @@ for(const name of ['OwnerExecutivePack','OwnerOperationsPerformance','OwnerOccup
 // adds precisely one presentation import. No auth, RBAC or navigation code may drift.
 const shellPath='apps/admin/components/AdminShell.tsx';
 const shell=read(shellPath);
-const appearanceImport='import FutureLuxuryAppearance from "./FutureLuxuryAppearance";\\n';
+const appearanceImport='import FutureLuxuryAppearance from "./FutureLuxuryAppearance";\n';
 assert.ok(shell.includes(appearanceImport),'FL2 appearance integration import must be present');
 assert.equal(shell.replace(appearanceImport,''),original(shellPath),'AdminShell: unexpected non-appearance source change');
 const control='apps/admin/components/OwnerControlV2.tsx';
