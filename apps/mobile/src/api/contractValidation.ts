@@ -71,6 +71,50 @@ export function verifyOwnerAccrualReadiness(v:unknown):void {
     ['supplier_return_credit_minus_stock_cost_kgs','supplier_payables_outstanding_kgs']);
   if(!['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(stock.inventory_valuation_status)))
     invalid('owner.accrual.valuation.status');
+  const delivered=obj(r.delivered_revenue_sources,'owner.accrual.delivered');
+  if(delivered.scope!=='OWNER_ONLY_PROPERTY_SCOPED')
+    invalid('owner.accrual.delivery.scope');
+  const lodging=obj(delivered.accommodation,'owner.accrual.delivery.lodging');
+  counts(lodging,['qualified_reservations','delivered_booked_nights_count',
+    'night_preview_limit','excluded_reservations_count'],'owner.accrual.delivery.lodging');
+  amounts(lodging,['allocated_booking_face_value_kgs'],'owner.accrual.delivery.lodging');
+  if(lodging.night_preview_truncated!==true&&lodging.night_preview_truncated!==false)
+    invalid('owner.accrual.delivery.truncated');
+  if(lodging.qualified_source!=='CHECKED_OUT_RESERVATION_WITH_MATCHED_ACTUAL_STAY'||
+     lodging.rate_quality!=='BOOKING_TOTAL_DISTRIBUTED_EVENLY_NOT_APPROVED_NIGHTLY_RATE')
+    invalid('owner.accrual.delivery.rate');
+  const nights=arr(lodging.night_preview,'owner.accrual.delivery.nights');
+  if(nights.length>(lodging.night_preview_limit as number))
+    invalid('owner.accrual.delivery.preview');
+  nights.forEach((entry,i)=>{
+    const item=obj(entry,'owner.accrual.delivery.night'+i);
+    str(item.reservation_id,'owner.accrual.delivery.id');
+    str(item.service_date,'owner.accrual.delivery.date');
+    if(!amountOk(item.allocated_booking_face_value_kgs))
+      invalid('owner.accrual.delivery.night.cost');
+  });
+  const dining=obj(delivered.dining,'owner.accrual.delivery.dining');
+  counts(dining,['served_orders_count','served_with_matching_folio_count',
+    'excluded_orders_count','non_dining_active_folio_charges',
+    'non_dining_undated_folio_count'],'owner.accrual.delivery.dining');
+  amounts(dining,['served_orders_face_value_kgs',
+    'single_source_folio_linked_candidate_kgs',
+    'non_dining_folio_face_value_kgs'],'owner.accrual.delivery.dining');
+  if(dining.kitchen_and_folio_double_counted!==false||
+     (dining.served_with_matching_folio_count as number)>
+       (dining.served_orders_count as number))
+    invalid('owner.accrual.delivery.duplicate');
+  const recognition=obj(delivered.recognition,'owner.accrual.delivery.recognition');
+  if(recognition.recognized_lodging_revenue_kgs!==null||
+     recognition.recognized_dining_revenue_kgs!==null||
+     recognition.recognized_other_services_revenue_kgs!==null||
+     recognition.recognized_total_revenue_kgs!==null||
+     recognition.status!=='SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS'||
+     recognition.requires_rate_package_tax_discount_and_refund_reconciliation!==true||
+     recognition.requires_approved_immutable_revenue_journal!==true||
+     recognition.cash_received_as_revenue!==false||
+     recognition.automatic_posting!==false)
+    invalid('owner.accrual.delivery.unrecognized');
   const truth=obj(r.recognition,'owner.accrual.recognition');
   if(truth.status!=='REQUIRES_APPROVED_RECOGNITION_LEDGER'||
      truth.recognized_revenue_kgs!==null||truth.recognized_expenses_kgs!==null||
