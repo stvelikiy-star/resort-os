@@ -58,7 +58,9 @@ const KITCHEN_REPORT_COPY={
 } as const;
 
 const ACCRUAL_READINESS_COPY={
- ru:{title:'OWNER · сверка доходов и расходов',
+ ru:{
+  delivered:'Проживание по фактическим ночам (оценка)',deliveredCount:'Подтверждённые ночи',deliveredExcluded:'Брони, требующие сверки',folioLinked:'Обслуженные заказы со сверенным folio',folioExcluded:'Заказы, требующие сверки',deliveredNotice:'Оценка проживания распределена по фактическим ночам. Пакеты услуг, скидки, налоги и возвраты ещё не сверены.',
+  title:'OWNER · сверка доходов и расходов',
   posted:'Проведённые обязательства',nonstock:'Расходы к классификации (не склад)',
   stockreview:'Расходы с риском дублирования склада',
   kitchen:'Кухня — стоимость приготовления',loss:'Порча и потери по движениям',
@@ -66,7 +68,9 @@ const ACCRUAL_READINESS_COPY={
   lodging:'Выехавшие брони — стоимость проживания (не выручка)',
   missing:'Заказы без связанной записи folio',
   status:'Признанная прибыль недоступна',notice:'Это показатели для сверки, не отчёт о прибыли. Платежи, накладные, продажи и расходы не складываются автоматически.'},
- kg:{title:'ЭЭСИ · киреше жана чыгаша салыштыруусу',
+ kg:{
+  delivered:'Чыныгы түндөр боюнча жашоо баасы (болжол)',deliveredCount:'Ырасталган түндөр',deliveredExcluded:'Текшерүүнү талап кылган брондор',folioLinked:'Folio менен салыштырылган заказдар',folioExcluded:'Текшерүүнү талап кылган заказдар',deliveredNotice:'Жашоо баасы чыныгы түндөр боюнча бөлүндү. Пакеттер, арзандатуулар, салыктар жана кайтаруулар текшериле элек.',
+  title:'ЭЭСИ · киреше жана чыгаша салыштыруусу',
   posted:'Катталган милдеттенмелер',nonstock:'Кампага кирбеген чыгаша талапкерлери',
   stockreview:'Кампа менен кош эсептелүү коркунучу',
   kitchen:'Ашкана — даярдоонун наркы',loss:'Жоготуу жана бузулуу',
@@ -74,7 +78,9 @@ const ACCRUAL_READINESS_COPY={
   lodging:'Чыккан коноктордун брондору — баа (киреше эмес)',
   missing:'Folio жазуусу жок буйрутмалар',
   status:'Таанылган пайда жеткиликсиз',notice:'Бул пайда эмес, салыштыруу үчүн маалымат. Төлөмдөр, накладнойлор жана чыгашалар автоматтык кошулбайт.'},
- en:{title:'OWNER · revenue and expense reconciliation',
+ en:{
+  delivered:'Lodging by delivered night (candidate)',deliveredCount:'Verified nights',deliveredExcluded:'Bookings requiring review',folioLinked:'Served orders matched to folio',folioExcluded:'Orders requiring review',deliveredNotice:'Booked value is allocated by verified stay nights. Packages, discounts, tax and refunds remain unverified.',
+  title:'OWNER · revenue and expense reconciliation',
   posted:'Posted obligations',nonstock:'Non-stock expense candidates',
   stockreview:'Expense amounts requiring stock-overlap review',
   kitchen:'Kitchen production carrying cost',loss:'Spoilage and waste movement cost',
@@ -83,7 +89,9 @@ const ACCRUAL_READINESS_COPY={
   missing:'Served orders with no linked folio',
   status:'Recognized profit unavailable',
   notice:'Operational candidates only, not a profit report. Payments, supplier invoices, sales and expenses must not be added automatically.'},
- kz:{title:'ИЕСІ · табыс пен шығынды салыстыру',
+ kz:{
+  delivered:'Нақты түндер бойынша тұру құны (бағалау)',deliveredCount:'Расталған түндер',deliveredExcluded:'Тексеруді қажет ететін броньдар',folioLinked:'Folio-мен сәйкес берілген тапсырыстар',folioExcluded:'Тексеруді қажет ететін тапсырыстар',deliveredNotice:'Тұру құны расталған түндерге бөлінді. Пакеттер, жеңілдіктер, салық және қайтарым тексерілмеген.',
+  title:'ИЕСІ · табыс пен шығынды салыстыру',
   posted:'Тіркелген міндеттемелер',nonstock:'Қоймадан тыс шығын үміткерлері',
   stockreview:'Қоймамен қайталану қаупі бар шығындар',
   kitchen:'Асхана — дайындау құны',loss:'Бүліну мен шығын құны',
@@ -290,6 +298,17 @@ export default function Finance() {
             data.owner_accrual_readiness_snapshot.revenue_source_candidates.checked_out_booked_total_kgs+' '+data.range.currency)}
           {line(accrualCopy.missing,
             String(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_without_linked_folio_count))}
+          {line(accrualCopy.delivered,
+            data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.allocated_booking_face_value_kgs+' '+data.range.currency)}
+          {line(accrualCopy.deliveredCount,
+            String(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.delivered_booked_nights_count))}
+          {line(accrualCopy.deliveredExcluded,
+            String(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.excluded_reservations_count))}
+          {line(accrualCopy.folioLinked,
+            data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.single_source_folio_linked_candidate_kgs+' '+data.range.currency)}
+          {line(accrualCopy.folioExcluded,
+            String(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.excluded_orders_count))}
+          <Text style={[font.small,{color:c.textMuted}]}>{accrualCopy.deliveredNotice}</Text>
           <Text style={[font.body,{color:c.warning,fontWeight:'700'}]}>{accrualCopy.status}</Text>
           <Text style={[font.small,{color:c.textMuted}]}>{accrualCopy.notice}</Text>
         </GlassCard>
