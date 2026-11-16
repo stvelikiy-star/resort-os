@@ -212,7 +212,8 @@ async def reverse_source(approval_id:uuid.UUID,body:SourceReversal,
             pid=await trusted_property_id(conn,user)
             owner_id=uuid.UUID(str(user["id"]))
             await lock_keys(conn,"revenue-event:"+str(body.id),
-                            "revenue-reversal:"+str(approval_id))
+                            "revenue-reversal:"+str(approval_id),
+                            "revenue-approval:"+str(pid)+":"+str(approval_id))
             prior=await conn.fetchrow(
                 'SELECT * FROM owner_revenue_source_events WHERE id=$1',body.id)
             if prior:
