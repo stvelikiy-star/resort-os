@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { FL2_OWNER_PATTERNS, FL2_OWNER_PHRASES } from "./fl2OwnerPhrases";
 
 type Locale = "ru" | "kg" | "kz" | "en";
 
@@ -2327,7 +2328,12 @@ for (const [key, phrase] of Object.entries(exact)) {
   phraseIndex.set(phrase.kg, phrase);
   phraseIndex.set(phrase.en, phrase);
 }
-
+// Preserve existing exact/domain translations; only fill untranslated OWNER UI copy.
+for (const phrase of FL2_OWNER_PHRASES) {
+  if (!phraseIndex.has(phrase.ru)) phraseIndex.set(phrase.ru, phrase);
+  if (!phraseIndex.has(phrase.kg)) phraseIndex.set(phrase.kg, phrase);
+  if (!phraseIndex.has(phrase.en)) phraseIndex.set(phrase.en, phrase);
+}
 
 type DynamicFragment = { ru: string; kg: string; kz: string; en: string };
 const DYNAMIC_FRAGMENTS: DynamicFragment[] = [
@@ -3263,6 +3269,9 @@ const tokenReplacements: Record<Locale, Array<[RegExp, string]>> = {
     [/\bОБЫЧНЫЙ\b/g, "NORMAL"],
   ],
 };
+
+tokenReplacements.kg.push(...FL2_OWNER_PATTERNS.kg);
+tokenReplacements.en.push(...FL2_OWNER_PATTERNS.en);
 
 function translateText(source: string, locale: Locale): string {
   const trimmed = source.trim();
