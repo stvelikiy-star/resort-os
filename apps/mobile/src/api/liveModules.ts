@@ -168,6 +168,16 @@ export interface OwnerDeliveredRevenueSources {
   };
 }
 export interface OwnerAccrualReadiness {
+  source_approval_journal:{
+    approval_events_count:number;
+    reversal_events_count:number;
+    active_room_nights_count:number;
+    active_served_dining_count:number;
+    active_source_face_value_kgs:string;
+    status:'SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION';
+    recognized_revenue_kgs:null;
+    recognized_profit_kgs:null;
+  };
   delivered_revenue_sources:OwnerDeliveredRevenueSources;
   scope:'OWNER_ONLY_PROPERTY_SCOPED';
   period:{from:string;to:string;timezone:string;currency:'KGS'};
