@@ -5,6 +5,8 @@ PostgreSQL service is destroyed: the immutable event must never reference a
 deleted synthetic stay/order. Never run against real hotel or production.
 """
 import asyncio
+import base64
+import hashlib
 import os
 import uuid
 from datetime import timedelta
@@ -179,7 +181,55 @@ async def main():
             # Append documented corrections to the still-active SECOND night;
             # no Revenue/Payment creation, and source evidence remains immutable.
             correction_url='/api/v1/admin/finance/owner/revenue-corrections'
-            proof='a'*64
+            evidence_url='/api/v1/admin/finance/owner/revenue-evidence'
+
+            async def upload_verified(label,reference):
+                # Valid synthetic PDF prefix, unique bytes and actual digest.
+                raw=(b'%PDF-1.4\\n1 0 obj\\n<< /Type /Catalog >>\\nendobj\\n'
+                     +label.encode('ascii')+b'\\n%%EOF\\n')
+                digest=hashlib.sha256(raw).hexdigest()
+                document_id=uuid.uuid4()
+                body={'id':str(document_id),'document_reference':reference,
+                      'document_date':today.isoformat(),'file_name':'source.pdf',
+                      'media_type':'application/pdf','sha256':digest,
+                      'content_base64':base64.b64encode(raw).decode('ascii')}
+                accept(await owner.post(evidence_url,json=body),201,'document upload')
+                return document_id,digest,raw,body
+
+            base_doc_id,proof,raw_pdf,uploaded=await upload_verified(
+                'discount-'+marker,'DISCOUNT-'+marker)
+            deny=await cook.post(evidence_url,json=uploaded)
+            accept(deny,403,'cook cannot upload financial document')
+            downloaded=await owner.get(evidence_url+'/'+str(base_doc_id)+'/content')
+            assert downloaded.status_code==200 and downloaded.content==raw_pdf
+            assert downloaded.headers['x-document-sha256']==proof
+            assert downloaded.headers['cache-control']=='private, no-store'
+            accept(await cook.get(evidence_url+'/'+str(base_doc_id)+'/content'),
+                   403,'cook cannot read primary document')
+            accept(await owner.post(evidence_url,json={
+                **uploaded,'sha256':'0'*64}),409,'uploaded bytes mismatch')
+            accept(await owner.post(evidence_url,json={
+                **uploaded,'media_type':'image/png'}),422,'incorrect media signature')
+            accept(await owner.post(evidence_url,json={
+                **uploaded,'content_base64':'!!!'}),422,'invalid base64')
+            accept(await owner.post(evidence_url,json={
+                **uploaded,'file_name':'changed.pdf'}),409,'changed document UUID')
+            accept(await owner.post(evidence_url,json=uploaded),201,
+                   'same source document ID replay')
+            try:
+                await db.execute(
+                    'UPDATE owner_revenue_evidence_documents SET "fileName"=$1 '
+                    'WHERE id=$2','tampered.pdf',base_doc_id)
+                raise AssertionError('Immutable document update must fail')
+            except asyncpg.PostgresError as exc:
+                assert 'OWNER_REVENUE_EVIDENCE_IMMUTABLE' in str(exc)
+            try:
+                await db.execute(
+                    'DELETE FROM owner_revenue_evidence_documents WHERE id=$1',
+                    base_doc_id)
+                raise AssertionError('Immutable document delete must fail')
+            except asyncpg.PostgresError as exc:
+                assert 'OWNER_REVENUE_EVIDENCE_IMMUTABLE' in str(exc)
             base_correction={
                 'approval_id':second['id'],
                 'kind':'DISCOUNT',
@@ -188,6 +238,7 @@ async def main():
                 'document_reference':'DISCOUNT-'+marker,
                 'document_date':today.isoformat(),
                 'document_sha256':proof,
+                'evidence_document_id':str(base_doc_id),
                 'evidence_reference':'CI-ONLY-SYNTHETIC-DOCUMENT-'+marker,
                 'reason':'Synthetic documented customer discount under review',
             }
@@ -211,8 +262,12 @@ async def main():
                 **correction,'id':str(uuid.uuid4()),
                 'document_reference':'DIFFERENT-REF-'+marker}),409,
                 'same SHA fingerprint cannot duplicate source correction')
+            over_id,over_hash,_,_=await upload_verified(
+                'overlimit-'+marker,'OVER-LIMIT-'+marker)
             accept(await owner.post(correction_url,json={
                 **correction,'id':str(uuid.uuid4()),
+                'evidence_document_id':str(over_id),
+                'document_sha256':over_hash,
                 'document_reference':'OVER-LIMIT-'+marker,
                 'amount_kgs':'999.0000'}),409,'correction exceeds face')
             accept(await owner.post(correction_url,json={
@@ -232,9 +287,13 @@ async def main():
                 ('CANCELLATION','LODGING','30.0000'),
             ]
             for kind,component,amount in kinds:
+                doc_id,digest,_,_=await upload_verified(
+                    kind.lower()+'-'+marker,kind+'-'+marker)
                 res=accept(await owner.post(correction_url,json={
                     **correction,'id':str(uuid.uuid4()),
                     'kind':kind,'component':component,'amount_kgs':amount,
+                    'evidence_document_id':str(doc_id),
+                    'document_sha256':digest,
                     'document_reference':kind+'-'+marker,
                     'reason':'Synthetic documentary '+kind.lower()+' for review'
                 }),201,kind)
@@ -268,6 +327,10 @@ async def main():
             assert changes['active_by_kind_kgs']['TAX_COMPONENT']=='20.0000'
             assert changes['active_by_kind_kgs']['REFUND']=='10.0000'
             assert changes['metadata_only_documents_not_independently_verified'] is True
+            assert changes['server_verified_document_bytes_count']>=5
+            assert changes['missing_document_bytes_count']==0
+            assert changes['all_recorded_document_bytes_available'] is True
+            assert changes['document_issuer_authenticity_independently_verified'] is False
             assert changes['recognized_revenue_kgs'] is None
             assert summary['recognition']['recognized_profit_kgs'] is None
             list_data=accept(await owner.get(correction_url,params=accrual_period),
