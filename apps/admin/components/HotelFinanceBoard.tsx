@@ -77,6 +77,16 @@ type FinanceResponse = {
   /** Present for OWNER only; never returned by Core to MANAGER. */
   /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
   owner_accrual_readiness_snapshot?: {
+    source_approval_journal:{
+      approval_events_count:number;
+      reversal_events_count:number;
+      active_room_nights_count:number;
+      active_served_dining_count:number;
+      active_source_face_value_kgs:string;
+      status:'SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION';
+      recognized_revenue_kgs:null;
+      recognized_profit_kgs:null;
+    };
     delivered_revenue_sources:{
       accommodation:{
         qualified_reservations:number;
@@ -336,6 +346,14 @@ export default function HotelFinanceBoard() {
               <div><span>Обслуженные ресторанные заказы со сверенным folio</span>
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.single_source_folio_linked_candidate_kgs)}</strong>
                 <small>{data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.excluded_orders_count} заказов требуют сверки; folio не суммируется повторно</small></div>
+              <div><span>Подтверждённые источники (не бухгалтерская выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.source_approval_journal.active_source_face_value_kgs)}</strong>
+                <small>{data.owner_accrual_readiness_snapshot.source_approval_journal.approval_events_count} утверждений; {data.owner_accrual_readiness_snapshot.source_approval_journal.reversal_events_count} отмен</small>
+              </div>
+              <div><span>Действующие подтверждённые источники</span>
+                <strong>{data.owner_accrual_readiness_snapshot.source_approval_journal.active_room_nights_count} ночей · {data.owner_accrual_readiness_snapshot.source_approval_journal.active_served_dining_count} заказов</strong>
+                <small>Это журнал подтверждений, а не проводки признанной выручки.</small></div>
+
             </div>
             <p className="finance-footnote">Прибыль недоступна: нет принятого журнала признания доходов и всех затрат.</p>
           </article>
