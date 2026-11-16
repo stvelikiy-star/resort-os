@@ -58,8 +58,13 @@ DECLARE
   debit_total numeric(24,4);
   credit_total numeric(24,4);
 BEGIN
-  target_id := CASE WHEN TG_TABLE_NAME = 'owner_accounting_journal_proposals'
-                    THEN NEW.id ELSE NEW."proposalId" END;
+  -- Each trigger has its own row type. A CASE expression resolves both
+  -- fields eagerly on the header row; use PL/pgSQL IF instead.
+  IF TG_TABLE_NAME = 'owner_accounting_journal_proposals' THEN
+    target_id := NEW.id;
+  ELSE
+    target_id := NEW."proposalId";
+  END IF;
   SELECT COUNT(*)::integer,
          COALESCE(SUM("amountKgs") FILTER (WHERE side='DEBIT'),0),
          COALESCE(SUM("amountKgs") FILTER (WHERE side='CREDIT'),0)
