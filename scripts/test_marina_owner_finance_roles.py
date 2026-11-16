@@ -6,13 +6,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
-from app import auth, owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections
+from app import auth, owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections, owner_revenue_evidence
 
 
 class OwnerFinanceRoles(unittest.TestCase):
     def test_custom_finance_module_cannot_promote_any_other_staff_role(self):
         app = FastAPI()
-        for module in (owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections):
+        for module in (owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections, owner_revenue_evidence):
             app.include_router(module.router)
         user = {'role': '', 'id': '00000000-0000-4000-8000-000000000001',
                 'module_permissions_custom': True, 'module_permissions': ['FINANCE']}
@@ -35,6 +35,7 @@ class OwnerFinanceRoles(unittest.TestCase):
                 ('/supplier-documents', {'id':'00000000-0000-4000-8000-000000000005', 'supplier_name':'Synthetic supplier', 'document_reference':'SYNTHETIC', 'document_date':'2026-11-15', 'lines':[{'id':'00000000-0000-4000-8000-000000000006','stock_item_id':'00000000-0000-4000-8000-000000000007','quantity':'1','unit_cost_kgs':'100'}]}),
                 ('/supplier-documents/00000000-0000-4000-8000-000000000005/settlements', {'id':'00000000-0000-4000-8000-000000000008','amount_kgs':'100','paid_on':'2026-11-15','method':'CASH'}),
                 ('/supplier-returns', {'id':'00000000-0000-4000-8000-000000000010','document_id':'00000000-0000-4000-8000-000000000005','document_line_id':'00000000-0000-4000-8000-000000000006','quantity':'1','credit_reference':'SYNTHETIC-CREDIT','reason':'Synthetic return'}),
+                ('/revenue-evidence', {'id':'00000000-0000-4000-8000-000000000035','document_reference':'SYNTH-DOC','document_date':'2026-11-15','file_name':'test.pdf','media_type':'application/pdf','sha256':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','content_base64':'QUJDRA=='}),
                 ('/revenue-corrections', {'id':'00000000-0000-4000-8000-000000000015','approval_id':'00000000-0000-4000-8000-000000000016','kind':'DISCOUNT','component':'LODGING','amount_kgs':'1.0000','document_reference':'SYNTH-DOC','document_date':'2026-11-15','document_sha256':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','evidence_reference':'CI-ONLY-DOCUMENT','reason':'Synthetic deny scenario'}),
                 ('/revenue-corrections/00000000-0000-4000-8000-000000000015/reverse', {'id':'00000000-0000-4000-8000-000000000017','reason':'Synthetic denied reversal'}),
                 ('/revenue-source-events', {'id':'00000000-0000-4000-8000-000000000010','source_type':'DINING_ORDER','source_id':'00000000-0000-4000-8000-000000000011','service_date':'2026-11-15','reason':'Synthetic approval denied'}),
