@@ -8,6 +8,9 @@ has('apps/staff/app/manifest.ts',['/marina-smart-approved.png','#0B1F2A']);
 assert.ok(!read('apps/staff/app/manifest.ts').includes('/icon.svg'),'Staff PWA must not install the old III logo');
 has('apps/mobile/src/theme/moduleIcons.ts',['store: Package','overview: LayoutDashboard','reception: ConciergeBell']);
 has('apps/mobile/src/roles/registry.ts',["STORE_STAFF: ['store', 'profile']","store: 'DINING'"]);
+// The role registry alone is insufficient: Expo Router must register the actual store screen.
+has('apps/mobile/app/(app)/_layout.tsx',["'kitchen', 'store', 'tasks'", "ORDER.includes(selected as TabKey)", 'mobileTabPlan(workspace.tabs)']);
+has('apps/mobile/app/(app)/store.tsx',['export default']);
 has('apps/mobile/src/components/OwnerExpenses.tsx',['postOwnerExpense','settleOwnerExpense','onCommitted?.()',"cancel:'Жокко чыгаруу'","cancel:'Cancel'"]);
 has('apps/mobile/app/finance.tsx',['ownerKitchenManagement','ownerRecordedCashMovements','onCommitted={refreshFinancialSnapshots}','reloadKitchen()','reloadCash()']);
 has('apps/mobile/src/api/liveModules.ts',['ownerKitchenManagement','ownerRecordedCashMovements','postOwnerExpense','settleOwnerExpense']);
