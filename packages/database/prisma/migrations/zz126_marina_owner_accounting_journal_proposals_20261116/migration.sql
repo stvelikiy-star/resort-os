@@ -47,4 +47,62 @@ CREATE TRIGGER owner_accounting_proposal_lines_append_only
   BEFORE UPDATE OR DELETE ON owner_accounting_journal_proposal_lines
   FOR EACH ROW EXECUTE FUNCTION reject_owner_accounting_journal_mutation();
 
+
+-- Enforce the complete, balanced journal also for direct SQL writes.
+-- DEFERRABLE checks run at transaction commit, after the header and all lines
+-- have been inserted. An empty/partial/unbalanced proposal cannot commit.
+CREATE FUNCTION check_owner_accounting_proposal_balanced() RETURNS trigger AS $
+DECLARE
+  target_id uuid;
+  total_lines integer;
+  debit_total numeric(24,4);
+  credit_total numeric(24,4);
+BEGIN
+  target_id := CASE WHEN TG_TABLE_NAME = 'owner_accounting_journal_proposals'
+                    THEN NEW.id ELSE NEW."proposalId" END;
+  SELECT COUNT(*)::integer,
+         COALESCE(SUM("amountKgs") FILTER (WHERE side='DEBIT'),0),
+         COALESCE(SUM("amountKgs") FILTER (WHERE side='CREDIT'),0)
+    INTO total_lines,debit_total,credit_total
+    FROM owner_accounting_journal_proposal_lines
+   WHERE "proposalId"=target_id;
+  IF total_lines < 2 OR total_lines > 128 OR debit_total<=0
+      OR debit_total<>credit_total THEN
+    RAISE EXCEPTION 'OWNER_ACCOUNTING_PROPOSAL_UNBALANCED'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER owner_accounting_proposal_balance_on_header
+  AFTER INSERT ON owner_accounting_journal_proposals
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION check_owner_accounting_proposal_balanced();
+CREATE CONSTRAINT TRIGGER owner_accounting_proposal_balance_on_line
+  AFTER INSERT ON owner_accounting_journal_proposal_lines
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION check_owner_accounting_proposal_balanced();
+
+-- An immutable proposal cannot gain additional lines in a later transaction.
+-- Its initial header and every initial line must be created atomically.
+CREATE FUNCTION require_owner_accounting_initial_transaction() RETURNS trigger AS $
+DECLARE
+  header_xmin bigint;
+BEGIN
+  SELECT xmin::text::bigint INTO header_xmin
+    FROM owner_accounting_journal_proposals
+   WHERE id=NEW."proposalId" AND "propertyId"=NEW."propertyId";
+  IF header_xmin IS NULL OR header_xmin<>(txid_current() % 4294967296) THEN
+    RAISE EXCEPTION 'OWNER_ACCOUNTING_PROPOSAL_ALREADY_SEALED'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END;
+$ LANGUAGE plpgsql;
+
+CREATE TRIGGER owner_accounting_lines_same_transaction
+  BEFORE INSERT ON owner_accounting_journal_proposal_lines
+  FOR EACH ROW EXECUTE FUNCTION require_owner_accounting_initial_transaction();
+
 -- Explicitly no accounting postings, profit, taxes or statement balances here.
