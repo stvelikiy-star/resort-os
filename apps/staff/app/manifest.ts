@@ -12,8 +12,10 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "ru",
     icons: [
       // Use the exact approved MARINA SMART PNG, shared with Web/Admin/Mobile.
-      // Do not declare it maskable until a safe-zone-compliant branded asset is verified.
-      { src: "/marina-smart-approved.png", type: "image/png", purpose: "any" }
+      // Maskable asset keeps the approved logo within its verified safe zone.
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
     ],
   };
 }
