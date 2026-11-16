@@ -6,13 +6,13 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'services/api'))
-from app import auth, owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections, owner_revenue_evidence
+from app import auth, owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections, owner_revenue_evidence, owner_accounting_journal
 
 
 class OwnerFinanceRoles(unittest.TestCase):
     def test_custom_finance_module_cannot_promote_any_other_staff_role(self):
         app = FastAPI()
-        for module in (owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections, owner_revenue_evidence):
+        for module in (owner_expenses, owner_cash_reconciliation, owner_kitchen_management, owner_supplier_documents, owner_supplier_returns, owner_accrual_readiness, owner_delivered_revenue, owner_revenue_source_journal, owner_revenue_corrections, owner_revenue_evidence, owner_accounting_journal):
             app.include_router(module.router)
         user = {'role': '', 'id': '00000000-0000-4000-8000-000000000001',
                 'module_permissions_custom': True, 'module_permissions': ['FINANCE']}
