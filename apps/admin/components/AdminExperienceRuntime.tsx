@@ -1,4 +1,5 @@
 "use client";
+import { ownerCommandCopy } from "./fl2/owner-command-copy";
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -222,6 +223,7 @@ const KZ_EXACT: Record<string, string> = {
 };
 
 const exact: Record<string, Phrase> = {
+  ...ownerCommandCopy,
   "Подтверждённые ночи проживания (оценка)": { ru: "Подтверждённые ночи проживания (оценка)", kg: "Ырасталган жашоо түндөрү (баа)", kz: "Расталған тұру түндері (бағалау)", en: "Verified accommodation nights (estimate)" },
   "ночей; ": { ru: "ночей; ", kg: "түн; ", kz: "түн; ", en: "nights; " },
   " броней требуют сверки": { ru: " броней требуют сверки", kg: " бронду текшерүү керек", kz: " броньды тексеру қажет", en: " bookings require review" },
@@ -2370,6 +2372,8 @@ common.push(
   { ru: "Сначала возьмите диалог, затем отвечайте.", kg: "Адегенде диалогду өзүңүзгө алыңыз, анан жооп бериңиз.", en: "Claim the conversation before replying." },
   { ru: "Черновик ответа менеджера", kg: "Менеджердин жооп долбоору", en: "Manager's draft reply" },
 );
+
+Object.assign(KZ_EXACT, Object.fromEntries(Object.entries(ownerCommandCopy).map(([key, value]) => [key, value.kz])));
 
 const phraseIndex = new Map<string, Phrase>();
 for (const phrase of common) {

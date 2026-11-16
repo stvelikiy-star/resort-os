@@ -3,6 +3,11 @@ on:
   pull_request:
     paths:
       - 'apps/staff/app/shift-v2.css'
+      - 'apps/staff/components/StaffProductLogo.tsx'
+      - 'apps/staff/components/KitchenEntry.tsx'
+      - 'apps/staff/components/WaiterEntry.tsx'
+      - 'apps/staff/components/StaffShiftV2.tsx'
+      - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'apps/staff/app/layout.tsx'
       - 'apps/staff/app/manifest.ts'
       - 'apps/staff/public/marina-smart*.png'

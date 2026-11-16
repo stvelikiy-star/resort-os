@@ -52,7 +52,15 @@ try{
   await motionPage.goto('http://127.0.0.1:8099/qa-operational?locale=en&theme=dark&role=OWNER');
   await motionPage.getByTestId('procurement-create').waitFor();
   await motionPage.getByTestId('qa-procurement').scrollIntoViewIfNeeded();
-  await motionPage.waitForTimeout(600);await motionContext.close();
+  const product=motionPage.getByRole('button',{name:/Рис.*KG/}).first();
+  await product.scrollIntoViewIfNeeded();
+  const box=await product.boundingBox();assert.ok(box);
+  await motionPage.mouse.move(box.x+box.width/2,box.y+box.height/2);
+  await motionPage.mouse.down();await motionPage.waitForTimeout(180);await motionPage.mouse.up();
+  await motionPage.waitForTimeout(450);
+  const category=motionPage.getByRole('button',{name:'Maintenance',exact:true});
+  await category.scrollIntoViewIfNeeded();await category.click();
+  await motionPage.waitForTimeout(450);await motionContext.close();
   fs.writeFileSync(`${out}/results.json`,JSON.stringify({source:'genuine React Native components exported to Expo Web, synthetic read adapters, writes disabled',sha:process.env.GITHUB_SHA||null,physicalAndroid:false,results},null,2));
   console.log('OPERATIONAL_VISUAL_PASS: 18 locale/theme/width combinations, role isolation, loading/empty/error and browser motion video');
 }finally{await browser.close();server.close();}

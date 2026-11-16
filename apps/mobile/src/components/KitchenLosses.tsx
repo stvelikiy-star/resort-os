@@ -8,22 +8,22 @@ import {ErrorState, GlassCard, LoadingShimmer} from './Future';
 import {Button, Field, SectionLabel} from './ui';
 
 const COPY={
-  ru:{title:'Порча и потери',kindWaste:'Потери',kindSpoilage:'Порча',select:'Выбрать ингредиент',
+  ru:{cancel:'Отмена',title:'Порча и потери',kindWaste:'Потери',kindSpoilage:'Порча',select:'Выбрать ингредиент',
     quantity:'Количество',reason:'Причина списания',save:'Списать со склада',retry:'Повторить ту же операцию',
     confirm:'Подтвердить списание?',done:'Списание сохранено',history:'Последние списания',
     notice:'Себестоимость — не платёж. При ошибке сети повторяйте только ту же операцию.',
     invalid:'Укажите продукт, положительное количество и причину минимум из 3 символов.',empty:'Списаний ещё нет'},
-  kg:{title:'Бузулуу жана жоготуулар',kindWaste:'Жоготуулар',kindSpoilage:'Бузулуу',select:'Азык тандоо',
+  kg:{cancel:'Жокко чыгаруу',title:'Бузулуу жана жоготуулар',kindWaste:'Жоготуулар',kindSpoilage:'Бузулуу',select:'Азык тандоо',
     quantity:'Саны',reason:'Эсептен чыгаруунун себеби',save:'Кампадан чыгаруу',retry:'Ошол эле операцияны кайталоо',
     confirm:'Чыгарууну ырастайсызбы?',done:'Чыгаруу сакталды',history:'Акыркы чыгаруулар',
     notice:'Өздүк нарк төлөм эмес. Тармак катасында ошол эле операцияны кайталаңыз.',
     invalid:'Азык, оң сан жана кеминде 3 тамгадан турган себеп керек.',empty:'Чыгаруу жок'},
-  en:{title:'Waste & spoilage',kindWaste:'Waste',kindSpoilage:'Spoilage',select:'Select ingredient',
+  en:{cancel:'Cancel',title:'Waste & spoilage',kindWaste:'Waste',kindSpoilage:'Spoilage',select:'Select ingredient',
     quantity:'Quantity',reason:'Write-off reason',save:'Deduct inventory',retry:'Retry same operation',
     confirm:'Confirm this stock loss?',done:'Inventory loss recorded',history:'Recent write-offs',
     notice:'Cost is not a payment. After a network error retry only the same operation.',
     invalid:'Select stock, positive quantity and a reason of at least 3 characters.',empty:'No write-offs'},
-  kz:{title:'Бүліну және шығындар',kindWaste:'Шығындар',kindSpoilage:'Бүліну',select:'Өнімді таңдау',
+  kz:{cancel:'Бас тарту',title:'Бүліну және шығындар',kindWaste:'Шығындар',kindSpoilage:'Бүліну',select:'Өнімді таңдау',
     quantity:'Саны',reason:'Есептен шығару себебі',save:'Қоймадан есептен шығару',retry:'Сол әрекетті қайталау',
     confirm:'Есептен шығаруды растау керек пе?',done:'Есептен шығарылды',history:'Соңғы есептен шығарулар',
     notice:'Өзіндік құн төлем емес. Желі қатесінде тек сол операцияны қайталаңыз.',
@@ -74,7 +74,7 @@ export function KitchenLosses({live,stock,reload}:{
       kind,quantity:q,reason:reason.trim(),
     };
     Alert.alert(t.confirm,stock.items.find(x=>x.id===selected)?.name||'',[
-      {text:locale==='en'?'Cancel':'Отмена',style:'cancel'},
+      {text:t.cancel,style:'cancel'},
       {text:t.save,onPress:()=>void execute(operation)},
     ]);
   };
