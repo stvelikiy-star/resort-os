@@ -59,6 +59,7 @@ const KITCHEN_REPORT_COPY={
 
 const ACCRUAL_READINESS_COPY={
  ru:{
+  journal:'Подтверждённые источники (не выручка)',approvals:'Утверждения источников',reversals:'Отмены утверждений',nightsApproved:'Подтверждённые ночи',diningApproved:'Подтверждённые заказы',
   delivered:'Проживание по фактическим ночам (оценка)',deliveredCount:'Подтверждённые ночи',deliveredExcluded:'Брони, требующие сверки',folioLinked:'Обслуженные заказы со сверенным folio',folioExcluded:'Заказы, требующие сверки',deliveredNotice:'Оценка проживания распределена по фактическим ночам. Пакеты услуг, скидки, налоги и возвраты ещё не сверены.',
   title:'OWNER · сверка доходов и расходов',
   posted:'Проведённые обязательства',nonstock:'Расходы к классификации (не склад)',
@@ -69,6 +70,7 @@ const ACCRUAL_READINESS_COPY={
   missing:'Заказы без связанной записи folio',
   status:'Признанная прибыль недоступна',notice:'Это показатели для сверки, не отчёт о прибыли. Платежи, накладные, продажи и расходы не складываются автоматически.'},
  kg:{
+  journal:'Ырасталган булактар (киреше эмес)',approvals:'Булак бекитүүлөрү',reversals:'Бекитүүнү жокко чыгаруулар',nightsApproved:'Ырасталган түндөр',diningApproved:'Ырасталган заказдар',
   delivered:'Чыныгы түндөр боюнча жашоо баасы (болжол)',deliveredCount:'Ырасталган түндөр',deliveredExcluded:'Текшерүүнү талап кылган брондор',folioLinked:'Folio менен салыштырылган заказдар',folioExcluded:'Текшерүүнү талап кылган заказдар',deliveredNotice:'Жашоо баасы чыныгы түндөр боюнча бөлүндү. Пакеттер, арзандатуулар, салыктар жана кайтаруулар текшериле элек.',
   title:'ЭЭСИ · киреше жана чыгаша салыштыруусу',
   posted:'Катталган милдеттенмелер',nonstock:'Кампага кирбеген чыгаша талапкерлери',
@@ -79,6 +81,7 @@ const ACCRUAL_READINESS_COPY={
   missing:'Folio жазуусу жок буйрутмалар',
   status:'Таанылган пайда жеткиликсиз',notice:'Бул пайда эмес, салыштыруу үчүн маалымат. Төлөмдөр, накладнойлор жана чыгашалар автоматтык кошулбайт.'},
  en:{
+  journal:'Approved sources (not earned revenue)',approvals:'Source approvals',reversals:'Approval reversals',nightsApproved:'Approved room nights',diningApproved:'Approved dining orders',
   delivered:'Lodging by delivered night (candidate)',deliveredCount:'Verified nights',deliveredExcluded:'Bookings requiring review',folioLinked:'Served orders matched to folio',folioExcluded:'Orders requiring review',deliveredNotice:'Booked value is allocated by verified stay nights. Packages, discounts, tax and refunds remain unverified.',
   title:'OWNER · revenue and expense reconciliation',
   posted:'Posted obligations',nonstock:'Non-stock expense candidates',
@@ -90,6 +93,7 @@ const ACCRUAL_READINESS_COPY={
   status:'Recognized profit unavailable',
   notice:'Operational candidates only, not a profit report. Payments, supplier invoices, sales and expenses must not be added automatically.'},
  kz:{
+  journal:'Расталған дереккөздер (табыс емес)',approvals:'Дереккөзді бекіту',reversals:'Бекітуді қайтару',nightsApproved:'Расталған түндер',diningApproved:'Расталған тапсырыстар',
   delivered:'Нақты түндер бойынша тұру құны (бағалау)',deliveredCount:'Расталған түндер',deliveredExcluded:'Тексеруді қажет ететін броньдар',folioLinked:'Folio-мен сәйкес берілген тапсырыстар',folioExcluded:'Тексеруді қажет ететін тапсырыстар',deliveredNotice:'Тұру құны расталған түндерге бөлінді. Пакеттер, жеңілдіктер, салық және қайтарым тексерілмеген.',
   title:'ИЕСІ · табыс пен шығынды салыстыру',
   posted:'Тіркелген міндеттемелер',nonstock:'Қоймадан тыс шығын үміткерлері',
@@ -309,6 +313,16 @@ export default function Finance() {
           {line(accrualCopy.folioExcluded,
             String(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.excluded_orders_count))}
           <Text style={[font.small,{color:c.textMuted}]}>{accrualCopy.deliveredNotice}</Text>
+          {line(accrualCopy.journal,
+            data.owner_accrual_readiness_snapshot.source_approval_journal.active_source_face_value_kgs+' '+data.range.currency)}
+          {line(accrualCopy.approvals,
+            String(data.owner_accrual_readiness_snapshot.source_approval_journal.approval_events_count))}
+          {line(accrualCopy.reversals,
+            String(data.owner_accrual_readiness_snapshot.source_approval_journal.reversal_events_count))}
+          {line(accrualCopy.nightsApproved,
+            String(data.owner_accrual_readiness_snapshot.source_approval_journal.active_room_nights_count))}
+          {line(accrualCopy.diningApproved,
+            String(data.owner_accrual_readiness_snapshot.source_approval_journal.active_served_dining_count))}
           <Text style={[font.body,{color:c.warning,fontWeight:'700'}]}>{accrualCopy.status}</Text>
           <Text style={[font.small,{color:c.textMuted}]}>{accrualCopy.notice}</Text>
         </GlassCard>
