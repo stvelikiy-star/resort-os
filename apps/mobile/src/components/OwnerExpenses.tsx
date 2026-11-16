@@ -8,7 +8,7 @@ import {ErrorState, GlassCard, LoadingShimmer} from './Future';
 import {Button, Field, SectionLabel} from './ui';
 
 const COPY={
- ru:{title:'Хозяйственные расходы',post:'Записать расход',amount:'Сумма, сом',
+ ru:{cancel:'Отмена',title:'Хозяйственные расходы',post:'Записать расход',amount:'Сумма, сом',
   name:'Название расхода',supplier:'Поставщик',reference:'Документ или номер счёта',
   category:'Категория',notes:'Примечание',date:'Дата расхода (ГГГГ-ММ-ДД)',
   posted:'Расходы за период',paid:'Оплачено по расходам периода',
@@ -17,7 +17,7 @@ const COPY={
   retry:'Повторить ту же операцию',success:'Запись сохранена',invalid:'Проверьте дату, сумму и название.',
   confirm:'Подтвердите ручную запись',unavailable:'Данные расходов не получены',
   notice:'Расход и его оплата — разные факты. Эта запись не переводит деньги и не создаёт платёж клиента. Прибыль здесь не рассчитывается.'},
- kg:{title:'Чарбалык чыгымдар',post:'Чыгымды каттоо',amount:'Сумма, сом',
+ kg:{cancel:'Жокко чыгаруу',title:'Чарбалык чыгымдар',post:'Чыгымды каттоо',amount:'Сумма, сом',
   name:'Чыгымдын аты',supplier:'Жеткирүүчү',reference:'Документ',category:'Категория',
   notes:'Эскертүү',date:'Чыгым күнү (ЖЖЖЖ-АА-КК)',posted:'Мезгилдин чыгымдары',
   paid:'Төлөнгөнү',outstanding:'Төлөнө элек',payments:'Кол менен катталган төлөмдөр',
@@ -26,7 +26,7 @@ const COPY={
   invalid:'Күндү, сумманы жана атын текшериңиз.',confirm:'Кол менен каттоону ырастоо',
   unavailable:'Чыгымдар жеткиликтүү эмес',
   notice:'Чыгым менен төлөм эки башка факт. Акча которулбайт, кардар төлөмү түзүлбөйт. Пайда эсептелбейт.'},
- en:{title:'Operating expenses',post:'Record an expense',amount:'Amount, KGS',
+ en:{cancel:'Cancel',title:'Operating expenses',post:'Record an expense',amount:'Amount, KGS',
   name:'Expense title',supplier:'Supplier',reference:'Invoice / document reference',
   category:'Category',notes:'Notes',date:'Expense date (YYYY-MM-DD)',
   posted:'Expenses in period',paid:'Settled against period expenses',outstanding:'Unpaid',
@@ -35,7 +35,7 @@ const COPY={
   success:'Saved',invalid:'Check the date, amount and title.',confirm:'Confirm manual record',
   unavailable:'Expenses unavailable',
   notice:'Expense and payment are separate facts. This does not transfer money or create a customer payment. Profit is not calculated.'},
- kz:{title:'Шаруашылық шығындар',post:'Шығынды тіркеу',amount:'Сома, сом',
+ kz:{cancel:'Бас тарту',title:'Шаруашылық шығындар',post:'Шығынды тіркеу',amount:'Сома, сом',
   name:'Шығын атауы',supplier:'Жеткізуші',reference:'Құжат нөмірі',category:'Санат',
   notes:'Ескерту',date:'Шығын күні (ЖЖЖЖ-АА-КК)',posted:'Кезең шығындары',
   paid:'Төленгені',outstanding:'Төленбеген',payments:'Қолмен тіркелген төлемдер',
@@ -59,8 +59,10 @@ const validDate=(value:string)=>/^\d{4}-\d{2}-\d{2}$/.test(value)&&
 const integerAmount=(value:string)=>/^[1-9]\d*$/.test(value)&&
   Number.isSafeInteger(Number(value))&&Number(value)<=2_000_000_000;
 
-export function OwnerExpenses({live,from,to}:{
+export function OwnerExpenses({live,from,to,onChanged}:{
  live:ReturnType<typeof createLiveModules>;from:string;to:string;
+ /** Called after a successful write so parent summaries (finance, reconciliation, cash) re-read the Core. */
+ onChanged?:()=>unknown;
 }){
  const {user,locale}=useSession();
  const {c}=useTheme();
@@ -88,12 +90,14 @@ export function OwnerExpenses({live,from,to}:{
      if(op.type==='EXPENSE')await live.postOwnerExpense(op.data);
      else await live.settleOwnerExpense(op.expenseId,op.data);
      await ledger.reload();
+     // The write is already committed: a failed parent refresh must not turn it into a false error.
+     void Promise.resolve(onChanged?.()).catch(()=>undefined);
      setPending(null);setAmount('');setTitle('');setSupplier('');
      setDocumentRef('');setNotes('');setSettlementAmount('');
      Alert.alert(t.success);
    }catch(err){Alert.alert(t.title,err instanceof Error?err.message:String(err));}
    finally{setBusy(false);}
- },[allowed,busy,ledger,live,t]);
+ },[allowed,busy,ledger,live,onChanged,t]);
  if(!allowed)return null;
  const create=()=>{
    if(!ledger.data||!title.trim()||title.trim().length>150||!validDate(date)||
@@ -104,7 +108,7 @@ export function OwnerExpenses({live,from,to}:{
      document_reference:documentRef.trim()||null,notes:notes.trim()||null,
    }};
    Alert.alert(t.confirm,asMoney(op.data.amount_kgs),[
-     {text:locale==='en'?'Cancel':'Отмена',style:'cancel'},
+     {text:t.cancel,style:'cancel'},
      {text:t.submit,onPress:()=>void execute(op)}]);
  };
  const settle=(expenseId:string,remaining:number)=>{
@@ -115,7 +119,7 @@ export function OwnerExpenses({live,from,to}:{
      paid_on:settlementDate,method,reference:null,
    }};
    Alert.alert(t.confirm,asMoney(op.data.amount_kgs),[
-     {text:locale==='en'?'Cancel':'Отмена',style:'cancel'},
+     {text:t.cancel,style:'cancel'},
      {text:t.submit,onPress:()=>void execute(op)}]);
  };
  return <GlassCard style={{gap:9}} testID="owner-expenses">

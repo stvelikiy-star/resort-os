@@ -246,7 +246,7 @@ export default function Finance() {
           <Text style={[font.small,{color:c.textMuted}]}>{cashCopy.notice}</Text>
         </GlassCard>:null}
       </>:null}
-      {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to}/> : null}
+      {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to} onChanged={() => Promise.all([reload(), reloadKitchen(), reloadCash()])}/> : null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>
