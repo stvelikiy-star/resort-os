@@ -41,6 +41,7 @@ export default function Overview() {
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   return <FutureScreen>
     <PremiumHeader title={copy.overview} subtitle={hotel?.name} eyebrow={user ? copy.welcome + ', ' + user.display_name : 'MARINA SMART'}
+      inlineCompactRight={user?.role === 'OWNER'}
       right={user ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         <View accessibilityLabel={copy.profile + ': ' + user.display_name}
           style={{ width: 48, height: 48, borderRadius: 24, borderWidth: 1, borderColor: c.border, backgroundColor: c.primarySoft, justifyContent: 'center', alignItems: 'center' }}>
