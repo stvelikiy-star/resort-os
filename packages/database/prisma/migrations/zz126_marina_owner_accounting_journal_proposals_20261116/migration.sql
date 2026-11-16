@@ -51,7 +51,7 @@ CREATE TRIGGER owner_accounting_proposal_lines_append_only
 -- Enforce the complete, balanced journal also for direct SQL writes.
 -- DEFERRABLE checks run at transaction commit, after the header and all lines
 -- have been inserted. An empty/partial/unbalanced proposal cannot commit.
-CREATE FUNCTION check_owner_accounting_proposal_balanced() RETURNS trigger AS $
+CREATE FUNCTION check_owner_accounting_proposal_balanced() RETURNS trigger AS $$
 DECLARE
   target_id uuid;
   total_lines integer;
@@ -73,7 +73,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER owner_accounting_proposal_balance_on_header
   AFTER INSERT ON owner_accounting_journal_proposals
@@ -86,7 +86,7 @@ CREATE CONSTRAINT TRIGGER owner_accounting_proposal_balance_on_line
 
 -- An immutable proposal cannot gain additional lines in a later transaction.
 -- Its initial header and every initial line must be created atomically.
-CREATE FUNCTION require_owner_accounting_initial_transaction() RETURNS trigger AS $
+CREATE FUNCTION require_owner_accounting_initial_transaction() RETURNS trigger AS $$
 DECLARE
   header_xmin bigint;
 BEGIN
@@ -99,7 +99,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER owner_accounting_lines_same_transaction
   BEFORE INSERT ON owner_accounting_journal_proposal_lines
