@@ -11,6 +11,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from .auth import require_roles, trusted_property_id
 from .owner_kitchen_reconciliation import owner_inventory_reconciliation
+from .owner_delivered_revenue import delivered_sources
 
 router = APIRouter(prefix="/api/v1/admin/finance/owner",
                  tags=["owner-accrual-readiness"])
@@ -138,6 +139,7 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
     # The carried value and outstanding payable from the same read snapshot
     # are warnings; neither supplier settlement nor invoice is kitchen COGS.
     reconciliation=await owner_inventory_reconciliation(conn,pid)
+    delivered=await delivered_sources(conn,pid,from_date,to_date,tz)
     stock=reconciliation["inventory"]
     supplier=reconciliation["supplier_documents"]
     blockers=[
@@ -192,6 +194,8 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
             "checked_out_booked_total_kgs":amount(lodging["booked_total"]),
             "amounts_are_not_additive_or_recognized":True,
         },
+        "delivered_revenue_sources":{**delivered,
+            "accommodation":{**delivered["accommodation"],"night_preview":[]}},
         "source_valuation":{
             "inventory_valuation_status":stock["valuation_status"],
             "source_mismatch_count":stock["linked_source"]["source_mismatch_count"],
