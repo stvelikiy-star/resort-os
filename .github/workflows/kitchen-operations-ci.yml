@@ -13,6 +13,7 @@ on:
       - 'services/api/app/owner_kitchen_reconciliation.py'
       - 'services/api/app/owner_accrual_readiness.py'
       - 'services/api/app/owner_delivered_revenue.py'
+      - 'services/api/app/owner_revenue_source_journal.py'
       - 'services/api/app/owner_expenses.py'
       - 'services/api/app/owner_supplier_documents.py'
       - 'services/api/app/owner_supplier_returns.py'
@@ -21,6 +22,7 @@ on:
       - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
       - 'packages/database/prisma/migrations/zz121_marina_supplier_documents_20261116/**'
       - 'packages/database/prisma/migrations/zz122_marina_supplier_returns_20261116/**'
+      - 'packages/database/prisma/migrations/zz123_marina_owner_revenue_source_events_20261116/**'
       - 'scripts/verify_supplier_document_e2e.py'
       - 'scripts/verify_supplier_returns_e2e.py'
       - 'scripts/verify_owner_expenses_e2e.py'
@@ -29,6 +31,7 @@ on:
       - 'scripts/test_owner_accrual_readiness.py'
       - 'scripts/test_owner_delivered_revenue.py'
       - 'scripts/verify_owner_delivered_revenue_e2e.py'
+      - 'scripts/verify_owner_revenue_source_journal_e2e.py'
       - 'services/api/app/staff_task_reports.py'
       - 'scripts/verify_mobile_staff_reports_e2e.py'
       - 'scripts/verify_mobile_menu_publication_e2e.py'
@@ -304,6 +307,11 @@ jobs:
         env:
           ALLOW_MOBILE_MENU_TEST_WRITES: '1'
         run: python scripts/verify_mobile_menu_publication_e2e.py
+
+      - name: Verify immutable OWNER source approvals and reversals PostgreSQL E2E
+        env:
+          ALLOW_REVENUE_JOURNAL_SYNTHETIC_CI: '1'
+        run: python scripts/verify_owner_revenue_source_journal_e2e.py
 
       - name: Show Core logs on failure
         if: failure()
