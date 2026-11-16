@@ -24,7 +24,7 @@ NEW_MIGRATIONS = {
     "zz123_marina_owner_revenue_source_events_20261116": "0be3f00ad48d352f4edfae00f3ba6b41e793f20c45032ff94a914b566a36fe17",
     "zz124_marina_owner_revenue_corrections_20261116": "4741659b4f047682b8a87b8b475ec8c395ca0823b24481cac7d3081545b78621",
     "zz125_marina_owner_revenue_evidence_bytes_20261116": "37f7b3e12f8c10e0defcd8acb2fbc3d0cea63f55c008e19622b2bb363e5fd285",
-    "zz126_marina_owner_accounting_journal_proposals_20261116": "e7a79ea62c6b2bd5d3a6a50035ec30a4fc1c98c5d2b0681895a0135b0db8b401"
+    "zz126_marina_owner_accounting_journal_proposals_20261116": "1368d2ebba7902f1197c6151e97ccc1e7a4ed6d32070b0b6e6dffef1a1d13f42"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
