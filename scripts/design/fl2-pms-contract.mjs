@@ -8,9 +8,14 @@ const ts=createRequire(new URL('../../apps/admin/package.json',import.meta.url))
 const base='9f13104bddeffdd2c236dfacb0086e4eaa5d6bfc';
 const read=p=>fs.readFileSync(p,'utf8');
 const original=p=>execFileSync('git',['show',`${base}:${p}`],{encoding:'utf8'});
-for(const name of ['PMSNewReservationModal','ReservationScheduleBuilder','RoomDetailModal','PMSGridV9','AdminShell','PMSControlSnapshotV9']) {
+for(const name of ['PMSNewReservationModal','ReservationScheduleBuilder','RoomDetailModal','PMSGridV9','PMSControlSnapshotV9']) {
  const p=`apps/admin/components/${name}.tsx`;if(dialogNames.includes(name))assertDialogBehavior(read(p),original(p),name);else assert.equal(read(p),original(p),`${name}: protected source changed`);
 }
+const shellPath='apps/admin/components/AdminShell.tsx';
+const appearanceImport='import FutureLuxuryAppearance from "./FutureLuxuryAppearance";\n';
+const shell=read(shellPath);
+assert.ok(shell.includes(appearanceImport),'C3: approved FL2 appearance import absent');
+assert.equal(shell.replace(appearanceImport,''),original(shellPath),'C3: AdminShell business/auth/navigation changed');
 const path='apps/admin/components/PMSOwnerGrid.tsx';
 function functions(s){const ast=ts.createSourceFile(path,s,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);const found={};function visit(n){if(ts.isFunctionDeclaration(n)&&n.name&&n.name.text!=='PMSOwnerGrid')found[n.name.text]=n.getText(ast);if(ts.isVariableDeclaration(n)&&n.initializer&&ts.isCallExpression(n.initializer)&&['useCallback','useMemo'].includes(n.initializer.expression.getText(ast)))found[n.name.getText(ast)]=n.getText(ast);ts.forEachChild(n,visit);}visit(ast);return found;}
 assert.deepEqual(functions(read(path)),functions(original(path)),'Booking operations, filtering, prices or callbacks changed');
