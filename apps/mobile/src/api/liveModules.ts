@@ -168,6 +168,16 @@ export interface OwnerDeliveredRevenueSources {
   };
 }
 export interface OwnerAccrualReadiness {
+  documented_source_corrections:{
+    recorded_corrections_count:number;
+    reversed_corrections_count:number;
+    active_by_kind_kgs:Record<'DISCOUNT'|'PACKAGE_SPLIT'|'CANCELLATION'|'REFUND'|'TAX_COMPONENT',string>;
+    metadata_only_documents_not_independently_verified:true;
+    refunds_are_cash_evidence_not_recognized_revenue:true;
+    tax_and_packages_are_classifications_not_expenses:true;
+    recognized_revenue_kgs:null;recognized_profit_kgs:null;
+    status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS';
+  };
   source_approval_journal:{
     approval_events_count:number;
     reversal_events_count:number;
