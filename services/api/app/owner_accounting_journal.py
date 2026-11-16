@@ -39,10 +39,11 @@ class JournalProposal(BaseModel):
 
     @field_validator("reason", "policy_version")
     @classmethod
-    def nonblank(cls, value):
+    def nonblank(cls, value, info):
         v = " ".join(value.split())
-        if not v or len(v) < 3:
-            raise ValueError("Nonempty policy and reason required")
+        minimum = 8 if info.field_name == "reason" else 3
+        if len(v) < minimum:
+            raise ValueError("Policy or reason is too short after whitespace normalization")
         return v
 
 
