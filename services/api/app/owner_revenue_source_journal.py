@@ -248,6 +248,41 @@ async def reverse_source(approval_id:uuid.UUID,body:SourceReversal,
             return event_view(row)
 
 
+async def source_approval_snapshot(conn,property_id,from_date,to_date):
+    """Counts are source-approved facts, NOT recognized revenue or P&L."""
+    row=await conn.fetchrow(
+        '''SELECT COUNT(*) FILTER (WHERE e.action='APPROVE_SOURCE')::int
+                    AS approval_count,
+                  COUNT(*) FILTER (WHERE e.action='REVERSE_SOURCE')::int
+                    AS reversal_count,
+                  COUNT(*) FILTER (WHERE e.action='APPROVE_SOURCE'
+                    AND e."sourceType"='ROOM_NIGHT'
+                    AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events r
+                      WHERE r."reversesId"=e.id))::int AS active_nights,
+                  COUNT(*) FILTER (WHERE e.action='APPROVE_SOURCE'
+                    AND e."sourceType"='DINING_ORDER'
+                    AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events r
+                      WHERE r."reversesId"=e.id))::int AS active_dining_orders,
+                  COALESCE(SUM(e."faceValueKgs") FILTER (
+                    WHERE e.action='APPROVE_SOURCE'
+                    AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events r
+                      WHERE r."reversesId"=e.id)),0) AS active_face_value
+           FROM owner_revenue_source_events e
+           WHERE e."propertyId"=$1 AND e."serviceDate">=$2
+             AND e."serviceDate"<=$3''',
+        property_id,from_date,to_date)
+    return {
+        "approval_events_count":row["approval_count"],
+        "reversal_events_count":row["reversal_count"],
+        "active_room_nights_count":row["active_nights"],
+        "active_served_dining_count":row["active_dining_orders"],
+        "active_source_face_value_kgs":str(row["active_face_value"]),
+        "status":"SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION",
+        "recognized_revenue_kgs":None,
+        "recognized_profit_kgs":None,
+    }
+
+
 @router.get("")
 async def list_events(request:Request,from_date:date=Query(),
                       to_date:date=Query(),user=Depends(owner_only)):
