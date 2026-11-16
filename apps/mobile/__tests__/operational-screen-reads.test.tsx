@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import '../src/i18n';
 import Overview from '../app/(app)/overview';
 import Tasks from '../app/(app)/tasks';
@@ -13,6 +13,7 @@ import Reservation from '../app/reservation/[id]';
 import Conversation from '../app/conversation/[id]';
 import NewBooking from '../app/new-booking';
 import Assistant from '../app/ai';
+import { Alert } from 'react-native';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import type { AuthUser, Role, Room } from '../src/api/types';
 
@@ -24,6 +25,8 @@ const mockApi = {
 };
 const mockModules = {
   dashboard: jest.fn(async () => null), reservation: jest.fn(async (): Promise<Record<string, unknown> | null> => null),
+  checkIn: jest.fn(async () => ({ status: 'CHECKED_IN' })),
+  checkOut: jest.fn(async () => ({ status: 'CHECKED_OUT' })),
   conversation: jest.fn(async () => null), pmsGrid: jest.fn(async () => null),
   assistantCapabilities: jest.fn(async () => null),
 };
@@ -193,4 +196,51 @@ it('never shows reservation finance to RECEPTION, even when FINANCE is present i
   const screen = await render(panel(Reservation));
   await waitFor(() => expect(mockModules.reservation).toHaveBeenCalledTimes(1));
   expect(screen.queryByTestId('reservation-finance')).toBeNull();
+});
+
+describe('reservation detail actions and role-specific states (native component)', () => {
+  const fixture = (status: string) => ({
+    reservation: { id: 'r1', booking_number: 'QA-CARD-1', status,
+      check_in: '2026-11-19', check_out: '2026-11-21' },
+    guest: { first_name: 'Synthetic', last_name: 'Guest', phone: '+996555000337', email: null },
+    room: { code: 'A101', room_type_name: 'Standard', state: 'CLEAN' },
+    schedule: [], finance: { total_kgs: 5000, paid_kgs: 0, remaining_kgs: 5000 },
+  });
+  it.each(['OWNER','RECEPTION'] as const)('%s sees confirmed arrival and can confirm check-in once', async role => {
+    mockModules.reservation.mockResolvedValue(fixture('GUARANTEED'));
+    identity(role, ['RESERVATIONS']);
+    const view = await render(panel(Reservation));
+    await waitFor(() => expect(view.getByTestId('reservation-guest-summary')).toBeTruthy());
+    expect(view.getByTestId('reservation-checkin')).toBeTruthy();
+    expect(view.queryByTestId('reservation-checkout')).toBeNull();
+    expect(view.queryByTestId('reservation-finance')).toBeNull();
+    const spy = jest.spyOn(Alert, 'alert');
+    await fireEvent.press(view.getByTestId('reservation-checkin'));
+    expect(mockModules.checkIn).not.toHaveBeenCalled();
+    const buttons=spy.mock.calls.at(-1)![2]!;
+    await act(async () => { await buttons.find(b=>b.style!=='cancel')!.onPress!(); });
+    await waitFor(() => expect(mockModules.checkIn).toHaveBeenCalledTimes(1));
+    expect(mockModules.checkOut).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+  it('shows checkout only for checked-in stay and no mutations after role revocation', async () => {
+    mockModules.reservation.mockResolvedValue(fixture('CHECKED_IN'));
+    identity('RECEPTION', ['RESERVATIONS']);
+    const view=await render(panel(Reservation));
+    await waitFor(() => expect(view.getByTestId('reservation-checkout')).toBeTruthy());
+    expect(view.queryByTestId('reservation-checkin')).toBeNull();
+    identity('RECEPTION', []);
+    await view.rerender(panel(Reservation));
+    expect(view.queryByTestId('reservation-checkout')).toBeNull();
+    expect(view.queryByTestId('reservation-guest-summary')).toBeNull();
+    expect(mockModules.checkOut).not.toHaveBeenCalled();
+  });
+  it('shows neither check-in nor checkout for cancelled reservations', async () => {
+    mockModules.reservation.mockResolvedValue(fixture('CANCELLED'));
+    identity('OWNER', ['RESERVATIONS']);
+    const view=await render(panel(Reservation));
+    await waitFor(() => expect(view.getByTestId('reservation-guest-summary')).toBeTruthy());
+    expect(view.queryByTestId('reservation-checkin')).toBeNull();
+    expect(view.queryByTestId('reservation-checkout')).toBeNull();
+  });
 });

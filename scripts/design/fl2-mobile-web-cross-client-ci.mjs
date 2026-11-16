@@ -138,6 +138,29 @@ async function main(){
   assert.equal(mobileWebDetail.guest.first_name,'Synthetic Web PMS Guest');
   assert.equal(mobileWebDetail.reservation.total_kgs,webQuote.pricing.total_kgs);
   // Preserve tenant isolation and no repeat commit after unknown ACK.
+  // HOLD remains disabled in Mobile LIVE. Audit only the actual Core API
+  // on the disposable PostgreSQL, never unlock the Mobile feature gate.
+  const holdDates=dateRange(12,14);
+  const holdPayload={
+    room_id:room.id,...holdDates,guest_name:'Synthetic Hold Audit',
+    guest_phone:'+996555000337'
+  };
+  const heldResponse=await a.context.request.post(API+'/admin/pms/holds',{data:holdPayload});
+  assert.equal(heldResponse.status(),201,'Owner cannot create isolated Core HOLD');
+  const held=await heldResponse.json();
+  assert.equal(held.status,'HELD');
+  assert.equal(held.duration_minutes,60);
+  assert.match(held.id,/^[0-9a-f-]{36}$/i);
+  const heldListResponse=await a.context.request.get(API+'/admin/pms/holds');
+  assert.equal(heldListResponse.status(),200);
+  const heldList=await heldListResponse.json();
+  assert.ok(heldList.holds.some(h=>h.id===held.id),'HOLD missing from owner list');
+  const collision=await a.context.request.post(API+'/admin/pms/holds',{data:holdPayload});
+  assert.equal(collision.status(),409,'Overlapping HOLD incorrectly accepted');
+  const heldGrid=await mobile.request('GET',`/api/v1/pms/grid?start=${holdDates.check_in}&end=${holdDates.check_out}`);
+  assert.equal(heldGrid.property,'HOTEL_A');
+  const heldRoom=heldGrid.rooms.find(r=>r.id===room.id);
+  assert.ok(heldRoom?.blocks?.length,'HOLD did not block real inventory grid');
   const b=await signIn(browser,'HOTEL_B');
   const bClient=createHotelHttpClient(MOBILE_HTTPS,createMobileTransport(b.cookies));
   const bGrid=await bClient.request('GET',`/api/v1/pms/grid?start=${first.check_in}&end=${second.check_out}`);
@@ -146,6 +169,26 @@ async function main(){
   assert.equal(blocksFor(bGrid,webBooking.reservation_id).length,0);
   await assert.rejects(()=>bClient.request('GET','/api/v1/admin/reception/reservations/'+committed.reservation_id),{code:'NOT_FOUND'});
   await assert.rejects(()=>bClient.request('GET','/api/v1/admin/reception/reservations/'+webBooking.reservation_id),{code:'NOT_FOUND'});
+  const foreignHoldRead=await b.context.request.get(API+'/admin/pms/holds/'+held.id);
+  assert.equal(foreignHoldRead.status(),404,'Other hotel can read HOLD');
+  const foreignHoldRelease=await b.context.request.delete(API+'/admin/pms/holds/'+held.id);
+  assert.equal(foreignHoldRelease.status(),404,'Other hotel can release HOLD');
+  const foreignHoldList=await b.context.request.get(API+'/admin/pms/holds');
+  assert.equal(foreignHoldList.status(),200);
+  assert.ok(!(await foreignHoldList.json()).holds.some(h=>h.id===held.id));
+  const release=await a.context.request.delete(API+'/admin/pms/holds/'+held.id);
+  assert.equal(release.status(),200);
+  assert.equal((await release.json()).status,'RELEASED');
+  const repeatRelease=await a.context.request.delete(API+'/admin/pms/holds/'+held.id);
+  assert.equal(repeatRelease.status(),200,'Repeat release should be idempotent');
+  const afterRelease=await a.context.request.get(API+'/admin/pms/holds');
+  assert.equal(afterRelease.status(),200);
+  assert.ok(!(await afterRelease.json()).holds.some(h=>h.id===held.id));
+  const unblocked=await a.context.request.post(API+'/admin/pms/holds',{data:holdPayload});
+  assert.equal(unblocked.status(),201,'Release did not unblock the room');
+  const newHold=await unblocked.json();
+  assert.notEqual(newHold.id,held.id);
+  assert.equal((await a.context.request.delete(API+'/admin/pms/holds/'+newHold.id)).status(),200);
   const result={testOnly:true,nativeAndroidTested:false,syntheticTransportBridge:true,
    mobileToWeb:committed.reservation_id,webToMobile:webBooking.reservation_id,
    hotel:'HOTEL_A',otherHotel:'HOTEL_B',roomId:room.id,first,second};
