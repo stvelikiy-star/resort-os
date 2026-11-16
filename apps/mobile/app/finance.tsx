@@ -105,10 +105,13 @@ export default function Finance() {
   );
   const reloadCash = recordedCash.reload;
   const reloadKitchen = ownerKitchen.reload;
+  const refreshFinancialSnapshots=useCallback(async()=>{
+    await Promise.all([reload(), reloadKitchen(), reloadCash()]);
+  },[reload,reloadKitchen,reloadCash]);
   const focused = useRef(false);
   useFocusEffect(useCallback(() => {
-    if (focused.current) { void reload(); void reloadKitchen(); void reloadCash(); } else focused.current = true;
-  }, [reload,reloadKitchen,reloadCash]));
+    if (focused.current) void refreshFinancialSnapshots(); else focused.current = true;
+  }, [refreshFinancialSnapshots]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
   const line = (label: string, amount: string, caption?: string) =>
@@ -118,7 +121,7 @@ export default function Finance() {
         <Text style={[font.body,{color:c.text}]}>{label}</Text>
         {caption ? <Text style={[font.small,{color:c.textMuted}]}>{caption}</Text> : null}
       </View>
-      <Text style={[font.body,{color:c.text,fontWeight:'700',textAlign:'right'}]}>{amount}</Text>
+      <Text style={[font.body,{color:c.text,fontWeight:'700',textAlign:'right',flexShrink:1,maxWidth:'52%'}]}>{amount}</Text>
     </View>;
   return <FutureScreen>
     <PressScale accessibilityLabel={copy.close} onPress={() => router.back()}
@@ -246,7 +249,7 @@ export default function Finance() {
           <Text style={[font.small,{color:c.textMuted}]}>{cashCopy.notice}</Text>
         </GlassCard>:null}
       </>:null}
-      {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to}/> : null}
+      {user?.role==='OWNER' && modules ? <OwnerExpenses live={modules} from={from} to={to} onCommitted={refreshFinancialSnapshots}/> : null}
       {data.received_by_method ? <>
         <SectionLabel>{extra.methods}</SectionLabel>
         {data.received_by_method.length ? <GlassCard style={{gap:5}}>
