@@ -49,6 +49,12 @@ class ProposedAccountingJournalTests(unittest.TestCase):
         ]})
         self.assertNotEqual(fingerprint(body), fingerprint(edited))
 
+    def test_blank_padded_short_reason_rejected_before_db(self):
+        for reason in ("      abc      ", "     1234567     ", "      "):
+            with self.subTest(reason=reason):
+                with self.assertRaises(ValueError):
+                    proposal(reason=reason)
+
     def test_explicit_source_allowlist(self):
         with self.assertRaises(ValueError):
             proposal(source_type="SUPPLIER_OBLIGATION")
