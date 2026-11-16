@@ -29,7 +29,7 @@ const pinned = {
   'owner_expenses.py': '7a6835a7e7a5d0926d0a1f36d5dcb41f291d0ea2',
   'owner_kitchen_management.py': '2fb4df2ee07b69498417feba200c660461050f0e',
   'owner_kitchen_reconciliation.py': 'cf1a944b5b88ce10347dac5bb33fc7681a94885f',
-  'owner_accrual_readiness.py': '2e1006d8a4076fd081ecba32b6d1744b9963b44e',
+  'owner_accrual_readiness.py': '52615444f61186cf67bde014d51e1c7ae7c88911',
   'hotel_finance.py': 'c493047538ab4a2866bf3b16e3994cab4a2e5ffb',
   'kitchen_procurement.py': '2718f40a9ee512f40dbd5cbe648f4a525f5b6b25',
   'kitchen_stock.py': '76002784ca9ba6a9341159426e4e04ab1b182168',
