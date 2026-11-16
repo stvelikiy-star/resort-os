@@ -1,6 +1,13 @@
 # MARINA SMART — P0 OWNER accounting recognition journal: implementation contract
 
-Status: **SPECIFICATION ONLY / NOT IMPLEMENTED / NO-GO**. Parent exact SHA: `e126caf3dc68e027b4f448721f7ed9a3c231e01b` (#548, 63/63 Actions success). No production, Ubuntu, ASKA TASH, main, AI/WhatsApp or visual-design modifications.
+Status: **PENDING-only proposal foundation implemented in Draft #550; no approval/posting/P&L / NO-GO**. Parent exact SHA: `e126caf3dc68e027b4f448721f7ed9a3c231e01b` (#548, 63/63 Actions success). No production, Ubuntu, ASKA TASH, main, AI/WhatsApp or visual-design modifications.
+
+## Current implementation scope (Draft #550)
+
+- Additive `zz126` creates immutable, tenant-scoped proposal headers and debit/credit lines only. PostgreSQL has deferred balancing constraints and rejects late line additions; the OWNER API requires a verified source and an idempotent request UUID.
+- CI now includes an isolated PostgreSQL journal E2E after the synthetic revenue approval journal: eight-way replay, changed-ID conflicts, role denial, direct SQL append/mutation/balance checks and no Payment/P&L.
+- **Pending and not approved:** independent accountant sign-off, statutory chart of accounts, actual posting, reversal of posted entries, taxes, payroll/depreciation, full kitchen COGS mapping and OWNER Web/Mobile posting screens.
+- Acceptance depends on exact SHA CI and isolated PostgreSQL E2E outcome; documentation does not imply pass or deployment.
 
 ## Separation of responsibilities
 
@@ -9,7 +16,7 @@ Status: **SPECIFICATION ONLY / NOT IMPLEMENTED / NO-GO**. Parent exact SHA: `e12
 - Existing `owner_revenue_evidence_documents` (#548) stores actual immutable bytes with server SHA-256; byte integrity **does not** prove legal authenticity or accounting approval.
 - **New accounting journal must be separate**, append-only, with explicit accountant-approved policy and recognition controls. Never reinterpret existing event rows as posted P&L on migration.
 
-## Journal invariants to implement (next code PR)
+## Journal invariants and remaining acceptance gates
 
 1. Scoped `propertyId` across journal header, lines, source events and evidence references; no cross-tenant reads/writes. Each journal posting has a client UUID operation id, hotel-local accounting date, source event reference, policy version, actor, approved-by identity/time, and deterministic payload fingerprint.
 2. Post balanced **debit and credit** lines with exact decimal currency values (KGS, no float); totals debit == totals credit; approved chart-of-accounts codes and period required. A draft/preview is never a posted entry.
