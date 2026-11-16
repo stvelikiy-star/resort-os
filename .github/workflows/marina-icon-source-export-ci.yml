@@ -1,0 +1,45 @@
+name: MARINA Approved Icon 66dp Source Export
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/marina-icon-source-export-ci.yml'
+permissions:
+  contents: read
+jobs:
+  icon-source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Pillow==11.3.0
+      - name: Export approved source inside guaranteed 66dp safe circle
+        run: |
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          from io import BytesIO
+          import base64,hashlib,math
+          source=Path('apps/mobile/assets/marina-smart-approved.png').read_bytes()
+          assert hashlib.sha256(source).hexdigest()=='24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356'
+          logo=Image.open(BytesIO(source)).convert('RGBA').resize((608,608),Image.Resampling.LANCZOS)
+          canvas=Image.new('RGBA',(1024,1024),(0,0,0,0))
+          canvas.alpha_composite(logo,(208,208))
+          pixels=canvas.load()
+          radius=1024*66/108/2
+          visible=0
+          for y in range(1024):
+            for x in range(1024):
+              if pixels[x,y][3]:
+                visible+=1
+                assert (x-511.5)**2+(y-511.5)**2<=radius**2
+          assert visible>250000
+          out=BytesIO();canvas.save(out,format='PNG')
+          result=out.getvalue()
+          print('ICON_EXPECTED_GIT_SHA:'+hashlib.sha1(b'blob '+str(len(result)).encode()+b'\0'+result).hexdigest())
+          encoded=base64.b64encode(result).decode()
+          for offset in range(0,len(encoded),4096):
+            print('ICON_CHUNK:'+encoded[offset:offset+4096])
+          print('ICON_66DP_SOURCE_PASS')
+          PY
