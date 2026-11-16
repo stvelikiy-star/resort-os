@@ -75,6 +75,32 @@ type FinanceResponse = {
   };
   refunded_snapshot_all_time: { amount_kgs: number; payment_count: number };
   /** Present for OWNER only; never returned by Core to MANAGER. */
+  /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
+  owner_accrual_readiness_snapshot?: {
+    posted_owner_obligations:{
+      posted_total_kgs:string;
+      non_stock_obligations_candidate_kgs:string;
+      stock_overlap_review_kgs:string;
+      matching_supplier_invoice_count:number;
+    };
+    kitchen_cost_movements:{
+      production_cost_candidate_kgs:string;
+      loss_cost_candidate_kgs:string;
+    };
+    revenue_source_candidates:{
+      served_dining_face_value_kgs:string;
+      served_without_linked_folio_count:number;
+      checked_out_booked_total_kgs:string;
+    };
+    recognition:{
+      recognized_revenue_kgs:null;
+      recognized_expenses_kgs:null;
+      recognized_profit_kgs:null;
+      completeness_verified:false;
+      status:"REQUIRES_APPROVED_RECOGNITION_LEDGER";
+      blockers:string[];
+    };
+  };
   owner_supplier_stock_snapshot?: {
     inventory: {
       real_book_inventory_value_kgs: string | null;
@@ -250,6 +276,43 @@ export default function HotelFinanceBoard() {
               Прибыль не рассчитана. Сначала нужна сверка признанной выручки,
               хозяйственных расходов и корректировок себестоимости.
             </p>
+          </article>
+        </section>}
+
+      {data.owner_accrual_readiness_snapshot &&
+        data.owner_accrual_readiness_snapshot.recognition.recognized_revenue_kgs === null &&
+        data.owner_accrual_readiness_snapshot.recognition.recognized_expenses_kgs === null &&
+        data.owner_accrual_readiness_snapshot.recognition.recognized_profit_kgs === null &&
+        data.owner_accrual_readiness_snapshot.recognition.completeness_verified === false &&
+        <section className="finance-split-grid" data-testid="owner-accrual-readiness">
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · доходы и расходы</h2>
+              <span>Источники для сверки, не прибыль</span></div>
+            <div className="finance-state-grid">
+              <div><span>Проведённые обязательства</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.posted_owner_obligations.posted_total_kgs)}</strong></div>
+              <div><span>Хозяйственные расходы (кандидаты)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.posted_owner_obligations.non_stock_obligations_candidate_kgs)}</strong></div>
+              <div><span>Требуется сверка с запасами</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.posted_owner_obligations.stock_overlap_review_kgs)}</strong></div>
+              <div><span>Совпадения накладных и расходов</span>
+                <strong>{data.owner_accrual_readiness_snapshot.posted_owner_obligations.matching_supplier_invoice_count}</strong></div>
+            </div>
+          </article>
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · признание выручки</h2>
+              <span>Подтверждения ещё нет</span></div>
+            <div className="finance-state-grid">
+              <div><span>Себестоимость приготовления</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.kitchen_cost_movements.production_cost_candidate_kgs)}</strong></div>
+              <div><span>Потери кухни</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.kitchen_cost_movements.loss_cost_candidate_kgs)}</strong></div>
+              <div><span>Обслуженные заказы (не выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_dining_face_value_kgs)}</strong></div>
+              <div><span>Брони после выезда (не выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.checked_out_booked_total_kgs)}</strong></div>
+            </div>
+            <p className="finance-footnote">Прибыль недоступна: нет принятого журнала признания доходов и всех затрат.</p>
           </article>
         </section>}
 
