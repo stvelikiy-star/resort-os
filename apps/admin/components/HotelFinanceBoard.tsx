@@ -85,6 +85,10 @@ type FinanceResponse = {
         REFUND:string;TAX_COMPONENT:string;
       };
       metadata_only_documents_not_independently_verified:true;
+      server_verified_document_bytes_count:number;
+      missing_document_bytes_count:number;
+      all_recorded_document_bytes_available:boolean;
+      document_issuer_authenticity_independently_verified:false;
       refunds_are_cash_evidence_not_recognized_revenue:true;
       recognized_revenue_kgs:null;recognized_profit_kgs:null;
       status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS';
@@ -368,7 +372,7 @@ export default function HotelFinanceBoard() {
 
               <div><span>Документальные корректировки (без признания выручки)</span>
                 <strong>{data.owner_accrual_readiness_snapshot.documented_source_corrections.recorded_corrections_count} записей</strong>
-                <small>{data.owner_accrual_readiness_snapshot.documented_source_corrections.reversed_corrections_count} отмен; документы не проверены независимо</small></div>
+                <small>{data.owner_accrual_readiness_snapshot.documented_source_corrections.reversed_corrections_count} отмен; {data.owner_accrual_readiness_snapshot.documented_source_corrections.server_verified_document_bytes_count} файлов проверены по SHA-256; {data.owner_accrual_readiness_snapshot.documented_source_corrections.missing_document_bytes_count} отсутствуют; подлинность издателя не подтверждена</small></div>
               <div><span>Скидки · отмены</span>
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.DISCOUNT)} · {exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.CANCELLATION)}</strong></div>
               <div><span>Пакеты · налоговая составляющая</span>
