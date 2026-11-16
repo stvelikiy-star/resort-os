@@ -5,6 +5,7 @@ fingerprint and its storage reference are declared by OWNER; the server cannot
 attest that bytes were actually uploaded or independently authenticated.
 No customer Payment, recognized revenue/expenses/profit, or tax payment is made.
 """
+import hashlib
 import json
 import re
 import uuid
@@ -36,6 +37,7 @@ class CorrectionWrite(BaseModel):
     document_reference: str = Field(min_length=4,max_length=150)
     document_date: date
     document_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    evidence_document_id: uuid.UUID
     evidence_reference: str = Field(min_length=8,max_length=300)
     reason: str = Field(min_length=8,max_length=500)
 
@@ -102,6 +104,8 @@ def view(row,repeated=False):
         "document_reference":row["documentReference"],
         "document_date":row["documentDate"].isoformat(),
         "document_sha256":row["documentSha256"],
+        "evidence_document_id":str(row["evidenceDocumentId"]) if row["evidenceDocumentId"] else None,
+        "bytes_sha256_verified_by_server":row["evidenceDocumentId"] is not None,
         "evidence_reference":row["evidenceReference"],
         "reason":row["reason"],
         "reverses_id":str(row["reversesId"]) if row["reversesId"] else None,
@@ -146,6 +150,7 @@ async def record_correction(body:CorrectionWrite,request:Request,user=Depends(ow
                     old["documentReference"]!=body.document_reference or
                     old["documentDate"]!=body.document_date or
                     old["documentSha256"]!=body.document_sha256 or
+                    old["evidenceDocumentId"]!=body.evidence_document_id or
                     old["evidenceReference"]!=body.evidence_reference or
                     old["reason"]!=body.reason or old["createdById"]!=owner_id):
                     raise HTTPException(409,detail={"code":"REVENUE_CORRECTION_ID_CONFLICT"})
@@ -172,6 +177,16 @@ async def record_correction(body:CorrectionWrite,request:Request,user=Depends(ow
                 body.document_reference,body.document_sha256)
             if duplicate:
                 raise HTTPException(409,detail={"code":"REVENUE_CORRECTION_DOCUMENT_ALREADY_USED"})
+            evidence=await conn.fetchrow(
+                '''SELECT * FROM owner_revenue_evidence_documents
+                   WHERE "propertyId"=$1 AND id=$2''',pid,body.evidence_document_id)
+            if not evidence:
+                raise HTTPException(404,detail={"code":"REVENUE_EVIDENCE_DOCUMENT_NOT_FOUND"})
+            if (evidence["documentReference"]!=body.document_reference or
+                evidence["documentDate"]!=body.document_date or
+                evidence["sha256"]!=body.document_sha256 or
+                hashlib.sha256(bytes(evidence["content"])).hexdigest()!=body.document_sha256):
+                raise HTTPException(409,detail={"code":"REVENUE_EVIDENCE_MISMATCH"})
             totals=await totals_for_approval(conn,pid,body.approval_id)
             try:
                 validate_correction(body.kind,body.component,body.amount_kgs,
@@ -183,19 +198,21 @@ async def record_correction(body:CorrectionWrite,request:Request,user=Depends(ow
                       "source_id":str(source["sourceId"]),
                       "service_date":source["serviceDate"].isoformat(),
                       "approved_face_value_kgs":str(source["faceValueKgs"]),
-                      "document_verification":"MANUAL_METADATA_UNVERIFIED",
+                      "document_verification":"BYTE_HASH_SERVER_VERIFIED_AUTHENTICITY_UNREVIEWED",
+                      "evidence_document_id":str(body.evidence_document_id),
                       "recognized_revenue":False}
             row=await conn.fetchrow(
                 '''INSERT INTO owner_revenue_correction_events
                    (id,"propertyId","approvalId",action,kind,component,"amountKgs",
                     "documentReference","documentDate","documentSha256",
-                    "evidenceReference",reason,"sourceSnapshot","createdById")
-                   VALUES ($1,$2,$3,'RECORD',$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13)
+                    "evidenceReference",reason,"sourceSnapshot","createdById","evidenceDocumentId")
+                   VALUES ($1,$2,$3,'RECORD',$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14)
                    RETURNING *''',
                 body.id,pid,body.approval_id,body.kind,body.component,
                 body.amount_kgs,body.document_reference,body.document_date,
                 body.document_sha256,body.evidence_reference,body.reason,
-                json.dumps(snapshot,separators=(",",":")),owner_id)
+                json.dumps(snapshot,separators=(",",":")),owner_id,
+                body.evidence_document_id)
             return view(row)
 
 
@@ -240,14 +257,15 @@ async def reverse_correction(correction_id:uuid.UUID,body:CorrectionReversal,
                 '''INSERT INTO owner_revenue_correction_events
                    (id,"propertyId","approvalId",action,kind,component,"amountKgs",
                     "documentReference","documentDate","documentSha256",
-                    "evidenceReference",reason,"reversesId","sourceSnapshot","createdById")
-                   VALUES ($1,$2,$3,'REVERSE',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14)
+                    "evidenceReference",reason,"reversesId","sourceSnapshot","createdById","evidenceDocumentId")
+                   VALUES ($1,$2,$3,'REVERSE',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15)
                    RETURNING *''',
                 body.id,pid,original["approvalId"],original["kind"],
                 original["component"],original["amountKgs"],
                 original["documentReference"],original["documentDate"],
                 original["documentSha256"],original["evidenceReference"],
-                body.reason,correction_id,source_snapshot,owner_id)
+                body.reason,correction_id,source_snapshot,owner_id,
+                original["evidenceDocumentId"])
             return view(inserted)
 
 
