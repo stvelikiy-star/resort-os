@@ -85,7 +85,12 @@ CHECKS: list[tuple[str, str, str]] = [
 
     # Guest services / offers / inbox
     ("apps/admin/components/GuestServicesCenter.tsx", "/core/api/v1/admin/guest-services", "guest services UI Core-backed"),
-    ("services/api/app/guest_services.py", 'center_access = require_roles("OWNER", "MANAGER", "RECEPTION")', "guest services RBAC"),
+    ("services/api/app/guest_services.py", 'center_roles = require_roles("OWNER", "MANAGER", "RECEPTION")', "guest services staff RBAC"),
+    ("services/api/app/guest_services.py", 'AGENT_SERVICE_QUEUE_FORBIDDEN', "agent cannot read hotel service queue"),
+    ("services/api/app/guest_services.py", 'AGENT_PMS_REQUIRED', "agent service creation requires PMS"),
+    ("services/api/app/guest_services.py", 'agent_id = await linked_agent_id_for_user(conn, pid, user)', "agent service membership rechecked"),
+    ("services/api/app/guest_services.py", 'AND ($3::uuid IS NULL OR r."agentId"=$3)', "agent services limited to own reservation"),
+    ("scripts/test_marina_agent_services.py", 'test_agent_cannot_read_hotel_queue_even_with_custom_services_grant', "agent service RBAC regression present"),
     ("apps/admin/components/GuestOffersBoard.tsx", "/core/api/v1/admin/guest-offers", "owner-configurable guest offers"),
     ("apps/admin/components/GuestOffersBoard.tsx", "clicks", "guest offer click analytics"),
     ("apps/admin/components/GuestOffersBoard.tsx", "requests", "guest offer request analytics"),

@@ -57,6 +57,9 @@ class ServerMobileTaskContractTests(unittest.TestCase):
     def test_invalid_report_payloads_fail_validation(self):
         with self.assertRaises(ValidationError):
             TaskCompletionReport(summary=" ", checklist=checked_items())
+        for empty in ("  ", "\t\n"):
+            with self.assertRaises(ValidationError):
+                TaskCompletionReport(summary=empty, checklist=checked_items())
         with self.assertRaises(ValidationError):
             TaskCompletionReport(summary="ok", checklist=checked_items(),
                                  evidence_urls=["file:///tmp/unsafe-photo.jpg"])

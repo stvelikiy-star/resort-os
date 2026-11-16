@@ -1,7 +1,7 @@
 export default function StaffShiftVisualFixture() {
   return <main className="shift-shell" data-staff-qa-fixture="true">
     <header className="shift-head">
-      <div><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>Очень длинное имя сотрудника для проверки переноса</h1><span>Ресепшен · Кыргызская Республика</span></div>
+      <div><img src="/marina-smart-approved.png" alt="MARINA SMART" width={44} height={44} style={{objectFit:"contain",display:"block"}}/><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>Очень длинное имя сотрудника для проверки переноса</h1><span>Ресепшен · Кыргызская Республика</span></div>
       <button className="shift-ghost">Выйти</button>
     </header>
     <section className="shift-kpis" aria-label="Сводка смены">

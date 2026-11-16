@@ -36,9 +36,13 @@ for(const theme of ['light','dark']) {
  const goldTextColor=theme==='light'?c.warning:c.gold;
  if(contrast(goldTextColor,c.surface)<4.5) fail(`premium wordmark text ${theme} is below WCAG AA`);
 }
-for (const fileName of ['apps/mobile/src/components/Brand.tsx','apps/mobile/src/components/OwnerControlDashboard.tsx']) {
- if(!file(fileName).includes("name === 'light' ? c.warning : c.gold")) fail(fileName+' has lost accessible light gold text mapping');
+const brand = file('apps/mobile/src/components/Brand.tsx');
+if ((brand.match(/color, letterSpacing: 1.3/g) || []).length !== 2) fail('Wordmark must use its explicit foreground for both words');
+if (!brand.includes("color = '#FFFFFF'")) fail('Dark hero wordmark foreground changed');
+for (const theme of ['light','dark']) for (const endpoint of ['heroFrom','heroTo']) {
+ if (contrast('#FFFFFF',data.theme[theme][endpoint]) < 4.5) fail(`White wordmark on ${theme}/${endpoint} is below WCAG AA`);
 }
+if (!file('apps/mobile/src/components/OwnerControlDashboard.tsx').includes("name === 'light' ? c.warning : c.gold")) fail('Demo notice text lost its contrast-safe theme mapping');
 const ts = file('apps/mobile/src/theme/tokens.ts');
 const mapped = {background:'bg',onPrimary:'primaryText'};
 for (const theme of ['light','dark']) {

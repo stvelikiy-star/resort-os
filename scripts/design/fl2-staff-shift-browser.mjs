@@ -1,6 +1,7 @@
 // Visual-only acceptance for Staff Shift CSS. Synthetic page, no real role/API operations.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 import { createRequire } from 'node:module';
 const {chromium}=createRequire(process.env.PLAYWRIGHT_PACKAGE || import.meta.url)('playwright');
 const out=process.env.STAFF_VISUAL_EVIDENCE||'staff-shift-evidence';
@@ -8,6 +9,19 @@ fs.mkdirSync(out,{recursive:true});
 const browser=await chromium.launch({headless:true});
 const results=[];
 try {
+ const brand=await browser.newContext();
+ const response=await brand.request.get('http://127.0.0.1:3002/manifest.webmanifest');
+ assert.equal(response.status(),200);
+ const manifest=await response.json();
+ assert.equal(manifest.theme_color,'#0B1F2A');
+ assert.ok(manifest.icons.some(i=>i.src==='/marina-smart-approved.png'&&i.purpose==='any'));
+ assert.ok(manifest.icons.some(i=>i.src==='/marina-smart-maskable.png'&&i.purpose==='maskable'));
+ assert.ok(manifest.icons.every(i=>!i.src.includes('icon.svg')&&!i.src.includes('icon-maskable.svg')));
+ const original=await brand.request.get('http://127.0.0.1:3002/marina-smart-approved.png');
+ assert.equal(createHash('sha256').update(await original.body()).digest('hex'),'24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356');
+ const mask=await brand.request.get('http://127.0.0.1:3002/marina-smart-maskable.png');
+ assert.equal(mask.status(),200);const png=await mask.body();assert.equal(png.readUInt32BE(16),512);assert.equal(png.readUInt32BE(20),512);
+ await brand.close();
  for(const width of [320,390,768,1440])for(const theme of ['dark','light']){
   const context=await browser.newContext({viewport:{width,height:width<600?844:900},colorScheme:theme,reducedMotion:'reduce'});
   const page=await context.newPage();const errors=[];

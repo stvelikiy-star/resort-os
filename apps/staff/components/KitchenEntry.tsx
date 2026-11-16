@@ -1,4 +1,5 @@
 "use client";
+import StaffProductLogo from "./StaffProductLogo";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -132,12 +133,12 @@ export default function KitchenEntry() {
     };
   }, [pulse]);
 
-  if (checking) return <main className={styles.loginPage}><div className={styles.loginCard}><p>MARINA SMART · Hotel OS</p><h1>Открываю кухню…</h1><span>Проверяю рабочую сессию.</span></div></main>;
+  if (checking) return <main className={styles.loginPage}><div className={styles.loginCard}><StaffProductLogo size={76}/><p>MARINA SMART · Hotel OS</p><h1>Открываю кухню…</h1><span>Проверяю рабочую сессию.</span></div></main>;
 
   if (!user) {
     return <main className={styles.loginPage}>
       <form className={styles.loginCard} onSubmit={login}>
-        <div className={styles.mark}>III</div>
+        <StaffProductLogo size={76}/>
         <p>MARINA SMART · отдельный вход</p>
         <h1>Кухня</h1>
         <span>План порций, заказы кухни, меню, стоп-лист и новые заезды — в одном рабочем контуре.</span>
@@ -154,7 +155,7 @@ export default function KitchenEntry() {
   return <>
     <section className={styles.pulse}>
       <div className={styles.pulseHead}>
-        <div><p>Кухня · сегодня</p><h2>Рабочая сводка</h2><span>{user.display_name} · {user.role}</span></div>
+        <div><StaffProductLogo/><p>Кухня · сегодня</p><h2>Рабочая сводка</h2><span>{user.display_name} · {user.role}</span></div>
         <div className={styles.pulseActions}><a href="/kitchen/today">Меню сегодня</a><a href="/waiter">Официант / зал</a><button onClick={() => void loadPulse()}>Обновить</button><button onClick={() => void logout()}>Выйти</button></div>
       </div>
       {pulseError && <div className={styles.error}>{pulseError}</div>}

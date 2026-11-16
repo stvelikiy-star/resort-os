@@ -66,6 +66,7 @@ import "./fl2-shell.css";
 
 export const metadata: Metadata = {
   title: "MARINA SMART — Hotel OS",
+  icons: { icon: "/marina-smart-approved.png", apple: "/marina-smart-approved.png" },
   description: "PMS, CRM, сайт и операционный центр MARINA SMART",
 };
 

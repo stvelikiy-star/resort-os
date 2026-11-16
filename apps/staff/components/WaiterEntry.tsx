@@ -1,4 +1,5 @@
 "use client";
+import StaffProductLogo from "./StaffProductLogo";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -236,11 +237,11 @@ export default function WaiterEntry() {
     finally { setBusy(null); }
   }
 
-  if (checking) return <main className={styles.center}>Открываю зал…</main>;
+  if (checking) return <main className={styles.center}><StaffProductLogo size={76}/>Открываю зал…</main>;
   if (!user) return <main className={styles.login}><form onSubmit={login}><img src="/marina-smart-approved.png" alt="MARINA SMART" style={{width:96,height:96,objectFit:"contain",display:"block",margin:"0 auto 12px"}} /><p>MARINA SMART · отдельный вход</p><h1>Официант / зал</h1><span>Столы, брони, заказы и выдача кухни в одном окне.</span><label>Логин<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label><label>Пароль<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" minLength={8} required /></label>{error && <div className={styles.error}>{error}</div>}<button disabled={submitting}>{submitting ? "Входим…" : "Войти в зал"}</button><a href="/kitchen">Вход кухни</a></form></main>;
 
   return <main className={styles.shell}>
-    <header className={styles.header}><div><p>MARINA SMART · Dining Floor</p><h1>Официант / зал</h1><span>{user.display_name} · {floor?.service_date || "сегодня"}</span></div><nav><a href="/kitchen">Кухня</a><a href="/kitchen/today">Меню сегодня</a><button onClick={() => void logout()}>Выйти</button></nav></header>
+    <header className={styles.header}><div><StaffProductLogo/><p>MARINA SMART · Dining Floor</p><h1>Официант / зал</h1><span>{user.display_name} · {floor?.service_date || "сегодня"}</span></div><nav><a href="/kitchen">Кухня</a><a href="/kitchen/today">Меню сегодня</a><button onClick={() => void logout()}>Выйти</button></nav></header>
     {error && <div className={styles.error}>{error}</div>}
 
     <section className={styles.metrics}>

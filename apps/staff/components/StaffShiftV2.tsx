@@ -1,4 +1,5 @@
 "use client";
+import StaffProductLogo from "./StaffProductLogo";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
@@ -286,7 +287,7 @@ export default function StaffShiftV2({ sharedSession }: {
 
   return <main className="shift-shell">
     <header className="shift-head">
-      <div><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>{user.display_name}</h1><span>{roleLabel[user.role]}{telegramDetected ? " · Telegram" : ""}</span></div>
+      <div><StaffProductLogo size={44}/><p className="shift-eyebrow">MARINA SMART · Моя смена</p><h1>{user.display_name}</h1><span>{roleLabel[user.role]}{telegramDetected ? " · Telegram" : ""}</span></div>
       <button className="shift-ghost" onClick={logout}>Выйти</button>
     </header>
 

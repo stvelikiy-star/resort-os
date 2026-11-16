@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 import { apiFor, dropApi } from '../api/factory';
 import { createRealApi } from '../api/realApi';
 import { flushPendingCookieLogouts, hasUnrevokedCookieForHost, queueCookieLogout } from '../lib/pendingLogout';
-import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress } from '../api/hotels';
+import { DEMO_HOTELS, HotelConnection, hotelConnectionId, isTrustedHotelOrigin, parseHotelAddress, provisionedHotelConnection } from '../api/hotels';
 import { ApiError } from '../api/types';
 import { activateClientSession, bindVerifiedHost } from '../api/unauthorizedSession';
 import { checkedHotelSelector, matchesSelectedHotel, sameSessionIdentity } from '../api/sharedHotelAuth';
@@ -40,8 +40,10 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
     initI18n(selected);
     return selected;
   });
-  const [hotels, setHotels] = useState<HotelConnection[]>(DEMO_HOTELS);
-  const [hotelId, setHotelId] = useState<string | null>(initialHotelId ?? null);
+  const pinnedHotel = useMemo(() => provisionedHotelConnection(), []);
+  const initialCatalogue = useMemo(() => [...DEMO_HOTELS, ...(pinnedHotel ? [pinnedHotel] : [])], [pinnedHotel]);
+  const [hotels, setHotels] = useState<HotelConnection[]>(initialCatalogue);
+  const [hotelId, setHotelId] = useState<string | null>(initialHotelId ?? pinnedHotel?.id ?? null);
   // Sessions are keyed by hotel id: signing in to hotel A never exposes data of hotel B.
   const [sessions, setSessions] = useState<Record<string, AuthUser>>(initialHotelId && initialUser ? { [initialHotelId]: initialUser } : {});
   const [serverAuthMode, setServerAuthMode] = useState<AuthMode | null>(null);
@@ -61,8 +63,8 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         if (!Array.isArray(saved)) return;
         // Saved connections are preferences, not trusted configuration.
         // Re-validate every origin before a network client can be constructed.
-        const known = new Set(DEMO_HOTELS.map((h) => h.id));
-        const hosts = new Set<string>();
+        const known = new Set(initialCatalogue.map((h) => h.id));
+        const hosts = new Set(initialCatalogue.filter((h) => !h.demo).map((h) => new URL(h.baseUrl).hostname));
         const extra: HotelConnection[] = [];
         for (const item of saved.slice(0, 50)) {
           if (!item || typeof item !== 'object') continue;
@@ -81,14 +83,14 @@ export function SessionProvider({ children, initialLocale, initialHotelId, initi
         // Never silently pick one: clear ambiguous preferences and require
         // an explicit, trusted single-property setup again.
         if (extra.length > 1) {
-          setHotels(DEMO_HOTELS);
+          setHotels(initialCatalogue);
           void setItem('marina.hotels', '[]');
           return;
         }
-        setHotels([...DEMO_HOTELS, ...extra]);
+        setHotels([...initialCatalogue, ...extra]);
       } catch { /* ignore corrupt preferences */ }
     });
-  }, [initialLocale]);
+  }, [initialLocale, initialCatalogue]);
 
   const hotel = hotels.find((h) => h.id === hotelId) ?? null;
   const user = hotel ? sessions[hotel.id] ?? null : null;

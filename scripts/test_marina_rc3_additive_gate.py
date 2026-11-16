@@ -1,5 +1,6 @@
 import json
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from marina_rc3_additive_gate import ROOT, RC2_FILE, RC3_FILE, validate_additive
 from marina_rc3_source_gate import validate, git_blob_sha
@@ -8,6 +9,14 @@ class AdditiveRC3SourceGateTests(unittest.TestCase):
     def test_39_pinned_sql_and_zz115_accepted_without_production_claims(self):
         self.assertEqual(validate_additive(), [])
         self.assertIs(json.loads((ROOT/RC3_FILE).read_text())["production_cutover_authorized"], False)
+
+    def test_unreviewed_task_report_change_fails_closed(self):
+        from marina_rc3_additive_gate import TASK_REPORT_PATH
+        original_read = Path.read_bytes
+        def tamper(path):
+            return b"unreviewed report code" if path == ROOT / TASK_REPORT_PATH else original_read(path)
+        with patch.object(Path, "read_bytes", tamper):
+            self.assertIn("reviewed additive task report source changed", validate_additive())
 
     def test_historical_source_gate_git_blob_unchanged(self):
         manifest=json.loads((ROOT/RC3_FILE).read_text())

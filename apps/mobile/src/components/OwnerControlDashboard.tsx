@@ -100,6 +100,15 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
         color={c.cyan} trackColor={c.surfaceAlt}/> : null}
     </GlassCard></StaggerItem>
 
+    {canFinance ? <View style={{ gap: space.sm }}>
+      <SectionLabel>{copy.financeTitle} · {copy.today}</SectionLabel>
+      {row(1,
+        metric(Wallet, copy.revenue, currency(data.finance.confirmed_payments_today_kgs), c.primary, open('/finance')),
+        metric(ShieldAlert, copy.debt, currency(data.finance.active_reservations_remaining_kgs), c.warning, open('/finance')),
+      )}
+      <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text>
+    </View> : null}
+
     <StaggerItem index={1}><GlassCard style={{ padding: 15, gap: 12, borderLeftWidth: 3, borderLeftColor: c.cyan }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
         <Text style={[font.h2, { color: c.text, flex: 1 }]}>{copy.roomCondition}</Text>
@@ -123,11 +132,6 @@ export function OwnerControlDashboard({ data, user, copy, canOpen, canOpenInbox,
         metric(ClipboardCheck, copy.housekeepingOverview, count(data.tasks.housekeeping_active), c.success, canOpen('tasks') ? open('/tasks') : undefined),
         metric(Wrench, copy.maintenanceOverview, count(data.tasks.maintenance_active), c.warning, canOpen('tasks') ? open('/tasks') : undefined),
       )}
-      {canFinance ? row(5,
-        metric(Wallet, copy.revenue, currency(data.finance.confirmed_payments_today_kgs), c.gold, open('/finance')),
-        metric(ShieldAlert, copy.debt, currency(data.finance.active_reservations_remaining_kgs), c.warning, open('/finance')),
-      ) : null}
-      {canFinance ? <Text style={[font.small, { color: c.textMuted }]}>{copy.paymentsNotProfit}</Text> : null}
     </View>
 
     <StaggerItem index={6}><View style={{ gap: space.sm }}>

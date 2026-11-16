@@ -1,5 +1,6 @@
 """Shared dining P0: exact ASGI admission and fail-closed staging opt-in."""
 import os
+import asyncio
 import sys
 import unittest
 import uuid
@@ -77,32 +78,36 @@ class SharedDiningP0Tests(unittest.TestCase):
         other_id = uuid.uuid4()
         waiter = {"id": str(waiter_id), "role": "WAITER"}
         cook = {"id": str(other_id), "role": "COOK"}
-        with patch.object(kitchen, "shared_dining_staging_guard") as stage:
-            kitchen.enforce_waiter_service_request(waiter, "SERVED")
-            stage.assert_called_once()
-            for status in ("NEW", "ACCEPTED", "COOKING", "READY", "CANCELLED"):
-                with self.subTest(status=status), self.assertRaises(HTTPException) as blocked:
-                    kitchen.enforce_waiter_service_request(waiter, status)
-                self.assertEqual(blocked.exception.status_code, 403)
-                self.assertEqual(blocked.exception.detail["code"], "WAITER_ONLY_SERVES")
-            kitchen.enforce_waiter_order_assignment(waiter, waiter_id)
-            for invalid in (None, other_id):
-                with self.subTest(assigned=invalid), self.assertRaises(HTTPException) as blocked:
-                    kitchen.enforce_waiter_order_assignment(waiter, invalid)
-                self.assertEqual(blocked.exception.status_code, 403)
-                self.assertEqual(blocked.exception.detail["code"], "WAITER_ORDER_NOT_ASSIGNED")
-            # The existing kitchen role retains its original status and order operations.
-            kitchen.enforce_waiter_service_request(cook, "COOKING")
-            kitchen.enforce_waiter_order_assignment(cook, None)
+        kitchen.enforce_waiter_service_request(waiter, "SERVED")
+        for status in ("NEW", "ACCEPTED", "COOKING", "READY", "CANCELLED"):
+            with self.subTest(status=status), self.assertRaises(HTTPException) as blocked:
+                kitchen.enforce_waiter_service_request(waiter, status)
+            self.assertEqual(blocked.exception.status_code, 403)
+            self.assertEqual(blocked.exception.detail["code"], "WAITER_ONLY_SERVES")
+        kitchen.enforce_waiter_order_assignment(waiter, waiter_id)
+        for invalid in (None, other_id):
+            with self.subTest(assigned=invalid), self.assertRaises(HTTPException) as blocked:
+                kitchen.enforce_waiter_order_assignment(waiter, invalid)
+            self.assertEqual(blocked.exception.status_code, 403)
+            self.assertEqual(blocked.exception.detail["code"], "WAITER_ORDER_NOT_ASSIGNED")
+        # The existing kitchen role retains its original status and order operations.
+        kitchen.enforce_waiter_service_request(cook, "COOKING")
+        kitchen.enforce_waiter_order_assignment(cook, None)
 
-    def test_waiter_serving_stays_closed_without_staging_guard(self):
-        waiter = {"id": str(uuid.uuid4()), "role": "WAITER"}
-        with patch.object(kitchen, "shared_dining_staging_guard",
-                          side_effect=HTTPException(status_code=503,
-                                                    detail="Shared dining not enabled")):
-            with self.assertRaises(HTTPException) as blocked:
-                kitchen.enforce_waiter_service_request(waiter, "SERVED")
-            self.assertEqual(blocked.exception.status_code, 503)
+    def test_shared_boundary_blocks_serving_without_staging_opt_in(self):
+        # Serving is now canonical (#483). The shared-mode opt-in guard lives
+        # in ASGI admission, not in kitchen.enforce_waiter_service_request.
+        delivered=[]
+        async def endpoint(scope,receive,send):
+            delivered.append(True)
+        boundary=dining.SharedDiningP0Boundary(endpoint,lambda app:app)
+        messages=[]
+        async def receive():return {"type":"http.request","body":b"","more_body":False}
+        async def send(message):messages.append(message)
+        with patch.object(dining,"guard",side_effect=HTTPException(503,"Shared dining not enabled")):
+            asyncio.run(boundary({"type":"http","method":"PATCH", "path":f"/api/v1/kitchen/orders/{ORDER_A}/status"},receive,send))
+        self.assertFalse(delivered)
+        self.assertEqual(messages[0]["status"],503)
 
     def test_cannot_activate_on_demo_production_or_plain_cookie(self):
         with patch.object(auth, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True), (
