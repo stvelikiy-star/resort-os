@@ -90,6 +90,12 @@ async def main():
                 fid,pid,rid,sid,gid,oid,today)
             await db.execute('UPDATE kitchen_orders SET "folioChargeId"=$2 WHERE id=$1',oid,fid)
             route='/api/v1/admin/finance/owner/revenue-source-events'
+            accrual_url='/api/v1/admin/finance/owner/accrual-readiness'
+            accrual_period={'from_date':start.isoformat(),'to_date':today.isoformat()}
+            baseline=accept(await owner.get(accrual_url,params=accrual_period),
+                            200,'owner baseline journal snapshot')
+            baseline_journal=baseline['source_approval_journal']
+            assert baseline_journal['recognized_profit_kgs'] is None
             r1=uuid.uuid4()
             approval={'id':str(r1),'source_type':'ROOM_NIGHT',
                       'source_id':str(rid),'service_date':start.isoformat(),
@@ -145,6 +151,15 @@ async def main():
             assert ids.count(str(r1))==1 and ids.count(str(reverse_id))==1
             assert events['history_append_only'] is True
             assert events['recognized_profit_kgs'] is None
+            snapshot=accept(await owner.get(accrual_url,params=accrual_period),
+                            200,'owner financial approval snapshot')
+            ledger=snapshot['source_approval_journal']
+            assert ledger['approval_events_count']-baseline_journal['approval_events_count']==3
+            assert ledger['reversal_events_count']-baseline_journal['reversal_events_count']==1
+            assert ledger['active_room_nights_count']-baseline_journal['active_room_nights_count']==1
+            assert ledger['active_served_dining_count']-baseline_journal['active_served_dining_count']==1
+            assert ledger['recognized_revenue_kgs'] is None
+            assert snapshot['recognition']['recognized_profit_kgs'] is None
             stored=await db.fetchval(
                 'SELECT COUNT(*) FROM owner_revenue_source_events WHERE "propertyId"=$1 AND id=$2',
                 pid,r1)
