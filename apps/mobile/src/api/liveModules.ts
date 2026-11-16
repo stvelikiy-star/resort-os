@@ -136,7 +136,47 @@ export interface KitchenLossAcknowledgment {
 export interface KitchenStockConsumeAck {
   consumed_portions:number; already_processed:boolean; cost_kgs:string; payment_created:false;
 }
+export interface OwnerAccrualReadiness {
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string;currency:'KGS'};
+  posted_owner_obligations:{
+    posted_total_kgs:string;non_stock_obligations_candidate_kgs:string;
+    stock_overlap_review_kgs:string;posted_count:number;
+    categories_kgs:Record<string,string>;
+    status:'CLASSIFICATION_REQUIRED'|'POSTED_NOT_RECOGNIZED';
+    matching_supplier_invoice_count:number;matching_supplier_invoice_kgs:string;
+  };
+  kitchen_cost_movements:{
+    production_cost_candidate_kgs:string;loss_cost_candidate_kgs:string;
+    receipt_inventory_inflow_kgs:string;supplier_return_inventory_debit_kgs:string;
+    sample_movement_gross_kgs:string;costs_are_reconciled_to_revenue:false;
+  };
+  revenue_source_candidates:{
+    served_dining_orders_count:number;served_dining_face_value_kgs:string;
+    served_without_linked_folio_count:number;served_without_linked_folio_kgs:string;
+    served_with_active_folio_count:number;served_with_active_folio_kgs:string;
+    disputed_dining_folio_count:number;
+    manual_folio_active_count:number;manual_folio_face_value_kgs:string;
+    manual_folio_without_service_date_count:number;
+    checked_out_reservations_count:number;checked_out_booked_total_kgs:string;
+    amounts_are_not_additive_or_recognized:true;
+  };
+  source_valuation:{
+    inventory_valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    source_mismatch_count:number;supplier_return_credit_minus_stock_cost_kgs:string;
+    supplier_payables_outstanding_kgs:string;
+  };
+  recognition:{
+    status:'REQUIRES_APPROVED_RECOGNITION_LEDGER';
+    blockers:string[];
+    recognized_revenue_kgs:null;recognized_expenses_kgs:null;recognized_profit_kgs:null;
+    completeness_verified:false;customer_payments_are_revenue:false;
+    supplier_settlements_are_expenses:false;receipts_are_expenses:false;
+    source_candidates_are_recognized:false;
+  };
+}
 export interface FinanceSummary {
+  owner_accrual_readiness_snapshot?:OwnerAccrualReadiness;
   kitchen_stock_cost?: {real_production_cost_kgs: string; sample_production_cost_kgs: string;
     movement_count: number; basis: 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'};
   range: { from: string; to: string; currency: string };
