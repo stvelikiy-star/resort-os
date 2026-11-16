@@ -59,6 +59,7 @@ const KITCHEN_REPORT_COPY={
 
 const ACCRUAL_READINESS_COPY={
  ru:{
+  corrections:'Корректировки по документам (не прибыль)',discount:'Скидки',packages:'Распределение пакетов',cancels:'Отмены',refunds:'Возвраты (отдельные денежные факты)',taxes:'Налоговые компоненты',docWarning:'Подлинность приложенных документов ещё не проверена.',
   journal:'Подтверждённые источники (не выручка)',approvals:'Утверждения источников',reversals:'Отмены утверждений',nightsApproved:'Подтверждённые ночи',diningApproved:'Подтверждённые заказы',
   delivered:'Проживание по фактическим ночам (оценка)',deliveredCount:'Подтверждённые ночи',deliveredExcluded:'Брони, требующие сверки',folioLinked:'Обслуженные заказы со сверенным folio',folioExcluded:'Заказы, требующие сверки',deliveredNotice:'Оценка проживания распределена по фактическим ночам. Пакеты услуг, скидки, налоги и возвраты ещё не сверены.',
   title:'OWNER · сверка доходов и расходов',
@@ -70,6 +71,7 @@ const ACCRUAL_READINESS_COPY={
   missing:'Заказы без связанной записи folio',
   status:'Признанная прибыль недоступна',notice:'Это показатели для сверки, не отчёт о прибыли. Платежи, накладные, продажи и расходы не складываются автоматически.'},
  kg:{
+  corrections:'Документтик түзөтүүлөр (пайда эмес)',discount:'Арзандатуулар',packages:'Пакеттерди бөлүштүрүү',cancels:'Жокко чыгаруулар',refunds:'Кайтаруулар (өзүнчө акча фактысы)',taxes:'Салык бөлүктөрү',docWarning:'Документтердин түп нускасы али текшериле элек.',
   journal:'Ырасталган булактар (киреше эмес)',approvals:'Булак бекитүүлөрү',reversals:'Бекитүүнү жокко чыгаруулар',nightsApproved:'Ырасталган түндөр',diningApproved:'Ырасталган заказдар',
   delivered:'Чыныгы түндөр боюнча жашоо баасы (болжол)',deliveredCount:'Ырасталган түндөр',deliveredExcluded:'Текшерүүнү талап кылган брондор',folioLinked:'Folio менен салыштырылган заказдар',folioExcluded:'Текшерүүнү талап кылган заказдар',deliveredNotice:'Жашоо баасы чыныгы түндөр боюнча бөлүндү. Пакеттер, арзандатуулар, салыктар жана кайтаруулар текшериле элек.',
   title:'ЭЭСИ · киреше жана чыгаша салыштыруусу',
@@ -81,6 +83,7 @@ const ACCRUAL_READINESS_COPY={
   missing:'Folio жазуусу жок буйрутмалар',
   status:'Таанылган пайда жеткиликсиз',notice:'Бул пайда эмес, салыштыруу үчүн маалымат. Төлөмдөр, накладнойлор жана чыгашалар автоматтык кошулбайт.'},
  en:{
+  corrections:'Documented corrections (not profit)',discount:'Discounts',packages:'Package allocations',cancels:'Cancellations',refunds:'Refund claims (separate cash facts)',taxes:'Tax components',docWarning:'Document authenticity has not been independently verified.',
   journal:'Approved sources (not earned revenue)',approvals:'Source approvals',reversals:'Approval reversals',nightsApproved:'Approved room nights',diningApproved:'Approved dining orders',
   delivered:'Lodging by delivered night (candidate)',deliveredCount:'Verified nights',deliveredExcluded:'Bookings requiring review',folioLinked:'Served orders matched to folio',folioExcluded:'Orders requiring review',deliveredNotice:'Booked value is allocated by verified stay nights. Packages, discounts, tax and refunds remain unverified.',
   title:'OWNER · revenue and expense reconciliation',
@@ -93,6 +96,7 @@ const ACCRUAL_READINESS_COPY={
   status:'Recognized profit unavailable',
   notice:'Operational candidates only, not a profit report. Payments, supplier invoices, sales and expenses must not be added automatically.'},
  kz:{
+  corrections:'Құжаттық түзетулер (пайда емес)',discount:'Жеңілдіктер',packages:'Пакет бөлінісі',cancels:'Бас тартулар',refunds:'Қайтарымдар (бөлек ақша дерегі)',taxes:'Салық құрамдастары',docWarning:'Құжаттардың түпнұсқалығы әлі тексерілмеген.',
   journal:'Расталған дереккөздер (табыс емес)',approvals:'Дереккөзді бекіту',reversals:'Бекітуді қайтару',nightsApproved:'Расталған түндер',diningApproved:'Расталған тапсырыстар',
   delivered:'Нақты түндер бойынша тұру құны (бағалау)',deliveredCount:'Расталған түндер',deliveredExcluded:'Тексеруді қажет ететін броньдар',folioLinked:'Folio-мен сәйкес берілген тапсырыстар',folioExcluded:'Тексеруді қажет ететін тапсырыстар',deliveredNotice:'Тұру құны расталған түндерге бөлінді. Пакеттер, жеңілдіктер, салық және қайтарым тексерілмеген.',
   title:'ИЕСІ · табыс пен шығынды салыстыру',
@@ -323,6 +327,19 @@ export default function Finance() {
             String(data.owner_accrual_readiness_snapshot.source_approval_journal.active_room_nights_count))}
           {line(accrualCopy.diningApproved,
             String(data.owner_accrual_readiness_snapshot.source_approval_journal.active_served_dining_count))}
+          {line(accrualCopy.corrections,
+            String(data.owner_accrual_readiness_snapshot.documented_source_corrections.recorded_corrections_count))}
+          {line(accrualCopy.discount,
+            data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.DISCOUNT+' '+data.range.currency)}
+          {line(accrualCopy.packages,
+            data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.PACKAGE_SPLIT+' '+data.range.currency)}
+          {line(accrualCopy.cancels,
+            data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.CANCELLATION+' '+data.range.currency)}
+          {line(accrualCopy.refunds,
+            data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.REFUND+' '+data.range.currency)}
+          {line(accrualCopy.taxes,
+            data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.TAX_COMPONENT+' '+data.range.currency)}
+          <Text style={[font.small,{color:c.warning}]}>{accrualCopy.docWarning}</Text>
           <Text style={[font.body,{color:c.warning,fontWeight:'700'}]}>{accrualCopy.status}</Text>
           <Text style={[font.small,{color:c.textMuted}]}>{accrualCopy.notice}</Text>
         </GlassCard>
