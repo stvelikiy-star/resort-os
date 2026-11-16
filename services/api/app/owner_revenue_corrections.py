@@ -41,16 +41,25 @@ class CorrectionWrite(BaseModel):
 
     @field_validator("document_reference","evidence_reference","reason")
     @classmethod
-    def normalize_reference(cls,v):
+    def normalize_reference(cls,v,info):
         x=" ".join(v.split())
-        if len(x)<8 if v=="" else False:
-            raise ValueError("Invalid reference")
+        minimum=4 if info.field_name=="document_reference" else 8
+        if len(x)<minimum:
+            raise ValueError("Document reference, evidence or reason is blank")
         return x
 
 
 class CorrectionReversal(BaseModel):
     id: uuid.UUID
     reason: str = Field(min_length=8,max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_blank(cls,value):
+        normalized=" ".join(value.split())
+        if len(normalized)<8:
+            raise ValueError("Reversal reason must contain at least 8 nonblank characters")
+        return normalized
 
 
 def validate_correction(kind,component,amount,face,totals):
