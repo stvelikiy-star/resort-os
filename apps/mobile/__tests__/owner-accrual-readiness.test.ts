@@ -36,6 +36,9 @@ const accrual={
   active_by_kind_kgs:{DISCOUNT:'0.0000',PACKAGE_SPLIT:'200.0000',
     CANCELLATION:'30.0000',REFUND:'10.0000',TAX_COMPONENT:'20.0000'},
   metadata_only_documents_not_independently_verified:true,
+  server_verified_document_bytes_count:5,missing_document_bytes_count:0,
+  all_recorded_document_bytes_available:true,
+  document_issuer_authenticity_independently_verified:false,
   refunds_are_cash_evidence_not_recognized_revenue:true,
   tax_and_packages_are_classifications_not_expenses:true,
   recognized_revenue_kgs:null,recognized_profit_kgs:null,
@@ -120,6 +123,12 @@ test('fail closed: fabricated recognized profit, double-counting, invalid blocke
   {...accrual,documented_source_corrections:{
     ...accrual.documented_source_corrections,
     metadata_only_documents_not_independently_verified:false}},
+  {...accrual,documented_source_corrections:{
+    ...accrual.documented_source_corrections,
+    server_verified_document_bytes_count:4}},
+  {...accrual,documented_source_corrections:{
+    ...accrual.documented_source_corrections,
+    document_issuer_authenticity_independently_verified:true}},
   {...accrual,documented_source_corrections:{
     ...accrual.documented_source_corrections,
     refunds_are_cash_evidence_not_recognized_revenue:false}},
