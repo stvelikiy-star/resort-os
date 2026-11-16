@@ -56,6 +56,7 @@ from .owner_cash_reconciliation import router as owner_cash_reconciliation_route
 from .owner_accrual_readiness import router as owner_accrual_readiness_router
 from .owner_delivered_revenue import router as owner_delivered_revenue_router
 from .owner_revenue_source_journal import router as owner_revenue_source_journal_router
+from .owner_revenue_corrections import router as owner_revenue_corrections_router
 from .main import app
 from .channel_reservations import router as channel_reservations_router
 from .channel_mappings import router as channel_mappings_router
@@ -264,6 +265,7 @@ app.include_router(owner_cash_reconciliation_router)
 app.include_router(owner_accrual_readiness_router)
 app.include_router(owner_delivered_revenue_router)
 app.include_router(owner_revenue_source_journal_router)
+app.include_router(owner_revenue_corrections_router)
 app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
 app.include_router(dining_control_router)
