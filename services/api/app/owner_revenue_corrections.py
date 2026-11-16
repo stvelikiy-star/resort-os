@@ -272,27 +272,39 @@ async def reverse_correction(correction_id:uuid.UUID,body:CorrectionReversal,
 async def correction_snapshot(conn,pid,from_date,to_date):
     rows=await conn.fetch(
         '''SELECT e.kind,e."amountKgs",e."documentSha256",e.action,e.id,
+                  d.id AS verified_document_id,
                   EXISTS (SELECT 1 FROM owner_revenue_correction_events r
                     WHERE r."propertyId"=e."propertyId"
                       AND r."reversesId"=e.id) AS reversed_
            FROM owner_revenue_correction_events e
            JOIN owner_revenue_source_events s ON s.id=e."approvalId"
                 AND s."propertyId"=e."propertyId"
+           LEFT JOIN owner_revenue_evidence_documents d
+                ON d.id=e."evidenceDocumentId" AND d."propertyId"=e."propertyId"
+               AND d.sha256=e."documentSha256"
            WHERE e."propertyId"=$1 AND s."serviceDate">=$2
                  AND s."serviceDate"<=$3''',pid,from_date,to_date)
     summary={kind:Decimal("0") for kind in ALL_KINDS}
-    entries=0;reversals=0
+    entries=0;reversals=0;verified=0;missing=0
     for r in rows:
         if r["action"]=="REVERSE":
             reversals+=1
         else:
             entries+=1
+            if r["verified_document_id"] is not None:
+                verified+=1
+            else:
+                missing+=1
             if not r["reversed_"]:
                 summary[r["kind"]]+=Decimal(r["amountKgs"])
     return {"recorded_corrections_count":entries,
             "reversed_corrections_count":reversals,
             "active_by_kind_kgs":{k:str(v.quantize(MONEY)) for k,v in summary.items()},
             "metadata_only_documents_not_independently_verified":True,
+            "server_verified_document_bytes_count":verified,
+            "missing_document_bytes_count":missing,
+            "all_recorded_document_bytes_available":missing==0,
+            "document_issuer_authenticity_independently_verified":False,
             "refunds_are_cash_evidence_not_recognized_revenue":True,
             "tax_and_packages_are_classifications_not_expenses":True,
             "recognized_revenue_kgs":None,
