@@ -69,3 +69,18 @@ html[data-marina-ui="future-luxury"] .fl2-style-panel { position:absolute;z-inde
 @media(max-width:1100px) {
   html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;overflow:visible; }
 }
+
+/* Touch targets: Future Luxury controls reach the 44px minimum on phones/tablets/coarse pointers (WCAG 2.5.5/2.5.8). Legacy skin unchanged. */
+@media (max-width: 820px), (pointer: coarse) {
+  html[data-marina-ui="future-luxury"] main button:not([data-section]),
+  html[data-marina-ui="future-luxury"] .btn,
+  html[data-marina-ui="future-luxury"] select,
+  html[data-marina-ui="future-luxury"] textarea,
+  html[data-marina-ui="future-luxury"] input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]) { min-height:44px !important; }
+}
+
+/* One active Dashboard item on desktop: grouped sidebar keeps the existing route.
+   On tablet/mobile retain the current section and its navigation toggle. */
+@media (min-width: 1101px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-current-section { display: none; }
+}
