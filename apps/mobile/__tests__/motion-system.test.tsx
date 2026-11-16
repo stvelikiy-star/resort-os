@@ -216,7 +216,7 @@ describe('source contracts', () => {
   });
   it('tab set, order and role guards are unchanged', () => {
     const layout = fs.readFileSync(path.join(root, 'app/(app)/_layout.tsx'), 'utf8');
-    expect(layout).toContain("const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'tasks', 'rooms', 'requests', 'admin', 'profile'];");
+    expect(layout).toContain("const ORDER: TabKey[] = ['overview', 'reception', 'pms', 'inbox', 'dining', 'kitchen', 'store', 'tasks', 'rooms', 'requests', 'admin', 'profile'];");
     expect(layout).toContain('hasTabForSession(user.role, user.module_permissions, mode, selected, serverAuthMode)');
     expect(layout).toContain('mobileTabPlan(workspace.tabs)');
     expect(layout).toContain("<Tabs.Screen name=\"more\"");
