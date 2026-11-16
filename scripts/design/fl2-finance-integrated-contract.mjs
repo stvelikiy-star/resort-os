@@ -16,6 +16,7 @@ const adminRuntime=has('apps/admin/components/AdminExperienceRuntime.tsx',['OWNE
 assert.ok(adminRuntime.includes('KZ_EXACT') && adminRuntime.includes('const exact:'),'KZ fallback and full locale dictionary both required');
 has('services/api/app/owner_kitchen_reconciliation.py',['recognized_profit_kgs']);
 has('apps/admin/components/AdminShell.tsx',['FutureLuxuryAppearance','data-fl2-theme']);
-has('apps/mobile/src/components/Motion.tsx',['ReducedMotion'] .filter(x=>read('apps/mobile/src/components/Motion.tsx').includes(x)).concat(['use']));
+has('apps/mobile/src/components/Motion.tsx',['useMotionPreference','motionPresets','stopAnimation']);
+has('apps/mobile/src/theme/motion.ts',['isReduceMotionEnabled','reduceMotionChanged','AppState.currentState']);
 for(const p of ['packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/migration.sql','packages/database/prisma/migrations/zz121_marina_supplier_documents_20261116/migration.sql','packages/database/prisma/migrations/zz122_marina_supplier_returns_20261116/migration.sql'])assert.ok(fs.statSync(p).size>0,p);
 console.log('FL2_FINANCE_INTEGRATION_PRESERVATION_PASS: brand, role, finance API, refresh, supplier valuation, i18n, owner profit gate, and migrations');
