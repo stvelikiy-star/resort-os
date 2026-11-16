@@ -17,12 +17,12 @@ test('all ordinary product icon references retain the exact approved source', ()
   expect(config.android.adaptiveIcon.backgroundColor).toBe('#0B1F2A');
 });
 
-test('Android adaptive foreground leaves every visible pixel inside the central 72/108 safe circle', () => {
+test('Android adaptive foreground leaves every visible pixel inside the central 66/108 safe circle', () => {
   expect(config.android.adaptiveIcon.foregroundImage).toBe('./assets/marina-smart-adaptive.png');
   const image = PNG.sync.read(fs.readFileSync(path.join(root, config.android.adaptiveIcon.foregroundImage)));
   expect(image.width).toBe(1024); expect(image.height).toBe(1024);
   const center = (image.width - 1) / 2;
-  const safeRadiusSquared = Math.pow(image.width * 72 / 108 / 2, 2);
+  const safeRadiusSquared = Math.pow(image.width * 66 / 108 / 2, 2);
   let visible = 0;
   let outside = 0;
   for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) {
