@@ -16,8 +16,8 @@ const ledger={
   items:[],totals:{posted_expenses_kgs:0,settled_against_period_expenses_kgs:0,outstanding_kgs:0},
 };
 const list=jest.fn(), post=jest.fn(), settled=jest.fn(), onCommitted=jest.fn();
-const live={ownerExpenses:list,postOwnerExpense:post,settleOwnerExpense:settled}
-  as unknown as ReturnType<typeof createLiveModules>;
+const live={ownerExpenses:list,postOwnerExpense:post,settleOwnerExpense:settled} as
+  unknown as ReturnType<typeof createLiveModules>;
 const makeScreen=()=> <ThemeProvider initial="light"><OwnerExpenses
   live={live} from="2026-11-01" to="2026-11-30" onCommitted={onCommitted}
 /></ThemeProvider>;
