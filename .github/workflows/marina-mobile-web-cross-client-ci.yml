@@ -47,12 +47,17 @@ jobs:
       OPENAI_API_KEY: ''
       MARINA_AI_API_KEY: ''
     steps:
-      - name: Checkout exact Mobile candidate including test transport
-        uses: actions/checkout@v4
-      - name: Checkout exact accepted Web/Staff/Guest integration candidate
+      # Both clients, API and Prisma migrations MUST come from one immutable source SHA.
+      # For PRs use the reviewed head, never GitHub's temporary PR merge commit.
+      - name: Checkout exact integrated release candidate including Mobile transport
         uses: actions/checkout@v4
         with:
-          ref: 1ab7e68a535e7ac03740ae9ad160682fa57669fe
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout the SAME integrated release SHA as isolated Web/API runtime
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: web-candidate
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -61,14 +66,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify immutable source pairing
+      - name: Fail closed unless Mobile, Web, API and migrations use the same SHA
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          test "$(git -C web-candidate rev-parse HEAD)" = '1ab7e68a535e7ac03740ae9ad160682fa57669fe'
+          mobile_sha="$(git rev-parse HEAD)"
+          web_api_sha="$(git -C web-candidate rev-parse HEAD)"
+          test "$mobile_sha" = "$EXPECTED_SHA"
+          test "$web_api_sha" = "$EXPECTED_SHA"
+          test "$mobile_sha" = "$web_api_sha"
           test -f apps/mobile/src/api/http.ts
           test -f web-candidate/scripts/marina_shared_live_browser_db.py
-          echo 'Web candidate exact SHA + tested Mobile client source confirmed'
+          test -f web-candidate/packages/database/prisma/schema.prisma
+          printf 'PASS: one immutable release source SHA for Mobile, Web, API and Prisma migrations: %s\n' "$EXPECTED_SHA"
       - name: Migrate and seed two isolated CI properties
         working-directory: web-candidate
         run: |
