@@ -36,7 +36,7 @@ const labelByLocale:Record<string,[string,string]>={
   kg:['Чыгымдын аты','Сумма, сом'],
   kz:['Шығын атауы','Сома, сом'],
 };
-async function fill(view:ReturnType<typeof render>){
+async function fill(view:Awaited<ReturnType<typeof render>>){
   const [name,amount]=labelByLocale[mockLocale];
   await waitFor(()=>expect(view.getByLabelText(name)).toBeTruthy());
   fireEvent.changeText(view.getByLabelText(name),'Supplies');
@@ -51,7 +51,7 @@ async function confirm(){
 }
 
 test('confirmed expense writes once, reloads the ledger and invalidates parent finance',async()=>{
-  const view=render(makeScreen()); await fill(view);await confirm();
+  const view=await render(makeScreen()); await fill(view);await confirm();
   await waitFor(()=>expect(onCommitted).toHaveBeenCalledTimes(1));
   expect(post).toHaveBeenCalledTimes(1);
   expect(list).toHaveBeenCalledTimes(2);
@@ -60,7 +60,7 @@ test('confirmed expense writes once, reloads the ledger and invalidates parent f
 
 test('unconfirmed network outcome retains identical retry, without updating finance',async()=>{
   post.mockRejectedValueOnce(new Error('lost ack'));
-  const view=render(makeScreen());await fill(view);await confirm();
+  const view=await render(makeScreen());await fill(view);await confirm();
   await waitFor(()=>expect(view.getByTestId('owner-expense-retry')).toBeTruthy());
   expect(onCommitted).not.toHaveBeenCalled();
   expect(jest.mocked(Alert.alert).mock.calls.some(c=>c[0]==='Saved')).toBe(false);
@@ -71,7 +71,7 @@ test('unconfirmed network outcome retains identical retry, without updating fina
 
 test('post-commit parent refresh rejection still shows saved and never offers duplicate retry',async()=>{
   onCommitted.mockRejectedValueOnce(new Error('finance summary unavailable'));
-  const view=render(makeScreen());await fill(view);await confirm();
+  const view=await render(makeScreen());await fill(view);await confirm();
   await waitFor(()=>expect(jest.mocked(Alert.alert).mock.calls.some(c=>c[0]==='Saved')).toBe(true));
   const success=jest.mocked(Alert.alert).mock.calls.find(c=>c[0]==='Saved');
   expect(success?.[1]).toContain('did not refresh');
@@ -81,7 +81,7 @@ test('post-commit parent refresh rejection still shows saved and never offers du
 
 test('MANAGER cannot access OWNER expense ledger',async()=>{
   mockRole='MANAGER';
-  const view=render(makeScreen());
+  const view=await render(makeScreen());
   expect(view.queryByTestId('owner-expenses')).toBeNull();
   expect(list).not.toHaveBeenCalled();expect(post).not.toHaveBeenCalled();
 });
@@ -90,7 +90,7 @@ test.each([
   ['en','Cancel'],['ru','Отмена'],['kg','Жокко чыгаруу'],['kz','Бас тарту'],
 ])('expense confirmation localizes cancel for %s',async(locale,cancel)=>{
   mockLocale=locale;
-  const view=render(makeScreen());await fill(view);
+  const view=await render(makeScreen());await fill(view);
   const buttons=jest.mocked(Alert.alert).mock.calls.at(-1)?.[2]??[];
   expect(buttons.find(x=>x.style==='cancel')?.text).toBe(cancel);
 });
