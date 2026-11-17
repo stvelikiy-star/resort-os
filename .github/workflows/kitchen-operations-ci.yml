@@ -270,6 +270,13 @@ jobs:
           ALLOW_STOCK_RECEIPT_TEST_WRITES: '1'
         run: python scripts/verify_stock_receipt_idempotency_e2e.py
 
+      - name: P0 Mobile STORE_STAFF real screen -> Core -> disposable PostgreSQL
+        env:
+          RUN_MARINA_REAL_SCREEN_E2E: '1'
+        run: |
+          npm ci --prefix apps/mobile --no-audit --no-fund
+          npm --prefix apps/mobile test -- --ci --runInBand --runTestsByPath __tests__/store-real-postgres-screen.e2e.test.tsx
+
       - name: Verify Staff Web lost acknowledgement and browser reload
         env:
           ALLOW_STOCK_RECEIPT_TEST_WRITES: '1'
