@@ -1,4 +1,5 @@
 "use client";
+import { ownerCommandCopy } from "./fl2/owner-command-copy";
 
 import { useEffect, useMemo, useState } from "react";
 import { FL2_OWNER_PATTERNS, FL2_OWNER_PHRASES } from "./fl2OwnerPhrases";
@@ -218,6 +219,7 @@ const KZ_EXACT: Record<string, string> = {
 };
 
 const exact: Record<string, Phrase> = {
+  ...ownerCommandCopy,
   " файлов проверены по SHA-256; ": { ru: " файлов проверены по SHA-256; ", kg: " файлдын SHA-256 текшерилди; ", kz: " файлдың SHA-256 тексерілді; ", en: " files SHA-256 verified; " },
   " отсутствуют; подлинность издателя не подтверждена": { ru: " отсутствуют; подлинность издателя не подтверждена", kg: " жетишпейт; документти берүүчүнүн аныктыгы ырасталган эмес", kz: " жетіспейді; құжатты берушінің түпнұсқалығы расталмаған", en: " missing; issuer authenticity not verified" },
   "Документальные корректировки (без признания выручки)": { ru: "Документальные корректировки (без признания выручки)", kg: "Документтик түзөтүүлөр (киреше таанылбайт)", kz: "Құжаттық түзетулер (табыс танылмаған)", en: "Documented corrections (no recognized revenue)" },
@@ -2381,6 +2383,8 @@ common.push(
   { ru: "Сначала возьмите диалог, затем отвечайте.", kg: "Адегенде диалогду өзүңүзгө алыңыз, анан жооп бериңиз.", en: "Claim the conversation before replying." },
   { ru: "Черновик ответа менеджера", kg: "Менеджердин жооп долбоору", en: "Manager's draft reply" },
 );
+
+Object.assign(KZ_EXACT, Object.fromEntries(Object.entries(ownerCommandCopy).map(([key, value]) => [key, value.kz])));
 
 const phraseIndex = new Map<string, Phrase>();
 for (const phrase of common) {

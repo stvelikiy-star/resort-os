@@ -1,4 +1,5 @@
 "use client";
+import StaffProductLogo from "./StaffProductLogo";
 import StoreStaffStock from "./StoreStaffStock";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -249,6 +250,7 @@ export default function StaffRoleGateway() {
     <main className="shift-shell">
       <header className="shift-head">
         <div>
+          <StaffProductLogo size={44}/>
           <p className="shift-eyebrow">MARINA SMART · Моя смена</p>
           <h1>{user.display_name}</h1>
           <span>{roleLabel[user.role]}{telegramNotice ? " · Telegram" : ""}</span>
