@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import GuestLanding from "../../components/GuestLanding";
 
 export const metadata: Metadata = {
-  title: { absolute: "AK BERMET — MARINA SMART · гостевой кабинет" },
-  description: "Вход в цифровой гостевой кабинет AK BERMET на платформе MARINA SMART.",
+  title: { absolute: "MARINA SMART · гостевой кабинет" },
+  description: "Цифровой гостевой кабинет MARINA SMART. Вход по персональной ссылке или QR-коду.",
   alternates: null,
   openGraph: null,
   twitter: null,

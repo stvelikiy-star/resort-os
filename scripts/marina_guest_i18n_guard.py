@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FILES = {
     "locale": ROOT / "apps/web/lib/marinaGuestLocale.ts",
     "landing": ROOT / "apps/web/app/guest/page.tsx",
+    "landing_component": ROOT / "apps/web/components/GuestLanding.tsx",
     "concierge": ROOT / "apps/web/components/GuestConciergeRuntime.tsx",
     "housekeeping": ROOT / "apps/web/components/GuestHousekeepingPolicy.tsx",
     "marketplace": ROOT / "apps/web/components/GuestMarketplace.tsx",
@@ -43,7 +44,18 @@ def main() -> int:
         'if (locale === "kz") return "kk";',
         'useMarinaGuestLocale',
     ], "marinaGuestLocale", errors)
-    require(texts["landing"], ["AK BERMET", "MARINA SMART", "RU · KG · KZ · EN"], "landing", errors)
+    require(texts["landing"], ["MARINA SMART", "RU · KG · KZ · EN"], "landing", errors)
+    require(texts["landing_component"], [
+        'type Locale = "ru" | "kg" | "kz" | "en"',
+        'const LOCALES: Locale[] = ["ru", "kg", "kz", "en"]',
+        "обратитесь на ресепшен своей гостиницы",
+        "мейманканаңыздын кабыл алуу кызматына",
+        "өз қонақүйіңіздің қабылдау бөліміне",
+        "your hotel's reception",
+    ], "GuestLanding", errors)
+    for surface in ("landing", "landing_component"):
+        if "AK BERMET" in texts[surface]:
+            errors.append(f"{surface}: old hotel branding must not be in shared Guest OS")
     require(texts["concierge"], [
         'type Locale = MarinaGuestLocale',
         'product: "MARINA SMART · қонақ кабинеті"',
@@ -54,7 +66,11 @@ def main() -> int:
     require(texts["housekeeping"], ['type Locale = MarinaGuestLocale', 'useMarinaGuestLocale()', 'eyebrow: "Бөлмені тазалау"', 'system: "Тазалау · MARINA SMART"'], "GuestHousekeepingPolicy", errors)
     require(texts["marketplace"], ['type Locale = MarinaGuestLocale', 'useMarinaGuestLocale()', 'eyebrow: "Сіздің демалысыңыз үшін"', 'name_kz?: string', 'title_kz?: string', 'kitchenSystem: "Асүй · MARINA SMART"', 'aiSystem: "AI · тексерілген деректер"'], "GuestMarketplace", errors)
     require(texts["ai"], ['Literal["ru", "kg", "kz", "en"]', '"kz": "Kazakh"'], "public_ai_admin", errors)
-    require(texts["cms"], ['SUPPORTED_LOCALES = ("ru", "kg", "kz", "en")'], "site_content", errors)
+    require(texts["cms"], [
+        'SUPPORTED_LOCALES = ("ru", "kg", "kz", "en")',
+        'legacy_fixture_defaults_allowed()',
+        'detail="Site not published"',
+    ], "site_content", errors)
     require(texts["cms_defaults"], ['"kz": {', '"AK BERMET · Resort & SPA · Шолпан-Ата"'], "site_content_defaults", errors)
     require(texts["cms_admin"], ['type Locale = "ru" | "kg" | "kz" | "en"', '{ code: "kz", label: "Қазақша" }'], "SiteContentBoard", errors)
     require(texts["offers_api"], ["title_kz: str", "hook_kz: str", "cta_kz: str", '"title_kz": row["titleKz"]', '"hook_kz": row["hookKz"]', '"cta_kz": row["ctaKz"]'], "guest_offers", errors)
