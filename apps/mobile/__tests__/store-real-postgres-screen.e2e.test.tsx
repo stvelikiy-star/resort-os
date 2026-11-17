@@ -209,9 +209,11 @@ liveOnly('STORE_STAFF screen commits one PostgreSQL receipt, OWNER sees it, WAIT
     const finalItem = (await owner.live.kitchenStock()).items.find(x => x.id === itemId);
     expect(Number(finalItem!.balance)).toBeCloseTo(Number(balanceAfter!.balance), 6);
 
-    const managerOnly = await waiter.request('/api/v1/admin/finance/owner/kitchen-operations');
+    const date = new Date().toISOString().slice(0, 10);
+    const reportPath = '/api/v1/admin/finance/owner/kitchen-operations?from_date=' + date + '&to_date=' + date;
+    const managerOnly = await waiter.request(reportPath);
     expect(managerOnly.status).toBe(403);
-    const ownerFinance = await owner.request('/api/v1/admin/finance/owner/kitchen-operations');
+    const ownerFinance = await owner.request(reportPath);
     expect(ownerFinance.status).toBe(200);
     console.log('MARINA_P0_SCREEN_DB_E2E_PASS: store=committed, owner=readback, waiter=403, replay=idempotent, conflict=409');
   } finally {
