@@ -1,7 +1,0 @@
-{
-  "name": "@resort-os/root-verification",
-  "private": true,
-  "scripts": {
-    "test": "node ./control-center-verify.mjs"
-  }
-}
