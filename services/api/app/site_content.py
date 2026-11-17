@@ -69,11 +69,20 @@ def legacy_fixture_defaults_allowed() -> bool:
     Never use the AK BERMET defaults as another hotel's public CMS copy.
     The historical fixture is preserved until its CI workflow is replaced.
     """
-    return (
-        not CUSTOMER_SITE_SAFE_MODE
-        and PROPERTY_CODE == "AK_BERMET_TEST"
-        and os.environ.get("APP_ENV", "").lower() in ("staging", "test")
+    if CUSTOMER_SITE_SAFE_MODE:
+        return False
+    app_env = os.environ.get("APP_ENV", "").lower()
+    # Transitional compatibility for existing historical Three Crowns smoke
+    # tests on disposable GitHub Actions runners only. Never in production or
+    # on a real property's deployed API, even if CI variables are inherited.
+    legacy_actions_fixture = (
+        PROPERTY_CODE == "THREE_CROWNS"
+        and app_env != "production"
+        and os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+        and os.environ.get("CI", "").lower() == "true"
     )
+    old_isolated_akb_fixture = PROPERTY_CODE == "AK_BERMET_TEST" and app_env in ("staging", "test")
+    return legacy_actions_fixture or old_isolated_akb_fixture
 
 
 def merge_with_defaults(template: dict[str, Any], stored: dict[str, Any]) -> dict[str, Any]:

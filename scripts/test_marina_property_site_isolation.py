@@ -109,6 +109,15 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(HTTPException):
                     await site_content.public_site_content(request_for(FakeConnection()))
 
+    def test_historical_three_crowns_fixture_only_on_github_actions(self):
+        with patch.object(site_content, "PROPERTY_CODE", "THREE_CROWNS"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", False):
+            with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "CI": "true", "APP_ENV": "test"}):
+                self.assertTrue(site_content.legacy_fixture_defaults_allowed())
+            with patch.dict(os.environ, {"GITHUB_ACTIONS": "false", "CI": "true", "APP_ENV": "test"}):
+                self.assertFalse(site_content.legacy_fixture_defaults_allowed())
+            with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "CI": "true", "APP_ENV": "production"}):
+                self.assertFalse(site_content.legacy_fixture_defaults_allowed())
+
     def test_safe_mode_never_allows_legacy_fixture(self):
         with patch.object(site_content, "PROPERTY_CODE", "AK_BERMET_TEST"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
             with patch.dict(os.environ, {"APP_ENV": "staging"}):
