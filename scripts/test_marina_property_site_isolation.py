@@ -63,12 +63,15 @@ def request_for(connection):
 
 class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
     async def test_unpublished_other_hotels_return_404_no_legacy_copy(self):
-        for property_code in ("ASKA_TASH", "MARINA_HOTEL01", "MARINA_RC430", "THREE_CROWNS"):
-            with self.subTest(property_code=property_code):
-                with patch.object(site_content, "PROPERTY_CODE", property_code), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", False):
-                    with self.assertRaises(HTTPException) as ctx:
-                        await site_content.public_site_content(request_for(FakeConnection()))
-                    self.assertEqual(ctx.exception.status_code, 404)
+        # Force real-runtime conditions even when this test runs on GitHub
+        # Actions, where historical smoke fixtures are available separately.
+        with patch.dict(os.environ, {"APP_ENV": "production", "GITHUB_ACTIONS": "false", "CI": "false"}):
+            for property_code in ("ASKA_TASH", "MARINA_HOTEL01", "MARINA_RC430", "THREE_CROWNS"):
+                with self.subTest(property_code=property_code):
+                    with patch.object(site_content, "PROPERTY_CODE", property_code), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", False):
+                        with self.assertRaises(HTTPException) as ctx:
+                            await site_content.public_site_content(request_for(FakeConnection()))
+                        self.assertEqual(ctx.exception.status_code, 404)
 
     async def test_unpublished_draft_is_not_publication(self):
         with patch.object(site_content, "PROPERTY_CODE", "ASKA_TASH"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", False):
