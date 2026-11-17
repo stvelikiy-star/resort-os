@@ -86,14 +86,15 @@ jobs:
               const response = await page.goto(base + "/guest", { waitUntil: "networkidle" });
               if (!response || response.status() !== 200) throw new Error("MARINA guest landing did not return HTTP 200");
               const body = await page.locator("body").innerText();
-              if (!body.includes("AK BERMET")) throw new Error("MARINA guest landing is missing AK BERMET");
               if (!body.includes("MARINA SMART")) throw new Error("MARINA guest landing is missing MARINA SMART");
-              for (const forbidden of ["Три Короны", "Three Crowns", "3korony.com"]) {
-                if (body.includes(forbidden)) throw new Error("Legacy Three Crowns branding is visible: " + forbidden);
-              }
               const title = await page.title();
-              if (!title.includes("AK BERMET") || !title.includes("MARINA SMART")) {
+              if (!title.includes("MARINA SMART")) {
                 throw new Error("MARINA guest landing metadata/title is incorrect: " + title);
+              }
+              for (const forbidden of ["Три Короны", "Three Crowns", "3korony.com", "AK BERMET", "Ак Бермет"]) {
+                if (body.includes(forbidden) || title.includes(forbidden)) {
+                  throw new Error("Foreign hotel branding is visible on MARINA guest landing: " + forbidden);
+                }
               }
               await context.close();
             }

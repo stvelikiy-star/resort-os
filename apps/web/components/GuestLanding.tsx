@@ -12,22 +12,22 @@ const COPY: Record<Locale, {
   ru: {
     guest: "Гостевой кабинет",
     instructions: "Для входа отсканируйте QR-код в номере или откройте персональную ссылку, которую вы получили при заселении.",
-    support: "Если доступ не открывается, обратитесь на ресепшен AK BERMET.",
+    support: "Если доступ не открывается, обратитесь на ресепшен своей гостиницы.",
   },
   kg: {
     guest: "Конок кабинети",
     instructions: "Кирүү үчүн бөлмөдөгү QR-кодду сканерлеңиз же каттоо учурунда алган жеке шилтемени ачыңыз.",
-    support: "Эгер кирүү ачылбаса, AK BERMET кабыл алуу кызматына кайрылыңыз.",
+    support: "Эгер кирүү ачылбаса, мейманканаңыздын кабыл алуу кызматына кайрылыңыз.",
   },
   kz: {
     guest: "Қонақ кабинеті",
     instructions: "Кіру үшін бөлмедегі QR-кодты сканерлеңіз немесе орналасу кезінде алған жеке сілтемені ашыңыз.",
-    support: "Егер қолжетімділік ашылмаса, AK BERMET қабылдау бөліміне хабарласыңыз.",
+    support: "Егер қолжетімділік ашылмаса, өз қонақүйіңіздің қабылдау бөліміне хабарласыңыз.",
   },
   en: {
     guest: "Guest area",
     instructions: "Scan the QR code in your room or open the personal link you received at check-in.",
-    support: "If access does not open, please contact AK BERMET reception.",
+    support: "If access does not open, please contact your hotel's reception.",
   },
 };
 
@@ -78,10 +78,7 @@ export default function GuestLanding() {
             </button>
           ))}
         </div>
-        <div style={{ letterSpacing: "0.24em", fontSize: 13, opacity: 0.72, marginBottom: 18 }}>
-          AK BERMET
-        </div>
-        <h1 style={{ fontSize: "clamp(38px, 8vw, 72px)", lineHeight: 0.98, margin: 0, fontWeight: 700 }}>
+         <h1 style={{ fontSize: "clamp(38px, 8vw, 72px)", lineHeight: 0.98, margin: 0, fontWeight: 700 }}>
           MARINA SMART
         </h1>
         <p style={{ fontSize: "clamp(18px, 3vw, 24px)", margin: "18px 0 0", opacity: 0.92 }}>

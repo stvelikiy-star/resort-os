@@ -145,6 +145,19 @@ jobs:
           }
           console.log('PASS: exact Next.js security patch is reflected in manifest and lockfile.');
           NODE
+            elif [ "$web_changed" = "$(printf '%s\n' 'apps/web/app/guest/page.tsx' 'apps/web/components/GuestLanding.tsx')" ]; then
+              # P0: exact two-file shared Guest OS exception. Never relax the
+              # public resort marketing pages, booking widget or owner CSS.
+              for contract in scripts/marina_guest_i18n_guard.py scripts/public_i18n_guard.py scripts/test_marina_property_site_isolation.py .github/workflows/marina-property-site-isolation-ci.yml; do
+                if ! printf '%s\n' "$changed" | grep -qx "$contract"; then
+                  echo "BLOCKED: guest brand isolation requires reviewed guard: $contract" >&2
+                  exit 1
+                fi
+              done
+              printf '%s  %s\n' '24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356' 'apps/web/public/marina-smart-approved.png' | sha256sum --check --status
+              python scripts/marina_guest_i18n_guard.py
+              python scripts/public_i18n_guard.py
+              echo 'PASS: two-file neutral Guest OS patch; old resort marketing remains frozen.'
             elif [ "$web_changed" = 'apps/web/components/BookingWidget.tsx' ]; then
               if ! printf '%s\n' "$changed" | grep -qx 'scripts/owner_ops_corrections_contract.py'; then
                 echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2

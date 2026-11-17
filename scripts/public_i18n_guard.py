@@ -48,8 +48,8 @@ def separated_guest_route_guard() -> int:
     texts = {key: path.read_text(encoding="utf-8") for key, path in paths.items()}
     requirements = {
         "public": ("Три Короны", "3korony.com"),
-        "guest": ("GuestLanding", "AK BERMET", "MARINA SMART", "index: false"),
-        "landing": ("AK BERMET", "MARINA SMART", 'type Locale = "ru" | "kg" | "kz" | "en"', "ru: {", "kg: {", "kz: {", "en: {"),
+        "guest": ("GuestLanding", "MARINA SMART", "index: false"),
+        "landing": ("MARINA SMART", 'type Locale = "ru" | "kg" | "kz" | "en"', "ru: {", "kg: {", "kz: {", "en: {"),
         "route": ("GuestConciergeRuntime",),
         "runtime": ("useMarinaGuestLocale", "MARINA_GUEST_LOCALES", "COPY", "ru: {", "kg: {", "kz: {", "en: {"),
         "locale": ("MARINA_GUEST_LOCALES", "marina-smart-guest-locale", "marina-smart-site-language", "window.localStorage.setItem(MARINA_GUEST_LOCALE_KEY, locale)"),
@@ -60,7 +60,7 @@ def separated_guest_route_guard() -> int:
         for name, needles in requirements.items()
         for needle in needles if needle not in texts[name]
     ]
-    for forbidden in ("Три Короны", "Three Crowns", "3korony.com"):
+    for forbidden in ("Три Короны", "Three Crowns", "3korony.com", "AK BERMET", "Ак Бермет"):
         if forbidden in texts["landing"] + texts["guest"]:
             errors.append(f"MARINA guest landing contains public-site brand: {forbidden}")
     if errors:
