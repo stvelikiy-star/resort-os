@@ -16,7 +16,7 @@ import type { AuthUser } from '../src/api/types';
 import type { createLiveModules } from '../src/api/liveModules';
 
 const API_ORIGIN = 'https://marina-ci.example';
-const storage = new Map<string, string>();
+const mockStorage = new Map<string, string>();
 type LiveApi = ReturnType<typeof createLiveModules>;
 let mockLive: LiveApi | null = null;
 let mockUser: AuthUser | null = null;
@@ -33,10 +33,10 @@ jest.mock('../src/api/liveModules', () => ({
   ...jest.requireActual('../src/api/liveModules'),
   useLiveModules: () => mockLive,
 }));
-jest.mock('../src/lib/storage', () => ({
-  getDurableItem: async (key: string) => storage.get(key) ?? null,
-  setDurableItem: async (key: string, value: string) => { storage.set(key, value); },
-  removeDurableItem: async (key: string) => { storage.delete(key); },
+jest.mock('../src/lib/mockStorage', () => ({
+  getDurableItem: async (key: string) => mockStorage.get(key) ?? null,
+  setDurableItem: async (key: string, value: string) => { mockStorage.set(key, value); },
+  removeDurableItem: async (key: string) => { mockStorage.delete(key); },
 }));
 jest.mock('../src/components/KitchenProcurement', () => ({ KitchenProcurement: () => null }));
 jest.mock('../src/components/KitchenLosses', () => ({ KitchenLosses: () => null }));
@@ -105,7 +105,7 @@ async function login(usernameEnv: string, passwordEnv: string): Promise<HttpSess
 const liveOnly = process.env.RUN_MARINA_REAL_SCREEN_E2E === '1' ? test : test.skip;
 
 liveOnly('STORE_STAFF screen commits one PostgreSQL receipt, OWNER sees it, WAITER denied and replay is safe', async () => {
-  storage.clear();
+  mockStorage.clear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   try {
     const owner = await login('BOOTSTRAP_OWNER_USERNAME', 'BOOTSTRAP_OWNER_PASSWORD');
@@ -173,6 +173,6 @@ liveOnly('STORE_STAFF screen commits one PostgreSQL receipt, OWNER sees it, WAIT
     expect(ownerFinance.status).toBe(200);
     console.log('MARINA_P0_SCREEN_DB_E2E_PASS: store=committed, owner=readback, waiter=403, replay=idempotent, conflict=409');
   } finally {
-    jest.restoreAllMocks(); mockLive = null; mockUser = null; storage.clear();
+    jest.restoreAllMocks(); mockLive = null; mockUser = null; mockStorage.clear();
   }
 }, 120_000);
