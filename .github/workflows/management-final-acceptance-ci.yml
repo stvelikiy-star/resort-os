@@ -145,94 +145,19 @@ jobs:
           }
           console.log('PASS: exact Next.js security patch is reflected in manifest and lockfile.');
           NODE
-            elif [ "$web_changed" = 
-                echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2
-                exit 1
-              fi
-              python scripts/owner_ops_corrections_contract.py
-            else
-              blocked=0
-              while IFS= read -r path; do
-                [ -z "$path" ] && continue
-                case "$path" in
-                  "apps/web/app/page.tsx"|"apps/web/app/rooms-premium.css"|"apps/web/app/rooms/page.tsx"|"apps/web/app/rooms/[slug]/page.tsx"|"apps/web/components/BookingWidget.tsx"|"apps/web/lib/roomMedia.ts"|apps/web/public/media/three-crowns/rooms/*)
-                    ;;
-                  *)
-                    echo "BLOCKED: public website path is outside the owner-approved room-media scope: $path" >&2
-                    blocked=1
-                    ;;
-                esac
-              done <<< "$web_changed"
-              [ "$blocked" -eq 0 ] || exit 1
-              for contract in scripts/public_browser_acceptance.mjs scripts/public_media_integrity_guard.py; do
-                if ! printf '%s\n' "$changed" | grep -qx "$contract"; then
-                  echo "BLOCKED: room-media change requires regression contract update: $contract" >&2
-                  exit 1
-                fi
-              done
-              python scripts/public_media_integrity_guard.py
-            fi
-          fi
-
-      - name: Run management final truth assertions
-        run: python scripts/verify_management_final_acceptance.py
-
-      - name: Run strict internal hardening assertions
-        run: python scripts/verify_internal_hardening.py
-
-      - name: Verify synthetic mutation scripts fail closed
-        run: python scripts/verify_synthetic_script_safety.py
-
-      - name: Verify legacy mutating utilities are fail closed
-        run: python scripts/verify_mutating_utility_safety.py
-
-      - name: Compile management Core and acceptance scripts
-        run: python -m compileall -q services/api/app scripts
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: |
-            apps/admin/package-lock.json
-            apps/staff/package-lock.json
-
-      - name: Typecheck and build Admin
-        working-directory: apps/admin
-        run: |
-          npm install --no-audit --no-fund
-          npm run typecheck
-          npm run build
-
-      - name: Typecheck and build Staff
-        working-directory: apps/staff
-        run: |
-          npm install --no-audit --no-fund
-          npm run typecheck
-          npm run build
-
-      - name: Acceptance summary
-        run: echo 'MANAGEMENT_FINAL_ACCEPTANCE_AND_INTERNAL_HARDENING_PASS'
-apps/web/app/guest/page.tsx\napps/web/components/GuestLanding.tsx' ]; then
-              # P0: exact two-file shared Guest OS branding fix. Keep all public
-              # marketing routes frozen and require the new property isolation
-              # regression contracts; never allow a generic Web exception.
-              for contract in \
-                scripts/marina_guest_i18n_guard.py \
-                scripts/public_i18n_guard.py \
-                scripts/test_marina_property_site_isolation.py \
-                .github/workflows/marina-property-site-isolation-ci.yml; do
+            elif [ "$web_changed" = "$(printf '%s\n' 'apps/web/app/guest/page.tsx' 'apps/web/components/GuestLanding.tsx')" ]; then
+              # P0: exact two-file shared Guest OS exception. Never relax the
+              # public resort marketing pages, booking widget or owner CSS.
+              for contract in scripts/marina_guest_i18n_guard.py scripts/public_i18n_guard.py scripts/test_marina_property_site_isolation.py .github/workflows/marina-property-site-isolation-ci.yml; do
                 if ! printf '%s\n' "$changed" | grep -qx "$contract"; then
                   echo "BLOCKED: guest brand isolation requires reviewed guard: $contract" >&2
                   exit 1
                 fi
               done
-              printf '%s  %s\n' \
-                '24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356' \
-                'apps/web/public/marina-smart-approved.png' | sha256sum --check --status
+              printf '%s  %s\n' '24678424bf13e4a983f6225fa72c3a73cabc573205832652ee39ed7b27f15356' 'apps/web/public/marina-smart-approved.png' | sha256sum --check --status
               python scripts/marina_guest_i18n_guard.py
               python scripts/public_i18n_guard.py
-              echo 'PASS: only shared Guest OS entry changed; old resort marketing files remain frozen.'
+              echo 'PASS: two-file neutral Guest OS patch; old resort marketing remains frozen.'
             elif [ "$web_changed" = 'apps/web/components/BookingWidget.tsx' ]; then
               if ! printf '%s\n' "$changed" | grep -qx 'scripts/owner_ops_corrections_contract.py'; then
                 echo 'BLOCKED: BookingWidget owner correction requires its regression contract update.' >&2
