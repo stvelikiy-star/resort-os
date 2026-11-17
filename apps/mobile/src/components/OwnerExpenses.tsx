@@ -14,7 +14,7 @@ const COPY={
   posted:'Расходы за период',paid:'Оплачено по расходам периода',
   outstanding:'Не оплачено',payments:'Ручные оплаты',newPayment:'Записать оплату',
   paidOn:'Дата оплаты (ГГГГ-ММ-ДД)',method:'Метод оплаты',submit:'Сохранить',
-  cancel:'Отмена',retry:'Повторить ту же операцию',success:'Запись сохранена',invalid:'Проверьте дату, сумму и название.',
+  cancel:'Отмена',retry:'Повторить ту же операцию',success:'Запись сохранена',refreshFailed:'Запись сохранена, но часть отчётов не обновилась. Обновите экран.',invalid:'Проверьте дату, сумму и название.',
   confirm:'Подтвердите ручную запись',unavailable:'Данные расходов не получены',
   notice:'Расход и его оплата — разные факты. Эта запись не переводит деньги и не создаёт платёж клиента. Прибыль здесь не рассчитывается.'},
  kg:{title:'Чарбалык чыгымдар',post:'Чыгымды каттоо',amount:'Сумма, сом',
@@ -22,7 +22,7 @@ const COPY={
   notes:'Эскертүү',date:'Чыгым күнү (ЖЖЖЖ-АА-КК)',posted:'Мезгилдин чыгымдары',
   paid:'Төлөнгөнү',outstanding:'Төлөнө элек',payments:'Кол менен катталган төлөмдөр',
   newPayment:'Төлөмдү каттоо',paidOn:'Төлөм күнү (ЖЖЖЖ-АА-КК)',method:'Төлөм ыкмасы',
-  submit:'Сактоо',cancel:'Жокко чыгаруу',retry:'Ошол операцияны кайра аткаруу',success:'Сакталды',
+  submit:'Сактоо',cancel:'Жокко чыгаруу',retry:'Ошол операцияны кайра аткаруу',success:'Сакталды',refreshFailed:'Жазуу сакталды, бирок айрым отчёттор жаңырган жок. Экранды жаңыртыңыз.',
   invalid:'Күндү, сумманы жана атын текшериңиз.',confirm:'Кол менен каттоону ырастоо',
   unavailable:'Чыгымдар жеткиликтүү эмес',
   notice:'Чыгым менен төлөм эки башка факт. Акча которулбайт, кардар төлөмү түзүлбөйт. Пайда эсептелбейт.'},
@@ -32,7 +32,7 @@ const COPY={
   posted:'Expenses in period',paid:'Settled against period expenses',outstanding:'Unpaid',
   payments:'Manually recorded payments',newPayment:'Record payment',paidOn:'Payment date (YYYY-MM-DD)',
   method:'Payment method',submit:'Save',cancel:'Cancel',retry:'Retry identical operation',
-  success:'Saved',invalid:'Check the date, amount and title.',confirm:'Confirm manual record',
+  success:'Saved',refreshFailed:'Saved, but some reports did not refresh. Refresh the screen.',invalid:'Check the date, amount and title.',confirm:'Confirm manual record',
   unavailable:'Expenses unavailable',
   notice:'Expense and payment are separate facts. This does not transfer money or create a customer payment. Profit is not calculated.'},
  kz:{title:'Шаруашылық шығындар',post:'Шығынды тіркеу',amount:'Сома, сом',
@@ -40,7 +40,7 @@ const COPY={
   notes:'Ескерту',date:'Шығын күні (ЖЖЖЖ-АА-КК)',posted:'Кезең шығындары',
   paid:'Төленгені',outstanding:'Төленбеген',payments:'Қолмен тіркелген төлемдер',
   newPayment:'Төлемді тіркеу',paidOn:'Төлем күні (ЖЖЖЖ-АА-КК)',method:'Төлем тәсілі',
-  submit:'Сақтау',cancel:'Бас тарту',retry:'Сол операцияны қайталау',success:'Сақталды',
+  submit:'Сақтау',cancel:'Бас тарту',retry:'Сол операцияны қайталау',success:'Сақталды',refreshFailed:'Жазба сақталды, бірақ кейбір есептер жаңартылмады. Бетті жаңартыңыз.',
   invalid:'Күнді, соманы және атауды тексеріңіз.',confirm:'Қолмен жазуды растау',
   unavailable:'Шығындар қолжетімсіз',
   notice:'Шығын мен төлем бөлек деректер. Ақша аударылмайды, клиент төлемі жасалмайды. Пайда есептелмейді.'},
@@ -89,10 +89,15 @@ export function OwnerExpenses({live,from,to,onCommitted}:{
    try{
      if(op.type==='EXPENSE')await live.postOwnerExpense(op.data);
      else await live.settleOwnerExpense(op.expenseId,op.data);
-     await Promise.all([ledger.reload(), onCommitted?.()]);
+     // A successful server commit must never be presented as a failed write
+     // because a subsequent report refresh fails. Do not offer a duplicate retry.
      setPending(null);setAmount('');setTitle('');setSupplier('');
      setDocumentRef('');setNotes('');setSettlementAmount('');
-     Alert.alert(t.success);
+     const refresh=await Promise.allSettled([
+       ledger.reload(),Promise.resolve().then(()=>onCommitted?.()),
+     ]);
+     const parentFailed=refresh.some(outcome=>outcome.status==='rejected');
+     Alert.alert(t.success,parentFailed?t.refreshFailed:undefined);
    }catch(err){Alert.alert(t.title,err instanceof Error?err.message:String(err));}
    finally{setBusy(false);}
  },[allowed,busy,ledger,live,onCommitted,t]);

@@ -13,8 +13,8 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/marina-smart-adaptive-foreground.png",
-        "backgroundColor": "#071D3C"
+        "foregroundImage": "./assets/marina-smart-adaptive.png",
+        "backgroundColor": "#0B1F2A"
       },
       "package": "kg.go.ms.staff",
       "allowBackup": false,
