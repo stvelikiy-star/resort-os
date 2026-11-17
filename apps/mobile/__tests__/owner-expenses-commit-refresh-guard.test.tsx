@@ -39,9 +39,9 @@ const labelByLocale:Record<string,[string,string]>={
 async function fill(view:Awaited<ReturnType<typeof render>>){
   const [name,amount]=labelByLocale[mockLocale];
   await waitFor(()=>expect(view.getByLabelText(name)).toBeTruthy());
-  fireEvent.changeText(view.getByLabelText(name),'Supplies');
-  fireEvent.changeText(view.getByLabelText(amount),'1200');
-  fireEvent.press(view.getByTestId('owner-expense-save'));
+  await fireEvent.changeText(view.getByLabelText(name),'Supplies');
+  await fireEvent.changeText(view.getByLabelText(amount),'1200');
+  await fireEvent.press(view.getByTestId('owner-expense-save'));
 }
 async function confirm(){
   const buttons=jest.mocked(Alert.alert).mock.calls.at(-1)?.[2]??[];
@@ -64,7 +64,7 @@ test('unconfirmed network outcome retains identical retry, without updating fina
   await waitFor(()=>expect(view.getByTestId('owner-expense-retry')).toBeTruthy());
   expect(onCommitted).not.toHaveBeenCalled();
   expect(jest.mocked(Alert.alert).mock.calls.some(c=>c[0]==='Saved')).toBe(false);
-  fireEvent.press(view.getByTestId('owner-expense-retry'));
+  await fireEvent.press(view.getByTestId('owner-expense-retry'));
   await waitFor(()=>expect(onCommitted).toHaveBeenCalledTimes(1));
   expect(post.mock.calls[0]).toEqual(post.mock.calls[1]);
 });
