@@ -33,7 +33,7 @@ jest.mock('../src/api/liveModules', () => ({
   ...jest.requireActual('../src/api/liveModules'),
   useLiveModules: () => mockLive,
 }));
-jest.mock('../src/lib/mockStorage', () => ({
+jest.mock('../src/lib/storage', () => ({
   getDurableItem: async (key: string) => mockStorage.get(key) ?? null,
   setDurableItem: async (key: string, value: string) => { mockStorage.set(key, value); },
   removeDurableItem: async (key: string) => { mockStorage.delete(key); },
