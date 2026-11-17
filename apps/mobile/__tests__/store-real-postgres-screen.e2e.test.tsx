@@ -7,6 +7,7 @@
  * This is screen-component E2E in Jest, NOT a physical Android/Expo Go E2E.
  */
 import React from 'react';
+import { request as nodeHttpRequest } from 'node:http';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import '../src/i18n';
@@ -60,12 +61,53 @@ function localCore(): string {
   }
   return base;
 }
+// Jest/React Native replaces global fetch. Use Node's actual loopback HTTP
+// client so a mocked network can NEVER produce a false-positive PASS.
+async function localFetch(address: string, init: RequestInit = {}): Promise<{
+  status: number; ok: boolean; headers: { get: (key: string) => string | null };
+  json: () => Promise<any>;
+}> {
+  const u = new URL(address);
+  if (u.protocol !== 'http:' || u.hostname !== '127.0.0.1' || u.port !== '8000') {
+    throw new Error('Blocked non-loopback screen E2E network target');
+  }
+  const rawHeaders = init.headers instanceof Headers
+    ? Object.fromEntries(init.headers.entries())
+    : (init.headers as Record<string, string> | undefined) ?? {};
+  return await new Promise((resolve, reject) => {
+    const req = nodeHttpRequest({
+      protocol: u.protocol, hostname: u.hostname, port: u.port,
+      path: u.pathname + u.search, method: init.method ?? 'GET',
+      headers: rawHeaders, timeout: 16000,
+    }, res => {
+      const chunks: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => chunks.push(chunk));
+      res.on('error', reject);
+      res.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        const cookies = res.headers['set-cookie'];
+        const cookieHeader = Array.isArray(cookies) ? cookies.join(', ') : cookies ?? '';
+        const status = res.statusCode ?? 0;
+        resolve({
+          status, ok: status >= 200 && status < 300,
+          headers: { get: (key: string) => key.toLowerCase() === 'set-cookie' ? cookieHeader : String(res.headers[key.toLowerCase()] ?? '') },
+          json: async () => text ? JSON.parse(text) : null,
+        });
+      });
+    });
+    req.on('timeout', () => req.destroy(new Error('Local test request timeout')));
+    req.on('error', reject);
+    if (init.body !== undefined && init.body !== null) req.write(String(init.body));
+    req.end();
+  });
+}
+
 async function login(usernameEnv: string, passwordEnv: string): Promise<HttpSession> {
   const base = localCore();
   const username = process.env[usernameEnv];
   const password = process.env[passwordEnv];
   if (!username || !password) throw new Error('Missing synthetic CI credential: ' + usernameEnv);
-  const signed = await fetch(base + '/api/v1/auth/login', {
+  const signed = await localFetch(base + '/api/v1/auth/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }), redirect: 'error',
   });
@@ -74,7 +116,7 @@ async function login(usernameEnv: string, passwordEnv: string): Promise<HttpSess
   if (!cookie) throw new Error('Synthetic role authentication issued no session cookie');
   const request = async (path: string, method = 'GET', payload?: unknown) => {
     if (!path.startsWith('/api/v1/') || path.includes('..')) throw new Error('Unsafe local path');
-    const res = await fetch(base + path, {
+    const res = await localFetch(base + path, {
       method, headers: { Cookie: cookie, Accept: 'application/json',
         ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }) },
       body: payload === undefined ? undefined : JSON.stringify(payload),
@@ -92,7 +134,7 @@ async function login(usernameEnv: string, passwordEnv: string): Promise<HttpSess
     const suffix = address.slice(API_ORIGIN.length);
     const headers = new Headers(init?.headers);
     headers.set('Cookie', cookie);
-    const res = await fetch(base + suffix, { ...init, headers, redirect: 'error' });
+    const res = await localFetch(base + suffix, { ...init, headers, redirect: 'error' });
     return { ok: res.ok, status: res.status, redirected: false, url: '',
       json: () => res.json() } as Response;
   };
