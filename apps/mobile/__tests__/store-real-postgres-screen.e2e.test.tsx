@@ -102,16 +102,21 @@ async function localFetch(address: string, init: RequestInit = {}): Promise<{
   });
 }
 
-async function login(usernameEnv: string, passwordEnv: string): Promise<HttpSession> {
+async function login(role: 'OWNER' | 'STORE_STAFF' | 'WAITER'): Promise<HttpSession> {
   const base = localCore();
-  const username = process.env[usernameEnv];
-  const password = process.env[passwordEnv];
-  if (!username || !password) throw new Error('Missing synthetic CI credential: ' + usernameEnv);
+  // Static env references are required by Expo's compile-time safety lint.
+  const credentials = {
+    OWNER: [process.env.BOOTSTRAP_OWNER_USERNAME, process.env.BOOTSTRAP_OWNER_PASSWORD],
+    STORE_STAFF: [process.env.PROC_STORE_USERNAME, process.env.PROC_STORE_PASSWORD],
+    WAITER: [process.env.WAITER_SERVE_E2E_USERNAME, process.env.WAITER_SERVE_E2E_PASSWORD],
+  } as const;
+  const [username, password] = credentials[role];
+  if (!username || !password) throw new Error('Missing synthetic CI credential for ' + role);
   const signed = await localFetch(base + '/api/v1/auth/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }), redirect: 'error',
   });
-  if (signed.status !== 200) throw new Error('Synthetic role login refused: ' + usernameEnv + ' / ' + signed.status);
+  if (signed.status !== 200) throw new Error('Synthetic role login refused: ' + role + ' / ' + signed.status);
   const cookie = signed.headers.get('set-cookie')?.match(/(?:^|,\s*)(resort_session=[^;,]+)/)?.[1];
   if (!cookie) throw new Error('Synthetic role authentication issued no session cookie');
   const request = async (path: string, method = 'GET', payload?: unknown) => {
@@ -150,9 +155,9 @@ liveOnly('STORE_STAFF screen commits one PostgreSQL receipt, OWNER sees it, WAIT
   mockStorage.clear();
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   try {
-    const owner = await login('BOOTSTRAP_OWNER_USERNAME', 'BOOTSTRAP_OWNER_PASSWORD');
-    const store = await login('PROC_STORE_USERNAME', 'PROC_STORE_PASSWORD');
-    const waiter = await login('WAITER_SERVE_E2E_USERNAME', 'WAITER_SERVE_E2E_PASSWORD');
+    const owner = await login('OWNER');
+    const store = await login('STORE_STAFF');
+    const waiter = await login('WAITER');
     expect(owner.me.role).toBe('OWNER');
     expect(store.me.role).toBe('STORE_STAFF');
     expect(waiter.me.role).toBe('WAITER');
