@@ -177,7 +177,7 @@ liveOnly('STORE_STAFF screen commits one PostgreSQL receipt, OWNER sees it, WAIT
       return originalTransport(body);
     };
     mockLive = store.live; mockUser = store.me;
-    const view = render(<ThemeProvider initial="light"><StoreWorkspace /></ThemeProvider>);
+    const view = await render(<ThemeProvider initial="light"><StoreWorkspace /></ThemeProvider>);
     await waitFor(() => expect(view.getByText(name + ' (KG)')).toBeTruthy());
     fireEvent.press(view.getByText(name + ' (KG)'));
     fireEvent.changeText(view.getByLabelText('Quantity'), '3');
