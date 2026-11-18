@@ -7,6 +7,8 @@ WORKDIR /app
 COPY apps/admin/package.json apps/admin/package-lock.json ./
 RUN npm ci
 COPY apps/admin ./
+# Preserve the monorepo-relative CSS import during the isolated frontend build.
+COPY packages/design/premium-motion.css /packages/design/premium-motion.css
 RUN npm run build
 
 FROM node:22-alpine
