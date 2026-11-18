@@ -1,0 +1,27 @@
+# Additive, opt-in launch profile for MARINA SMART restricted one-property pilot.
+# Usage (after a separately approved host/disk/TLS/backup preflight):
+#   docker compose --env-file .env.marina-production \
+#     -f compose.marina-production.yaml \
+#     -f compose.marina-pilot-no-providers.yaml \
+#     config
+#
+# This file NEVER starts/stops live containers. The canonical production
+# blueprint is unchanged. Future integrations remain available by deploying
+# the original blueprint under a separately accepted launch profile.
+#
+# The pilot does not start its own n8n. Existing host n8n is NOT referenced
+# or modified. Do not expose/publish the automation hostname in the pilot
+# until a separate integration acceptance and Caddy route check.
+
+services:
+  api:
+    environment:
+      ENABLE_AUTOMATION: "false"
+      ENABLE_AI_SALES: "false"
+      REQUIRE_AUTOMATION_SERVICE: "false"
+      ENABLE_GREEN_API_CONNECTION: "false"
+      ENABLE_PAYMENT_OPERATIONS: "false"
+      ENABLE_MKASSA: "false"
+  n8n:
+    profiles:
+      - integrations
