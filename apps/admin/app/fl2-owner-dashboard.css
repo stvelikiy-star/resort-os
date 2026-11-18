@@ -76,14 +76,14 @@ html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .
   border-radius: 18px !important;
   box-shadow: 0 10px 30px rgba(2, 12, 29, .12);
   transition: border-color 180ms ease, box-shadow 200ms ease, transform 180ms ease;
-  animation: fl2-owner-kpi-enter 360ms both cubic-bezier(.2,.8,.2,1);
+  animation: fl2-owner-kpi-enter var(--marina-motion-deliberate) var(--marina-motion-out) both;
 }
-html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(2) { animation-delay: 40ms; }
-html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(3) { animation-delay: 80ms; }
-html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(4) { animation-delay: 120ms; }
-html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(5) { animation-delay: 160ms; }
-html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(6) { animation-delay: 200ms; }
-html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(7) { animation-delay: 240ms; }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(2) { animation-delay: calc(var(--marina-motion-stagger) * 1); }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(3) { animation-delay: calc(var(--marina-motion-stagger) * 2); }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(4) { animation-delay: calc(var(--marina-motion-stagger) * 3); }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(5) { animation-delay: calc(var(--marina-motion-stagger) * 4); }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(6) { animation-delay: calc(var(--marina-motion-stagger) * 5); }
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(7) { animation-delay: calc(var(--marina-motion-stagger) * 6); }
 html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:hover {
   border-color: rgba(0, 216, 255, .65) !important;
   box-shadow: 0 14px 36px rgba(2, 12, 29, .22);
