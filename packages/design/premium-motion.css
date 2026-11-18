@@ -1,0 +1,14 @@
+/* MARINA SMART Premium Motion — canonical Web/Staff CSS token source.
+ * Mobile uses the existing typed motion object in apps/mobile/src/theme/tokens.ts.
+ * Do not copy numeric durations or easing curves into screen-specific CSS.
+ * This file contains no layouts, colors, branding or behavioral state.
+ */
+:root {
+  --marina-motion-quick: 120ms;
+  --marina-motion-standard: 200ms;
+  --marina-motion-deliberate: 320ms;
+  --marina-motion-stagger: 40ms;
+  --marina-motion-out: cubic-bezier(.2, .8, .2, 1);
+  --marina-motion-in: cubic-bezier(.4, 0, 1, 1);
+  --marina-motion-press-scale: .985;
+}
