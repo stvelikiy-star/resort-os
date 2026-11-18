@@ -51,6 +51,9 @@ for app in ("admin", "staff"):
     layout = (ROOT / f"apps/{app}/app/layout.tsx").read_text(encoding="utf-8")
     check('import "../../../packages/design/premium-motion.css";' in layout,
           f"{app} must import the shared CSS exactly once")
+    dockerfile = (ROOT / f"apps/{app}/Dockerfile").read_text(encoding="utf-8")
+    check("COPY packages/design/premium-motion.css /packages/design/premium-motion.css" in dockerfile,
+          f"{app} Docker build must include the shared CSS without altering runtime deployments")
 
 # The premium layer may only use explicit canonical durations. All entrances
 # are finite and use native/composited opacity/transform, not layout dimensions.
