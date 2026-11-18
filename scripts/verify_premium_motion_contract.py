@@ -28,7 +28,7 @@ components = MOBILE_COMPONENTS.read_text(encoding="utf-8")
 # canonical file; section CSS/screens are not allowed to invent timing values.
 for name, milliseconds in (("quick", 120), ("standard", 200), ("deliberate", 320)):
     check(f"--marina-motion-{name}: {milliseconds}ms;" in css, f"CSS missing {name} motion token")
-    check(re.search(rf"\\b{name}:\\s*{milliseconds}\\b", mobile) is not None,
+    check(re.search(rf"\b{name}:\s*{milliseconds}\b", mobile) is not None,
           f"Mobile missing {name} motion token")
 check("--marina-motion-stagger: 40ms;" in css, "Web card stagger must be 40ms")
 check(re.search(r"cardStagger:\s*40", mobile) is not None, "Mobile card stagger must be 40ms")
@@ -69,7 +69,7 @@ for path in ("apps/admin/app/fl2-shell.css",
              "apps/admin/app/fl2-interaction-polish.css",
              "apps/admin/app/fl2-owner-dashboard.css"):
     text = (ROOT / path).read_text(encoding="utf-8")
-    check(re.search(r"\\b(?:120|150|160|180|200|220|240|320|340|360|700)ms\\b", text) is None,
+    check(re.search(r"\b(?:120|150|160|180|200|220|240|320|340|360|700)ms\b", text) is None,
           f"Un-tokenized legacy duration in the adapted Admin motion surface: {path}")
 
 print("MARINA PREMIUM MOTION CONTRACT PASS: canonical 120/200/320ms, bounded stagger, no unsafe success, Reduced Motion, Admin/Staff/Mobile aligned.")
