@@ -56,15 +56,23 @@ export const font = {
 } as const;
 export const elevation = { card: { shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, floating: { shadowOpacity: 0.18, shadowRadius: 26, shadowOffset: { width: 0, height: 12 }, elevation: 9 } } as const;
 export const TOUCH = 56;
+/** Premium Motion: the only duration constants used by Mobile.
+ * Visual-only; server authorization, business state and timing are unchanged.
+ */
+const MOTION_DURATION = { quick: 120, standard: 200, deliberate: 320 } as const;
 export const motion = {
-  press: 125, tab: 220, card: 320, modal: 340, chart: 700,
-  /** Bottom sheet: enter is slightly slower than exit so dismissal never feels sluggish. */
-  sheetIn: 320, sheetOut: 220,
-  /** Server-confirmed status swap and tab-icon focus. */
-  status: 240, tabIcon: 200,
-  /** Bounded "work in progress" loops: pulses/rotations before settling static. */
+  press: MOTION_DURATION.quick,
+  tab: MOTION_DURATION.standard,
+  card: MOTION_DURATION.deliberate,
+  modal: MOTION_DURATION.deliberate,
+  chart: MOTION_DURATION.deliberate,
+  sheetIn: MOTION_DURATION.deliberate,
+  sheetOut: MOTION_DURATION.standard,
+  status: MOTION_DURATION.standard,
+  tabIcon: MOTION_DURATION.standard,
+  /** Finite, bounded effects only. Index 0–7 = at most eight staggered cards. */
   maxShimmerPulses: 3, maxOrbTurns: 8,
-  cardStagger: 55, maxStaggerCards: 6,
+  cardStagger: 40, maxStaggerCards: 7,
   spring: { speed: 30, bounciness: 5 },
 } as const;
 export const iconography = { nav: 23, action: 22, metric: 24, stroke: 1.9, strokeActive: 2.5 } as const;
