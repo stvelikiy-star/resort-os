@@ -1,0 +1,94 @@
+name: MARINA SMART Premium Motion CI
+
+on:
+  pull_request:
+    paths:
+      - "packages/design/premium-motion.css"
+      - "apps/admin/app/fl2-*.css"
+      - "apps/admin/app/layout.tsx"
+      - "apps/staff/app/layout.tsx"
+      - "apps/mobile/src/theme/tokens.ts"
+      - "apps/mobile/src/components/Motion.tsx"
+      - "apps/mobile/__tests__/motion-system.test.tsx"
+      - "scripts/verify_premium_motion_contract.py"
+      - ".github/workflows/marina-premium-motion-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: premium-motion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-and-design:
+    name: Premium Motion source and FL2 design contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Only native/composited motion and approved tokens
+        run: python3 scripts/verify_premium_motion_contract.py
+      - name: Existing design foundation
+        run: npm run design:validate
+      - name: Existing FL2 baseline
+        run: npm run design:fl2:audit
+      - name: Existing FL2 brand/accessibility/components/owner
+        run: |
+          npm run design:fl2:brand
+          npm run design:fl2:accessibility
+          npm run design:fl2:components
+          npm run design:fl2:owner
+
+  admin:
+    name: Premium Motion Admin production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci --prefix apps/admin --no-audit --no-fund
+      - run: npm --prefix apps/admin run typecheck
+      - name: Production Admin compile (shared CSS imported from packages/design)
+        run: npm --prefix apps/admin run build
+
+  staff:
+    name: Premium Motion Staff production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/staff/package-lock.json
+      - run: npm ci --prefix apps/staff --no-audit --no-fund
+      - run: npm --prefix apps/staff run typecheck
+      - name: Production Staff compile (shared CSS imported from packages/design)
+        run: npm --prefix apps/staff run build
+
+  mobile:
+    name: Premium Motion Mobile TypeScript / ESLint / Jest
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci --prefix apps/mobile --no-audit --no-fund
+      - run: npm --prefix apps/mobile run typecheck
+      - run: npm --prefix apps/mobile run lint
+      - name: Existing and added native component Motion tests
+        run: npm --prefix apps/mobile test -- --ci --runInBand --runTestsByPath __tests__/motion-system.test.tsx
