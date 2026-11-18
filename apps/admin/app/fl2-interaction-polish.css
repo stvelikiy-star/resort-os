@@ -67,7 +67,7 @@ html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.receptio
  * never implies a confirmed API success or changes a payment/booking state. */
 @media(hover:hover) and (prefers-reduced-motion:no-preference){
   html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents) .btn:not(:disabled){
-    transition:background-color 160ms ease,border-color 160ms ease,box-shadow 160ms ease,filter 160ms ease;
+    transition:transform var(--marina-motion-quick) var(--marina-motion-out);
   }
   html[data-marina-ui="future-luxury"] :is(.work-shell,.management-shell,.reception-shell,.inbox-shell,.growth-shell,.fl2-agents) .btn.primary:not(:disabled):hover{
     filter:brightness(1.06);
