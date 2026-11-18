@@ -23,6 +23,8 @@ css = CSS.read_text(encoding="utf-8")
 mobile = MOBILE_TOKENS.read_text(encoding="utf-8")
 motion = MOBILE_MOTION.read_text(encoding="utf-8")
 components = MOBILE_COMPONENTS.read_text(encoding="utf-8")
+future = (ROOT / "apps/mobile/src/components/Future.tsx").read_text(encoding="utf-8")
+ui = (ROOT / "apps/mobile/src/components/ui.tsx").read_text(encoding="utf-8")
 
 # Both runtimes express the same allowed tempo. Each platform has one
 # canonical file; section CSS/screens are not allowed to invent timing values.
@@ -37,6 +39,13 @@ check("chart: MOTION_DURATION.deliberate" in mobile, "Charts must not use 700ms"
 check("duration: motionPresets.sheetOut.duration, easing: motionPresets.sheetOut.easing" in components,
       "Bottom Sheet exit must use the existing shared motion preset")
 check("speed: motion.spring.speed" in components, "Tab spring must use the existing shared spring")
+check("duration: 650" not in future and "duration: 1700" not in future,
+      "Mobile bounded shimmer and orb must use shared duration tokens")
+check("transformOrigin: 'left center'" in ui and "useNativeDriver: true" in ui,
+      "Progress bar must use the native driver and stay anchored to its left edge")
+check("width: progress.interpolate" not in ui,
+      "Do not animate progress-bar width/layout; use transform scaleX")
+
 
 for app in ("admin", "staff"):
     layout = (ROOT / f"apps/{app}/app/layout.tsx").read_text(encoding="utf-8")
