@@ -189,6 +189,17 @@ describe('TabIcon', () => {
 });
 
 describe('Premium Motion 120 / 200 / 320 shared rules', () => {
+  it('progress visualization moves using native scaleX rather than changing layout width', async () => {
+    await setOsReduceMotion(true);
+    const view = await render(wrap(<AnimatedProgressBar testID="progress" percent={62} />));
+    const bar = view.getByTestId('progress').children[0] as { props: { style?: unknown } };
+    const style = StyleSheet.flatten(bar.props.style as never) as Record<string, unknown>;
+    expect(style.width).toBe('100%');
+    expect(style.transformOrigin).toBe('left center');
+    expect((style.transform as { scaleX?: unknown }[])[0]).toHaveProperty('scaleX');
+    expect(view.getByTestId('progress').props.accessibilityValue.now).toBe(62);
+  });
+
   it('central tokens stay within the approved tempo and never exceed 8 staggered cards', () => {
     expect([motion.press, motion.tab, motion.card, motion.modal, motion.chart,
       motion.sheetIn, motion.sheetOut, motion.status, motion.tabIcon]).toEqual(
