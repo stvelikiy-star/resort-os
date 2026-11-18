@@ -5,6 +5,7 @@ on:
     paths:
       - 'release/marina-smart-current-candidate.json'
       - 'compose.marina-production.yaml'
+      - 'compose.marina-pilot-no-providers.yaml'
       - '.env.marina-production.example'
       - 'deploy/marina/**'
       - 'deploy/marina-provisioner.Dockerfile'
@@ -138,6 +139,45 @@ jobs:
           assert data['networks']['backend']['name'].startswith('marina-ak-bermet-ci_')
           assert all('ports' not in service for name, service in data['services'].items() if name != 'caddy')
           print('PASS: only Caddy publishes ingress; database private; bootstrap opt-in; per-hotel isolated network')
+          PY
+      - name: Fail-closed restricted pilot Compose overlay (never starts containers)
+        run: |
+          docker compose --profile bootstrap --env-file .env.marina-production.ci \
+            -f compose.marina-production.yaml -f compose.marina-pilot-no-providers.yaml \
+            config > /tmp/marina-compose-pilot.yml
+          docker compose --profile bootstrap --profile integrations --env-file .env.marina-production.ci \
+            -f compose.marina-production.yaml -f compose.marina-pilot-no-providers.yaml \
+            config > /tmp/marina-compose-pilot-with-integrations.yml
+          python - <<'PY'
+          import copy
+          import yaml
+          original = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          pilot = yaml.safe_load(open('/tmp/marina-compose-pilot.yml'))
+          integrated = yaml.safe_load(open('/tmp/marina-compose-pilot-with-integrations.yml'))
+          assert 'n8n' in original['services'], 'canonical source must retain integration functionality'
+          assert 'n8n' not in pilot['services'], 'pilot must never start a new n8n by default'
+          assert integrated['services']['n8n']['profiles'] == ['integrations']
+          assert integrated['services']['n8n']['image'] == original['services']['n8n']['image']
+          required_off = (
+              'ENABLE_AUTOMATION', 'ENABLE_AI_SALES', 'REQUIRE_AUTOMATION_SERVICE',
+              'ENABLE_GREEN_API_CONNECTION', 'ENABLE_PAYMENT_OPERATIONS', 'ENABLE_MKASSA',
+          )
+          env = pilot['services']['api']['environment']
+          for key in required_off:
+              assert env[key] == 'false', f'{key} must be disabled for the restricted pilot'
+          original_api = copy.deepcopy(original['services']['api'])
+          pilot_api = copy.deepcopy(pilot['services']['api'])
+          for key in required_off:
+              original_api['environment'].pop(key, None)
+              pilot_api['environment'].pop(key, None)
+          assert pilot_api == original_api, 'pilot must not modify any unrelated Core setting'
+          for name, baseline in original['services'].items():
+              if name not in ('n8n', 'api'):
+                  assert pilot['services'][name] == baseline, f'{name} topology changed'
+          assert pilot['networks'] == original['networks']
+          assert pilot['volumes'] == original['volumes']
+          print('PASS: restricted pilot excludes n8n, disables unapproved providers, preserves all other services')
+          print('BOUNDARY: deployment, TLS, external S3 and physical Android are NOT accepted by this render check')
           PY
       - name: Verify release tags change without moving hotel storage or networks
         run: |
