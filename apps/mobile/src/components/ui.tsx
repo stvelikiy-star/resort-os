@@ -34,14 +34,15 @@ export function AnimatedProgressBar({ percent, color, trackColor, height = 11, l
   useEffect(() => {
     progress.stopAnimation();
     if (!ready || !allowed) { progress.setValue(safePercent); return; }
-    const animation = Animated.timing(progress, { toValue: safePercent, duration: motionPresets.chart.duration, easing: motionPresets.chart.easing, useNativeDriver: false });
+    const animation = Animated.timing(progress, { toValue: safePercent, duration: motionPresets.chart.duration, easing: motionPresets.chart.easing, useNativeDriver: true });
     animation.start(({ finished }) => { if (!finished) progress.setValue(safePercent); });
     return () => { animation.stop(); progress.setValue(safePercent); };
   }, [progress, safePercent, allowed, ready]);
   return (
     <View testID={testID} accessible accessibilityRole="progressbar" accessibilityLabel={label} accessibilityValue={{ min: 0, max: 100, now: safePercent }}
       style={{ height, borderRadius: radius.pill, backgroundColor: trackColor ?? c.surfaceAlt, overflow: 'hidden' }}>
-      <Animated.View style={{ width: progress.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'], extrapolate: 'clamp' }), height, borderRadius: radius.pill, backgroundColor: color ?? c.cyan }} />
+      <Animated.View style={{ width: '100%', height, borderRadius: radius.pill, backgroundColor: color ?? c.cyan, transformOrigin: 'left center',
+        transform: [{ scaleX: progress.interpolate({ inputRange: [0, 100], outputRange: [0, 1], extrapolate: 'clamp' }) }] }} />
     </View>
   );
 }
