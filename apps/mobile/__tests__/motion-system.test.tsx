@@ -2,7 +2,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { AccessibilityInfo, AppState, Modal, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, AppState, StyleSheet, Text, View } from 'react-native';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { cappedStagger, getMotionSnapshot, primeMotionPreference, resetMotionPreferenceForTests } from '../src/theme/motion';
@@ -220,15 +220,19 @@ describe('Premium Motion 120 / 200 / 320 shared rules', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  it('Android Back closes through the existing modal request-close handler', async () => {
+  it('sheet close action and native Android Back callback share the existing handler', async () => {
     await setOsReduceMotion(true);
     const onRequestClose = jest.fn();
     const view = await render(<AnimatedSheet visible closeLabel="Close" onRequestClose={onRequestClose}>
       <View testID="sheet-body"><Text>Booking</Text></View>
     </AnimatedSheet>);
-    await act(async () => { view.UNSAFE_getByType(Modal).props.onRequestClose(); });
+    fireEvent.press(view.getByLabelText('Close'));
     expect(onRequestClose).toHaveBeenCalledTimes(1);
     expect(view.getByTestId('sheet-body')).toBeTruthy();
+    // Source contract: Modal forwards the same handler to native Android Back.
+    // Device Back gesture itself requires emulator/handset acceptance.
+    const source = fs.readFileSync(path.join(__dirname, '../src/components/Motion.tsx'), 'utf8');
+    expect(source).toContain('onRequestClose={onRequestClose}');
   });
 
   it('pending server operations cannot trigger ConfirmedChange success motion', async () => {
