@@ -50,7 +50,7 @@ html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .
   background: var(--fl2-owner-accent);
   color: #061225;
   font-weight: 750;
-  transition: filter 160ms ease, transform 160ms ease;
+  transition: transform var(--marina-motion-quick) var(--marina-motion-out);
 }
 html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn:hover {
   filter: brightness(1.09);
@@ -75,7 +75,7 @@ html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .
   border: 1px solid rgba(0, 216, 255, .23) !important;
   border-radius: 18px !important;
   box-shadow: 0 10px 30px rgba(2, 12, 29, .12);
-  transition: border-color 180ms ease, box-shadow 200ms ease, transform 180ms ease;
+  transition: transform var(--marina-motion-quick) var(--marina-motion-out);
   animation: fl2-owner-kpi-enter var(--marina-motion-deliberate) var(--marina-motion-out) both;
 }
 html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(2) { animation-delay: calc(var(--marina-motion-stagger) * 1); }
