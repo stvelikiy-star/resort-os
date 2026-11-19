@@ -141,6 +141,12 @@ async def issue_qr(conn, *, pid: uuid.UUID, point_id: uuid.UUID, label: str | No
             detail={"code": "SERVICE_POINT_ACTIVE_QR_EXISTS", "qr_id": str(active)},
         )
 
+    # Do not issue QR codes pointing to the legacy hotel for other properties.
+    if PROPERTY_CODE != "THREE_CROWNS" and not (
+        os.environ.get("SERVICE_POINT_PUBLIC_BASE_URL", "").strip()
+        or os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "").strip()
+    ):
+        raise HTTPException(status_code=503, detail={"code": "SERVICE_POINT_QR_ORIGIN_NOT_CONFIGURED"})
     raw_token = secrets.token_urlsafe(32)
     qr_id = uuid.uuid4()
     await conn.execute(
@@ -155,12 +161,6 @@ async def issue_qr(conn, *, pid: uuid.UUID, point_id: uuid.UUID, label: str | No
         hash_secret(raw_token),
         label or point["name"],
     )
-    # Do not issue QR codes pointing to the legacy hotel for other properties.
-    if PROPERTY_CODE != "THREE_CROWNS" and not (
-        os.environ.get("SERVICE_POINT_PUBLIC_BASE_URL", "").strip()
-        or os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "").strip()
-    ):
-        raise HTTPException(status_code=503, detail={"code": "SERVICE_POINT_QR_ORIGIN_NOT_CONFIGURED"})
     public_url = f"{PUBLIC_BASE_URL}/p/{raw_token}"
     return {
         "qr_id": str(qr_id),
