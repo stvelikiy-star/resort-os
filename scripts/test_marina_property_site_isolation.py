@@ -246,6 +246,9 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("3korony", body)
         self.assertNotIn("KGS / night", body)
         self.assertEqual(fake.room_types, categories)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            legacy_language = await customer_site_page.customer_rooms(request_for(fake), lang="en")
+        self.assertIn("Alpha Studio", legacy_language.body.decode())
 
     async def test_customer_rooms_unpublished_cannot_reveal_internal_categories(self):
         fake = FakeConnection(published_version=0, room_types=[{"name": "INTERNAL SECRET"}])
