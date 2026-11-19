@@ -47,6 +47,18 @@
     reverse_proxy api:8000
   }
 
+  # Restore only the legacy public catalogue index from this hotel's DB.
+  # Unpublished sites and deep links are deliberately not synthesized.
+  @catalogue {
+    method GET
+    path /rooms /rooms/
+    header Accept *text/html*
+  }
+  handle @catalogue {
+    rewrite * /api/v1/site/customer-rooms?{query}
+    reverse_proxy api:8000
+  }
+
   @unpublished {
     method GET
     header Accept *text/html*
