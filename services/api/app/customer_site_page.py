@@ -124,10 +124,11 @@ def render_customer_site(locale: str, content: dict | None) -> HTMLResponse:
 
 
 @router.get("/api/v1/site/customer-page")
-async def customer_page(request: Request, locale: str = "ru"):
+async def customer_page(request: Request, locale: str = "ru", lang: str | None = None):
     if not CUSTOMER_SITE_SAFE_MODE:
         raise HTTPException(404, detail="Customer page is disabled")
-    locale = validate_locale(locale)
+    # Legacy website used ?lang=; preserve old bookmarked language URLs.
+    locale = validate_locale(lang if lang is not None else locale)
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
         row = await load_row(conn, property_id, locale)
