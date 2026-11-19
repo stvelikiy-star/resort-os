@@ -53,6 +53,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://marina_ci:synthetic_full_ci_only@127.0.0.1:5432/marina_full_ci?schema=public
       PROPERTY_CODE: MARINA_FULL_CI
+      # Disposable single-hotel CI must never inherit the legacy 3korony.com origin.
+      GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:13000
       MARINA_PROPERTY_NAME: MARINA Full Stack Synthetic Hotel
       RATE_PLAN_CODE: MARINA_DIRECT
       APP_ENV: staging
