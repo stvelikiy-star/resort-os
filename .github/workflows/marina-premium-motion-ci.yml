@@ -1,0 +1,34 @@
+name: MARINA Premium Motion Contract
+
+on:
+  pull_request:
+    paths:
+      - 'apps/admin/app/fl2-shell.css'
+      - 'apps/admin/components/PMSUniversalBoard.tsx'
+      - 'apps/staff/app/globals.css'
+      - 'apps/mobile/src/theme/tokens.ts'
+      - 'apps/mobile/src/theme/motion.ts'
+      - 'scripts/validate-premium-motion-unified.mjs'
+      - '.github/workflows/marina-premium-motion-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  premium-motion-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify duration tiers, safe transforms, Reduced Motion and universal PMS brand
+        run: node scripts/validate-premium-motion-unified.mjs
+      - name: Existing global motion safety gate
+        run: node scripts/validate-motion-safety.mjs
+      - name: Validate Future Luxury design foundation
+        run: npm run design:validate
