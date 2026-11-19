@@ -11,6 +11,7 @@ on:
       - 'apps/web/components/GuestLanding.tsx'
       - 'scripts/marina_guest_i18n_guard.py'
       - 'scripts/test_marina_property_site_isolation.py'
+      - 'scripts/test_marina_customer_gateway_routes_ci.py'
       - '.github/workflows/marina-property-site-isolation-ci.yml'
   workflow_dispatch:
 
@@ -37,6 +38,8 @@ jobs:
           docker run --rm --network none \
             -v "$PWD/deploy/marina/customer-unpublished.Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2.10.2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Verify actual Caddy legacy homepage and room deep-link routing on localhost
+        run: python scripts/test_marina_customer_gateway_routes_ci.py
       - name: Verify Guest OS RU/KG/KZ/EN and neutral landing
         run: python scripts/marina_guest_i18n_guard.py
       - uses: actions/setup-node@v4
