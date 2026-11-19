@@ -59,6 +59,19 @@
     reverse_proxy api:8000
   }
 
+  # Exact historical room URLs require a verified hotel-local slug map.
+  # Unmapped links return 404 from the API, never another property's catalogue.
+  @legacy_room_detail {
+    method GET
+    path /rooms/*
+    header Accept *text/html*
+  }
+  handle @legacy_room_detail {
+    uri strip_prefix /rooms
+    rewrite * /api/v1/site/customer-room{path}?{query}
+    reverse_proxy api:8000
+  }
+
   @unpublished {
     method GET
     header Accept *text/html*
