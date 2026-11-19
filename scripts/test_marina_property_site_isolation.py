@@ -19,9 +19,10 @@ from app import customer_site_page, site_content  # noqa: E402
 
 
 class FakeConnection:
-    def __init__(self, published=None, published_version=0):
+    def __init__(self, published=None, published_version=0, room_types=None):
         self.published = published
         self.published_version = published_version
+        self.room_types = room_types or []
         self.property_id = uuid.uuid4()
 
     async def fetchval(self, statement, code):
@@ -42,6 +43,11 @@ class FakeConnection:
             "publishedAt": None,
             "updatedAt": None,
         }
+
+    async def fetch(self, statement, property_id):
+        assert 'room_types' in statement and 'rooms' in statement
+        assert property_id == self.property_id
+        return self.room_types
 
     @asynccontextmanager
     async def transaction(self):
@@ -219,6 +225,46 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
             response = await customer_site_page.customer_page(request_for(FakeConnection(document, published_version=0)), locale="ru")
         self.assertNotIn("Hotel ALPHA", response.body.decode())
         self.assertEqual(response.headers["x-robots-tag"], "noindex, nofollow")
+
+
+
+    async def test_customer_rooms_returns_only_own_published_categories(self):
+        document = {
+            "hero": {"title": "Hotel ALPHA", "copy": "Alpha stay"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "Alpha Avenue"},
+            "seo": {"title": "Alpha Rooms", "description": "Alpha rooms"},
+            "rooms": {"title": "Rooms catalogue"},
+        }
+        categories = [{"name": "Alpha Studio <safe>", "capacityAdults": 2, "capacityChildren": 1, "areaLabel": "32 m2"}]
+        fake = FakeConnection(document, published_version=4, room_types=categories)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await customer_site_page.customer_rooms(request_for(fake), locale="en")
+        body = result.body.decode()
+        self.assertIn("Alpha Studio &lt;safe&gt;", body)
+        self.assertIn("Hotel ALPHA", body)
+        self.assertNotIn("Три Короны", body)
+        self.assertNotIn("3korony", body)
+        self.assertNotIn("KGS / night", body)
+        self.assertEqual(fake.room_types, categories)
+
+    async def test_customer_rooms_unpublished_cannot_reveal_internal_categories(self):
+        fake = FakeConnection(published_version=0, room_types=[{"name": "INTERNAL SECRET"}])
+        with patch.object(site_content, "PROPERTY_CODE", "BETA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await customer_site_page.customer_rooms(request_for(fake), locale="ru")
+        self.assertNotIn("INTERNAL SECRET", result.body.decode())
+        self.assertEqual(result.headers["x-robots-tag"], "noindex, nofollow")
+
+    async def test_customer_rooms_new_document_without_catalogue_stays_unpublished(self):
+        new_document = {
+            "hero": {"title": "Hotel BETA", "subtitle": "Beta stay"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "beta@example.test", "address": "Beta Avenue"},
+            "seo": {"title": "Beta", "description": "Beta"},
+        }
+        fake = FakeConnection(new_document, published_version=1, room_types=[{"name": "NOT OWNER PUBLISHED"}])
+        with patch.object(site_content, "PROPERTY_CODE", "BETA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await customer_site_page.customer_rooms(request_for(fake), locale="ru")
+        self.assertNotIn("NOT OWNER PUBLISHED", result.body.decode())
+        self.assertEqual(result.headers["x-robots-tag"], "noindex, nofollow")
 
 
 
