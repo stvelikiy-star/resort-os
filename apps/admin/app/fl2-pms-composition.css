@@ -668,3 +668,42 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .v8-preview {
     flex-basis:100%;
   }
 }
+
+
+/* FL2 desktop 31-day PMS acceptance: the authenticated grouped sidebar reduces
+ * the available grid width. Keep every day visible without changing dates,
+ * pricing, room state, bookings, or compact/touch layouts below 1101px. */
+@media (min-width:1101px) {
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack {
+    --fl2-pms-day-width:22px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-grid-group {
+    min-width:calc(var(--fl2-pms-room-width) + var(--fl2-pms-status-width) + 682px);
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-room-row { min-height:38px; }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-room-label {
+    height:38px;min-height:38px;padding:4px 8px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-room-state { height:38px; }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-night-cell {
+    height:38px;min-height:38px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-booking-bar {
+    height:30px;min-height:30px;margin:4px 0;padding:2px 5px;
+  }
+}
+@media (min-width:1440px) {
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack {
+    --fl2-pms-day-width:24px;
+  }
+  html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack
+  .owner-grid-scroll[data-window-days="31"] .owner-grid-group {
+    min-width:calc(var(--fl2-pms-room-width) + var(--fl2-pms-status-width) + 744px);
+  }
+}
