@@ -46,3 +46,25 @@ def validate_customer_site_content(locale: str, content: Any) -> dict[str, dict[
             cleaned[field] = value
         result[section] = cleaned
     return result
+
+
+def project_legacy_published_content(locale: str, content: Any) -> dict[str, dict[str, str]]:
+    """Read-only compatibility view for pre-upgrade published CMS documents.
+
+    Never mutate the original stored JSON or invent missing customer facts.
+    New publications remain subject to the exact customer-site schema.
+    """
+    if not isinstance(content, dict):
+        raise HTTPException(422, detail="Legacy published site content must be an object")
+    hero = content.get("hero")
+    contacts = content.get("contacts")
+    seo = content.get("seo")
+    if not all(isinstance(section, dict) for section in (hero, contacts, seo)):
+        raise HTTPException(422, detail="Legacy published site requires hero, contacts and seo")
+    subtitle = hero.get("subtitle") or hero.get("copy")
+    projected = {
+        "hero": {"title": hero.get("title"), "subtitle": subtitle},
+        "contacts": {field: contacts.get(field) for field in CUSTOMER_SITE_FIELDS["contacts"]},
+        "seo": {field: seo.get(field) for field in CUSTOMER_SITE_FIELDS["seo"]},
+    }
+    return validate_customer_site_content(locale, projected)
