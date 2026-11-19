@@ -248,6 +248,13 @@ def guest_qr_public_origin() -> str:
     serving all tenants; no tenant or request header may select its hostname.
     """
     if not MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        # Preserve the historical default exclusively for its own hotel.
+        # A different single-property hotel must configure its own guest origin.
+        if PROPERTY_CODE != "THREE_CROWNS" and not os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "").strip():
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "GUEST_QR_ORIGIN_NOT_CONFIGURED"},
+            )
         return PUBLIC_BASE_URL
     value = os.environ.get("GUEST_OS_PUBLIC_BASE_URL", "").strip()
     try:

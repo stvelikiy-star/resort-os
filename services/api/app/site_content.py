@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
-from .customer_site_contract import validate_customer_site_content
+from .customer_site_contract import project_legacy_published_content, validate_customer_site_content
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 SCOPE = "PUBLIC_SITE"
@@ -225,6 +225,28 @@ async def load_row(conn, property_id: uuid.UUID, locale: str) -> dict[str, Any] 
     }
 
 
+def customer_published_view(locale: str, published_content: dict[str, Any]) -> dict[str, Any]:
+    """Read-only validated view shared by customer JSON and HTML endpoints."""
+    try:
+        validate_customer_site_content(locale, published_content)
+        return published_content
+    except HTTPException as exc:
+        hero = published_content.get("hero", {})
+        legacy_shape = (
+            isinstance(hero, dict) and "copy" in hero
+        ) or any(key not in {"hero", "contacts", "seo"} for key in published_content)
+        if exc.status_code != 422 or not legacy_shape:
+            raise
+        all_public_text = "\n".join(_content_strings(published_content))
+        for label, pattern in FORBIDDEN_PUBLIC_CONTENT.items():
+            if pattern.search(all_public_text):
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": "PUBLIC_CONTENT_TRUTH_VIOLATION", "rule": label, "locale": locale},
+                )
+        return project_legacy_published_content(locale, published_content)
+
+
 @router.get("/api/v1/site/content")
 async def public_site_content(request: Request, locale: str = "ru"):
     locale = validate_locale(locale)
@@ -235,11 +257,10 @@ async def public_site_content(request: Request, locale: str = "ru"):
         if not legacy_fixture_defaults_allowed():
             raise HTTPException(status_code=404, detail="Site not published")
         return {"property": PROPERTY_CODE, "locale": locale, "content": default_for(locale), "published_version": 0, "published_at": None, "source": "DEFAULT"}
+    published_content = row["publishedJson"]
     if CUSTOMER_SITE_SAFE_MODE:
-        if not row["publishedVersion"]:
-            raise HTTPException(status_code=404, detail="Site not published")
-        validate_customer_site_content(locale, row["publishedJson"])
-    return {"property": PROPERTY_CODE, "locale": locale, "content": row["publishedJson"], "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "source": "DATABASE"}
+        published_content = customer_published_view(locale, published_content)
+    return {"property": PROPERTY_CODE, "locale": locale, "content": published_content, "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "source": "DATABASE"}
 
 
 @router.get("/api/v1/admin/site/content")

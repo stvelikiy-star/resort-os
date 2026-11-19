@@ -15,13 +15,14 @@ from fastapi import HTTPException
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "services" / "api"))
-from app import site_content  # noqa: E402
+from app import customer_site_page, site_content  # noqa: E402
 
 
 class FakeConnection:
-    def __init__(self, published=None, published_version=0):
+    def __init__(self, published=None, published_version=0, room_types=None):
         self.published = published
         self.published_version = published_version
+        self.room_types = room_types or []
         self.property_id = uuid.uuid4()
 
     async def fetchval(self, statement, code):
@@ -43,9 +44,28 @@ class FakeConnection:
             "updatedAt": None,
         }
 
+    async def fetch(self, statement, property_id):
+        assert 'room_types' in statement and 'rooms' in statement
+        assert property_id == self.property_id
+        return self.room_types
+
     @asynccontextmanager
     async def transaction(self):
         yield self
+
+
+class FakeRoomConnection(FakeConnection):
+    def __init__(self, published=None, published_version=0, room=None):
+        super().__init__(published, published_version)
+        self.room = room
+
+    async def fetchrow(self, statement, *params):
+        if "FROM room_types" in statement:
+            assert len(params) == 2 and params[0] == self.property_id
+            if self.room is None or self.room["code"] != params[1]:
+                return None
+            return self.room
+        return await super().fetchrow(statement, *params)
 
 
 class FakeDB:
@@ -132,6 +152,217 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("MARINA SMART", content)
             for legacy in ("AK BERMET", "Три Короны", "Three Crowns"):
                 self.assertNotIn(legacy, content)
+
+
+    async def test_customer_safe_mode_reads_legacy_publication_without_mutating_it(self):
+        import copy
+        original = {
+            "hero": {"title": "Synthetic ALPHA", "copy": "Stay at ALPHA"},
+            "contacts": {
+                "phone": "+996 555 111 222", "whatsapp": "+996 555 111 222",
+                "email": "alpha@example.test", "address": "ALPHA Test Street",
+            },
+            "seo": {"title": "ALPHA site", "description": "ALPHA only"},
+            "rooms": {"title": "Old rooms section must be retained in storage"},
+        }
+        before = copy.deepcopy(original)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await site_content.public_site_content(request_for(FakeConnection(original, published_version=3)))
+        self.assertEqual(result["property"], "ALPHA")
+        self.assertEqual(result["content"]["hero"]["subtitle"], "Stay at ALPHA")
+        self.assertEqual(set(result["content"]), {"hero", "contacts", "seo"})
+        self.assertEqual(result["published_version"], 3)
+        self.assertEqual(original, before)
+        self.assertIn("rooms", original)
+
+    async def test_customer_safe_mode_rejects_incomplete_legacy_publication(self):
+        original = {
+            "hero": {"title": "ALPHA", "copy": "Our hotel"},
+            "contacts": {"phone": "+996 555 111 222"},
+            "seo": {"title": "ALPHA", "description": "Our hotel"},
+            "rooms": {"title": "Catalog"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            with self.assertRaises(HTTPException) as ctx:
+                await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_customer_safe_mode_rejects_forbidden_claim_hidden_in_legacy_section(self):
+        original = {
+            "hero": {"title": "ALPHA", "copy": "Stay at ALPHA"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Street"},
+            "seo": {"title": "ALPHA", "description": "ALPHA"},
+            "rooms": {"copy": "Fixed 30% prepayment required"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            with self.assertRaises(HTTPException) as ctx:
+                await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_customer_safe_mode_does_not_project_invalid_new_publication(self):
+        original = {
+            "hero": {"title": "ALPHA", "subtitle": "Our hotel"},
+            "contacts": {"phone": "INVALID", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Street"},
+            "seo": {"title": "ALPHA", "description": "ALPHA"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            with self.assertRaises(HTTPException) as ctx:
+                await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
+        self.assertEqual(ctx.exception.status_code, 422)
+
+
+
+    async def test_customer_html_page_renders_legacy_published_copy_for_own_hotel(self):
+        document = {
+            "hero": {"title": "Hotel ALPHA", "copy": "Welcome to Alpha"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Avenue"},
+            "seo": {"title": "Alpha Homepage", "description": "Only Alpha"},
+            "rooms": {"title": "Historic rooms kept in PostgreSQL"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            response = await customer_site_page.customer_page(request_for(FakeConnection(document, published_version=2)), locale="ru")
+        body = response.body.decode()
+        self.assertIn("Hotel ALPHA", body)
+        self.assertIn("Welcome to Alpha", body)
+        self.assertIn("alpha@example.test", body)
+        self.assertNotIn("Три Короны", body)
+        self.assertNotIn("3korony", body)
+
+    async def test_customer_html_page_does_not_publish_unpublished_legacy_draft(self):
+        document = {
+            "hero": {"title": "Hotel ALPHA", "copy": "Welcome"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Avenue"},
+            "seo": {"title": "Alpha Homepage", "description": "Only Alpha"},
+            "rooms": {"title": "Historical rooms"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            response = await customer_site_page.customer_page(request_for(FakeConnection(document, published_version=0)), locale="ru")
+        self.assertNotIn("Hotel ALPHA", response.body.decode())
+        self.assertEqual(response.headers["x-robots-tag"], "noindex, nofollow")
+
+
+
+    async def test_customer_rooms_returns_only_own_published_categories(self):
+        document = {
+            "hero": {"title": "Hotel ALPHA", "copy": "Alpha stay"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "Alpha Avenue"},
+            "seo": {"title": "Alpha Rooms", "description": "Alpha rooms"},
+            "rooms": {"title": "Rooms catalogue"},
+        }
+        categories = [{"name": "Alpha Studio <safe>", "capacityAdults": 2, "capacityChildren": 1, "areaLabel": "32 m2"}]
+        fake = FakeConnection(document, published_version=4, room_types=categories)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await customer_site_page.customer_rooms(request_for(fake), locale="en")
+        body = result.body.decode()
+        self.assertIn("Alpha Studio &lt;safe&gt;", body)
+        self.assertIn("Hotel ALPHA", body)
+        self.assertNotIn("Три Короны", body)
+        self.assertNotIn("3korony", body)
+        self.assertNotIn("KGS / night", body)
+        self.assertEqual(fake.room_types, categories)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            legacy_language = await customer_site_page.customer_rooms(request_for(fake), lang="en")
+        self.assertIn("Alpha Studio", legacy_language.body.decode())
+
+    async def test_customer_rooms_unpublished_cannot_reveal_internal_categories(self):
+        fake = FakeConnection(published_version=0, room_types=[{"name": "INTERNAL SECRET"}])
+        with patch.object(site_content, "PROPERTY_CODE", "BETA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await customer_site_page.customer_rooms(request_for(fake), locale="ru")
+        self.assertNotIn("INTERNAL SECRET", result.body.decode())
+        self.assertEqual(result.headers["x-robots-tag"], "noindex, nofollow")
+
+    async def test_customer_rooms_new_document_without_catalogue_stays_unpublished(self):
+        new_document = {
+            "hero": {"title": "Hotel BETA", "subtitle": "Beta stay"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "beta@example.test", "address": "Beta Avenue"},
+            "seo": {"title": "Beta", "description": "Beta"},
+        }
+        fake = FakeConnection(new_document, published_version=1, room_types=[{"name": "NOT OWNER PUBLISHED"}])
+        with patch.object(site_content, "PROPERTY_CODE", "BETA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await customer_site_page.customer_rooms(request_for(fake), locale="ru")
+        self.assertNotIn("NOT OWNER PUBLISHED", result.body.decode())
+        self.assertEqual(result.headers["x-robots-tag"], "noindex, nofollow")
+
+
+
+    async def test_customer_homepage_preserves_legacy_lang_bookmarks(self):
+        published = {
+            "hero": {"title": "Hotel BETA", "copy": "BETA only"},
+            "contacts": {"phone": "+996 555 222 333", "whatsapp": "+996 555 222 333",
+                         "email": "beta@example.test", "address": "Synthetic BETA Street"},
+            "seo": {"title": "BETA public", "description": "BETA only"},
+            "rooms": {"title": "BETA Rooms"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "BETA"), \
+             patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            for code in ("ru", "kg", "en"):
+                page = await customer_site_page.customer_page(
+                    request_for(FakeConnection(published, published_version=2)),
+                    locale="ru", lang=code,
+                )
+                self.assertEqual(page.status_code, 200)
+                self.assertIn(f'<html lang="{code}">', page.body.decode())
+                self.assertIn("Hotel BETA", page.body.decode())
+                self.assertNotIn("Три Короны", page.body.decode())
+
+
+    async def test_legacy_deep_room_url_resolves_only_hotel_owned_category(self):
+        import json
+        for code, title in (("ALPHA", "ALPHA Studio"), ("BETA", "BETA Garden")):
+            published = {
+                "hero": {"title": "Hotel " + code, "copy": code + " guest copy"},
+                "contacts": {"phone": "+996 555 222 333", "whatsapp": "+996 555 222 333",
+                             "email": code.lower() + "@example.test", "address": code + " Street"},
+                "seo": {"title": code + " Hotel", "description": code + " rooms"},
+                "rooms": {"title": code + " categories"},
+            }
+            fake = FakeRoomConnection(published, 2, {
+                "code": "STD", "name": title, "capacityAdults": 2,
+                "capacityChildren": 1, "areaLabel": "25 m2",
+            })
+            with patch.object(site_content, "PROPERTY_CODE", code), \
+                 patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+                 patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True), \
+                 patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": json.dumps({"old-standard": "STD"})}):
+                page = await customer_site_page.customer_room_detail(
+                    "old-standard", request_for(fake), lang="en",
+                )
+                self.assertIn(title, page.body.decode())
+                self.assertIn('<html lang="en">', page.body.decode())
+                self.assertNotIn("Hotel " + ("BETA" if code == "ALPHA" else "ALPHA"), page.body.decode())
+                self.assertNotIn("3korony", page.body.decode().lower())
+
+    async def test_legacy_deep_room_url_fails_closed_without_verified_mapping(self):
+        published = {
+            "hero": {"title": "Hotel ALPHA", "copy": "ALPHA guest copy"},
+            "contacts": {"phone": "+996 555 222 333", "whatsapp": "+996 555 222 333",
+                         "email": "alpha@example.test", "address": "ALPHA Street"},
+            "seo": {"title": "ALPHA Hotel", "description": "ALPHA rooms"},
+            "rooms": {"title": "Rooms"},
+        }
+        fake = FakeRoomConnection(published, 2, {
+            "code": "STD", "name": "Alpha Studio", "capacityAdults": 2,
+            "capacityChildren": 0, "areaLabel": "25 m2",
+        })
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), \
+             patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": ""}):
+            with self.assertRaises(HTTPException) as ctx:
+                await customer_site_page.customer_room_detail("old-standard", request_for(fake))
+            self.assertEqual(ctx.exception.status_code, 404)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), \
+             patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": '{"old-standard":"FOREIGN"}'}):
+            with self.assertRaises(HTTPException) as ctx:
+                await customer_site_page.customer_room_detail("old-standard", request_for(fake))
+            self.assertEqual(ctx.exception.status_code, 404)
+        with patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": '{"bad/slug":"STD"}'}):
+            with self.assertRaises(HTTPException) as ctx:
+                customer_site_page.configured_legacy_room_slugs()
+            self.assertEqual(ctx.exception.status_code, 503)
 
 
 if __name__ == "__main__":

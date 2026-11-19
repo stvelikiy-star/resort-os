@@ -47,6 +47,34 @@
     reverse_proxy api:8000
   }
 
+  # Restore only the legacy public catalogue index from this hotel's DB.
+  # Unpublished sites and deep links are deliberately not synthesized.
+  @catalogue {
+    method GET
+    path /rooms /rooms/
+    header Accept *text/html*
+  }
+  handle @catalogue {
+    rewrite * /api/v1/site/customer-rooms?{query}
+    reverse_proxy api:8000
+  }
+
+  # Exact historical room URLs require a verified hotel-local slug map.
+  # Unmapped links return 404 from the API, never another property's catalogue.
+  @legacy_room_detail {
+    method GET
+    path /rooms/*
+    header Accept *text/html*
+  }
+  handle @legacy_room_detail {
+    # Caddy normally sorts rewrite before uri. route preserves strip -> rewrite.
+    route {
+      uri strip_prefix /rooms
+      rewrite * /api/v1/site/customer-room{path}?{query}
+      reverse_proxy api:8000
+    }
+  }
+
   @unpublished {
     method GET
     header Accept *text/html*

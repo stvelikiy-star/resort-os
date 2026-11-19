@@ -5,6 +5,11 @@ on:
       - 'scripts/design/fl2-mobile-web-cross-client-ci.mjs'
       - 'scripts/design/fl2-mobile-web-cross-client-db.py'
       - '.github/workflows/marina-mobile-web-cross-client-ci.yml'
+      - 'services/api/app/staff_control.py'
+      - 'services/api/app/guest_os.py'
+      - 'services/api/app/site_content.py'
+      - 'services/api/app/customer_site_page.py'
+      - 'services/api/app/service_points.py'
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,0 +1,22 @@
+name: MARINA Hotel QR Origin Regression
+
+on:
+  pull_request:
+    paths:
+      - services/api/app/guest_os.py
+      - services/api/app/service_points.py
+      - scripts/verify_marina_qr_origin_guard.py
+      - .github/workflows/marina-qr-origin-guard-ci.yml
+  workflow_dispatch:
+
+jobs:
+  qr-origin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fail-closed QR origin and legacy compatibility
+        run: python3 scripts/verify_marina_qr_origin_guard.py

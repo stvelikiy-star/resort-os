@@ -5,6 +5,7 @@ on:
       - 'scripts/design/fl2-android-emulator-smoke.sh'
       - 'scripts/design/fl2-android-owner-reception-demo.py'
       - '.github/workflows/marina-fl2-android-emulator-ci.yml'
+      - 'services/api/app/staff_control.py'
       - 'apps/mobile/**'
   workflow_dispatch:
 permissions:
