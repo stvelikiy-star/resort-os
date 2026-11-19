@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .customer_site_contract import validate_customer_site_content
-from .site_content import CUSTOMER_SITE_SAFE_MODE, get_property_id, load_row, validate_locale
+from .site_content import CUSTOMER_SITE_SAFE_MODE, customer_published_view, get_property_id, load_row, validate_locale
 
 router = APIRouter(tags=["customer-site"])
 LANG = {
@@ -133,4 +133,4 @@ async def customer_page(request: Request, locale: str = "ru"):
         row = await load_row(conn, property_id, locale)
     if not row or not row["publishedJson"] or not row["publishedVersion"]:
         return render_customer_site(locale, None)
-    return render_customer_site(locale, row["publishedJson"])
+    return render_customer_site(locale, customer_published_view(locale, row["publishedJson"]))
