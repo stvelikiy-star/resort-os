@@ -85,7 +85,10 @@ export function useMotionAllowed(): boolean {
   return useMotionPreference().allowed;
 }
 export function cappedStagger(index: number): number {
-  return Math.min(Math.max(index, 0), motion.maxStaggerCards) * motion.cardStagger;
+  // Only the first eight mounted cards stagger; later cards appear immediately.
+  // Never indefinitely postpone information on long operational lists.
+  if (!Number.isFinite(index) || index >= motion.maxStaggerCards) return 0;
+  return Math.max(0, index) * motion.cardStagger;
 }
 
 /** Animates a REAL number from the API.
