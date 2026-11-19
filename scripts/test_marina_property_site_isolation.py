@@ -134,5 +134,63 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn(legacy, content)
 
 
+    async def test_customer_safe_mode_reads_legacy_publication_without_mutating_it(self):
+        import copy
+        original = {
+            "hero": {"title": "Synthetic ALPHA", "copy": "Stay at ALPHA"},
+            "contacts": {
+                "phone": "+996 555 111 222", "whatsapp": "+996 555 111 222",
+                "email": "alpha@example.test", "address": "ALPHA Test Street",
+            },
+            "seo": {"title": "ALPHA site", "description": "ALPHA only"},
+            "rooms": {"title": "Old rooms section must be retained in storage"},
+        }
+        before = copy.deepcopy(original)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            result = await site_content.public_site_content(request_for(FakeConnection(original, published_version=3)))
+        self.assertEqual(result["property"], "ALPHA")
+        self.assertEqual(result["content"]["hero"]["subtitle"], "Stay at ALPHA")
+        self.assertEqual(set(result["content"]), {"hero", "contacts", "seo"})
+        self.assertEqual(result["published_version"], 3)
+        self.assertEqual(original, before)
+        self.assertIn("rooms", original)
+
+    async def test_customer_safe_mode_rejects_incomplete_legacy_publication(self):
+        original = {
+            "hero": {"title": "ALPHA", "copy": "Our hotel"},
+            "contacts": {"phone": "+996 555 111 222"},
+            "seo": {"title": "ALPHA", "description": "Our hotel"},
+            "rooms": {"title": "Catalog"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            with self.assertRaises(HTTPException) as ctx:
+                await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_customer_safe_mode_rejects_forbidden_claim_hidden_in_legacy_section(self):
+        original = {
+            "hero": {"title": "ALPHA", "copy": "Stay at ALPHA"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Street"},
+            "seo": {"title": "ALPHA", "description": "ALPHA"},
+            "rooms": {"copy": "Fixed 30% prepayment required"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            with self.assertRaises(HTTPException) as ctx:
+                await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
+        self.assertEqual(ctx.exception.status_code, 422)
+
+    async def test_customer_safe_mode_does_not_project_invalid_new_publication(self):
+        original = {
+            "hero": {"title": "ALPHA", "subtitle": "Our hotel"},
+            "contacts": {"phone": "INVALID", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Street"},
+            "seo": {"title": "ALPHA", "description": "ALPHA"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True):
+            with self.assertRaises(HTTPException) as ctx:
+                await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
+        self.assertEqual(ctx.exception.status_code, 422)
+
+
+
 if __name__ == "__main__":
     unittest.main()
