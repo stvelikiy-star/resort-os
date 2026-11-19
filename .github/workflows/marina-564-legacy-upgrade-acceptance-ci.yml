@@ -1,4 +1,4 @@
-name: MARINA #564 Legacy Two-Hotel Migration Acceptance
+name: "MARINA 564 Legacy Two-Hotel Migration Acceptance"
 
 on:
   pull_request:
@@ -81,7 +81,7 @@ jobs:
             sudo apt-get install -y postgresql-client-16
           fi
           echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
-          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\\.'
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -F "16."
       - name: Prepare OLD frozen Prisma client and apply only OLD migrations
         shell: bash
         run: |
