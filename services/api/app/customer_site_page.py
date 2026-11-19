@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from .customer_site_contract import validate_customer_site_content
-from .site_content import CUSTOMER_SITE_SAFE_MODE, get_property_id, load_row, validate_locale
+from .site_content import CUSTOMER_SITE_SAFE_MODE, customer_published_view, get_property_id, load_row, validate_locale
 
 router = APIRouter(tags=["customer-site"])
 LANG = {
@@ -133,4 +133,77 @@ async def customer_page(request: Request, locale: str = "ru"):
         row = await load_row(conn, property_id, locale)
     if not row or not row["publishedJson"] or not row["publishedVersion"]:
         return render_customer_site(locale, None)
-    return render_customer_site(locale, row["publishedJson"])
+    return render_customer_site(locale, customer_published_view(locale, row["publishedJson"]))
+
+
+ROOMS_LANG = {
+    "ru": {"heading": "Номера", "intro": "Категории размещения гостиницы. Наличие и стоимость уточняются при бронировании.", "capacity": "Взрослых", "children": "Детей", "empty": "Каталог номеров ещё не опубликован."},
+    "kg": {"heading": "Номерлер", "intro": "Мейманкананын жайгашуу категориялары. Бош орундар жана баалар брондоодо такталат.", "capacity": "Чоңдор", "children": "Балдар", "empty": "Номерлер каталогу азырынча жарыялана элек."},
+    "en": {"heading": "Rooms", "intro": "The hotel's accommodation categories. Check availability and prices when booking.", "capacity": "Adults", "children": "Children", "empty": "The room catalogue has not been published yet."},
+}
+
+
+def render_customer_rooms(locale: str, content: dict, room_types: list[dict]) -> HTMLResponse:
+    """Tenant-filtered, read-only public category listing. No prices or availability claims."""
+    data = validate_customer_site_content(locale, content)
+    copy = ROOMS_LANG[locale]
+    e = lambda value: html.escape(str(value), quote=True)
+    cards = "".join(
+        '<article class="card"><h2>' + e(room["name"]) + '</h2>'
+        + '<p>' + e(copy["capacity"]) + ': ' + e(room["capacityAdults"])
+        + (', ' + e(copy["children"]) + ': ' + e(room["capacityChildren"]) if room.get("capacityChildren") else "")
+        + (' · ' + e(room["areaLabel"]) if room.get("areaLabel") else "")
+        + '</p></article>'
+        for room in room_types
+    )
+    if not cards:
+        cards = '<p>' + e(copy["empty"]) + '</p>'
+    canonical_home = _canonical(locale)
+    canonical = canonical_home.replace("/?locale=", "/rooms?locale=") if canonical_home and room_types else ""
+    navigation = "".join(
+        f'<a href="/rooms?locale={lang}" lang="{lang}">{label}</a>'
+        for lang, label in (("ru", "РУС"), ("kg", "КЫР"), ("en", "ENG"))
+    )
+    body = (
+        f'<!doctype html><html lang="{locale}"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        f'<meta name="robots" content="{"index,follow" if canonical else "noindex,nofollow"}">'
+        + (f'<link rel="canonical" href="{e(canonical)}">' if canonical else "")
+        + f'<title>{e(copy["heading"])} · {e(data["hero"]["title"])}</title><style>{CSS}</style></head><body>'
+        f'<div class="shell"><header><a class="brand" href="/">{e(data["hero"]["title"])}</a>'
+        f'<nav class="languages">{navigation}</nav></header>'
+        f'<main><section class="hero"><p class="label">{e(copy["heading"])}</p>'
+        f'<h1>{e(copy["heading"])}</h1><p>{e(copy["intro"])}</p></section>'
+        f'<section class="details">{cards}</section></main><footer>MARINA SMART</footer></div></body></html>'
+    )
+    return _response(body, published=bool(room_types), canonical=canonical)
+
+
+@router.get("/api/v1/site/customer-rooms")
+async def customer_rooms(request: Request, locale: str = "ru", lang: str | None = None):
+    if not CUSTOMER_SITE_SAFE_MODE:
+        raise HTTPException(404, detail="Customer rooms are disabled")
+    # The old public catalogue used ?lang=kg/en; keep those existing links.
+    locale = validate_locale(lang if lang is not None else locale)
+    async with request.app.state.db.acquire() as conn:
+        property_id = await get_property_id(conn)
+        row = await load_row(conn, property_id, locale)
+        if not row or not row["publishedJson"] or not row["publishedVersion"]:
+            return render_customer_site(locale, None)
+        content = customer_published_view(locale, row["publishedJson"])
+        # Never infer catalogue publication from the existence of internal rooms.
+        # The old site's published CMS document must explicitly contain rooms.
+        published_rooms = row["publishedJson"].get("rooms")
+        if not isinstance(published_rooms, dict) or not published_rooms:
+            return render_customer_rooms(locale, content, [])
+        types = await conn.fetch(
+            """SELECT rt.name,rt."capacityAdults",rt."capacityChildren",rt."areaLabel"
+               FROM room_types rt
+               WHERE rt."propertyId"=$1
+                 AND EXISTS (
+                   SELECT 1 FROM rooms r WHERE r."propertyId"=$1 AND r."roomTypeId"=rt.id
+                 )
+               ORDER BY rt.name,rt.id""",
+            property_id,
+        )
+    return render_customer_rooms(locale, content, [dict(item) for item in types])
