@@ -7,6 +7,7 @@ on:
       # even when the strict Expo version gate fails before Jest.
       - 'apps/mobile/**'
       - '.github/workflows/marina-mobile-dependency-audit.yml'
+      - 'services/api/app/staff_control.py'
   schedule:
     # Scheduled workflows run only from GitHub's default branch after an approved merge.
     - cron: '15 3 * * 1'
