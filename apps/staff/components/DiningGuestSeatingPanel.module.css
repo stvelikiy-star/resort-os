@@ -63,3 +63,7 @@
   .assign button,.head button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.shell button{animation:none!important;transition:none!important}}
+
+/* Keep guest and room labels from widening the mobile seating form. */
+.assign label{min-width:0}
+.assign select{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
