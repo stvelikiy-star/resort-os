@@ -15,7 +15,7 @@ from fastapi import HTTPException
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "services" / "api"))
-from app import site_content  # noqa: E402
+from app import customer_site_page, site_content  # noqa: E402
 
 
 class FakeConnection:
@@ -189,6 +189,36 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(HTTPException) as ctx:
                 await site_content.public_site_content(request_for(FakeConnection(original, published_version=2)))
         self.assertEqual(ctx.exception.status_code, 422)
+
+
+
+    async def test_customer_html_page_renders_legacy_published_copy_for_own_hotel(self):
+        document = {
+            "hero": {"title": "Hotel ALPHA", "copy": "Welcome to Alpha"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Avenue"},
+            "seo": {"title": "Alpha Homepage", "description": "Only Alpha"},
+            "rooms": {"title": "Historic rooms kept in PostgreSQL"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            response = await customer_site_page.customer_page(request_for(FakeConnection(document, published_version=2)), locale="ru")
+        body = response.body.decode()
+        self.assertIn("Hotel ALPHA", body)
+        self.assertIn("Welcome to Alpha", body)
+        self.assertIn("alpha@example.test", body)
+        self.assertNotIn("Три Короны", body)
+        self.assertNotIn("3korony", body)
+
+    async def test_customer_html_page_does_not_publish_unpublished_legacy_draft(self):
+        document = {
+            "hero": {"title": "Hotel ALPHA", "copy": "Welcome"},
+            "contacts": {"phone": "+996 555 111 222", "whatsapp": "+996 555 111 222", "email": "alpha@example.test", "address": "ALPHA Avenue"},
+            "seo": {"title": "Alpha Homepage", "description": "Only Alpha"},
+            "rooms": {"title": "Historical rooms"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            response = await customer_site_page.customer_page(request_for(FakeConnection(document, published_version=0)), locale="ru")
+        self.assertNotIn("Hotel ALPHA", response.body.decode())
+        self.assertEqual(response.headers["x-robots-tag"], "noindex, nofollow")
 
 
 
