@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'services/api/app/site_content.py'
+      - 'services/api/app/customer_site_contract.py'
       - 'apps/web/app/guest/page.tsx'
       - 'apps/web/components/GuestLanding.tsx'
       - 'scripts/marina_guest_i18n_guard.py'
