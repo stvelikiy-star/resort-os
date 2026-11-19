@@ -116,8 +116,9 @@ try {
   // services and MUST NOT show a nonfunctional hotel AI entry point.
   const actions = page.locator(".concierge-actions button");
   // The guest services contract specifies the allowed set, not DOM ordering.
-  assert.deepEqual((await actions.evaluateAll((nodes) =>
-    nodes.map((n) => n.getAttribute("data-service-code"))).sort()), ["ADMIN", "MAINTENANCE"]);
+  const reviewedActions = await actions.evaluateAll((nodes) =>
+    nodes.map((n) => n.getAttribute("data-service-code")));
+  assert.deepEqual(reviewedActions.sort(), ["ADMIN", "MAINTENANCE"]);
   assert.equal(await page.locator('section[aria-label*="MARINA AI"]').count(), 0);
   await page.locator('.concierge-actions button[data-service-code="MAINTENANCE"]').click();
   await page.locator(".concierge-modal textarea").fill("Synthetic browser maintenance request B");
