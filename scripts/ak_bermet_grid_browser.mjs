@@ -19,8 +19,10 @@ try {
     await page.locator("button.login-button").click();
   }
 
-  await page.getByRole("button", { name: "Шахматка", exact: true }).waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "Шахматка", exact: true }).click();
+  // Scope the navigation target: Future Luxury also exposes other "Шахматка" actions.
+  const pmsNav = page.locator(".fl2-grouped-navigation").getByRole("button", { name: "Шахматка", exact: true });
+  await pmsNav.waitFor({ state: "visible" });
+  await pmsNav.click();
   await page.locator(".owner-grid-shell").waitFor({ state: "visible" });
   await page.locator(".owner-grid-loading").waitFor({ state: "detached" }).catch(() => {});
 
