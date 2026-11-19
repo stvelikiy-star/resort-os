@@ -9,6 +9,9 @@ function assert(condition, message) {
 }
 
 async function login(page) {
+  // This contract exercises the existing Legacy navigation and all its business sections.
+  // Future Luxury grouped navigation is covered separately by its dedicated QA.
+  await page.addInitScript(() => localStorage.setItem("marina-admin-ui", "legacy"));
   await page.goto(BASE, { waitUntil: "networkidle" });
   if (await page.locator('input[autocomplete="username"]').count()) {
     await page.locator('input[autocomplete="username"]').fill(USERNAME);
