@@ -5,7 +5,7 @@ import path from 'path';
 import { AccessibilityInfo, AppState, StyleSheet, Text, View } from 'react-native';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
-import { getMotionSnapshot, primeMotionPreference, resetMotionPreferenceForTests } from '../src/theme/motion';
+import { cappedStagger, getMotionSnapshot, primeMotionPreference, resetMotionPreferenceForTests } from '../src/theme/motion';
 import { AnimatedKpi, OccupancyRing, PremiumEntrance } from '../src/components/Future';
 import { AnimatedProgressBar, PressScale } from '../src/components/ui';
 import { AnimatedSheet, ConfirmedChange, TabIcon } from '../src/components/Motion';
@@ -242,5 +242,15 @@ describe('PressScale (#468 fixes preserved on the shared motion store)', () => {
     expect(scaleOf(screen.getByText('Go').parent as never)).toBe(1);
     fireEvent.press(screen.getByTestId('b'));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Premium Motion bounded cascade', () => {
+  it('staggers only eight cards, at shared 40ms intervals', () => {
+    expect(Array.from({ length: 8 }, (_, index) => cappedStagger(index)))
+      .toEqual([0, 40, 80, 120, 160, 200, 240, 280]);
+    expect(cappedStagger(8)).toBe(0);
+    expect(cappedStagger(99)).toBe(0);
+    expect(cappedStagger(Number.NaN)).toBe(0);
   });
 });

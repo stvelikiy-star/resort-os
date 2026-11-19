@@ -52,3 +52,31 @@ body{background:var(--shift-bg);color:var(--shift-ink)}
   .shift-modal-head { gap:8px; }
   .shift-modal-head h2 { overflow-wrap:anywhere; }
 }
+
+/* Premium Motion: same Staff token contract; only visual presentation.
+   Dialog focus/escape behavior belongs to the existing React interaction. */
+.shift-shell :is(.shift-primary,.shift-ghost,.shift-kpis button):not(:disabled):active {
+  transform: scale(.985);
+}
+.shift-shell :is(.shift-primary,.shift-ghost,.shift-kpis button) {
+  transition: transform var(--marina-motion-fast) var(--marina-motion-ease),
+              opacity var(--marina-motion-fast) var(--marina-motion-ease);
+  touch-action: manipulation;
+}
+.shift-shell :is(.shift-primary,.shift-ghost,.shift-kpis button):disabled { transform: none; }
+:is(.shift-login,.shift-task,.shift-empty,.shift-error,.shift-notice,.shift-modal) {
+  animation: marina-shift-reveal var(--marina-motion-base) var(--marina-motion-ease) both;
+}
+.shift-modal { animation-duration: var(--marina-motion-slow); }
+@keyframes marina-shift-reveal {
+  from { opacity: .88; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.shift-login,.shift-task,.shift-empty,.shift-error,.shift-notice,.shift-modal) {
+    animation: none !important; opacity: 1; transform: none !important;
+  }
+  .shift-shell :is(.shift-primary,.shift-ghost,.shift-kpis button) {
+    transition: none !important; transform: none !important;
+  }
+}

@@ -651,7 +651,7 @@ export default function PMSUniversalBoard() {
     <section className={`v8-board density-${density.toLowerCase()} ${cutMode ? "cut-mode" : ""}`}>
       <header className="v8-board-head">
         <div>
-          <p className="eyebrow">Three Crowns · Universal Tape Chart</p>
+          <p className="eyebrow">MARINA SMART · Universal Tape Chart</p>
           <h2>Супершахматка</h2>
           <span>Realtime, перемещения, разрез проживания и серверный preview перед каждым commit.</span>
         </div>

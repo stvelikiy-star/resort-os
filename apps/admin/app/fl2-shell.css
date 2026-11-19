@@ -84,3 +84,44 @@ html[data-marina-ui="future-luxury"] .fl2-style-panel { position:absolute;z-inde
 @media (min-width: 1101px) {
   html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-current-section { display: none; }
 }
+
+/* Premium Motion System — FL2 only; legacy screens, API semantics and layout are unchanged.
+   Shared timing contract with apps/mobile/src/theme/tokens.ts and Staff CSS.
+   Never animate layout geometry or accounting values. */
+html[data-marina-ui="future-luxury"] {
+  --marina-motion-fast: 120ms;
+  --marina-motion-base: 200ms;
+  --marina-motion-slow: 320ms;
+  --marina-motion-stagger: 40ms;
+  --marina-motion-ease: cubic-bezier(.2,.8,.2,1);
+}
+html[data-marina-ui="future-luxury"] .fl2-nav-group button {
+  transition: opacity var(--marina-motion-fast) var(--marina-motion-ease),
+              transform var(--marina-motion-fast) var(--marina-motion-ease);
+  touch-action: manipulation;
+}
+html[data-marina-ui="future-luxury"] .fl2-nav-group button:not(:disabled):active {
+  transform: scale(.985);
+}
+html[data-marina-ui="future-luxury"] .fl2-nav-group button:disabled,
+html[data-marina-ui="future-luxury"] .fl2-nav-group button[aria-disabled="true"] {
+  transform: none;
+}
+html[data-marina-ui="future-luxury"] :is(.fl2-current-section,.fl2-nav-group) {
+  animation: marina-fl2-reveal var(--marina-motion-base) var(--marina-motion-ease) both;
+}
+html[data-marina-ui="future-luxury"] .fl2-nav-group:nth-child(2) { animation-delay: var(--marina-motion-stagger); }
+html[data-marina-ui="future-luxury"] .fl2-nav-group:nth-child(3) { animation-delay: calc(2 * var(--marina-motion-stagger)); }
+html[data-marina-ui="future-luxury"] .fl2-nav-group:nth-child(4) { animation-delay: calc(3 * var(--marina-motion-stagger)); }
+@keyframes marina-fl2-reveal {
+  from { opacity: .88; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-marina-ui="future-luxury"] :is(.fl2-current-section,.fl2-nav-group) {
+    animation: none !important; opacity: 1; transform: none;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-nav-group button {
+    transition: none !important; transform: none !important;
+  }
+}

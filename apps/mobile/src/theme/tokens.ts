@@ -56,15 +56,18 @@ export const font = {
 } as const;
 export const elevation = { card: { shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 3 }, floating: { shadowOpacity: 0.18, shadowRadius: 26, shadowOffset: { width: 0, height: 12 }, elevation: 9 } } as const;
 export const TOUCH = 56;
+/** Premium Motion: one native token map; keep all app components bound here.
+ * Duration tiers mirror Admin/Staff CSS tokens: 120 / 200 / 320 ms.
+ * Motion never signals server success on its own. */
 export const motion = {
-  press: 125, tab: 220, card: 320, modal: 340, chart: 700,
-  /** Bottom sheet: enter is slightly slower than exit so dismissal never feels sluggish. */
-  sheetIn: 320, sheetOut: 220,
+  press: 120, tab: 200, card: 320, modal: 320, chart: 320,
+  /** Bottom sheet: short exit, no extra delay for work. */
+  sheetIn: 320, sheetOut: 200,
   /** Server-confirmed status swap and tab-icon focus. */
-  status: 240, tabIcon: 200,
-  /** Bounded "work in progress" loops: pulses/rotations before settling static. */
+  status: 200, tabIcon: 200,
+  /** Bounded pre-result indicators; never infinite. */
   maxShimmerPulses: 3, maxOrbTurns: 8,
-  cardStagger: 55, maxStaggerCards: 6,
+  cardStagger: 40, maxStaggerCards: 8,
   spring: { speed: 30, bounciness: 5 },
 } as const;
 export const iconography = { nav: 23, action: 22, metric: 24, stroke: 1.9, strokeActive: 2.5 } as const;
