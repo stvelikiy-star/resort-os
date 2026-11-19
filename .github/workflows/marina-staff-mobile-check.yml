@@ -5,6 +5,9 @@ on:
     paths:
       - 'apps/mobile/**'
       - '.github/workflows/marina-staff-mobile-check.yml'
+      - 'services/api/app/staff_control.py'
+      - 'services/api/app/guest_os.py'
+      - 'services/api/app/service_points.py'
   push:
     branches:
       - 'feat/marina-staff-mobile-foundation-20261030'
