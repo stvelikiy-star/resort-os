@@ -10,6 +10,7 @@ import pathlib
 import secrets
 import uuid
 from unittest.mock import patch
+from typing import Any
 from urllib.parse import urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -70,7 +71,7 @@ def guest_test():
 
 async def service_point_test():
     ns = {
-        "os": os, "uuid": uuid, "secrets": secrets,
+        "os": os, "uuid": uuid, "secrets": secrets, "Any": Any,
         "HTTPException": HTTPException, "PROPERTY_CODE": "ALPHA",
         "PUBLIC_BASE_URL": "https://3korony.com",
         "hash_secret": lambda token: "fakehash",
