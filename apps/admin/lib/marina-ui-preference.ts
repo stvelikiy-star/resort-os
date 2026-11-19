@@ -6,9 +6,11 @@ const KEY = 'marina-admin-ui';
 export function readMarinaUiPreference(): MarinaUiPreference {
   if (typeof window === 'undefined') return 'legacy';
   try {
-    return window.localStorage.getItem(KEY) === 'future-luxury' ? 'future-luxury' : 'legacy';
+    // The approved Future Luxury design is the default for new users.
+    // Preserve Legacy for anyone who explicitly selected it.
+    return window.localStorage.getItem(KEY) === 'legacy' ? 'legacy' : 'future-luxury';
   } catch {
-    return 'legacy';
+    return 'future-luxury';
   }
 }
 
