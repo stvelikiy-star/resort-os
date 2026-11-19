@@ -67,9 +67,12 @@
     header Accept *text/html*
   }
   handle @legacy_room_detail {
-    uri strip_prefix /rooms
-    rewrite * /api/v1/site/customer-room{path}?{query}
-    reverse_proxy api:8000
+    # Caddy normally sorts rewrite before uri. route preserves strip -> rewrite.
+    route {
+      uri strip_prefix /rooms
+      rewrite * /api/v1/site/customer-room{path}?{query}
+      reverse_proxy api:8000
+    }
   }
 
   @unpublished {
