@@ -20,6 +20,7 @@ on:
       - 'scripts/marina_hotel_rules_e2e.py'
       - 'scripts/marina_guest_identity_e2e.py'
       - 'scripts/marina_staff_access_e2e.py'
+      - 'scripts/marina_legacy_dining_owner_transition_e2e.py'
       - 'scripts/test_marina_demo_credentials.py'
       - 'scripts/test_guest_property_context.py'
       - 'scripts/marina_guest_identity_browser.mjs'
@@ -53,6 +54,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://marina_ci:synthetic_full_ci_only@127.0.0.1:5432/marina_full_ci?schema=public
       PROPERTY_CODE: MARINA_FULL_CI
+      # Disposable single-hotel CI must never inherit the legacy 3korony.com origin.
+      GUEST_OS_PUBLIC_BASE_URL: http://127.0.0.1:13000
       MARINA_PROPERTY_NAME: MARINA Full Stack Synthetic Hotel
       RATE_PLAN_CODE: MARINA_DIRECT
       APP_ENV: staging
@@ -171,6 +174,7 @@ jobs:
         run: |
           python scripts/test_marina_demo_credentials.py
           python scripts/marina_staff_access_e2e.py
+          python scripts/marina_legacy_dining_owner_transition_e2e.py
       - name: Verify seasonal pricing across date boundaries on disposable DB
         env:
           MARINA_BOOKING_TEST_API: http://127.0.0.1:18000
