@@ -54,6 +54,20 @@ class FakeConnection:
         yield self
 
 
+class FakeRoomConnection(FakeConnection):
+    def __init__(self, published=None, published_version=0, room=None):
+        super().__init__(published, published_version)
+        self.room = room
+
+    async def fetchrow(self, statement, *params):
+        if "FROM room_types" in statement:
+            assert len(params) == 2 and params[0] == self.property_id
+            if self.room is None or self.room["code"] != params[1]:
+                return None
+            return self.room
+        return await super().fetchrow(statement, *params)
+
+
 class FakeDB:
     def __init__(self, connection):
         self.connection = connection
@@ -291,6 +305,64 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(f'<html lang="{code}">', page.body.decode())
                 self.assertIn("Hotel BETA", page.body.decode())
                 self.assertNotIn("Три Короны", page.body.decode())
+
+
+    async def test_legacy_deep_room_url_resolves_only_hotel_owned_category(self):
+        import json
+        for code, title in (("ALPHA", "ALPHA Studio"), ("BETA", "BETA Garden")):
+            published = {
+                "hero": {"title": "Hotel " + code, "copy": code + " guest copy"},
+                "contacts": {"phone": "+996 555 222 333", "whatsapp": "+996 555 222 333",
+                             "email": code.lower() + "@example.test", "address": code + " Street"},
+                "seo": {"title": code + " Hotel", "description": code + " rooms"},
+                "rooms": {"title": code + " categories"},
+            }
+            fake = FakeRoomConnection(published, 2, {
+                "code": "STD", "name": title, "capacityAdults": 2,
+                "capacityChildren": 1, "areaLabel": "25 m2",
+            })
+            with patch.object(site_content, "PROPERTY_CODE", code), \
+                 patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+                 patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True), \
+                 patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": json.dumps({"old-standard": "STD"})}):
+                page = await customer_site_page.customer_room_detail(
+                    "old-standard", request_for(fake), lang="en",
+                )
+                self.assertIn(title, page.body.decode())
+                self.assertIn('<html lang="en">', page.body.decode())
+                self.assertNotIn("Hotel " + ("BETA" if code == "ALPHA" else "ALPHA"), page.body.decode())
+                self.assertNotIn("3korony", page.body.decode().lower())
+
+    async def test_legacy_deep_room_url_fails_closed_without_verified_mapping(self):
+        published = {
+            "hero": {"title": "Hotel ALPHA", "copy": "ALPHA guest copy"},
+            "contacts": {"phone": "+996 555 222 333", "whatsapp": "+996 555 222 333",
+                         "email": "alpha@example.test", "address": "ALPHA Street"},
+            "seo": {"title": "ALPHA Hotel", "description": "ALPHA rooms"},
+            "rooms": {"title": "Rooms"},
+        }
+        fake = FakeRoomConnection(published, 2, {
+            "code": "STD", "name": "Alpha Studio", "capacityAdults": 2,
+            "capacityChildren": 0, "areaLabel": "25 m2",
+        })
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), \
+             patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": ""}):
+            with self.assertRaises(HTTPException) as ctx:
+                await customer_site_page.customer_room_detail("old-standard", request_for(fake))
+            self.assertEqual(ctx.exception.status_code, 404)
+        with patch.object(site_content, "PROPERTY_CODE", "ALPHA"), \
+             patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": '{"old-standard":"FOREIGN"}'}):
+            with self.assertRaises(HTTPException) as ctx:
+                await customer_site_page.customer_room_detail("old-standard", request_for(fake))
+            self.assertEqual(ctx.exception.status_code, 404)
+        with patch.dict(os.environ, {"MARINA_CUSTOMER_ROOM_SLUG_MAP_JSON": '{"bad/slug":"STD"}'}):
+            with self.assertRaises(HTTPException) as ctx:
+                customer_site_page.configured_legacy_room_slugs()
+            self.assertEqual(ctx.exception.status_code, 503)
 
 
 if __name__ == "__main__":
