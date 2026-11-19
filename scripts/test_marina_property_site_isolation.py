@@ -271,5 +271,27 @@ class IsolatedPublicSiteTests(unittest.IsolatedAsyncioTestCase):
 
 
 
+    async def test_customer_homepage_preserves_legacy_lang_bookmarks(self):
+        published = {
+            "hero": {"title": "Hotel BETA", "copy": "BETA only"},
+            "contacts": {"phone": "+996 555 222 333", "whatsapp": "+996 555 222 333",
+                         "email": "beta@example.test", "address": "Synthetic BETA Street"},
+            "seo": {"title": "BETA public", "description": "BETA only"},
+            "rooms": {"title": "BETA Rooms"},
+        }
+        with patch.object(site_content, "PROPERTY_CODE", "BETA"), \
+             patch.object(site_content, "CUSTOMER_SITE_SAFE_MODE", True), \
+             patch.object(customer_site_page, "CUSTOMER_SITE_SAFE_MODE", True):
+            for code in ("ru", "kg", "en"):
+                page = await customer_site_page.customer_page(
+                    request_for(FakeConnection(published, published_version=2)),
+                    locale="ru", lang=code,
+                )
+                self.assertEqual(page.status_code, 200)
+                self.assertIn(f'<html lang="{code}">', page.body.decode())
+                self.assertIn("Hotel BETA", page.body.decode())
+                self.assertNotIn("Три Короны", page.body.decode())
+
+
 if __name__ == "__main__":
     unittest.main()
