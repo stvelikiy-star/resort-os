@@ -1,0 +1,164 @@
+name: MARINA #564 Legacy Two-Hotel Migration Acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml'
+      - 'scripts/marina_disposable_legacy_fixture_ci.py'
+      - 'scripts/marina_disposable_upgrade_acceptance_ci.py'
+      - 'services/api/app/customer_site_page.py'
+      - 'services/api/app/site_content.py'
+      - 'services/api/app/staff_control.py'
+      - 'packages/database/prisma/migrations/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-upgrade-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      old_pg:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_old
+          POSTGRES_USER: marina_audit
+          POSTGRES_PASSWORD: synthetic-disposable-only
+        ports:
+          - 55431:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_audit -d marina_old"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+      new_pg:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: marina_new
+          POSTGRES_USER: marina_audit
+          POSTGRES_PASSWORD: synthetic-disposable-only
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U marina_audit -d marina_new"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      MARINA_MIGRATION_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_OLD_TO_564
+      MARINA_LEGACY_OLD_DB: postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55431/marina_old
+      MARINA_LEGACY_NEW_DB: postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_new
+      MARINA_LEGACY_ROLLBACK_DB: postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_rollback
+      PGPASSWORD: synthetic-disposable-only
+      ENABLE_PAYMENT_OPERATIONS: 'false'
+      ENABLE_MKASSA: 'false'
+      ENABLE_SERVICE_POINT_QR: 'false'
+      COOKIE_SECURE: 'false'
+      AUTH_TRUST_PROXY_HEADERS: 'false'
+      MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+      MARINA_TENANT_CONTEXT_ENABLED: 'false'
+      APP_ENV: test
+      NEXT_TELEMETRY_DISABLED: '1'
+      OPENAI_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout immutable old application snapshot, never current main
+        uses: actions/checkout@v4
+        with:
+          ref: 984d17546dc9d7b6443cdcc376b03c62cdd64bd5
+          path: old
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Ensure PostgreSQL 16 client tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/lib/postgresql/16/bin/pg_dump; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\\.'
+      - name: Prepare OLD frozen Prisma client and apply only OLD migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd old/packages/database && npm ci --no-audit --no-fund)
+          (cd old/packages/database && DATABASE_URL="$MARINA_LEGACY_OLD_DB" npx prisma migrate deploy)
+          test "$(psql "$MARINA_LEGACY_OLD_DB" -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 24
+      - name: Install API dependencies and seed two old hotel fixtures
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check -r services/api/requirements.txt
+          python scripts/marina_disposable_legacy_fixture_ci.py
+          python scripts/marina_disposable_upgrade_acceptance_ci.py snapshot old
+      - name: Snapshot and clone exact original PostgreSQL (A -> B)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_dump -Fc -Z0 -f "$RUNNER_TEMP/marina-old-a.dump" "$MARINA_LEGACY_OLD_DB"
+          pg_restore --no-owner --no-acl --exit-on-error -d "$MARINA_LEGACY_NEW_DB" "$RUNNER_TEMP/marina-old-a.dump"
+          python scripts/marina_disposable_upgrade_acceptance_ci.py snapshot clone
+      - name: Upgrade cloned B with only NEW immutable migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd packages/database && npm ci --no-audit --no-fund)
+          (cd packages/database && DATABASE_URL="$MARINA_LEGACY_NEW_DB" npx prisma migrate deploy)
+          python scripts/marina_disposable_upgrade_acceptance_ci.py snapshot new
+      - name: Independently restore old backup and check data/finance invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE marina_rollback"
+          pg_restore --no-owner --no-acl --exit-on-error -d "$MARINA_LEGACY_ROLLBACK_DB" "$RUNNER_TEMP/marina-old-a.dump"
+          python scripts/marina_disposable_upgrade_acceptance_ci.py snapshot rollback
+          python scripts/marina_disposable_upgrade_acceptance_ci.py compare
+      - name: Verify clean-install migration count on fresh isolated DB
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE marina_clean"
+          (cd packages/database && DATABASE_URL="postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_clean" npx prisma migrate deploy)
+          test "$(psql "postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_clean" -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 51
+      - name: Launch isolated upgraded APIs for both hotels in customer-safe mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/marina-migration-564
+          for item in ALPHA:18102 BETA:18103; do
+            code="${item%%:*}"; port="${item##*:}"
+            env PROPERTY_CODE="$code" MARINA_CUSTOMER_SITE_SAFE_MODE=true DATABASE_URL="$MARINA_LEGACY_NEW_DB" \
+              python -m uvicorn app.app_entry:app --app-dir services/api --host 127.0.0.1 --port "$port" \
+              > "/tmp/marina-migration-564/$code.log" 2>&1 &
+            echo "$!" > "/tmp/marina-migration-564/$code.pid"
+          done
+          for port in 18102 18103; do
+            for i in {1..60}; do
+              if curl -fsS "http://127.0.0.1:$port/health" >/dev/null; then break; fi
+              sleep 1
+            done
+            curl -fsS "http://127.0.0.1:$port/health" >/dev/null
+          done
+      - name: Verify legacy publications, no foreign brand, room index, owner role preservation
+        shell: bash
+        run: |
+          python scripts/marina_disposable_upgrade_acceptance_ci.py http ALPHA 18102
+          python scripts/marina_disposable_upgrade_acceptance_ci.py http BETA 18103
+      - name: Failure diagnostics from disposable services only
+        if: failure()
+        shell: bash
+        run: |
+          for code in ALPHA BETA; do
+            tail -n 120 "/tmp/marina-migration-564/$code.log" 2>/dev/null || true
+          done
+      - name: Stop disposable API processes
+        if: always()
+        shell: bash
+        run: |
+          for pidfile in /tmp/marina-migration-564/*.pid; do
+            if [ -f "$pidfile" ]; then kill "$(cat "$pidfile")" 2>/dev/null || true; fi
+          done
