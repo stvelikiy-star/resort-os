@@ -52,3 +52,44 @@ body{background:var(--shift-bg);color:var(--shift-ink)}
   .shift-modal-head { gap:8px; }
   .shift-modal-head h2 { overflow-wrap:anywhere; }
 }
+
+/* MARINA_STAFF_PREFS_COMPACT_20261120 */
+
+/* Keep the language choice reachable but do not occupy half the shift header. */
+.staff-locale-switcher.staff-locale-switcher {
+  position:sticky;top:8px;display:block;width:62px;min-width:62px;
+  max-width:62px;min-height:44px;height:44px;margin:8px 10px 8px auto;
+  padding:0;border-radius:13px;overflow:visible;z-index:80;
+}
+.staff-locale-switcher > summary {
+  display:flex;justify-content:center;align-items:center;gap:5px;
+  height:44px;min-height:44px;padding:0 6px;
+  border-radius:13px;cursor:pointer;list-style:none;color:var(--shift-ink);
+}
+.staff-locale-switcher > summary::-webkit-details-marker {display:none}
+.staff-locale-switcher > summary strong {font-size:12px}
+.staff-locale-switcher > summary span {font-size:14px;color:var(--shift-muted)}
+.staff-locale-switcher:not([open]) > .staff-locale-menu {display:none}
+.staff-locale-switcher[open] > .staff-locale-menu {
+  position:absolute;right:0;top:calc(100% + 8px);width:156px;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+  padding:8px;border:1px solid var(--shift-line);border-radius:15px;
+  background:var(--shift-header);color:var(--shift-ink);
+  box-shadow:var(--shift-shadow);
+}
+.staff-locale-switcher .staff-locale-menu button {
+  min-width:44px;min-height:44px;width:100%;height:44px;
+  border:1px solid var(--shift-line);border-radius:10px;
+  background:var(--shift-surface);color:var(--shift-ink);cursor:pointer;
+}
+.staff-locale-switcher .staff-locale-menu button[aria-pressed="true"] {
+  background:var(--shift-soft);color:var(--shift-ink);border-color:var(--shift-accent);
+}
+.staff-locale-switcher > summary:focus-visible {
+  outline:3px solid var(--shift-accent);outline-offset:3px;
+}
+/* A single brand accent across light/dark instead of a saturated gradient.
+   Preserve red/amber/green strictly for operation status and alerts. */
+.shift-primary {background:var(--shift-accent);color:var(--shift-action-ink);box-shadow:var(--shift-shadow)}
+@media(prefers-color-scheme:light){:root{--shift-action-ink:#ffffff}}
+

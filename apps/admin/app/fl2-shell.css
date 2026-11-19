@@ -84,3 +84,75 @@ html[data-marina-ui="future-luxury"] .fl2-style-panel { position:absolute;z-inde
 @media (min-width: 1101px) {
   html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-current-section { display: none; }
 }
+
+/* MARINA_PREFS_COMPACT_20261120 */
+
+/* Compact bilingual controls: display a single 44px launcher, not a floating
+   four-button toolbar. All four supported languages remain available. */
+.admin-locale-switcher.admin-locale-switcher {
+  position:fixed;inset:auto max(12px,env(safe-area-inset-right))
+    max(12px,env(safe-area-inset-bottom)) auto;
+  display:block;width:58px;min-width:58px;max-width:58px;height:44px;min-height:44px;
+  margin:0;padding:0;z-index:1800;overflow:visible;flex-wrap:initial;
+  border-radius:14px;border:1px solid var(--mx-edge,rgba(148,163,184,.35));
+  background:var(--mx-glass-strong,#123342);color:var(--mx-ink,#f8fafc);
+  box-shadow:0 8px 25px rgba(1,18,27,.16);
+}
+.admin-locale-switcher > summary {
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  height:44px;min-height:44px;padding:0 4px;cursor:pointer;
+  border-radius:14px;list-style:none;color:inherit;
+}
+.admin-locale-switcher > summary::-webkit-details-marker {display:none}
+.admin-locale-switcher > summary strong {font-size:11px;letter-spacing:.01em}
+.admin-locale-switcher > summary:focus-visible,
+.admin-locale-switcher button:focus-visible {outline:3px solid var(--mx-focus,#14b8a6);outline-offset:2px}
+.admin-locale-switcher:not([open]) > .admin-locale-menu {display:none}
+.admin-locale-switcher[open] > .admin-locale-menu {
+  position:absolute;right:0;bottom:calc(100% + 8px);z-index:2;
+  width:154px;max-width:calc(100vw - 24px);padding:8px;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;
+  border:1px solid var(--mx-edge,rgba(148,163,184,.35));border-radius:15px;
+  background:var(--mx-glass-strong,#123342);color:var(--mx-ink,#f8fafc);
+  box-shadow:0 12px 35px rgba(1,18,27,.22);
+}
+.admin-locale-switcher .admin-locale-menu button {
+  min-width:44px;min-height:44px;width:100%;height:44px;padding:5px;
+  border:1px solid var(--mx-edge,rgba(148,163,184,.35));border-radius:10px;
+  background:var(--mx-glass,#204251);color:var(--mx-ink,#f8fafc);
+  font-size:12px;font-weight:700;cursor:pointer;
+}
+.admin-locale-switcher .admin-locale-menu button[aria-pressed="true"] {
+  border-color:var(--mx-accent,#14b8a6);
+  background:var(--mx-accent-soft,rgba(20,184,166,.15));
+  color:var(--mx-ink,#f8fafc);
+}
+@media(max-width:620px){
+  html[data-marina-ui="future-luxury"] .fl2-style-options summary {
+    width:44px;min-width:44px;max-width:44px;padding:0;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-style-options summary span {
+    position:absolute;width:1px;height:1px;margin:-1px;padding:0;
+    overflow:hidden;clip-path:inset(50%);white-space:nowrap;
+  }
+  html[data-marina-ui="future-luxury"] .fl2-style-panel {
+    left:0;top:calc(100% + 8px);bottom:auto;
+    min-width:min(248px,calc(100vw - 24px));max-width:calc(100vw - 24px);
+    box-shadow:0 16px 35px rgba(1,18,27,.22);
+  }
+}
+/* Consistent actions for both FL2 palettes. Keep real warning/critical
+   notices and financial status colors semantic, not decorative. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] .hotel-finance-shell .btn:not(.primary):not(.danger) {
+  background:var(--mx-glass-strong);
+  color:var(--mx-ink);
+  border-color:var(--mx-edge);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .hotel-finance-shell .btn.primary {
+  background:var(--mx-accent);color:var(--mx-accent-ink);
+  border-color:var(--mx-accent);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .hotel-finance-shell .btn:focus-visible {
+  outline:3px solid var(--mx-focus);outline-offset:2px;
+}
+

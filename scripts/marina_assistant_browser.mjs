@@ -41,6 +41,7 @@ try {
       };
       await page.route("**/_next/static/**/*.js", slowChunks);
       await page.goto(base, { waitUntil: "domcontentloaded" });
+      await page.locator('.staff-locale-switcher summary').click();
       await page.getByRole("button", { name: "KG", exact: true }).click();
       await page.waitForFunction(() => document.documentElement.lang === "ky");
       await page.unroute("**/_next/static/**/*.js", slowChunks);
@@ -56,6 +57,7 @@ try {
       const expectedLanguage = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
       let languageReady = false;
       for (let attempt = 0; attempt < 4; attempt += 1) {
+        await page.locator(surfaceIndex === 0 ? '.admin-locale-switcher summary' : '.staff-locale-switcher summary').click();
         await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
         try {
           await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected,

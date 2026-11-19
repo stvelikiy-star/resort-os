@@ -1370,8 +1370,12 @@ export default function StaffLocaleRuntime() {
 
   const label = locale === "en" ? "Language" : locale === "kg" ? "Тил" : locale === "kz" ? "Тіл" : "Язык";
 
-  return <div data-staff-i18n-skip className="staff-locale-switcher">
-    <span>{label}</span>
-    {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" disabled={!initialized} onClick={() => setLocale(value)} aria-pressed={locale === value}>{value.toUpperCase()}</button>)}
-  </div>;
+  return <details data-staff-i18n-skip className="staff-locale-switcher">
+    <summary aria-label={`${label}: ${locale.toUpperCase()}`} title={label}>
+      <strong>{locale.toUpperCase()}</strong><span aria-hidden="true">⌄</span>
+    </summary>
+    <div className="staff-locale-menu" role="group" aria-label={label}>
+      {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" disabled={!initialized} onClick={(event) => { setLocale(value); event.currentTarget.closest("details")?.removeAttribute("open"); }} aria-pressed={locale === value}>{value.toUpperCase()}</button>)}
+    </div>
+  </details>;
 }

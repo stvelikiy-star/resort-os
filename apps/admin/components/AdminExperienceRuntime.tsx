@@ -2,6 +2,7 @@
 import { ownerCommandCopy } from "./fl2/owner-command-copy";
 
 import { useEffect, useMemo, useState } from "react";
+import { Languages } from "lucide-react";
 import { FL2_OWNER_PATTERNS, FL2_OWNER_PHRASES } from "./fl2OwnerPhrases";
 
 type Locale = "ru" | "kg" | "kz" | "en";
@@ -3490,10 +3491,14 @@ export default function AdminExperienceRuntime() {
   }[locale];
 
   return <>
-    <div className="admin-locale-switcher" data-i18n-skip>
-      <span>{labels.language}</span>
-      {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} onClick={() => setLocale(value)}>{value.toUpperCase()}</button>)}
-    </div>
+    <details className="admin-locale-switcher" data-i18n-skip>
+      <summary aria-label={`${labels.language}: ${locale.toUpperCase()}`} title={labels.language}>
+        <Languages size={17} aria-hidden="true" /><strong>{locale.toUpperCase()}</strong>
+      </summary>
+      <div className="admin-locale-menu" role="group" aria-label={labels.language}>
+        {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} aria-pressed={locale === value} onClick={(event) => { setLocale(value); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{value.toUpperCase()}</button>)}
+      </div>
+    </details>
 
     {detailOpen && currentReservationCheckedIn && <button type="button" className="guest-pin-reissue" data-i18n-skip onClick={reissuePin} disabled={pinBusy}>{pinBusy ? "…" : labels.reissue}</button>}
     {pinError && <div className="guest-pin-runtime-error" data-i18n-skip>{labels.error}: {pinError}</div>}

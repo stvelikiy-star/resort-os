@@ -58,6 +58,7 @@ try {
  }
  const languages=await open();
  for(const [code,heading] of [['EN','Growth'],['KG','Өнүгүү'],['KZ','Даму'],['RU','Развитие']]) {
+  await languages.page.locator('.admin-locale-switcher summary').click();
   await languages.page.locator('.admin-locale-switcher').getByRole('button',{name:code,exact:true}).click();
   await languages.page.locator('.fl2-nav-group h2').filter({hasText:heading}).first().waitFor();
  }

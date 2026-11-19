@@ -16,6 +16,7 @@ try {
   assert.equal(res?.status(),200);
   await page.locator('[data-staff-qa-fixture="true"]').waitFor();
   assert.equal(await page.locator('nextjs-portal').count(),0,'Visual acceptance must run without Next.js dev overlay');
+  await page.locator('.staff-locale-switcher summary').click();
   const m=await page.evaluate(()=>{
    const buttons=[...document.querySelectorAll('.staff-locale-switcher button,.shift-modal-head button')];
    const rects=buttons.map(x=>({text:x.getAttribute('aria-label')||x.textContent,width:x.getBoundingClientRect().width,height:x.getBoundingClientRect().height}));
@@ -28,6 +29,7 @@ try {
   assert.ok(m.headerOverflow<=1,'Staff header overflow '+JSON.stringify({width,theme,m}));
   assert.equal(m.rects.length,5,'Expected 4 authentic locale buttons and 1 dialog close');
   assert.ok(m.rects.every(x=>x.width>=43.9&&x.height>=43.9),'Staff target smaller than 44px '+JSON.stringify({width,theme,m}));
+  await page.locator('.staff-locale-switcher summary').click();
   await page.locator('.shift-modal-head button').focus();
   const focus=await page.locator('.shift-modal-head button').evaluate(e=>({outline:getComputedStyle(e).outlineStyle,width:getComputedStyle(e).outlineWidth}));
   assert.notEqual(focus.outline,'none','Keyboard focus invisible');
