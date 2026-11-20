@@ -29,8 +29,12 @@ try {
   assert.equal(await page.locator('[data-section]').count(),26);
   await page.locator('.fl2-account-settings summary').click();
    const profileRect=await page.locator('.fl2-account-panel').boundingBox();
-   assert.ok(profileRect && profileRect.x>=4 && profileRect.x+profileRect.width<=width-4,
-     `Profile panel must fit the viewport: ${JSON.stringify({width,theme,profileRect})}`);
+   assert.ok(profileRect && profileRect.x>=4 && profileRect.x+profileRect.width<=width-4
+     && profileRect.y>=4 && profileRect.y+profileRect.height <= page.viewportSize().height-4,
+     `Profile panel must fit the viewport horizontally AND vertically: ${JSON.stringify({width,theme,profileRect})}`);
+   const localeRect=await page.locator('#marina-preferences-locale-slot').getByRole('button',{name:'EN',exact:true}).boundingBox();
+   assert.ok(localeRect && localeRect.y>=4 && localeRect.y+localeRect.height<=page.viewportSize().height-4,
+     `Language options must be clickable on screen: ${JSON.stringify({width,theme,localeRect})}`);
    const appearance=await metrics(page);
    assert.deepEqual(appearance.small,[]);
    const profileLauncher=await page.locator('.fl2-account-settings summary').boundingBox();
