@@ -27,7 +27,13 @@ try {
   await page.waitForSelector('[data-fl2-owner="true"]');
   assert.equal(await page.locator('.fl2-nav-group').count(),6);
   assert.equal(await page.locator('[data-section]').count(),26);
-  await page.locator('.fl2-account-settings summary').click();const appearance=await metrics(page);assert.deepEqual(appearance.small,[]);await page.locator('.fl2-account-settings summary').click();
+  await page.locator('.fl2-account-settings summary').click();
+   const profileRect=await page.locator('.fl2-account-panel').boundingBox();
+   assert.ok(profileRect && profileRect.x>=4 && profileRect.x+profileRect.width<=width-4,
+     `Profile panel must fit the viewport: ${JSON.stringify({width,theme,profileRect})}`);
+   const appearance=await metrics(page);
+   assert.deepEqual(appearance.small,[]);
+   await page.locator('.fl2-account-settings summary').click();
   const closed=await metrics(page); assert.equal(closed.overflow,0); assert.deepEqual(closed.small,[]);
   assert.equal(await page.locator('.fl2-assistant-dock>button').evaluate(e=>getComputedStyle(e).position),'static');
   await page.screenshot({path:`${out}/owner-${width}-${theme}.png`});
