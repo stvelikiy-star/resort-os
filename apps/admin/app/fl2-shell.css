@@ -380,3 +380,34 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-o
 html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-grid > .command-panel :is(small,.command-note) {
   color: var(--mx-muted) !important;
 }
+
+/* FL2 PROFILE ICON 44PX: compact in all authenticated viewports */
+
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-account-settings {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  flex: 0 0 44px !important;
+}
+html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings > summary {
+  width: 44px !important;
+  padding: 0 !important;
+}
+html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings > summary > span {
+  display: none !important;
+}
+/* Only compact headers need viewport-fixed popovers. On desktop the
+   profile remains anchored above its sidebar launcher. */
+@media (max-width: 1100px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings .fl2-account-panel {
+    position: fixed !important;
+    left: max(12px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+    /* A fixed element's 100% top is the viewport height, not the
+       Profile launcher height. Keep the entire menu on screen. */
+    top: clamp(180px, 22dvh, 200px) !important;
+    bottom: auto !important;
+    width: min(330px, calc(100vw - 24px)) !important;
+    max-height: calc(100dvh - clamp(180px, 22dvh, 200px) - 12px) !important;
+  }
+}

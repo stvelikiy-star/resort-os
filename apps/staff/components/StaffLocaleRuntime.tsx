@@ -8,6 +8,9 @@ type Copy = { kg: string; kz: string; en: string };
 const STORAGE_KEY = "marina-smart-staff-locale";
 
 const COPY: Record<string, Copy> = {
+  "Взять": { kg: "Өзүнө алуу", kz: "Өзіне алу", en: "Claim" },
+  "Количество": { kg: "Саны", kz: "Саны", en: "Quantity" },
+  "Записать приход": { kg: "Түшүүнү каттоо", kz: "Кірісті тіркеу", en: "Record receipt" },
   "MARINA SMART · МОЯ СМЕНА": { kg: "MARINA SMART · МЕНИН НӨӨМӨТҮМ", kz: "MARINA SMART · МЕНІҢ АУЫСЫМЫМ", en: "MARINA SMART · MY SHIFT" },
   "Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.": { kg: "Меню, үстөлдөр, буйрутмалар жана жаңы келген коноктор өзүнчө ашкана интерфейсинде башкарылат.", kz: "Мәзір, үстелдер, тапсырыстар және жаңа келулер бөлек асүй интерфейсінде басқарылады.", en: "Menu, tables, orders, and new arrivals are managed in the separate kitchen workspace." },
   "Склад · остатки и приход": { kg: "Кампа · калдыктар жана түшүүлөр", kz: "Қойма · қалдықтар мен кірістер", en: "Inventory · stock and receipts" },

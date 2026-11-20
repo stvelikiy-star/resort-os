@@ -29,10 +29,17 @@ try {
   assert.equal(await page.locator('[data-section]').count(),26);
   await page.locator('.fl2-account-settings summary').click();
    const profileRect=await page.locator('.fl2-account-panel').boundingBox();
-   assert.ok(profileRect && profileRect.x>=4 && profileRect.x+profileRect.width<=width-4,
-     `Profile panel must fit the viewport: ${JSON.stringify({width,theme,profileRect})}`);
+   assert.ok(profileRect && profileRect.x>=4 && profileRect.x+profileRect.width<=width-4
+     && profileRect.y>=4 && profileRect.y+profileRect.height <= page.viewportSize().height-4,
+     `Profile panel must fit the viewport horizontally AND vertically: ${JSON.stringify({width,theme,profileRect})}`);
+   const localeRect=await page.locator('#marina-preferences-locale-slot').getByRole('button',{name:'EN',exact:true}).boundingBox();
+   assert.ok(localeRect && localeRect.y>=4 && localeRect.y+localeRect.height<=page.viewportSize().height-4,
+     `Language options must be clickable on screen: ${JSON.stringify({width,theme,localeRect})}`);
    const appearance=await metrics(page);
    assert.deepEqual(appearance.small,[]);
+   const profileLauncher=await page.locator('.fl2-account-settings summary').boundingBox();
+   assert.ok(profileLauncher && profileLauncher.width<=44.5 && profileLauncher.height>=43.9,
+     'Profile must be a compact 44px icon, not a wide language/theme toolbar');
    await page.locator('.fl2-account-settings summary').click();
   const closed=await metrics(page); assert.equal(closed.overflow,0); assert.deepEqual(closed.small,[]);
   assert.equal(await page.locator('.fl2-assistant-dock>button').evaluate(e=>getComputedStyle(e).position),'static');
@@ -68,6 +75,23 @@ try {
 
   await languages.page.locator('#marina-preferences-locale-slot').getByRole('button',{name:code,exact:true}).click();
   await languages.page.locator('.fl2-nav-group h2').filter({hasText:heading}).first().waitFor();
+  if(code === 'EN') {
+    // Source-case translation is verified during the already visible EN selection.
+    await languages.page.waitForFunction(() => document.documentElement.lang === 'en');
+   await languages.page.evaluate(() => {
+     const root=document.createElement('div');
+     root.id='qa-localization-source-case';
+     for(const label of ['Стадия','Сумма','Название отеля','Кому назначить питание']) {
+       const span=document.createElement('span');
+       span.textContent=label;
+       root.appendChild(span);
+     }
+     document.body.appendChild(root);
+   });
+   await languages.page.waitForFunction(() =>
+     [...document.querySelectorAll('#qa-localization-source-case span')].map(x=>x.textContent).join('|') ===
+     'Stage|Amount|Hotel name|Assign meals to');
+  }
  }
  await languages.context.close();
  const empty=await open({permissions:[]});assert.equal(await empty.page.locator('[data-section]').count(),0);await empty.page.getByText('Доступ к разделам отключён.',{exact:true}).waitFor();await empty.context.close();
