@@ -199,14 +199,14 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .hotel-finance-shell .btn:f
   outline-offset: 2px;
 }
 .auth-toolbar .fl2-account-panel {
-  position: fixed;
-  left: 12px;
-  bottom: 72px;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
   z-index: 2600;
   display: grid;
   gap: 14px;
   width: min(306px, calc(100vw - 24px));
-  max-height: calc(100dvh - 100px);
+  max-height: min(72dvh, calc(100dvh - 100px));
   padding: 18px;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -313,19 +313,19 @@ html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin
   }
   .auth-toolbar .fl2-account-panel {
     left: auto; right: max(12px, env(safe-area-inset-right));
-    top: clamp(132px, 21dvh, 180px); bottom: auto;
+    top: calc(100% + 8px); bottom: auto;
     width: min(330px, calc(100vw - 24px));
-    max-height: calc(100dvh - 155px);
+    max-height: calc(100dvh - 180px);
   }
 }
 @media (min-width: 1101px) {
   html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-account-panel {
-    left: 12px;
-    bottom: 64px;
+    left: 0;
+    bottom: calc(100% + 8px);
   }
 }
 html:not([data-marina-ui="future-luxury"]) .auth-toolbar .fl2-account-panel {
-  left: auto; right: 12px; top: 70px; bottom: auto;
+  left: auto; right: 0; top: calc(100% + 8px); bottom: auto;
 }
 @media (max-width: 390px) {
   .auth-toolbar .fl2-account-panel { padding: 14px; gap: 11px; }
