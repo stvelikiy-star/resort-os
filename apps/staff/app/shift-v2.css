@@ -88,6 +88,13 @@ body{background:var(--shift-bg);color:var(--shift-ink)}
 .staff-locale-switcher > summary:focus-visible {
   outline:3px solid var(--shift-accent);outline-offset:3px;
 }
+/* A modal close control must have a visible focus indicator for both
+   keyboard navigation and programmatically restored dialog focus. */
+.shift-modal-head .shift-ghost:focus {
+  outline:3px solid var(--shift-accent);
+  outline-offset:3px;
+}
+
 /* A single brand accent across light/dark instead of a saturated gradient.
    Preserve red/amber/green strictly for operation status and alerts. */
 .shift-primary {background:var(--shift-accent);color:var(--shift-action-ink);box-shadow:var(--shift-shadow)}

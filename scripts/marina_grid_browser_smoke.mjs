@@ -17,6 +17,9 @@ page.on("response", r => {
   }
 });
 try {
+  // This full-stack contract exercises the original Legacy navigation.
+  // The default Future Luxury layout has its own dedicated browser acceptance.
+  await page.addInitScript(() => localStorage.setItem("marina-admin-ui", "legacy"));
   await page.goto(BASE, { waitUntil: "networkidle" });
   await page.locator('input[autocomplete="username"]').fill(USERNAME);
   await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);

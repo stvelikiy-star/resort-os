@@ -89,7 +89,7 @@ html[data-marina-ui="future-luxury"] .fl2-style-panel { position:absolute;z-inde
 
 /* Compact bilingual controls: display a single 44px launcher, not a floating
    four-button toolbar. All four supported languages remain available. */
-.admin-locale-switcher.admin-locale-switcher {
+html[data-marina-ui="future-luxury"] .admin-locale-switcher.admin-locale-switcher {
   position:fixed;inset:auto max(12px,env(safe-area-inset-right))
     max(12px,env(safe-area-inset-bottom)) auto;
   display:block;width:58px;min-width:58px;max-width:58px;height:44px;min-height:44px;
